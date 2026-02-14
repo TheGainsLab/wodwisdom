@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } },
     )
 
-    // Admin client for sending the invite email (needs service_role)
+    // Admin client — only used for sending invite email (needs service_role)
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -67,8 +67,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Check seat limits (use admin client — RLS already verified ownership above)
-    const { count } = await supabaseAdmin
+    // Check seat limits
+    const { count } = await supabase
       .from('gym_members')
       .select('*', { count: 'exact', head: true })
       .eq('gym_id', gym_id)
@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
     }
 
     // Check for duplicate invite
-    const { data: existing } = await supabaseAdmin
+    const { data: existing } = await supabase
       .from('gym_members')
       .select('id')
       .eq('gym_id', gym_id)
@@ -97,8 +97,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Insert the gym_members row (use admin client to bypass RLS)
-    const { error: insertError } = await supabaseAdmin
+    // Insert the gym_members row
+    const { error: insertError } = await supabase
       .from('gym_members')
       .insert({
         gym_id,
