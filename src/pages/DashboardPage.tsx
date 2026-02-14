@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, INVITE_ENDPOINT } from '../lib/supabase';
 import Nav from '../components/Nav';
 
 interface Gym { id: string; name: string; max_seats: number; }
@@ -53,18 +53,23 @@ export default function DashboardPage({ session }: { session: Session }) {
     if (!inviteEmail.trim()) { setError('Enter an email'); return; }
     if (!gym) return;
     setError(''); setSuccess('');
-    const activeCount = members.filter(m => m.status === 'active' || m.status === 'invited').length;
-    if (activeCount >= gym.max_seats) { setError('All ' + gym.max_seats + ' coach seats are filled'); return; }
-    const existing = members.find(m => m.invited_email === inviteEmail.trim().toLowerCase());
-    if (existing) { setError('This email has already been invited'); return; }
-    const { error: err } = await supabase.from('gym_members').insert({
-      gym_id: gym.id, invited_email: inviteEmail.trim().toLowerCase(), invited_by: session.user.id, status: 'invited'
-    });
-    if (err) { setError(err.message); return; }
-    setInviteEmail('');
-    setSuccess('Invite sent!');
-    setTimeout(() => setSuccess(''), 3000);
-    loadGym();
+    try {
+      const { data: { session: current } } = await supabase.auth.getSession();
+      if (!current) { setError('Not authenticated'); return; }
+      const resp = await fetch(INVITE_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + current.access_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail.trim(), gym_id: gym.id }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) { setError(data.error || 'Failed to invite'); return; }
+      setInviteEmail('');
+      setSuccess(data.email_sent ? 'Invite email sent!' : 'Coach added — email could not be sent. Share the link manually.');
+      setTimeout(() => setSuccess(''), 5000);
+      loadGym();
+    } catch (err: any) {
+      setError(err.message || 'Network error');
+    }
   };
 
   const revokeCoach = async (memberId: string) => {
