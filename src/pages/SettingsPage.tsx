@@ -49,7 +49,7 @@ export default function SettingsPage({ session }: { session: Session }) {
     setTimeout(() => setSuccess(''), 3000);
   };
 
-  const roleBadge = profile.role === 'owner' ? 'Gym Owner' : profile.role === 'coach' ? 'Coach' : 'Member';
+  const roleBadge = profile.role === 'owner' ? 'Gym Owner' : profile.role === 'coach' ? 'Coach' : 'User';
 
   return (
     <div className="app-layout">

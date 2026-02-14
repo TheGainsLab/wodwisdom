@@ -156,12 +156,12 @@ export default function DashboardPage({ session }: { session: Session }) {
               </div>
             ) :
 
-            /* ---- User view (individual subscriber) ---- */
-            role === 'user' || role === null ? (
+            /* ---- User view ---- */
+            role !== 'owner' && role !== 'coach' ? (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 32 }}>
                 <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Your Account</h2>
                 <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 4 }}>{session.user.email}</p>
-                <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--accent)', background: 'rgba(255,58,58,0.1)', padding: '3px 10px', borderRadius: 4 }}>Individual Plan</span>
+                <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--accent)', background: 'rgba(255,58,58,0.1)', padding: '3px 10px', borderRadius: 4 }}>User</span>
               </div>
             ) :
 
