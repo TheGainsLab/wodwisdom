@@ -67,8 +67,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Check seat limits
-    const { count } = await supabase
+    // Check seat limits (use admin client — RLS already verified ownership above)
+    const { count } = await supabaseAdmin
       .from('gym_members')
       .select('*', { count: 'exact', head: true })
       .eq('gym_id', gym_id)
@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
     }
 
     // Check for duplicate invite
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseAdmin
       .from('gym_members')
       .select('id')
       .eq('gym_id', gym_id)
@@ -97,8 +97,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Insert the gym_members row
-    const { error: insertError } = await supabase
+    // Insert the gym_members row (use admin client to bypass RLS)
+    const { error: insertError } = await supabaseAdmin
       .from('gym_members')
       .insert({
         gym_id,
@@ -108,6 +108,7 @@ Deno.serve(async (req) => {
       })
 
     if (insertError) {
+      console.error('gym_members insert error:', insertError)
       return new Response(JSON.stringify({ error: insertError.message }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
