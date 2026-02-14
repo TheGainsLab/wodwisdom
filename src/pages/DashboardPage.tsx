@@ -156,8 +156,17 @@ export default function DashboardPage({ session }: { session: Session }) {
               </div>
             ) :
 
+            /* ---- User view (individual subscriber) ---- */
+            role === 'user' || role === null ? (
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 32 }}>
+                <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Your Account</h2>
+                <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 4 }}>{session.user.email}</p>
+                <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--accent)', background: 'rgba(255,58,58,0.1)', padding: '3px 10px', borderRadius: 4 }}>Individual Plan</span>
+              </div>
+            ) :
+
             /* ---- Owner view: no gym yet ---- */
-            role !== 'owner' || !gym ? (
+            !gym ? (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 32 }}>
                 <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Create Your Gym</h2>
                 <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 24 }}>Set up your gym to invite and manage coaches.</p>
