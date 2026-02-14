@@ -20,7 +20,11 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   const loadGym = async () => {
     setLoading(true);
-    const { data: gyms } = await supabase.from('gyms').select('*').eq('owner_id', session.user.id).limit(1);
+    const { data: gyms, error: gymErr } = await supabase.from('gyms').select('*').eq('owner_id', session.user.id).limit(1);
+    if (gymErr) {
+      console.error('loadGym error:', gymErr);
+      setError('Failed to load gym: ' + gymErr.message);
+    }
     if (gyms && gyms.length > 0) {
       setGym(gyms[0]);
       const { data: mems } = await supabase.from('gym_members').select('*').eq('gym_id', gyms[0].id).neq('status', 'declined').order('created_at');
