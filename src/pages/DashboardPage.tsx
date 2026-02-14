@@ -5,21 +5,38 @@ import Nav from '../components/Nav';
 
 interface Gym { id: string; name: string; max_seats: number; }
 interface Member { id: string; invited_email: string; user_id: string | null; status: string; full_name?: string; }
+interface CoachGym { gym_name: string; status: string; invited_email: string; }
 
 export default function DashboardPage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
   const [gym, setGym] = useState<Gym | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [coachGyms, setCoachGyms] = useState<CoachGym[]>([]);
   const [gymName, setGymName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  useEffect(() => { loadGym(); }, []);
+  useEffect(() => { loadDashboard(); }, []);
 
-  const loadGym = async () => {
+  const loadDashboard = async () => {
     setLoading(true);
+    // Load profile role
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+    const userRole = profile?.role || 'user';
+    setRole(userRole);
+
+    if (userRole === 'owner') {
+      await loadOwnerGym();
+    } else if (userRole === 'coach') {
+      await loadCoachGyms();
+    }
+    setLoading(false);
+  };
+
+  const loadOwnerGym = async () => {
     const { data: gyms, error: gymErr } = await supabase.from('gyms').select('*').eq('owner_id', session.user.id).limit(1);
     if (gymErr) {
       console.error('loadGym error:', gymErr);
@@ -39,7 +56,23 @@ export default function DashboardPage({ session }: { session: Session }) {
         setMembers(enriched);
       }
     }
-    setLoading(false);
+  };
+
+  const loadCoachGyms = async () => {
+    const email = session.user.email?.toLowerCase();
+    const { data: memberships } = await supabase
+      .from('gym_members')
+      .select('status, invited_email, gym_id, gyms(name)')
+      .or(`user_id.eq.${session.user.id}${email ? `,invited_email.eq.${email}` : ''}`)
+      .neq('status', 'declined')
+      .neq('status', 'revoked');
+    if (memberships) {
+      setCoachGyms(memberships.map((m: any) => ({
+        gym_name: m.gyms?.name || 'Unknown gym',
+        status: m.status,
+        invited_email: m.invited_email,
+      })));
+    }
   };
 
   const createGym = async () => {
@@ -48,6 +81,7 @@ export default function DashboardPage({ session }: { session: Session }) {
     const { data, error: err } = await supabase.from('gyms').insert({ name: gymName.trim(), owner_id: session.user.id, max_seats: 3 }).select().single();
     if (err) { setError(err.message); return; }
     await supabase.from('profiles').update({ role: 'owner' }).eq('id', session.user.id);
+    setRole('owner');
     setGym(data);
     setSuccess('Gym created!');
     setTimeout(() => setSuccess(''), 3000);
@@ -70,7 +104,7 @@ export default function DashboardPage({ session }: { session: Session }) {
       setInviteEmail('');
       setSuccess(data.email_sent ? 'Invite email sent!' : 'Coach added — email could not be sent. Share the link manually.');
       setTimeout(() => setSuccess(''), 5000);
-      loadGym();
+      loadDashboard();
     } catch (err: any) {
       setError(err.message || 'Network error');
     }
@@ -78,7 +112,7 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   const revokeCoach = async (memberId: string) => {
     await supabase.from('gym_members').update({ status: 'revoked' }).eq('id', memberId);
-    loadGym();
+    loadDashboard();
   };
 
   const statusColor = (s: string) => s === 'active' ? '#2ec486' : s === 'invited' ? '#f0a050' : '#666';
@@ -98,14 +132,42 @@ export default function DashboardPage({ session }: { session: Session }) {
             {error && <div className="auth-error" style={{ display: 'block', marginBottom: 16 }}>{error}</div>}
             {success && <div style={{ background: 'rgba(46,196,134,0.1)', border: '1px solid rgba(46,196,134,0.25)', color: '#2ec486', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 16 }}>{success}</div>}
             {loading ? <div className="page-loading"><div className="loading-pulse" /></div> :
-             !gym ? (
+
+            /* ---- Coach view ---- */
+            role === 'coach' ? (
+              <div>
+                {coachGyms.length === 0 ? (
+                  <div className="empty-state"><p>You haven't been added to any gyms yet.</p></div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {coachGyms.map((cg, i) => (
+                      <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <h2 style={{ fontSize: 20, fontWeight: 700 }}>{cg.gym_name}</h2>
+                            <p style={{ color: 'var(--text-dim)', fontSize: 13, marginTop: 4 }}>You're a coach at this gym</p>
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: statusColor(cg.status), background: statusColor(cg.status) + '20', padding: '3px 10px', borderRadius: 4 }}>{cg.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) :
+
+            /* ---- Owner view: no gym yet ---- */
+            role !== 'owner' || !gym ? (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 32 }}>
                 <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Create Your Gym</h2>
                 <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 24 }}>Set up your gym to invite and manage coaches.</p>
                 <div className="field"><label>Gym Name</label><input type="text" value={gymName} onChange={e => setGymName(e.target.value)} placeholder="e.g. CrossFit Thunder" onKeyDown={e => e.key === 'Enter' && createGym()} /></div>
                 <button className="auth-btn" onClick={createGym}>Create Gym</button>
               </div>
-            ) : (
+            ) :
+
+            /* ---- Owner view: has gym ---- */
+            (
               <>
                 <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
