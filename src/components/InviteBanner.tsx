@@ -23,7 +23,7 @@ export default function InviteBanner({ session }: { session: Session }) {
     if (!invite) return;
     if (accept) {
       await supabase.from('gym_members').update({ user_id: session.user.id, status: 'active' }).eq('id', invite.id);
-      await supabase.from('profiles').update({ role: 'coach' }).eq('id', session.user.id);
+      await supabase.from('profiles').update({ role: 'coach', subscription_status: 'active' }).eq('id', session.user.id);
     } else {
       await supabase.from('gym_members').delete().eq('id', invite.id);
     }
