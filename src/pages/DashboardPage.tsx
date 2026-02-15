@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, INVITE_ENDPOINT } from '../lib/supabase';
 import Nav from '../components/Nav';
 
 interface Gym { id: string; name: string; max_seats: number; }
@@ -121,8 +121,23 @@ export default function DashboardPage({ session }: { session: Session }) {
       if (insertErr) { setError(insertErr.message); return; }
     }
 
+    // Send invite email via Resend (best-effort — invite is already saved)
+    let emailSent = false;
+    try {
+      const { data: { session: current } } = await supabase.auth.getSession();
+      if (current) {
+        const resp = await fetch(INVITE_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + current.access_token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: normalizedEmail, gym_name: gym.name }),
+        });
+        const result = await resp.json().catch(() => ({}));
+        emailSent = result.email_sent === true;
+      }
+    } catch { /* email is best-effort */ }
+
     setInviteEmail('');
-    setSuccess('Coach invited!');
+    setSuccess(emailSent ? 'Invite email sent!' : 'Coach invited! Email could not be sent — share the signup link manually.');
     setTimeout(() => setSuccess(''), 5000);
     loadDashboard();
   };

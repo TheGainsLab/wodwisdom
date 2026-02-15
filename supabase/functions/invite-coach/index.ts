@@ -20,20 +20,12 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Client scoped to the calling user (respects RLS)
+    // Verify caller is authenticated
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
       { global: { headers: { Authorization: authHeader } } },
     )
-
-    // Admin client — only used for sending invite email (needs service_role)
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    )
-
-    // Verify caller
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -42,123 +34,56 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { email, gym_id } = await req.json()
-    if (!email || !gym_id) {
-      return new Response(JSON.stringify({ error: 'Missing email or gym_id' }), {
+    const { email, gym_name } = await req.json()
+    if (!email || !gym_name) {
+      return new Response(JSON.stringify({ error: 'Missing email or gym_name' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const normalizedEmail = email.trim().toLowerCase()
-
-    // Verify caller owns this gym
-    const { data: gym, error: gymError } = await supabase
-      .from('gyms')
-      .select('id, name, max_seats')
-      .eq('id', gym_id)
-      .eq('owner_id', user.id)
-      .single()
-
-    if (gymError || !gym) {
-      return new Response(JSON.stringify({ error: 'Gym not found or you are not the owner' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Check seat limits
-    const { count } = await supabase
-      .from('gym_members')
-      .select('*', { count: 'exact', head: true })
-      .eq('gym_id', gym_id)
-      .in('status', ['active', 'invited'])
-
-    if ((count || 0) >= gym.max_seats) {
-      return new Response(JSON.stringify({ error: `All ${gym.max_seats} coach seats are filled` }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Check for existing membership row (any status)
-    const { data: existing } = await supabase
-      .from('gym_members')
-      .select('id, status')
-      .eq('gym_id', gym_id)
-      .eq('invited_email', normalizedEmail)
-      .limit(1)
-
-    if (existing && existing.length > 0) {
-      const row = existing[0]
-      if (row.status === 'active' || row.status === 'invited') {
-        return new Response(JSON.stringify({ error: 'This email has already been invited' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-      // Re-invite a previously declined or revoked coach
-      const { error: updateError } = await supabase
-        .from('gym_members')
-        .update({ status: 'invited', invited_by: user.id })
-        .eq('id', row.id)
-      if (updateError) {
-        console.error('gym_members update error:', updateError)
-        return new Response(JSON.stringify({ error: updateError.message }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-    } else {
-      // Insert a new gym_members row
-      const { error: insertError } = await supabase
-        .from('gym_members')
-        .insert({
-          gym_id,
-          invited_email: normalizedEmail,
-          invited_by: user.id,
-          status: 'invited',
-        })
-
-      if (insertError) {
-        console.error('gym_members insert error:', insertError)
-        return new Response(JSON.stringify({ error: insertError.message }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-    }
-
-    // Send the invite email via Supabase Auth
-    // This creates the user if they don't exist and sends a magic link
-    // If they already have an account, it still sends a link (no error)
     const siteUrl = Deno.env.get('SITE_URL') || req.headers.get('origin') || ''
-    const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      normalizedEmail,
-      {
-        redirectTo: siteUrl,
-        data: { invited_to_gym: gym.name },
-      },
-    )
-
-    if (inviteError) {
-      // DB row was created so the owner sees "invited" status,
-      // but the email failed — let them know
-      console.error('Invite email failed:', inviteError.message)
-      return new Response(JSON.stringify({
-        success: true,
-        email_sent: false,
-        message: 'Coach added but the invite email could not be sent. Share the signup link manually.',
-      }), {
+    const resendKey = Deno.env.get('RESEND_API_KEY')
+    if (!resendKey) {
+      return new Response(JSON.stringify({ error: 'RESEND_API_KEY not configured' }), {
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      email_sent: true,
-      message: `Invite email sent to ${normalizedEmail}`,
-    }), {
+    const fromEmail = Deno.env.get('FROM_EMAIL') || 'noreply@wodwisdom.app'
+
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `WOD Wisdom <${fromEmail}>`,
+        to: [email],
+        subject: `You've been invited to coach at ${gym_name}`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2>You're invited!</h2>
+            <p><strong>${gym_name}</strong> wants you as a coach on WOD Wisdom.</p>
+            <p>Sign up or log in to accept:</p>
+            <a href="${siteUrl}" style="display: inline-block; background: #ff3a3a; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">Open WOD Wisdom</a>
+          </div>
+        `,
+      }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json()
+      console.error('Resend error:', err)
+      return new Response(JSON.stringify({ error: err.message || 'Email send failed' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    return new Response(JSON.stringify({ success: true, email_sent: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
