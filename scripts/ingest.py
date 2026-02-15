@@ -105,11 +105,18 @@ def prompt_metadata(auto_title: str) -> dict:
 def process_one(target: str, args: argparse.Namespace, endpoint: str, secret: str):
     """Process a single PDF file or URL."""
     is_url = target.startswith("http://") or target.startswith("https://")
+    is_txt = not is_url and target.lower().endswith(".txt")
 
     if is_url:
         print(f"\nFetching: {target}")
         auto_title, content = extract_web_text(target)
         auto_source_url = target
+    elif is_txt:
+        print(f"\nReading: {target}")
+        with open(target, "r") as f:
+            content = f.read()
+        auto_title = guess_title_from_pdf(target)
+        auto_source_url = None
     else:
         print(f"\nReading: {target}")
         content = extract_pdf_text(target)
