@@ -55,6 +55,7 @@ export default function HistoryPage({ session }: { session: Session }) {
                  </div>
                  {expanded === msg.id && (
                    <div className="history-answer">
+                     <div dangerouslySetInnerHTML={{ __html: formatMd(msg.answer) }} />
                      {msg.summary && (
                        <div className="summary-box">
                          <div className="summary-header">
@@ -64,7 +65,6 @@ export default function HistoryPage({ session }: { session: Session }) {
                          <div className="summary-content" dangerouslySetInnerHTML={{ __html: formatMd(msg.summary) }} />
                        </div>
                      )}
-                     <div dangerouslySetInnerHTML={{ __html: formatMd(msg.answer) }} />
                      {msg.sources && msg.sources.length > 0 && (
                        <div className="sources-bar">
                          <span className="sources-label">Sources</span>

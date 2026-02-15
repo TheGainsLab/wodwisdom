@@ -12,6 +12,7 @@ interface Message {
   bookmarked?: boolean;
   summary?: string;
   summarizing?: boolean;
+  streaming?: boolean;
 }
 
 const SUGGESTIONS = [
@@ -58,18 +59,97 @@ export default function ChatPage({ session }: { session: Session }) {
     const userMsg: Message = { role: 'user', content: question };
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
+
+    // Add a placeholder assistant message for streaming
+    const assistantIdx = messages.length + 1; // index of the new assistant message
+    setMessages(prev => [...prev, { role: 'assistant', content: '', sources: [], streaming: true }]);
+
     try {
       const resp = await fetch(CHAT_ENDPOINT, {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ question, history: [...messages, userMsg].slice(-10), source_filter: sourceFilter === 'all' ? undefined : sourceFilter }),
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Something went wrong');
-      setMessages(prev => [...prev, { role: 'assistant', content: data.answer, sources: data.sources, message_id: data.message_id, bookmarked: false }]);
-      if (data.usage) { setDailyUsage(data.usage.daily_questions); setDailyLimit(data.usage.daily_limit); }
+
+      // Check if this is a streaming response or a JSON error
+      const contentType = resp.headers.get('Content-Type') || '';
+      if (!resp.ok || contentType.includes('application/json')) {
+        const data = await resp.json();
+        throw new Error(data.error || 'Something went wrong');
+      }
+
+      const reader = resp.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let accumulatedContent = '';
+      let sources: { title: string; author: string; source: string }[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          if (!raw) continue;
+
+          try {
+            const event = JSON.parse(raw);
+
+            if (event.type === 'sources') {
+              sources = event.sources || [];
+            }
+
+            if (event.type === 'delta') {
+              accumulatedContent += event.text;
+              setMessages(prev => prev.map((m, i) =>
+                i === assistantIdx ? { ...m, content: accumulatedContent } : m
+              ));
+            }
+
+            if (event.type === 'done') {
+              setMessages(prev => prev.map((m, i) =>
+                i === assistantIdx
+                  ? { ...m, content: accumulatedContent, sources, message_id: event.message_id, bookmarked: false, streaming: false }
+                  : m
+              ));
+              if (event.usage) {
+                setDailyUsage(event.usage.daily_questions);
+                setDailyLimit(event.usage.daily_limit);
+              }
+            }
+
+            if (event.type === 'error') {
+              throw new Error(event.error || 'Stream error');
+            }
+          } catch (parseErr) {
+            // Skip unparseable SSE lines unless it's a rethrown error
+            if (parseErr instanceof Error && parseErr.message !== 'Stream error') continue;
+            throw parseErr;
+          }
+        }
+      }
+
+      // Ensure streaming flag is cleared even if no 'done' event arrived
+      setMessages(prev => prev.map((m, i) =>
+        i === assistantIdx && m.streaming ? { ...m, sources, streaming: false } : m
+      ));
+
     } catch (err: any) {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Error: ' + err.message, sources: [] }]);
+      setMessages(prev => {
+        // Replace the streaming placeholder with an error, or append one
+        const last = prev[prev.length - 1];
+        if (last && last.role === 'assistant' && last.streaming) {
+          return prev.map((m, i) =>
+            i === prev.length - 1 ? { ...m, content: 'Error: ' + err.message, sources: [], streaming: false } : m
+          );
+        }
+        return [...prev, { role: 'assistant', content: 'Error: ' + err.message, sources: [] }];
+      });
     }
     setIsLoading(false);
     inputRef.current?.focus();
@@ -143,24 +223,14 @@ export default function ChatPage({ session }: { session: Session }) {
                 {m.role === 'assistant' && (
                   <div className="msg-header">
                     <span className="msg-avatar">W</span>
-                    {m.message_id && !m.summary && !m.summarizing && (
-                      <button className="summarize-btn" onClick={() => summarizeMessage(m.message_id!, i)} title="Summarize">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="21" y1="10" x2="7" y2="10" /><line x1="21" y1="6" x2="3" y2="6" /><line x1="21" y1="14" x2="3" y2="14" /><line x1="21" y1="18" x2="7" y2="18" /></svg>
-                      </button>
-                    )}
-                    {m.summarizing && <span className="summarize-loading">Summarizing…</span>}
                     {m.message_id && <button className={"bookmark-btn " + (m.bookmarked ? "active" : "")} onClick={() => toggleBookmark(m.message_id!, i)}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill={m.bookmarked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
                     </button>}
                   </div>
                 )}
-                <div className={"msg-body " + m.role} dangerouslySetInnerHTML={{ __html: m.role === 'user' ? m.content.replace(/</g,'&lt;') : formatMarkdown(m.content) }} />
-                {m.sources && m.sources.length > 0 && (
-                  <div className="sources-bar">
-                    <span className="sources-label">Sources</span>
-                    {[...new Set(m.sources.map(s => s.title).filter(Boolean))].map((t, j) => <span key={j} className="source-chip">{t}</span>)}
-                  </div>
-                )}
+                <div className={"msg-body " + m.role + (m.streaming ? " streaming" : "")} dangerouslySetInnerHTML={{ __html: m.role === 'user' ? m.content.replace(/</g,'&lt;') : formatMarkdown(m.content) }} />
+
+                {/* Summary box — shown when a summary exists */}
                 {m.summary && (
                   <div className="summary-box">
                     <div className="summary-header">
@@ -170,9 +240,26 @@ export default function ChatPage({ session }: { session: Session }) {
                     <div className="summary-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(m.summary) }} />
                   </div>
                 )}
+
+                {/* Summarize button — below answer, above sources, only after streaming completes */}
+                {m.role === 'assistant' && m.message_id && !m.streaming && !m.summary && !m.summarizing && (
+                  <button className="summarize-action-btn" onClick={() => summarizeMessage(m.message_id!, i)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="21" y1="10" x2="7" y2="10" /><line x1="21" y1="6" x2="3" y2="6" /><line x1="21" y1="14" x2="3" y2="14" /><line x1="21" y1="18" x2="7" y2="18" /></svg>
+                    Summarize
+                  </button>
+                )}
+                {m.summarizing && <span className="summarize-loading">Summarizing...</span>}
+
+                {/* Sources — always last */}
+                {m.sources && m.sources.length > 0 && !m.streaming && (
+                  <div className="sources-bar">
+                    <span className="sources-label">Sources</span>
+                    {[...new Set(m.sources.map(s => s.title).filter(Boolean))].map((t, j) => <span key={j} className="source-chip">{t}</span>)}
+                  </div>
+                )}
               </div>
             ))}
-            {isLoading && <div className="msg assistant"><div className="msg-header"><span className="msg-avatar">W</span></div><div className="typing"><span /><span /><span /></div></div>}
+            {isLoading && messages[messages.length - 1]?.role !== 'assistant' && <div className="msg assistant"><div className="msg-header"><span className="msg-avatar">W</span></div><div className="typing"><span /><span /><span /></div></div>}
           </div>
         )}
 
