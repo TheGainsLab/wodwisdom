@@ -7,6 +7,7 @@ export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(!!inviteEmail);
   const [email, setEmail] = useState(inviteEmail);
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -14,6 +15,8 @@ export default function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) { setError('Enter email and password'); return; }
+    if (isSignUp && password !== confirmPassword) { setError('Passwords do not match'); return; }
+    if (isSignUp && password.length < 6) { setError('Password must be at least 6 characters'); return; }
     setLoading(true); setError('');
     try {
       if (isSignUp) {
@@ -45,7 +48,8 @@ export default function AuthPage() {
         <form onSubmit={handleSubmit}>
           {isSignUp && <div className="field"><label>Full Name</label><input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></div>}
           {!inviteEmail && <div className="field"><label>Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" /></div>}
-          <div className="field"><label>Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={inviteEmail ? 'Choose a password' : 'Your password'} /></div>
+          <div className="field"><label>Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={isSignUp ? 'Choose a password (min 6 chars)' : 'Your password'} /></div>
+          {isSignUp && <div className="field"><label>Confirm Password</label><input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" /></div>}
           <button className="auth-btn" type="submit" disabled={loading}>{loading ? (isSignUp ? 'Creating...' : 'Signing in...') : inviteEmail ? 'Create Account & Accept Invite' : (isSignUp ? 'Create Account' : 'Sign In')}</button>
         </form>
         {!inviteEmail && <div className="auth-toggle">
