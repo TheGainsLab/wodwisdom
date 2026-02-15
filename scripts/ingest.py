@@ -5,6 +5,7 @@ Ingest articles (PDFs or web URLs) into WodWisdom.
 Usage:
   python scripts/ingest.py article.pdf
   python scripts/ingest.py https://journal.crossfit.com/article/some-article
+  python scripts/ingest.py https://pmc.ncbi.nlm.nih.gov/.../article.pdf   # PDF URL
   python scripts/ingest.py ./pdfs/            # whole folder of PDFs
 
 Optional flags:
@@ -21,7 +22,9 @@ import argparse
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -61,6 +64,41 @@ def extract_web_text(url: str) -> tuple[str, str]:
     # Try to find the article body
     article = soup.find("article") or soup.find("main") or soup.find("body")
     text = article.get_text(separator="\n", strip=True) if article else soup.get_text(separator="\n", strip=True)
+
+    return title, text
+
+
+def is_pdf_url(url: str) -> bool:
+    """Check if a URL points to a PDF (by extension or Content-Type)."""
+    path = urlparse(url).path.lower()
+    if path.endswith(".pdf"):
+        return True
+    # HEAD request to check Content-Type without downloading the whole file
+    try:
+        resp = requests.head(url, timeout=10, headers={"User-Agent": "WodWisdom-Ingest/1.0"}, allow_redirects=True)
+        content_type = resp.headers.get("Content-Type", "")
+        return "application/pdf" in content_type
+    except requests.RequestException:
+        return False
+
+
+def download_pdf(url: str) -> tuple[str, str]:
+    """Download a PDF from a URL, extract text, and return (title, text)."""
+    resp = requests.get(url, timeout=60, headers={"User-Agent": "WodWisdom-Ingest/1.0"})
+    resp.raise_for_status()
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(resp.content)
+        tmp_path = tmp.name
+
+    try:
+        text = extract_pdf_text(tmp_path)
+    finally:
+        os.unlink(tmp_path)
+
+    # Derive a title from the URL filename
+    filename = Path(urlparse(url).path).stem
+    title = filename.replace("-", " ").replace("_", " ").title() if filename else ""
 
     return title, text
 
@@ -107,7 +145,11 @@ def process_one(target: str, args: argparse.Namespace, endpoint: str, secret: st
     is_url = target.startswith("http://") or target.startswith("https://")
     is_txt = not is_url and target.lower().endswith(".txt")
 
-    if is_url:
+    if is_url and is_pdf_url(target):
+        print(f"\nDownloading PDF: {target}")
+        auto_title, content = download_pdf(target)
+        auto_source_url = target
+    elif is_url:
         print(f"\nFetching: {target}")
         auto_title, content = extract_web_text(target)
         auto_source_url = target
