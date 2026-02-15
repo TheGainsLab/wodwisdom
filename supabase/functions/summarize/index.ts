@@ -71,35 +71,35 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Call LLM to generate summary
-    const openaiKey = Deno.env.get('OPENAI_API_KEY')
-    if (!openaiKey) {
-      return new Response(JSON.stringify({ error: 'OPENAI_API_KEY not configured' }), {
+    // Call Claude Sonnet to generate summary
+    const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
+    if (!anthropicKey) {
+      return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const llmRes = await fetch('https://api.openai.com/v1/chat/completions', {
+    const llmRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openaiKey}`,
         'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        system: SUMMARY_PROMPT,
         messages: [
-          { role: 'system', content: SUMMARY_PROMPT },
           { role: 'user', content: msg.answer },
         ],
-        max_tokens: 300,
-        temperature: 0.3,
       }),
     })
 
     if (!llmRes.ok) {
       const err = await llmRes.json()
-      console.error('OpenAI error:', err)
+      console.error('Anthropic error:', err)
       return new Response(JSON.stringify({ error: 'Failed to generate summary' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
     }
 
     const llmData = await llmRes.json()
-    const summary = llmData.choices?.[0]?.message?.content?.trim() || ''
+    const summary = llmData.content?.map((b: any) => b.text || '').join('').trim() || ''
 
     if (!summary) {
       return new Response(JSON.stringify({ error: 'Empty summary returned' }), {
