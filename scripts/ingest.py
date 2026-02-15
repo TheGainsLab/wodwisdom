@@ -31,6 +31,9 @@ import requests
 from bs4 import BeautifulSoup
 from pypdf import PdfReader
 
+# Minimum chars of body text before we consider JS-rendering fallback
+_MIN_CONTENT_LENGTH = 200
+
 
 INGEST_ENDPOINT = os.getenv(
     "INGEST_ENDPOINT",
@@ -51,10 +54,21 @@ def extract_pdf_text(path: str) -> str:
 
 
 def extract_web_text(url: str) -> tuple[str, str]:
-    """Fetch a URL and return (title, body text)."""
+    """Fetch a URL and return (title, body text).
+
+    Falls back to headless browser rendering (Playwright) when the static
+    HTML yields very little text, which indicates a JS-rendered SPA.
+    """
     resp = requests.get(url, timeout=30, headers={"User-Agent": "WodWisdom-Ingest/1.0"})
     resp.raise_for_status()
-    return _parse_html_response(resp)
+    title, text = _parse_html_response(resp)
+
+    if len(text.strip()) >= _MIN_CONTENT_LENGTH:
+        return title, text
+
+    # Static HTML had almost no content — likely a JS-rendered page.
+    print("  Static HTML yielded very little text, trying headless browser...")
+    return _render_js_page(url)
 
 
 def is_pdf_url(url: str) -> bool:
@@ -74,6 +88,33 @@ def is_pdf_url(url: str) -> bool:
 def _parse_html_response(resp: requests.Response) -> tuple[str, str]:
     """Parse an HTML response and return (title, body text)."""
     soup = BeautifulSoup(resp.text, "html.parser")
+    for tag in soup(["script", "style", "nav", "footer", "header"]):
+        tag.decompose()
+    title = soup.title.string.strip() if soup.title and soup.title.string else ""
+    article = soup.find("article") or soup.find("main") or soup.find("body")
+    text = article.get_text(separator="\n", strip=True) if article else soup.get_text(separator="\n", strip=True)
+    return title, text
+
+
+def _render_js_page(url: str) -> tuple[str, str]:
+    """Render a JS-heavy page with Playwright and extract text."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        sys.exit(
+            "  ERROR: This page requires JavaScript rendering but Playwright is not installed.\n"
+            "  Install it with:\n"
+            "    pip3 install playwright && python3 -m playwright install chromium\n"
+        )
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(url, wait_until="networkidle", timeout=30_000)
+        html = page.content()
+        browser.close()
+
+    soup = BeautifulSoup(html, "html.parser")
     for tag in soup(["script", "style", "nav", "footer", "header"]):
         tag.decompose()
     title = soup.title.string.strip() if soup.title and soup.title.string else ""
