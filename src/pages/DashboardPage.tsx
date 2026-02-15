@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, INVITE_ENDPOINT } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 
 interface Gym { id: string; name: string; max_seats: number; }
@@ -91,24 +91,40 @@ export default function DashboardPage({ session }: { session: Session }) {
     if (!inviteEmail.trim()) { setError('Enter an email'); return; }
     if (!gym) return;
     setError(''); setSuccess('');
-    try {
-      const { data: { session: current } } = await supabase.auth.getSession();
-      if (!current) { setError('Not authenticated'); return; }
-      const resp = await fetch(INVITE_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + current.access_token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail.trim(), gym_id: gym.id }),
+    const normalizedEmail = inviteEmail.trim().toLowerCase();
+
+    // Check seat limits
+    const activeCount = members.filter(m => m.status === 'active' || m.status === 'invited').length;
+    if (activeCount >= gym.max_seats) { setError(`All ${gym.max_seats} coach seats are filled`); return; }
+
+    // Check for existing row (re-invite or duplicate)
+    const { data: existing } = await supabase
+      .from('gym_members')
+      .select('id, status')
+      .eq('gym_id', gym.id)
+      .eq('invited_email', normalizedEmail)
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      const row = existing[0];
+      if (row.status === 'active' || row.status === 'invited') { setError('This email has already been invited'); return; }
+      // Re-invite a previously declined/revoked coach
+      const { error: updateErr } = await supabase.from('gym_members').update({ status: 'invited' }).eq('id', row.id);
+      if (updateErr) { setError(updateErr.message); return; }
+    } else {
+      const { error: insertErr } = await supabase.from('gym_members').insert({
+        gym_id: gym.id,
+        invited_email: normalizedEmail,
+        invited_by: session.user.id,
+        status: 'invited',
       });
-      let data: any;
-      try { data = await resp.json(); } catch { data = {}; }
-      if (!resp.ok) { setError(data.error || data.message || data.msg || `Invite failed (${resp.status})`); return; }
-      setInviteEmail('');
-      setSuccess(data.email_sent ? 'Invite email sent!' : 'Coach added — email could not be sent. Share the link manually.');
-      setTimeout(() => setSuccess(''), 5000);
-      loadDashboard();
-    } catch (err: any) {
-      setError(err.message || 'Network error');
+      if (insertErr) { setError(insertErr.message); return; }
     }
+
+    setInviteEmail('');
+    setSuccess('Coach invited!');
+    setTimeout(() => setSuccess(''), 5000);
+    loadDashboard();
   };
 
   const revokeCoach = async (memberId: string) => {
