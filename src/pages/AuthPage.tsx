@@ -31,19 +31,20 @@ export default function AuthPage() {
     <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-logo">W</div>
-        <h1>{isSignUp ? 'Create Account' : 'Sign In'}</h1>
-        <p className="auth-subtitle">{inviteEmail ? 'Create your account to accept the coaching invite' : isSignUp ? 'Start your coaching knowledge journey' : 'Access your coaching knowledge base'}</p>
+        <h1>{inviteEmail ? 'Welcome to WOD Wisdom' : isSignUp ? 'Create Account' : 'Sign In'}</h1>
+        <p className="auth-subtitle">{inviteEmail ? 'Enter your name and a password to create your account' : isSignUp ? 'Start your coaching knowledge journey' : 'Access your coaching knowledge base'}</p>
+        {inviteEmail && <div className="invite-email-badge">{inviteEmail}</div>}
         {error && <div className="auth-error">{error}</div>}
         <form onSubmit={handleSubmit}>
           {isSignUp && <div className="field"><label>Full Name</label><input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></div>}
-          <div className="field"><label>Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" /></div>
-          <div className="field"><label>Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Your password" /></div>
-          <button className="auth-btn" type="submit" disabled={loading}>{loading ? (isSignUp ? 'Creating...' : 'Signing in...') : (isSignUp ? 'Create Account' : 'Sign In')}</button>
+          {!inviteEmail && <div className="field"><label>Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" /></div>}
+          <div className="field"><label>Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={inviteEmail ? 'Choose a password' : 'Your password'} /></div>
+          <button className="auth-btn" type="submit" disabled={loading}>{loading ? (isSignUp ? 'Creating...' : 'Signing in...') : inviteEmail ? 'Create Account & Accept Invite' : (isSignUp ? 'Create Account' : 'Sign In')}</button>
         </form>
-        <div className="auth-toggle">
+        {!inviteEmail && <div className="auth-toggle">
           <span>{isSignUp ? 'Have an account? ' : 'No account? '}</span>
           <a onClick={() => { setIsSignUp(!isSignUp); setError(''); }}>{isSignUp ? 'Sign in' : 'Sign up'}</a>
-        </div>
+        </div>}
       </div>
     </div>
   );

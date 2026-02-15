@@ -26,6 +26,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);-web
 .auth-logo{width:48px;height:48px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:24px;color:white;margin-bottom:24px}
 .auth-card h1{font-size:26px;font-weight:700;letter-spacing:-.5px;margin-bottom:6px}
 .auth-subtitle{color:var(--text-dim);font-size:14px;margin-bottom:28px}
+.invite-email-badge{background:rgba(255,58,58,.08);border:1px solid rgba(255,58,58,.2);color:var(--accent);padding:10px 16px;border-radius:8px;font-size:15px;font-weight:600;text-align:center;margin-bottom:16px;letter-spacing:.3px}
 .auth-error{background:rgba(255,58,58,.1);border:1px solid rgba(255,58,58,.25);color:#ff8888;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px}
 .field{margin-bottom:18px}
 .field label{display:block;font-size:12px;font-weight:600;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
