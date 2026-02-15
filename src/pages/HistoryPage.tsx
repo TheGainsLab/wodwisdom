@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 
-interface ChatMessage { id: string; question: string; answer: string; sources: any[]; created_at: string; }
+interface ChatMessage { id: string; question: string; answer: string; sources: any[]; created_at: string; summary?: string; }
 
 function formatMd(t: string): string {
   return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/\n\n/g,'</p><p>').replace(/\n- /g,'<br>\u2022 ').replace(/\n/g,'<br>').replace(/^/,'<p>').replace(/$/,'</p>');
@@ -55,6 +55,15 @@ export default function HistoryPage({ session }: { session: Session }) {
                  </div>
                  {expanded === msg.id && (
                    <div className="history-answer">
+                     {msg.summary && (
+                       <div className="summary-box">
+                         <div className="summary-header">
+                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="21" y1="10" x2="7" y2="10" /><line x1="21" y1="6" x2="3" y2="6" /><line x1="21" y1="14" x2="3" y2="14" /><line x1="21" y1="18" x2="7" y2="18" /></svg>
+                           <span>Quick Summary</span>
+                         </div>
+                         <div className="summary-content" dangerouslySetInnerHTML={{ __html: formatMd(msg.summary) }} />
+                       </div>
+                     )}
                      <div dangerouslySetInnerHTML={{ __html: formatMd(msg.answer) }} />
                      {msg.sources && msg.sources.length > 0 && (
                        <div className="sources-bar">

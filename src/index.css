@@ -78,9 +78,18 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);-web
 .msg.assistant{align-self:flex-start;width:100%}
 .msg-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .msg-avatar{width:28px;height:28px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:white;flex-shrink:0}
-.bookmark-btn{margin-left:auto;background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px;border-radius:4px;opacity:0}
+.summarize-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px;border-radius:4px;opacity:0;margin-left:auto;transition:color .15s}
+.msg:hover .summarize-btn{opacity:1}
+.summarize-btn:hover{color:var(--accent)}
+.summarize-loading{margin-left:auto;font-size:11px;color:var(--text-muted);font-style:italic;animation:pulse 1s ease infinite}
+.bookmark-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px;border-radius:4px;opacity:0}
 .msg:hover .bookmark-btn{opacity:1}
 .bookmark-btn:hover,.bookmark-btn.active{color:var(--accent)}
+.summary-box{margin-top:12px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:6px;padding:14px 18px;animation:fadeIn .3s ease}
+.summary-header{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);margin-bottom:8px}
+.summary-content{font-size:14px;line-height:1.6;color:var(--text-dim)}
+.summary-content p{margin-bottom:4px}
+.summary-content p:last-child{margin-bottom:0}
 .msg-body.assistant{background:var(--surface);border:1px solid var(--border);padding:18px 22px;border-radius:4px 14px 14px 14px;font-size:15px;line-height:1.75}
 .msg-body.assistant p{margin-bottom:12px}
 .msg-body.assistant p:last-child{margin-bottom:0}

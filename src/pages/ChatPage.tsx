@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { CHAT_ENDPOINT, supabase } from '../lib/supabase';
+import { CHAT_ENDPOINT, SUMMARIZE_ENDPOINT, supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import InviteBanner from '../components/InviteBanner';
 
@@ -10,6 +10,8 @@ interface Message {
   sources?: { title: string; author: string; source: string }[];
   message_id?: string;
   bookmarked?: boolean;
+  summary?: string;
+  summarizing?: boolean;
 }
 
 const SUGGESTIONS = [
@@ -84,6 +86,24 @@ export default function ChatPage({ session }: { session: Session }) {
     setMessages(prev => prev.map((m, i) => i === idx ? { ...m, bookmarked: !m.bookmarked } : m));
   };
 
+  const summarizeMessage = async (msgId: string, idx: number) => {
+    const msg = messages[idx];
+    if (!msg || !msgId || msg.summary || msg.summarizing) return;
+    setMessages(prev => prev.map((m, i) => i === idx ? { ...m, summarizing: true } : m));
+    try {
+      const resp = await fetch(SUMMARIZE_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message_id: msgId }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Failed to summarize');
+      setMessages(prev => prev.map((m, i) => i === idx ? { ...m, summary: data.summary, summarizing: false } : m));
+    } catch {
+      setMessages(prev => prev.map((m, i) => i === idx ? { ...m, summarizing: false } : m));
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
@@ -123,6 +143,12 @@ export default function ChatPage({ session }: { session: Session }) {
                 {m.role === 'assistant' && (
                   <div className="msg-header">
                     <span className="msg-avatar">W</span>
+                    {m.message_id && !m.summary && !m.summarizing && (
+                      <button className="summarize-btn" onClick={() => summarizeMessage(m.message_id!, i)} title="Summarize">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="21" y1="10" x2="7" y2="10" /><line x1="21" y1="6" x2="3" y2="6" /><line x1="21" y1="14" x2="3" y2="14" /><line x1="21" y1="18" x2="7" y2="18" /></svg>
+                      </button>
+                    )}
+                    {m.summarizing && <span className="summarize-loading">Summarizing…</span>}
                     {m.message_id && <button className={"bookmark-btn " + (m.bookmarked ? "active" : "")} onClick={() => toggleBookmark(m.message_id!, i)}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill={m.bookmarked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
                     </button>}
@@ -133,6 +159,15 @@ export default function ChatPage({ session }: { session: Session }) {
                   <div className="sources-bar">
                     <span className="sources-label">Sources</span>
                     {[...new Set(m.sources.map(s => s.title).filter(Boolean))].map((t, j) => <span key={j} className="source-chip">{t}</span>)}
+                  </div>
+                )}
+                {m.summary && (
+                  <div className="summary-box">
+                    <div className="summary-header">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="21" y1="10" x2="7" y2="10" /><line x1="21" y1="6" x2="3" y2="6" /><line x1="21" y1="14" x2="3" y2="14" /><line x1="21" y1="18" x2="7" y2="18" /></svg>
+                      <span>Quick Summary</span>
+                    </div>
+                    <div className="summary-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(m.summary) }} />
                   </div>
                 )}
               </div>
