@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, INVITE_ENDPOINT } from '../lib/supabase';
+import { supabase, INVITE_ENDPOINT, ANON_KEY } from '../lib/supabase';
 import Nav from '../components/Nav';
 
 interface Gym { id: string; name: string; max_seats: number; }
@@ -124,11 +124,15 @@ export default function DashboardPage({ session }: { session: Session }) {
     // Send invite email via Resend (best-effort — invite is already saved)
     let emailSent = false;
     try {
-      const { data: { session: current } } = await supabase.auth.getSession();
+      const { data: { session: current } } = await supabase.auth.refreshSession();
       if (current) {
         const resp = await fetch(INVITE_ENDPOINT, {
           method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + current.access_token, 'Content-Type': 'application/json' },
+          headers: {
+            'Authorization': 'Bearer ' + current.access_token,
+            'apikey': ANON_KEY,
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({ email: normalizedEmail, gym_name: gym.name }),
         });
         const result = await resp.json().catch(() => ({}));
