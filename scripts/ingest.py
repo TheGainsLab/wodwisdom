@@ -53,19 +53,7 @@ def extract_web_text(url: str) -> tuple[str, str]:
     """Fetch a URL and return (title, body text)."""
     resp = requests.get(url, timeout=30, headers={"User-Agent": "WodWisdom-Ingest/1.0"})
     resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "html.parser")
-
-    # Remove script/style elements
-    for tag in soup(["script", "style", "nav", "footer", "header"]):
-        tag.decompose()
-
-    title = soup.title.string.strip() if soup.title and soup.title.string else ""
-
-    # Try to find the article body
-    article = soup.find("article") or soup.find("main") or soup.find("body")
-    text = article.get_text(separator="\n", strip=True) if article else soup.get_text(separator="\n", strip=True)
-
-    return title, text
+    return _parse_html_response(resp)
 
 
 def is_pdf_url(url: str) -> bool:
@@ -82,10 +70,29 @@ def is_pdf_url(url: str) -> bool:
         return False
 
 
+def _parse_html_response(resp: requests.Response) -> tuple[str, str]:
+    """Parse an HTML response and return (title, body text)."""
+    soup = BeautifulSoup(resp.text, "html.parser")
+    for tag in soup(["script", "style", "nav", "footer", "header"]):
+        tag.decompose()
+    title = soup.title.string.strip() if soup.title and soup.title.string else ""
+    article = soup.find("article") or soup.find("main") or soup.find("body")
+    text = article.get_text(separator="\n", strip=True) if article else soup.get_text(separator="\n", strip=True)
+    return title, text
+
+
 def download_pdf(url: str) -> tuple[str, str]:
-    """Download a PDF from a URL, extract text, and return (title, text)."""
+    """Download a PDF from a URL, extract text, and return (title, text).
+    Falls back to HTML parsing if the server returns a web page instead."""
     resp = requests.get(url, timeout=60, headers={"User-Agent": "WodWisdom-Ingest/1.0"})
     resp.raise_for_status()
+
+    content_type = resp.headers.get("Content-Type", "")
+    is_pdf = "application/pdf" in content_type or resp.content[:5] == b"%PDF-"
+
+    if not is_pdf:
+        print("  Server returned HTML instead of PDF, parsing as web page...")
+        return _parse_html_response(resp)
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp.write(resp.content)
