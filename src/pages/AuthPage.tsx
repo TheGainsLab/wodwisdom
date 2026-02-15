@@ -17,8 +17,15 @@ export default function AuthPage() {
     setLoading(true); setError('');
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } });
+        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } });
         if (error) throw error;
+        // If this is an invite sign-up, accept the invite immediately
+        if (inviteEmail && data.user) {
+          const userId = data.user.id;
+          const normalized = inviteEmail.toLowerCase();
+          await supabase.from('gym_members').update({ user_id: userId, status: 'active' }).eq('invited_email', normalized).eq('status', 'invited');
+          await supabase.from('profiles').update({ role: 'coach', subscription_status: 'active' }).eq('id', userId);
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
