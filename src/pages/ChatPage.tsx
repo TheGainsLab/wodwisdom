@@ -71,73 +71,86 @@ export default function ChatPage({ session }: { session: Session }) {
         body: JSON.stringify({ question, history: [...messages, userMsg].slice(-10), source_filter: sourceFilter === 'all' ? undefined : sourceFilter }),
       });
 
-      // Check if this is a streaming response or a JSON error
       const contentType = resp.headers.get('Content-Type') || '';
-      if (!resp.ok || contentType.includes('application/json')) {
+
+      // Handle error responses
+      if (!resp.ok) {
         const data = await resp.json();
         throw new Error(data.error || 'Something went wrong');
       }
 
-      const reader = resp.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let accumulatedContent = '';
-      let sources: { title: string; author: string; source: string }[] = [];
+      // Handle legacy non-streaming JSON response (old edge function)
+      if (contentType.includes('application/json')) {
+        const data = await resp.json();
+        setMessages(prev => prev.map((m, i) =>
+          i === assistantIdx
+            ? { ...m, content: data.answer, sources: data.sources, message_id: data.message_id, bookmarked: false, streaming: false }
+            : m
+        ));
+        if (data.usage) { setDailyUsage(data.usage.daily_questions); setDailyLimit(data.usage.daily_limit); }
+      } else {
+        // Handle streaming SSE response
+        const reader = resp.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let accumulatedContent = '';
+        let sources: { title: string; author: string; source: string }[] = [];
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
 
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const raw = line.slice(6).trim();
-          if (!raw) continue;
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const raw = line.slice(6).trim();
+            if (!raw) continue;
 
-          try {
-            const event = JSON.parse(raw);
+            try {
+              const event = JSON.parse(raw);
 
-            if (event.type === 'sources') {
-              sources = event.sources || [];
-            }
-
-            if (event.type === 'delta') {
-              accumulatedContent += event.text;
-              setMessages(prev => prev.map((m, i) =>
-                i === assistantIdx ? { ...m, content: accumulatedContent } : m
-              ));
-            }
-
-            if (event.type === 'done') {
-              setMessages(prev => prev.map((m, i) =>
-                i === assistantIdx
-                  ? { ...m, content: accumulatedContent, sources, message_id: event.message_id, bookmarked: false, streaming: false }
-                  : m
-              ));
-              if (event.usage) {
-                setDailyUsage(event.usage.daily_questions);
-                setDailyLimit(event.usage.daily_limit);
+              if (event.type === 'sources') {
+                sources = event.sources || [];
               }
-            }
 
-            if (event.type === 'error') {
-              throw new Error(event.error || 'Stream error');
+              if (event.type === 'delta') {
+                accumulatedContent += event.text;
+                setMessages(prev => prev.map((m, i) =>
+                  i === assistantIdx ? { ...m, content: accumulatedContent } : m
+                ));
+              }
+
+              if (event.type === 'done') {
+                setMessages(prev => prev.map((m, i) =>
+                  i === assistantIdx
+                    ? { ...m, content: accumulatedContent, sources, message_id: event.message_id, bookmarked: false, streaming: false }
+                    : m
+                ));
+                if (event.usage) {
+                  setDailyUsage(event.usage.daily_questions);
+                  setDailyLimit(event.usage.daily_limit);
+                }
+              }
+
+              if (event.type === 'error') {
+                throw new Error(event.error || 'Stream error');
+              }
+            } catch (parseErr) {
+              // Skip unparseable SSE lines unless it's a rethrown error
+              if (parseErr instanceof Error && parseErr.message !== 'Stream error') continue;
+              throw parseErr;
             }
-          } catch (parseErr) {
-            // Skip unparseable SSE lines unless it's a rethrown error
-            if (parseErr instanceof Error && parseErr.message !== 'Stream error') continue;
-            throw parseErr;
           }
         }
-      }
 
-      // Ensure streaming flag is cleared even if no 'done' event arrived
-      setMessages(prev => prev.map((m, i) =>
-        i === assistantIdx && m.streaming ? { ...m, sources, streaming: false } : m
-      ));
+        // Ensure streaming flag is cleared even if no 'done' event arrived
+        setMessages(prev => prev.map((m, i) =>
+          i === assistantIdx && m.streaming ? { ...m, sources, streaming: false } : m
+        ));
+      }
 
     } catch (err: any) {
       setMessages(prev => {
