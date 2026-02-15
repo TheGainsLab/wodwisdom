@@ -21,6 +21,7 @@ Optional flags:
 import argparse
 import json
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -147,10 +148,30 @@ def prompt_metadata(auto_title: str) -> dict:
     }
 
 
+def normalize_url(url: str) -> str:
+    """Rewrite known PDF-viewer URLs to their HTML article equivalents.
+
+    PMC PDF URLs (e.g. .../articles/PMC123456/pdf/filename.pdf) serve a
+    JS-based viewer with no extractable text.  The full-text HTML lives at
+    the parent article path (.../articles/PMC123456/).
+    """
+    # PMC: https://pmc.ncbi.nlm.nih.gov/articles/PMC.../pdf/....pdf
+    m = re.match(r"(https?://pmc\.ncbi\.nlm\.nih\.gov/articles/PMC\d+)/pdf/.+\.pdf", url)
+    if m:
+        rewritten = m.group(1) + "/"
+        print(f"  Rewriting PMC PDF URL → {rewritten}")
+        return rewritten
+    return url
+
+
 def process_one(target: str, args: argparse.Namespace, endpoint: str, secret: str):
     """Process a single PDF file or URL."""
     is_url = target.startswith("http://") or target.startswith("https://")
     is_txt = not is_url and target.lower().endswith(".txt")
+
+    # Rewrite known PDF-viewer URLs to full-text HTML equivalents
+    if is_url:
+        target = normalize_url(target)
 
     if is_url and is_pdf_url(target):
         print(f"\nDownloading PDF: {target}")
