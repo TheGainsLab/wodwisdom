@@ -114,7 +114,7 @@ serve(async (req) => {
     }
     messages.push({ role: "user", content: question });
 
-    // Call Claude
+    // Call Claude with streaming
     const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -125,53 +125,139 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 1024,
+        stream: true,
         system: SYSTEM_PROMPT + context,
         messages,
       }),
     });
-    const claudeData = await claudeResp.json();
-    const answer = claudeData.content.map((b: any) => b.text || "").join("");
-    const inTok = claudeData.usage?.input_tokens || 0;
-    const outTok = claudeData.usage?.output_tokens || 0;
 
-    // Persist message
-    const { data: msgRow } = await supa
-      .from("chat_messages")
-      .insert({
-        user_id: user.id,
-        question,
-        answer,
-        sources,
-        input_tokens: inTok,
-        output_tokens: outTok,
-      })
-      .select("id")
-      .single();
+    if (!claudeResp.ok) {
+      const err = await claudeResp.json();
+      console.error("Claude API error:", err);
+      return new Response(JSON.stringify({ error: "Failed to generate response" }), {
+        status: 500,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
 
-    await supa.rpc("increment_usage", {
-      p_user_id: user.id,
-      p_input_tokens: inTok,
-      p_output_tokens: outTok,
+    // Prepare sources for the initial SSE event
+    const clientSources = sources.map((s) => ({
+      title: s.title,
+      author: s.author,
+      source: s.source,
+    }));
+
+    const userId = user.id;
+    const currentDailyCount = dailyCount || 0;
+
+    // Stream SSE back to the client
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        // Send sources as the first event so the frontend has them ready
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: "sources", sources: clientSources })}\n\n`)
+        );
+
+        let fullAnswer = "";
+        let inputTokens = 0;
+        let outputTokens = 0;
+
+        const reader = claudeResp.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              if (!line.startsWith("data: ")) continue;
+              const data = line.slice(6).trim();
+              if (data === "[DONE]") continue;
+
+              try {
+                const event = JSON.parse(data);
+
+                if (event.type === "content_block_delta" && event.delta?.text) {
+                  fullAnswer += event.delta.text;
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ type: "delta", text: event.delta.text })}\n\n`)
+                  );
+                }
+
+                if (event.type === "message_delta" && event.usage) {
+                  outputTokens = event.usage.output_tokens || 0;
+                }
+
+                if (event.type === "message_start" && event.message?.usage) {
+                  inputTokens = event.message.usage.input_tokens || 0;
+                }
+              } catch {
+                // Skip unparseable lines
+              }
+            }
+          }
+
+          // Persist message to database
+          const { data: msgRow } = await supa
+            .from("chat_messages")
+            .insert({
+              user_id: userId,
+              question,
+              answer: fullAnswer,
+              sources: clientSources,
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
+            })
+            .select("id")
+            .single();
+
+          await supa.rpc("increment_usage", {
+            p_user_id: userId,
+            p_input_tokens: inputTokens,
+            p_output_tokens: outputTokens,
+          });
+
+          // Send final event with message_id and usage
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "done",
+                message_id: msgRow?.id,
+                usage: {
+                  input_tokens: inputTokens,
+                  output_tokens: outputTokens,
+                  daily_questions: currentDailyCount + 1,
+                  daily_limit: DAILY_LIMIT,
+                },
+              })}\n\n`
+            )
+          );
+        } catch (err) {
+          console.error("Stream processing error:", err);
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "error", error: "Stream interrupted" })}\n\n`)
+          );
+        }
+
+        controller.close();
+      },
     });
 
-    return new Response(
-      JSON.stringify({
-        answer,
-        message_id: msgRow?.id,
-        sources: sources.map((s) => ({
-          title: s.title,
-          author: s.author,
-          source: s.source,
-        })),
-        usage: {
-          input_tokens: inTok,
-          output_tokens: outTok,
-          daily_questions: (dailyCount || 0) + 1,
-          daily_limit: DAILY_LIMIT,
-        },
-      }),
-      { headers: { ...cors, "Content-Type": "application/json" } }
-    );
+    return new Response(stream, {
+      headers: {
+        ...cors,
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
+    });
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500,

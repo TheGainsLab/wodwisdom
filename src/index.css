@@ -78,10 +78,12 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);-web
 .msg.assistant{align-self:flex-start;width:100%}
 .msg-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .msg-avatar{width:28px;height:28px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:white;flex-shrink:0}
-.summarize-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px;border-radius:4px;opacity:0;margin-left:auto;transition:color .15s}
-.msg:hover .summarize-btn{opacity:1}
-.summarize-btn:hover{color:var(--accent)}
-.summarize-loading{margin-left:auto;font-size:11px;color:var(--text-muted);font-style:italic;animation:pulse 1s ease infinite}
+.summarize-action-btn{display:flex;align-items:center;gap:6px;margin-top:10px;padding:8px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text-dim);font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;animation:fadeIn .3s ease}
+.summarize-action-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
+.summarize-action-btn:active{transform:scale(.97)}
+.summarize-loading{display:block;margin-top:10px;font-size:12px;color:var(--text-muted);font-style:italic;animation:pulse 1s ease infinite}
+.msg-body.assistant.streaming::after{content:'';display:inline-block;width:2px;height:1em;background:var(--accent);margin-left:2px;vertical-align:text-bottom;animation:blink .7s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 .bookmark-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px;border-radius:4px;opacity:0}
 .msg:hover .bookmark-btn{opacity:1}
 .bookmark-btn:hover,.bookmark-btn.active{color:var(--accent)}
