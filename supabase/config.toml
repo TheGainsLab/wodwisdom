@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.invite-coach]
 verify_jwt = false
+
+[functions.ingest]
+verify_jwt = false
