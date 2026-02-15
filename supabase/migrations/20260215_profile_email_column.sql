@@ -1,17 +1,14 @@
--- Add email column to profiles table and populate it from auth metadata
--- This ensures profile queries can access email directly without joining auth.users
+-- Fix: trigger was not populating the existing email column on new signups
+-- Also backfill any profiles where email is NULL
 
--- Add the column if it doesn't exist
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email text;
-
--- Backfill existing profiles from auth.users
+-- Backfill existing profiles with NULL email
 UPDATE public.profiles
 SET email = u.email
 FROM auth.users u
 WHERE profiles.id = u.id
   AND profiles.email IS NULL;
 
--- Update the trigger to also save email on new signups
+-- Update the trigger to include email
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
