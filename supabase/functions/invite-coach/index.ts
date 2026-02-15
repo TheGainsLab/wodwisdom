@@ -81,38 +81,52 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Check for duplicate invite
+    // Check for existing membership row (any status)
     const { data: existing } = await supabase
       .from('gym_members')
-      .select('id')
+      .select('id, status')
       .eq('gym_id', gym_id)
       .eq('invited_email', normalizedEmail)
-      .in('status', ['active', 'invited'])
       .limit(1)
 
     if (existing && existing.length > 0) {
-      return new Response(JSON.stringify({ error: 'This email has already been invited' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+      const row = existing[0]
+      if (row.status === 'active' || row.status === 'invited') {
+        return new Response(JSON.stringify({ error: 'This email has already been invited' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      // Re-invite a previously declined or revoked coach
+      const { error: updateError } = await supabase
+        .from('gym_members')
+        .update({ status: 'invited', invited_by: user.id })
+        .eq('id', row.id)
+      if (updateError) {
+        console.error('gym_members update error:', updateError)
+        return new Response(JSON.stringify({ error: updateError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    } else {
+      // Insert a new gym_members row
+      const { error: insertError } = await supabase
+        .from('gym_members')
+        .insert({
+          gym_id,
+          invited_email: normalizedEmail,
+          invited_by: user.id,
+          status: 'invited',
+        })
 
-    // Insert the gym_members row
-    const { error: insertError } = await supabase
-      .from('gym_members')
-      .insert({
-        gym_id,
-        invited_email: normalizedEmail,
-        invited_by: user.id,
-        status: 'invited',
-      })
-
-    if (insertError) {
-      console.error('gym_members insert error:', insertError)
-      return new Response(JSON.stringify({ error: insertError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      if (insertError) {
+        console.error('gym_members insert error:', insertError)
+        return new Response(JSON.stringify({ error: insertError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
     }
 
     // Send the invite email via Supabase Auth

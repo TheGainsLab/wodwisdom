@@ -99,8 +99,9 @@ export default function DashboardPage({ session }: { session: Session }) {
         headers: { 'Authorization': 'Bearer ' + current.access_token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: inviteEmail.trim(), gym_id: gym.id }),
       });
-      const data = await resp.json();
-      if (!resp.ok) { setError(data.error || 'Failed to invite'); return; }
+      let data: any;
+      try { data = await resp.json(); } catch { data = {}; }
+      if (!resp.ok) { setError(data.error || data.message || data.msg || `Invite failed (${resp.status})`); return; }
       setInviteEmail('');
       setSuccess(data.email_sent ? 'Invite email sent!' : 'Coach added — email could not be sent. Share the link manually.');
       setTimeout(() => setSuccess(''), 5000);
