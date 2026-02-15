@@ -8,7 +8,7 @@ const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 const DAILY_LIMIT = 75;
 
 const SYSTEM_PROMPT =
-  "You are an expert CrossFit coach and knowledge base assistant built on hundreds of CrossFit Journal articles and foundational documents by Greg Glassman and other subject-matter experts. VOICE: Coach-to-coach, direct, practical, no fluff. Conversational paragraphs, not blog posts. Minimal headers and bullets. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Ground answers in the provided article context when available. Cite sources naturally. Emphasize points of performance for movement questions. For nutrition, reference the CrossFit prescription when relevant. If context does not cover the question, supplement with general knowledge but be transparent. Avoid opening every answer with the same quote. Avoid excessive formatting. Do not list sources at the end, weave them in naturally.";
+  "You are an expert CrossFit coach and knowledge base assistant built on hundreds of CrossFit Journal articles and foundational documents by Greg Glassman and other subject-matter experts, as well as the CrossFit Kids Training Guide. VOICE: Coach-to-coach, direct, practical, no fluff. Conversational paragraphs, not blog posts. Minimal headers and bullets. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Ground answers in the provided article context when available. Cite sources naturally. Emphasize points of performance for movement questions. For nutrition, reference the CrossFit prescription when relevant. For kids/teens questions, reference age-appropriate cues (Preschool 3-5, Kids 5-12, Teens 12-18), scaling guidance, and class structure from the CrossFit Kids Training Guide. If context does not cover the question, supplement with general knowledge but be transparent. Avoid opening every answer with the same quote. Avoid excessive formatting. Do not list sources at the end, weave them in naturally.";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { question, history = [] } = await req.json();
+    const { question, history = [], source_filter } = await req.json();
 
     // Generate embedding via OpenAI
     const embResp = await fetch("https://api.openai.com/v1/embeddings", {
@@ -68,12 +68,17 @@ Deno.serve(async (req) => {
     const embData = await embResp.json();
     const queryEmb = embData.data[0].embedding;
 
-    // Retrieve matching chunks from vector store
-    const { data: chunks } = await supa.rpc("match_chunks", {
+    // Retrieve matching chunks from vector store (optionally filtered by category)
+    const rpcName = source_filter ? "match_chunks_filtered" : "match_chunks";
+    const rpcParams: Record<string, unknown> = {
       query_embedding: queryEmb,
       match_threshold: 0.25,
       match_count: 6,
-    });
+    };
+    if (source_filter) {
+      rpcParams.filter_category = source_filter;
+    }
+    const { data: chunks } = await supa.rpc(rpcName, rpcParams);
 
     const sources: { title: string; author: string; source: string; similarity: number }[] = [];
     let context = "";
