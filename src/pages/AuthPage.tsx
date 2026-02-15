@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 export default function AuthPage() {
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState('');
+  const params = new URLSearchParams(window.location.search);
+  const inviteEmail = params.get('invite') || '';
+  const [isSignUp, setIsSignUp] = useState(!!inviteEmail);
+  const [email, setEmail] = useState(inviteEmail);
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
@@ -30,7 +32,7 @@ export default function AuthPage() {
       <div className="auth-card">
         <div className="auth-logo">W</div>
         <h1>{isSignUp ? 'Create Account' : 'Sign In'}</h1>
-        <p className="auth-subtitle">{isSignUp ? 'Start your coaching knowledge journey' : 'Access your coaching knowledge base'}</p>
+        <p className="auth-subtitle">{inviteEmail ? 'Create your account to accept the coaching invite' : isSignUp ? 'Start your coaching knowledge journey' : 'Access your coaching knowledge base'}</p>
         {error && <div className="auth-error">{error}</div>}
         <form onSubmit={handleSubmit}>
           {isSignUp && <div className="field"><label>Full Name</label><input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></div>}

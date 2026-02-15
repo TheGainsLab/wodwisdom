@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
             <h2>You're invited!</h2>
             <p><strong>${gym_name}</strong> wants you as a coach on WOD Wisdom.</p>
             <p>Sign up or log in to accept:</p>
-            <a href="${siteUrl}" style="display: inline-block; background: #ff3a3a; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">Open WOD Wisdom</a>
+            <a href="${siteUrl}?invite=${encodeURIComponent(email)}" style="display: inline-block; background: #ff3a3a; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">Open WOD Wisdom</a>
           </div>
         `,
       }),
