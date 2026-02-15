@@ -15,14 +15,24 @@ interface Message {
   streaming?: boolean;
 }
 
-const SUGGESTIONS = [
-  'What are the points of performance for the air squat?',
-  'How should I scale workouts for beginners?',
-  'What is the nutritional prescription?',
-  'Explain the three metabolic pathways',
-  'What does virtuosity mean in coaching?',
-  'How do I improve member retention?',
-];
+const SUGGESTIONS: Record<string, string[]> = {
+  default: [
+    'What are the points of performance for the air squat?',
+    'How should I scale workouts for beginners?',
+    'What is the nutritional prescription?',
+    'Explain the three metabolic pathways',
+    'What does virtuosity mean in coaching?',
+    'How do I improve member retention?',
+  ],
+  kids: [
+    'How should I structure a CrossFit Kids class?',
+    'What are the squat teaching cues for kids vs teens?',
+    'What age groups does CrossFit Kids cover?',
+    'How do I scale movements for preschool-age children?',
+    'What equipment do I need for a kids class of 10?',
+    'What sample workouts work for kids ages 5-12?',
+  ],
+};
 
 function formatMarkdown(text: string): string {
   return text
@@ -41,7 +51,7 @@ export default function ChatPage({ session }: { session: Session }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'journal' | 'physiology'>('all');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'journal' | 'physiology' | 'kids'>('all');
   const [navOpen, setNavOpen] = useState(false);
   const [dailyUsage, setDailyUsage] = useState(0);
   const [dailyLimit, setDailyLimit] = useState(75);
@@ -201,9 +211,11 @@ export default function ChatPage({ session }: { session: Session }) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
-  const sourceButtons = (['all', 'journal', 'physiology'] as const).map(s => (
+  const activeSuggestions = sourceFilter === 'kids' ? SUGGESTIONS.kids : SUGGESTIONS.default;
+
+  const sourceButtons = (['all', 'journal', 'physiology', 'kids'] as const).map(s => (
     <button key={s} className={"source-btn " + (sourceFilter === s ? "active" : "")} onClick={() => setSourceFilter(s)}>
-      {s === 'all' ? 'All' : s === 'journal' ? 'Journal' : 'Physiology'}
+      {s === 'all' ? 'All' : s === 'journal' ? 'Journal' : s === 'physiology' ? 'Physiology' : 'Kids'}
     </button>
   ));
 
@@ -226,7 +238,7 @@ export default function ChatPage({ session }: { session: Session }) {
             <h2>What do you want to know?</h2>
             <p>Search hundreds of articles on movements, nutrition, coaching methodology, programming, and more.</p>
             <div className="suggestions">
-              {SUGGESTIONS.map((s, i) => <button key={i} className="suggestion" onClick={() => sendMessage(s)}>{s}</button>)}
+              {activeSuggestions.map((s, i) => <button key={i} className="suggestion" onClick={() => sendMessage(s)}>{s}</button>)}
             </div>
           </div>
         ) : (
