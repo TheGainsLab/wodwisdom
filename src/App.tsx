@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import AuthPage from './pages/AuthPage';
+import LandingPage from './pages/LandingPage';
 import ChatPage from './pages/ChatPage';
 import HistoryPage from './pages/HistoryPage';
 import BookmarksPage from './pages/BookmarksPage';
@@ -28,7 +29,12 @@ export default function App() {
   }, []);
 
   if (loading) return <div className="loading-screen"><div className="loading-pulse" /></div>;
-  if (!session) return <AuthPage />;
+  if (!session) return (
+    <Routes>
+      <Route path="/auth" element={<AuthPage />} />
+      <Route path="*" element={<LandingPage />} />
+    </Routes>
+  );
 
   return (
     <Routes>
