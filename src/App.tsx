@@ -18,8 +18,11 @@ export default function App() {
       setSession(session);
       setLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      if (event === 'PASSWORD_RECOVERY') {
+        window.location.href = '/settings';
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
