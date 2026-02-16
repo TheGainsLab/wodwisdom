@@ -128,4 +128,14 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);-web
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes bounce{to{transform:translateY(-4px)}}
-@media(max-width:640px){.chat-header{padding:10px 12px}.source-btn{padding:6px 10px;font-size:11px}.messages{padding:16px 12px}.msg.user{max-width:85%}.msg-body.assistant{padding:14px 16px}.input-area{padding:10px 12px 14px}.auth-card{padding:32px 24px}.suggestions{flex-direction:column}.welcome h2{font-size:22px}.welcome-logo{width:52px;height:52px;font-size:26px}}
+/* History search */
+.history-search-wrap{position:relative;flex:1;max-width:320px;margin-left:auto}
+.history-search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none}
+.history-search-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 36px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;transition:border-color .2s,box-shadow .2s}
+.history-search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.history-search-input::placeholder{color:var(--text-muted)}
+.history-search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px;display:flex;align-items:center;justify-content:center;border-radius:4px}
+.history-search-clear:hover{color:var(--text)}
+.search-result-count{max-width:800px;margin:0 auto 8px;font-size:12px;color:var(--text-muted);padding:0 2px}
+.history-match-badge{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);background:var(--accent-glow);padding:2px 8px;border-radius:4px;flex-shrink:0}
+@media(max-width:640px){.chat-header{padding:10px 12px}.source-btn{padding:6px 10px;font-size:11px}.messages{padding:16px 12px}.msg.user{max-width:85%}.msg-body.assistant{padding:14px 16px}.input-area{padding:10px 12px 14px}.auth-card{padding:32px 24px}.suggestions{flex-direction:column}.welcome h2{font-size:22px}.welcome-logo{width:52px;height:52px;font-size:26px}.page-header{flex-wrap:wrap}.history-search-wrap{max-width:none;flex-basis:100%;order:3;margin-left:0;margin-top:8px}}
