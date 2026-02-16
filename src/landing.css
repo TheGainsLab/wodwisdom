@@ -1,0 +1,111 @@
+/* ===== Layout & Container ===== */
+.landing-page{scroll-behavior:smooth;min-height:100vh}
+.landing-container{max-width:1080px;margin:0 auto;padding:0 24px}
+
+/* ===== Header ===== */
+.landing-header{position:sticky;top:0;z-index:100;background:rgba(9,9,11,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.landing-header-inner{max-width:1080px;margin:0 auto;padding:0 24px;height:64px;display:flex;align-items:center;gap:24px}
+.landing-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.landing-logo{width:36px;height:36px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:white}
+.landing-brand-name{font-weight:700;font-size:17px;letter-spacing:-.3px}
+.landing-nav{display:flex;gap:8px;margin-left:auto}
+.landing-nav a{color:var(--text-dim);text-decoration:none;font-size:14px;font-weight:500;padding:8px 14px;border-radius:8px;transition:color .15s,background .15s}
+.landing-nav a:hover{color:var(--text);background:var(--surface2)}
+.landing-signin-btn{margin-left:8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 20px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;flex-shrink:0}
+.landing-signin-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ===== Shared CTA Button ===== */
+.landing-cta{display:inline-block;background:var(--accent);color:white;border:none;border-radius:10px;padding:16px 36px;font-family:'Outfit',sans-serif;font-size:16px;font-weight:600;cursor:pointer;transition:background .2s,transform .1s}
+.landing-cta:hover{background:var(--accent-hover)}
+.landing-cta:active{transform:scale(.98)}
+
+/* ===== Shared Section Titles ===== */
+.landing-section-title{font-size:32px;font-weight:700;letter-spacing:-.5px;text-align:center;margin-bottom:12px}
+.landing-section-sub{text-align:center;color:var(--text-dim);font-size:16px;margin-bottom:48px;max-width:540px;margin-left:auto;margin-right:auto;line-height:1.6}
+
+/* ===== Hero ===== */
+.landing-hero{min-height:calc(100vh - 64px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 24px;background-image:radial-gradient(ellipse at 30% 40%,rgba(255,58,58,.07) 0%,transparent 60%),radial-gradient(ellipse at 70% 60%,rgba(255,58,58,.04) 0%,transparent 60%)}
+.landing-hero-title{font-size:clamp(48px,8vw,80px);font-weight:800;letter-spacing:-2px;line-height:1.05;margin-bottom:20px;animation:fadeUp .6s ease}
+.landing-hero-sub{font-size:clamp(16px,2.5vw,20px);color:var(--text-dim);max-width:560px;line-height:1.6;margin-bottom:40px;animation:fadeUp .6s ease .1s both}
+.landing-hero .landing-cta{animation:fadeUp .6s ease .2s both}
+
+/* ===== Explainer ===== */
+.landing-explainer{padding:100px 0;border-top:1px solid var(--border)}
+.landing-explainer-grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px}
+.landing-explainer-grid p{font-size:16px;line-height:1.75;color:var(--text-dim)}
+
+/* ===== Demo ===== */
+.landing-demo{padding:100px 0;border-top:1px solid var(--border)}
+.landing-demo-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:40px}
+.landing-demo-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:16px}
+.landing-demo-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);background:var(--accent-glow);padding:4px 10px;border-radius:6px;width:fit-content}
+.landing-demo-q{align-self:flex-end;max-width:85%}
+.landing-demo-a{display:flex;flex-direction:column;gap:8px}
+
+/* ===== Audience ===== */
+.landing-audience{padding:100px 0;border-top:1px solid var(--border)}
+.landing-audience-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:40px}
+.landing-audience-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px 28px}
+.landing-audience-icon{width:48px;height:48px;background:var(--accent-glow);border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--accent);margin-bottom:20px}
+.landing-audience-card h3{font-size:20px;font-weight:700;margin-bottom:10px;letter-spacing:-.3px}
+.landing-audience-card p{font-size:15px;line-height:1.7;color:var(--text-dim)}
+
+/* ===== Steps ===== */
+.landing-steps{padding:100px 0;border-top:1px solid var(--border)}
+.landing-steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;margin-top:40px;text-align:center}
+.landing-step-num{font-size:48px;font-weight:800;color:var(--accent);line-height:1;margin-bottom:16px}
+.landing-step h3{font-size:20px;font-weight:700;margin-bottom:10px;letter-spacing:-.3px}
+.landing-step p{font-size:15px;line-height:1.7;color:var(--text-dim);max-width:280px;margin:0 auto}
+
+/* ===== Pricing ===== */
+.landing-pricing{padding:100px 0;border-top:1px solid var(--border)}
+.landing-pricing-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:720px;margin:0 auto}
+.landing-pricing-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px 32px;display:flex;flex-direction:column;position:relative}
+.landing-pricing-card.featured{border-color:var(--accent);box-shadow:0 0 40px var(--accent-glow)}
+.landing-pricing-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--accent);color:white;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:5px 14px;border-radius:20px;white-space:nowrap}
+.landing-pricing-card h3{font-size:22px;font-weight:700;margin-bottom:8px;letter-spacing:-.3px}
+.landing-price{font-size:48px;font-weight:800;letter-spacing:-1px;margin-bottom:24px}
+.landing-price span{font-size:16px;font-weight:500;color:var(--text-dim)}
+.landing-pricing-features{list-style:none;display:flex;flex-direction:column;gap:12px;margin-bottom:32px;flex:1}
+.landing-pricing-features li{font-size:15px;color:var(--text-dim);padding-left:24px;position:relative}
+.landing-pricing-features li::before{content:'';position:absolute;left:0;top:6px;width:14px;height:14px;border-radius:50%;border:2px solid var(--accent);background:transparent}
+.landing-pricing-card .landing-cta{width:100%;text-align:center}
+
+/* ===== FAQ ===== */
+.landing-faq{padding:100px 0;border-top:1px solid var(--border)}
+.landing-faq-list{max-width:720px;margin:40px auto 0;display:flex;flex-direction:column;gap:8px}
+.landing-faq-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:border-color .2s}
+.landing-faq-item:hover{border-color:var(--border-light)}
+.landing-faq-question{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;font-size:15px;font-weight:600;gap:16px}
+.landing-faq-chevron{flex-shrink:0;transition:transform .2s;color:var(--text-muted)}
+.landing-faq-item.open .landing-faq-chevron{transform:rotate(180deg)}
+.landing-faq-answer{padding:0 22px 18px;color:var(--text-dim);font-size:15px;line-height:1.7}
+
+/* ===== Footer CTA ===== */
+.landing-footer-cta{padding:100px 24px;text-align:center;background-image:radial-gradient(ellipse at 50% 50%,rgba(255,58,58,.06) 0%,transparent 60%)}
+.landing-footer-cta h2{font-size:clamp(28px,5vw,40px);font-weight:700;letter-spacing:-.5px;margin-bottom:28px}
+.landing-footer{padding:24px;text-align:center;border-top:1px solid var(--border);color:var(--text-muted);font-size:13px}
+
+/* ===== Scroll targets ===== */
+#how-it-works,#pricing,#faq{scroll-margin-top:80px}
+
+/* ===== Responsive ===== */
+@media(max-width:768px){
+.landing-nav{display:none}
+.landing-hero{min-height:auto;padding:60px 24px 80px}
+.landing-explainer-grid{grid-template-columns:1fr;gap:24px}
+.landing-demo-grid{grid-template-columns:1fr;gap:20px}
+.landing-audience-grid{grid-template-columns:1fr;gap:16px}
+.landing-steps-grid{grid-template-columns:1fr;gap:40px}
+.landing-pricing-grid{grid-template-columns:1fr;max-width:400px}
+.landing-explainer,.landing-demo,.landing-audience,.landing-steps,.landing-pricing,.landing-faq{padding:72px 0}
+}
+
+@media(max-width:480px){
+.landing-header-inner{padding:0 16px}
+.landing-container{padding:0 16px}
+.landing-hero{padding:40px 16px 60px}
+.landing-section-title{font-size:26px}
+.landing-pricing-card{padding:28px 22px}
+.landing-audience-card{padding:24px 20px}
+}

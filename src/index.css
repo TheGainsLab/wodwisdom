@@ -17,6 +17,7 @@
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;overflow:hidden;height:100vh;height:100dvh}
+body.landing-body{overflow:auto;height:auto}
 #root{height:100%}
 .loading-screen{height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg)}
 .loading-pulse{width:40px;height:40px;border-radius:50%;background:var(--accent);animation:pulse 1s ease infinite}
