@@ -5,6 +5,7 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
+const FREE_LIMIT = 3;
 const DAILY_LIMIT = 75;
 
 const SYSTEM_PROMPT =
@@ -40,15 +41,46 @@ Deno.serve(async (req) => {
       check_user_id: user.id,
     });
 
-    const { data: dailyCount } = await supa.rpc("get_daily_usage", {
-      check_user_id: user.id,
-    });
+    // Determine subscription tier
+    const { data: profile } = await supa
+      .from("profiles")
+      .select("subscription_status")
+      .eq("id", user.id)
+      .single();
 
-    if ((dailyCount || 0) >= DAILY_LIMIT) {
-      return new Response(JSON.stringify({ error: "Daily limit reached" }), {
-        status: 429,
-        headers: { ...cors, "Content-Type": "application/json" },
+    const isFreeTier = !profile || profile.subscription_status !== "active";
+
+    let dailyCount = 0;
+    let totalCount = 0;
+
+    if (isFreeTier) {
+      // Free tier: 3 lifetime questions
+      const { count } = await supa
+        .from("chat_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      totalCount = count || 0;
+
+      if (totalCount >= FREE_LIMIT) {
+        return new Response(
+          JSON.stringify({ error: "Free limit reached", code: "FREE_LIMIT" }),
+          { status: 402, headers: { ...cors, "Content-Type": "application/json" } }
+        );
+      }
+    } else {
+      // Paid tier: 75 questions per day
+      const { data: dc } = await supa.rpc("get_daily_usage", {
+        check_user_id: user.id,
       });
+      dailyCount = dc || 0;
+
+      if (dailyCount >= DAILY_LIMIT) {
+        return new Response(
+          JSON.stringify({ error: "Daily limit reached" }),
+          { status: 429, headers: { ...cors, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     const { question, history = [], source_filter } = await req.json();
@@ -152,7 +184,6 @@ Deno.serve(async (req) => {
     }));
 
     const userId = user.id;
-    const currentDailyCount = dailyCount || 0;
 
     // Stream SSE back to the client
     const encoder = new TextEncoder();
@@ -229,6 +260,10 @@ Deno.serve(async (req) => {
           });
 
           // Send final event with message_id and usage
+          const usagePayload = isFreeTier
+            ? { tier: "free", total_questions: totalCount + 1, free_limit: FREE_LIMIT }
+            : { tier: "paid", daily_questions: dailyCount + 1, daily_limit: DAILY_LIMIT };
+
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
@@ -237,8 +272,7 @@ Deno.serve(async (req) => {
                 usage: {
                   input_tokens: inputTokens,
                   output_tokens: outputTokens,
-                  daily_questions: currentDailyCount + 1,
-                  daily_limit: DAILY_LIMIT,
+                  ...usagePayload,
                 },
               })}\n\n`
             )
