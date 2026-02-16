@@ -55,16 +55,45 @@ export default function ChatPage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [dailyUsage, setDailyUsage] = useState(0);
   const [dailyLimit, setDailyLimit] = useState(75);
+  const [tier, setTier] = useState<'free' | 'paid'>('free');
+  const [totalQuestions, setTotalQuestions] = useState(0);
+  const [freeLimit, setFreeLimit] = useState(3);
+  const [tierLoaded, setTierLoaded] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load subscription tier and usage on mount
+  useEffect(() => {
+    (async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('subscription_status')
+        .eq('id', session.user.id)
+        .single();
+
+      const isPaid = profile?.subscription_status === 'active';
+      setTier(isPaid ? 'paid' : 'free');
+
+      if (!isPaid) {
+        const { count } = await supabase
+          .from('chat_messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', session.user.id);
+        setTotalQuestions(count || 0);
+      }
+      setTierLoaded(true);
+    })();
+  }, []);
 
   useEffect(() => {
     if (messagesRef.current) messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
   }, [messages, isLoading]);
 
+  const isPaywalled = tier === 'free' && totalQuestions >= freeLimit;
+
   const sendMessage = async (text?: string) => {
     const question = text || input.trim();
-    if (!question || isLoading) return;
+    if (!question || isLoading || isPaywalled) return;
     setInput('');
     const userMsg: Message = { role: 'user', content: question };
     setMessages(prev => [...prev, userMsg]);
@@ -86,6 +115,10 @@ export default function ChatPage({ session }: { session: Session }) {
       // Handle error responses
       if (!resp.ok) {
         const data = await resp.json();
+        if (resp.status === 402 && data.code === 'FREE_LIMIT') {
+          setTotalQuestions(freeLimit);
+          throw new Error('Free trial ended');
+        }
         throw new Error(data.error || 'Something went wrong');
       }
 
@@ -97,7 +130,15 @@ export default function ChatPage({ session }: { session: Session }) {
             ? { ...m, content: data.answer, sources: data.sources, message_id: data.message_id, bookmarked: false, streaming: false }
             : m
         ));
-        if (data.usage) { setDailyUsage(data.usage.daily_questions); setDailyLimit(data.usage.daily_limit); }
+        if (data.usage) {
+          if (data.usage.tier === 'free') {
+            setTotalQuestions(data.usage.total_questions);
+            setFreeLimit(data.usage.free_limit);
+          } else {
+            setDailyUsage(data.usage.daily_questions);
+            setDailyLimit(data.usage.daily_limit);
+          }
+        }
       } else {
         // Handle streaming SSE response
         const reader = resp.body!.getReader();
@@ -140,8 +181,13 @@ export default function ChatPage({ session }: { session: Session }) {
                     : m
                 ));
                 if (event.usage) {
-                  setDailyUsage(event.usage.daily_questions);
-                  setDailyLimit(event.usage.daily_limit);
+                  if (event.usage.tier === 'free') {
+                    setTotalQuestions(event.usage.total_questions);
+                    setFreeLimit(event.usage.free_limit);
+                  } else {
+                    setDailyUsage(event.usage.daily_questions);
+                    setDailyLimit(event.usage.daily_limit);
+                  }
                 }
               }
 
@@ -219,6 +265,10 @@ export default function ChatPage({ session }: { session: Session }) {
     </button>
   ));
 
+  const usagePill = tier === 'free'
+    ? <div className="usage-pill">{totalQuestions}/{freeLimit} free</div>
+    : <div className="usage-pill">{dailyUsage}/{dailyLimit}</div>;
+
   return (
     <div className="app-layout">
       <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
@@ -229,7 +279,7 @@ export default function ChatPage({ session }: { session: Session }) {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
           <div className="source-toggle">{sourceButtons}</div>
-          <div className="usage-pill">{dailyUsage}/{dailyLimit}</div>
+          {tierLoaded && usagePill}
         </header>
 
         {messages.length === 0 && !isLoading ? (
@@ -237,9 +287,21 @@ export default function ChatPage({ session }: { session: Session }) {
             <div className="welcome-logo">W</div>
             <h2>What do you want to know?</h2>
             <p>Search hundreds of articles on movements, nutrition, coaching methodology, programming, and more.</p>
-            <div className="suggestions">
-              {activeSuggestions.map((s, i) => <button key={i} className="suggestion" onClick={() => sendMessage(s)}>{s}</button>)}
-            </div>
+            {!isPaywalled && (
+              <div className="suggestions">
+                {activeSuggestions.map((s, i) => <button key={i} className="suggestion" onClick={() => sendMessage(s)}>{s}</button>)}
+              </div>
+            )}
+            {isPaywalled && (
+              <div className="paywall-card">
+                <div className="paywall-icon">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                </div>
+                <h3>You've used your 3 free questions</h3>
+                <p>Upgrade to get unlimited access to the full coaching knowledge base.</p>
+                <button className="paywall-btn">Upgrade Now</button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="messages" ref={messagesRef}>
@@ -288,14 +350,24 @@ export default function ChatPage({ session }: { session: Session }) {
           </div>
         )}
 
-        <div className="input-area">
-          <div className="input-row">
-            <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} rows={1} placeholder="Ask about movements, nutrition, coaching, programming..." />
-            <button className="send-btn" onClick={() => sendMessage()} disabled={isLoading || !input.trim()}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
-            </button>
+        {isPaywalled && messages.length > 0 ? (
+          <div className="paywall-bar">
+            <div className="paywall-bar-inner">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+              <span>You've used your 3 free questions.</span>
+              <button className="paywall-btn-sm">Upgrade to keep asking</button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="input-area">
+            <div className="input-row">
+              <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} rows={1} placeholder="Ask about movements, nutrition, coaching, programming..." />
+              <button className="send-btn" onClick={() => sendMessage()} disabled={isLoading || !input.trim()}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
