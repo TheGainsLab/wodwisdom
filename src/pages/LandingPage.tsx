@@ -69,7 +69,8 @@ export default function LandingPage() {
           <div className="landing-explainer-grid">
             <p>
               Every CrossFit journal article, seminar, and study guide, trained into one AI.{' '}
-              A coach who has learned everything and never forgets a word — and never sleeps.
+              A coach who has learned everything and never forgets a word — and never sleeps.{' '}
+              The information you need all in one place. No need to dig around online or flip through social media reels for a cue or a hint. It's all here.
             </p>
             <p>
               Flip on Science Mode and go deeper. We trained WodWisdom on graduate-level physiology
