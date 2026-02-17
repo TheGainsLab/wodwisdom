@@ -188,14 +188,17 @@ export default function LandingPage() {
           <h2 className="landing-section-title">How it works</h2>
           <div className="landing-steps-grid">
             <div className="landing-step">
+              <div className="landing-step-num">1</div>
               <h3>You ask</h3>
               <p>Ask anything related to fitness, training, nutrition, programming and more. General questions, specific questions, any questions. Review workouts. Nutrition planning. Anything and everything health and fitness.</p>
             </div>
             <div className="landing-step">
+              <div className="landing-step-num">2</div>
               <h3>We search</h3>
               <p>Our AI is trained to search thousands of journal articles, study guides, seminar content and more. Flip on science mode and gain access to graduate level anatomy, physiology and biochemistry.</p>
             </div>
             <div className="landing-step">
+              <div className="landing-step-num">3</div>
               <h3>You get the answer</h3>
               <p>Get a clear, sourced answer. WodWisdom thoroughly answers your question, and sources every article so you can dig in further. Need a quick answer? Click summarize and get a bulleted list. Bookmark it for easy reference, and fire away with follow up questions.</p>
             </div>
