@@ -68,13 +68,12 @@ export default function LandingPage() {
           <h2 className="landing-section-title">Bigger brains, bigger gains</h2>
           <div className="landing-explainer-grid">
             <p>
-              WodWisdom is an AI-powered knowledge base built from hundreds of articles on CrossFit
-              coaching methodology, movement standards, nutrition, programming, and exercise physiology.
+              Every CrossFit journal article, seminar, and study guide, trained into one AI.{' '}
+              A coach who has learned everything and never forgets a word — and never sleeps.
             </p>
             <p>
-              Ask any question in plain English. Get clear, sourced answers pulled directly from the
-              CrossFit Journal, physiology textbooks, and the CrossFit Kids curriculum — not generic
-              internet advice.
+              Flip on Science Mode and go deeper. We trained WodWisdom on graduate-level physiology
+              texts — so when you want to geek out and get technical, it's there.
             </p>
           </div>
         </div>
