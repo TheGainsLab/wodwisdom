@@ -11,11 +11,18 @@ Usage:
 Optional flags:
   --title "..."       Override auto-detected title
   --author "..."      Article author
-  --category "..."    e.g. journal, physiology, movement
+  --category "..."    e.g. journal, science
   --source "..."      e.g. CrossFit Journal
   --source-url "..."  Link to original article
+  --batch             Non-interactive: auto-detect title from filename
   --endpoint URL      Override ingest endpoint
   --secret SECRET     Override INGEST_SECRET (or set env var)
+
+Batch example (84 Guyton chapters):
+  python scripts/ingest.py ./guyton-chapters/ --batch \
+    --category science \
+    --source "Textbook of Medical Physiology" \
+    --author "Guyton & Hall"
 """
 
 import argparse
@@ -249,6 +256,14 @@ def process_one(target: str, args: argparse.Namespace, endpoint: str, secret: st
             "source": args.source,
             "source_url": args.source_url or auto_source_url,
         }
+    elif args.batch:
+        metadata = {
+            "title": auto_title,
+            "author": args.author,
+            "category": args.category,
+            "source": args.source,
+            "source_url": args.source_url or auto_source_url,
+        }
     else:
         metadata = prompt_metadata(auto_title)
         if not metadata.get("source_url") and auto_source_url:
@@ -269,6 +284,9 @@ def main():
     parser.add_argument("--category", help="Article category")
     parser.add_argument("--source", help="Article source")
     parser.add_argument("--source-url", dest="source_url", help="Source URL")
+    parser.add_argument("--batch", action="store_true",
+                        help="Non-interactive batch mode: auto-detect title from filename, "
+                             "use CLI flags for the rest")
     parser.add_argument("--endpoint", default=INGEST_ENDPOINT, help="Ingest endpoint URL")
     parser.add_argument("--secret", default=INGEST_SECRET, help="Ingest secret")
     args = parser.parse_args()
