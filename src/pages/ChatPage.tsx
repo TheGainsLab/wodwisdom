@@ -16,7 +16,7 @@ interface Message {
 }
 
 const SUGGESTIONS: Record<string, string[]> = {
-  default: [
+  journal: [
     'What are the points of performance for the air squat?',
     'How should I scale workouts for beginners?',
     'What is the nutritional prescription?',
@@ -24,13 +24,13 @@ const SUGGESTIONS: Record<string, string[]> = {
     'What does virtuosity mean in coaching?',
     'How do I improve member retention?',
   ],
-  kids: [
-    'How should I structure a CrossFit Kids class?',
-    'What are the squat teaching cues for kids vs teens?',
-    'What age groups does CrossFit Kids cover?',
-    'How do I scale movements for preschool-age children?',
-    'What equipment do I need for a kids class of 10?',
-    'What sample workouts work for kids ages 5-12?',
+  science: [
+    'Explain the sliding filament theory of muscle contraction',
+    'How does the body regulate blood pressure?',
+    'What role does the hypothalamus play in homeostasis?',
+    'Describe the physiology of oxygen transport in blood',
+    'How do the kidneys regulate fluid balance?',
+    'Explain the cardiac cycle and its phases',
   ],
 };
 
@@ -51,7 +51,7 @@ export default function ChatPage({ session }: { session: Session }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'journal' | 'physiology' | 'kids'>('all');
+  const [sourceFilter, setSourceFilter] = useState<'journal' | 'science'>('journal');
   const [navOpen, setNavOpen] = useState(false);
   const [dailyUsage, setDailyUsage] = useState(0);
   const [dailyLimit, setDailyLimit] = useState(75);
@@ -107,7 +107,7 @@ export default function ChatPage({ session }: { session: Session }) {
       const resp = await fetch(CHAT_ENDPOINT, {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, history: [...messages, userMsg].slice(-10), source_filter: sourceFilter === 'all' ? undefined : sourceFilter }),
+        body: JSON.stringify({ question, history: [...messages, userMsg].slice(-10), source_filter: sourceFilter }),
       });
 
       const contentType = resp.headers.get('Content-Type') || '';
@@ -257,11 +257,11 @@ export default function ChatPage({ session }: { session: Session }) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
-  const activeSuggestions = sourceFilter === 'kids' ? SUGGESTIONS.kids : SUGGESTIONS.default;
+  const activeSuggestions = SUGGESTIONS[sourceFilter];
 
-  const sourceButtons = (['all', 'journal', 'physiology', 'kids'] as const).map(s => (
+  const sourceButtons = (['journal', 'science'] as const).map(s => (
     <button key={s} className={"source-btn " + (sourceFilter === s ? "active" : "")} onClick={() => setSourceFilter(s)}>
-      {s === 'all' ? 'All' : s === 'journal' ? 'Journal' : s === 'physiology' ? 'Physiology' : 'Kids'}
+      {s === 'journal' ? 'Journal' : 'Science'}
     </button>
   ));
 
@@ -286,7 +286,9 @@ export default function ChatPage({ session }: { session: Session }) {
           <div className="welcome">
             <div className="welcome-logo">W</div>
             <h2>What do you want to know?</h2>
-            <p>Search hundreds of articles on movements, nutrition, coaching methodology, programming, and more.</p>
+            <p>{sourceFilter === 'science'
+              ? 'Search medical physiology concepts from the Textbook of Medical Physiology.'
+              : 'Search hundreds of articles on movements, nutrition, coaching methodology, programming, and more.'}</p>
             {!isPaywalled && (
               <div className="suggestions">
                 {activeSuggestions.map((s, i) => <button key={i} className="suggestion" onClick={() => sendMessage(s)}>{s}</button>)}
