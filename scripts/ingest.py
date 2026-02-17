@@ -296,12 +296,12 @@ def main():
         print("Error: Set INGEST_SECRET env var or pass --secret")
         sys.exit(1)
 
-    # Expand directories into PDF files
+    # Expand directories into PDF files (recursively)
     all_targets = []
     for t in args.targets:
         p = Path(t)
         if p.is_dir():
-            all_targets.extend(sorted(str(f) for f in p.glob("*.pdf")))
+            all_targets.extend(sorted(str(f) for f in p.rglob("*.pdf")))
         else:
             all_targets.append(t)
 
