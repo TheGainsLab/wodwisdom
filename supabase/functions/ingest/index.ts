@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
       id: `${slug}-chunk-${i}`,
       title,
       author: author || null,
-      category: category || null,
+      category: category || "journal",
       source: source || null,
       source_url: source_url || null,
       chunk_index: i,

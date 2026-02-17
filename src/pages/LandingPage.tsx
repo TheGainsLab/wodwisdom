@@ -57,7 +57,7 @@ export default function LandingPage() {
       <section className="landing-hero">
         <h1 className="landing-hero-title">Fitness intelligence.</h1>
         <p className="landing-hero-sub">
-          The entire CrossFit knowledge base — searchable by AI. Like having a Level 4 coach in your pocket.
+          Every journal article, seminar, and study guide — trained into one AI, available 24/7.
         </p>
         <button className="landing-cta" onClick={goToAuth}>Get Started Free</button>
       </section>
@@ -65,7 +65,7 @@ export default function LandingPage() {
       {/* ===== Explainer ===== */}
       <section className="landing-explainer">
         <div className="landing-container">
-          <h2 className="landing-section-title">Your coaching brain, supercharged</h2>
+          <h2 className="landing-section-title">Bigger brains, bigger gains</h2>
           <div className="landing-explainer-grid">
             <p>
               WodWisdom is an AI-powered knowledge base built from hundreds of articles on CrossFit
