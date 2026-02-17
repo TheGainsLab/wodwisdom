@@ -57,7 +57,7 @@ export default function LandingPage() {
       <section className="landing-hero">
         <h1 className="landing-hero-title">Fitness intelligence.</h1>
         <p className="landing-hero-sub">
-          The entire CrossFit knowledge base — searchable by AI. Like having a Level 4 coach in your pocket.
+          Every journal article, seminar, and study guide — trained into one AI, available 24/7.
         </p>
         <button className="landing-cta" onClick={goToAuth}>Get Started Free</button>
       </section>
