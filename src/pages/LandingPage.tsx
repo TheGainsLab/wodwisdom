@@ -65,7 +65,7 @@ export default function LandingPage() {
       {/* ===== Explainer ===== */}
       <section className="landing-explainer">
         <div className="landing-container">
-          <h2 className="landing-section-title">Your coaching brain, supercharged</h2>
+          <h2 className="landing-section-title">Bigger brains, bigger gains</h2>
           <div className="landing-explainer-grid">
             <p>
               WodWisdom is an AI-powered knowledge base built from hundreds of articles on CrossFit
