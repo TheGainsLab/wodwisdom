@@ -8,6 +8,38 @@ const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 const FREE_LIMIT = 3;
 const DAILY_LIMIT = 75;
 
+function buildAthleteContext(
+  lifts: Record<string, number> | null | undefined,
+  skills: Record<string, string> | null | undefined
+): string {
+  const hasLifts = lifts && Object.keys(lifts).length > 0;
+  const hasSkills = skills && Object.keys(skills).length > 0;
+  if (!hasLifts && !hasSkills) return "";
+
+  const parts: string[] = ["\n\nATHLETE PROFILE:"];
+
+  if (hasLifts) {
+    const liftLine = Object.entries(lifts)
+      .filter(([, v]) => v > 0)
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v} lbs`)
+      .join(", ");
+    if (liftLine) parts.push("1RM Lifts — " + liftLine);
+  }
+
+  if (hasSkills) {
+    const skillLine = Object.entries(skills)
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
+      .join(", ");
+    if (skillLine) parts.push("Skills — " + skillLine);
+  }
+
+  parts.push(
+    "Personalize advice when relevant: suggest appropriate weights, scaling options, and progressions based on their current abilities."
+  );
+
+  return parts.join("\n");
+}
+
 const JOURNAL_SYSTEM_PROMPT =
   "You are an expert CrossFit coach and knowledge base assistant built on hundreds of CrossFit Journal articles and foundational documents by Greg Glassman and other subject-matter experts. VOICE: Coach-to-coach, direct, practical, no fluff. Conversational paragraphs, not blog posts. Minimal headers and bullets. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Ground answers in the provided article context when available. Cite sources naturally. Emphasize points of performance for movement questions. For nutrition, reference the CrossFit prescription when relevant. If context does not cover the question, supplement with general knowledge but be transparent. Avoid opening every answer with the same quote. Avoid excessive formatting. Do not list sources at the end, weave them in naturally.";
 
@@ -52,6 +84,13 @@ Deno.serve(async (req) => {
       .single();
 
     const isFreeTier = !profile || profile.subscription_status !== "active";
+
+    // Fetch athlete profile for prompt personalization
+    const { data: athleteProfile } = await supa
+      .from("athlete_profiles")
+      .select("lifts, skills")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
     let dailyCount = 0;
     let totalCount = 0;
@@ -161,7 +200,10 @@ Deno.serve(async (req) => {
         model: "claude-sonnet-4-20250514",
         max_tokens: 1024,
         stream: true,
-        system: (source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT) + context,
+        system:
+          (source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT) +
+          buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills) +
+          context,
         messages,
       }),
     });

@@ -129,6 +129,34 @@ body.landing-body{overflow:auto;height:auto}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes bounce{to{transform:translateY(-4px)}}
+/* Settings cards */
+.settings-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:0}
+.settings-card-title{font-size:16px;font-weight:700;letter-spacing:-.2px;margin-bottom:16px}
+.settings-avatar{width:44px;height:44px;background:var(--accent);border-radius:11px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;color:white;flex-shrink:0}
+.settings-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.settings-label{font-size:13px;color:var(--text-dim)}
+.settings-value{font-size:13px;font-weight:500}
+.role-badge{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);background:var(--accent-glow);padding:3px 10px;border-radius:4px;margin-left:auto}
+.success-msg{background:rgba(46,196,134,0.1);border:1px solid rgba(46,196,134,0.25);color:#2ec486;padding:10px 14px;border-radius:8px;font-size:13px}
+/* Athlete profile */
+.athlete-card-subtitle{font-size:13px;color:var(--text-dim);margin-bottom:16px;margin-top:-8px}
+.lift-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lift-item{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.lift-label{font-size:13px;font-weight:500;white-space:nowrap}
+.lift-input{width:72px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;text-align:right;outline:none;transition:border-color .2s}
+.lift-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow)}
+.lift-input::placeholder{color:var(--text-muted)}
+.lift-input::-webkit-outer-spin-button,.lift-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.lift-input[type=number]{-moz-appearance:textfield}
+.skill-list{display:flex;flex-direction:column;gap:6px}
+.skill-row{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.skill-name{font-size:13px;font-weight:500;white-space:nowrap;flex-shrink:0}
+.skill-levels{display:flex;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;flex-shrink:0}
+.skill-level-btn{padding:5px 10px;border:none;background:none;color:var(--text-muted);font-family:'Outfit',sans-serif;font-size:11px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
+.skill-level-btn:not(:last-child){border-right:1px solid var(--border)}
+.skill-level-btn:hover{color:var(--text-dim);background:var(--surface2)}
+.skill-level-btn.active{background:var(--accent);color:white}
+@media(max-width:640px){.lift-grid{grid-template-columns:1fr}.skill-row{flex-direction:column;align-items:flex-start;gap:8px}.skill-levels{width:100%}.skill-level-btn{flex:1;text-align:center}}
 /* Admin */
 .admin-stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:8px}
 .admin-stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 22px}
