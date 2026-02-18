@@ -12,3 +12,6 @@ verify_jwt = false
 
 [functions.admin-data]
 verify_jwt = false
+
+[functions.workout-review]
+verify_jwt = false

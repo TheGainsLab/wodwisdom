@@ -5,5 +5,6 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 export const ANON_KEY = SUPABASE_ANON_KEY;
 export const CHAT_ENDPOINT = SUPABASE_URL + '/functions/v1/chat';
 export const SUMMARIZE_ENDPOINT = SUPABASE_URL + '/functions/v1/summarize';
+export const WORKOUT_REVIEW_ENDPOINT = SUPABASE_URL + '/functions/v1/workout-review';
 export const INVITE_ENDPOINT = SUPABASE_URL + '/functions/v1/invite-coach';
 export const ADMIN_ENDPOINT = SUPABASE_URL + '/functions/v1/admin-data';
