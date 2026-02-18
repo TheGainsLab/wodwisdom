@@ -1,10 +1,12 @@
 -- Admin role and analytics RPC functions
 
--- 1. Add check constraint for valid roles
+-- 1. Add check constraint for valid roles (drop both possible constraint names)
 ALTER TABLE profiles
   DROP CONSTRAINT IF EXISTS valid_role;
 ALTER TABLE profiles
-  ADD CONSTRAINT valid_role CHECK (role IN ('user', 'coach', 'owner', 'admin'));
+  DROP CONSTRAINT IF EXISTS profiles_role_check;
+ALTER TABLE profiles
+  ADD CONSTRAINT profiles_role_check CHECK (role IN ('user', 'coach', 'owner', 'admin'));
 
 -- 2. Aggregate usage stats
 CREATE OR REPLACE FUNCTION admin_usage_stats()
