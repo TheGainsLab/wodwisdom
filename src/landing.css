@@ -36,8 +36,12 @@
 
 /* ===== Demo ===== */
 .landing-demo{padding:100px 0;border-top:1px solid var(--border)}
-.landing-demo-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:40px}
-.landing-demo-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:16px}
+.landing-demo-tabs{display:flex;justify-content:center;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:40px auto 24px;width:fit-content}
+.landing-demo-tab{padding:10px 20px;border:none;background:none;color:var(--text-muted);font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:color .15s,background .15s}
+.landing-demo-tab:not(:last-child){border-right:1px solid var(--border)}
+.landing-demo-tab.active{background:var(--accent);color:white}
+.landing-demo-tab:hover:not(.active){color:var(--text-dim)}
+.landing-demo-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:16px;max-width:680px;margin:0 auto}
 .landing-demo-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);background:var(--accent-glow);padding:4px 10px;border-radius:6px;width:fit-content}
 .landing-demo-q{align-self:flex-end;max-width:85%}
 .landing-demo-a{display:flex;flex-direction:column;gap:8px}
@@ -94,7 +98,6 @@
 .landing-nav{display:none}
 .landing-hero{min-height:auto;padding:60px 24px 80px}
 .landing-explainer-grid{grid-template-columns:1fr;gap:24px}
-.landing-demo-grid{grid-template-columns:1fr;gap:20px}
 .landing-audience-grid{grid-template-columns:1fr;gap:16px}
 .landing-steps-grid{grid-template-columns:1fr;gap:40px}
 .landing-pricing-grid{grid-template-columns:1fr;max-width:400px}
@@ -106,6 +109,7 @@
 .landing-container{padding:0 16px}
 .landing-hero{padding:40px 16px 60px}
 .landing-section-title{font-size:26px}
+.landing-demo-tab{padding:8px 14px;font-size:11px}
 .landing-pricing-card{padding:28px 22px}
 .landing-audience-card{padding:24px 20px}
 }

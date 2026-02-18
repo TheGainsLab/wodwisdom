@@ -2,6 +2,62 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../landing.css';
 
+const DEMO_EXAMPLES = [
+  {
+    tab: 'Coaching',
+    question: 'Evaluate the following workout for my gym. Four rounds for time: 20 wall balls at 20/14 to 10/9 foot target, 10 toes to bar, five power cleans 135/95. Provide suggestions for preparing a class',
+    answer: [
+      <>This is a solid triplet that progresses from high-volume/light-load to low-volume/heavy-load. The workout structure allows athletes to recover grip and breathing during power cleans while hitting different energy systems.</>,
+      <><strong>Time Domain &amp; Expectations</strong> Expect 12–18 minutes for most athletes. Wall balls will be the limiting factor early, while power cleans become the bottleneck as rounds progress. Athletes should complete round one in 3–4 minutes — if they're taking longer, scale immediately.</>,
+      <><strong>Movement Scaling Priorities</strong> For wall balls, reduce ball weight before target height. A 14/10 lb ball maintains the squat-throw pattern better than lowering the target significantly. Consider 10/8 foot targets for newer athletes.</>,
+      <>Toes to bar scale to knee raises, then hanging knee raises, then strict knee raises. Preserve the hanging/grip element when possible.</>,
+      <>Power cleans are your biggest scaling concern at 135/95 — that's relatively heavy for a fatigued state. Scale to 115/75 or even 95/65 for intermediate athletes. Focus on maintaining hip drive and proper catch position rather than grinding through heavy loads with poor mechanics.</>,
+      <><strong>Class Preparation</strong> Warm up thoroughly with air squats, wall ball progressions, and hanging work. Spend significant time on clean setup and technique review — this movement will deteriorate fastest under fatigue.</>,
+      <>Brief athletes on pacing: wall balls in 2–3 sets maximum, quick transitions, and treating power cleans as recovery time with deliberate setup. Consider running scaled versions through one full round during warm-up to test appropriateness.</>,
+      <>The high rep count (140 wall balls total) makes this volume-intensive, so don't hesitate to reduce rounds to three for newer athletes.</>,
+    ],
+    sources: ['CrossFit Level 2 Training Guide', 'CrossFit Journal — Scaling'],
+  },
+  {
+    tab: 'Nutrition',
+    question: 'I do CrossFit at 9am. I am up at 6, get kids ready for school, then I get breakfast. My goals are fitness and performance, and I train once a day. Any guidance on morning nutrition before and after class? Specific suggestions welcome',
+    answer: [
+      <>Your timing gives you a solid three-hour window, which is perfect for proper fueling. Here's what I'd recommend:</>,
+      <><strong>Pre-workout (6–7am):</strong> Focus on easily digestible carbs with minimal fat and fiber to avoid GI distress. Think banana with a small amount of nut butter, oatmeal with berries, or toast with honey. If you handle dairy well, Greek yogurt with fruit works too. Avoid large amounts of protein, fat, or fiber that take energy to digest.</>,
+      <><strong>Hydration:</strong> Drink 16–20oz of water upon waking, then sip another 8–12oz leading up to your workout. You don't need sports drinks for a one-hour session — water is sufficient.</>,
+      <><strong>Post-workout:</strong> This is your key recovery window. Within 30–60 minutes, prioritize protein and carbs to kickstart recovery. Eggs with toast, protein smoothie with fruit, or Greek yogurt with granola all work well. Since you're training for performance, aim for 20–30g of quality protein and similar carbs.</>,
+      <>The CrossFit prescription emphasizes real food over supplements. Your body adapts well to consistent timing, so whatever pattern you choose, stick with it. Since you're up early managing kids and training hard, don't overthink it — focus on foods you enjoy and digest well.</>,
+      <>Pay attention to how different pre-workout meals affect your performance and adjust accordingly. Some people thrive on more food, others prefer training closer to fasted.</>,
+    ],
+    sources: ['CrossFit Journal — Nutrition', 'CrossFit Level 1 Training Guide'],
+  },
+  {
+    tab: 'Movement',
+    question: 'A few athletes in my class are working on stringing together toes to bar. Can you suggest some cues or guidance to help them?',
+    answer: [
+      <>For stringing together toes to bar, focus on the connection between reps rather than individual reps. The key is maintaining momentum and rhythm.</>,
+      <><strong>Critical transition cues:</strong> "Don't stop at the bottom" — most athletes lose their string by coming to a dead hang. "Keep the swing alive" — maintain a slight hollow-to-arch rhythm even between reps. "Quick touch and go" — brief contact with the bar, then immediately back into the next rep.</>,
+      <><strong>Rhythm and timing:</strong> Think of it like a pendulum that never fully stops. Athletes should practice the hollow-arch cycle continuously on the bar before adding the actual toe contact. Have them hang and practice 5–10 small kips without bringing toes up, just to feel the rhythm.</>,
+      <><strong>Grip and positioning:</strong> Encourage a slightly wider grip than strict pull-ups — this gives more room for the legs to come through. Keep shoulders slightly forward of the bar throughout the movement to maintain better swing mechanics.</>,
+      <><strong>Common faults to watch:</strong> Many athletes pike too hard at the top, which kills momentum. Cue "light tap" rather than driving knees to chest. Others let their shoulders go completely passive at the bottom — they need to maintain some tension to keep the swing going.</>,
+      <><strong>Practice progression:</strong> Start with hanging leg raises focusing on rhythm, then progress to alternating single-leg touches, then full toes to bar. The goal is smooth, continuous movement rather than stopping between each rep.</>,
+    ],
+    sources: ['CrossFit Journal — Toes to Bar', 'CrossFit Level 2 Training Guide'],
+  },
+  {
+    tab: 'Science',
+    question: 'Does conditioning generally improve the ability of muscle cells to extract oxygen from blood?',
+    answer: [
+      <>Yes, conditioning significantly improves the ability of muscle cells to extract oxygen from blood through several key adaptations.</>,
+      <>During exercise, muscle cells become much more efficient at pulling oxygen from the blood flowing through them. The physiological texts show that during strenuous exercise, the <strong>utilization coefficient</strong> — the percentage of oxygen that muscle cells extract from blood as it passes through tissue capillaries — can increase dramatically from about 25% at rest to 75–85% during intense exercise. In highly active muscle areas, utilization coefficients approaching 100% have been recorded.</>,
+      <>Training enhances this oxygen extraction capacity through multiple mechanisms. First, conditioning increases the number of open capillaries during exercise. While some muscle capillaries have little to no blood flow at rest, strenuous exercise opens all available capillaries, creating a 2–3 fold increase in capillary surface area. This dramatically reduces the distance oxygen must diffuse from capillaries to working muscle fibers.</>,
+      <>The trained muscle also becomes better at creating the local chemical environment that facilitates oxygen release. During exercise, muscles release carbon dioxide, acids, and heat — all of which shift the <strong>oxygen-hemoglobin dissociation curve</strong> to the right. This forces oxygen to be released from hemoglobin at higher tissue pressures, making it more available to muscle cells even when 70% of the oxygen has already been extracted.</>,
+      <>Additionally, conditioned muscles develop enhanced metabolic machinery at the cellular level that can more efficiently utilize the extracted oxygen for energy production. This combination of improved delivery, extraction, and utilization makes trained muscle remarkably efficient at grabbing and using oxygen from the blood supply.</>,
+    ],
+    sources: ['Guyton & Hall — Textbook of Medical Physiology', 'CrossFit Journal — Conditioning'],
+  },
+];
+
 const FAQ_ITEMS = [
   {
     q: 'What sources does WodWisdom use?',
@@ -28,6 +84,7 @@ const FAQ_ITEMS = [
 export default function LandingPage() {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [activeDemo, setActiveDemo] = useState(0);
   const goToAuth = () => navigate('/auth');
 
   useEffect(() => {
@@ -84,68 +141,35 @@ export default function LandingPage() {
       <section className="landing-demo">
         <div className="landing-container">
           <h2 className="landing-section-title">See it in action</h2>
-          <div className="landing-demo-grid">
-            {/* Athlete demo */}
-            <div className="landing-demo-card">
-              <span className="landing-demo-label">Athlete</span>
-              <div className="landing-demo-q">
-                <div className="msg-body user">What are the points of performance for the overhead squat?</div>
-              </div>
-              <div className="landing-demo-a">
-                <div className="msg-header">
-                  <span className="msg-avatar">W</span>
-                </div>
-                <div className="msg-body assistant">
-                  <p>
-                    The overhead squat demands <strong>midline stabilization</strong> and active shoulders above
-                    everything else. The bar sits slightly behind the head with arms locked out, armpits facing
-                    forward, and the shoulder blades pulled together and down. Your stance should be just outside
-                    shoulder width with toes turned out about 30 degrees.
-                  </p>
-                  <p>
-                    As you descend, push your knees out over your toes, keep your chest tall, and drive your
-                    weight through your heels. The bar should stay over the midfoot throughout the entire range of
-                    motion — if it drifts forward, you lose it. Full depth means the hip crease passes below the
-                    top of the knee while maintaining a neutral spine. Glassman calls this movement the
-                    "ultimate core exercise" because any deficiency in stability or mobility is immediately exposed.
-                  </p>
-                </div>
-                <div className="sources-bar">
-                  <span className="sources-label">Sources</span>
-                  <span className="source-chip">CrossFit Journal — The Overhead Squat</span>
-                </div>
-              </div>
+          <div className="landing-demo-tabs">
+            {DEMO_EXAMPLES.map((ex, i) => (
+              <button
+                key={ex.tab}
+                className={'landing-demo-tab' + (activeDemo === i ? ' active' : '')}
+                onClick={() => setActiveDemo(i)}
+              >
+                {ex.tab}
+              </button>
+            ))}
+          </div>
+          <div className="landing-demo-card">
+            <div className="landing-demo-q">
+              <div className="msg-body user">{DEMO_EXAMPLES[activeDemo].question}</div>
             </div>
-            {/* Coach demo */}
-            <div className="landing-demo-card">
-              <span className="landing-demo-label">Coach</span>
-              <div className="landing-demo-q">
-                <div className="msg-body user">How should I scale thrusters for a class with mixed experience levels?</div>
+            <div className="landing-demo-a">
+              <div className="msg-header">
+                <span className="msg-avatar">W</span>
               </div>
-              <div className="landing-demo-a">
-                <div className="msg-header">
-                  <span className="msg-avatar">W</span>
-                </div>
-                <div className="msg-body assistant">
-                  <p>
-                    Think in <strong>three tiers</strong> based on movement competency, not just strength.
-                    Newer athletes should use a PVC pipe or training bar and focus on hitting full depth with an
-                    upright torso — the front squat to push press is the progression. If they can't maintain
-                    midline stability under load, the weight is too heavy regardless of what's prescribed.
-                  </p>
-                  <p>
-                    Intermediate athletes can load the barbell but should stay at a weight where they can complete
-                    at least 5 reps unbroken with good mechanics. Advanced athletes work at the prescribed load.
-                    The key coaching cue across all levels: <strong>"elbows high and outside, drive through the
-                    heels, press as you stand."</strong> This keeps the movement connected and prevents the common
-                    fault of pressing early and losing the squat.
-                  </p>
-                </div>
-                <div className="sources-bar">
-                  <span className="sources-label">Sources</span>
-                  <span className="source-chip">CrossFit Level 2 Training Guide</span>
-                  <span className="source-chip">CrossFit Journal — Scaling</span>
-                </div>
+              <div className="msg-body assistant">
+                {DEMO_EXAMPLES[activeDemo].answer.map((p, i) => (
+                  <p key={i}>{p}</p>
+                ))}
+              </div>
+              <div className="sources-bar">
+                <span className="sources-label">Sources</span>
+                {DEMO_EXAMPLES[activeDemo].sources.map((s, i) => (
+                  <span key={i} className="source-chip">{s}</span>
+                ))}
               </div>
             </div>
           </div>
