@@ -9,6 +9,7 @@ import HistoryPage from './pages/HistoryPage';
 import BookmarksPage from './pages/BookmarksPage';
 import DashboardPage from './pages/DashboardPage';
 import SettingsPage from './pages/SettingsPage';
+import AdminPage from './pages/AdminPage';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -43,6 +44,7 @@ export default function App() {
       <Route path="/dashboard" element={<DashboardPage session={session} />} />
       <Route path="/bookmarks" element={<BookmarksPage session={session} />} />
       <Route path="/settings" element={<SettingsPage session={session} />} />
+      <Route path="/admin" element={<AdminPage session={session} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
