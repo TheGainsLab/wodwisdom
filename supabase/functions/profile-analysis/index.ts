@@ -48,6 +48,26 @@ function formatProfile(profile: {
   return parts.join("\n") || "No profile data.";
 }
 
+function formatConditioningOnly(profile: {
+  conditioning?: Record<string, string | number> | null;
+  bodyweight?: number | null;
+  units?: string | null;
+}): string {
+  const parts: string[] = [];
+  const u = profile.units === "kg" ? "kg" : "lbs";
+  if (profile.bodyweight && profile.bodyweight > 0) {
+    parts.push(`Bodyweight: ${profile.bodyweight} ${u}`);
+  }
+  if (profile.conditioning && Object.keys(profile.conditioning).length > 0) {
+    const condStr = Object.entries(profile.conditioning)
+      .filter(([, v]) => v !== "" && v != null)
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
+      .join(", ");
+    if (condStr) parts.push("Conditioning — " + condStr);
+  }
+  return parts.join("\n") || "No conditioning data.";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
@@ -123,7 +143,8 @@ Deno.serve(async (req) => {
           { headers: { ...cors, "Content-Type": "application/json" } }
         );
       }
-      userPrompt = `Analyze this athlete's conditioning/engine:\n\n${profileStr}\n\nAssess their work capacity. What's strong? What limits them? How do running, rowing, and bike compare? One clear priority for conditioning.`;
+      const conditioningStr = formatConditioningOnly(profileData);
+      userPrompt = `Analyze this athlete's conditioning/engine. Focus ONLY on these benchmarks:\n\n${conditioningStr}\n\nAssess their work capacity based on these times and calories. What's strong? What limits them? How do running, rowing, and bike compare? One clear priority for conditioning. Do NOT discuss lifts or strength.`;
     } else {
       if (!hasLifts && !hasSkills && !hasConditioning) {
         return new Response(
@@ -133,7 +154,11 @@ Deno.serve(async (req) => {
           { headers: { ...cors, "Content-Type": "application/json" } }
         );
       }
-      userPrompt = `Analyze this athlete's full profile:\n\n${profileStr}\n\nGive a brief strength snapshot, skill focus, and engine/conditioning assessment. One priority for each relevant area (lifts, skills, conditioning).`;
+      const sections: string[] = [];
+      if (hasLifts) sections.push("1. Strength snapshot and one priority");
+      if (hasSkills) sections.push("2. Skill focus and one priority");
+      if (hasConditioning) sections.push("3. Engine/conditioning assessment and one priority");
+      userPrompt = `Analyze this athlete's full profile:\n\n${profileStr}\n\nInclude each of these sections when the data exists:\n${sections.join("\n")}\n\nBe concise. Cover strength, skills, and conditioning as separate sections where data is present.`;
     }
 
     const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
