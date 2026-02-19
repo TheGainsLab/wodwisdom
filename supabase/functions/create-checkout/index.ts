@@ -28,7 +28,8 @@ serve(async (req) => {
 
     const origin = req.headers.get("Origin") || req.headers.get("Referer")?.replace(/\/$/, "") || "https://wodwisdom.com";
     const baseUrl = origin.startsWith("http") ? origin : `https://${origin}`;
-    const returnUrl = `${baseUrl}/checkout/complete`;
+    const successUrl = `${baseUrl}/checkout/complete`;
+    const cancelUrl = `${baseUrl}/checkout`;
 
     const params: Record<string, string> = {
       "mode": "subscription",
@@ -36,8 +37,8 @@ serve(async (req) => {
       "line_items[0][price]": priceId!,
       "line_items[0][quantity]": "1",
       "customer_email": user.email!,
-      "ui_mode": "embedded",
-      "return_url": returnUrl,
+      "success_url": successUrl,
+      "cancel_url": cancelUrl,
       "metadata[user_id]": user.id,
       "metadata[plan]": plan,
       "subscription_data[metadata][user_id]": user.id,
@@ -56,7 +57,7 @@ serve(async (req) => {
     const session = await resp.json();
     if (session.error) throw new Error(session.error.message);
 
-    return new Response(JSON.stringify({ client_secret: session.client_secret }), {
+    return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (e) {
