@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, CREATE_PORTAL_ENDPOINT } from '../lib/supabase';
 import Nav from '../components/Nav';
 
 interface Profile {
   full_name: string;
   role: string;
+  subscription_status?: string;
 }
 
 export default function SettingsPage({ session }: { session: Session }) {
@@ -19,14 +20,31 @@ export default function SettingsPage({ session }: { session: Session }) {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
-    supabase.from('profiles').select('full_name, role').eq('id', session.user.id).single()
+    supabase.from('profiles').select('full_name, role, subscription_status').eq('id', session.user.id).single()
       .then(({ data }) => {
         if (data) setProfile(data);
         setLoading(false);
       });
   }, [session.user.id]);
+
+  const openBillingPortal = async () => {
+    setPortalLoading(true);
+    try {
+      const resp = await fetch(CREATE_PORTAL_ENDPOINT, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const data = await resp.json();
+      if (data.url) window.location.href = data.url;
+      else if (data.error) setError(data.error);
+    } finally {
+      setPortalLoading(false);
+    }
+  };
 
   const saveProfile = async () => {
     setSaving(true); setError(''); setSuccess('');
@@ -68,6 +86,15 @@ export default function SettingsPage({ session }: { session: Session }) {
 
             {loading ? <div className="page-loading"><div className="loading-pulse" /></div> : (
               <>
+                {(profile.subscription_status === 'active' || profile.subscription_status === 'canceling' || profile.subscription_status === 'past_due') && (
+                  <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
+                    <h2 className="settings-card-title">Subscription</h2>
+                    <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 16 }}>Update payment method, change plan, or cancel anytime.</p>
+                    <button className="auth-btn" onClick={openBillingPortal} disabled={portalLoading}>
+                      {portalLoading ? 'Opening...' : 'Manage subscription'}
+                    </button>
+                  </div>
+                )}
                 {/* Profile Section */}
                 <div className="settings-card">
                   <h2 className="settings-card-title">Profile</h2>
