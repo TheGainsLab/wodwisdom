@@ -54,6 +54,7 @@ export default function ChatPage({ session }: { session: Session }) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<'journal' | 'science'>('journal');
+  const [includeProfile, setIncludeProfile] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [dailyUsage, setDailyUsage] = useState(0);
   const [dailyLimit, setDailyLimit] = useState(75);
@@ -109,7 +110,7 @@ export default function ChatPage({ session }: { session: Session }) {
       const resp = await fetch(CHAT_ENDPOINT, {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, history: [...messages, userMsg].slice(-10), source_filter: sourceFilter }),
+        body: JSON.stringify({ question, history: [...messages, userMsg].slice(-10), source_filter: sourceFilter, include_profile: includeProfile }),
       });
 
       const contentType = resp.headers.get('Content-Type') || '';
@@ -364,6 +365,15 @@ export default function ChatPage({ session }: { session: Session }) {
           </div>
         ) : (
           <div className="input-area">
+            <div className="profile-include-row">
+              <button
+                type="button"
+                className={'profile-include-btn' + (includeProfile ? ' active' : '')}
+                onClick={() => setIncludeProfile(v => !v)}
+              >
+                Include my profile (lifts, skills, conditioning)
+              </button>
+            </div>
             <div className="input-row">
               <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} rows={1} placeholder="Ask about movements, nutrition, coaching, programming..." />
               <button className="send-btn" onClick={() => sendMessage()} disabled={isLoading || !input.trim()}>

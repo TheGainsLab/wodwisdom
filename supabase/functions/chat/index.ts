@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { question, history = [], source_filter } = await req.json();
+    const { question, history = [], source_filter, include_profile = false } = await req.json();
 
     // Generate embedding via OpenAI
     const embResp = await fetch("https://api.openai.com/v1/embeddings", {
@@ -220,7 +220,7 @@ Deno.serve(async (req) => {
         stream: true,
         system:
           (source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT) +
-          buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units) +
+          (include_profile ? buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units) : "") +
           context,
         messages,
       }),
