@@ -6,7 +6,8 @@ export default function AuthPage() {
   const [searchParams] = useSearchParams();
   const inviteEmail = searchParams.get('invite') || '';
   const nextUrl = searchParams.get('next') || '/';
-  const [isSignUp, setIsSignUp] = useState(!!inviteEmail);
+  const fromTryItFree = searchParams.get('signup') === '1';
+  const [isSignUp, setIsSignUp] = useState(!!inviteEmail || fromTryItFree);
   const [email, setEmail] = useState(inviteEmail);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -57,8 +58,10 @@ export default function AuthPage() {
     <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-logo">W</div>
-        <h1>{forgotPassword ? 'Reset Password' : inviteEmail ? 'Welcome to WOD Wisdom' : isSignUp ? 'Create Account' : 'Sign In'}</h1>
-        <p className="auth-subtitle">{forgotPassword ? 'Enter your email and we\'ll send you a reset link' : inviteEmail ? 'Enter your name and a password to create your account' : isSignUp ? 'Start your coaching knowledge journey' : 'Access your coaching knowledge base'}</p>
+        <h1>{forgotPassword ? 'Reset Password' : inviteEmail ? 'Welcome to WOD Wisdom' : isSignUp && fromTryItFree ? 'Create Your Account' : isSignUp ? 'Create Account' : 'Sign In'}</h1>
+        {!(isSignUp && fromTryItFree) && (
+          <p className="auth-subtitle">{forgotPassword ? 'Enter your email and we\'ll send you a reset link' : inviteEmail ? 'Enter your name and a password to create your account' : isSignUp ? 'Start your coaching knowledge journey' : 'Access your coaching knowledge base'}</p>
+        )}
         {inviteEmail && <div className="invite-email-badge">{inviteEmail}</div>}
         {error && <div className="auth-error">{error}</div>}
         {forgotPassword ? (
@@ -86,10 +89,12 @@ export default function AuthPage() {
               <button className="auth-btn" type="submit" disabled={loading}>{loading ? (isSignUp ? 'Creating...' : 'Signing in...') : inviteEmail ? 'Create Account & Accept Invite' : (isSignUp ? 'Create Account' : 'Sign In')}</button>
             </form>
             {!inviteEmail && !isSignUp && <div className="auth-toggle"><a onClick={() => { setForgotPassword(true); setError(''); }}>Forgot password?</a></div>}
-            {!inviteEmail && <div className="auth-toggle">
-              <span>{isSignUp ? 'Have an account? ' : 'No account? '}</span>
-              <a onClick={() => { setIsSignUp(!isSignUp); setError(''); }}>{isSignUp ? 'Sign in' : 'Sign up'}</a>
-            </div>}
+            {!inviteEmail && (
+              <div className="auth-toggle">
+                <span>{isSignUp ? 'Already have an account? ' : 'No account? '}</span>
+                <a onClick={() => { setIsSignUp(!isSignUp); setError(''); }}>{isSignUp ? 'Sign in' : 'Sign up'}</a>
+              </div>
+            )}
           </>
         )}
       </div>

@@ -86,6 +86,7 @@ export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [activeDemo, setActiveDemo] = useState(0);
   const goToAuth = () => navigate('/auth');
+  const goToSignup = () => navigate('/auth?signup=1');
 
   useEffect(() => {
     document.body.classList.add('landing-body');
@@ -116,7 +117,7 @@ export default function LandingPage() {
         <p className="landing-hero-sub">
           Every journal article, seminar, and study guide — trained into one AI, available 24/7.
         </p>
-        <button className="landing-cta" onClick={goToAuth}>Try it Free</button>
+        <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
       </section>
 
       {/* ===== Explainer ===== */}
@@ -245,7 +246,7 @@ export default function LandingPage() {
                 <li>Bookmarks & summaries</li>
                 <li>Search history</li>
               </ul>
-              <button className="landing-cta" onClick={goToAuth}>Try it Free</button>
+              <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
             </div>
             <div className="landing-pricing-card featured">
               <div className="landing-pricing-badge">Best for teams</div>
@@ -257,7 +258,7 @@ export default function LandingPage() {
                 <li>Gym dashboard</li>
                 <li>Invite & manage coaches</li>
               </ul>
-              <button className="landing-cta" onClick={goToAuth}>Try it Free</button>
+              <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
             </div>
           </div>
         </div>
@@ -290,7 +291,7 @@ export default function LandingPage() {
       {/* ===== Footer CTA ===== */}
       <section className="landing-footer-cta">
         <h2>The best coaches never stop learning.</h2>
-        <button className="landing-cta" onClick={goToAuth}>Try it Free</button>
+        <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
       </section>
 
       <footer className="landing-footer">
