@@ -3,18 +3,39 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 
-const LIFTS = [
-  { key: 'back_squat', label: 'Back Squat' },
-  { key: 'front_squat', label: 'Front Squat' },
-  { key: 'overhead_squat', label: 'Overhead Squat' },
-  { key: 'deadlift', label: 'Deadlift' },
-  { key: 'clean', label: 'Clean' },
-  { key: 'clean_and_jerk', label: 'Clean & Jerk' },
-  { key: 'snatch', label: 'Snatch' },
-  { key: 'press', label: 'Press' },
-  { key: 'push_press', label: 'Push Press' },
-  { key: 'push_jerk', label: 'Push Jerk' },
-  { key: 'bench_press', label: 'Bench Press' },
+const LIFT_GROUPS = [
+  {
+    title: 'Squats',
+    lifts: [
+      { key: 'back_squat', label: 'Back Squat' },
+      { key: 'front_squat', label: 'Front Squat' },
+      { key: 'overhead_squat', label: 'Overhead Squat' },
+    ],
+  },
+  {
+    title: 'Hip Hinge',
+    lifts: [{ key: 'deadlift', label: 'Deadlift' }],
+  },
+  {
+    title: 'Olympic',
+    lifts: [
+      { key: 'clean', label: 'Clean (only)' },
+      { key: 'power_clean', label: 'Power Clean' },
+      { key: 'clean_and_jerk', label: 'Clean & Jerk' },
+      { key: 'jerk', label: 'Jerk (only)' },
+      { key: 'snatch', label: 'Snatch' },
+      { key: 'power_snatch', label: 'Power Snatch' },
+      { key: 'push_jerk', label: 'Push Jerk' },
+    ],
+  },
+  {
+    title: 'Pressing',
+    lifts: [
+      { key: 'press', label: 'Strict Press' },
+      { key: 'push_press', label: 'Push Press' },
+      { key: 'bench_press', label: 'Bench Press' },
+    ],
+  },
 ];
 
 const SKILLS = [
@@ -48,6 +69,8 @@ export default function AthletePage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [lifts, setLifts] = useState<Record<string, number>>({});
   const [skills, setSkills] = useState<Record<string, SkillLevel>>({});
+  const [bodyweight, setBodyweight] = useState<string>('');
+  const [units, setUnits] = useState<'lbs' | 'kg'>('lbs');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -56,13 +79,15 @@ export default function AthletePage({ session }: { session: Session }) {
   useEffect(() => {
     supabase
       .from('athlete_profiles')
-      .select('lifts, skills')
+      .select('lifts, skills, bodyweight, units')
       .eq('user_id', session.user.id)
       .maybeSingle()
       .then(({ data }) => {
         if (data) {
           setLifts(data.lifts || {});
           setSkills(data.skills || {});
+          setBodyweight(data.bodyweight != null ? String(data.bodyweight) : '');
+          setUnits((data.units as 'lbs' | 'kg') || 'lbs');
         }
         setLoading(false);
       });
@@ -89,6 +114,8 @@ export default function AthletePage({ session }: { session: Session }) {
       if (val > 0) cleanLifts[key] = val;
     }
 
+    const bw = bodyweight === '' ? null : parseFloat(bodyweight);
+
     const { error: err } = await supabase
       .from('athlete_profiles')
       .upsert(
@@ -96,6 +123,8 @@ export default function AthletePage({ session }: { session: Session }) {
           user_id: session.user.id,
           lifts: cleanLifts,
           skills,
+          bodyweight: bw && !isNaN(bw) ? bw : null,
+          units,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' }
@@ -129,23 +158,60 @@ export default function AthletePage({ session }: { session: Session }) {
                 {/* 1RM Lifts */}
                 <div className="settings-card">
                   <h2 className="settings-card-title">1RM Lifts</h2>
-                  <p className="athlete-card-subtitle">Enter your one-rep max weights in pounds</p>
-                  <div className="lift-grid">
-                    {LIFTS.map(lift => (
-                      <div className="lift-item" key={lift.key}>
-                        <span className="lift-label">{lift.label}</span>
-                        <input
-                          className="lift-input"
-                          type="number"
-                          min="0"
-                          step="5"
-                          placeholder="0"
-                          value={lifts[lift.key] || ''}
-                          onChange={e => setLift(lift.key, e.target.value)}
-                        />
-                      </div>
-                    ))}
+                  <p className="athlete-card-subtitle">Enter your one-rep max weights</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+                    <div className="lift-item" style={{ flex: '0 0 auto' }}>
+                      <span className="lift-label">Bodyweight</span>
+                      <input
+                        className="lift-input"
+                        type="number"
+                        min="0"
+                        step={units === 'lbs' ? 5 : 2}
+                        placeholder="0"
+                        value={bodyweight}
+                        onChange={e => setBodyweight(e.target.value)}
+                        style={{ width: 90 }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Units</span>
+                      <button
+                        type="button"
+                        className={'skill-level-btn' + (units === 'lbs' ? ' active' : '')}
+                        onClick={() => setUnits('lbs')}
+                      >
+                        lbs
+                      </button>
+                      <button
+                        type="button"
+                        className={'skill-level-btn' + (units === 'kg' ? ' active' : '')}
+                        onClick={() => setUnits('kg')}
+                      >
+                        kg
+                      </button>
+                    </div>
                   </div>
+                  {LIFT_GROUPS.map(group => (
+                    <div key={group.title} style={{ marginBottom: 20 }}>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
+                      <div className="lift-grid">
+                        {group.lifts.map(lift => (
+                          <div className="lift-item" key={lift.key}>
+                            <span className="lift-label">{lift.label}</span>
+                            <input
+                              className="lift-input"
+                              type="number"
+                              min="0"
+                              step="5"
+                              placeholder="0"
+                              value={lifts[lift.key] || ''}
+                              onChange={e => setLift(lift.key, e.target.value)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 {/* Skills Assessment */}

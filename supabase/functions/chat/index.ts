@@ -10,18 +10,26 @@ const DAILY_LIMIT = 75;
 
 function buildAthleteContext(
   lifts: Record<string, number> | null | undefined,
-  skills: Record<string, string> | null | undefined
+  skills: Record<string, string> | null | undefined,
+  bodyweight: number | null | undefined,
+  units: string | null | undefined
 ): string {
   const hasLifts = lifts && Object.keys(lifts).length > 0;
   const hasSkills = skills && Object.keys(skills).length > 0;
-  if (!hasLifts && !hasSkills) return "";
+  const hasBodyweight = bodyweight != null && bodyweight > 0;
+  if (!hasLifts && !hasSkills && !hasBodyweight) return "";
 
   const parts: string[] = ["\n\nATHLETE PROFILE:"];
+  const u = units === "kg" ? "kg" : "lbs";
+
+  if (hasBodyweight) {
+    parts.push(`Bodyweight: ${bodyweight} ${u}`);
+  }
 
   if (hasLifts) {
     const liftLine = Object.entries(lifts)
       .filter(([, v]) => v > 0)
-      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v} lbs`)
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v} ${u}`)
       .join(", ");
     if (liftLine) parts.push("1RM Lifts — " + liftLine);
   }
@@ -88,7 +96,7 @@ Deno.serve(async (req) => {
     // Fetch athlete profile for prompt personalization
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
-      .select("lifts, skills")
+      .select("lifts, skills, bodyweight, units")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -202,7 +210,7 @@ Deno.serve(async (req) => {
         stream: true,
         system:
           (source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT) +
-          buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills) +
+          buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.bodyweight, athleteProfile?.units) +
           context,
         messages,
       }),
