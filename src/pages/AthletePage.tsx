@@ -355,8 +355,13 @@ export default function AthletePage({ session }: { session: Session }) {
                   )}
                 </div>
 
-                <button className="auth-btn" onClick={saveProfile} disabled={saving}>
-                  {saving ? 'Saving...' : 'Save Athlete Profile'}
+                <button
+                  className="auth-btn"
+                  onClick={saveProfile}
+                  disabled={saving}
+                  style={success ? { background: '#2ec486', color: 'white' } : undefined}
+                >
+                  {saving ? 'Saving...' : success ? 'Saved ✓' : 'Save Athlete Profile'}
                 </button>
               </>
             )}
