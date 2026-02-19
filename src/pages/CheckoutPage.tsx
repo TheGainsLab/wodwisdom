@@ -47,7 +47,7 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
   };
 
   const planName = plan === 'gym' ? 'Gym' : 'Coach';
-  const planPrice = plan === 'gym' ? '$19.99' : '$4.99';
+  const planPrice = plan === 'gym' ? '$24.99' : '$7.99';
 
   return (
     <div className="app-layout">
@@ -69,7 +69,7 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
                 <div className="checkout-plan-card" onClick={() => !loading && selectPlan('athlete')}>
                   <div>
                     <h3 style={{ fontSize: 18, fontWeight: 700 }}>Coach</h3>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)' }}>$4.99<span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-dim)' }}>/mo</span></div>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)' }}>$7.99<span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-dim)' }}>/mo</span></div>
                     <ul style={{ marginTop: 12, paddingLeft: 18, color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.8 }}>
                       <li>Unlimited questions</li>
                       <li>Full source library</li>
@@ -84,7 +84,7 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
                   <div className="checkout-plan-badge">Best for teams</div>
                   <div>
                     <h3 style={{ fontSize: 18, fontWeight: 700 }}>Gym</h3>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)' }}>$19.99<span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-dim)' }}>/mo</span></div>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)' }}>$24.99<span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-dim)' }}>/mo</span></div>
                     <ul style={{ marginTop: 12, paddingLeft: 18, color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.8 }}>
                       <li>Everything in Coach</li>
                       <li>Up to 3 coach seats</li>

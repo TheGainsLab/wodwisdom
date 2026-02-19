@@ -119,7 +119,7 @@ export default function ChatPage({ session }: { session: Session }) {
         const data = await resp.json();
         if (resp.status === 402 && data.code === 'FREE_LIMIT') {
           setTotalQuestions(freeLimit);
-          throw new Error('Free trial ended');
+          throw new Error("You've used your 3 free questions");
         }
         throw new Error(data.error || 'Something went wrong');
       }

@@ -86,6 +86,7 @@ export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [activeDemo, setActiveDemo] = useState(0);
   const goToAuth = () => navigate('/auth');
+  const goToCheckout = () => navigate('/auth?next=/checkout');
 
   useEffect(() => {
     document.body.classList.add('landing-body');
@@ -116,7 +117,7 @@ export default function LandingPage() {
         <p className="landing-hero-sub">
           Every journal article, seminar, and study guide — trained into one AI, available 24/7.
         </p>
-        <button className="landing-cta" onClick={goToAuth}>Get Started Free</button>
+        <button className="landing-cta" onClick={goToAuth}>Get Started</button>
       </section>
 
       {/* ===== Explainer ===== */}
@@ -238,26 +239,26 @@ export default function LandingPage() {
           <div className="landing-pricing-grid">
             <div className="landing-pricing-card">
               <h3>Coach</h3>
-              <div className="landing-price">$4.99<span>/mo</span></div>
+              <div className="landing-price">$7.99<span>/mo</span></div>
               <ul className="landing-pricing-features">
                 <li>Unlimited questions</li>
                 <li>Full source library</li>
                 <li>Bookmarks & summaries</li>
                 <li>Search history</li>
               </ul>
-              <button className="landing-cta" onClick={goToAuth}>Start Free Trial</button>
+              <button className="landing-cta" onClick={goToCheckout}>Subscribe</button>
             </div>
             <div className="landing-pricing-card featured">
               <div className="landing-pricing-badge">Best for teams</div>
               <h3>Gym</h3>
-              <div className="landing-price">$19.99<span>/mo</span></div>
+              <div className="landing-price">$24.99<span>/mo</span></div>
               <ul className="landing-pricing-features">
                 <li>Everything in Coach</li>
                 <li>Up to 3 coach seats</li>
                 <li>Gym dashboard</li>
                 <li>Invite & manage coaches</li>
               </ul>
-              <button className="landing-cta" onClick={goToAuth}>Start Free Trial</button>
+              <button className="landing-cta" onClick={goToCheckout}>Subscribe</button>
             </div>
           </div>
         </div>
@@ -290,7 +291,7 @@ export default function LandingPage() {
       {/* ===== Footer CTA ===== */}
       <section className="landing-footer-cta">
         <h2>The best coaches never stop learning.</h2>
-        <button className="landing-cta" onClick={goToAuth}>Get Started Free</button>
+        <button className="landing-cta" onClick={goToAuth}>Get Started</button>
       </section>
 
       <footer className="landing-footer">

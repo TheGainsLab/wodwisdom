@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 export default function AuthPage() {
-  const params = new URLSearchParams(window.location.search);
-  const inviteEmail = params.get('invite') || '';
+  const [searchParams] = useSearchParams();
+  const inviteEmail = searchParams.get('invite') || '';
+  const nextUrl = searchParams.get('next') || '/';
   const [isSignUp, setIsSignUp] = useState(!!inviteEmail);
   const [email, setEmail] = useState(inviteEmail);
   const [password, setPassword] = useState('');
@@ -41,9 +43,11 @@ export default function AuthPage() {
           await supabase.from('gym_members').update({ user_id: userId, status: 'active' }).eq('invited_email', normalized).eq('status', 'invited');
           await supabase.from('profiles').update({ role: 'coach', subscription_status: 'active' }).eq('id', userId);
         }
+        window.location.href = nextUrl;
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        window.location.href = nextUrl;
       }
     } catch (err: any) { setError(err.message); }
     setLoading(false);
