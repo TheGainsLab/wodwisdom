@@ -15,6 +15,7 @@ const cors = {
 function formatProfile(profile: {
   lifts?: Record<string, number> | null;
   skills?: Record<string, string> | null;
+  conditioning?: Record<string, string | number> | null;
   bodyweight?: number | null;
   units?: string | null;
 }): string {
@@ -36,6 +37,13 @@ function formatProfile(profile: {
       .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
       .join(", ");
     if (skillStr) parts.push("Skills — " + skillStr);
+  }
+  if (profile.conditioning && Object.keys(profile.conditioning).length > 0) {
+    const condStr = Object.entries(profile.conditioning)
+      .filter(([, v]) => v !== "" && v != null)
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
+      .join(", ");
+    if (condStr) parts.push("Conditioning — " + condStr);
   }
   return parts.join("\n") || "No profile data.";
 }
@@ -67,11 +75,11 @@ Deno.serve(async (req) => {
     }
 
     const { type } = await req.json();
-    const analysisType = type === "skills" ? "skills" : type === "full" ? "full" : "lifts";
+    const analysisType = type === "skills" ? "skills" : type === "engine" ? "engine" : type === "full" ? "full" : "lifts";
 
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
-      .select("lifts, skills, bodyweight, units")
+      .select("lifts, skills, conditioning, bodyweight, units")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -82,6 +90,8 @@ Deno.serve(async (req) => {
       profileData.lifts && Object.keys(profileData.lifts).length > 0 && Object.values(profileData.lifts).some((v: unknown) => (v as number) > 0);
     const hasSkills =
       profileData.skills && Object.keys(profileData.skills).length > 0 && Object.entries(profileData.skills).some(([, v]) => v && v !== "none");
+    const hasConditioning =
+      profileData.conditioning && Object.keys(profileData.conditioning).length > 0 && Object.values(profileData.conditioning).some((v) => v !== "" && v != null);
 
     let userPrompt: string;
     if (analysisType === "lifts") {
@@ -104,16 +114,26 @@ Deno.serve(async (req) => {
         );
       }
       userPrompt = `Analyze this athlete's skills:\n\n${profileStr}\n\nBased on their levels, what should they focus on next? Suggest 1–2 skills and a simple progression.`;
-    } else {
-      if (!hasLifts && !hasSkills) {
+    } else if (analysisType === "engine") {
+      if (!hasConditioning) {
         return new Response(
           JSON.stringify({
-            analysis: "Add your lifts and skills to get a full profile analysis. Fill out the sections above and try again.",
+            analysis: "Add your conditioning benchmarks to get an engine analysis. Fill out the conditioning section above and try again.",
           }),
           { headers: { ...cors, "Content-Type": "application/json" } }
         );
       }
-      userPrompt = `Analyze this athlete's full profile:\n\n${profileStr}\n\nGive a brief strength snapshot, then skill focus. One priority for each (lifts + skills).`;
+      userPrompt = `Analyze this athlete's conditioning/engine:\n\n${profileStr}\n\nAssess their work capacity. What's strong? What limits them? How do running, rowing, and bike compare? One clear priority for conditioning.`;
+    } else {
+      if (!hasLifts && !hasSkills && !hasConditioning) {
+        return new Response(
+          JSON.stringify({
+            analysis: "Add your lifts, skills, or conditioning to get a full profile analysis. Fill out the sections above and try again.",
+          }),
+          { headers: { ...cors, "Content-Type": "application/json" } }
+        );
+      }
+      userPrompt = `Analyze this athlete's full profile:\n\n${profileStr}\n\nGive a brief strength snapshot, skill focus, and engine/conditioning assessment. One priority for each relevant area (lifts, skills, conditioning).`;
     }
 
     const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {

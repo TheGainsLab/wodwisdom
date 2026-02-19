@@ -11,13 +11,15 @@ const DAILY_LIMIT = 75;
 function buildAthleteContext(
   lifts: Record<string, number> | null | undefined,
   skills: Record<string, string> | null | undefined,
+  conditioning: Record<string, string | number> | null | undefined,
   bodyweight: number | null | undefined,
   units: string | null | undefined
 ): string {
   const hasLifts = lifts && Object.keys(lifts).length > 0;
   const hasSkills = skills && Object.keys(skills).length > 0;
+  const hasConditioning = conditioning && Object.keys(conditioning).length > 0 && Object.values(conditioning).some((v) => v !== "" && v != null);
   const hasBodyweight = bodyweight != null && bodyweight > 0;
-  if (!hasLifts && !hasSkills && !hasBodyweight) return "";
+  if (!hasLifts && !hasSkills && !hasConditioning && !hasBodyweight) return "";
 
   const parts: string[] = ["\n\nATHLETE PROFILE:"];
   const u = units === "kg" ? "kg" : "lbs";
@@ -39,6 +41,14 @@ function buildAthleteContext(
       .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
       .join(", ");
     if (skillLine) parts.push("Skills — " + skillLine);
+  }
+
+  if (hasConditioning) {
+    const condLine = Object.entries(conditioning)
+      .filter(([, v]) => v !== "" && v != null)
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
+      .join(", ");
+    if (condLine) parts.push("Conditioning — " + condLine);
   }
 
   parts.push(
@@ -96,7 +106,7 @@ Deno.serve(async (req) => {
     // Fetch athlete profile for prompt personalization
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
-      .select("lifts, skills, bodyweight, units")
+      .select("lifts, skills, conditioning, bodyweight, units")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -210,7 +220,7 @@ Deno.serve(async (req) => {
         stream: true,
         system:
           (source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT) +
-          buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.bodyweight, athleteProfile?.units) +
+          buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units) +
           context,
         messages,
       }),

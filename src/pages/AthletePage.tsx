@@ -98,6 +98,31 @@ const SKILL_GROUPS = [
 
 const SKILL_LEVEL_GUIDELINE = 'Beginner = basic grasp · Intermediate = good unless tired · Advanced = reliable when fatigued';
 
+const CONDITIONING_GROUPS = [
+  {
+    title: 'Running',
+    benchmarks: [
+      { key: '1_mile_run', label: '1 Mile Run', placeholder: 'e.g. 6:45', isTime: true },
+      { key: '5k_run', label: '5k Run', placeholder: 'e.g. 22:30', isTime: true },
+    ],
+  },
+  {
+    title: 'Rowing',
+    benchmarks: [
+      { key: '1k_row', label: '1k Row', placeholder: 'e.g. 3:45', isTime: true },
+      { key: '2k_row', label: '2k Row', placeholder: 'e.g. 7:30', isTime: true },
+      { key: '5k_row', label: '5k Row', placeholder: 'e.g. 20:00', isTime: true },
+    ],
+  },
+  {
+    title: 'Bike',
+    benchmarks: [
+      { key: '1min_bike_cals', label: '1 Min Cals', placeholder: '0', isTime: false },
+      { key: '10min_bike_cals', label: '10 Min Cals', placeholder: '0', isTime: false },
+    ],
+  },
+];
+
 const SKILL_LEVELS = ['none', 'beginner', 'intermediate', 'advanced'] as const;
 type SkillLevel = typeof SKILL_LEVELS[number];
 
@@ -112,25 +137,27 @@ export default function AthletePage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [lifts, setLifts] = useState<Record<string, number>>({});
   const [skills, setSkills] = useState<Record<string, SkillLevel>>({});
+  const [conditioning, setConditioning] = useState<Record<string, string | number>>({});
   const [bodyweight, setBodyweight] = useState<string>('');
   const [units, setUnits] = useState<'lbs' | 'kg'>('lbs');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [analysisResult, setAnalysisResult] = useState<{ type: 'lifts' | 'skills' | 'full'; text: string } | null>(null);
-  const [analysisLoading, setAnalysisLoading] = useState<'lifts' | 'skills' | 'full' | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<{ type: 'lifts' | 'skills' | 'engine' | 'full'; text: string } | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState<'lifts' | 'skills' | 'engine' | 'full' | null>(null);
 
   useEffect(() => {
     supabase
       .from('athlete_profiles')
-      .select('lifts, skills, bodyweight, units')
+      .select('lifts, skills, conditioning, bodyweight, units')
       .eq('user_id', session.user.id)
       .maybeSingle()
       .then(({ data }) => {
         if (data) {
           setLifts(data.lifts || {});
           setSkills(data.skills || {});
+          setConditioning(data.conditioning || {});
           setBodyweight(data.bodyweight != null ? String(data.bodyweight) : '');
           setUnits((data.units as 'lbs' | 'kg') || 'lbs');
         }
@@ -148,7 +175,19 @@ export default function AthletePage({ session }: { session: Session }) {
     setSkills(prev => ({ ...prev, [key]: level }));
   };
 
-  const fetchProfileAnalysis = async (type: 'lifts' | 'skills' | 'full') => {
+  const setConditioningVal = (key: string, value: string | number) => {
+    if (value === '' || value === null || value === undefined) {
+      setConditioning(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    } else {
+      setConditioning(prev => ({ ...prev, [key]: value }));
+    }
+  };
+
+  const fetchProfileAnalysis = async (type: 'lifts' | 'skills' | 'engine' | 'full') => {
     setAnalysisLoading(type);
     setAnalysisResult(null);
     setError('');
@@ -184,6 +223,14 @@ export default function AthletePage({ session }: { session: Session }) {
 
     const bw = bodyweight === '' ? null : parseFloat(bodyweight);
 
+    const cleanConditioning: Record<string, string | number> = {};
+    for (const [key, val] of Object.entries(conditioning)) {
+      if (val !== '' && val != null) {
+        const b = CONDITIONING_GROUPS.flatMap(g => g.benchmarks).find(bm => bm.key === key);
+        cleanConditioning[key] = b?.isTime ? String(val) : (typeof val === 'number' ? val : parseInt(String(val), 10) || 0);
+      }
+    }
+
     const { error: err } = await supabase
       .from('athlete_profiles')
       .upsert(
@@ -191,6 +238,7 @@ export default function AthletePage({ session }: { session: Session }) {
           user_id: session.user.id,
           lifts: cleanLifts,
           skills,
+          conditioning: cleanConditioning,
           bodyweight: bw && !isNaN(bw) ? bw : null,
           units,
           updated_at: new Date().toISOString(),
@@ -312,6 +360,32 @@ export default function AthletePage({ session }: { session: Session }) {
                   ))}
                 </div>
 
+                {/* Conditioning Benchmarks */}
+                <div className="settings-card">
+                  <h2 className="settings-card-title">Conditioning Benchmarks</h2>
+                  <p className="athlete-card-subtitle">Running and rowing times (MM:SS), bike in calories.</p>
+                  {CONDITIONING_GROUPS.map(group => (
+                    <div key={group.title} style={{ marginBottom: 20 }}>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
+                      <div className="lift-grid">
+                        {group.benchmarks.map(bm => (
+                          <div className="lift-item" key={bm.key}>
+                            <span className="lift-label">{bm.label}</span>
+                            <input
+                              className="lift-input"
+                              type={bm.isTime ? 'text' : 'number'}
+                              min={bm.isTime ? undefined : 0}
+                              placeholder={bm.placeholder}
+                              value={conditioning[bm.key] ?? ''}
+                              onChange={e => setConditioningVal(bm.key, bm.isTime ? e.target.value.trim() : (e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0))}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
                 {/* AI Profile Analysis */}
                 <div className="settings-card" style={{ borderColor: 'rgba(255,58,58,.2)', background: 'var(--accent-glow)' }}>
                   <h2 className="settings-card-title">AI Profile Analysis</h2>
@@ -339,6 +413,15 @@ export default function AthletePage({ session }: { session: Session }) {
                       type="button"
                       className="auth-btn"
                       style={{ background: 'var(--surface2)', color: 'var(--text)' }}
+                      onClick={() => fetchProfileAnalysis('engine')}
+                      disabled={!!analysisLoading}
+                    >
+                      {analysisLoading === 'engine' ? 'Analyzing...' : 'AI Engine Analysis'}
+                    </button>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      style={{ background: 'var(--surface2)', color: 'var(--text)' }}
                       onClick={() => fetchProfileAnalysis('full')}
                       disabled={!!analysisLoading}
                     >
@@ -348,7 +431,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   {analysisResult && (
                     <div className="workout-review-section" style={{ marginTop: 0 }}>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
-                        {analysisResult.type === 'lifts' ? 'Lifting' : analysisResult.type === 'skills' ? 'Skills' : 'Full Profile'}
+                        {analysisResult.type === 'lifts' ? 'Lifting' : analysisResult.type === 'skills' ? 'Skills' : analysisResult.type === 'engine' ? 'Engine' : 'Full Profile'}
                       </h3>
                       <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap' }}>{analysisResult.text}</div>
                     </div>
