@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, PROFILE_ANALYSIS_ENDPOINT } from '../lib/supabase';
 import Nav from '../components/Nav';
 
 const LIFT_GROUPS = [
@@ -118,6 +118,8 @@ export default function AthletePage({ session }: { session: Session }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [analysisResult, setAnalysisResult] = useState<{ type: 'lifts' | 'skills' | 'full'; text: string } | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState<'lifts' | 'skills' | 'full' | null>(null);
 
   useEffect(() => {
     supabase
@@ -144,6 +146,29 @@ export default function AthletePage({ session }: { session: Session }) {
 
   const setSkill = (key: string, level: SkillLevel) => {
     setSkills(prev => ({ ...prev, [key]: level }));
+  };
+
+  const fetchProfileAnalysis = async (type: 'lifts' | 'skills' | 'full') => {
+    setAnalysisLoading(type);
+    setAnalysisResult(null);
+    setError('');
+    try {
+      const resp = await fetch(PROFILE_ANALYSIS_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + session.access_token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ type }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Analysis failed');
+      setAnalysisResult({ type, text: data.analysis });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Analysis failed');
+    } finally {
+      setAnalysisLoading(null);
+    }
   };
 
   const saveProfile = async () => {
@@ -285,6 +310,49 @@ export default function AthletePage({ session }: { session: Session }) {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* AI Profile Analysis */}
+                <div className="settings-card" style={{ borderColor: 'rgba(255,58,58,.2)', background: 'var(--accent-glow)' }}>
+                  <h2 className="settings-card-title">AI Profile Analysis</h2>
+                  <p className="athlete-card-subtitle">Free analysis of your profile. Does not use your question limit.</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      style={{ background: 'var(--surface2)', color: 'var(--text)' }}
+                      onClick={() => fetchProfileAnalysis('lifts')}
+                      disabled={!!analysisLoading}
+                    >
+                      {analysisLoading === 'lifts' ? 'Analyzing...' : 'AI Lifting Analysis'}
+                    </button>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      style={{ background: 'var(--surface2)', color: 'var(--text)' }}
+                      onClick={() => fetchProfileAnalysis('skills')}
+                      disabled={!!analysisLoading}
+                    >
+                      {analysisLoading === 'skills' ? 'Analyzing...' : 'AI Skills Analysis'}
+                    </button>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      style={{ background: 'var(--surface2)', color: 'var(--text)' }}
+                      onClick={() => fetchProfileAnalysis('full')}
+                      disabled={!!analysisLoading}
+                    >
+                      {analysisLoading === 'full' ? 'Analyzing...' : 'AI Full Profile'}
+                    </button>
+                  </div>
+                  {analysisResult && (
+                    <div className="workout-review-section" style={{ marginTop: 0 }}>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
+                        {analysisResult.type === 'lifts' ? 'Lifting' : analysisResult.type === 'skills' ? 'Skills' : 'Full Profile'}
+                      </h3>
+                      <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap' }}>{analysisResult.text}</div>
+                    </div>
+                  )}
                 </div>
 
                 <button className="auth-btn" onClick={saveProfile} disabled={saving}>

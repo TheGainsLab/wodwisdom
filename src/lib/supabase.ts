@@ -6,6 +6,7 @@ export const ANON_KEY = SUPABASE_ANON_KEY;
 export const CHAT_ENDPOINT = SUPABASE_URL + '/functions/v1/chat';
 export const SUMMARIZE_ENDPOINT = SUPABASE_URL + '/functions/v1/summarize';
 export const WORKOUT_REVIEW_ENDPOINT = SUPABASE_URL + '/functions/v1/workout-review';
+export const PROFILE_ANALYSIS_ENDPOINT = SUPABASE_URL + '/functions/v1/profile-analysis';
 export const CREATE_CHECKOUT_ENDPOINT = SUPABASE_URL + '/functions/v1/create-checkout';
 export const CREATE_PORTAL_ENDPOINT = SUPABASE_URL + '/functions/v1/create-portal-session';
 export const INVITE_ENDPOINT = SUPABASE_URL + '/functions/v1/invite-coach';
