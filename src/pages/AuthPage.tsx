@@ -16,6 +16,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [forgotPassword, setForgotPassword] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [confirmSent, setConfirmSent] = useState(false);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,14 +36,24 @@ export default function AuthPage() {
     setLoading(true); setError('');
     try {
       if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } });
+        const redirectTo = window.location.origin + (nextUrl.startsWith('/') ? nextUrl : '/');
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name: name }, emailRedirectTo: redirectTo },
+        });
         if (error) throw error;
-        // If this is an invite sign-up, accept the invite immediately
+        // If this is an invite sign-up, accept the invite immediately (DB updates apply when they confirm)
         if (inviteEmail && data.user) {
           const userId = data.user.id;
           const normalized = inviteEmail.toLowerCase();
           await supabase.from('gym_members').update({ user_id: userId, status: 'active' }).eq('invited_email', normalized).eq('status', 'invited');
           await supabase.from('profiles').update({ role: 'coach', subscription_status: 'active' }).eq('id', userId);
+        }
+        // If no session, confirmation is required — show "check your email"
+        if (!data.session) {
+          setConfirmSent(true);
+          return;
         }
         window.location.href = nextUrl;
       } else {
@@ -79,6 +90,11 @@ export default function AuthPage() {
               <div className="auth-toggle"><a onClick={() => { setForgotPassword(false); setError(''); }}>Back to sign in</a></div>
             </>
           )
+        ) : confirmSent ? (
+          <>
+            <div className="success-msg">Check your email to confirm your account. Click the link we sent to complete signup.</div>
+            <div className="auth-toggle"><a onClick={() => { setConfirmSent(false); setError(''); }}>Back to sign in</a></div>
+          </>
         ) : (
           <>
             <form onSubmit={handleSubmit}>
