@@ -185,6 +185,15 @@ body.landing-body{overflow:auto;height:auto}
 .history-search-clear:hover{color:var(--text)}
 .search-result-count{max-width:800px;margin:0 auto 8px;font-size:12px;color:var(--text-muted);padding:0 2px}
 .history-match-badge{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);background:var(--accent-glow);padding:2px 8px;border-radius:4px;flex-shrink:0}
+/* Checkout */
+.checkout-plans{display:flex;flex-direction:column;gap:16px}
+.checkout-plan-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;cursor:pointer;transition:all .2s;position:relative}
+.checkout-plan-card:hover{border-color:var(--accent);box-shadow:0 0 20px var(--accent-glow)}
+.checkout-plan-card.featured{border-color:rgba(255,58,58,.3)}
+.checkout-plan-card.featured:hover{border-color:var(--accent)}
+.checkout-plan-badge{position:absolute;top:12px;right:16px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);background:var(--accent-glow);padding:4px 10px;border-radius:6px}
+.checkout-embedded{min-height:400px}
+.checkout-embedded iframe{min-height:400px}
 /* Workout Review */
 .workout-review-input-wrap{display:flex;flex-direction:column}
 .workout-review-textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;color:var(--text);font-family:'Outfit',sans-serif;font-size:15px;line-height:1.5;resize:vertical;min-height:140px;outline:none;transition:border-color .2s,box-shadow .2s}

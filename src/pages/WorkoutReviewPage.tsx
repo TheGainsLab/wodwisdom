@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { WORKOUT_REVIEW_ENDPOINT, supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
@@ -30,6 +31,7 @@ function formatMarkdown(text: string): string {
 }
 
 export default function WorkoutReviewPage({ session }: { session: Session }) {
+  const navigate = useNavigate();
   const [workoutText, setWorkoutText] = useState('');
   const [review, setReview] = useState<WorkoutReview | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -143,7 +145,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                     </div>
                     <h3>You've used your 3 free questions</h3>
                     <p>Upgrade to get unlimited access to workout reviews and the full coaching knowledge base.</p>
-                    <button className="paywall-btn" onClick={() => window.location.href = '/settings'}>Upgrade Now</button>
+                    <button className="paywall-btn" onClick={() => navigate('/checkout')}>Upgrade Now</button>
                   </div>
                 ) : (
                   <button

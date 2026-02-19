@@ -12,6 +12,8 @@ import SettingsPage from './pages/SettingsPage';
 import AdminPage from './pages/AdminPage';
 import AthletePage from './pages/AthletePage';
 import WorkoutReviewPage from './pages/WorkoutReviewPage';
+import CheckoutPage from './pages/CheckoutPage';
+import CheckoutCompletePage from './pages/CheckoutCompletePage';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -43,6 +45,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<ChatPage session={session} />} />
       <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
+      <Route path="/checkout" element={<CheckoutPage session={session} />} />
+      <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
       <Route path="/history" element={<HistoryPage session={session} />} />
       <Route path="/dashboard" element={<DashboardPage session={session} />} />
       <Route path="/bookmarks" element={<BookmarksPage session={session} />} />

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { CHAT_ENDPOINT, SUMMARIZE_ENDPOINT, supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
@@ -48,6 +49,7 @@ function formatMarkdown(text: string): string {
 }
 
 export default function ChatPage({ session }: { session: Session }) {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -301,7 +303,7 @@ export default function ChatPage({ session }: { session: Session }) {
                 </div>
                 <h3>You've used your 3 free questions</h3>
                 <p>Upgrade to get unlimited access to the full coaching knowledge base.</p>
-                <button className="paywall-btn">Upgrade Now</button>
+                <button className="paywall-btn" onClick={() => navigate('/checkout')}>Upgrade Now</button>
               </div>
             )}
           </div>
@@ -357,7 +359,7 @@ export default function ChatPage({ session }: { session: Session }) {
             <div className="paywall-bar-inner">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
               <span>You've used your 3 free questions.</span>
-              <button className="paywall-btn-sm">Upgrade to keep asking</button>
+              <button className="paywall-btn-sm" onClick={() => navigate('/checkout')}>Upgrade to keep asking</button>
             </div>
           </div>
         ) : (
