@@ -38,22 +38,65 @@ const LIFT_GROUPS = [
   },
 ];
 
-const SKILLS = [
-  { key: 'muscle_ups', label: 'Muscle-Ups' },
-  { key: 'bar_muscle_ups', label: 'Bar Muscle-Ups' },
-  { key: 'hspu', label: 'HSPU' },
-  { key: 'strict_hspu', label: 'Strict HSPU' },
-  { key: 'handstand_walk', label: 'Handstand Walk' },
-  { key: 'double_unders', label: 'Double-Unders' },
-  { key: 'pistols', label: 'Pistols' },
-  { key: 'rope_climbs', label: 'Rope Climbs' },
-  { key: 'toes_to_bar', label: 'Toes-to-Bar' },
-  { key: 'kipping_pull_ups', label: 'Kipping Pull-Ups' },
-  { key: 'butterfly_pull_ups', label: 'Butterfly Pull-Ups' },
-  { key: 'strict_pull_ups', label: 'Strict Pull-Ups' },
-  { key: 'ring_dips', label: 'Ring Dips' },
-  { key: 'l_sit', label: 'L-Sit' },
+const SKILL_GROUPS = [
+  {
+    title: 'Muscle-Ups',
+    skills: [
+      { key: 'muscle_ups', label: 'Muscle-Ups (rings)' },
+      { key: 'bar_muscle_ups', label: 'Bar Muscle-Ups' },
+      { key: 'strict_ring_muscle_ups', label: 'Strict Ring Muscle-Ups' },
+    ],
+  },
+  {
+    title: 'Bar',
+    skills: [
+      { key: 'toes_to_bar', label: 'Toes-to-Bar' },
+      { key: 'bar_muscle_ups', label: 'Bar Muscle-Ups' },
+    ],
+  },
+  {
+    title: 'Pull-Ups',
+    skills: [
+      { key: 'strict_pull_ups', label: 'Strict Pull-Ups' },
+      { key: 'kipping_pull_ups', label: 'Kipping Pull-Ups' },
+      { key: 'butterfly_pull_ups', label: 'Butterfly Pull-Ups' },
+      { key: 'chest_to_bar_pull_ups', label: 'Chest to Bar Pull-Ups' },
+    ],
+  },
+  {
+    title: 'Rope Climbs',
+    skills: [
+      { key: 'rope_climbs', label: 'Rope Climbs' },
+      { key: 'legless_rope_climbs', label: 'Legless Rope Climbs' },
+    ],
+  },
+  {
+    title: 'HSPU',
+    skills: [
+      { key: 'wall_facing_hspu', label: 'Wall-Facing HSPU' },
+      { key: 'hspu', label: 'HSPU' },
+      { key: 'strict_hspu', label: 'Strict HSPU' },
+      { key: 'deficit_hspu', label: 'Deficit HSPU' },
+    ],
+  },
+  {
+    title: 'Rings',
+    skills: [
+      { key: 'ring_dips', label: 'Ring Dips' },
+      { key: 'l_sit', label: 'L-Sit' },
+    ],
+  },
+  {
+    title: 'Other',
+    skills: [
+      { key: 'handstand_walk', label: 'Handstand Walk' },
+      { key: 'double_unders', label: 'Double-Unders' },
+      { key: 'pistols', label: 'Pistols' },
+    ],
+  },
 ];
+
+const SKILL_LEVEL_GUIDELINE = 'Beginner = basic grasp · Intermediate = good unless tired · Advanced = reliable when fatigued';
 
 const SKILL_LEVELS = ['none', 'beginner', 'intermediate', 'advanced'] as const;
 type SkillLevel = typeof SKILL_LEVELS[number];
@@ -217,26 +260,31 @@ export default function AthletePage({ session }: { session: Session }) {
                 {/* Skills Assessment */}
                 <div className="settings-card">
                   <h2 className="settings-card-title">Skills Assessment</h2>
-                  <p className="athlete-card-subtitle">Rate your current ability for each skill</p>
-                  <div className="skill-list">
-                    {SKILLS.map(skill => (
-                      <div className="skill-row" key={skill.key}>
-                        <span className="skill-name">{skill.label}</span>
-                        <div className="skill-levels">
-                          {SKILL_LEVELS.map(level => (
-                            <button
-                              key={level}
-                              className={'skill-level-btn' + ((skills[skill.key] || 'none') === level ? ' active' : '')}
-                              onClick={() => setSkill(skill.key, level)}
-                              type="button"
-                            >
-                              {LEVEL_LABELS[level]}
-                            </button>
-                          ))}
-                        </div>
+                  <p className="athlete-card-subtitle">Rate your current ability for each skill. {SKILL_LEVEL_GUIDELINE}</p>
+                  {SKILL_GROUPS.map(group => (
+                    <div key={group.title} style={{ marginBottom: 24 }}>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 12 }}>{group.title}</h3>
+                      <div className="skill-list">
+                        {group.skills.map(skill => (
+                          <div className="skill-row" key={skill.key}>
+                            <span className="skill-name">{skill.label}</span>
+                            <div className="skill-levels">
+                              {SKILL_LEVELS.map(level => (
+                                <button
+                                  key={level}
+                                  className={'skill-level-btn' + ((skills[skill.key] || 'none') === level ? ' active' : '')}
+                                  onClick={() => setSkill(skill.key, level)}
+                                  type="button"
+                                >
+                                  {LEVEL_LABELS[level]}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
 
                 <button className="auth-btn" onClick={saveProfile} disabled={saving}>
