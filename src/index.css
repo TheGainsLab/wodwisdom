@@ -216,4 +216,34 @@ body.landing-body{overflow:auto;height:auto}
 .workout-review-movement strong{display:block;font-size:14px;color:var(--text);margin-bottom:6px}
 .workout-review-cues{margin:0;padding-left:20px;color:var(--text-dim);font-size:14px;line-height:1.6}
 .workout-review-cues li{margin-bottom:4px}
+/* Programs */
+.programs-list-wrap{max-width:800px;margin:0 auto}
+.add-program-cta{display:flex;align-items:center;gap:10px;width:100%;padding:16px 20px;background:var(--surface);border:2px dashed var(--border);border-radius:12px;font-family:'Outfit',sans-serif;font-size:15px;font-weight:600;color:var(--accent);cursor:pointer;transition:all .2s;margin-bottom:20px}
+.add-program-cta:hover{border-color:var(--accent);background:var(--accent-glow)}
+.program-paste-zone{background:var(--surface);border:2px dashed var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+.program-paste-zone.drag-over{border-color:var(--accent);background:var(--accent-glow)}
+.program-paste-zone p{font-size:13px;color:var(--text-dim);margin-bottom:12px}
+.program-paste-zone textarea{width:100%;min-height:200px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.6;resize:vertical;outline:none}
+.program-paste-zone textarea:focus{border-color:var(--accent)}
+.program-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.program-name-input{flex:1;min-width:180px;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px}
+.program-preview-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.program-preview-header h2{font-size:16px;font-weight:700}
+.link-btn{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;font-weight:500}
+.link-btn:hover{text-decoration:underline}
+.program-preview-table-wrap{overflow-x:auto;margin-bottom:16px;border:1px solid var(--border);border-radius:8px}
+.program-preview-table{width:100%;border-collapse:collapse;font-size:13px}
+.program-preview-table th,.program-preview-table td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border)}
+.program-preview-table th{background:var(--bg);font-weight:600;color:var(--text-dim)}
+.program-preview-table tr:last-child td{border-bottom:none}
+.program-edit-num{width:56px;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px}
+.program-edit-text{width:100%;min-width:200px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:13px}
+.program-remove-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:4px}
+.program-remove-btn:hover{text-decoration:underline}
+.program-workouts-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
+.program-workouts-table{width:100%;border-collapse:collapse;font-size:13px}
+.program-workouts-table th,.program-workouts-table td{padding:12px 16px;text-align:left;border-bottom:1px solid var(--border)}
+.program-workouts-table th{background:var(--bg);font-weight:600;color:var(--text-dim)}
+.program-workouts-table .workout-text-cell{color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px}
+.error-msg{color:var(--accent);font-size:13px}
 @media(max-width:640px){.chat-header{padding:10px 12px}.source-btn{padding:6px 10px;font-size:11px}.messages{padding:16px 12px}.msg.user{max-width:85%}.msg-body.assistant{padding:14px 16px}.input-area{padding:10px 12px 14px}.auth-card{padding:32px 24px}.suggestions{flex-direction:column}.welcome h2{font-size:22px}.welcome-logo{width:52px;height:52px;font-size:26px}.page-header{flex-wrap:wrap}.history-search-wrap{max-width:none;flex-basis:100%;order:3;margin-left:0;margin-top:8px}}
