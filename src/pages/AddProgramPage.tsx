@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
+import * as mammoth from 'mammoth';
+import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import InviteBanner from '../components/InviteBanner';
@@ -59,6 +61,71 @@ function parseProgramText(text: string): ParsedWorkout[] {
   return result;
 }
 
+const DAY_COL_NAMES = ['monday', 'mon', 'tuesday', 'tue', 'wednesday', 'wed', 'thursday', 'thu', 'friday', 'fri', 'saturday', 'sat', 'sunday', 'sun'];
+const DAY_COL_TO_NUM: Record<string, number> = { monday: 1, mon: 1, tuesday: 2, tue: 2, wednesday: 3, wed: 3, thursday: 4, thu: 4, friday: 5, fri: 5, saturday: 6, sat: 6, sunday: 7, sun: 7 };
+
+function parseExcelToWorkouts(arrayBuffer: ArrayBuffer): ParsedWorkout[] {
+  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 }) as (string | number)[][];
+
+  if (!rows || rows.length < 1) return [];
+
+  const result: ParsedWorkout[] = [];
+  const headerRow = rows[0].map(c => String(c || '').trim().toLowerCase());
+  const dataRows = rows.slice(1);
+
+  const idxWeek = headerRow.findIndex(h => h === 'week' || h === 'wk');
+  const idxDay = headerRow.findIndex(h => h === 'day' || h === 'day_num');
+  const idxWorkout = headerRow.findIndex(h => ['workout', 'wod', 'exercise', 'exercises'].includes(h));
+  const dayCols = headerRow.map((h, i) => {
+    const match = DAY_COL_NAMES.find(d => h === d || h.startsWith(d));
+    return match ? { idx: i, dayNum: DAY_COL_TO_NUM[match] || 1 } : null;
+  }).filter(Boolean) as { idx: number; dayNum: number }[];
+
+  const isPivot = dayCols.length >= 3 && (idxWorkout < 0 || dayCols.some(d => d.idx < (idxWorkout ?? Infinity)));
+  const pivotWeekCol = headerRow.findIndex(h => h === 'week' || h === 'wk');
+
+  if (isPivot && dayCols.length > 0) {
+    for (let r = 0; r < dataRows.length; r++) {
+      const row = dataRows[r];
+      const weekNum = pivotWeekCol >= 0 ? (parseInt(String(row[pivotWeekCol] || 1), 10) || r + 1) : r + 1;
+      for (const { idx, dayNum } of dayCols) {
+        const val = row[idx];
+        const text = String(val || '').trim();
+        if (text.length > 0) {
+          result.push({ week_num: weekNum, day_num: dayNum, workout_text: text, sort_order: result.length });
+        }
+      }
+    }
+  } else if (idxWeek >= 0 || idxDay >= 0 || idxWorkout >= 0) {
+    const w = idxWeek >= 0 ? idxWeek : 0;
+    const d = idxDay >= 0 ? idxDay : idxWeek >= 0 ? idxWeek + 1 : 1;
+    const txt = idxWorkout >= 0 ? idxWorkout : Math.max(w, d) + 1;
+    for (const row of dataRows) {
+      const workoutText = String(row[txt] ?? '').trim();
+      if (workoutText.length > 0) {
+        const weekNum = parseInt(String(row[w] ?? 1), 10) || 1;
+        const dayNum = idxDay >= 0 ? (parseInt(String(row[d] ?? 1), 10) || 1) : 1;
+        result.push({ week_num: weekNum, day_num: dayNum, workout_text: workoutText, sort_order: result.length });
+      }
+    }
+  } else {
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const weekNum = parseInt(String(row[0] ?? 1), 10) || 1;
+      const dayNum = parseInt(String(row[1] ?? (i % 7) + 1), 10) || ((i % 7) + 1);
+      const workoutText = row.slice(2).map(c => String(c || '').trim()).filter(Boolean).join(' ');
+      if (workoutText.length > 0) {
+        result.push({ week_num: weekNum, day_num: dayNum, workout_text: workoutText, sort_order: result.length });
+      }
+    }
+  }
+
+  return result;
+}
+
 export default function AddProgramPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const [pasteText, setPasteText] = useState('');
@@ -90,17 +157,52 @@ export default function AddProgramPage({ session }: { session: Session }) {
     setIsDragOver(false);
     const file = e.dataTransfer.files[0];
     if (!file) return;
-    if (!['text/plain', 'text/csv', 'application/csv'].includes(file.type) && !file.name.endsWith('.txt') && !file.name.endsWith('.csv')) {
-      setError('Use .txt or .csv files. Excel coming soon.');
+    const ext = file.name.toLowerCase().split('.').pop() || '';
+    const isTxt = ['text/plain', 'text/csv', 'application/csv'].includes(file.type) || ext === 'txt' || ext === 'csv';
+    const isDocx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || ext === 'docx';
+    const isExcel = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'].includes(file.type) || ext === 'xlsx' || ext === 'xls';
+
+    if (!isTxt && !isDocx && !isExcel) {
+      setError('Use .txt, .csv, .docx, or .xlsx files.');
       return;
     }
+
+    if (isTxt) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setPasteText(reader.result as string);
+        setError('');
+      };
+      reader.readAsText(file);
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onload = () => {
-      const content = reader.result as string;
-      setPasteText(content);
-      setError('');
+    reader.onload = async () => {
+      const buf = reader.result as ArrayBuffer;
+      if (isDocx) {
+        try {
+          const { value } = await mammoth.extractRawText({ arrayBuffer: buf });
+          setPasteText(value || '');
+          setError('');
+        } catch (err) {
+          setError('Could not read this Word file. Try copying the text and pasting instead.');
+        }
+      } else if (isExcel) {
+        try {
+          const workouts = parseExcelToWorkouts(buf);
+          if (workouts.length === 0) {
+            setError('Could not find workouts in this Excel file. Expected columns like Week, Day, Workout.');
+            return;
+          }
+          setParsed(workouts);
+          setError('');
+        } catch (err) {
+          setError('Could not read this Excel file.');
+        }
+      }
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -169,7 +271,7 @@ export default function AddProgramPage({ session }: { session: Session }) {
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                 >
-                  <p>Paste your program below, or drop a .txt or .csv file here</p>
+                  <p>Paste your program below, or drop a .txt, .csv, .docx, or .xlsx file here</p>
                   <textarea
                     placeholder="Week 1&#10;Monday: 5 RFT 20 WB, 10 T2B, 5 PC 135/95&#10;Tuesday: Back squat 5x5 @ 80%&#10;Wednesday: Helen&#10;&#10;Week 2&#10;..."
                     value={pasteText}
