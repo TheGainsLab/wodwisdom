@@ -218,6 +218,10 @@ body.landing-body{overflow:auto;height:auto}
 .workout-review-cues li{margin-bottom:4px}
 /* Programs */
 .programs-list-wrap{max-width:800px;margin:0 auto}
+.program-list-actions{display:flex;gap:4px;flex-shrink:0}
+.program-list-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:none;background:none;color:var(--text-muted);cursor:pointer;border-radius:6px;transition:color .15s,background .15s}
+.program-list-btn:hover{color:var(--text);background:var(--surface2)}
+.program-list-btn-delete:hover{color:var(--accent)}
 .add-program-cta{display:flex;align-items:center;gap:10px;width:100%;padding:16px 20px;background:var(--surface);border:2px dashed var(--border);border-radius:12px;font-family:'Outfit',sans-serif;font-size:15px;font-weight:600;color:var(--accent);cursor:pointer;transition:all .2s;margin-bottom:20px}
 .add-program-cta:hover{border-color:var(--accent);background:var(--accent-glow)}
 .program-paste-zone{background:var(--surface);border:2px dashed var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
@@ -240,6 +244,8 @@ body.landing-body{overflow:auto;height:auto}
 .program-edit-text{width:100%;min-width:200px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text)}
 .program-remove-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:4px}
 .program-remove-btn:hover{text-decoration:underline}
+.program-detail-wrap,.programs-add-wrap{max-width:900px;margin:0 auto}
+.program-detail-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .program-workouts-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
 .program-workouts-table{width:100%;border-collapse:collapse;font-size:13px}
 .program-workouts-table th,.program-workouts-table td{padding:12px 16px;text-align:left;border-bottom:1px solid var(--border)}
