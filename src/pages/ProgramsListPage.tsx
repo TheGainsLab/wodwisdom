@@ -101,7 +101,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                         </button>
                       </div>
                     </div>
-                    <div className="history-answer" style={{ padding: '8px 18px 14px', fontSize: 12, color: 'var(--text-muted)' }}>
+                    <div className="history-answer" style={{ padding: '8px 18px 14px', fontSize: 12, color: 'var(--text-dim)' }}>
                       Created {formatDate(p.created_at)}
                     </div>
                   </div>
