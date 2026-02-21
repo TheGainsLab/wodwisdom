@@ -33,6 +33,14 @@ const SUGGESTIONS: Record<string, string[]> = {
     'How do the kidneys regulate fluid balance?',
     'Explain the cardiac cycle and its phases',
   ],
+  'strength-science': [
+    'How does periodization improve strength gains?',
+    'What are the biomechanics of the deadlift?',
+    'How does progressive overload work for hypertrophy?',
+    'What role does the nervous system play in strength?',
+    'How should I program squats for intermediates?',
+    'What does the research say about training frequency?',
+  ],
 };
 
 function formatMarkdown(text: string): string {
@@ -53,7 +61,7 @@ export default function ChatPage({ session }: { session: Session }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState<'journal' | 'science'>('journal');
+  const [sourceFilter, setSourceFilter] = useState<'journal' | 'science' | 'strength-science'>('journal');
   const [includeProfile, setIncludeProfile] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [dailyUsage, setDailyUsage] = useState(0);
@@ -262,9 +270,9 @@ export default function ChatPage({ session }: { session: Session }) {
 
   const activeSuggestions = SUGGESTIONS[sourceFilter];
 
-  const sourceButtons = (['journal', 'science'] as const).map(s => (
+  const sourceButtons = (['journal', 'science', 'strength-science'] as const).map(s => (
     <button key={s} className={"source-btn " + (sourceFilter === s ? "active" : "")} onClick={() => setSourceFilter(s)}>
-      {s === 'journal' ? 'Journal' : 'Science'}
+      {s === 'journal' ? 'Journal' : s === 'science' ? 'Science' : 'Strength'}
     </button>
   ));
 
@@ -291,6 +299,8 @@ export default function ChatPage({ session }: { session: Session }) {
             <h2>What do you want to know?</h2>
             <p>{sourceFilter === 'science'
               ? 'Search medical physiology concepts from the Textbook of Medical Physiology.'
+              : sourceFilter === 'strength-science'
+              ? 'Search strength training science, programming, and biomechanics.'
               : 'Search hundreds of articles on movements, nutrition, coaching methodology, programming, and more.'}</p>
             {!isPaywalled && (
               <div className="suggestions">

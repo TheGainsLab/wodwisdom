@@ -64,6 +64,9 @@ const JOURNAL_SYSTEM_PROMPT =
 const SCIENCE_SYSTEM_PROMPT =
   "You are a medical physiology expert grounded in the Textbook of Medical Physiology (Guyton & Hall). Explain concepts clearly using accurate physiological terminology. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Ground answers in the provided article context when available. Cite sources naturally. Use clinical examples when helpful to illustrate concepts. If context does not cover the question, say so transparently rather than guessing. Avoid excessive formatting. Do not list sources at the end, weave them in naturally.";
 
+const STRENGTH_SYSTEM_PROMPT =
+  "You are a strength and conditioning expert grounded in strength-science literature. Focus on programming, periodization, biomechanics, and the physiology of strength. Coach-to-coach voice, practical and evidence-based. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Ground answers in the provided context when available. Cite sources naturally. Emphasize application to training—how to program, progress, and avoid common errors. If context does not cover the question, supplement with general knowledge but be transparent. Avoid excessive formatting. Do not list sources at the end, weave them in naturally.";
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -219,7 +222,7 @@ Deno.serve(async (req) => {
         max_tokens: 1024,
         stream: true,
         system:
-          (source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT) +
+          (source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : source_filter === "strength-science" ? STRENGTH_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT) +
           (include_profile ? buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units) : "") +
           context,
         messages,
