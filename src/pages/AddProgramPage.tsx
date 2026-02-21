@@ -64,6 +64,24 @@ function parseProgramText(text: string): ParsedWorkout[] {
 const DAY_COL_NAMES = ['monday', 'mon', 'tuesday', 'tue', 'wednesday', 'wed', 'thursday', 'thu', 'friday', 'fri', 'saturday', 'sat', 'sunday', 'sun'];
 const DAY_COL_TO_NUM: Record<string, number> = { monday: 1, mon: 1, tuesday: 2, tue: 2, wednesday: 3, wed: 3, thursday: 4, thu: 4, friday: 5, fri: 5, saturday: 6, sat: 6, sunday: 7, sun: 7 };
 
+function parseDayValue(val: unknown): number | null {
+  const s = String(val || '').trim().toLowerCase();
+  if (DAY_COL_TO_NUM[s] != null) return DAY_COL_TO_NUM[s];
+  const n = parseInt(s, 10);
+  if (!isNaN(n) && n >= 1 && n <= 7) return n;
+  return null;
+}
+
+function findHeaderRow(rows: (string | number)[][]): number {
+  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    const row = rows[i] || [];
+    const cells = row.map(c => String(c || '').trim().toLowerCase());
+    const dayCount = cells.filter(c => DAY_COL_NAMES.includes(c)).length;
+    if (dayCount >= 2) return i;
+  }
+  return 0;
+}
+
 function parseExcelToWorkouts(arrayBuffer: ArrayBuffer): ParsedWorkout[] {
   const workbook = XLSX.read(arrayBuffer, { type: 'array' });
   const sheetName = workbook.SheetNames[0];
@@ -73,29 +91,51 @@ function parseExcelToWorkouts(arrayBuffer: ArrayBuffer): ParsedWorkout[] {
   if (!rows || rows.length < 1) return [];
 
   const result: ParsedWorkout[] = [];
-  const headerRow = rows[0].map(c => String(c || '').trim().toLowerCase());
-  const dataRows = rows.slice(1);
+  const headerRowIdx = findHeaderRow(rows);
+  const headerRow = (rows[headerRowIdx] || []).map(c => String(c || '').trim().toLowerCase());
+  const dataRows = rows.slice(headerRowIdx + 1);
 
   const idxWeek = headerRow.findIndex(h => h === 'week' || h === 'wk');
   const idxDay = headerRow.findIndex(h => h === 'day' || h === 'day_num');
   const idxWorkout = headerRow.findIndex(h => ['workout', 'wod', 'exercise', 'exercises'].includes(h));
-  const dayCols = headerRow.map((h, i) => {
-    const match = DAY_COL_NAMES.find(d => h === d || h.startsWith(d));
-    return match ? { idx: i, dayNum: DAY_COL_TO_NUM[match] || 1 } : null;
-  }).filter(Boolean) as { idx: number; dayNum: number }[];
+  const dayCols = headerRow
+    .map((h, i) => (DAY_COL_NAMES.includes(h) ? { idx: i, dayNum: DAY_COL_TO_NUM[h] || 1 } : null))
+    .filter((x): x is { idx: number; dayNum: number } => x != null)
+    .sort((a, b) => a.dayNum - b.dayNum);
 
-  const isPivot = dayCols.length >= 3 && (idxWorkout < 0 || dayCols.some(d => d.idx < (idxWorkout ?? Infinity)));
+  const isPivot = dayCols.length >= 2;
   const pivotWeekCol = headerRow.findIndex(h => h === 'week' || h === 'wk');
 
   if (isPivot && dayCols.length > 0) {
-    for (let r = 0; r < dataRows.length; r++) {
-      const row = dataRows[r];
-      const weekNum = pivotWeekCol >= 0 ? (parseInt(String(row[pivotWeekCol] || 1), 10) || r + 1) : r + 1;
+    const blocks: (string | number)[][][] = [];
+    let currentBlock: (string | number)[][] = [];
+    for (const row of dataRows) {
+      const arr = row || [];
+      const hasDataInDayCols = dayCols.some(({ idx }) => {
+        const val = arr[idx];
+        return val != null && String(val).trim().length > 0;
+      });
+      if (hasDataInDayCols) {
+        currentBlock.push(arr);
+      } else if (currentBlock.length > 0) {
+        blocks.push(currentBlock);
+        currentBlock = [];
+      }
+    }
+    if (currentBlock.length > 0) blocks.push(currentBlock);
+
+    let sortOrder = 0;
+    for (let weekIdx = 0; weekIdx < blocks.length; weekIdx++) {
+      const block = blocks[weekIdx];
+      const firstRow = block[0] as (string | number)[] | undefined;
+      const weekNum = pivotWeekCol >= 0 && firstRow?.[pivotWeekCol] != null
+        ? parseInt(String(firstRow[pivotWeekCol]), 10) || weekIdx + 1
+        : weekIdx + 1;
       for (const { idx, dayNum } of dayCols) {
-        const val = row[idx];
-        const text = String(val || '').trim();
-        if (text.length > 0) {
-          result.push({ week_num: weekNum, day_num: dayNum, workout_text: text, sort_order: result.length });
+        const parts = block.map((r: (string | number)[]) => String(r[idx] || '').trim()).filter(Boolean);
+        const workoutText = parts.join(' ');
+        if (workoutText.length > 0) {
+          result.push({ week_num: weekNum, day_num: dayNum, workout_text: workoutText, sort_order: sortOrder++ });
         }
       }
     }
@@ -107,18 +147,20 @@ function parseExcelToWorkouts(arrayBuffer: ArrayBuffer): ParsedWorkout[] {
       const workoutText = String(row[txt] ?? '').trim();
       if (workoutText.length > 0) {
         const weekNum = parseInt(String(row[w] ?? 1), 10) || 1;
-        const dayNum = idxDay >= 0 ? (parseInt(String(row[d] ?? 1), 10) || 1) : 1;
+        const parsedDay = parseDayValue(row[d]);
+        const dayNum = parsedDay ?? 1;
         result.push({ week_num: weekNum, day_num: dayNum, workout_text: workoutText, sort_order: result.length });
       }
     }
   } else {
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
+    for (let i = headerRowIdx + 1; i < rows.length; i++) {
+      const row = rows[i] || [];
       const weekNum = parseInt(String(row[0] ?? 1), 10) || 1;
-      const dayNum = parseInt(String(row[1] ?? (i % 7) + 1), 10) || ((i % 7) + 1);
+      const parsedDay = parseDayValue(row[1]);
+      const dayNum = parsedDay ?? ((i - headerRowIdx) % 7) + 1;
       const workoutText = row.slice(2).map(c => String(c || '').trim()).filter(Boolean).join(' ');
       if (workoutText.length > 0) {
-        result.push({ week_num: weekNum, day_num: dayNum, workout_text: workoutText, sort_order: result.length });
+        result.push({ week_num: weekNum, day_num: Math.min(7, Math.max(1, dayNum)), workout_text: workoutText, sort_order: result.length });
       }
     }
   }
