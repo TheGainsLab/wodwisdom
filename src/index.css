@@ -236,8 +236,8 @@ body.landing-body{overflow:auto;height:auto}
 .program-preview-table th,.program-preview-table td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border)}
 .program-preview-table th{background:var(--bg);font-weight:600;color:var(--text-dim)}
 .program-preview-table tr:last-child td{border-bottom:none}
-.program-edit-num{width:56px;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px}
-.program-edit-text{width:100%;min-width:200px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:13px}
+.program-edit-num{width:56px;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text)}
+.program-edit-text{width:100%;min-width:200px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text)}
 .program-remove-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:4px}
 .program-remove-btn:hover{text-decoration:underline}
 .program-workouts-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
