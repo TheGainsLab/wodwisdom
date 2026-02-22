@@ -1,5 +1,7 @@
 // Shared program analyzer - used by analyze-program and incorporate-movements
 
+import { inferTimeDomain } from "./time-domain.ts";
+
 /** Passed when movements table is used. Drives recognition + essential-only not_programmed. */
 export interface MovementsContext {
   library: Record<string, { modality: "W" | "G" | "M"; category: string }>;
@@ -284,32 +286,6 @@ function detectWorkoutFormat(text: string): string {
   if (/BUY\s+IN|CASH\s+OUT/.test(t)) return "Buy-In/Cash-Out";
   if (/\d+X\d+|@\d+%/.test(t)) return "Strength";
   return "Other";
-}
-
-function inferTimeDomain(text: string): "short" | "medium" | "long" {
-  const t = text.toLowerCase();
-  const amrapMatch = t.match(/amrap\s*(\d+)|as many.*?(\d+)\s*min/i);
-  if (amrapMatch) {
-    const mins = parseInt(amrapMatch[1] || amrapMatch[2] || "10", 10);
-    if (mins <= 9) return "short";
-    if (mins <= 20) return "medium";
-    return "long";
-  }
-  const rftMatch = t.match(/(\d+)\s*round|(\d+)\s*rft/i);
-  if (rftMatch) {
-    const rounds = parseInt(rftMatch[1] || rftMatch[2] || "5", 10);
-    if (rounds <= 3) return "short";
-    if (rounds <= 5) return "medium";
-    return "long";
-  }
-  const emomMatch = t.match(/emom\s*(\d+)|e(\d+)mom|every\s+(\d+)\s+min/i);
-  if (emomMatch) {
-    const mins = parseInt(emomMatch[1] || emomMatch[2] || emomMatch[3] || "10", 10);
-    if (mins <= 10) return "short";
-    if (mins <= 15) return "medium";
-    return "long";
-  }
-  return "medium";
 }
 
 function countMetconMovements(

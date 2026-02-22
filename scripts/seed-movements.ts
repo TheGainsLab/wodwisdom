@@ -141,7 +141,23 @@ const CANONICAL_MAP: Record<string, string> = {
   "assault bike": "assault_bike",
 };
 
-// Modality inference: M, G, or W
+// Load modality from curated mapping (source of truth for W/G/M)
+function loadModalityMap(): Record<string, "W" | "G" | "M"> {
+  const path = resolve(process.cwd(), "supabase/seed/movement-modalities.json");
+  const map: Record<string, "W" | "G" | "M"> = {};
+  try {
+    const raw = JSON.parse(readFileSync(path, "utf-8"));
+    for (const [key, val] of Object.entries(raw)) {
+      if (key.startsWith("_") || typeof val !== "string") continue;
+      if (val === "W" || val === "G" || val === "M") map[key] = val;
+    }
+  } catch (err) {
+    console.error("Could not load movement-modalities.json:", err);
+  }
+  return map;
+}
+
+// Fallback when canonical is not in movement-modalities.json
 function inferModality(canonical: string): "W" | "G" | "M" {
   const m = canonical.toLowerCase();
   if (
@@ -175,23 +191,11 @@ function toDisplayName(canonical: string): string {
     .join(" ");
 }
 
-// Recognition-only movements (competition_count = 0)
-const RECOGNITION_ONLY: Array<{ canonical: string; modality: "W" | "G" | "M"; category: string }> = [
-  { canonical: "turkish_get_up", modality: "W", category: "Weightlifting" },
-  { canonical: "tgu", modality: "W", category: "Weightlifting" },
-  { canonical: "goblet_squat", modality: "W", category: "Weightlifting" },
-  { canonical: "farmer_carry", modality: "W", category: "Weightlifting" },
-  { canonical: "sdhp", modality: "W", category: "Weightlifting" },
-  { canonical: "sumo_deadlift_high_pull", modality: "W", category: "Weightlifting" },
-  { canonical: "kettlebell_swing", modality: "W", category: "Weightlifting" },
-  { canonical: "kb_swing", modality: "W", category: "Weightlifting" },
-  { canonical: "single_under", modality: "G", category: "Gymnastics" },
-  { canonical: "jump_rope", modality: "G", category: "Gymnastics" },
-  { canonical: "jumping_jack", modality: "G", category: "Gymnastics" },
-  { canonical: "echo_bike", modality: "M", category: "Monostructural" },
-  { canonical: "ski_erg", modality: "M", category: "Monostructural" },
-  { canonical: "swim", modality: "M", category: "Monostructural" },
-  { canonical: "swimming", modality: "M", category: "Monostructural" },
+// Recognition-only movements (competition_count = 0) — modality comes from movement-modalities.json
+const RECOGNITION_ONLY = [
+  "turkish_get_up", "tgu", "goblet_squat", "farmer_carry", "sdhp", "sumo_deadlift_high_pull",
+  "kettlebell_swing", "kb_swing", "single_under", "jump_rope", "jumping_jack",
+  "echo_bike", "ski_erg", "swim", "swimming",
 ];
 
 function escapeSql(str: string): string {
@@ -199,6 +203,10 @@ function escapeSql(str: string): string {
 }
 
 function main() {
+  const modalityMap = loadModalityMap();
+  const getModality = (canonical: string) =>
+    modalityMap[canonical] ?? inferModality(canonical);
+
   const seedPath = resolve(process.cwd(), "supabase/seed/competition-exercises.json");
   let rows: CompetitionRow[] = [];
 
@@ -223,8 +231,6 @@ function main() {
     const key = name.toLowerCase().replace(/\s+/g, " ").trim();
     const canonical =
       CANONICAL_MAP[key] ?? CANONICAL_MAP[name] ?? slugify(name);
-    const modality = inferModality(canonical);
-    const category = inferCategory(modality);
 
     let entry = byCanonical.get(canonical);
     if (!entry) {
@@ -242,28 +248,32 @@ function main() {
   }
 
   // Add recognition-only
-  for (const r of RECOGNITION_ONLY) {
-    if (!byCanonical.has(r.canonical)) {
-      byCanonical.set(r.canonical, {
+  for (const canonical of RECOGNITION_ONLY) {
+    if (!byCanonical.has(canonical)) {
+      byCanonical.set(canonical, {
         slugs: new Set(),
         aliases: new Set(),
-        displayName: toDisplayName(r.canonical),
+        displayName: toDisplayName(canonical),
       });
     }
   }
 
-  // Emit SQL
+  // Emit SQL — modality from movement-modalities.json, fallback to inference
   const values: string[] = [];
+  const unmapped: string[] = [];
   for (const [canonical, entry] of byCanonical.entries()) {
-    const rec = RECOGNITION_ONLY.find((r) => r.canonical === canonical);
-    const modality = rec?.modality ?? inferModality(canonical);
-    const category = rec?.category ?? inferCategory(modality);
+    const modality = getModality(canonical);
+    if (!modalityMap[canonical]) unmapped.push(canonical);
+    const category = inferCategory(modality);
     const count = entry.slugs.size;
     const aliases = JSON.stringify([...entry.aliases]);
-    const display = rec ? toDisplayName(canonical) : entry.displayName;
+    const display = entry.displayName;
     values.push(
       `  ('${escapeSql(canonical)}', '${escapeSql(display)}', '${modality}', '${escapeSql(category)}', '${escapeSql(aliases)}'::jsonb, ${count})`
     );
+  }
+  if (unmapped.length > 0) {
+    console.error("Movements not in movement-modalities.json (using inference):", unmapped.join(", "));
   }
 
   const sql = `-- Seed movements (run in Supabase SQL Editor)
