@@ -87,6 +87,9 @@ Deno.serve(async (req) => {
         notices: analysis.notices,
         not_programmed: analysis.not_programmed,
         consecutive_overlaps: analysis.consecutive_overlaps,
+        loading_ratio: analysis.loading_ratio,
+        distinct_loads: analysis.distinct_loads,
+        load_bands: analysis.load_bands,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "program_id" }

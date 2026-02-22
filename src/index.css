@@ -283,6 +283,7 @@ body.landing-body{overflow:auto;height:auto}
 .analysis-movement-chip.selected{background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
 .analysis-incorporate-actions{display:flex;align-items:center;gap:16px;margin-top:16px}
 .analysis-selected-count{font-size:13px;color:var(--text-dim)}
+.analysis-loading-stats{font-size:13px;color:var(--text-dim);margin-bottom:12px}
 .program-pending-file{margin-top:12px;font-size:13px;color:var(--text-dim)}
 /* Compare */
 .compare-row-modified{background:rgba(255,58,58,.06)}

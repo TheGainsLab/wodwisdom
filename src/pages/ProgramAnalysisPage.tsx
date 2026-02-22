@@ -11,10 +11,20 @@ interface ProgramAnalysis {
   time_domains: Record<string, number>;
   workout_structure: Record<string, number>;
   workout_formats: Record<string, number>;
-  movement_frequency: { name: string; count: number; modality: string; load: string }[];
+  movement_frequency: { name: string; count: number; modality: string; loads?: string[]; load?: string }[];
   notices: string[];
   not_programmed: Record<string, string[]>;
   consecutive_overlaps: { week: number; days: string; movements: string[] }[];
+  loading_ratio?: { loaded: number; bodyweight: number };
+  distinct_loads?: number;
+  load_bands?: Record<string, number>;
+}
+
+function formatLoadsDisplay(m: { loads?: string[]; load?: string }): string {
+  const loads = m.loads ?? (m.load ? [m.load] : []);
+  const nonBw = [...new Set(loads)].filter(l => l && l !== 'BW');
+  if (nonBw.length === 0) return 'BW';
+  return nonBw.join(', ');
 }
 
 function BarChart({ data, max }: { data: Record<string, number>; max?: number }) {
@@ -84,7 +94,7 @@ export default function ProgramAnalysisPage({ session }: { session: Session }) {
 
     const { data: existing } = await supabase
       .from('program_analyses')
-      .select('modal_balance, time_domains, workout_structure, workout_formats, movement_frequency, notices, not_programmed, consecutive_overlaps')
+      .select('modal_balance, time_domains, workout_structure, workout_formats, movement_frequency, notices, not_programmed, consecutive_overlaps, loading_ratio, distinct_loads, load_bands')
       .eq('program_id', id)
       .single();
 
@@ -204,6 +214,22 @@ export default function ProgramAnalysisPage({ session }: { session: Session }) {
                   <h2 className="analysis-section-title">Workout formats</h2>
                   <BarChart data={analysis.workout_formats} />
                 </div>
+                {(analysis.loading_ratio || analysis.load_bands) && (
+                  <div className="analysis-section">
+                    <h2 className="analysis-section-title">Loading analysis</h2>
+                    {analysis.loading_ratio && (
+                      <div className="analysis-loading-stats">
+                        <span>Loaded: {analysis.loading_ratio.loaded} · Bodyweight: {analysis.loading_ratio.bodyweight}</span>
+                        {analysis.distinct_loads != null && (
+                          <span style={{ marginLeft: 16 }}>Distinct loads: {analysis.distinct_loads}</span>
+                        )}
+                      </div>
+                    )}
+                    {analysis.load_bands && Object.values(analysis.load_bands).some(v => v > 0) && (
+                      <BarChart data={analysis.load_bands} />
+                    )}
+                  </div>
+                )}
                 <div className="analysis-section">
                   <h2 className="analysis-section-title">Movement frequency</h2>
                   <div className="analysis-movement-table-wrap">
@@ -213,6 +239,7 @@ export default function ProgramAnalysisPage({ session }: { session: Session }) {
                           <th>Movement</th>
                           <th>Count</th>
                           <th>Modality</th>
+                          <th>Load</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -221,6 +248,7 @@ export default function ProgramAnalysisPage({ session }: { session: Session }) {
                             <td>{m.name}</td>
                             <td>{m.count}</td>
                             <td>{m.modality === 'W' ? 'Weightlifting' : m.modality === 'G' ? 'Gymnastics' : 'Monostructural'}</td>
+                            <td>{formatLoadsDisplay(m)}</td>
                           </tr>
                         ))}
                       </tbody>
