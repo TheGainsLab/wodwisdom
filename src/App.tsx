@@ -16,6 +16,9 @@ import ProgramsListPage from './pages/ProgramsListPage';
 import AddProgramPage from './pages/AddProgramPage';
 import ProgramDetailPage from './pages/ProgramDetailPage';
 import ProgramEditPage from './pages/ProgramEditPage';
+import ProgramAnalysisPage from './pages/ProgramAnalysisPage';
+import ProgramComparePage from './pages/ProgramComparePage';
+import ProgramReviewPage from './pages/ProgramReviewPage';
 import CheckoutPage from './pages/CheckoutPage';
 import CheckoutCompletePage from './pages/CheckoutCompletePage';
 
@@ -52,6 +55,9 @@ export default function App() {
       <Route path="/programs" element={<ProgramsListPage session={session} />} />
       <Route path="/programs/new" element={<AddProgramPage session={session} />} />
       <Route path="/programs/:id/edit" element={<ProgramEditPage session={session} />} />
+      <Route path="/programs/:id/analyze" element={<ProgramAnalysisPage session={session} />} />
+      <Route path="/programs/:id/modify/:modificationId/compare" element={<ProgramComparePage session={session} />} />
+      <Route path="/programs/:id/modify/:modificationId/review" element={<ProgramReviewPage session={session} />} />
       <Route path="/programs/:id" element={<ProgramDetailPage session={session} />} />
       <Route path="/checkout" element={<CheckoutPage session={session} />} />
       <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
