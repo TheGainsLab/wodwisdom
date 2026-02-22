@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { analyzeWorkouts, DEFAULT_MOVEMENT_ALIASES, type MovementsContext, type WorkoutInput } from "../_shared/analyzer.ts";
 import { extractMovementsAI, type LibraryEntry } from "../_shared/extract-movements-ai.ts";
+import { generateNoticesAI } from "../_shared/generate-notices-ai.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -142,6 +143,11 @@ Deno.serve(async (req) => {
     );
     if (extractionNotices.length > 0) {
       analysis.notices = [...extractionNotices, ...analysis.notices];
+    }
+
+    if (ANTHROPIC_API_KEY) {
+      const aiNotices = await generateNoticesAI(analysis, ANTHROPIC_API_KEY);
+      analysis.notices = [...analysis.notices, ...aiNotices];
     }
 
     const { error: upsertErr } = await supa.from("program_analyses").upsert(
