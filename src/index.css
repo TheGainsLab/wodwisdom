@@ -119,7 +119,7 @@ body.landing-body{overflow:auto;height:auto}
 .send-btn:disabled{opacity:.3;cursor:not-allowed}
 .page-body{flex:1;overflow-y:auto;padding:16px}
 .page-loading{height:200px;display:flex;align-items:center;justify-content:center}
-.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;color:var(--text-muted);gap:12px;font-size:14px}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;color:var(--text-dim);gap:12px;font-size:14px}
 .history-list{display:flex;flex-direction:column;gap:6px;max-width:800px;margin:0 auto}
 .history-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer}
 .history-item:hover{border-color:var(--border-light)}
