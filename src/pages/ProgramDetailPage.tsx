@@ -66,6 +66,13 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     navigate('/programs');
   };
 
+  const handleNameChange = async (newName: string) => {
+    const trimmed = newName.trim() || 'Untitled Program';
+    if (!id || !program || trimmed === program.name) return;
+    const { error } = await supabase.from('programs').update({ name: trimmed }).eq('id', id).eq('user_id', session.user.id);
+    if (!error) setProgram(p => p ? { ...p, name: trimmed } : null);
+  };
+
   if (!id) return null;
 
   return (
@@ -77,7 +84,18 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>{program?.name || 'Program'}</h1>
+          {program ? (
+            <input
+              type="text"
+              className="program-detail-name-input"
+              value={program.name}
+              onChange={e => setProgram(p => p ? { ...p, name: e.target.value } : null)}
+              onBlur={e => handleNameChange(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
+            />
+          ) : (
+            <h1>Program</h1>
+          )}
         </header>
         <div className="page-body">
           <div className="program-detail-wrap">

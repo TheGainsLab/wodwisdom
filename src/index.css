@@ -55,6 +55,8 @@ body.landing-body{overflow:auto;height:auto}
 .nav-link.logout:hover{color:var(--accent)}
 .chat-header,.page-header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
 .page-header h1{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.program-detail-name-input{flex:1;min-width:0;background:none;border:none;font-family:inherit;font-size:18px;font-weight:700;letter-spacing:-.3px;color:var(--text);outline:none;padding:4px 8px;margin:-4px -8px;border-radius:6px}
+.program-detail-name-input:hover,.program-detail-name-input:focus{background:var(--surface2)}
 .menu-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:8px;background:none;color:var(--text-dim);cursor:pointer;flex-shrink:0}
 .menu-btn:hover{color:var(--text);border-color:var(--border-light)}
 .source-toggle{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0}
@@ -232,8 +234,12 @@ body.landing-body{overflow:auto;height:auto}
 .program-paste-zone textarea:focus{border-color:var(--accent)}
 .program-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .program-name-input{flex:1;min-width:180px;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px}
-.program-preview-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.program-preview-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px}
 .program-preview-header h2{font-size:16px;font-weight:700}
+.program-edit-name-row{display:flex;align-items:center;gap:12px;flex:1;min-width:200px}
+.program-edit-name-label{font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.program-preview-header-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.program-edit-workout-count{font-size:14px;color:var(--text-dim)}
 .link-btn{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;font-weight:500}
 .link-btn:hover{text-decoration:underline}
 .program-preview-table-wrap{overflow-x:auto;margin-bottom:16px;border:1px solid var(--border);border-radius:8px}
