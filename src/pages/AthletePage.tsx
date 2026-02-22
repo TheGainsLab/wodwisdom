@@ -1,7 +1,112 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, PROFILE_ANALYSIS_ENDPOINT } from '../lib/supabase';
 import Nav from '../components/Nav';
+
+function LiftStepper({
+  value,
+  onChange,
+  step,
+  unit,
+  placeholder = '—',
+}: {
+  value: number | undefined;
+  onChange: (v: number) => void;
+  step: number;
+  unit: string;
+  placeholder?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const liveRef = useRef(value ?? 0);
+  liveRef.current = value ?? 0;
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const display = value && value > 0 ? value : undefined;
+
+  const stopRepeat = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = undefined;
+    }
+  }, []);
+
+  const startRepeat = useCallback((delta: number) => {
+    stopRepeat();
+    const next = Math.max(0, liveRef.current + delta);
+    liveRef.current = next;
+    onChange(next);
+    let speed = 200;
+    const tick = () => {
+      timerRef.current = setTimeout(() => {
+        const v = Math.max(0, liveRef.current + delta);
+        liveRef.current = v;
+        onChange(v);
+        speed = Math.max(60, speed * 0.88);
+        tick();
+      }, speed);
+    };
+    timerRef.current = setTimeout(tick, 400);
+  }, [onChange, step, stopRepeat]);
+
+  useEffect(() => () => stopRepeat(), [stopRepeat]);
+
+  const commitEdit = () => {
+    setEditing(false);
+    const num = draft === '' ? 0 : parseInt(draft, 10);
+    if (!isNaN(num)) onChange(Math.max(0, num));
+  };
+
+  return (
+    <div className="lift-stepper">
+      <button
+        type="button"
+        className="lift-stepper-btn"
+        onPointerDown={() => startRepeat(-step)}
+        onPointerUp={stopRepeat}
+        onPointerLeave={stopRepeat}
+        aria-label="Decrease"
+      >
+        −
+      </button>
+      {editing ? (
+        <input
+          className="lift-stepper-value editing"
+          type="number"
+          min="0"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={commitEdit}
+          onKeyDown={e => { if (e.key === 'Enter') commitEdit(); }}
+          autoFocus
+        />
+      ) : (
+        <button
+          type="button"
+          className={'lift-stepper-value' + (display ? '' : ' empty')}
+          onClick={() => {
+            setDraft(display ? String(display) : '');
+            setEditing(true);
+          }}
+          title="Click to type a value"
+        >
+          {display ?? placeholder}
+          {display ? <span className="lift-stepper-unit">{unit}</span> : null}
+        </button>
+      )}
+      <button
+        type="button"
+        className="lift-stepper-btn"
+        onPointerDown={() => startRepeat(step)}
+        onPointerUp={stopRepeat}
+        onPointerLeave={stopRepeat}
+        aria-label="Increase"
+      >
+        +
+      </button>
+    </div>
+  );
+}
 
 const LIFT_GROUPS = [
   {
@@ -278,15 +383,11 @@ export default function AthletePage({ session }: { session: Session }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
                     <div className="lift-item" style={{ flex: '0 0 auto' }}>
                       <span className="lift-label">Bodyweight</span>
-                      <input
-                        className="lift-input"
-                        type="number"
-                        min="0"
+                      <LiftStepper
+                        value={bodyweight === '' ? undefined : parseFloat(bodyweight) || undefined}
+                        onChange={v => setBodyweight(v > 0 ? String(v) : '')}
                         step={units === 'lbs' ? 5 : 2}
-                        placeholder="0"
-                        value={bodyweight}
-                        onChange={e => setBodyweight(e.target.value)}
-                        style={{ width: 90 }}
+                        unit={units}
                       />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -314,14 +415,11 @@ export default function AthletePage({ session }: { session: Session }) {
                         {group.lifts.map(lift => (
                           <div className="lift-item" key={lift.key}>
                             <span className="lift-label">{lift.label}</span>
-                            <input
-                              className="lift-input"
-                              type="number"
-                              min="0"
-                              step="5"
-                              placeholder="0"
-                              value={lifts[lift.key] || ''}
-                              onChange={e => setLift(lift.key, e.target.value)}
+                            <LiftStepper
+                              value={lifts[lift.key]}
+                              onChange={v => setLift(lift.key, String(v))}
+                              step={units === 'lbs' ? 5 : 2}
+                              unit={units}
                             />
                           </div>
                         ))}
