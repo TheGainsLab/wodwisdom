@@ -218,8 +218,9 @@ body.landing-body{overflow:auto;height:auto}
 .workout-review-cues li{margin-bottom:4px}
 /* Programs */
 .programs-list-wrap{max-width:800px;margin:0 auto}
+.programs-list-wrap .history-time{color:var(--text)}
 .program-list-actions{display:flex;gap:4px;flex-shrink:0}
-.program-list-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:none;background:none;color:var(--text-muted);cursor:pointer;border-radius:6px;transition:color .15s,background .15s}
+.program-list-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:none;background:none;color:var(--text);cursor:pointer;border-radius:6px;transition:color .15s,background .15s}
 .program-list-btn:hover{color:var(--text);background:var(--surface2)}
 .program-list-btn-delete:hover{color:var(--accent)}
 .add-program-cta{display:flex;align-items:center;gap:10px;width:100%;padding:16px 20px;background:var(--surface);border:2px dashed var(--border);border-radius:12px;font-family:'Outfit',sans-serif;font-size:15px;font-weight:600;color:var(--accent);cursor:pointer;transition:all .2s;margin-bottom:20px}
