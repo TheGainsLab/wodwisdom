@@ -81,15 +81,6 @@ function estimateTotalReps(text: string): number {
   return total > 0 ? total : 50; // default to medium-ish if can't parse
 }
 
-/**
- * Check if workout has significant loaded movements.
- * Loaded movements take longer per rep (setup, recovery, heavier breathing).
- */
-function hasHeavyLoading(text: string): boolean {
-  const t = text.toLowerCase();
-  return /\(\d{2,3}\)|\d{2,3}\s*(?:lb|#|kg)|@\d+%/.test(t);
-}
-
 export function inferTimeDomain(text: string): TimeDomain {
   const t = text.toLowerCase();
 
@@ -155,10 +146,8 @@ export function inferTimeDomain(text: string): TimeDomain {
 
   // FOR TIME / Rounds For Time — estimate from rep volume
   const totalReps = estimateTotalReps(t);
-  const isLoaded = hasHeavyLoading(t);
-  const effectiveVolume = isLoaded ? totalReps * 1.5 : totalReps;
 
-  if (effectiveVolume < 100) return "short";
-  if (effectiveVolume <= 300) return "medium";
+  if (totalReps < 100) return "short";
+  if (totalReps <= 300) return "medium";
   return "long";
 }
