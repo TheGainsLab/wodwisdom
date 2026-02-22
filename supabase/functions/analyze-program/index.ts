@@ -1,8 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { analyzeWorkouts, DEFAULT_MOVEMENT_ALIASES, type MovementsContext, type WorkoutInput } from "../_shared/analyzer.ts";
+import { extractMovementsAI, type LibraryEntry } from "../_shared/extract-movements-ai.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -56,7 +58,7 @@ Deno.serve(async (req) => {
 
     const { data: workouts, error: wkErr } = await supa
       .from("program_workouts")
-      .select("week_num, day_num, workout_text, sort_order")
+      .select("id, week_num, day_num, workout_text, sort_order")
       .eq("program_id", program_id)
       .order("sort_order");
 
@@ -102,7 +104,45 @@ Deno.serve(async (req) => {
       movementsContext = { library, aliases, essentialCanonicals };
     }
 
-    const analysis = analyzeWorkouts(workouts as WorkoutInput[], movementsContext);
+    let extractedByWorkout: { canonical: string; modality: string; load: string }[][] | undefined;
+    const extractionNotices: string[] = [];
+
+    if (movementsContext && movementsRows && movementsRows.length > 0 && ANTHROPIC_API_KEY) {
+      const libraryEntries: LibraryEntry[] = (movementsRows as { canonical_name: string; display_name: string; modality: string; aliases: string[] }[]).map(
+        (row) => {
+          const defaultAliases = Object.entries(DEFAULT_MOVEMENT_ALIASES)
+            .filter(([, c]) => c === row.canonical_name)
+            .map(([a]) => a);
+          return {
+            canonical_name: row.canonical_name,
+            display_name: row.display_name,
+            modality: row.modality,
+            aliases: [...(Array.isArray(row.aliases) ? row.aliases : []), ...defaultAliases],
+          };
+        }
+      );
+      const workoutsForExtraction = (workouts as { id: string; workout_text: string }[]).map((w) => ({
+        id: w.id,
+        workout_text: w.workout_text,
+      }));
+
+      const aiResult = await extractMovementsAI(workoutsForExtraction, libraryEntries, ANTHROPIC_API_KEY);
+      if (aiResult) {
+        extractedByWorkout = aiResult.extracted;
+        extractionNotices.push(...aiResult.notices);
+      } else {
+        console.warn("AI extraction failed, falling back to regex");
+      }
+    }
+
+    const analysis = analyzeWorkouts(
+      workouts as WorkoutInput[],
+      movementsContext,
+      extractedByWorkout
+    );
+    if (extractionNotices.length > 0) {
+      analysis.notices = [...extractionNotices, ...analysis.notices];
+    }
 
     const { error: upsertErr } = await supa.from("program_analyses").upsert(
       {

@@ -142,7 +142,12 @@ export interface WorkoutInput {
   day_num: number;
   workout_text: string;
   sort_order?: number;
+  /** When present, used for AI extraction matching (e.g. program_workouts.id) */
+  id?: string;
 }
+
+/** Shape from extractor (regex or AI). canonical, modality, load required. */
+export type ExtractedMovementForAnalysis = { canonical: string; modality: string; load: string };
 
 export interface AnalysisOutput {
   modal_balance: Record<string, number>;
@@ -297,13 +302,18 @@ function countMetconMovements(
 
 export function analyzeWorkouts(
   workouts: WorkoutInput[],
-  movements?: MovementsContext
+  movements?: MovementsContext,
+  extractedByWorkout?: ExtractedMovementForAnalysis[][]
 ): AnalysisOutput {
   const library = movements?.library ?? MOVEMENT_LIBRARY;
   const aliases = movements?.aliases ?? DEFAULT_MOVEMENT_ALIASES;
   const essentialCanonicals =
     movements?.essentialCanonicals ?? new Set(Object.keys(MOVEMENT_LIBRARY));
   const extract = (text: string) => extractMovementsImpl(text, library, aliases);
+
+  const getMoves = (idx: number): ExtractedMovementForAnalysis[] =>
+    extractedByWorkout?.[idx] ?? extract(workouts[idx].workout_text);
+
   const modalCounts: Record<string, number> = { Weightlifting: 0, Gymnastics: 0, Monostructural: 0 };
   const timeDomainCounts: Record<string, number> = { short: 0, medium: 0, long: 0 };
   const structureCounts: Record<string, number> = { couplets: 0, triplets: 0, chipper: 0, other: 0 };
@@ -315,7 +325,8 @@ export function analyzeWorkouts(
   let bodyweightCount = 0;
   const allLoads = new Set<string>();
 
-  for (const w of workouts) {
+  for (let i = 0; i < workouts.length; i++) {
+    const w = workouts[i];
     const text = w.workout_text;
     const format = detectWorkoutFormat(text);
     formatCounts[format] = (formatCounts[format] || 0) + 1;
@@ -324,7 +335,8 @@ export function analyzeWorkouts(
       const domain = inferTimeDomain(text);
       timeDomainCounts[domain] = (timeDomainCounts[domain] || 0) + 1;
 
-      const mc = countMetconMovements(text, extract);
+      const movesForStructure = getMoves(i);
+      const mc = new Set(movesForStructure.map((m) => m.canonical)).size;
       if (mc === 2) structureCounts.couplets++;
       else if (mc === 3) structureCounts.triplets++;
       else if (mc >= 4) structureCounts.chipper++;
@@ -333,7 +345,7 @@ export function analyzeWorkouts(
       structureCounts.other++;
     }
 
-    const moves = extract(text);
+    const moves = getMoves(i);
     for (const m of moves) {
       allFoundMovements.add(m.canonical);
       const modLabel = m.modality === "W" ? "Weightlifting" : m.modality === "G" ? "Gymnastics" : "Monostructural";
@@ -422,8 +434,10 @@ export function analyzeWorkouts(
     const isConsecutive = curr.week_num === next.week_num && next.day_num === curr.day_num + 1;
     if (!isConsecutive) continue;
 
-    const currMoves = new Set(extract(curr.workout_text).map((m) => m.canonical));
-    const nextMoves = extract(next.workout_text).map((m) => m.canonical);
+    const idxCurr = workouts.indexOf(curr);
+    const idxNext = workouts.indexOf(next);
+    const currMoves = new Set(getMoves(idxCurr).map((m) => m.canonical));
+    const nextMoves = getMoves(idxNext).map((m) => m.canonical);
     const shared = nextMoves.filter((c) => currMoves.has(c));
     if (shared.length > 0) {
       overlaps.push({
