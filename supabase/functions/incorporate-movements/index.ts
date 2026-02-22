@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { analyzeWorkouts, type WorkoutInput } from "../_shared/analyzer.ts";
+import { analyzeWorkouts, DEFAULT_MOVEMENT_ALIASES, type MovementsContext, type WorkoutInput } from "../_shared/analyzer.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -103,6 +103,31 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...cors, "Content-Type": "application/json" },
       });
+    }
+
+    let movementsContext: MovementsContext | undefined;
+    const { data: movementsRows } = await supa
+      .from("movements")
+      .select("canonical_name, display_name, modality, category, aliases, competition_count");
+    if (movementsRows && movementsRows.length > 0) {
+      const library: Record<string, { modality: "W" | "G" | "M"; category: string }> = {};
+      const aliases: Record<string, string> = {};
+      const essentialCanonicals = new Set<string>();
+      for (const row of movementsRows as { canonical_name: string; display_name: string; modality: string; category: string; aliases: string[]; competition_count: number }[]) {
+        const c = row.canonical_name;
+        library[c] = { modality: row.modality as "W" | "G" | "M", category: row.category };
+        if (row.competition_count > 0) essentialCanonicals.add(c);
+        const a = Array.isArray(row.aliases) ? row.aliases : [];
+        for (const al of a) {
+          if (al && typeof al === "string") aliases[al.toLowerCase().trim()] = c;
+        }
+        const displaySpaced = row.display_name?.replace(/_/g, " ").toLowerCase();
+        if (displaySpaced && displaySpaced !== c) aliases[displaySpaced] = c;
+      }
+      for (const [alias, canonical] of Object.entries(DEFAULT_MOVEMENT_ALIASES)) {
+        if (library[canonical] && !aliases[alias]) aliases[alias] = canonical;
+      }
+      movementsContext = { library, aliases, essentialCanonicals };
     }
 
     const programText = workouts
@@ -244,7 +269,7 @@ Using CrossFit programming principles, generate modifications to incorporate the
       }
     }
 
-    const modifiedAnalysis = analyzeWorkouts(modifiedWorkouts);
+    const modifiedAnalysis = analyzeWorkouts(modifiedWorkouts, movementsContext);
 
     await supa
       .from("program_modifications")

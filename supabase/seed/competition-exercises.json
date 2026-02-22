@@ -1,0 +1,6865 @@
+[
+  {
+    "workout_id": "0bc5b4f9-aec2-4052-b64d-066f8e692478",
+    "slug": "Open-2011-11-1",
+    "workout_name": "Open 11.1",
+    "format": "AMRAP",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "0bc5b4f9-aec2-4052-b64d-066f8e692478",
+    "slug": "Open-2011-11-1",
+    "workout_name": "Open 11.1",
+    "format": "AMRAP",
+    "exercise_name": "Power snatch",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Power snatch",
+      "weight_male_lbs": "75",
+      "weight_female_lbs": "55"
+    }
+  },
+  {
+    "workout_id": "cc520a7e-1fed-4bef-adc1-79810bd0c410",
+    "slug": "Open-2011-11-2",
+    "workout_name": "Open 11.2",
+    "format": "AMRAP",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "155",
+      "weight_female_lbs": "100"
+    }
+  },
+  {
+    "workout_id": "cc520a7e-1fed-4bef-adc1-79810bd0c410",
+    "slug": "Open-2011-11-2",
+    "workout_name": "Open 11.2",
+    "format": "AMRAP",
+    "exercise_name": "Push-up",
+    "task_json": {
+      "reps": "12",
+      "exercise": "Push-up"
+    }
+  },
+  {
+    "workout_id": "cc520a7e-1fed-4bef-adc1-79810bd0c410",
+    "slug": "Open-2011-11-2",
+    "workout_name": "Open 11.2",
+    "format": "AMRAP",
+    "exercise_name": "Box jump",
+    "task_json": {
+      "reps": "15",
+      "notes": "24 inch box",
+      "exercise": "Box jump"
+    }
+  },
+  {
+    "workout_id": "ff2a49a8-d8cf-4663-852b-f0e4c14e67e8",
+    "slug": "Open-2011-11-3",
+    "workout_name": "Open 11.3",
+    "format": "AMRAP",
+    "exercise_name": "Squat clean",
+    "task_json": {
+      "reps": "Max",
+      "exercise": "Squat clean",
+      "weight_male_lbs": "165",
+      "weight_female_lbs": "110"
+    }
+  },
+  {
+    "workout_id": "ff2a49a8-d8cf-4663-852b-f0e4c14e67e8",
+    "slug": "Open-2011-11-3",
+    "workout_name": "Open 11.3",
+    "format": "AMRAP",
+    "exercise_name": "Jerk",
+    "task_json": {
+      "reps": "Max",
+      "exercise": "Jerk",
+      "weight_male_lbs": "165",
+      "weight_female_lbs": "110"
+    }
+  },
+  {
+    "workout_id": "db5d6496-32e3-419a-8e5d-4fd85cb29d84",
+    "slug": "Open-2011-11-4",
+    "workout_name": "Open 11.4",
+    "format": "AMRAP",
+    "exercise_name": "Bar-facing burpee",
+    "task_json": {
+      "reps": "60",
+      "exercise": "Bar-facing burpee"
+    }
+  },
+  {
+    "workout_id": "db5d6496-32e3-419a-8e5d-4fd85cb29d84",
+    "slug": "Open-2011-11-4",
+    "workout_name": "Open 11.4",
+    "format": "AMRAP",
+    "exercise_name": "Overhead squat",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Overhead squat",
+      "weight_male_lbs": "120",
+      "weight_female_lbs": "120"
+    }
+  },
+  {
+    "workout_id": "db5d6496-32e3-419a-8e5d-4fd85cb29d84",
+    "slug": "Open-2011-11-4",
+    "workout_name": "Open 11.4",
+    "format": "AMRAP",
+    "exercise_name": "Muscle-up",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Muscle-up"
+    }
+  },
+  {
+    "workout_id": "a711f5a0-a200-4c09-95c4-2b110e82069a",
+    "slug": "Open-2011-11-5",
+    "workout_name": "Open 11.5",
+    "format": "AMRAP",
+    "exercise_name": "Power clean",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Power clean",
+      "weight_male_lbs": "145",
+      "weight_female_lbs": "105"
+    }
+  },
+  {
+    "workout_id": "a711f5a0-a200-4c09-95c4-2b110e82069a",
+    "slug": "Open-2011-11-5",
+    "workout_name": "Open 11.5",
+    "format": "AMRAP",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "a711f5a0-a200-4c09-95c4-2b110e82069a",
+    "slug": "Open-2011-11-5",
+    "workout_name": "Open 11.5",
+    "format": "AMRAP",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "15",
+      "notes": "10 foot target",
+      "exercise": "Wall ball",
+      "weight_male_lbs": "20",
+      "weight_female_lbs": "14"
+    }
+  },
+  {
+    "workout_id": "dca364a6-de85-43b8-8aa0-b3c11a1955fd",
+    "slug": "Open-2011-11-6",
+    "workout_name": "Open 11.6",
+    "format": "AMRAP",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "3-6-9-12...",
+      "exercise": "Thruster",
+      "weight_male_lbs": "100",
+      "weight_female_lbs": "100"
+    }
+  },
+  {
+    "workout_id": "dca364a6-de85-43b8-8aa0-b3c11a1955fd",
+    "slug": "Open-2011-11-6",
+    "workout_name": "Open 11.6",
+    "format": "AMRAP",
+    "exercise_name": "Chest to bar pull-up",
+    "task_json": {
+      "reps": "3-6-9-12...",
+      "exercise": "Chest to bar pull-up"
+    }
+  },
+  {
+    "workout_id": "22bf10ff-2d4a-45dd-b727-b1dd51b89165",
+    "slug": "Open-2012-12-1",
+    "workout_name": "Open 12.1",
+    "format": "AMRAP",
+    "exercise_name": "Burpee",
+    "task_json": {
+      "reps": "Max",
+      "notes": "6-inch target",
+      "exercise": "Burpee"
+    }
+  },
+  {
+    "workout_id": "c1bd3b52-4cc6-4274-9c8c-a687bd69051c",
+    "slug": "Open-2012-12-2",
+    "workout_name": "Open 12.2",
+    "format": "Ladder",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Snatch",
+      "weight_male_lbs": "75",
+      "weight_female_lbs": "45"
+    }
+  },
+  {
+    "workout_id": "c1bd3b52-4cc6-4274-9c8c-a687bd69051c",
+    "slug": "Open-2012-12-2",
+    "workout_name": "Open 12.2",
+    "format": "Ladder",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Snatch",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "75"
+    }
+  },
+  {
+    "workout_id": "c1bd3b52-4cc6-4274-9c8c-a687bd69051c",
+    "slug": "Open-2012-12-2",
+    "workout_name": "Open 12.2",
+    "format": "Ladder",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Snatch",
+      "weight_male_lbs": "165",
+      "weight_female_lbs": "100"
+    }
+  },
+  {
+    "workout_id": "c1bd3b52-4cc6-4274-9c8c-a687bd69051c",
+    "slug": "Open-2012-12-2",
+    "workout_name": "Open 12.2",
+    "format": "Ladder",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "Max",
+      "exercise": "Snatch",
+      "weight_male_lbs": "210",
+      "weight_female_lbs": "120"
+    }
+  },
+  {
+    "workout_id": "fd104de5-f509-4d12-a2d4-1d42854c3b8f",
+    "slug": "Open-2012-12-3",
+    "workout_name": "Open 12.3",
+    "format": "AMRAP",
+    "exercise_name": "Box jump",
+    "task_json": {
+      "reps": "15",
+      "notes": "24 inch box",
+      "exercise": "Box jump"
+    }
+  },
+  {
+    "workout_id": "fd104de5-f509-4d12-a2d4-1d42854c3b8f",
+    "slug": "Open-2012-12-3",
+    "workout_name": "Open 12.3",
+    "format": "AMRAP",
+    "exercise_name": "Push press",
+    "task_json": {
+      "reps": "12",
+      "exercise": "Push press",
+      "weight_male_lbs": "115",
+      "weight_female_lbs": "75"
+    }
+  },
+  {
+    "workout_id": "fd104de5-f509-4d12-a2d4-1d42854c3b8f",
+    "slug": "Open-2012-12-3",
+    "workout_name": "Open 12.3",
+    "format": "AMRAP",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "12574de5-f923-46e1-8b2a-34a43d3c2761",
+    "slug": "Open-2012-12-4",
+    "workout_name": "Open 12.4",
+    "format": "AMRAP",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "150",
+      "notes": "10 foot target",
+      "exercise": "Wall ball",
+      "weight_male_lbs": "20",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "12574de5-f923-46e1-8b2a-34a43d3c2761",
+    "slug": "Open-2012-12-4",
+    "workout_name": "Open 12.4",
+    "format": "AMRAP",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "90",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "12574de5-f923-46e1-8b2a-34a43d3c2761",
+    "slug": "Open-2012-12-4",
+    "workout_name": "Open 12.4",
+    "format": "AMRAP",
+    "exercise_name": "Muscle-up",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Muscle-up"
+    }
+  },
+  {
+    "workout_id": "ad1636be-5c17-46ed-ae34-ad6c72a258a1",
+    "slug": "Open-2012-12-5",
+    "workout_name": "Open 12.5",
+    "format": "AMRAP",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "3-6-9-12...",
+      "exercise": "Thruster",
+      "weight_male_lbs": "100",
+      "weight_female_lbs": "100"
+    }
+  },
+  {
+    "workout_id": "ad1636be-5c17-46ed-ae34-ad6c72a258a1",
+    "slug": "Open-2012-12-5",
+    "workout_name": "Open 12.5",
+    "format": "AMRAP",
+    "exercise_name": "Chest to bar pull-up",
+    "task_json": {
+      "reps": "3-6-9-12...",
+      "exercise": "Chest to bar pull-up"
+    }
+  },
+  {
+    "workout_id": "56b871ae-769e-4d88-a1a6-2935b37ed56e",
+    "slug": "Open-2013-13-1",
+    "workout_name": "Open 13.1",
+    "format": "AMRAP",
+    "exercise_name": "Burpee",
+    "task_json": {
+      "reps": "40",
+      "exercise": "Burpee"
+    }
+  },
+  {
+    "workout_id": "56b871ae-769e-4d88-a1a6-2935b37ed56e",
+    "slug": "Open-2013-13-1",
+    "workout_name": "Open 13.1",
+    "format": "AMRAP",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Snatch",
+      "weight_male_lbs": "75",
+      "weight_female_lbs": "45"
+    }
+  },
+  {
+    "workout_id": "56b871ae-769e-4d88-a1a6-2935b37ed56e",
+    "slug": "Open-2013-13-1",
+    "workout_name": "Open 13.1",
+    "format": "AMRAP",
+    "exercise_name": "Burpee",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Burpee"
+    }
+  },
+  {
+    "workout_id": "56b871ae-769e-4d88-a1a6-2935b37ed56e",
+    "slug": "Open-2013-13-1",
+    "workout_name": "Open 13.1",
+    "format": "AMRAP",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Snatch",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "75"
+    }
+  },
+  {
+    "workout_id": "56b871ae-769e-4d88-a1a6-2935b37ed56e",
+    "slug": "Open-2013-13-1",
+    "workout_name": "Open 13.1",
+    "format": "AMRAP",
+    "exercise_name": "Burpee",
+    "task_json": {
+      "reps": "20",
+      "exercise": "Burpee"
+    }
+  },
+  {
+    "workout_id": "56b871ae-769e-4d88-a1a6-2935b37ed56e",
+    "slug": "Open-2013-13-1",
+    "workout_name": "Open 13.1",
+    "format": "AMRAP",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Snatch",
+      "weight_male_lbs": "165",
+      "weight_female_lbs": "100"
+    }
+  },
+  {
+    "workout_id": "56b871ae-769e-4d88-a1a6-2935b37ed56e",
+    "slug": "Open-2013-13-1",
+    "workout_name": "Open 13.1",
+    "format": "AMRAP",
+    "exercise_name": "Burpee",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Burpee"
+    }
+  },
+  {
+    "workout_id": "56b871ae-769e-4d88-a1a6-2935b37ed56e",
+    "slug": "Open-2013-13-1",
+    "workout_name": "Open 13.1",
+    "format": "AMRAP",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "Max",
+      "exercise": "Snatch",
+      "weight_male_lbs": "210",
+      "weight_female_lbs": "120"
+    }
+  },
+  {
+    "workout_id": "bfefdf8b-804f-4810-a491-e51cdac1d692",
+    "slug": "Open-2013-13-2",
+    "workout_name": "Open 13.2",
+    "format": "AMRAP",
+    "exercise_name": "Shoulder to overhead",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Shoulder to overhead",
+      "weight_male_lbs": "115",
+      "weight_female_lbs": "75"
+    }
+  },
+  {
+    "workout_id": "bfefdf8b-804f-4810-a491-e51cdac1d692",
+    "slug": "Open-2013-13-2",
+    "workout_name": "Open 13.2",
+    "format": "AMRAP",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "115",
+      "weight_female_lbs": "75"
+    }
+  },
+  {
+    "workout_id": "bfefdf8b-804f-4810-a491-e51cdac1d692",
+    "slug": "Open-2013-13-2",
+    "workout_name": "Open 13.2",
+    "format": "AMRAP",
+    "exercise_name": "Box jump",
+    "task_json": {
+      "reps": "15",
+      "notes": "24 inch box",
+      "exercise": "Box jump"
+    }
+  },
+  {
+    "workout_id": "690d1fce-079f-4fe1-979e-921dc2099f63",
+    "slug": "Open-2013-13-3",
+    "workout_name": "Open 13.3",
+    "format": "AMRAP",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "150",
+      "notes": "10 foot target",
+      "exercise": "Wall ball",
+      "weight_male_lbs": "20",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "690d1fce-079f-4fe1-979e-921dc2099f63",
+    "slug": "Open-2013-13-3",
+    "workout_name": "Open 13.3",
+    "format": "AMRAP",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "90",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "690d1fce-079f-4fe1-979e-921dc2099f63",
+    "slug": "Open-2013-13-3",
+    "workout_name": "Open 13.3",
+    "format": "AMRAP",
+    "exercise_name": "Muscle-up",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Muscle-up"
+    }
+  },
+  {
+    "workout_id": "d6d17516-4f75-4f2e-8ecd-f7d19934dc31",
+    "slug": "Open-2013-13-4",
+    "workout_name": "Open 12.4",
+    "format": "AMRAP",
+    "exercise_name": "Clean and jerk",
+    "task_json": {
+      "reps": "3-6-9-12...",
+      "exercise": "Clean and jerk",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "75"
+    }
+  },
+  {
+    "workout_id": "d6d17516-4f75-4f2e-8ecd-f7d19934dc31",
+    "slug": "Open-2013-13-4",
+    "workout_name": "Open 12.4",
+    "format": "AMRAP",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "3-6-9-12...",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "70d00818-2b76-454b-8444-b88b91d0815f",
+    "slug": "Open-2013-13-5",
+    "workout_name": "Open 13.5",
+    "format": "Ladder",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Thruster",
+      "weight_male_lbs": "100",
+      "weight_female_lbs": "70"
+    }
+  },
+  {
+    "workout_id": "70d00818-2b76-454b-8444-b88b91d0815f",
+    "slug": "Open-2013-13-5",
+    "workout_name": "Open 13.5",
+    "format": "Ladder",
+    "exercise_name": "Chest to bar pull-up",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Chest to bar pull-up"
+    }
+  },
+  {
+    "workout_id": "d01fdebe-db70-4988-9a64-e995bcf61ce8",
+    "slug": "Open-2014-14-1",
+    "workout_name": "Open 14.1",
+    "format": "AMRAP",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "d01fdebe-db70-4988-9a64-e995bcf61ce8",
+    "slug": "Open-2014-14-1",
+    "workout_name": "Open 14.1",
+    "format": "AMRAP",
+    "exercise_name": "Power snatch",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Power snatch",
+      "weight_male_lbs": "75",
+      "weight_female_lbs": "55"
+    }
+  },
+  {
+    "workout_id": "d4e78723-d04f-4c44-a97d-d05070a5a4a1",
+    "slug": "Open-2014-14-2",
+    "workout_name": "Open 14.2",
+    "format": "Ladder",
+    "exercise_name": "Overhead squat",
+    "task_json": {
+      "reps": "10-12-14-16...",
+      "notes": "2 rounds per 3-minute window, reps increase by 2 each window",
+      "exercise": "Overhead squat",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "d4e78723-d04f-4c44-a97d-d05070a5a4a1",
+    "slug": "Open-2014-14-2",
+    "workout_name": "Open 14.2",
+    "format": "Ladder",
+    "exercise_name": "Chest to bar pull-up",
+    "task_json": {
+      "reps": "10-12-14-16...",
+      "notes": "2 rounds per 3-minute window, reps increase by 2 each window",
+      "exercise": "Chest to bar pull-up"
+    }
+  },
+  {
+    "workout_id": "c3a4c6ce-dc8f-45e5-8998-280757ca760b",
+    "slug": "Open-2014-14-3",
+    "workout_name": "Open 14.3",
+    "format": "Ladder",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "95"
+    }
+  },
+  {
+    "workout_id": "c3a4c6ce-dc8f-45e5-8998-280757ca760b",
+    "slug": "Open-2014-14-3",
+    "workout_name": "Open 14.3",
+    "format": "Ladder",
+    "exercise_name": "Box jump",
+    "task_json": {
+      "reps": "15",
+      "notes": "24 inch box",
+      "exercise": "Box jump"
+    }
+  },
+  {
+    "workout_id": "c3a4c6ce-dc8f-45e5-8998-280757ca760b",
+    "slug": "Open-2014-14-3",
+    "workout_name": "Open 14.3",
+    "format": "Ladder",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "185",
+      "weight_female_lbs": "135"
+    }
+  },
+  {
+    "workout_id": "c3a4c6ce-dc8f-45e5-8998-280757ca760b",
+    "slug": "Open-2014-14-3",
+    "workout_name": "Open 14.3",
+    "format": "Ladder",
+    "exercise_name": "Box jump",
+    "task_json": {
+      "reps": "15",
+      "notes": "24 inch box",
+      "exercise": "Box jump"
+    }
+  },
+  {
+    "workout_id": "c3a4c6ce-dc8f-45e5-8998-280757ca760b",
+    "slug": "Open-2014-14-3",
+    "workout_name": "Open 14.3",
+    "format": "Ladder",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "20",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "c3a4c6ce-dc8f-45e5-8998-280757ca760b",
+    "slug": "Open-2014-14-3",
+    "workout_name": "Open 14.3",
+    "format": "Ladder",
+    "exercise_name": "Box jump",
+    "task_json": {
+      "reps": "15",
+      "notes": "24 inch box",
+      "exercise": "Box jump"
+    }
+  },
+  {
+    "workout_id": "c3a4c6ce-dc8f-45e5-8998-280757ca760b",
+    "slug": "Open-2014-14-3",
+    "workout_name": "Open 14.3",
+    "format": "Ladder",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "25",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "275",
+      "weight_female_lbs": "185"
+    }
+  },
+  {
+    "workout_id": "c3a4c6ce-dc8f-45e5-8998-280757ca760b",
+    "slug": "Open-2014-14-3",
+    "workout_name": "Open 14.3",
+    "format": "Ladder",
+    "exercise_name": "Box jump",
+    "task_json": {
+      "reps": "15",
+      "notes": "24 inch box",
+      "exercise": "Box jump"
+    }
+  },
+  {
+    "workout_id": "c3a4c6ce-dc8f-45e5-8998-280757ca760b",
+    "slug": "Open-2014-14-3",
+    "workout_name": "Open 14.3",
+    "format": "Ladder",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "315",
+      "weight_female_lbs": "205"
+    }
+  },
+  {
+    "workout_id": "c3a4c6ce-dc8f-45e5-8998-280757ca760b",
+    "slug": "Open-2014-14-3",
+    "workout_name": "Open 14.3",
+    "format": "Ladder",
+    "exercise_name": "Box jump",
+    "task_json": {
+      "reps": "15",
+      "notes": "24 inch box",
+      "exercise": "Box jump"
+    }
+  },
+  {
+    "workout_id": "c3a4c6ce-dc8f-45e5-8998-280757ca760b",
+    "slug": "Open-2014-14-3",
+    "workout_name": "Open 14.3",
+    "format": "Ladder",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "35",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "365",
+      "weight_female_lbs": "225"
+    }
+  },
+  {
+    "workout_id": "c3a4c6ce-dc8f-45e5-8998-280757ca760b",
+    "slug": "Open-2014-14-3",
+    "workout_name": "Open 14.3",
+    "format": "Ladder",
+    "exercise_name": "Box jump",
+    "task_json": {
+      "reps": "15",
+      "notes": "24 inch box",
+      "exercise": "Box jump"
+    }
+  },
+  {
+    "workout_id": "360944c2-2783-4f17-bcb4-9543f3aaa5d1",
+    "slug": "Open-2014-14-4",
+    "workout_name": "Open 14.4",
+    "format": "AMRAP",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "60",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "360944c2-2783-4f17-bcb4-9543f3aaa5d1",
+    "slug": "Open-2014-14-4",
+    "workout_name": "Open 14.4",
+    "format": "AMRAP",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "360944c2-2783-4f17-bcb4-9543f3aaa5d1",
+    "slug": "Open-2014-14-4",
+    "workout_name": "Open 14.4",
+    "format": "AMRAP",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "40",
+      "notes": "10 foot target",
+      "exercise": "Wall ball",
+      "weight_male_lbs": "20",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "360944c2-2783-4f17-bcb4-9543f3aaa5d1",
+    "slug": "Open-2014-14-4",
+    "workout_name": "Open 14.4",
+    "format": "AMRAP",
+    "exercise_name": "Clean",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Clean",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "135"
+    }
+  },
+  {
+    "workout_id": "360944c2-2783-4f17-bcb4-9543f3aaa5d1",
+    "slug": "Open-2014-14-4",
+    "workout_name": "Open 14.4",
+    "format": "AMRAP",
+    "exercise_name": "Muscle-up",
+    "task_json": {
+      "reps": "20",
+      "exercise": "Muscle-up"
+    }
+  },
+  {
+    "workout_id": "bf334784-db8a-4d04-bd2e-2934e04c82fa",
+    "slug": "Open-2014-14-5",
+    "workout_name": "Open 14.5",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "21-18-15-12-9-6-3",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "bf334784-db8a-4d04-bd2e-2934e04c82fa",
+    "slug": "Open-2014-14-5",
+    "workout_name": "Open 14.5",
+    "format": "For Time",
+    "exercise_name": "Burpee",
+    "task_json": {
+      "reps": "21-18-15-12-9-6-3",
+      "exercise": "Burpee"
+    }
+  },
+  {
+    "workout_id": "5f8c1f25-3507-4b01-b9dc-cabb2a167f9f",
+    "slug": "Open-2015-15-1",
+    "workout_name": "Open 15.1",
+    "format": "AMRAP",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "5f8c1f25-3507-4b01-b9dc-cabb2a167f9f",
+    "slug": "Open-2015-15-1",
+    "workout_name": "Open 15.1",
+    "format": "AMRAP",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "115",
+      "weight_female_lbs": "75"
+    }
+  },
+  {
+    "workout_id": "5f8c1f25-3507-4b01-b9dc-cabb2a167f9f",
+    "slug": "Open-2015-15-1",
+    "workout_name": "Open 15.1",
+    "format": "AMRAP",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Snatch",
+      "weight_male_lbs": "115",
+      "weight_female_lbs": "75"
+    }
+  },
+  {
+    "workout_id": "bd899ef4-c900-40f7-b4d2-bedd0b572cf7",
+    "slug": "Open-2015-15-1a",
+    "workout_name": "Open 15.1a",
+    "format": "Ladder",
+    "exercise_name": "Clean and jerk",
+    "task_json": {
+      "reps": "1RM",
+      "exercise": "Clean and jerk"
+    }
+  },
+  {
+    "workout_id": "e718d8b8-fc5b-47c9-8888-2962c519adce",
+    "slug": "Open-2015-15-2",
+    "workout_name": "Open 15.2",
+    "format": "Ladder",
+    "exercise_name": "Overhead squat",
+    "task_json": {
+      "reps": "10-12-14-16...",
+      "notes": "2 rounds per 3-minute window, reps increase by 2 each window",
+      "exercise": "Overhead squat",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "e718d8b8-fc5b-47c9-8888-2962c519adce",
+    "slug": "Open-2015-15-2",
+    "workout_name": "Open 15.2",
+    "format": "Ladder",
+    "exercise_name": "Chest to bar pull-up",
+    "task_json": {
+      "reps": "10-12-14-16...",
+      "notes": "2 rounds per 3-minute window, reps increase by 2 each window",
+      "exercise": "Chest to bar pull-up"
+    }
+  },
+  {
+    "workout_id": "2b9f0853-d9c6-496e-b72c-0304228f69bd",
+    "slug": "Open-2015-15-3",
+    "workout_name": "Open 15.3",
+    "format": "AMRAP",
+    "exercise_name": "Muscle-up",
+    "task_json": {
+      "reps": "7",
+      "exercise": "Muscle-up"
+    }
+  },
+  {
+    "workout_id": "2b9f0853-d9c6-496e-b72c-0304228f69bd",
+    "slug": "Open-2015-15-3",
+    "workout_name": "Open 15.3",
+    "format": "AMRAP",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "50",
+      "notes": "Men to 10 feet, Women to 9 feet",
+      "exercise": "Wall ball",
+      "weight_male_lbs": "20",
+      "weight_female_lbs": "14"
+    }
+  },
+  {
+    "workout_id": "2b9f0853-d9c6-496e-b72c-0304228f69bd",
+    "slug": "Open-2015-15-3",
+    "workout_name": "Open 15.3",
+    "format": "AMRAP",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "100",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "393f08d0-706d-462c-bacd-32f627411bef",
+    "slug": "Open-2015-15-4",
+    "workout_name": "Open 15.4",
+    "format": "Ladder",
+    "exercise_name": "Handstand push-up",
+    "task_json": {
+      "reps": "3-6-9-12-15-18-21...",
+      "notes": "Add 3 reps each round",
+      "exercise": "Handstand push-up"
+    }
+  },
+  {
+    "workout_id": "393f08d0-706d-462c-bacd-32f627411bef",
+    "slug": "Open-2015-15-4",
+    "workout_name": "Open 15.4",
+    "format": "Ladder",
+    "exercise_name": "Clean",
+    "task_json": {
+      "reps": "3-3-3-6-6-6-9...",
+      "notes": "Add 3 reps every 3 rounds",
+      "exercise": "Clean",
+      "weight_male_lbs": "185",
+      "weight_female_lbs": "125"
+    }
+  },
+  {
+    "workout_id": "90b23610-0144-487e-9994-d976323a7b84",
+    "slug": "Open-2015-15-5",
+    "workout_name": "Open 15.5",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "reps": "27-21-15-9",
+      "calories": "27-21-15-9",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "90b23610-0144-487e-9994-d976323a7b84",
+    "slug": "Open-2015-15-5",
+    "workout_name": "Open 15.5",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "27-21-15-9",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "b0221449-e29b-425a-a86e-deb38e1dc7a0",
+    "slug": "Open-2016-16-1",
+    "workout_name": "Open 16.1",
+    "format": "AMRAP",
+    "exercise_name": "Overhead walking lunge",
+    "task_json": {
+      "distance": "25 ft",
+      "exercise": "Overhead walking lunge",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "b0221449-e29b-425a-a86e-deb38e1dc7a0",
+    "slug": "Open-2016-16-1",
+    "workout_name": "Open 16.1",
+    "format": "AMRAP",
+    "exercise_name": "Burpee",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Burpee"
+    }
+  },
+  {
+    "workout_id": "b0221449-e29b-425a-a86e-deb38e1dc7a0",
+    "slug": "Open-2016-16-1",
+    "workout_name": "Open 16.1",
+    "format": "AMRAP",
+    "exercise_name": "Overhead walking lunge",
+    "task_json": {
+      "distance": "25 ft",
+      "exercise": "Overhead walking lunge",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "b0221449-e29b-425a-a86e-deb38e1dc7a0",
+    "slug": "Open-2016-16-1",
+    "workout_name": "Open 16.1",
+    "format": "AMRAP",
+    "exercise_name": "Chest to bar pull-up",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Chest to bar pull-up"
+    }
+  },
+  {
+    "workout_id": "b2beb82d-622d-4ca9-8954-5bef453af7fd",
+    "slug": "Open-2016-16-2",
+    "workout_name": "Open 16.2",
+    "format": "Ladder",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "25",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "b2beb82d-622d-4ca9-8954-5bef453af7fd",
+    "slug": "Open-2016-16-2",
+    "workout_name": "Open 16.2",
+    "format": "Ladder",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "b2beb82d-622d-4ca9-8954-5bef453af7fd",
+    "slug": "Open-2016-16-2",
+    "workout_name": "Open 16.2",
+    "format": "Ladder",
+    "exercise_name": "Squat clean",
+    "task_json": {
+      "reps": "15-13-11-9-7",
+      "notes": "4-minute intervals, decreasing reps and increasing weight each round",
+      "exercise": "Squat clean",
+      "weight_male_lbs": "135-185-225-275-315",
+      "weight_female_lbs": "85-115-145-175-205"
+    }
+  },
+  {
+    "workout_id": "f669eea3-b3cb-48db-b5e0-ddef53e41bc8",
+    "slug": "Open-2016-16-3",
+    "workout_name": "Open 16.3",
+    "format": "AMRAP",
+    "exercise_name": "Power snatch",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Power snatch",
+      "weight_male_lbs": "75",
+      "weight_female_lbs": "55"
+    }
+  },
+  {
+    "workout_id": "f669eea3-b3cb-48db-b5e0-ddef53e41bc8",
+    "slug": "Open-2016-16-3",
+    "workout_name": "Open 16.3",
+    "format": "AMRAP",
+    "exercise_name": "Bar muscle-up",
+    "task_json": {
+      "reps": "3",
+      "exercise": "Bar muscle-up"
+    }
+  },
+  {
+    "workout_id": "aa700ae0-9afd-476a-bab3-f0b4b623c57a",
+    "slug": "Open-2016-16-4",
+    "workout_name": "Open 16.4",
+    "format": "AMRAP",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "55",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "aa700ae0-9afd-476a-bab3-f0b4b623c57a",
+    "slug": "Open-2016-16-4",
+    "workout_name": "Open 16.4",
+    "format": "AMRAP",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "55",
+      "notes": "Men to 10 feet, Women to 9 feet",
+      "exercise": "Wall ball",
+      "weight_male_lbs": "20",
+      "weight_female_lbs": "14"
+    }
+  },
+  {
+    "workout_id": "aa700ae0-9afd-476a-bab3-f0b4b623c57a",
+    "slug": "Open-2016-16-4",
+    "workout_name": "Open 16.4",
+    "format": "AMRAP",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "55",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "aa700ae0-9afd-476a-bab3-f0b4b623c57a",
+    "slug": "Open-2016-16-4",
+    "workout_name": "Open 16.4",
+    "format": "AMRAP",
+    "exercise_name": "Handstand push-up",
+    "task_json": {
+      "reps": "55",
+      "exercise": "Handstand push-up"
+    }
+  },
+  {
+    "workout_id": "a6ff81ec-2fdc-4e23-aca9-1198c8592107",
+    "slug": "Open-2016-16-5",
+    "workout_name": "Open 16.5",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "21-18-15-12-9-6-3",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "a6ff81ec-2fdc-4e23-aca9-1198c8592107",
+    "slug": "Open-2016-16-5",
+    "workout_name": "Open 16.5",
+    "format": "For Time",
+    "exercise_name": "Burpee",
+    "task_json": {
+      "reps": "21-18-15-12-9-6-3",
+      "exercise": "Burpee"
+    }
+  },
+  {
+    "workout_id": "4b96d539-f8d9-4579-9d85-dd0af82fa668",
+    "slug": "Open-2017-17-1",
+    "workout_name": "Open 17.1",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Dumbbell snatch"
+    }
+  },
+  {
+    "workout_id": "4b96d539-f8d9-4579-9d85-dd0af82fa668",
+    "slug": "Open-2017-17-1",
+    "workout_name": "Open 17.1",
+    "format": "For Time",
+    "exercise_name": "Burpee box jump-over",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Burpee box jump-over"
+    }
+  },
+  {
+    "workout_id": "4b96d539-f8d9-4579-9d85-dd0af82fa668",
+    "slug": "Open-2017-17-1",
+    "workout_name": "Open 17.1",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "20",
+      "exercise": "Dumbbell snatch"
+    }
+  },
+  {
+    "workout_id": "4b96d539-f8d9-4579-9d85-dd0af82fa668",
+    "slug": "Open-2017-17-1",
+    "workout_name": "Open 17.1",
+    "format": "For Time",
+    "exercise_name": "Burpee box jump-over",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Burpee box jump-over"
+    }
+  },
+  {
+    "workout_id": "4b96d539-f8d9-4579-9d85-dd0af82fa668",
+    "slug": "Open-2017-17-1",
+    "workout_name": "Open 17.1",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Dumbbell snatch"
+    }
+  },
+  {
+    "workout_id": "4b96d539-f8d9-4579-9d85-dd0af82fa668",
+    "slug": "Open-2017-17-1",
+    "workout_name": "Open 17.1",
+    "format": "For Time",
+    "exercise_name": "Burpee box jump-over",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Burpee box jump-over"
+    }
+  },
+  {
+    "workout_id": "4b96d539-f8d9-4579-9d85-dd0af82fa668",
+    "slug": "Open-2017-17-1",
+    "workout_name": "Open 17.1",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "40",
+      "exercise": "Dumbbell snatch"
+    }
+  },
+  {
+    "workout_id": "4b96d539-f8d9-4579-9d85-dd0af82fa668",
+    "slug": "Open-2017-17-1",
+    "workout_name": "Open 17.1",
+    "format": "For Time",
+    "exercise_name": "Burpee box jump-over",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Burpee box jump-over"
+    }
+  },
+  {
+    "workout_id": "4b96d539-f8d9-4579-9d85-dd0af82fa668",
+    "slug": "Open-2017-17-1",
+    "workout_name": "Open 17.1",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Dumbbell snatch"
+    }
+  },
+  {
+    "workout_id": "c957ff1d-3798-421f-91d6-5eae0c635471",
+    "slug": "Open-2017-17-2",
+    "workout_name": "Open 17.2",
+    "format": "AMRAP",
+    "exercise_name": "Weighted walking lunge",
+    "task_json": {
+      "notes": "2 rounds",
+      "distance": "50 ft",
+      "exercise": "Weighted walking lunge",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "c957ff1d-3798-421f-91d6-5eae0c635471",
+    "slug": "Open-2017-17-2",
+    "workout_name": "Open 17.2",
+    "format": "AMRAP",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "16",
+      "notes": "Alternates with bar muscle-ups every 2 rounds",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "c957ff1d-3798-421f-91d6-5eae0c635471",
+    "slug": "Open-2017-17-2",
+    "workout_name": "Open 17.2",
+    "format": "AMRAP",
+    "exercise_name": "Power clean",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Power clean",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "c957ff1d-3798-421f-91d6-5eae0c635471",
+    "slug": "Open-2017-17-2",
+    "workout_name": "Open 17.2",
+    "format": "AMRAP",
+    "exercise_name": "Weighted walking lunge",
+    "task_json": {
+      "notes": "2 rounds",
+      "distance": "50 ft",
+      "exercise": "Weighted walking lunge",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "c957ff1d-3798-421f-91d6-5eae0c635471",
+    "slug": "Open-2017-17-2",
+    "workout_name": "Open 17.2",
+    "format": "AMRAP",
+    "exercise_name": "Bar muscle-up",
+    "task_json": {
+      "reps": "16",
+      "notes": "Alternates with toes-to-bars every 2 rounds",
+      "exercise": "Bar muscle-up"
+    }
+  },
+  {
+    "workout_id": "c957ff1d-3798-421f-91d6-5eae0c635471",
+    "slug": "Open-2017-17-2",
+    "workout_name": "Open 17.2",
+    "format": "AMRAP",
+    "exercise_name": "Power clean",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Power clean",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "a7241dbf-5877-413a-aded-b576fbf91a2d",
+    "slug": "Open-2017-17-3",
+    "workout_name": "Open 17.3",
+    "format": "Ladder",
+    "exercise_name": "Chest to bar pull-up",
+    "task_json": {
+      "reps": "6-7-8-9-10-11",
+      "notes": "3 rounds each, 4-minute intervals",
+      "exercise": "Chest to bar pull-up"
+    }
+  },
+  {
+    "workout_id": "a7241dbf-5877-413a-aded-b576fbf91a2d",
+    "slug": "Open-2017-17-3",
+    "workout_name": "Open 17.3",
+    "format": "Ladder",
+    "exercise_name": "Squat snatch",
+    "task_json": {
+      "reps": "6-5-4-3-2-1",
+      "notes": "3 rounds each, 4-minute intervals, decreasing reps with increasing weight",
+      "exercise": "Squat snatch",
+      "weight_male_lbs": "95-135-185-225-245-265",
+      "weight_female_lbs": "95-135-185-225-245-265"
+    }
+  },
+  {
+    "workout_id": "08111204-7041-4652-a46c-acb6b3a7dba2",
+    "slug": "Open-2017-17-4",
+    "workout_name": "Open 17.4",
+    "format": "AMRAP",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "55",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "08111204-7041-4652-a46c-acb6b3a7dba2",
+    "slug": "Open-2017-17-4",
+    "workout_name": "Open 17.4",
+    "format": "AMRAP",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "55",
+      "notes": "Men to 10 feet, Women to 9 feet",
+      "exercise": "Wall ball",
+      "weight_male_lbs": "20",
+      "weight_female_lbs": "14"
+    }
+  },
+  {
+    "workout_id": "08111204-7041-4652-a46c-acb6b3a7dba2",
+    "slug": "Open-2017-17-4",
+    "workout_name": "Open 17.4",
+    "format": "AMRAP",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "55",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "08111204-7041-4652-a46c-acb6b3a7dba2",
+    "slug": "Open-2017-17-4",
+    "workout_name": "Open 17.4",
+    "format": "AMRAP",
+    "exercise_name": "Handstand push-up",
+    "task_json": {
+      "reps": "55",
+      "exercise": "Handstand push-up"
+    }
+  },
+  {
+    "workout_id": "8ac23542-00f6-45a5-a48d-c17802148b5d",
+    "slug": "Open-2017-17-5",
+    "workout_name": "Open 17.5",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "95"
+    }
+  },
+  {
+    "workout_id": "8ac23542-00f6-45a5-a48d-c17802148b5d",
+    "slug": "Open-2017-17-5",
+    "workout_name": "Open 17.5",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "35",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "b6c63146-0413-4ccc-b903-3b944f54ed8b",
+    "slug": "Open-2018-18-1",
+    "workout_name": "Open 18.1",
+    "format": "AMRAP",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "b6c63146-0413-4ccc-b903-3b944f54ed8b",
+    "slug": "Open-2018-18-1",
+    "workout_name": "Open 18.1",
+    "format": "AMRAP",
+    "exercise_name": "Dumbbell hang clean and jerk",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Dumbbell hang clean and jerk",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "b6c63146-0413-4ccc-b903-3b944f54ed8b",
+    "slug": "Open-2018-18-1",
+    "workout_name": "Open 18.1",
+    "format": "AMRAP",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "14",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "7aff41dc-7d7c-493e-83d9-68c7ac3ba3b4",
+    "slug": "Open-2018-18-2",
+    "workout_name": "Open 18.2",
+    "format": "For Time",
+    "exercise_name": "Dumbbell squat",
+    "task_json": {
+      "reps": "1-2-3-4-5-6-7-8-9-10",
+      "exercise": "Dumbbell squat",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "7aff41dc-7d7c-493e-83d9-68c7ac3ba3b4",
+    "slug": "Open-2018-18-2",
+    "workout_name": "Open 18.2",
+    "format": "For Time",
+    "exercise_name": "Bar facing burpee",
+    "task_json": {
+      "reps": "1-2-3-4-5-6-7-8-9-10",
+      "exercise": "Bar facing burpee"
+    }
+  },
+  {
+    "workout_id": "06408d7a-7b8c-4cb9-b38e-a3357a8f1b27",
+    "slug": "Open-2018-18-2a",
+    "workout_name": "Open 18.2a",
+    "format": "For Time",
+    "exercise_name": "Clean",
+    "task_json": {
+      "reps": "1RM",
+      "exercise": "Clean"
+    }
+  },
+  {
+    "workout_id": "684eae81-4913-4476-a747-08ffe3ef2ac0",
+    "slug": "Open-2018-18-3",
+    "workout_name": "Open 18.3",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "100",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "684eae81-4913-4476-a747-08ffe3ef2ac0",
+    "slug": "Open-2018-18-3",
+    "workout_name": "Open 18.3",
+    "format": "For Time",
+    "exercise_name": "Overhead squat",
+    "task_json": {
+      "reps": "20",
+      "exercise": "Overhead squat",
+      "weight_male_lbs": "115",
+      "weight_female_lbs": "80"
+    }
+  },
+  {
+    "workout_id": "684eae81-4913-4476-a747-08ffe3ef2ac0",
+    "slug": "Open-2018-18-3",
+    "workout_name": "Open 18.3",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "100",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "684eae81-4913-4476-a747-08ffe3ef2ac0",
+    "slug": "Open-2018-18-3",
+    "workout_name": "Open 18.3",
+    "format": "For Time",
+    "exercise_name": "Ring muscle-up",
+    "task_json": {
+      "reps": "12",
+      "exercise": "Ring muscle-up"
+    }
+  },
+  {
+    "workout_id": "684eae81-4913-4476-a747-08ffe3ef2ac0",
+    "slug": "Open-2018-18-3",
+    "workout_name": "Open 18.3",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "100",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "684eae81-4913-4476-a747-08ffe3ef2ac0",
+    "slug": "Open-2018-18-3",
+    "workout_name": "Open 18.3",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "20",
+      "exercise": "Dumbbell snatch",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "684eae81-4913-4476-a747-08ffe3ef2ac0",
+    "slug": "Open-2018-18-3",
+    "workout_name": "Open 18.3",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "100",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "a8fba0ed-e5d6-42ec-aecf-aa8f98ad70b9",
+    "slug": "Open-2018-18-4",
+    "workout_name": "Open 18.4",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "a8fba0ed-e5d6-42ec-aecf-aa8f98ad70b9",
+    "slug": "Open-2018-18-4",
+    "workout_name": "Open 18.4",
+    "format": "For Time",
+    "exercise_name": "Handstand push-up",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Handstand push-up"
+    }
+  },
+  {
+    "workout_id": "a8fba0ed-e5d6-42ec-aecf-aa8f98ad70b9",
+    "slug": "Open-2018-18-4",
+    "workout_name": "Open 18.4",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "a8fba0ed-e5d6-42ec-aecf-aa8f98ad70b9",
+    "slug": "Open-2018-18-4",
+    "workout_name": "Open 18.4",
+    "format": "For Time",
+    "exercise_name": "Handstand push-up",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Handstand push-up"
+    }
+  },
+  {
+    "workout_id": "a8fba0ed-e5d6-42ec-aecf-aa8f98ad70b9",
+    "slug": "Open-2018-18-4",
+    "workout_name": "Open 18.4",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "a8fba0ed-e5d6-42ec-aecf-aa8f98ad70b9",
+    "slug": "Open-2018-18-4",
+    "workout_name": "Open 18.4",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "315",
+      "weight_female_lbs": "205"
+    }
+  },
+  {
+    "workout_id": "a8fba0ed-e5d6-42ec-aecf-aa8f98ad70b9",
+    "slug": "Open-2018-18-4",
+    "workout_name": "Open 18.4",
+    "format": "For Time",
+    "exercise_name": "Handstand walk",
+    "task_json": {
+      "distance": "50 ft",
+      "exercise": "Handstand walk"
+    }
+  },
+  {
+    "workout_id": "a8fba0ed-e5d6-42ec-aecf-aa8f98ad70b9",
+    "slug": "Open-2018-18-4",
+    "workout_name": "Open 18.4",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "315",
+      "weight_female_lbs": "205"
+    }
+  },
+  {
+    "workout_id": "a8fba0ed-e5d6-42ec-aecf-aa8f98ad70b9",
+    "slug": "Open-2018-18-4",
+    "workout_name": "Open 18.4",
+    "format": "For Time",
+    "exercise_name": "Handstand walk",
+    "task_json": {
+      "distance": "50 ft",
+      "exercise": "Handstand walk"
+    }
+  },
+  {
+    "workout_id": "a8fba0ed-e5d6-42ec-aecf-aa8f98ad70b9",
+    "slug": "Open-2018-18-4",
+    "workout_name": "Open 18.4",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "315",
+      "weight_female_lbs": "205"
+    }
+  },
+  {
+    "workout_id": "a8fba0ed-e5d6-42ec-aecf-aa8f98ad70b9",
+    "slug": "Open-2018-18-4",
+    "workout_name": "Open 18.4",
+    "format": "For Time",
+    "exercise_name": "Handstand walk",
+    "task_json": {
+      "distance": "50 ft",
+      "exercise": "Handstand walk"
+    }
+  },
+  {
+    "workout_id": "36e43ede-385a-4fde-bcfc-1361b4a12fef",
+    "slug": "Open-2018-18-5",
+    "workout_name": "Open 18.5",
+    "format": "AMRAP",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "3-6-9-12...",
+      "exercise": "Thruster",
+      "weight_male_lbs": "100",
+      "weight_female_lbs": "70"
+    }
+  },
+  {
+    "workout_id": "36e43ede-385a-4fde-bcfc-1361b4a12fef",
+    "slug": "Open-2018-18-5",
+    "workout_name": "Open 18.5",
+    "format": "AMRAP",
+    "exercise_name": "Chest to bar pull-up",
+    "task_json": {
+      "reps": "3-6-9-12...",
+      "exercise": "Chest to bar pull-up"
+    }
+  },
+  {
+    "workout_id": "fcb8b4c4-252e-4420-8e95-13d1b0b3f9cc",
+    "slug": "Open-2019-19-1",
+    "workout_name": "Open 19.1",
+    "format": "AMRAP",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "19",
+      "exercise": "Wall ball",
+      "weight_male_lbs": "20",
+      "weight_female_lbs": "14"
+    }
+  },
+  {
+    "workout_id": "fcb8b4c4-252e-4420-8e95-13d1b0b3f9cc",
+    "slug": "Open-2019-19-1",
+    "workout_name": "Open 19.1",
+    "format": "AMRAP",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "19",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "185978f1-8f3e-4638-80e3-05627865f479",
+    "slug": "Open-2019-19-2",
+    "workout_name": "Open 19.2",
+    "format": "Ladder",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "25",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "185978f1-8f3e-4638-80e3-05627865f479",
+    "slug": "Open-2019-19-2",
+    "workout_name": "Open 19.2",
+    "format": "Ladder",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "185978f1-8f3e-4638-80e3-05627865f479",
+    "slug": "Open-2019-19-2",
+    "workout_name": "Open 19.2",
+    "format": "Ladder",
+    "exercise_name": "Squat clean",
+    "task_json": {
+      "reps": "15-13-11-9-7",
+      "notes": "4-minute intervals, decreasing reps and increasing weight each round",
+      "exercise": "Squat clean",
+      "weight_male_lbs": "135-185-225-275-315",
+      "weight_female_lbs": "85-115-145-175-205"
+    }
+  },
+  {
+    "workout_id": "5122f57d-f6bf-44d3-9966-a3c84ec0f05c",
+    "slug": "Open-2019-19-3",
+    "workout_name": "Open 19.3",
+    "format": "For Time",
+    "exercise_name": "Dumbbell overhead lunge",
+    "task_json": {
+      "distance": "200 ft",
+      "exercise": "Dumbbell overhead lunge",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "5122f57d-f6bf-44d3-9966-a3c84ec0f05c",
+    "slug": "Open-2019-19-3",
+    "workout_name": "Open 19.3",
+    "format": "For Time",
+    "exercise_name": "Dumbbell box step-up",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Dumbbell box step-up",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "5122f57d-f6bf-44d3-9966-a3c84ec0f05c",
+    "slug": "Open-2019-19-3",
+    "workout_name": "Open 19.3",
+    "format": "For Time",
+    "exercise_name": "Strict handstand push-up",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Strict handstand push-up"
+    }
+  },
+  {
+    "workout_id": "5122f57d-f6bf-44d3-9966-a3c84ec0f05c",
+    "slug": "Open-2019-19-3",
+    "workout_name": "Open 19.3",
+    "format": "For Time",
+    "exercise_name": "Handstand walk",
+    "task_json": {
+      "distance": "200 ft",
+      "exercise": "Handstand walk"
+    }
+  },
+  {
+    "workout_id": "a0dc70f5-cbc6-4968-90ad-30bab11882cc",
+    "slug": "Open-2019-19-4",
+    "workout_name": "Open 19.4",
+    "format": "For Time",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "10",
+      "notes": "3 rounds",
+      "exercise": "Snatch",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "a0dc70f5-cbc6-4968-90ad-30bab11882cc",
+    "slug": "Open-2019-19-4",
+    "workout_name": "Open 19.4",
+    "format": "For Time",
+    "exercise_name": "Bar facing burpee",
+    "task_json": {
+      "reps": "12",
+      "notes": "3 rounds",
+      "exercise": "Bar facing burpee"
+    }
+  },
+  {
+    "workout_id": "a0dc70f5-cbc6-4968-90ad-30bab11882cc",
+    "slug": "Open-2019-19-4",
+    "workout_name": "Open 19.4",
+    "format": "For Time",
+    "exercise_name": "Rest",
+    "task_json": {
+      "time": "3:00",
+      "exercise": "Rest"
+    }
+  },
+  {
+    "workout_id": "a0dc70f5-cbc6-4968-90ad-30bab11882cc",
+    "slug": "Open-2019-19-4",
+    "workout_name": "Open 19.4",
+    "format": "For Time",
+    "exercise_name": "Bar muscle-up",
+    "task_json": {
+      "reps": "10",
+      "notes": "3 rounds",
+      "exercise": "Bar muscle-up"
+    }
+  },
+  {
+    "workout_id": "a0dc70f5-cbc6-4968-90ad-30bab11882cc",
+    "slug": "Open-2019-19-4",
+    "workout_name": "Open 19.4",
+    "format": "For Time",
+    "exercise_name": "Bar facing burpee",
+    "task_json": {
+      "reps": "12",
+      "notes": "3 rounds",
+      "exercise": "Bar facing burpee"
+    }
+  },
+  {
+    "workout_id": "4aa01da8-198a-426c-8708-f69496be3a3d",
+    "slug": "Open-2019-19-5",
+    "workout_name": "Open 19.5",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "33-27-21-15-9",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "4aa01da8-198a-426c-8708-f69496be3a3d",
+    "slug": "Open-2019-19-5",
+    "workout_name": "Open 19.5",
+    "format": "For Time",
+    "exercise_name": "Chest to bar pull-up",
+    "task_json": {
+      "reps": "33-27-21-15-9",
+      "exercise": "Chest to bar pull-up"
+    }
+  },
+  {
+    "workout_id": "0021da40-0389-4ad5-acca-9ddfdf9af3d9",
+    "slug": "Open-2020-20-1",
+    "workout_name": "Open 20.1",
+    "format": "For Time",
+    "exercise_name": "Ground to overhead",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Ground to overhead",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "0021da40-0389-4ad5-acca-9ddfdf9af3d9",
+    "slug": "Open-2020-20-1",
+    "workout_name": "Open 20.1",
+    "format": "For Time",
+    "exercise_name": "Bar facing burpee",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Bar facing burpee"
+    }
+  },
+  {
+    "workout_id": "fe40af3e-4b93-418d-bad4-658e5dd2111d",
+    "slug": "Open-2020-20-2",
+    "workout_name": "Open 20.2",
+    "format": "AMRAP",
+    "exercise_name": "Dumbbell thruster",
+    "task_json": {
+      "reps": "4",
+      "exercise": "Dumbbell thruster",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "fe40af3e-4b93-418d-bad4-658e5dd2111d",
+    "slug": "Open-2020-20-2",
+    "workout_name": "Open 20.2",
+    "format": "AMRAP",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "6",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "fe40af3e-4b93-418d-bad4-658e5dd2111d",
+    "slug": "Open-2020-20-2",
+    "workout_name": "Open 20.2",
+    "format": "AMRAP",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "24",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "6463815c-23d0-4b09-9b81-19403ec42495",
+    "slug": "Open-2020-20-3",
+    "workout_name": "Open 20.3",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "6463815c-23d0-4b09-9b81-19403ec42495",
+    "slug": "Open-2020-20-3",
+    "workout_name": "Open 20.3",
+    "format": "For Time",
+    "exercise_name": "Handstand push-up",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Handstand push-up"
+    }
+  },
+  {
+    "workout_id": "6463815c-23d0-4b09-9b81-19403ec42495",
+    "slug": "Open-2020-20-3",
+    "workout_name": "Open 20.3",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "6463815c-23d0-4b09-9b81-19403ec42495",
+    "slug": "Open-2020-20-3",
+    "workout_name": "Open 20.3",
+    "format": "For Time",
+    "exercise_name": "Handstand push-up",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Handstand push-up"
+    }
+  },
+  {
+    "workout_id": "6463815c-23d0-4b09-9b81-19403ec42495",
+    "slug": "Open-2020-20-3",
+    "workout_name": "Open 20.3",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "6463815c-23d0-4b09-9b81-19403ec42495",
+    "slug": "Open-2020-20-3",
+    "workout_name": "Open 20.3",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "315",
+      "weight_female_lbs": "205"
+    }
+  },
+  {
+    "workout_id": "6463815c-23d0-4b09-9b81-19403ec42495",
+    "slug": "Open-2020-20-3",
+    "workout_name": "Open 20.3",
+    "format": "For Time",
+    "exercise_name": "Handstand walk",
+    "task_json": {
+      "distance": "50 ft",
+      "exercise": "Handstand walk"
+    }
+  },
+  {
+    "workout_id": "6463815c-23d0-4b09-9b81-19403ec42495",
+    "slug": "Open-2020-20-3",
+    "workout_name": "Open 20.3",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "315",
+      "weight_female_lbs": "205"
+    }
+  },
+  {
+    "workout_id": "6463815c-23d0-4b09-9b81-19403ec42495",
+    "slug": "Open-2020-20-3",
+    "workout_name": "Open 20.3",
+    "format": "For Time",
+    "exercise_name": "Handstand walk",
+    "task_json": {
+      "distance": "50 ft",
+      "exercise": "Handstand walk"
+    }
+  },
+  {
+    "workout_id": "6463815c-23d0-4b09-9b81-19403ec42495",
+    "slug": "Open-2020-20-3",
+    "workout_name": "Open 20.3",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "315",
+      "weight_female_lbs": "205"
+    }
+  },
+  {
+    "workout_id": "6463815c-23d0-4b09-9b81-19403ec42495",
+    "slug": "Open-2020-20-3",
+    "workout_name": "Open 20.3",
+    "format": "For Time",
+    "exercise_name": "Handstand walk",
+    "task_json": {
+      "distance": "50 ft",
+      "exercise": "Handstand walk"
+    }
+  },
+  {
+    "workout_id": "67b1d461-5d55-46a8-96e8-c8eedb03c249",
+    "slug": "Open-2020-20-4",
+    "workout_name": "Open 20.4",
+    "format": "For Time",
+    "exercise_name": "Box jump",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Box jump",
+      "weight_male_lbs": "24",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "67b1d461-5d55-46a8-96e8-c8eedb03c249",
+    "slug": "Open-2020-20-4",
+    "workout_name": "Open 20.4",
+    "format": "For Time",
+    "exercise_name": "Clean and jerk",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Clean and jerk",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "67b1d461-5d55-46a8-96e8-c8eedb03c249",
+    "slug": "Open-2020-20-4",
+    "workout_name": "Open 20.4",
+    "format": "For Time",
+    "exercise_name": "Box jump",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Box jump",
+      "weight_male_lbs": "24",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "67b1d461-5d55-46a8-96e8-c8eedb03c249",
+    "slug": "Open-2020-20-4",
+    "workout_name": "Open 20.4",
+    "format": "For Time",
+    "exercise_name": "Clean and jerk",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Clean and jerk",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "95"
+    }
+  },
+  {
+    "workout_id": "67b1d461-5d55-46a8-96e8-c8eedb03c249",
+    "slug": "Open-2020-20-4",
+    "workout_name": "Open 20.4",
+    "format": "For Time",
+    "exercise_name": "Box jump",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Box jump",
+      "weight_male_lbs": "24",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "67b1d461-5d55-46a8-96e8-c8eedb03c249",
+    "slug": "Open-2020-20-4",
+    "workout_name": "Open 20.4",
+    "format": "For Time",
+    "exercise_name": "Clean and jerk",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Clean and jerk",
+      "weight_male_lbs": "185",
+      "weight_female_lbs": "135"
+    }
+  },
+  {
+    "workout_id": "67b1d461-5d55-46a8-96e8-c8eedb03c249",
+    "slug": "Open-2020-20-4",
+    "workout_name": "Open 20.4",
+    "format": "For Time",
+    "exercise_name": "Alternating pistol squat",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Alternating pistol squat"
+    }
+  },
+  {
+    "workout_id": "67b1d461-5d55-46a8-96e8-c8eedb03c249",
+    "slug": "Open-2020-20-4",
+    "workout_name": "Open 20.4",
+    "format": "For Time",
+    "exercise_name": "Clean and jerk",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Clean and jerk",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "67b1d461-5d55-46a8-96e8-c8eedb03c249",
+    "slug": "Open-2020-20-4",
+    "workout_name": "Open 20.4",
+    "format": "For Time",
+    "exercise_name": "Alternating pistol squat",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Alternating pistol squat"
+    }
+  },
+  {
+    "workout_id": "67b1d461-5d55-46a8-96e8-c8eedb03c249",
+    "slug": "Open-2020-20-4",
+    "workout_name": "Open 20.4",
+    "format": "For Time",
+    "exercise_name": "Clean and jerk",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Clean and jerk",
+      "weight_male_lbs": "275",
+      "weight_female_lbs": "185"
+    }
+  },
+  {
+    "workout_id": "67b1d461-5d55-46a8-96e8-c8eedb03c249",
+    "slug": "Open-2020-20-4",
+    "workout_name": "Open 20.4",
+    "format": "For Time",
+    "exercise_name": "Alternating pistol squat",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Alternating pistol squat"
+    }
+  },
+  {
+    "workout_id": "67b1d461-5d55-46a8-96e8-c8eedb03c249",
+    "slug": "Open-2020-20-4",
+    "workout_name": "Open 20.4",
+    "format": "For Time",
+    "exercise_name": "Clean and jerk",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Clean and jerk",
+      "weight_male_lbs": "315",
+      "weight_female_lbs": "225"
+    }
+  },
+  {
+    "workout_id": "3ac516ad-f941-4386-9e61-88838726d29b",
+    "slug": "Open-2020-20-5",
+    "workout_name": "Open 20.5",
+    "format": "For Time",
+    "exercise_name": "Ring muscle-up",
+    "task_json": {
+      "reps": "40",
+      "exercise": "Ring muscle-up"
+    }
+  },
+  {
+    "workout_id": "3ac516ad-f941-4386-9e61-88838726d29b",
+    "slug": "Open-2020-20-5",
+    "workout_name": "Open 20.5",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "80",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "3ac516ad-f941-4386-9e61-88838726d29b",
+    "slug": "Open-2020-20-5",
+    "workout_name": "Open 20.5",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "120",
+      "exercise": "Wall ball"
+    }
+  },
+  {
+    "workout_id": "ec53a920-df6c-4af6-9977-54893de556e4",
+    "slug": "Open-2021-21-1",
+    "workout_name": "Open 21.1",
+    "format": "For Time",
+    "exercise_name": "Wall walk",
+    "task_json": {
+      "reps": "1",
+      "exercise": "Wall walk"
+    }
+  },
+  {
+    "workout_id": "ec53a920-df6c-4af6-9977-54893de556e4",
+    "slug": "Open-2021-21-1",
+    "workout_name": "Open 21.1",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "ec53a920-df6c-4af6-9977-54893de556e4",
+    "slug": "Open-2021-21-1",
+    "workout_name": "Open 21.1",
+    "format": "For Time",
+    "exercise_name": "Wall walk",
+    "task_json": {
+      "reps": "3",
+      "exercise": "Wall walk"
+    }
+  },
+  {
+    "workout_id": "ec53a920-df6c-4af6-9977-54893de556e4",
+    "slug": "Open-2021-21-1",
+    "workout_name": "Open 21.1",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "ec53a920-df6c-4af6-9977-54893de556e4",
+    "slug": "Open-2021-21-1",
+    "workout_name": "Open 21.1",
+    "format": "For Time",
+    "exercise_name": "Wall walk",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Wall walk"
+    }
+  },
+  {
+    "workout_id": "ec53a920-df6c-4af6-9977-54893de556e4",
+    "slug": "Open-2021-21-1",
+    "workout_name": "Open 21.1",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "60",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "ec53a920-df6c-4af6-9977-54893de556e4",
+    "slug": "Open-2021-21-1",
+    "workout_name": "Open 21.1",
+    "format": "For Time",
+    "exercise_name": "Wall walk",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Wall walk"
+    }
+  },
+  {
+    "workout_id": "ec53a920-df6c-4af6-9977-54893de556e4",
+    "slug": "Open-2021-21-1",
+    "workout_name": "Open 21.1",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "90",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "ec53a920-df6c-4af6-9977-54893de556e4",
+    "slug": "Open-2021-21-1",
+    "workout_name": "Open 21.1",
+    "format": "For Time",
+    "exercise_name": "Wall walk",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Wall walk"
+    }
+  },
+  {
+    "workout_id": "ec53a920-df6c-4af6-9977-54893de556e4",
+    "slug": "Open-2021-21-1",
+    "workout_name": "Open 21.1",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "150",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "ec53a920-df6c-4af6-9977-54893de556e4",
+    "slug": "Open-2021-21-1",
+    "workout_name": "Open 21.1",
+    "format": "For Time",
+    "exercise_name": "Wall walk",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Wall walk"
+    }
+  },
+  {
+    "workout_id": "ec53a920-df6c-4af6-9977-54893de556e4",
+    "slug": "Open-2021-21-1",
+    "workout_name": "Open 21.1",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "210",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "58f37a1f-88e0-40e5-9c48-f95dee2555c2",
+    "slug": "Open-2021-21-2",
+    "workout_name": "Open 21.2",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Dumbbell snatch",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "58f37a1f-88e0-40e5-9c48-f95dee2555c2",
+    "slug": "Open-2021-21-2",
+    "workout_name": "Open 21.2",
+    "format": "For Time",
+    "exercise_name": "Burpee box jump-over",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Burpee box jump-over",
+      "weight_male_lbs": "24",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "58f37a1f-88e0-40e5-9c48-f95dee2555c2",
+    "slug": "Open-2021-21-2",
+    "workout_name": "Open 21.2",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "20",
+      "exercise": "Dumbbell snatch",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "58f37a1f-88e0-40e5-9c48-f95dee2555c2",
+    "slug": "Open-2021-21-2",
+    "workout_name": "Open 21.2",
+    "format": "For Time",
+    "exercise_name": "Burpee box jump-over",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Burpee box jump-over",
+      "weight_male_lbs": "24",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "58f37a1f-88e0-40e5-9c48-f95dee2555c2",
+    "slug": "Open-2021-21-2",
+    "workout_name": "Open 21.2",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Dumbbell snatch",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "58f37a1f-88e0-40e5-9c48-f95dee2555c2",
+    "slug": "Open-2021-21-2",
+    "workout_name": "Open 21.2",
+    "format": "For Time",
+    "exercise_name": "Burpee box jump-over",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Burpee box jump-over",
+      "weight_male_lbs": "24",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "58f37a1f-88e0-40e5-9c48-f95dee2555c2",
+    "slug": "Open-2021-21-2",
+    "workout_name": "Open 21.2",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "40",
+      "exercise": "Dumbbell snatch",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "58f37a1f-88e0-40e5-9c48-f95dee2555c2",
+    "slug": "Open-2021-21-2",
+    "workout_name": "Open 21.2",
+    "format": "For Time",
+    "exercise_name": "Burpee box jump-over",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Burpee box jump-over",
+      "weight_male_lbs": "24",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "58f37a1f-88e0-40e5-9c48-f95dee2555c2",
+    "slug": "Open-2021-21-2",
+    "workout_name": "Open 21.2",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Dumbbell snatch",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "58f37a1f-88e0-40e5-9c48-f95dee2555c2",
+    "slug": "Open-2021-21-2",
+    "workout_name": "Open 21.2",
+    "format": "For Time",
+    "exercise_name": "Burpee box jump-over",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Burpee box jump-over",
+      "weight_male_lbs": "24",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "510f83c2-19ea-4205-bf2a-06dfcecf7136",
+    "slug": "Open-2021-21-3",
+    "workout_name": "Open 21.3",
+    "format": "For Time",
+    "exercise_name": "Front squat",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Front squat",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "510f83c2-19ea-4205-bf2a-06dfcecf7136",
+    "slug": "Open-2021-21-3",
+    "workout_name": "Open 21.3",
+    "format": "For Time",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "510f83c2-19ea-4205-bf2a-06dfcecf7136",
+    "slug": "Open-2021-21-3",
+    "workout_name": "Open 21.3",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "510f83c2-19ea-4205-bf2a-06dfcecf7136",
+    "slug": "Open-2021-21-3",
+    "workout_name": "Open 21.3",
+    "format": "For Time",
+    "exercise_name": "Rest",
+    "task_json": {
+      "time": "1:00",
+      "exercise": "Rest"
+    }
+  },
+  {
+    "workout_id": "510f83c2-19ea-4205-bf2a-06dfcecf7136",
+    "slug": "Open-2021-21-3",
+    "workout_name": "Open 21.3",
+    "format": "For Time",
+    "exercise_name": "Front squat",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Front squat",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "510f83c2-19ea-4205-bf2a-06dfcecf7136",
+    "slug": "Open-2021-21-3",
+    "workout_name": "Open 21.3",
+    "format": "For Time",
+    "exercise_name": "Chest to bar pull-up",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Chest to bar pull-up"
+    }
+  },
+  {
+    "workout_id": "510f83c2-19ea-4205-bf2a-06dfcecf7136",
+    "slug": "Open-2021-21-3",
+    "workout_name": "Open 21.3",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "510f83c2-19ea-4205-bf2a-06dfcecf7136",
+    "slug": "Open-2021-21-3",
+    "workout_name": "Open 21.3",
+    "format": "For Time",
+    "exercise_name": "Rest",
+    "task_json": {
+      "time": "1:00",
+      "exercise": "Rest"
+    }
+  },
+  {
+    "workout_id": "510f83c2-19ea-4205-bf2a-06dfcecf7136",
+    "slug": "Open-2021-21-3",
+    "workout_name": "Open 21.3",
+    "format": "For Time",
+    "exercise_name": "Front squat",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Front squat",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "510f83c2-19ea-4205-bf2a-06dfcecf7136",
+    "slug": "Open-2021-21-3",
+    "workout_name": "Open 21.3",
+    "format": "For Time",
+    "exercise_name": "Bar muscle-up",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Bar muscle-up"
+    }
+  },
+  {
+    "workout_id": "510f83c2-19ea-4205-bf2a-06dfcecf7136",
+    "slug": "Open-2021-21-3",
+    "workout_name": "Open 21.3",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "510f83c2-19ea-4205-bf2a-06dfcecf7136",
+    "slug": "Open-2021-21-3",
+    "workout_name": "Open 21.3",
+    "format": "For Time",
+    "exercise_name": "Rest",
+    "task_json": {
+      "time": "1:00",
+      "exercise": "Rest"
+    }
+  },
+  {
+    "workout_id": "bff0d5ec-fe68-4f33-a62c-3896cd0e9d7e",
+    "slug": "Open-2021-21-4",
+    "workout_name": "Open 21.4",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "1RM",
+      "exercise": "Deadlift"
+    }
+  },
+  {
+    "workout_id": "bff0d5ec-fe68-4f33-a62c-3896cd0e9d7e",
+    "slug": "Open-2021-21-4",
+    "workout_name": "Open 21.4",
+    "format": "For Time",
+    "exercise_name": "Clean",
+    "task_json": {
+      "reps": "1RM",
+      "exercise": "Clean"
+    }
+  },
+  {
+    "workout_id": "bff0d5ec-fe68-4f33-a62c-3896cd0e9d7e",
+    "slug": "Open-2021-21-4",
+    "workout_name": "Open 21.4",
+    "format": "For Time",
+    "exercise_name": "Hang clean",
+    "task_json": {
+      "reps": "1RM",
+      "exercise": "Hang clean"
+    }
+  },
+  {
+    "workout_id": "bff0d5ec-fe68-4f33-a62c-3896cd0e9d7e",
+    "slug": "Open-2021-21-4",
+    "workout_name": "Open 21.4",
+    "format": "For Time",
+    "exercise_name": "Jerk",
+    "task_json": {
+      "reps": "1RM",
+      "exercise": "Jerk"
+    }
+  },
+  {
+    "workout_id": "1d6162f3-961a-461e-be0f-93f153b3a841",
+    "slug": "Open-2022-22-1",
+    "workout_name": "Open 22.1",
+    "format": "AMRAP",
+    "exercise_name": "Wall walk",
+    "task_json": {
+      "reps": "3",
+      "exercise": "Wall walk"
+    }
+  },
+  {
+    "workout_id": "1d6162f3-961a-461e-be0f-93f153b3a841",
+    "slug": "Open-2022-22-1",
+    "workout_name": "Open 22.1",
+    "format": "AMRAP",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "12",
+      "exercise": "Dumbbell snatch",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "1d6162f3-961a-461e-be0f-93f153b3a841",
+    "slug": "Open-2022-22-1",
+    "workout_name": "Open 22.1",
+    "format": "AMRAP",
+    "exercise_name": "Box jump-over",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Box jump-over",
+      "weight_male_lbs": "24",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "fe7109b3-0378-4c78-91de-ddabdf89fdd8",
+    "slug": "Open-2022-22-2",
+    "workout_name": "Open 22.2",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "1-2-3-4-5-6-7-8-9-10-9-8-7-6-5-4-3-2-1",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "fe7109b3-0378-4c78-91de-ddabdf89fdd8",
+    "slug": "Open-2022-22-2",
+    "workout_name": "Open 22.2",
+    "format": "For Time",
+    "exercise_name": "Bar facing burpee",
+    "task_json": {
+      "reps": "1-2-3-4-5-6-7-8-9-10-9-8-7-6-5-4-3-2-1",
+      "exercise": "Bar facing burpee"
+    }
+  },
+  {
+    "workout_id": "21f868cc-a04e-446d-9057-a22289a1bc48",
+    "slug": "Open-2022-22-3",
+    "workout_name": "Open 22.3",
+    "format": "For Time",
+    "exercise_name": "Pull-up",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Pull-up"
+    }
+  },
+  {
+    "workout_id": "21f868cc-a04e-446d-9057-a22289a1bc48",
+    "slug": "Open-2022-22-3",
+    "workout_name": "Open 22.3",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "42",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "21f868cc-a04e-446d-9057-a22289a1bc48",
+    "slug": "Open-2022-22-3",
+    "workout_name": "Open 22.3",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "21f868cc-a04e-446d-9057-a22289a1bc48",
+    "slug": "Open-2022-22-3",
+    "workout_name": "Open 22.3",
+    "format": "For Time",
+    "exercise_name": "Chest to bar pull-up",
+    "task_json": {
+      "reps": "18",
+      "exercise": "Chest to bar pull-up"
+    }
+  },
+  {
+    "workout_id": "21f868cc-a04e-446d-9057-a22289a1bc48",
+    "slug": "Open-2022-22-3",
+    "workout_name": "Open 22.3",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "36",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "21f868cc-a04e-446d-9057-a22289a1bc48",
+    "slug": "Open-2022-22-3",
+    "workout_name": "Open 22.3",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "18",
+      "exercise": "Thruster",
+      "weight_male_lbs": "115",
+      "weight_female_lbs": "75"
+    }
+  },
+  {
+    "workout_id": "21f868cc-a04e-446d-9057-a22289a1bc48",
+    "slug": "Open-2022-22-3",
+    "workout_name": "Open 22.3",
+    "format": "For Time",
+    "exercise_name": "Bar muscle-up",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Bar muscle-up"
+    }
+  },
+  {
+    "workout_id": "21f868cc-a04e-446d-9057-a22289a1bc48",
+    "slug": "Open-2022-22-3",
+    "workout_name": "Open 22.3",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "21f868cc-a04e-446d-9057-a22289a1bc48",
+    "slug": "Open-2022-22-3",
+    "workout_name": "Open 22.3",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Thruster",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "95"
+    }
+  },
+  {
+    "workout_id": "0dca14c4-5f99-44db-ac22-d440c7075e11",
+    "slug": "Open-2022-23-1",
+    "workout_name": "Open 23.1",
+    "format": "AMRAP",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "60",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "0dca14c4-5f99-44db-ac22-d440c7075e11",
+    "slug": "Open-2022-23-1",
+    "workout_name": "Open 23.1",
+    "format": "AMRAP",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "0dca14c4-5f99-44db-ac22-d440c7075e11",
+    "slug": "Open-2022-23-1",
+    "workout_name": "Open 23.1",
+    "format": "AMRAP",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "40",
+      "notes": "10 foot target",
+      "exercise": "Wall ball",
+      "weight_male_lbs": "20",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "0dca14c4-5f99-44db-ac22-d440c7075e11",
+    "slug": "Open-2022-23-1",
+    "workout_name": "Open 23.1",
+    "format": "AMRAP",
+    "exercise_name": "Clean",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Clean",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "135"
+    }
+  },
+  {
+    "workout_id": "0dca14c4-5f99-44db-ac22-d440c7075e11",
+    "slug": "Open-2022-23-1",
+    "workout_name": "Open 23.1",
+    "format": "AMRAP",
+    "exercise_name": "Muscle-up",
+    "task_json": {
+      "reps": "20",
+      "exercise": "Muscle-up"
+    }
+  },
+  {
+    "workout_id": "418174b6-7f90-4eb0-b1ce-ef032694c3ea",
+    "slug": "Open-2023-23-2a",
+    "workout_name": "Open 23.2A",
+    "format": "AMRAP",
+    "exercise_name": "Burpee pull-up",
+    "task_json": {
+      "reps": "5-10-15-20...",
+      "notes": "Add 5 reps each round",
+      "exercise": "Burpee pull-up"
+    }
+  },
+  {
+    "workout_id": "418174b6-7f90-4eb0-b1ce-ef032694c3ea",
+    "slug": "Open-2023-23-2a",
+    "workout_name": "Open 23.2A",
+    "format": "AMRAP",
+    "exercise_name": "Shuttle run",
+    "task_json": {
+      "reps": "10",
+      "distance": "25 ft out and back",
+      "exercise": "Shuttle run"
+    }
+  },
+  {
+    "workout_id": "856779fa-6b19-4d30-9fc9-9aaadaa31659",
+    "slug": "Open-2023-23-2b",
+    "workout_name": "Open 23.2B",
+    "format": "Ladder",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "1RM",
+      "exercise": "Thruster"
+    }
+  },
+  {
+    "workout_id": "bb4432e1-680e-4094-bab3-257c14808f50",
+    "slug": "Open-2023-23-3",
+    "workout_name": "Open 23.3",
+    "format": "Ladder",
+    "exercise_name": "Wall walk",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Wall walk"
+    }
+  },
+  {
+    "workout_id": "bb4432e1-680e-4094-bab3-257c14808f50",
+    "slug": "Open-2023-23-3",
+    "workout_name": "Open 23.3",
+    "format": "Ladder",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "bb4432e1-680e-4094-bab3-257c14808f50",
+    "slug": "Open-2023-23-3",
+    "workout_name": "Open 23.3",
+    "format": "Ladder",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Snatch",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "bb4432e1-680e-4094-bab3-257c14808f50",
+    "slug": "Open-2023-23-3",
+    "workout_name": "Open 23.3",
+    "format": "Ladder",
+    "exercise_name": "Wall walk",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Wall walk"
+    }
+  },
+  {
+    "workout_id": "bb4432e1-680e-4094-bab3-257c14808f50",
+    "slug": "Open-2023-23-3",
+    "workout_name": "Open 23.3",
+    "format": "Ladder",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "bb4432e1-680e-4094-bab3-257c14808f50",
+    "slug": "Open-2023-23-3",
+    "workout_name": "Open 23.3",
+    "format": "Ladder",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "12",
+      "exercise": "Snatch",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "95"
+    }
+  },
+  {
+    "workout_id": "bb4432e1-680e-4094-bab3-257c14808f50",
+    "slug": "Open-2023-23-3",
+    "workout_name": "Open 23.3",
+    "format": "Ladder",
+    "exercise_name": "Strict handstand push-up",
+    "task_json": {
+      "reps": "20",
+      "notes": "If complete by 9:00",
+      "exercise": "Strict handstand push-up"
+    }
+  },
+  {
+    "workout_id": "bb4432e1-680e-4094-bab3-257c14808f50",
+    "slug": "Open-2023-23-3",
+    "workout_name": "Open 23.3",
+    "format": "Ladder",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "bb4432e1-680e-4094-bab3-257c14808f50",
+    "slug": "Open-2023-23-3",
+    "workout_name": "Open 23.3",
+    "format": "Ladder",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Snatch",
+      "weight_male_lbs": "185",
+      "weight_female_lbs": "125"
+    }
+  },
+  {
+    "workout_id": "bb4432e1-680e-4094-bab3-257c14808f50",
+    "slug": "Open-2023-23-3",
+    "workout_name": "Open 23.3",
+    "format": "Ladder",
+    "exercise_name": "Strict handstand push-up",
+    "task_json": {
+      "reps": "20",
+      "notes": "If complete by 12:00",
+      "exercise": "Strict handstand push-up"
+    }
+  },
+  {
+    "workout_id": "bb4432e1-680e-4094-bab3-257c14808f50",
+    "slug": "Open-2023-23-3",
+    "workout_name": "Open 23.3",
+    "format": "Ladder",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "bb4432e1-680e-4094-bab3-257c14808f50",
+    "slug": "Open-2023-23-3",
+    "workout_name": "Open 23.3",
+    "format": "Ladder",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "6",
+      "exercise": "Snatch",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "79a7d9a2-d567-439a-b7dc-3229e5454a37",
+    "slug": "open-2024-24-1",
+    "workout_name": "Open 24.1",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "21-15-9",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "79a7d9a2-d567-439a-b7dc-3229e5454a37",
+    "slug": "open-2024-24-1",
+    "workout_name": "Open 24.1",
+    "format": "For Time",
+    "exercise_name": "Pull-up",
+    "task_json": {
+      "reps": "21-15-9",
+      "exercise": "Pull-up"
+    }
+  },
+  {
+    "workout_id": "810f86dd-752a-4c09-9fab-5eb3f9bc0291",
+    "slug": "Open-2024-24-1",
+    "workout_name": "Open 24.1",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "21",
+      "notes": "Arm 1",
+      "exercise": "Dumbbell snatch",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "810f86dd-752a-4c09-9fab-5eb3f9bc0291",
+    "slug": "Open-2024-24-1",
+    "workout_name": "Open 24.1",
+    "format": "For Time",
+    "exercise_name": "Lateral burpee over dumbbell",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Lateral burpee over dumbbell"
+    }
+  },
+  {
+    "workout_id": "810f86dd-752a-4c09-9fab-5eb3f9bc0291",
+    "slug": "Open-2024-24-1",
+    "workout_name": "Open 24.1",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "21",
+      "notes": "Arm 2",
+      "exercise": "Dumbbell snatch",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "810f86dd-752a-4c09-9fab-5eb3f9bc0291",
+    "slug": "Open-2024-24-1",
+    "workout_name": "Open 24.1",
+    "format": "For Time",
+    "exercise_name": "Lateral burpee over dumbbell",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Lateral burpee over dumbbell"
+    }
+  },
+  {
+    "workout_id": "810f86dd-752a-4c09-9fab-5eb3f9bc0291",
+    "slug": "Open-2024-24-1",
+    "workout_name": "Open 24.1",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "15",
+      "notes": "Arm 1",
+      "exercise": "Dumbbell snatch",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "810f86dd-752a-4c09-9fab-5eb3f9bc0291",
+    "slug": "Open-2024-24-1",
+    "workout_name": "Open 24.1",
+    "format": "For Time",
+    "exercise_name": "Lateral burpee over dumbbell",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Lateral burpee over dumbbell"
+    }
+  },
+  {
+    "workout_id": "810f86dd-752a-4c09-9fab-5eb3f9bc0291",
+    "slug": "Open-2024-24-1",
+    "workout_name": "Open 24.1",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "15",
+      "notes": "Arm 2",
+      "exercise": "Dumbbell snatch",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "810f86dd-752a-4c09-9fab-5eb3f9bc0291",
+    "slug": "Open-2024-24-1",
+    "workout_name": "Open 24.1",
+    "format": "For Time",
+    "exercise_name": "Lateral burpee over dumbbell",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Lateral burpee over dumbbell"
+    }
+  },
+  {
+    "workout_id": "810f86dd-752a-4c09-9fab-5eb3f9bc0291",
+    "slug": "Open-2024-24-1",
+    "workout_name": "Open 24.1",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "9",
+      "notes": "Arm 1",
+      "exercise": "Dumbbell snatch",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "810f86dd-752a-4c09-9fab-5eb3f9bc0291",
+    "slug": "Open-2024-24-1",
+    "workout_name": "Open 24.1",
+    "format": "For Time",
+    "exercise_name": "Lateral burpee over dumbbell",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Lateral burpee over dumbbell"
+    }
+  },
+  {
+    "workout_id": "810f86dd-752a-4c09-9fab-5eb3f9bc0291",
+    "slug": "Open-2024-24-1",
+    "workout_name": "Open 24.1",
+    "format": "For Time",
+    "exercise_name": "Dumbbell snatch",
+    "task_json": {
+      "reps": "9",
+      "notes": "Arm 2",
+      "exercise": "Dumbbell snatch",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "810f86dd-752a-4c09-9fab-5eb3f9bc0291",
+    "slug": "Open-2024-24-1",
+    "workout_name": "Open 24.1",
+    "format": "For Time",
+    "exercise_name": "Lateral burpee over dumbbell",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Lateral burpee over dumbbell"
+    }
+  },
+  {
+    "workout_id": "73e43f5b-8cc2-49fe-ba73-10b45d3d20de",
+    "slug": "Open-2024-24-2",
+    "workout_name": "Open 24.2",
+    "format": "AMRAP",
+    "exercise_name": "Row",
+    "task_json": {
+      "distance": "300m",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "73e43f5b-8cc2-49fe-ba73-10b45d3d20de",
+    "slug": "Open-2024-24-2",
+    "workout_name": "Open 24.2",
+    "format": "AMRAP",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "185",
+      "weight_female_lbs": "125"
+    }
+  },
+  {
+    "workout_id": "73e43f5b-8cc2-49fe-ba73-10b45d3d20de",
+    "slug": "Open-2024-24-2",
+    "workout_name": "Open 24.2",
+    "format": "AMRAP",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "f83f7afa-84cb-49aa-8ce6-cff0f55969fd",
+    "slug": "Open-2024-24-3",
+    "workout_name": "Open 24.3",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "10",
+      "notes": "5 rounds",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "f83f7afa-84cb-49aa-8ce6-cff0f55969fd",
+    "slug": "Open-2024-24-3",
+    "workout_name": "Open 24.3",
+    "format": "For Time",
+    "exercise_name": "Chest to bar pull-up",
+    "task_json": {
+      "reps": "10",
+      "notes": "5 rounds",
+      "exercise": "Chest to bar pull-up"
+    }
+  },
+  {
+    "workout_id": "f83f7afa-84cb-49aa-8ce6-cff0f55969fd",
+    "slug": "Open-2024-24-3",
+    "workout_name": "Open 24.3",
+    "format": "For Time",
+    "exercise_name": "Rest",
+    "task_json": {
+      "time": "1:00",
+      "exercise": "Rest"
+    }
+  },
+  {
+    "workout_id": "f83f7afa-84cb-49aa-8ce6-cff0f55969fd",
+    "slug": "Open-2024-24-3",
+    "workout_name": "Open 24.3",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "7",
+      "notes": "5 rounds",
+      "exercise": "Thruster",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "95"
+    }
+  },
+  {
+    "workout_id": "f83f7afa-84cb-49aa-8ce6-cff0f55969fd",
+    "slug": "Open-2024-24-3",
+    "workout_name": "Open 24.3",
+    "format": "For Time",
+    "exercise_name": "Bar muscle-up",
+    "task_json": {
+      "reps": "7",
+      "notes": "5 rounds",
+      "exercise": "Bar muscle-up"
+    }
+  },
+  {
+    "workout_id": "b16f142e-a019-49e6-92a9-8f4607f717bb",
+    "slug": "Open-2025-25-1",
+    "workout_name": "Open 25.1",
+    "format": "AMRAP",
+    "exercise_name": "Lateral burpee over dumbbell",
+    "task_json": {
+      "reps": "3-6-9-12...",
+      "notes": "Add 3 reps each round",
+      "exercise": "Lateral burpee over dumbbell",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "b16f142e-a019-49e6-92a9-8f4607f717bb",
+    "slug": "Open-2025-25-1",
+    "workout_name": "Open 25.1",
+    "format": "AMRAP",
+    "exercise_name": "Dumbbell hang clean to overhead",
+    "task_json": {
+      "reps": "3-6-9-12...",
+      "notes": "Add 3 reps each round",
+      "exercise": "Dumbbell hang clean to overhead",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "b16f142e-a019-49e6-92a9-8f4607f717bb",
+    "slug": "Open-2025-25-1",
+    "workout_name": "Open 25.1",
+    "format": "AMRAP",
+    "exercise_name": "Walking lunge",
+    "task_json": {
+      "notes": "2x15ft",
+      "distance": "30 ft",
+      "exercise": "Walking lunge"
+    }
+  },
+  {
+    "workout_id": "b3741169-53e3-4969-a322-0a48bf751f3e",
+    "slug": "Open-2025-25-2",
+    "workout_name": "Open 25.2",
+    "format": "For Time",
+    "exercise_name": "Pull-up",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Pull-up"
+    }
+  },
+  {
+    "workout_id": "b3741169-53e3-4969-a322-0a48bf751f3e",
+    "slug": "Open-2025-25-2",
+    "workout_name": "Open 25.2",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "42",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "b3741169-53e3-4969-a322-0a48bf751f3e",
+    "slug": "Open-2025-25-2",
+    "workout_name": "Open 25.2",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "b3741169-53e3-4969-a322-0a48bf751f3e",
+    "slug": "Open-2025-25-2",
+    "workout_name": "Open 25.2",
+    "format": "For Time",
+    "exercise_name": "Chest-to-bar pull-up",
+    "task_json": {
+      "reps": "18",
+      "exercise": "Chest-to-bar pull-up"
+    }
+  },
+  {
+    "workout_id": "b3741169-53e3-4969-a322-0a48bf751f3e",
+    "slug": "Open-2025-25-2",
+    "workout_name": "Open 25.2",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "36",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "b3741169-53e3-4969-a322-0a48bf751f3e",
+    "slug": "Open-2025-25-2",
+    "workout_name": "Open 25.2",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "18",
+      "exercise": "Thruster",
+      "weight_male_lbs": "115",
+      "weight_female_lbs": "75"
+    }
+  },
+  {
+    "workout_id": "b3741169-53e3-4969-a322-0a48bf751f3e",
+    "slug": "Open-2025-25-2",
+    "workout_name": "Open 25.2",
+    "format": "For Time",
+    "exercise_name": "Bar muscle-up",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Bar muscle-up"
+    }
+  },
+  {
+    "workout_id": "b3741169-53e3-4969-a322-0a48bf751f3e",
+    "slug": "Open-2025-25-2",
+    "workout_name": "Open 25.2",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "b3741169-53e3-4969-a322-0a48bf751f3e",
+    "slug": "Open-2025-25-2",
+    "workout_name": "Open 25.2",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Thruster",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "95"
+    }
+  },
+  {
+    "workout_id": "c78917ac-ca60-439c-b9e0-a97fffe24488",
+    "slug": "Open-2025-25-3",
+    "workout_name": "Open 25.3",
+    "format": "For Time",
+    "exercise_name": "Wall walk",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Wall walk"
+    }
+  },
+  {
+    "workout_id": "c78917ac-ca60-439c-b9e0-a97fffe24488",
+    "slug": "Open-2025-25-3",
+    "workout_name": "Open 25.3",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "50",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "c78917ac-ca60-439c-b9e0-a97fffe24488",
+    "slug": "Open-2025-25-3",
+    "workout_name": "Open 25.3",
+    "format": "For Time",
+    "exercise_name": "Wall walk",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Wall walk"
+    }
+  },
+  {
+    "workout_id": "c78917ac-ca60-439c-b9e0-a97fffe24488",
+    "slug": "Open-2025-25-3",
+    "workout_name": "Open 25.3",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "25",
+      "exercise": "Deadlift"
+    }
+  },
+  {
+    "workout_id": "c78917ac-ca60-439c-b9e0-a97fffe24488",
+    "slug": "Open-2025-25-3",
+    "workout_name": "Open 25.3",
+    "format": "For Time",
+    "exercise_name": "Wall walk",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Wall walk"
+    }
+  },
+  {
+    "workout_id": "c78917ac-ca60-439c-b9e0-a97fffe24488",
+    "slug": "Open-2025-25-3",
+    "workout_name": "Open 25.3",
+    "format": "For Time",
+    "exercise_name": "Clean",
+    "task_json": {
+      "reps": "25",
+      "exercise": "Clean"
+    }
+  },
+  {
+    "workout_id": "c78917ac-ca60-439c-b9e0-a97fffe24488",
+    "slug": "Open-2025-25-3",
+    "workout_name": "Open 25.3",
+    "format": "For Time",
+    "exercise_name": "Wall walk",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Wall walk"
+    }
+  },
+  {
+    "workout_id": "c78917ac-ca60-439c-b9e0-a97fffe24488",
+    "slug": "Open-2025-25-3",
+    "workout_name": "Open 25.3",
+    "format": "For Time",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "25",
+      "exercise": "Snatch"
+    }
+  },
+  {
+    "workout_id": "c78917ac-ca60-439c-b9e0-a97fffe24488",
+    "slug": "Open-2025-25-3",
+    "workout_name": "Open 25.3",
+    "format": "For Time",
+    "exercise_name": "Wall walk",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Wall walk"
+    }
+  },
+  {
+    "workout_id": "c78917ac-ca60-439c-b9e0-a97fffe24488",
+    "slug": "Open-2025-25-3",
+    "workout_name": "Open 25.3",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "50",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "6ba0466f-d732-4e85-b751-8330dd7bf262",
+    "slug": "qfs-2021-21-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Handstand push-up",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Handstand push-up"
+    }
+  },
+  {
+    "workout_id": "6ba0466f-d732-4e85-b751-8330dd7bf262",
+    "slug": "qfs-2021-21-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Dumbbell shoulder to overhead",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Dumbbell shoulder to overhead",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "6ba0466f-d732-4e85-b751-8330dd7bf262",
+    "slug": "qfs-2021-21-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "15",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "0be9aea7-f99d-41e3-a1c5-d950cd9de225",
+    "slug": "qfs-2021-21-2",
+    "workout_name": "QF WOD 2",
+    "format": "For Time",
+    "exercise_name": "GHD sit-up",
+    "task_json": {
+      "reps": "60",
+      "exercise": "GHD sit-up"
+    }
+  },
+  {
+    "workout_id": "0be9aea7-f99d-41e3-a1c5-d950cd9de225",
+    "slug": "qfs-2021-21-2",
+    "workout_name": "QF WOD 2",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "6",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "0be9aea7-f99d-41e3-a1c5-d950cd9de225",
+    "slug": "qfs-2021-21-2",
+    "workout_name": "QF WOD 2",
+    "format": "For Time",
+    "exercise_name": "Alternating pistol squat",
+    "task_json": {
+      "reps": "60",
+      "exercise": "Alternating pistol squat"
+    }
+  },
+  {
+    "workout_id": "0be9aea7-f99d-41e3-a1c5-d950cd9de225",
+    "slug": "qfs-2021-21-2",
+    "workout_name": "QF WOD 2",
+    "format": "For Time",
+    "exercise_name": "GHD sit-up",
+    "task_json": {
+      "reps": "50",
+      "exercise": "GHD sit-up"
+    }
+  },
+  {
+    "workout_id": "0be9aea7-f99d-41e3-a1c5-d950cd9de225",
+    "slug": "qfs-2021-21-2",
+    "workout_name": "QF WOD 2",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "0be9aea7-f99d-41e3-a1c5-d950cd9de225",
+    "slug": "qfs-2021-21-2",
+    "workout_name": "QF WOD 2",
+    "format": "For Time",
+    "exercise_name": "Alternating pistol squat",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Alternating pistol squat"
+    }
+  },
+  {
+    "workout_id": "0be9aea7-f99d-41e3-a1c5-d950cd9de225",
+    "slug": "qfs-2021-21-2",
+    "workout_name": "QF WOD 2",
+    "format": "For Time",
+    "exercise_name": "GHD sit-up",
+    "task_json": {
+      "reps": "40",
+      "exercise": "GHD sit-up"
+    }
+  },
+  {
+    "workout_id": "0be9aea7-f99d-41e3-a1c5-d950cd9de225",
+    "slug": "qfs-2021-21-2",
+    "workout_name": "QF WOD 2",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "4",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "0be9aea7-f99d-41e3-a1c5-d950cd9de225",
+    "slug": "qfs-2021-21-2",
+    "workout_name": "QF WOD 2",
+    "format": "For Time",
+    "exercise_name": "Alternating pistol squat",
+    "task_json": {
+      "reps": "40",
+      "exercise": "Alternating pistol squat"
+    }
+  },
+  {
+    "workout_id": "25a1b7a5-acb6-46e8-8a1a-da686f35c297",
+    "slug": "qfs-2021-21-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "120",
+      "exercise": "Wall ball"
+    }
+  },
+  {
+    "workout_id": "25a1b7a5-acb6-46e8-8a1a-da686f35c297",
+    "slug": "qfs-2021-21-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "120",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "edb58b3e-49d1-4db9-893a-72dd0a767ef5",
+    "slug": "qfs-2021-21-4",
+    "workout_name": "QF WOD 4",
+    "format": "Ladder",
+    "exercise_name": "Front squat",
+    "task_json": {
+      "reps": "4RM",
+      "exercise": "Front squat"
+    }
+  },
+  {
+    "workout_id": "bb89dd2a-57ba-410f-88b1-161cf97f2fa0",
+    "slug": "qfs-2021-21-5",
+    "workout_name": "QF WOD 5",
+    "format": "For Time",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "9-6-3",
+      "exercise": "Snatch",
+      "weight_male_lbs": "185",
+      "weight_female_lbs": "135"
+    }
+  },
+  {
+    "workout_id": "bb89dd2a-57ba-410f-88b1-161cf97f2fa0",
+    "slug": "qfs-2021-21-5",
+    "workout_name": "QF WOD 5",
+    "format": "For Time",
+    "exercise_name": "Burpee box jump-over",
+    "task_json": {
+      "reps": "9-6-3",
+      "exercise": "Burpee box jump-over",
+      "weight_male_lbs": "30",
+      "weight_female_lbs": "24"
+    }
+  },
+  {
+    "workout_id": "ec8f1124-a7dc-48e8-a77b-82b6a9835d24",
+    "slug": "qfs-2022-22-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Dumbbell walking lunge",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Dumbbell walking lunge",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "ec8f1124-a7dc-48e8-a77b-82b6a9835d24",
+    "slug": "qfs-2022-22-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Handstand push-up",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Handstand push-up"
+    }
+  },
+  {
+    "workout_id": "ec8f1124-a7dc-48e8-a77b-82b6a9835d24",
+    "slug": "qfs-2022-22-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Dumbbell front rack walking lunge",
+    "task_json": {
+      "reps": "40",
+      "exercise": "Dumbbell front rack walking lunge",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "ec8f1124-a7dc-48e8-a77b-82b6a9835d24",
+    "slug": "qfs-2022-22-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Deficit handstand push-up",
+    "task_json": {
+      "reps": "20",
+      "notes": "3.5/2 inch deficit",
+      "exercise": "Deficit handstand push-up"
+    }
+  },
+  {
+    "workout_id": "ec8f1124-a7dc-48e8-a77b-82b6a9835d24",
+    "slug": "qfs-2022-22-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Overhead walking lunge",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Overhead walking lunge",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "ec8f1124-a7dc-48e8-a77b-82b6a9835d24",
+    "slug": "qfs-2022-22-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Strict handstand push-up",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Strict handstand push-up"
+    }
+  },
+  {
+    "workout_id": "c3f124be-481a-4985-a7d7-91a4635bcdb3",
+    "slug": "qfs-2022-22-2",
+    "workout_name": "QF WOD 2",
+    "format": "For Time",
+    "exercise_name": "Alternating pistol squat",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Alternating pistol squat"
+    }
+  },
+  {
+    "workout_id": "c3f124be-481a-4985-a7d7-91a4635bcdb3",
+    "slug": "qfs-2022-22-2",
+    "workout_name": "QF WOD 2",
+    "format": "For Time",
+    "exercise_name": "GHD sit-up",
+    "task_json": {
+      "reps": "30",
+      "exercise": "GHD sit-up"
+    }
+  },
+  {
+    "workout_id": "c3f124be-481a-4985-a7d7-91a4635bcdb3",
+    "slug": "qfs-2022-22-2",
+    "workout_name": "QF WOD 2",
+    "format": "For Time",
+    "exercise_name": "Ring muscle-up",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Ring muscle-up"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Wall ball"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Shuttle run",
+    "task_json": {
+      "reps": "4",
+      "exercise": "Shuttle run"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "1",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "16",
+      "exercise": "Wall ball"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Shuttle run",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Shuttle run"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "2",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "24",
+      "exercise": "Wall ball"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Shuttle run",
+    "task_json": {
+      "reps": "12",
+      "exercise": "Shuttle run"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "3",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "32",
+      "exercise": "Wall ball"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Shuttle run",
+    "task_json": {
+      "reps": "16",
+      "exercise": "Shuttle run"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "4",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "24",
+      "exercise": "Wall ball"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Shuttle run",
+    "task_json": {
+      "reps": "12",
+      "exercise": "Shuttle run"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "3",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "16",
+      "exercise": "Wall ball"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Shuttle run",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Shuttle run"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "2",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Wall ball"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Shuttle run",
+    "task_json": {
+      "reps": "4",
+      "exercise": "Shuttle run"
+    }
+  },
+  {
+    "workout_id": "9d521820-d821-4e96-b98b-550f898773e7",
+    "slug": "qfs-2022-22-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "1",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "30d382d1-cdda-4077-aebe-e1bc83b443f6",
+    "slug": "qfs-2022-22-4",
+    "workout_name": "QF WOD 4",
+    "format": "Ladder",
+    "exercise_name": "Clean",
+    "task_json": {
+      "reps": "1RM",
+      "exercise": "Clean"
+    }
+  },
+  {
+    "workout_id": "30d382d1-cdda-4077-aebe-e1bc83b443f6",
+    "slug": "qfs-2022-22-4",
+    "workout_name": "QF WOD 4",
+    "format": "Ladder",
+    "exercise_name": "Bench press",
+    "task_json": {
+      "reps": "1RM",
+      "exercise": "Bench press"
+    }
+  },
+  {
+    "workout_id": "30d382d1-cdda-4077-aebe-e1bc83b443f6",
+    "slug": "qfs-2022-22-4",
+    "workout_name": "QF WOD 4",
+    "format": "Ladder",
+    "exercise_name": "Overhead squat",
+    "task_json": {
+      "reps": "1RM",
+      "exercise": "Overhead squat"
+    }
+  },
+  {
+    "workout_id": "163bdc3a-264d-4991-b0b1-51f121b56a43",
+    "slug": "qfs-2022-22-5",
+    "workout_name": "QF WOD 5",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "30",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "163bdc3a-264d-4991-b0b1-51f121b56a43",
+    "slug": "qfs-2022-22-5",
+    "workout_name": "QF WOD 5",
+    "format": "For Time",
+    "exercise_name": "Burpee box jump-over",
+    "task_json": {
+      "reps": "20",
+      "exercise": "Burpee box jump-over",
+      "weight_male_lbs": "24",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "163bdc3a-264d-4991-b0b1-51f121b56a43",
+    "slug": "qfs-2022-22-5",
+    "workout_name": "QF WOD 5",
+    "format": "For Time",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Snatch",
+      "weight_male_lbs": "185",
+      "weight_female_lbs": "135"
+    }
+  },
+  {
+    "workout_id": "52e7fc48-3ebe-4aa1-899a-2b0c8a0908df",
+    "slug": "qfs-2022-23-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Front squat",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Front squat",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "52e7fc48-3ebe-4aa1-899a-2b0c8a0908df",
+    "slug": "qfs-2022-23-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Handstand walk",
+    "task_json": {
+      "reps": "9",
+      "distance": "25 ft",
+      "exercise": "Handstand walk"
+    }
+  },
+  {
+    "workout_id": "52e7fc48-3ebe-4aa1-899a-2b0c8a0908df",
+    "slug": "qfs-2022-23-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Front squat",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Front squat",
+      "weight_male_lbs": "185",
+      "weight_female_lbs": "125"
+    }
+  },
+  {
+    "workout_id": "52e7fc48-3ebe-4aa1-899a-2b0c8a0908df",
+    "slug": "qfs-2022-23-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Muscle-up",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Muscle-up"
+    }
+  },
+  {
+    "workout_id": "52e7fc48-3ebe-4aa1-899a-2b0c8a0908df",
+    "slug": "qfs-2022-23-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Front squat",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Front squat",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "95"
+    }
+  },
+  {
+    "workout_id": "52e7fc48-3ebe-4aa1-899a-2b0c8a0908df",
+    "slug": "qfs-2022-23-1",
+    "workout_name": "QF WOD 1",
+    "format": "For Time",
+    "exercise_name": "Chest to wall handstand push-up",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Chest to wall handstand push-up"
+    }
+  },
+  {
+    "workout_id": "f41b7d5a-451a-4734-bbe8-56eb9d508712",
+    "slug": "qfs-2022-23-2",
+    "workout_name": "QF WOD 2",
+    "format": "AMRAP",
+    "exercise_name": "Single-arm dumbbell snatch",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Single-arm dumbbell snatch",
+      "weight_male_lbs": "70",
+      "weight_female_lbs": "50"
+    }
+  },
+  {
+    "workout_id": "f41b7d5a-451a-4734-bbe8-56eb9d508712",
+    "slug": "qfs-2022-23-2",
+    "workout_name": "QF WOD 2",
+    "format": "AMRAP",
+    "exercise_name": "Single-arm overhead walking lunge",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Single-arm overhead walking lunge",
+      "weight_male_lbs": "70",
+      "weight_female_lbs": "50"
+    }
+  },
+  {
+    "workout_id": "f41b7d5a-451a-4734-bbe8-56eb9d508712",
+    "slug": "qfs-2022-23-2",
+    "workout_name": "QF WOD 2",
+    "format": "AMRAP",
+    "exercise_name": "Single-arm dumbbell snatch",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Single-arm dumbbell snatch",
+      "weight_male_lbs": "70",
+      "weight_female_lbs": "50"
+    }
+  },
+  {
+    "workout_id": "f41b7d5a-451a-4734-bbe8-56eb9d508712",
+    "slug": "qfs-2022-23-2",
+    "workout_name": "QF WOD 2",
+    "format": "AMRAP",
+    "exercise_name": "Single-arm overhead walking lunge",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Single-arm overhead walking lunge",
+      "weight_male_lbs": "70",
+      "weight_female_lbs": "50"
+    }
+  },
+  {
+    "workout_id": "f41b7d5a-451a-4734-bbe8-56eb9d508712",
+    "slug": "qfs-2022-23-2",
+    "workout_name": "QF WOD 2",
+    "format": "AMRAP",
+    "exercise_name": "Crossover",
+    "task_json": {
+      "reps": "40",
+      "exercise": "Crossover"
+    }
+  },
+  {
+    "workout_id": "14e38860-95a6-4b79-89fa-402018847d30",
+    "slug": "qfs-2022-23-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Burpee box jump-over",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Burpee box jump-over",
+      "weight_male_lbs": "30",
+      "weight_female_lbs": "24"
+    }
+  },
+  {
+    "workout_id": "14e38860-95a6-4b79-89fa-402018847d30",
+    "slug": "qfs-2022-23-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Clean and jerk",
+    "task_json": {
+      "reps": "1-2-3-4-5",
+      "notes": "Round 1: 1 rep, Round 2: 2 reps, Round 3: 3 reps, Round 4: 4 reps, Round 5: 5 reps",
+      "exercise": "Clean and jerk",
+      "weight_male_lbs": "275",
+      "weight_female_lbs": "185"
+    }
+  },
+  {
+    "workout_id": "e1a82ece-ab07-4c75-91e1-55b652d05a2b",
+    "slug": "qfs-2022-23-4",
+    "workout_name": "QF WOD 4",
+    "format": "AMRAP",
+    "exercise_name": "Row",
+    "task_json": {
+      "distance": "1000m",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "e1a82ece-ab07-4c75-91e1-55b652d05a2b",
+    "slug": "qfs-2022-23-4",
+    "workout_name": "QF WOD 4",
+    "format": "AMRAP",
+    "exercise_name": "GHD sit-up",
+    "task_json": {
+      "reps": "50",
+      "exercise": "GHD sit-up"
+    }
+  },
+  {
+    "workout_id": "e1a82ece-ab07-4c75-91e1-55b652d05a2b",
+    "slug": "qfs-2022-23-4",
+    "workout_name": "QF WOD 4",
+    "format": "AMRAP",
+    "exercise_name": "Row",
+    "task_json": {
+      "distance": "500m",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "e1a82ece-ab07-4c75-91e1-55b652d05a2b",
+    "slug": "qfs-2022-23-4",
+    "workout_name": "QF WOD 4",
+    "format": "AMRAP",
+    "exercise_name": "V-up",
+    "task_json": {
+      "reps": "25",
+      "exercise": "V-up"
+    }
+  },
+  {
+    "workout_id": "77ce5580-db52-4d22-b294-84782ddd4230",
+    "slug": "qfs-2022-23-5",
+    "workout_name": "QF WOD 5",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "77ce5580-db52-4d22-b294-84782ddd4230",
+    "slug": "qfs-2022-23-5",
+    "workout_name": "QF WOD 5",
+    "format": "For Time",
+    "exercise_name": "Chest to bar pull-up",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Chest to bar pull-up"
+    }
+  },
+  {
+    "workout_id": "77ce5580-db52-4d22-b294-84782ddd4230",
+    "slug": "qfs-2022-23-5",
+    "workout_name": "QF WOD 5",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "275",
+      "weight_female_lbs": "185"
+    }
+  },
+  {
+    "workout_id": "77ce5580-db52-4d22-b294-84782ddd4230",
+    "slug": "qfs-2022-23-5",
+    "workout_name": "QF WOD 5",
+    "format": "For Time",
+    "exercise_name": "Bar muscle-up",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Bar muscle-up"
+    }
+  },
+  {
+    "workout_id": "77ce5580-db52-4d22-b294-84782ddd4230",
+    "slug": "qfs-2022-23-5",
+    "workout_name": "QF WOD 5",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "315",
+      "weight_female_lbs": "205"
+    }
+  },
+  {
+    "workout_id": "73dadf51-8958-485b-b655-9ce04639161d",
+    "slug": "qfs-2024-24-1",
+    "workout_name": "QF WOD 1",
+    "format": "AMRAP",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "Max",
+      "time": "1:00",
+      "exercise": "Snatch",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "85"
+    }
+  },
+  {
+    "workout_id": "73dadf51-8958-485b-b655-9ce04639161d",
+    "slug": "qfs-2024-24-1",
+    "workout_name": "QF WOD 1",
+    "format": "AMRAP",
+    "exercise_name": "Row",
+    "task_json": {
+      "time": "1:00",
+      "calories": "Max",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "73dadf51-8958-485b-b655-9ce04639161d",
+    "slug": "qfs-2024-24-1",
+    "workout_name": "QF WOD 1",
+    "format": "AMRAP",
+    "exercise_name": "Dumbbell box step-up",
+    "task_json": {
+      "reps": "Max",
+      "time": "1:00",
+      "notes": "20 inch box",
+      "exercise": "Dumbbell box step-up",
+      "weight_male_lbs": "50",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "73dadf51-8958-485b-b655-9ce04639161d",
+    "slug": "qfs-2024-24-1",
+    "workout_name": "QF WOD 1",
+    "format": "AMRAP",
+    "exercise_name": "Rest",
+    "task_json": {
+      "time": "1:00",
+      "exercise": "Rest"
+    }
+  },
+  {
+    "workout_id": "c05a333b-b364-4749-a090-b05369db4fb2",
+    "slug": "qfs-2024-24-2",
+    "workout_name": "QF WOD 2",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Wall ball",
+      "weight_male_lbs": "20",
+      "weight_female_lbs": "14"
+    }
+  },
+  {
+    "workout_id": "c05a333b-b364-4749-a090-b05369db4fb2",
+    "slug": "qfs-2024-24-2",
+    "workout_name": "QF WOD 2",
+    "format": "For Time",
+    "exercise_name": "Lateral burpee box jump-over",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Lateral burpee box jump-over",
+      "weight_male_lbs": "24",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "0415d6c0-5fc9-4c72-b1ef-b1a7eca82ac7",
+    "slug": "qfs-2024-24-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Handstand push-up",
+    "task_json": {
+      "reps": "10",
+      "notes": "3 rounds",
+      "exercise": "Handstand push-up"
+    }
+  },
+  {
+    "workout_id": "0415d6c0-5fc9-4c72-b1ef-b1a7eca82ac7",
+    "slug": "qfs-2024-24-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "20",
+      "notes": "3 rounds",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "0415d6c0-5fc9-4c72-b1ef-b1a7eca82ac7",
+    "slug": "qfs-2024-24-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Strict handstand push-up",
+    "task_json": {
+      "reps": "10",
+      "notes": "2 rounds",
+      "exercise": "Strict handstand push-up"
+    }
+  },
+  {
+    "workout_id": "0415d6c0-5fc9-4c72-b1ef-b1a7eca82ac7",
+    "slug": "qfs-2024-24-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "5",
+      "notes": "2 rounds, 15 ft",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "0415d6c0-5fc9-4c72-b1ef-b1a7eca82ac7",
+    "slug": "qfs-2024-24-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Chest to wall handstand push-up",
+    "task_json": {
+      "reps": "10",
+      "notes": "1 round",
+      "exercise": "Chest to wall handstand push-up"
+    }
+  },
+  {
+    "workout_id": "0415d6c0-5fc9-4c72-b1ef-b1a7eca82ac7",
+    "slug": "qfs-2024-24-3",
+    "workout_name": "QF WOD 3",
+    "format": "For Time",
+    "exercise_name": "Muscle-up",
+    "task_json": {
+      "reps": "20",
+      "notes": "1 round",
+      "exercise": "Muscle-up"
+    }
+  },
+  {
+    "workout_id": "142965ed-0a3b-4da8-a3b1-93a96979da82",
+    "slug": "qfs-2024-24-4",
+    "workout_name": "QF WOD 4",
+    "format": "AMRAP",
+    "exercise_name": "Clean and jerk",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Clean and jerk",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "85"
+    }
+  },
+  {
+    "workout_id": "142965ed-0a3b-4da8-a3b1-93a96979da82",
+    "slug": "qfs-2024-24-4",
+    "workout_name": "QF WOD 4",
+    "format": "AMRAP",
+    "exercise_name": "Rest",
+    "task_json": {
+      "time": "1:00",
+      "exercise": "Rest"
+    }
+  },
+  {
+    "workout_id": "142965ed-0a3b-4da8-a3b1-93a96979da82",
+    "slug": "qfs-2024-24-4",
+    "workout_name": "QF WOD 4",
+    "format": "AMRAP",
+    "exercise_name": "Clean and jerk",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Clean and jerk",
+      "weight_male_lbs": "185",
+      "weight_female_lbs": "125"
+    }
+  },
+  {
+    "workout_id": "142965ed-0a3b-4da8-a3b1-93a96979da82",
+    "slug": "qfs-2024-24-4",
+    "workout_name": "QF WOD 4",
+    "format": "AMRAP",
+    "exercise_name": "Rest",
+    "task_json": {
+      "time": "1:00",
+      "exercise": "Rest"
+    }
+  },
+  {
+    "workout_id": "142965ed-0a3b-4da8-a3b1-93a96979da82",
+    "slug": "qfs-2024-24-4",
+    "workout_name": "QF WOD 4",
+    "format": "AMRAP",
+    "exercise_name": "Clean and jerk",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Clean and jerk",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "142965ed-0a3b-4da8-a3b1-93a96979da82",
+    "slug": "qfs-2024-24-4",
+    "workout_name": "QF WOD 4",
+    "format": "AMRAP",
+    "exercise_name": "Rest",
+    "task_json": {
+      "time": "1:00",
+      "exercise": "Rest"
+    }
+  },
+  {
+    "workout_id": "142965ed-0a3b-4da8-a3b1-93a96979da82",
+    "slug": "qfs-2024-24-4",
+    "workout_name": "QF WOD 4",
+    "format": "AMRAP",
+    "exercise_name": "Clean and jerk",
+    "task_json": {
+      "reps": "Max",
+      "notes": "Remaining time",
+      "exercise": "Clean and jerk",
+      "weight_male_lbs": "245",
+      "weight_female_lbs": "165"
+    }
+  },
+  {
+    "workout_id": "89e73619-9a27-4a90-98bb-6a7acd4e199a",
+    "slug": "RegSemis-2011-11-1",
+    "workout_name": "Reg WOD 11-1",
+    "format": "For Time",
+    "exercise_name": "Run",
+    "task_json": {
+      "distance": "1000m",
+      "exercise": "Run"
+    }
+  },
+  {
+    "workout_id": "89e73619-9a27-4a90-98bb-6a7acd4e199a",
+    "slug": "RegSemis-2011-11-1",
+    "workout_name": "Reg WOD 11-1",
+    "format": "For Time",
+    "exercise_name": "Handstand push-up",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Handstand push-up"
+    }
+  },
+  {
+    "workout_id": "89e73619-9a27-4a90-98bb-6a7acd4e199a",
+    "slug": "RegSemis-2011-11-1",
+    "workout_name": "Reg WOD 11-1",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "distance": "1000m",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "9cb5f0a8-61f1-44a0-9b99-939ec2a57d9d",
+    "slug": "RegSemis-2011-11-2",
+    "workout_name": "Reg WOD 11-2",
+    "format": "Ladder",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "1",
+      "notes": "Ladder format, increase 10 lbs each attempt",
+      "exercise": "Thruster",
+      "weight_male_lbs": "155-165-175-185...",
+      "weight_female_lbs": "105-115-125-135..."
+    }
+  },
+  {
+    "workout_id": "5e8b60b7-03ff-4a60-918c-38308f67b529",
+    "slug": "RegSemis-2011-11-3",
+    "workout_name": "Reg WOD 11-3",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "21-15-9",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "315",
+      "weight_female_lbs": "205"
+    }
+  },
+  {
+    "workout_id": "5e8b60b7-03ff-4a60-918c-38308f67b529",
+    "slug": "RegSemis-2011-11-3",
+    "workout_name": "Reg WOD 11-3",
+    "format": "For Time",
+    "exercise_name": "Box jump",
+    "task_json": {
+      "reps": "21-15-9",
+      "exercise": "Box jump",
+      "weight_male_lbs": "30",
+      "weight_female_lbs": "24"
+    }
+  },
+  {
+    "workout_id": "223b7e3d-a9d2-497e-9122-2847de80cb9d",
+    "slug": "RegSemis-2011-11-4",
+    "workout_name": "Reg WOD 11-4",
+    "format": "For Time",
+    "exercise_name": "Pull-up",
+    "task_json": {
+      "reps": "100",
+      "exercise": "Pull-up"
+    }
+  },
+  {
+    "workout_id": "223b7e3d-a9d2-497e-9122-2847de80cb9d",
+    "slug": "RegSemis-2011-11-4",
+    "workout_name": "Reg WOD 11-4",
+    "format": "For Time",
+    "exercise_name": "Kettlebell swing",
+    "task_json": {
+      "reps": "100",
+      "exercise": "Kettlebell swing",
+      "weight_male_kg": "24",
+      "weight_female_kg": "16"
+    }
+  },
+  {
+    "workout_id": "223b7e3d-a9d2-497e-9122-2847de80cb9d",
+    "slug": "RegSemis-2011-11-4",
+    "workout_name": "Reg WOD 11-4",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "100",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "223b7e3d-a9d2-497e-9122-2847de80cb9d",
+    "slug": "RegSemis-2011-11-4",
+    "workout_name": "Reg WOD 11-4",
+    "format": "For Time",
+    "exercise_name": "Overhead squat",
+    "task_json": {
+      "reps": "100",
+      "exercise": "Overhead squat",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "a9f41c6a-0304-40f3-acdb-05b78ff49434",
+    "slug": "RegSemis-2011-11-5",
+    "workout_name": "Reg WOD 11-5",
+    "format": "For Time",
+    "exercise_name": "Ring muscle-up",
+    "task_json": {
+      "reps": "9-7-5",
+      "exercise": "Ring muscle-up"
+    }
+  },
+  {
+    "workout_id": "a9f41c6a-0304-40f3-acdb-05b78ff49434",
+    "slug": "RegSemis-2011-11-5",
+    "workout_name": "Reg WOD 11-5",
+    "format": "For Time",
+    "exercise_name": "Squat snatch",
+    "task_json": {
+      "reps": "9-7-5",
+      "exercise": "Squat snatch",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "95"
+    }
+  },
+  {
+    "workout_id": "9dfc5537-e559-451f-84a4-ec441ada9cd3",
+    "slug": "RegSemis-2011-11-6",
+    "workout_name": "Reg WOD 11-6",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "20",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "9dfc5537-e559-451f-84a4-ec441ada9cd3",
+    "slug": "RegSemis-2011-11-6",
+    "workout_name": "Reg WOD 11-6",
+    "format": "For Time",
+    "exercise_name": "Burpee",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Burpee"
+    }
+  },
+  {
+    "workout_id": "9dfc5537-e559-451f-84a4-ec441ada9cd3",
+    "slug": "RegSemis-2011-11-6",
+    "workout_name": "Reg WOD 11-6",
+    "format": "For Time",
+    "exercise_name": "Dumbbell ground to overhead",
+    "task_json": {
+      "reps": "40",
+      "notes": "2 dumbbells",
+      "exercise": "Dumbbell ground to overhead",
+      "weight_male_lbs": "45",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "9dfc5537-e559-451f-84a4-ec441ada9cd3",
+    "slug": "RegSemis-2011-11-6",
+    "workout_name": "Reg WOD 11-6",
+    "format": "For Time",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "9dfc5537-e559-451f-84a4-ec441ada9cd3",
+    "slug": "RegSemis-2011-11-6",
+    "workout_name": "Reg WOD 11-6",
+    "format": "For Time",
+    "exercise_name": "Overhead walking lunge",
+    "task_json": {
+      "notes": "Plate",
+      "distance": "100 ft",
+      "exercise": "Overhead walking lunge",
+      "weight_male_lbs": "45",
+      "weight_female_lbs": "25"
+    }
+  },
+  {
+    "workout_id": "9dfc5537-e559-451f-84a4-ec441ada9cd3",
+    "slug": "RegSemis-2011-11-6",
+    "workout_name": "Reg WOD 11-6",
+    "format": "For Time",
+    "exercise_name": "Sprint",
+    "task_json": {
+      "distance": "150 ft",
+      "exercise": "Sprint"
+    }
+  },
+  {
+    "workout_id": "53fa269f-5405-4a75-a2bc-9b37297b6d88",
+    "slug": "RegSemis-2012-12-1",
+    "workout_name": "Reg WOD 12-1",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "21-15-9",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "53fa269f-5405-4a75-a2bc-9b37297b6d88",
+    "slug": "RegSemis-2012-12-1",
+    "workout_name": "Reg WOD 12-1",
+    "format": "For Time",
+    "exercise_name": "Handstand push-up",
+    "task_json": {
+      "reps": "21-15-9",
+      "exercise": "Handstand push-up"
+    }
+  },
+  {
+    "workout_id": "cc77b23d-4894-4b56-98a3-bf3d33ec9af1",
+    "slug": "RegSemis-2012-12-2",
+    "workout_name": "Reg WOD 12-2",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "distance": "2000m",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "cc77b23d-4894-4b56-98a3-bf3d33ec9af1",
+    "slug": "RegSemis-2012-12-2",
+    "workout_name": "Reg WOD 12-2",
+    "format": "For Time",
+    "exercise_name": "Alternating pistol squat",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Alternating pistol squat"
+    }
+  },
+  {
+    "workout_id": "cc77b23d-4894-4b56-98a3-bf3d33ec9af1",
+    "slug": "RegSemis-2012-12-2",
+    "workout_name": "Reg WOD 12-2",
+    "format": "For Time",
+    "exercise_name": "Hang clean",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Hang clean",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "135"
+    }
+  },
+  {
+    "workout_id": "0c41d09c-bff0-4f9e-9a97-35648633ef9e",
+    "slug": "RegSemis-2012-12-3",
+    "workout_name": "Reg WOD 12-3",
+    "format": "For Time",
+    "exercise_name": "One-arm dumbbell snatch",
+    "task_json": {
+      "reps": "10",
+      "exercise": "One-arm dumbbell snatch",
+      "weight_male_lbs": "100",
+      "weight_female_lbs": "70"
+    }
+  },
+  {
+    "workout_id": "0c41d09c-bff0-4f9e-9a97-35648633ef9e",
+    "slug": "RegSemis-2012-12-3",
+    "workout_name": "Reg WOD 12-3",
+    "format": "For Time",
+    "exercise_name": "Sprint",
+    "task_json": {
+      "distance": "100 ft",
+      "exercise": "Sprint"
+    }
+  },
+  {
+    "workout_id": "1d8b07b2-31d3-4461-9038-86d35e6e7146",
+    "slug": "RegSemis-2012-12-4",
+    "workout_name": "Reg WOD 12-4",
+    "format": "For Time",
+    "exercise_name": "Back squat",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Back squat",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "95"
+    }
+  },
+  {
+    "workout_id": "1d8b07b2-31d3-4461-9038-86d35e6e7146",
+    "slug": "RegSemis-2012-12-4",
+    "workout_name": "Reg WOD 12-4",
+    "format": "For Time",
+    "exercise_name": "Pull-up",
+    "task_json": {
+      "reps": "40",
+      "exercise": "Pull-up"
+    }
+  },
+  {
+    "workout_id": "1d8b07b2-31d3-4461-9038-86d35e6e7146",
+    "slug": "RegSemis-2012-12-4",
+    "workout_name": "Reg WOD 12-4",
+    "format": "For Time",
+    "exercise_name": "Shoulder to overhead",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Shoulder to overhead",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "95"
+    }
+  },
+  {
+    "workout_id": "1d8b07b2-31d3-4461-9038-86d35e6e7146",
+    "slug": "RegSemis-2012-12-4",
+    "workout_name": "Reg WOD 12-4",
+    "format": "For Time",
+    "exercise_name": "Front squat",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Front squat",
+      "weight_male_lbs": "85",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "1d8b07b2-31d3-4461-9038-86d35e6e7146",
+    "slug": "RegSemis-2012-12-4",
+    "workout_name": "Reg WOD 12-4",
+    "format": "For Time",
+    "exercise_name": "Pull-up",
+    "task_json": {
+      "reps": "40",
+      "exercise": "Pull-up"
+    }
+  },
+  {
+    "workout_id": "1d8b07b2-31d3-4461-9038-86d35e6e7146",
+    "slug": "RegSemis-2012-12-4",
+    "workout_name": "Reg WOD 12-4",
+    "format": "For Time",
+    "exercise_name": "Shoulder to overhead",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Shoulder to overhead",
+      "weight_male_lbs": "85",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "1d8b07b2-31d3-4461-9038-86d35e6e7146",
+    "slug": "RegSemis-2012-12-4",
+    "workout_name": "Reg WOD 12-4",
+    "format": "For Time",
+    "exercise_name": "Overhead squat",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Overhead squat",
+      "weight_male_lbs": "65",
+      "weight_female_lbs": "45"
+    }
+  },
+  {
+    "workout_id": "1d8b07b2-31d3-4461-9038-86d35e6e7146",
+    "slug": "RegSemis-2012-12-4",
+    "workout_name": "Reg WOD 12-4",
+    "format": "For Time",
+    "exercise_name": "Pull-up",
+    "task_json": {
+      "reps": "40",
+      "exercise": "Pull-up"
+    }
+  },
+  {
+    "workout_id": "1d8b07b2-31d3-4461-9038-86d35e6e7146",
+    "slug": "RegSemis-2012-12-4",
+    "workout_name": "Reg WOD 12-4",
+    "format": "For Time",
+    "exercise_name": "Shoulder to overhead",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Shoulder to overhead",
+      "weight_male_lbs": "65",
+      "weight_female_lbs": "45"
+    }
+  },
+  {
+    "workout_id": "f1a01ef1-4147-4aa7-ba86-137cb0caa4bd",
+    "slug": "RegSemis-2012-12-5",
+    "workout_name": "Reg WOD 12-5",
+    "format": "Ladder",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "1",
+      "notes": "Ladder format, increase 10 lbs each attempt",
+      "exercise": "Snatch",
+      "weight_male_lbs": "155-165-175-185...",
+      "weight_female_lbs": "105-115-125-135..."
+    }
+  },
+  {
+    "workout_id": "b1e20ca4-c34e-435f-a9c5-63a700271e94",
+    "slug": "RegSemis-2012-12-6",
+    "workout_name": "Reg WOD 12-6",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "7",
+      "notes": "3 rounds",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "345",
+      "weight_female_lbs": "225"
+    }
+  },
+  {
+    "workout_id": "b1e20ca4-c34e-435f-a9c5-63a700271e94",
+    "slug": "RegSemis-2012-12-6",
+    "workout_name": "Reg WOD 12-6",
+    "format": "For Time",
+    "exercise_name": "Muscle-up",
+    "task_json": {
+      "reps": "7",
+      "notes": "3 rounds",
+      "exercise": "Muscle-up"
+    }
+  },
+  {
+    "workout_id": "b1e20ca4-c34e-435f-a9c5-63a700271e94",
+    "slug": "RegSemis-2012-12-6",
+    "workout_name": "Reg WOD 12-6",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "21",
+      "notes": "3 rounds",
+      "exercise": "Wall ball",
+      "weight_male_lbs": "20",
+      "weight_female_lbs": "14"
+    }
+  },
+  {
+    "workout_id": "b1e20ca4-c34e-435f-a9c5-63a700271e94",
+    "slug": "RegSemis-2012-12-6",
+    "workout_name": "Reg WOD 12-6",
+    "format": "For Time",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "21",
+      "notes": "3 rounds",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "b1e20ca4-c34e-435f-a9c5-63a700271e94",
+    "slug": "RegSemis-2012-12-6",
+    "workout_name": "Reg WOD 12-6",
+    "format": "For Time",
+    "exercise_name": "Dumbbell farmer carry",
+    "task_json": {
+      "notes": "2 dumbbells",
+      "distance": "100 ft",
+      "exercise": "Dumbbell farmer carry",
+      "weight_male_lbs": "100",
+      "weight_female_lbs": "70"
+    }
+  },
+  {
+    "workout_id": "b1e20ca4-c34e-435f-a9c5-63a700271e94",
+    "slug": "RegSemis-2012-12-6",
+    "workout_name": "Reg WOD 12-6",
+    "format": "For Time",
+    "exercise_name": "Burpee box jump",
+    "task_json": {
+      "reps": "28",
+      "exercise": "Burpee box jump",
+      "weight_male_lbs": "24",
+      "weight_female_lbs": "20"
+    }
+  },
+  {
+    "workout_id": "b1e20ca4-c34e-435f-a9c5-63a700271e94",
+    "slug": "RegSemis-2012-12-6",
+    "workout_name": "Reg WOD 12-6",
+    "format": "For Time",
+    "exercise_name": "Dumbbell farmer carry",
+    "task_json": {
+      "notes": "2 dumbbells",
+      "distance": "100 ft",
+      "exercise": "Dumbbell farmer carry",
+      "weight_male_lbs": "100",
+      "weight_female_lbs": "70"
+    }
+  },
+  {
+    "workout_id": "b1e20ca4-c34e-435f-a9c5-63a700271e94",
+    "slug": "RegSemis-2012-12-6",
+    "workout_name": "Reg WOD 12-6",
+    "format": "For Time",
+    "exercise_name": "Muscle-up",
+    "task_json": {
+      "reps": "3",
+      "exercise": "Muscle-up"
+    }
+  },
+  {
+    "workout_id": "82675b1e-6834-41f5-8e13-77530ce3c8d5",
+    "slug": "RegSemis-2013-13-1",
+    "workout_name": "Reg WOD 13-1",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "distance": "1000m",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "82675b1e-6834-41f5-8e13-77530ce3c8d5",
+    "slug": "RegSemis-2013-13-1",
+    "workout_name": "Reg WOD 13-1",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Thruster",
+      "weight_male_lbs": "45",
+      "weight_female_lbs": "35"
+    }
+  },
+  {
+    "workout_id": "82675b1e-6834-41f5-8e13-77530ce3c8d5",
+    "slug": "RegSemis-2013-13-1",
+    "workout_name": "Reg WOD 13-1",
+    "format": "For Time",
+    "exercise_name": "Pull-up",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Pull-up"
+    }
+  },
+  {
+    "workout_id": "a703dc02-44f4-46f4-99c8-cad75af618bb",
+    "slug": "RegSemis-2013-13-2",
+    "workout_name": "Reg WOD 13-2",
+    "format": "Ladder",
+    "exercise_name": "Overhead squat",
+    "task_json": {
+      "reps": "3RM",
+      "exercise": "Overhead squat"
+    }
+  },
+  {
+    "workout_id": "10f33c7a-678b-48ef-9d2c-8db97bf95d0e",
+    "slug": "RegSemis-2013-13-3",
+    "workout_name": "Reg WOD 13-3",
+    "format": "For Time",
+    "exercise_name": "Burpee muscle-up",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Burpee muscle-up"
+    }
+  },
+  {
+    "workout_id": "4c65ee3d-2d53-4840-8eef-896e3767927b",
+    "slug": "RegSemis-2013-13-4",
+    "workout_name": "Reg WOD 13-4",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "100",
+      "exercise": "Wall ball"
+    }
+  },
+  {
+    "workout_id": "4c65ee3d-2d53-4840-8eef-896e3767927b",
+    "slug": "RegSemis-2013-13-4",
+    "workout_name": "Reg WOD 13-4",
+    "format": "For Time",
+    "exercise_name": "Chest to bar pull-up",
+    "task_json": {
+      "reps": "100",
+      "exercise": "Chest to bar pull-up"
+    }
+  },
+  {
+    "workout_id": "4c65ee3d-2d53-4840-8eef-896e3767927b",
+    "slug": "RegSemis-2013-13-4",
+    "workout_name": "Reg WOD 13-4",
+    "format": "For Time",
+    "exercise_name": "Alternating pistol squat",
+    "task_json": {
+      "reps": "100",
+      "exercise": "Alternating pistol squat"
+    }
+  },
+  {
+    "workout_id": "4c65ee3d-2d53-4840-8eef-896e3767927b",
+    "slug": "RegSemis-2013-13-4",
+    "workout_name": "Reg WOD 13-4",
+    "format": "For Time",
+    "exercise_name": "One-arm dumbbell snatch",
+    "task_json": {
+      "reps": "100",
+      "notes": "Alternating arms",
+      "exercise": "One-arm dumbbell snatch",
+      "weight_male_lbs": "70",
+      "weight_female_lbs": "50"
+    }
+  },
+  {
+    "workout_id": "319935d8-f1f6-41e9-a841-e8507588b999",
+    "slug": "RegSemis-2013-13-5",
+    "workout_name": "Reg WOD 13-5",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "21-15-9",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "315",
+      "weight_female_lbs": "205"
+    }
+  },
+  {
+    "workout_id": "319935d8-f1f6-41e9-a841-e8507588b999",
+    "slug": "RegSemis-2013-13-5",
+    "workout_name": "Reg WOD 13-5",
+    "format": "For Time",
+    "exercise_name": "Box jump",
+    "task_json": {
+      "reps": "21-15-9",
+      "exercise": "Box jump",
+      "weight_male_lbs": "30",
+      "weight_female_lbs": "24"
+    }
+  },
+  {
+    "workout_id": "31e3f8ba-289a-4a08-8eea-7df5e104bd8a",
+    "slug": "RegSemis-2013-13-6",
+    "workout_name": "Reg WOD 13-6",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "100",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "31e3f8ba-289a-4a08-8eea-7df5e104bd8a",
+    "slug": "RegSemis-2013-13-6",
+    "workout_name": "Reg WOD 13-6",
+    "format": "For Time",
+    "exercise_name": "Handstand push-up",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Handstand push-up"
+    }
+  },
+  {
+    "workout_id": "31e3f8ba-289a-4a08-8eea-7df5e104bd8a",
+    "slug": "RegSemis-2013-13-6",
+    "workout_name": "Reg WOD 13-6",
+    "format": "For Time",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "40",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "31e3f8ba-289a-4a08-8eea-7df5e104bd8a",
+    "slug": "RegSemis-2013-13-6",
+    "workout_name": "Reg WOD 13-6",
+    "format": "For Time",
+    "exercise_name": "Axle shoulder to overhead",
+    "task_json": {
+      "reps": "30",
+      "exercise": "Axle shoulder to overhead",
+      "weight_male_lbs": "160",
+      "weight_female_lbs": "100"
+    }
+  },
+  {
+    "workout_id": "31e3f8ba-289a-4a08-8eea-7df5e104bd8a",
+    "slug": "RegSemis-2013-13-6",
+    "workout_name": "Reg WOD 13-6",
+    "format": "For Time",
+    "exercise_name": "Axle front rack walking lunge",
+    "task_json": {
+      "distance": "90 ft",
+      "exercise": "Axle front rack walking lunge",
+      "weight_male_lbs": "160",
+      "weight_female_lbs": "100"
+    }
+  },
+  {
+    "workout_id": "dfe8f06a-a273-47fd-afa7-8aea284a2716",
+    "slug": "RegSemis-2013-13-7",
+    "workout_name": "Reg WOD 13-7",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "2",
+      "distance": "15 ft",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "dfe8f06a-a273-47fd-afa7-8aea284a2716",
+    "slug": "RegSemis-2013-13-7",
+    "workout_name": "Reg WOD 13-7",
+    "format": "For Time",
+    "exercise_name": "Sprint",
+    "task_json": {
+      "distance": "100 ft",
+      "exercise": "Sprint"
+    }
+  },
+  {
+    "workout_id": "dfe8f06a-a273-47fd-afa7-8aea284a2716",
+    "slug": "RegSemis-2013-13-7",
+    "workout_name": "Reg WOD 13-7",
+    "format": "For Time",
+    "exercise_name": "Squat clean",
+    "task_json": {
+      "reps": "4",
+      "exercise": "Squat clean",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "135"
+    }
+  },
+  {
+    "workout_id": "dfe8f06a-a273-47fd-afa7-8aea284a2716",
+    "slug": "RegSemis-2013-13-7",
+    "workout_name": "Reg WOD 13-7",
+    "format": "For Time",
+    "exercise_name": "Sprint",
+    "task_json": {
+      "distance": "100 ft",
+      "exercise": "Sprint"
+    }
+  },
+  {
+    "workout_id": "6acf90f6-5a14-493a-8819-37456df6fc66",
+    "slug": "RegSemis-2014-14-1",
+    "workout_name": "Reg WOD 14-1",
+    "format": "Ladder",
+    "exercise_name": "Hang squat snatch",
+    "task_json": {
+      "reps": "1",
+      "notes": "1-rep-max",
+      "exercise": "Hang squat snatch"
+    }
+  },
+  {
+    "workout_id": "23886cfd-0a2d-4515-867b-969cf1184af5",
+    "slug": "RegSemis-2014-14-2",
+    "workout_name": "Reg WOD 14-2",
+    "format": "Ladder",
+    "exercise_name": "Handstand walk",
+    "task_json": {
+      "notes": "Max distance",
+      "exercise": "Handstand walk"
+    }
+  },
+  {
+    "workout_id": "07f3ff0f-1aa8-4536-832b-1fc94c4d6d51",
+    "slug": "RegSemis-2014-14-3",
+    "workout_name": "Reg WOD 14-3",
+    "format": "For Time",
+    "exercise_name": "Alternating pistol",
+    "task_json": {
+      "reps": "50",
+      "rounds": "3",
+      "exercise": "Alternating pistol"
+    }
+  },
+  {
+    "workout_id": "07f3ff0f-1aa8-4536-832b-1fc94c4d6d51",
+    "slug": "RegSemis-2014-14-3",
+    "workout_name": "Reg WOD 14-3",
+    "format": "For Time",
+    "exercise_name": "Ring muscle-up",
+    "task_json": {
+      "reps": "7",
+      "rounds": "3",
+      "exercise": "Ring muscle-up"
+    }
+  },
+  {
+    "workout_id": "07f3ff0f-1aa8-4536-832b-1fc94c4d6d51",
+    "slug": "RegSemis-2014-14-3",
+    "workout_name": "Reg WOD 14-3",
+    "format": "For Time",
+    "exercise_name": "Hang power clean",
+    "task_json": {
+      "reps": "10",
+      "rounds": "3",
+      "exercise": "Hang power clean",
+      "weight_male_lbs": "175",
+      "weight_female_lbs": "115"
+    }
+  },
+  {
+    "workout_id": "d0809c0e-39d8-4f25-9279-35a4f6d3e9cf",
+    "slug": "RegSemis-2014-14-4",
+    "workout_name": "Reg WOD 14-4",
+    "format": "For Time",
+    "exercise_name": "Strict handstand push-up",
+    "task_json": {
+      "reps": "21-15-9-6-3",
+      "exercise": "Strict handstand push-up"
+    }
+  },
+  {
+    "workout_id": "d0809c0e-39d8-4f25-9279-35a4f6d3e9cf",
+    "slug": "RegSemis-2014-14-4",
+    "workout_name": "Reg WOD 14-4",
+    "format": "For Time",
+    "exercise_name": "Front squat",
+    "task_json": {
+      "reps": "21-15-9-6-3",
+      "exercise": "Front squat",
+      "weight_male_lbs": "195",
+      "weight_female_lbs": "125"
+    }
+  },
+  {
+    "workout_id": "d0809c0e-39d8-4f25-9279-35a4f6d3e9cf",
+    "slug": "RegSemis-2014-14-4",
+    "workout_name": "Reg WOD 14-4",
+    "format": "For Time",
+    "exercise_name": "Burpee",
+    "task_json": {
+      "reps": "21-15-9-6-3",
+      "exercise": "Burpee"
+    }
+  },
+  {
+    "workout_id": "b8b83c43-e982-493d-8237-28ce6562262a",
+    "slug": "RegSemis-2014-14-5",
+    "workout_name": "Reg WOD 14-5",
+    "format": "For Time",
+    "exercise_name": "Legless rope ascent",
+    "task_json": {
+      "reps": "1",
+      "notes": "14-ft rope",
+      "rounds": "10",
+      "exercise": "Legless rope ascent"
+    }
+  },
+  {
+    "workout_id": "b8b83c43-e982-493d-8237-28ce6562262a",
+    "slug": "RegSemis-2014-14-5",
+    "workout_name": "Reg WOD 14-5",
+    "format": "For Time",
+    "exercise_name": "Sprint",
+    "task_json": {
+      "notes": "200-ft",
+      "rounds": "10",
+      "exercise": "Sprint"
+    }
+  },
+  {
+    "workout_id": "8084397c-5ad4-4988-8979-16c2ae3f9060",
+    "slug": "RegSemis-2014-14-6",
+    "workout_name": "Reg WOD 14-6",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "50",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "8084397c-5ad4-4988-8979-16c2ae3f9060",
+    "slug": "RegSemis-2014-14-6",
+    "workout_name": "Reg WOD 14-6",
+    "format": "For Time",
+    "exercise_name": "Box jump over",
+    "task_json": {
+      "reps": "50",
+      "notes": "24/18 inch",
+      "exercise": "Box jump over"
+    }
+  },
+  {
+    "workout_id": "8084397c-5ad4-4988-8979-16c2ae3f9060",
+    "slug": "RegSemis-2014-14-6",
+    "workout_name": "Reg WOD 14-6",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "180",
+      "weight_female_lbs": "120"
+    }
+  },
+  {
+    "workout_id": "8084397c-5ad4-4988-8979-16c2ae3f9060",
+    "slug": "RegSemis-2014-14-6",
+    "workout_name": "Reg WOD 14-6",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Wall ball"
+    }
+  },
+  {
+    "workout_id": "8084397c-5ad4-4988-8979-16c2ae3f9060",
+    "slug": "RegSemis-2014-14-6",
+    "workout_name": "Reg WOD 14-6",
+    "format": "For Time",
+    "exercise_name": "Ring dip",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Ring dip"
+    }
+  },
+  {
+    "workout_id": "8084397c-5ad4-4988-8979-16c2ae3f9060",
+    "slug": "RegSemis-2014-14-6",
+    "workout_name": "Reg WOD 14-6",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Wall ball",
+      "weight_male_lbs": "20",
+      "weight_female_lbs": "14"
+    }
+  },
+  {
+    "workout_id": "8084397c-5ad4-4988-8979-16c2ae3f9060",
+    "slug": "RegSemis-2014-14-6",
+    "workout_name": "Reg WOD 14-6",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "180",
+      "weight_female_lbs": "120"
+    }
+  },
+  {
+    "workout_id": "8084397c-5ad4-4988-8979-16c2ae3f9060",
+    "slug": "RegSemis-2014-14-6",
+    "workout_name": "Reg WOD 14-6",
+    "format": "For Time",
+    "exercise_name": "Box jump over",
+    "task_json": {
+      "reps": "50",
+      "notes": "24/18 inch",
+      "exercise": "Box jump over"
+    }
+  },
+  {
+    "workout_id": "8084397c-5ad4-4988-8979-16c2ae3f9060",
+    "slug": "RegSemis-2014-14-6",
+    "workout_name": "Reg WOD 14-6",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "50",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "19c52dbd-bedd-4968-bfa9-22446ca73c45",
+    "slug": "RegSemis-2014-14-7",
+    "workout_name": "Reg WOD 14-7",
+    "format": "For Time",
+    "exercise_name": "Pull-up",
+    "task_json": {
+      "reps": "64",
+      "exercise": "Pull-up"
+    }
+  },
+  {
+    "workout_id": "19c52dbd-bedd-4968-bfa9-22446ca73c45",
+    "slug": "RegSemis-2014-14-7",
+    "workout_name": "Reg WOD 14-7",
+    "format": "For Time",
+    "exercise_name": "Overhead squat",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Overhead squat",
+      "weight_male_lbs": "205",
+      "weight_female_lbs": "135"
+    }
+  },
+  {
+    "workout_id": "a6474c9e-52eb-453a-95bd-5667a5a550c0",
+    "slug": "RegSemis-2015-15-1",
+    "workout_name": "Reg WOD 15-1",
+    "format": "For Time",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "75",
+      "exercise": "Snatch",
+      "weight_male_lbs": "75",
+      "weight_female_lbs": "55"
+    }
+  },
+  {
+    "workout_id": "354f50cb-82ca-47b6-a2c7-eab9bfc2f710",
+    "slug": "RegSemis-2015-15-2",
+    "workout_name": "Reg WOD 15-2",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Thruster",
+      "weight_male_lbs": "115",
+      "weight_female_lbs": "75"
+    }
+  },
+  {
+    "workout_id": "354f50cb-82ca-47b6-a2c7-eab9bfc2f710",
+    "slug": "RegSemis-2015-15-2",
+    "workout_name": "Reg WOD 15-2",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "12",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "354f50cb-82ca-47b6-a2c7-eab9bfc2f710",
+    "slug": "RegSemis-2015-15-2",
+    "workout_name": "Reg WOD 15-2",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Thruster",
+      "weight_male_lbs": "115",
+      "weight_female_lbs": "75"
+    }
+  },
+  {
+    "workout_id": "354f50cb-82ca-47b6-a2c7-eab9bfc2f710",
+    "slug": "RegSemis-2015-15-2",
+    "workout_name": "Reg WOD 15-2",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "354f50cb-82ca-47b6-a2c7-eab9bfc2f710",
+    "slug": "RegSemis-2015-15-2",
+    "workout_name": "Reg WOD 15-2",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Thruster",
+      "weight_male_lbs": "115",
+      "weight_female_lbs": "75"
+    }
+  },
+  {
+    "workout_id": "354f50cb-82ca-47b6-a2c7-eab9bfc2f710",
+    "slug": "RegSemis-2015-15-2",
+    "workout_name": "Reg WOD 15-2",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "6",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "ed471c4b-7041-4b54-90c7-943534f16e6b",
+    "slug": "RegSemis-2015-15-3",
+    "workout_name": "Reg WOD 15-3",
+    "format": "For Time",
+    "exercise_name": "Run",
+    "task_json": {
+      "notes": "1-mile",
+      "exercise": "Run"
+    }
+  },
+  {
+    "workout_id": "ed471c4b-7041-4b54-90c7-943534f16e6b",
+    "slug": "RegSemis-2015-15-3",
+    "workout_name": "Reg WOD 15-3",
+    "format": "For Time",
+    "exercise_name": "Overhead squat",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Overhead squat",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "95"
+    }
+  },
+  {
+    "workout_id": "ed471c4b-7041-4b54-90c7-943534f16e6b",
+    "slug": "RegSemis-2015-15-3",
+    "workout_name": "Reg WOD 15-3",
+    "format": "For Time",
+    "exercise_name": "GHD sit-up",
+    "task_json": {
+      "reps": "100",
+      "exercise": "GHD sit-up"
+    }
+  },
+  {
+    "workout_id": "ed471c4b-7041-4b54-90c7-943534f16e6b",
+    "slug": "RegSemis-2015-15-3",
+    "workout_name": "Reg WOD 15-3",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "150",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "ed471c4b-7041-4b54-90c7-943534f16e6b",
+    "slug": "RegSemis-2015-15-3",
+    "workout_name": "Reg WOD 15-3",
+    "format": "For Time",
+    "exercise_name": "Sumo deadlift high pull",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Sumo deadlift high pull",
+      "weight_male_lbs": "135",
+      "weight_female_lbs": "95"
+    }
+  },
+  {
+    "workout_id": "ed471c4b-7041-4b54-90c7-943534f16e6b",
+    "slug": "RegSemis-2015-15-3",
+    "workout_name": "Reg WOD 15-3",
+    "format": "For Time",
+    "exercise_name": "Box jump over",
+    "task_json": {
+      "reps": "100",
+      "notes": "24/18 inch",
+      "exercise": "Box jump over"
+    }
+  },
+  {
+    "workout_id": "19aac161-bb29-405f-9b8a-fc01833296f7",
+    "slug": "RegSemis-2015-15-4",
+    "workout_name": "Reg WOD 15-4",
+    "format": "For Time",
+    "exercise_name": "Handstand walk",
+    "task_json": {
+      "notes": "250 ft",
+      "exercise": "Handstand walk"
+    }
+  },
+  {
+    "workout_id": "1cb50b07-3c87-4c92-acc0-9fd30dc58857",
+    "slug": "RegSemis-2015-15-5",
+    "workout_name": "Reg WOD 15-5",
+    "format": "Ladder",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "1",
+      "notes": "1-rep-max, two 20-second windows with 80 seconds rest",
+      "exercise": "Snatch"
+    }
+  },
+  {
+    "workout_id": "a94f4348-188e-4075-b622-66ea8dbe2baf",
+    "slug": "RegSemis-2015-15-6",
+    "workout_name": "Reg WOD 15-6",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "rounds": "5",
+      "calories": "25",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "a94f4348-188e-4075-b622-66ea8dbe2baf",
+    "slug": "RegSemis-2015-15-6",
+    "workout_name": "Reg WOD 15-6",
+    "format": "For Time",
+    "exercise_name": "Chest-to-bar pull-up",
+    "task_json": {
+      "reps": "16",
+      "rounds": "5",
+      "exercise": "Chest-to-bar pull-up"
+    }
+  },
+  {
+    "workout_id": "a94f4348-188e-4075-b622-66ea8dbe2baf",
+    "slug": "RegSemis-2015-15-6",
+    "workout_name": "Reg WOD 15-6",
+    "format": "For Time",
+    "exercise_name": "Strict deficit handstand push-up",
+    "task_json": {
+      "reps": "9",
+      "rounds": "5",
+      "exercise": "Strict deficit handstand push-up"
+    }
+  },
+  {
+    "workout_id": "d1513218-150b-4554-88af-ea18af24385a",
+    "slug": "RegSemis-2015-15-7",
+    "workout_name": "Reg WOD 15-7",
+    "format": "For Time",
+    "exercise_name": "Muscle-up",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Muscle-up"
+    }
+  },
+  {
+    "workout_id": "d1513218-150b-4554-88af-ea18af24385a",
+    "slug": "RegSemis-2015-15-7",
+    "workout_name": "Reg WOD 15-7",
+    "format": "For Time",
+    "exercise_name": "Squat clean",
+    "task_json": {
+      "reps": "1",
+      "exercise": "Squat clean",
+      "weight_male_lbs": "205",
+      "weight_female_lbs": "135"
+    }
+  },
+  {
+    "workout_id": "d1513218-150b-4554-88af-ea18af24385a",
+    "slug": "RegSemis-2015-15-7",
+    "workout_name": "Reg WOD 15-7",
+    "format": "For Time",
+    "exercise_name": "Squat clean",
+    "task_json": {
+      "reps": "1",
+      "exercise": "Squat clean",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "145"
+    }
+  },
+  {
+    "workout_id": "d1513218-150b-4554-88af-ea18af24385a",
+    "slug": "RegSemis-2015-15-7",
+    "workout_name": "Reg WOD 15-7",
+    "format": "For Time",
+    "exercise_name": "Squat clean",
+    "task_json": {
+      "reps": "1",
+      "exercise": "Squat clean",
+      "weight_male_lbs": "245",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "d1513218-150b-4554-88af-ea18af24385a",
+    "slug": "RegSemis-2015-15-7",
+    "workout_name": "Reg WOD 15-7",
+    "format": "For Time",
+    "exercise_name": "Squat clean",
+    "task_json": {
+      "reps": "1",
+      "exercise": "Squat clean",
+      "weight_male_lbs": "255",
+      "weight_female_lbs": "165"
+    }
+  },
+  {
+    "workout_id": "d1513218-150b-4554-88af-ea18af24385a",
+    "slug": "RegSemis-2015-15-7",
+    "workout_name": "Reg WOD 15-7",
+    "format": "For Time",
+    "exercise_name": "Squat clean",
+    "task_json": {
+      "reps": "1",
+      "exercise": "Squat clean",
+      "weight_male_lbs": "265",
+      "weight_female_lbs": "175"
+    }
+  },
+  {
+    "workout_id": "2aa1b3e3-9379-431a-84f4-ee09d2a69e2c",
+    "slug": "RegSemis-2016-16-1",
+    "workout_name": "Reg WOD 16-1",
+    "format": "For Time",
+    "exercise_name": "Squat snatch",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Squat snatch",
+      "weight_male_lbs": "185",
+      "weight_female_lbs": "135"
+    }
+  },
+  {
+    "workout_id": "2aa1b3e3-9379-431a-84f4-ee09d2a69e2c",
+    "slug": "RegSemis-2016-16-1",
+    "workout_name": "Reg WOD 16-1",
+    "format": "For Time",
+    "exercise_name": "Squat snatch",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Squat snatch",
+      "weight_male_lbs": "205",
+      "weight_female_lbs": "145"
+    }
+  },
+  {
+    "workout_id": "2aa1b3e3-9379-431a-84f4-ee09d2a69e2c",
+    "slug": "RegSemis-2016-16-1",
+    "workout_name": "Reg WOD 16-1",
+    "format": "For Time",
+    "exercise_name": "Squat snatch",
+    "task_json": {
+      "reps": "6",
+      "exercise": "Squat snatch",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "2aa1b3e3-9379-431a-84f4-ee09d2a69e2c",
+    "slug": "RegSemis-2016-16-1",
+    "workout_name": "Reg WOD 16-1",
+    "format": "For Time",
+    "exercise_name": "Squat snatch",
+    "task_json": {
+      "reps": "4",
+      "exercise": "Squat snatch",
+      "weight_male_lbs": "245",
+      "weight_female_lbs": "165"
+    }
+  },
+  {
+    "workout_id": "2aa1b3e3-9379-431a-84f4-ee09d2a69e2c",
+    "slug": "RegSemis-2016-16-1",
+    "workout_name": "Reg WOD 16-1",
+    "format": "For Time",
+    "exercise_name": "Squat snatch",
+    "task_json": {
+      "reps": "2",
+      "exercise": "Squat snatch",
+      "weight_male_lbs": "265",
+      "weight_female_lbs": "175"
+    }
+  },
+  {
+    "workout_id": "5c9a1295-7bd5-48b1-bb85-7e2acfda41ea",
+    "slug": "RegSemis-2016-16-2",
+    "workout_name": "Reg WOD 16-2",
+    "format": "For Time",
+    "exercise_name": "Strict muscle-up",
+    "task_json": {
+      "reps": "4",
+      "rounds": "10",
+      "exercise": "Strict muscle-up"
+    }
+  },
+  {
+    "workout_id": "5c9a1295-7bd5-48b1-bb85-7e2acfda41ea",
+    "slug": "RegSemis-2016-16-2",
+    "workout_name": "Reg WOD 16-2",
+    "format": "For Time",
+    "exercise_name": "Strict handstand push-up",
+    "task_json": {
+      "reps": "7",
+      "rounds": "10",
+      "exercise": "Strict handstand push-up"
+    }
+  },
+  {
+    "workout_id": "5c9a1295-7bd5-48b1-bb85-7e2acfda41ea",
+    "slug": "RegSemis-2016-16-2",
+    "workout_name": "Reg WOD 16-2",
+    "format": "For Time",
+    "exercise_name": "Kettlebell snatch",
+    "task_json": {
+      "reps": "12",
+      "rounds": "10",
+      "exercise": "Kettlebell snatch",
+      "weight_male_lbs": "70",
+      "weight_female_lbs": "53"
+    }
+  },
+  {
+    "workout_id": "da4b9fa4-e62f-45e6-bf0c-75d31d32fb71",
+    "slug": "RegSemis-2016-16-3",
+    "workout_name": "Reg WOD 16-3",
+    "format": "For Time",
+    "exercise_name": "Wall ball",
+    "task_json": {
+      "reps": "104",
+      "exercise": "Wall ball",
+      "weight_male_lbs": "20",
+      "weight_female_lbs": "14"
+    }
+  },
+  {
+    "workout_id": "da4b9fa4-e62f-45e6-bf0c-75d31d32fb71",
+    "slug": "RegSemis-2016-16-3",
+    "workout_name": "Reg WOD 16-3",
+    "format": "For Time",
+    "exercise_name": "Pull-up",
+    "task_json": {
+      "reps": "52",
+      "exercise": "Pull-up"
+    }
+  },
+  {
+    "workout_id": "515a834c-88f7-4a7c-9086-c2972122297e",
+    "slug": "RegSemis-2016-16-4",
+    "workout_name": "Reg WOD 16-4",
+    "format": "For Time",
+    "exercise_name": "Alternating pistol",
+    "task_json": {
+      "reps": "28",
+      "rounds": "4",
+      "exercise": "Alternating pistol"
+    }
+  },
+  {
+    "workout_id": "515a834c-88f7-4a7c-9086-c2972122297e",
+    "slug": "RegSemis-2016-16-4",
+    "workout_name": "Reg WOD 16-4",
+    "format": "For Time",
+    "exercise_name": "Power clean",
+    "task_json": {
+      "reps": "15",
+      "rounds": "4",
+      "exercise": "Power clean",
+      "weight_male_lbs": "115",
+      "weight_female_lbs": "80"
+    }
+  },
+  {
+    "workout_id": "e3c73cb0-25df-4667-acb7-3c130ee799b3",
+    "slug": "RegSemis-2016-16-5",
+    "workout_name": "Reg WOD 16-5",
+    "format": "For Time",
+    "exercise_name": "Run",
+    "task_json": {
+      "notes": "400 meter",
+      "rounds": "3",
+      "exercise": "Run"
+    }
+  },
+  {
+    "workout_id": "e3c73cb0-25df-4667-acb7-3c130ee799b3",
+    "slug": "RegSemis-2016-16-5",
+    "workout_name": "Reg WOD 16-5",
+    "format": "For Time",
+    "exercise_name": "GHD sit-up",
+    "task_json": {
+      "reps": "40",
+      "rounds": "3",
+      "exercise": "GHD sit-up"
+    }
+  },
+  {
+    "workout_id": "e3c73cb0-25df-4667-acb7-3c130ee799b3",
+    "slug": "RegSemis-2016-16-5",
+    "workout_name": "Reg WOD 16-5",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "7",
+      "rounds": "3",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "405",
+      "weight_female_lbs": "275"
+    }
+  },
+  {
+    "workout_id": "967e5466-9674-4e3a-aad5-d7f530df7281",
+    "slug": "RegSemis-2016-16-6",
+    "workout_name": "Reg WOD 16-6",
+    "format": "For Time",
+    "exercise_name": "Bike",
+    "task_json": {
+      "notes": "1,000 meters",
+      "exercise": "Bike"
+    }
+  },
+  {
+    "workout_id": "967e5466-9674-4e3a-aad5-d7f530df7281",
+    "slug": "RegSemis-2016-16-6",
+    "workout_name": "Reg WOD 16-6",
+    "format": "For Time",
+    "exercise_name": "Handstand walk",
+    "task_json": {
+      "notes": "100 ft",
+      "exercise": "Handstand walk"
+    }
+  },
+  {
+    "workout_id": "967e5466-9674-4e3a-aad5-d7f530df7281",
+    "slug": "RegSemis-2016-16-6",
+    "workout_name": "Reg WOD 16-6",
+    "format": "For Time",
+    "exercise_name": "Overhead squat",
+    "task_json": {
+      "reps": "10",
+      "exercise": "Overhead squat",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "967e5466-9674-4e3a-aad5-d7f530df7281",
+    "slug": "RegSemis-2016-16-6",
+    "workout_name": "Reg WOD 16-6",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "calories": "500",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "967e5466-9674-4e3a-aad5-d7f530df7281",
+    "slug": "RegSemis-2016-16-6",
+    "workout_name": "Reg WOD 16-6",
+    "format": "For Time",
+    "exercise_name": "Burpee box jump over",
+    "task_json": {
+      "reps": "50",
+      "notes": "24/20 inch",
+      "exercise": "Burpee box jump over"
+    }
+  },
+  {
+    "workout_id": "967e5466-9674-4e3a-aad5-d7f530df7281",
+    "slug": "RegSemis-2016-16-6",
+    "workout_name": "Reg WOD 16-6",
+    "format": "For Time",
+    "exercise_name": "Overhead squat",
+    "task_json": {
+      "reps": "5",
+      "exercise": "Overhead squat",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  },
+  {
+    "workout_id": "8c7c5fe6-06b3-44c9-92a6-e6c05b258e6d",
+    "slug": "RegSemis-2016-16-7",
+    "workout_name": "Reg WOD 16-7",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "21",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "8c7c5fe6-06b3-44c9-92a6-e6c05b258e6d",
+    "slug": "RegSemis-2016-16-7",
+    "workout_name": "Reg WOD 16-7",
+    "format": "For Time",
+    "exercise_name": "Legless rope climb",
+    "task_json": {
+      "reps": "3",
+      "exercise": "Legless rope climb"
+    }
+  },
+  {
+    "workout_id": "8c7c5fe6-06b3-44c9-92a6-e6c05b258e6d",
+    "slug": "RegSemis-2016-16-7",
+    "workout_name": "Reg WOD 16-7",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "15",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "8c7c5fe6-06b3-44c9-92a6-e6c05b258e6d",
+    "slug": "RegSemis-2016-16-7",
+    "workout_name": "Reg WOD 16-7",
+    "format": "For Time",
+    "exercise_name": "Legless rope climb",
+    "task_json": {
+      "reps": "2",
+      "exercise": "Legless rope climb"
+    }
+  },
+  {
+    "workout_id": "8c7c5fe6-06b3-44c9-92a6-e6c05b258e6d",
+    "slug": "RegSemis-2016-16-7",
+    "workout_name": "Reg WOD 16-7",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Thruster",
+      "weight_male_lbs": "95",
+      "weight_female_lbs": "65"
+    }
+  },
+  {
+    "workout_id": "8c7c5fe6-06b3-44c9-92a6-e6c05b258e6d",
+    "slug": "RegSemis-2016-16-7",
+    "workout_name": "Reg WOD 16-7",
+    "format": "For Time",
+    "exercise_name": "Legless rope climb",
+    "task_json": {
+      "reps": "1",
+      "exercise": "Legless rope climb"
+    }
+  },
+  {
+    "workout_id": "cbab630f-8d7e-46e2-97f1-869896e53038",
+    "slug": "RegSemis-2018-18-1",
+    "workout_name": "Reg WOD 18-1",
+    "format": "For Time",
+    "exercise_name": "Row",
+    "task_json": {
+      "notes": "3000 meter",
+      "exercise": "Row"
+    }
+  },
+  {
+    "workout_id": "cbab630f-8d7e-46e2-97f1-869896e53038",
+    "slug": "RegSemis-2018-18-1",
+    "workout_name": "Reg WOD 18-1",
+    "format": "For Time",
+    "exercise_name": "Double-under",
+    "task_json": {
+      "reps": "300",
+      "exercise": "Double-under"
+    }
+  },
+  {
+    "workout_id": "cbab630f-8d7e-46e2-97f1-869896e53038",
+    "slug": "RegSemis-2018-18-1",
+    "workout_name": "Reg WOD 18-1",
+    "format": "For Time",
+    "exercise_name": "Run",
+    "task_json": {
+      "notes": "3 mile",
+      "exercise": "Run"
+    }
+  },
+  {
+    "workout_id": "ef96dc41-61cf-4c57-94df-f4e7e4f0d3b4",
+    "slug": "RegSemis-2018-18-2",
+    "workout_name": "Reg WOD 18-2",
+    "format": "For Time",
+    "exercise_name": "Deadlift",
+    "task_json": {
+      "reps": "10-9-8-7-6-5-4-3-2-1",
+      "exercise": "Deadlift",
+      "weight_male_lbs": "295",
+      "weight_female_lbs": "220"
+    }
+  },
+  {
+    "workout_id": "ef96dc41-61cf-4c57-94df-f4e7e4f0d3b4",
+    "slug": "RegSemis-2018-18-2",
+    "workout_name": "Reg WOD 18-2",
+    "format": "For Time",
+    "exercise_name": "Bench press",
+    "task_json": {
+      "reps": "10-9-8-7-6-5-4-3-2-1",
+      "exercise": "Bench press",
+      "weight_male_lbs": "195",
+      "weight_female_lbs": "135"
+    }
+  },
+  {
+    "workout_id": "ef96dc41-61cf-4c57-94df-f4e7e4f0d3b4",
+    "slug": "RegSemis-2018-18-2",
+    "workout_name": "Reg WOD 18-2",
+    "format": "For Time",
+    "exercise_name": "Squat clean",
+    "task_json": {
+      "reps": "10-9-8-7-6-5-4-3-2-1",
+      "exercise": "Squat clean",
+      "weight_male_lbs": "145",
+      "weight_female_lbs": "105"
+    }
+  },
+  {
+    "workout_id": "a1ff63f3-8e5e-448a-9e3b-dee37c9b237c",
+    "slug": "RegSemis-2018-18-3",
+    "workout_name": "Reg WOD 18-3",
+    "format": "For Time",
+    "exercise_name": "Muscle-up",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Muscle-up"
+    }
+  },
+  {
+    "workout_id": "a1ff63f3-8e5e-448a-9e3b-dee37c9b237c",
+    "slug": "RegSemis-2018-18-3",
+    "workout_name": "Reg WOD 18-3",
+    "format": "For Time",
+    "exercise_name": "Obstacle handstand walk",
+    "task_json": {
+      "exercise": "Obstacle handstand walk"
+    }
+  },
+  {
+    "workout_id": "a1ff63f3-8e5e-448a-9e3b-dee37c9b237c",
+    "slug": "RegSemis-2018-18-3",
+    "workout_name": "Reg WOD 18-3",
+    "format": "For Time",
+    "exercise_name": "Alternating pistol",
+    "task_json": {
+      "reps": "36",
+      "exercise": "Alternating pistol"
+    }
+  },
+  {
+    "workout_id": "a1ff63f3-8e5e-448a-9e3b-dee37c9b237c",
+    "slug": "RegSemis-2018-18-3",
+    "workout_name": "Reg WOD 18-3",
+    "format": "For Time",
+    "exercise_name": "Obstacle handstand walk",
+    "task_json": {
+      "exercise": "Obstacle handstand walk"
+    }
+  },
+  {
+    "workout_id": "a1ff63f3-8e5e-448a-9e3b-dee37c9b237c",
+    "slug": "RegSemis-2018-18-3",
+    "workout_name": "Reg WOD 18-3",
+    "format": "For Time",
+    "exercise_name": "Muscle-up",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Muscle-up"
+    }
+  },
+  {
+    "workout_id": "a1ff63f3-8e5e-448a-9e3b-dee37c9b237c",
+    "slug": "RegSemis-2018-18-3",
+    "workout_name": "Reg WOD 18-3",
+    "format": "For Time",
+    "exercise_name": "Obstacle handstand walk",
+    "task_json": {
+      "exercise": "Obstacle handstand walk"
+    }
+  },
+  {
+    "workout_id": "a1ff63f3-8e5e-448a-9e3b-dee37c9b237c",
+    "slug": "RegSemis-2018-18-3",
+    "workout_name": "Reg WOD 18-3",
+    "format": "For Time",
+    "exercise_name": "Alternating pistol",
+    "task_json": {
+      "reps": "45",
+      "exercise": "Alternating pistol"
+    }
+  },
+  {
+    "workout_id": "a1ff63f3-8e5e-448a-9e3b-dee37c9b237c",
+    "slug": "RegSemis-2018-18-3",
+    "workout_name": "Reg WOD 18-3",
+    "format": "For Time",
+    "exercise_name": "Obstacle handstand walk",
+    "task_json": {
+      "exercise": "Obstacle handstand walk"
+    }
+  },
+  {
+    "workout_id": "a1ff63f3-8e5e-448a-9e3b-dee37c9b237c",
+    "slug": "RegSemis-2018-18-3",
+    "workout_name": "Reg WOD 18-3",
+    "format": "For Time",
+    "exercise_name": "Muscle-up",
+    "task_json": {
+      "reps": "9",
+      "exercise": "Muscle-up"
+    }
+  },
+  {
+    "workout_id": "a1ff63f3-8e5e-448a-9e3b-dee37c9b237c",
+    "slug": "RegSemis-2018-18-3",
+    "workout_name": "Reg WOD 18-3",
+    "format": "For Time",
+    "exercise_name": "Obstacle handstand walk",
+    "task_json": {
+      "exercise": "Obstacle handstand walk"
+    }
+  },
+  {
+    "workout_id": "a1ff63f3-8e5e-448a-9e3b-dee37c9b237c",
+    "slug": "RegSemis-2018-18-3",
+    "workout_name": "Reg WOD 18-3",
+    "format": "For Time",
+    "exercise_name": "Alternating pistol",
+    "task_json": {
+      "reps": "54",
+      "exercise": "Alternating pistol"
+    }
+  },
+  {
+    "workout_id": "73eba150-60a7-4171-9272-a0fc2abb272b",
+    "slug": "RegSemis-2018-18-4",
+    "workout_name": "Reg WOD 18-4",
+    "format": "For Time",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "10",
+      "rounds": "2",
+      "exercise": "Snatch",
+      "weight_male_lbs": "175",
+      "weight_female_lbs": "125"
+    }
+  },
+  {
+    "workout_id": "73eba150-60a7-4171-9272-a0fc2abb272b",
+    "slug": "RegSemis-2018-18-4",
+    "workout_name": "Reg WOD 18-4",
+    "format": "For Time",
+    "exercise_name": "Burpee",
+    "task_json": {
+      "reps": "12",
+      "rounds": "2",
+      "exercise": "Burpee"
+    }
+  },
+  {
+    "workout_id": "73eba150-60a7-4171-9272-a0fc2abb272b",
+    "slug": "RegSemis-2018-18-4",
+    "workout_name": "Reg WOD 18-4",
+    "format": "For Time",
+    "exercise_name": "Snatch",
+    "task_json": {
+      "reps": "10",
+      "rounds": "2",
+      "exercise": "Snatch",
+      "weight_male_lbs": "115",
+      "weight_female_lbs": "75"
+    }
+  },
+  {
+    "workout_id": "73eba150-60a7-4171-9272-a0fc2abb272b",
+    "slug": "RegSemis-2018-18-4",
+    "workout_name": "Reg WOD 18-4",
+    "format": "For Time",
+    "exercise_name": "Burpee",
+    "task_json": {
+      "reps": "12",
+      "rounds": "2",
+      "exercise": "Burpee"
+    }
+  },
+  {
+    "workout_id": "bbe438cc-728f-4ad2-a2dd-54cc6cb4463d",
+    "slug": "RegSemis-2018-18-5",
+    "workout_name": "Reg WOD 18-5",
+    "format": "For Time",
+    "exercise_name": "Handstand push-up",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Handstand push-up"
+    }
+  },
+  {
+    "workout_id": "bbe438cc-728f-4ad2-a2dd-54cc6cb4463d",
+    "slug": "RegSemis-2018-18-5",
+    "workout_name": "Reg WOD 18-5",
+    "format": "For Time",
+    "exercise_name": "Toes to bar",
+    "task_json": {
+      "reps": "50",
+      "exercise": "Toes to bar"
+    }
+  },
+  {
+    "workout_id": "bbe438cc-728f-4ad2-a2dd-54cc6cb4463d",
+    "slug": "RegSemis-2018-18-5",
+    "workout_name": "Reg WOD 18-5",
+    "format": "For Time",
+    "exercise_name": "Assault bike",
+    "task_json": {
+      "calories": "50",
+      "exercise": "Assault bike"
+    }
+  },
+  {
+    "workout_id": "bbe438cc-728f-4ad2-a2dd-54cc6cb4463d",
+    "slug": "RegSemis-2018-18-5",
+    "workout_name": "Reg WOD 18-5",
+    "format": "For Time",
+    "exercise_name": "Dumbbell box step-over",
+    "task_json": {
+      "reps": "50",
+      "notes": "24/20 inch",
+      "exercise": "Dumbbell box step-over",
+      "weight_male_lbs": "70",
+      "weight_female_lbs": "50"
+    }
+  },
+  {
+    "workout_id": "bbe438cc-728f-4ad2-a2dd-54cc6cb4463d",
+    "slug": "RegSemis-2018-18-5",
+    "workout_name": "Reg WOD 18-5",
+    "format": "For Time",
+    "exercise_name": "Right-arm dumbbell overhead lunge",
+    "task_json": {
+      "notes": "50 feet",
+      "exercise": "Right-arm dumbbell overhead lunge",
+      "weight_male_lbs": "70",
+      "weight_female_lbs": "50"
+    }
+  },
+  {
+    "workout_id": "bbe438cc-728f-4ad2-a2dd-54cc6cb4463d",
+    "slug": "RegSemis-2018-18-5",
+    "workout_name": "Reg WOD 18-5",
+    "format": "For Time",
+    "exercise_name": "Left-arm dumbbell overhead lunge",
+    "task_json": {
+      "notes": "50 feet",
+      "exercise": "Left-arm dumbbell overhead lunge",
+      "weight_male_lbs": "70",
+      "weight_female_lbs": "50"
+    }
+  },
+  {
+    "workout_id": "ee031de8-55cc-47cb-a5ae-87e46df9b33f",
+    "slug": "RegSemis-2018-18-6",
+    "workout_name": "Reg WOD 18-6",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "4",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "ee031de8-55cc-47cb-a5ae-87e46df9b33f",
+    "slug": "RegSemis-2018-18-6",
+    "workout_name": "Reg WOD 18-6",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "16",
+      "exercise": "Thruster",
+      "weight_male_lbs": "155",
+      "weight_female_lbs": "105"
+    }
+  },
+  {
+    "workout_id": "ee031de8-55cc-47cb-a5ae-87e46df9b33f",
+    "slug": "RegSemis-2018-18-6",
+    "workout_name": "Reg WOD 18-6",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "3",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "ee031de8-55cc-47cb-a5ae-87e46df9b33f",
+    "slug": "RegSemis-2018-18-6",
+    "workout_name": "Reg WOD 18-6",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "12",
+      "exercise": "Thruster",
+      "weight_male_lbs": "155",
+      "weight_female_lbs": "105"
+    }
+  },
+  {
+    "workout_id": "ee031de8-55cc-47cb-a5ae-87e46df9b33f",
+    "slug": "RegSemis-2018-18-6",
+    "workout_name": "Reg WOD 18-6",
+    "format": "For Time",
+    "exercise_name": "Rope climb",
+    "task_json": {
+      "reps": "2",
+      "exercise": "Rope climb"
+    }
+  },
+  {
+    "workout_id": "ee031de8-55cc-47cb-a5ae-87e46df9b33f",
+    "slug": "RegSemis-2018-18-6",
+    "workout_name": "Reg WOD 18-6",
+    "format": "For Time",
+    "exercise_name": "Thruster",
+    "task_json": {
+      "reps": "8",
+      "exercise": "Thruster",
+      "weight_male_lbs": "155",
+      "weight_female_lbs": "105"
+    }
+  },
+  {
+    "workout_id": "97816f2a-49ed-4ec8-88ce-8adae26620e4",
+    "slug": "semi-2021-event-3",
+    "workout_name": "Semifinal Event 3",
+    "format": "AMRAP",
+    "exercise_name": "Max Squat Clean & Jerk",
+    "task_json": {
+      "time": "15:00",
+      "exercise": "Max Squat Clean & Jerk",
+      "weight_male_lbs": "225",
+      "weight_female_lbs": "155"
+    }
+  }
+]

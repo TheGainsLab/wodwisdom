@@ -1,5 +1,13 @@
 // Shared program analyzer - used by analyze-program and incorporate-movements
 
+/** Passed when movements table is used. Drives recognition + essential-only not_programmed. */
+export interface MovementsContext {
+  library: Record<string, { modality: "W" | "G" | "M"; category: string }>;
+  aliases: Record<string, string>;
+  /** Canonical names with competition_count > 0 — only these appear in not_programmed */
+  essentialCanonicals: Set<string>;
+}
+
 const MOVEMENT_LIBRARY: Record<string, { modality: "W" | "G" | "M"; category: string }> = {
   back_squat: { modality: "W", category: "Weightlifting" },
   front_squat: { modality: "W", category: "Weightlifting" },
@@ -82,7 +90,8 @@ const MOVEMENT_LIBRARY: Record<string, { modality: "W" | "G" | "M"; category: st
   jump_rope: { modality: "G", category: "Gymnastics" },
 };
 
-const MOVEMENT_ALIASES: Record<string, string> = {
+/** Default shorthand and common aliases; merged into DB aliases when using movements table */
+export const DEFAULT_MOVEMENT_ALIASES: Record<string, string> = {
   t2b: "toes_to_bar",
   "toes to bar": "toes_to_bar",
   "toes to bars": "toes_to_bar",
@@ -205,9 +214,15 @@ function assignLoadsToMovements(
   return new Map([...assignment].map(([k, v]) => [k, v.label]));
 }
 
-function extractMovements(text: string): { name: string; canonical: string; modality: string; load: string }[] {
+type ExtractedMovement = { name: string; canonical: string; modality: string; load: string };
+
+function extractMovementsImpl(
+  text: string,
+  library: Record<string, { modality: "W" | "G" | "M"; category: string }>,
+  aliases: Record<string, string>
+): ExtractedMovement[] {
   const segments = text.split(/\s*,\s*/).map((s) => s.trim()).filter(Boolean);
-  const result: { name: string; canonical: string; modality: string; load: string }[] = [];
+  const result: ExtractedMovement[] = [];
   const seenInSegment = new Set<string>();
 
   for (const segment of segments) {
@@ -215,7 +230,7 @@ function extractMovements(text: string): { name: string; canonical: string; moda
     seenInSegment.clear();
     const movementMatches: { canonical: string; start: number; end: number }[] = [];
 
-    for (const [canonical] of Object.entries(MOVEMENT_LIBRARY)) {
+    for (const [canonical] of Object.entries(library)) {
       const spaced = canonical.replace(/_/g, " ");
       const patterns = [`\\b${spaced}s?\\b`, `\\b${canonical}\\b`];
       for (const p of patterns) {
@@ -226,8 +241,8 @@ function extractMovements(text: string): { name: string; canonical: string; moda
         }
       }
     }
-    for (const [alias, canonical] of Object.entries(MOVEMENT_ALIASES)) {
-      if (!MOVEMENT_LIBRARY[canonical]) continue;
+    for (const [alias, canonical] of Object.entries(aliases)) {
+      if (!library[canonical]) continue;
       const regex = new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}s?\\b`, "gi");
       let m: RegExpMatchArray | null;
       while ((m = regex.exec(lower)) !== null) {
@@ -245,7 +260,7 @@ function extractMovements(text: string): { name: string; canonical: string; moda
       seenInSegment.add(key);
 
       const loadLabel = loadAssignment.get(i) ?? "BW";
-      const info = MOVEMENT_LIBRARY[canonical] || { modality: "?", category: "Other" };
+      const info = library[canonical] || { modality: "?" as const, category: "Other" };
       result.push({
         name: canonical.replace(/_/g, " "),
         canonical,
@@ -297,12 +312,22 @@ function inferTimeDomain(text: string): "short" | "medium" | "long" {
   return "medium";
 }
 
-function countMetconMovements(text: string): number {
-  const movements = extractMovements(text);
-  return new Set(movements.map((m) => m.canonical)).size;
+function countMetconMovements(
+  text: string,
+  extract: (t: string) => ExtractedMovement[]
+): number {
+  return new Set(extract(text).map((m) => m.canonical)).size;
 }
 
-export function analyzeWorkouts(workouts: WorkoutInput[]): AnalysisOutput {
+export function analyzeWorkouts(
+  workouts: WorkoutInput[],
+  movements?: MovementsContext
+): AnalysisOutput {
+  const library = movements?.library ?? MOVEMENT_LIBRARY;
+  const aliases = movements?.aliases ?? DEFAULT_MOVEMENT_ALIASES;
+  const essentialCanonicals =
+    movements?.essentialCanonicals ?? new Set(Object.keys(MOVEMENT_LIBRARY));
+  const extract = (text: string) => extractMovementsImpl(text, library, aliases);
   const modalCounts: Record<string, number> = { Weightlifting: 0, Gymnastics: 0, Monostructural: 0 };
   const timeDomainCounts: Record<string, number> = { short: 0, medium: 0, long: 0 };
   const structureCounts: Record<string, number> = { couplets: 0, triplets: 0, chipper: 0, other: 0 };
@@ -323,7 +348,7 @@ export function analyzeWorkouts(workouts: WorkoutInput[]): AnalysisOutput {
       const domain = inferTimeDomain(text);
       timeDomainCounts[domain] = (timeDomainCounts[domain] || 0) + 1;
 
-      const mc = countMetconMovements(text);
+      const mc = countMetconMovements(text, extract);
       if (mc === 2) structureCounts.couplets++;
       else if (mc === 3) structureCounts.triplets++;
       else if (mc >= 4) structureCounts.chipper++;
@@ -332,7 +357,7 @@ export function analyzeWorkouts(workouts: WorkoutInput[]): AnalysisOutput {
       structureCounts.other++;
     }
 
-    const moves = extractMovements(text);
+    const moves = extract(text);
     for (const m of moves) {
       allFoundMovements.add(m.canonical);
       const modLabel = m.modality === "W" ? "Weightlifting" : m.modality === "G" ? "Gymnastics" : "Monostructural";
@@ -402,9 +427,12 @@ export function analyzeWorkouts(workouts: WorkoutInput[]): AnalysisOutput {
     Gymnastics: [],
     Monostructural: [],
   };
-  for (const [canonical, info] of Object.entries(MOVEMENT_LIBRARY)) {
-    if (!allFoundMovements.has(canonical) && notProgrammed[info.category]) {
-      notProgrammed[info.category].push(canonical.replace(/_/g, " "));
+  for (const canonical of essentialCanonicals) {
+    if (allFoundMovements.has(canonical)) continue;
+    const info = library[canonical];
+    const category = info?.category ?? "Weightlifting";
+    if (notProgrammed[category]) {
+      notProgrammed[category].push(canonical.replace(/_/g, " "));
     }
   }
 
@@ -418,8 +446,8 @@ export function analyzeWorkouts(workouts: WorkoutInput[]): AnalysisOutput {
     const isConsecutive = curr.week_num === next.week_num && next.day_num === curr.day_num + 1;
     if (!isConsecutive) continue;
 
-    const currMoves = new Set(extractMovements(curr.workout_text).map((m) => m.canonical));
-    const nextMoves = extractMovements(next.workout_text).map((m) => m.canonical);
+    const currMoves = new Set(extract(curr.workout_text).map((m) => m.canonical));
+    const nextMoves = extract(next.workout_text).map((m) => m.canonical);
     const shared = nextMoves.filter((c) => currMoves.has(c));
     if (shared.length > 0) {
       overlaps.push({
