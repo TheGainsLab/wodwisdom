@@ -147,7 +147,7 @@ export function inferTimeDomain(text: string): TimeDomain {
   // FOR TIME / Rounds For Time — estimate from rep volume
   const totalReps = estimateTotalReps(t);
 
-  if (totalReps < 100) return "short";
+  if (totalReps < 150) return "short";
   if (totalReps <= 300) return "medium";
   return "long";
 }
