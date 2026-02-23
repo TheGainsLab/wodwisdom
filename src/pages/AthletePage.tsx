@@ -133,6 +133,80 @@ const LEVEL_LABELS: Record<SkillLevel, string> = {
   advanced: 'Advanced',
 };
 
+interface ProfileSnapshot {
+  lifts?: Record<string, number>;
+  skills?: Record<string, string>;
+  conditioning?: Record<string, string | number>;
+  bodyweight?: number | null;
+  units?: string;
+}
+
+interface Evaluation {
+  id: string;
+  profile_snapshot: ProfileSnapshot;
+  lifting_analysis: string | null;
+  skills_analysis: string | null;
+  engine_analysis: string | null;
+  created_at: string;
+}
+
+/** Build human-readable diff lines between two profile snapshots */
+function buildProfileDiffs(prev: ProfileSnapshot, current: ProfileSnapshot): string[] {
+  const diffs: string[] = [];
+  const u = current.units === 'kg' ? 'kg' : 'lbs';
+
+  // Bodyweight
+  if (prev.bodyweight && current.bodyweight && prev.bodyweight !== current.bodyweight) {
+    const diff = current.bodyweight - prev.bodyweight;
+    diffs.push(`Bodyweight: ${prev.bodyweight} → ${current.bodyweight} ${u} (${diff > 0 ? '+' : ''}${diff})`);
+  }
+
+  // Lifts
+  const allLiftKeys = new Set([...Object.keys(prev.lifts || {}), ...Object.keys(current.lifts || {})]);
+  for (const key of allLiftKeys) {
+    const prevVal = prev.lifts?.[key];
+    const curVal = current.lifts?.[key];
+    if (prevVal && curVal && prevVal !== curVal) {
+      const diff = curVal - prevVal;
+      const label = LIFT_GROUPS.flatMap(g => g.lifts).find(l => l.key === key)?.label || key.replace(/_/g, ' ');
+      diffs.push(`${label}: ${prevVal} → ${curVal} ${u} (${diff > 0 ? '+' : ''}${diff})`);
+    } else if (!prevVal && curVal && curVal > 0) {
+      const label = LIFT_GROUPS.flatMap(g => g.lifts).find(l => l.key === key)?.label || key.replace(/_/g, ' ');
+      diffs.push(`${label}: new — ${curVal} ${u}`);
+    }
+  }
+
+  // Skills
+  const levelOrder: Record<string, number> = { none: 0, beginner: 1, intermediate: 2, advanced: 3 };
+  const allSkillKeys = new Set([...Object.keys(prev.skills || {}), ...Object.keys(current.skills || {})]);
+  for (const key of allSkillKeys) {
+    const prevVal = prev.skills?.[key];
+    const curVal = current.skills?.[key];
+    if (prevVal && curVal && prevVal !== curVal && curVal !== 'none') {
+      const arrow = (levelOrder[curVal] || 0) > (levelOrder[prevVal] || 0) ? ' ↑' : ' ↓';
+      const label = SKILL_GROUPS.flatMap(g => g.skills).find(s => s.key === key)?.label || key.replace(/_/g, ' ');
+      diffs.push(`${label}: ${prevVal} → ${curVal}${arrow}`);
+    }
+  }
+
+  // Conditioning
+  const allCondKeys = new Set([...Object.keys(prev.conditioning || {}), ...Object.keys(current.conditioning || {})]);
+  for (const key of allCondKeys) {
+    const prevVal = prev.conditioning?.[key];
+    const curVal = current.conditioning?.[key];
+    if (prevVal != null && curVal != null && String(prevVal) !== String(curVal)) {
+      const label = CONDITIONING_GROUPS.flatMap(g => g.benchmarks).find(b => b.key === key)?.label || key.replace(/_/g, ' ');
+      diffs.push(`${label}: ${prevVal} → ${curVal}`);
+    }
+  }
+
+  return diffs;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 export default function AthletePage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [lifts, setLifts] = useState<Record<string, number>>({});
@@ -147,22 +221,46 @@ export default function AthletePage({ session }: { session: Session }) {
   const [analysisResult, setAnalysisResult] = useState<{ type: 'lifts' | 'skills' | 'engine' | 'full'; text: string } | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState<'lifts' | 'skills' | 'engine' | 'full' | null>(null);
 
-  useEffect(() => {
-    supabase
-      .from('athlete_profiles')
-      .select('lifts, skills, conditioning, bodyweight, units')
+  // Evaluation history
+  const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+  const [expandedEvalId, setExpandedEvalId] = useState<string | null>(null);
+
+  const fetchEvaluations = async () => {
+    const { data } = await supabase
+      .from('profile_evaluations')
+      .select('id, profile_snapshot, lifting_analysis, skills_analysis, engine_analysis, created_at')
       .eq('user_id', session.user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setLifts(data.lifts || {});
-          setSkills(data.skills || {});
-          setConditioning(data.conditioning || {});
-          setBodyweight(data.bodyweight != null ? String(data.bodyweight) : '');
-          setUnits((data.units as 'lbs' | 'kg') || 'lbs');
-        }
-        setLoading(false);
-      });
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (data) setEvaluations(data);
+  };
+
+  useEffect(() => {
+    Promise.all([
+      supabase
+        .from('athlete_profiles')
+        .select('lifts, skills, conditioning, bodyweight, units')
+        .eq('user_id', session.user.id)
+        .maybeSingle(),
+      supabase
+        .from('profile_evaluations')
+        .select('id, profile_snapshot, lifting_analysis, skills_analysis, engine_analysis, created_at')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(20),
+    ]).then(([profileRes, evalRes]) => {
+      if (profileRes.data) {
+        setLifts(profileRes.data.lifts || {});
+        setSkills(profileRes.data.skills || {});
+        setConditioning(profileRes.data.conditioning || {});
+        setBodyweight(profileRes.data.bodyweight != null ? String(profileRes.data.bodyweight) : '');
+        setUnits((profileRes.data.units as 'lbs' | 'kg') || 'lbs');
+      }
+      if (evalRes.data) {
+        setEvaluations(evalRes.data);
+      }
+      setLoading(false);
+    });
   }, [session.user.id]);
 
   const setLift = (key: string, value: string) => {
@@ -203,6 +301,8 @@ export default function AthletePage({ session }: { session: Session }) {
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || 'Analysis failed');
       setAnalysisResult({ type, text: data.analysis });
+      // Refresh evaluation history after new analysis is saved
+      fetchEvaluations();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
     } finally {
@@ -251,6 +351,9 @@ export default function AthletePage({ session }: { session: Session }) {
     setSaving(false);
     setTimeout(() => setSuccess(''), 3000);
   };
+
+  // Build current profile snapshot for diff comparison
+  const currentSnapshot: ProfileSnapshot = { lifts, skills, conditioning, bodyweight: bodyweight ? parseFloat(bodyweight) : null, units };
 
   return (
     <div className="app-layout">
@@ -389,7 +492,7 @@ export default function AthletePage({ session }: { session: Session }) {
                 {/* AI Profile Analysis */}
                 <div className="settings-card" style={{ borderColor: 'rgba(255,58,58,.2)', background: 'var(--accent-glow)' }}>
                   <h2 className="settings-card-title">AI Profile Analysis</h2>
-                  <p className="athlete-card-subtitle">Free analysis of your profile. Does not use your question limit.</p>
+                  <p className="athlete-card-subtitle">Save your profile first, then analyze. Results are saved for comparison over time.</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
                     <button
                       type="button"
@@ -446,6 +549,107 @@ export default function AthletePage({ session }: { session: Session }) {
                 >
                   {saving ? 'Saving...' : success ? 'Saved ✓' : 'Save Athlete Profile'}
                 </button>
+
+                {/* Evaluation History */}
+                {evaluations.length > 0 && (
+                  <div className="settings-card">
+                    <h2 className="settings-card-title">Evaluation History</h2>
+                    <p className="athlete-card-subtitle">Past AI evaluations with profile snapshots. Click to expand.</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {evaluations.map((ev, idx) => {
+                        const isExpanded = expandedEvalId === ev.id;
+                        const prevEval = evaluations[idx + 1] || null;
+                        const diffs = prevEval ? buildProfileDiffs(prevEval.profile_snapshot, ev.profile_snapshot) : [];
+                        const analysisTypes: string[] = [];
+                        if (ev.lifting_analysis) analysisTypes.push('Lifting');
+                        if (ev.skills_analysis) analysisTypes.push('Skills');
+                        if (ev.engine_analysis) analysisTypes.push('Engine');
+
+                        return (
+                          <div key={ev.id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedEvalId(isExpanded ? null : ev.id)}
+                              style={{
+                                width: '100%',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: '12px 16px',
+                                background: 'var(--bg)',
+                                border: 'none',
+                                color: 'var(--text)',
+                                cursor: 'pointer',
+                                fontFamily: 'inherit',
+                                fontSize: 14,
+                              }}
+                            >
+                              <span style={{ fontWeight: 600 }}>{formatDate(ev.created_at)}</span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{analysisTypes.join(', ')}</span>
+                                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
+                              </span>
+                            </button>
+                            {isExpanded && (
+                              <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                                {/* Profile changes since previous eval */}
+                                {diffs.length > 0 && (
+                                  <div style={{ marginBottom: 16 }}>
+                                    <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: '#2ec486', marginBottom: 8 }}>
+                                      Changes since {formatDate(prevEval!.created_at)}
+                                    </h4>
+                                    <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-dim)' }}>
+                                      {diffs.map((d, i) => <div key={i}>{d}</div>)}
+                                    </div>
+                                  </div>
+                                )}
+                                {idx === evaluations.length - 1 && diffs.length === 0 && (
+                                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12, fontStyle: 'italic' }}>First evaluation — no prior data to compare.</div>
+                                )}
+
+                                {/* Compare snapshot to current profile */}
+                                {idx > 0 || true ? (() => {
+                                  const currentDiffs = buildProfileDiffs(ev.profile_snapshot, currentSnapshot);
+                                  if (currentDiffs.length === 0) return null;
+                                  return (
+                                    <div style={{ marginBottom: 16 }}>
+                                      <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 8 }}>
+                                        Changes since then (vs current)
+                                      </h4>
+                                      <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-dim)' }}>
+                                        {currentDiffs.map((d, i) => <div key={i}>{d}</div>)}
+                                      </div>
+                                    </div>
+                                  );
+                                })() : null}
+
+                                {/* Analysis text */}
+                                {ev.lifting_analysis && (
+                                  <div className="workout-review-section" style={{ marginTop: 0, marginBottom: ev.skills_analysis || ev.engine_analysis ? 12 : 0 }}>
+                                    <h3>Lifting</h3>
+                                    <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap' }}>{ev.lifting_analysis}</div>
+                                  </div>
+                                )}
+                                {ev.skills_analysis && (
+                                  <div className="workout-review-section" style={{ marginTop: 0, marginBottom: ev.engine_analysis ? 12 : 0 }}>
+                                    <h3>Skills</h3>
+                                    <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap' }}>{ev.skills_analysis}</div>
+                                  </div>
+                                )}
+                                {ev.engine_analysis && (
+                                  <div className="workout-review-section" style={{ marginTop: 0 }}>
+                                    <h3>Engine</h3>
+                                    <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap' }}>{ev.engine_analysis}</div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
