@@ -237,14 +237,48 @@ Deno.serve(async (req) => {
     const hasConditioning =
       profileData.conditioning && Object.keys(profileData.conditioning).length > 0 && Object.values(profileData.conditioning).some((v) => v !== "" && v != null);
 
-    // Fetch most recent evaluation for comparison
-    const { data: prevEval } = await supa
-      .from("profile_evaluations")
-      .select("profile_snapshot, created_at, lifting_analysis, skills_analysis, engine_analysis")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Fetch most recent evaluation that has data for the requested analysis type.
+    // For "full", grab the latest eval that has ANY analysis column populated.
+    // For individual types, grab the latest eval where THAT column is not null
+    // (so a Feb "full" eval counts as prior context for a Mar "skills" eval).
+    async function fetchPrevEval(col: "lifting_analysis" | "skills_analysis" | "engine_analysis") {
+      const { data } = await supa
+        .from("profile_evaluations")
+        .select("profile_snapshot, created_at, lifting_analysis, skills_analysis, engine_analysis")
+        .eq("user_id", user.id)
+        .not(col, "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    }
+
+    const colForType: Record<AnalysisType, "lifting_analysis" | "skills_analysis" | "engine_analysis"> = {
+      lifts: "lifting_analysis",
+      skills: "skills_analysis",
+      engine: "engine_analysis",
+      full: "lifting_analysis", // for full, we fetch per-column below
+    };
+
+    // For individual types, one lookup. For full, fetch each column's history separately.
+    let prevEval: Awaited<ReturnType<typeof fetchPrevEval>> = null;
+    let prevEvalLifts: typeof prevEval = null;
+    let prevEvalSkills: typeof prevEval = null;
+    let prevEvalEngine: typeof prevEval = null;
+
+    if (analysisType === "full") {
+      [prevEvalLifts, prevEvalSkills, prevEvalEngine] = await Promise.all([
+        hasLifts ? fetchPrevEval("lifting_analysis") : Promise.resolve(null),
+        hasSkills ? fetchPrevEval("skills_analysis") : Promise.resolve(null),
+        hasConditioning ? fetchPrevEval("engine_analysis") : Promise.resolve(null),
+      ]);
+      // Use whichever is most recent as the "primary" for overall comparison
+      prevEval = [prevEvalLifts, prevEvalSkills, prevEvalEngine]
+        .filter(Boolean)
+        .sort((a, b) => new Date(b!.created_at).getTime() - new Date(a!.created_at).getTime())[0] || null;
+    } else {
+      prevEval = await fetchPrevEval(colForType[analysisType]);
+    }
 
     // Build RAG context and comparison in parallel
     const [ragContext, comparisonContext] = await Promise.all([
@@ -293,49 +327,42 @@ Deno.serve(async (req) => {
           { headers: { ...cors, "Content-Type": "application/json" } }
         );
       }
-      const sections: string[] = [];
-      if (hasLifts) sections.push("1. Strength snapshot and one priority");
-      if (hasSkills) sections.push("2. Skill focus and one priority");
-      if (hasConditioning) sections.push("3. Engine/conditioning assessment and one priority");
-      userPrompt = `Analyze this athlete's full profile:\n\n${profileStr}\n\nInclude each of these sections when the data exists:\n${sections.join("\n")}\n\nBe concise. Cover strength, skills, and conditioning as separate sections where data is present.${comparisonContext}`;
+      // Full analysis: handled separately below with 3 parallel AI calls
+      userPrompt = ""; // placeholder — not used for full
     }
 
     const systemPrompt = SYSTEM_PROMPT + ragContext;
 
-    const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 512,
-        stream: false,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
-
-    if (!claudeResp.ok) {
-      const err = await claudeResp.json().catch(() => ({}));
-      console.error("Claude API error:", err);
-      return new Response(
-        JSON.stringify({ error: "Failed to generate analysis" }),
-        { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
-      );
+    /** Call Claude API and return the text response */
+    async function callClaude(prompt: string): Promise<string> {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY!,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 512,
+          stream: false,
+          system: systemPrompt,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        console.error("Claude API error:", err);
+        throw new Error("Failed to generate analysis");
+      }
+      const data = await resp.json();
+      return data.content?.[0]?.text?.trim() || data.content?.[0]?.input?.trim() || "Unable to generate analysis.";
     }
 
-    const claudeData = await claudeResp.json();
-    const analysis =
-      claudeData.content?.[0]?.text?.trim() ||
-      claudeData.content?.[0]?.input?.trim() ||
-      "Unable to generate analysis.";
-
-    // Build the evaluation row — populate whichever column matches the type
+    // Build the evaluation row
     const evalRow: Record<string, unknown> = {
       user_id: user.id,
+      type: analysisType,
       profile_snapshot: {
         lifts: profileData.lifts || {},
         skills: profileData.skills || {},
@@ -345,17 +372,54 @@ Deno.serve(async (req) => {
       },
     };
 
-    if (analysisType === "lifts") {
-      evalRow.lifting_analysis = analysis;
-    } else if (analysisType === "skills") {
-      evalRow.skills_analysis = analysis;
-    } else if (analysisType === "engine") {
-      evalRow.engine_analysis = analysis;
+    let analysis: string;
+
+    if (analysisType === "full") {
+      // 3 separate AI calls in parallel — each column gets a clean, focused analysis
+      const fullPromises: Promise<string | null>[] = [];
+      const liftComparison = prevEvalLifts ? buildComparisonContext(prevEvalLifts, profileData, "lifts") : "";
+      const skillComparison = prevEvalSkills ? buildComparisonContext(prevEvalSkills, profileData, "skills") : "";
+      const engineComparison = prevEvalEngine ? buildComparisonContext(prevEvalEngine, profileData, "engine") : "";
+
+      fullPromises.push(
+        hasLifts
+          ? callClaude(`Analyze this athlete's strength profile:\n\n${profileStr}\n\nSummarize their strength—what stands out? Identify any imbalances (e.g. squat vs deadlift, press vs bench). Give one clear priority to focus on.${liftComparison}`)
+          : Promise.resolve(null)
+      );
+      fullPromises.push(
+        hasSkills
+          ? callClaude(`Analyze this athlete's skills:\n\n${profileStr}\n\nBased on their levels, what should they focus on next? Suggest 1–2 skills and a simple progression.${skillComparison}`)
+          : Promise.resolve(null)
+      );
+      fullPromises.push(
+        hasConditioning
+          ? callClaude(`Analyze this athlete's conditioning/engine. Focus ONLY on these benchmarks:\n\n${formatConditioningOnly(profileData)}\n\nAssess their work capacity based on these times and calories. What's strong? What limits them? How do running, rowing, and bike compare? One clear priority for conditioning. Do NOT discuss lifts or strength.${engineComparison}`)
+          : Promise.resolve(null)
+      );
+
+      const [liftResult, skillResult, engineResult] = await Promise.all(fullPromises);
+      evalRow.lifting_analysis = liftResult;
+      evalRow.skills_analysis = skillResult;
+      evalRow.engine_analysis = engineResult;
+
+      // Build combined response for the immediate UI display
+      const parts: string[] = [];
+      if (liftResult) parts.push("**Strength**\n" + liftResult);
+      if (skillResult) parts.push("**Skills**\n" + skillResult);
+      if (engineResult) parts.push("**Engine**\n" + engineResult);
+      analysis = parts.join("\n\n");
     } else {
-      // Full — store in all applicable columns
-      evalRow.lifting_analysis = hasLifts ? analysis : null;
-      evalRow.skills_analysis = hasSkills ? analysis : null;
-      evalRow.engine_analysis = hasConditioning ? analysis : null;
+      // Single AI call for individual type
+      const claudeResp = await callClaude(userPrompt);
+      analysis = claudeResp;
+
+      if (analysisType === "lifts") {
+        evalRow.lifting_analysis = analysis;
+      } else if (analysisType === "skills") {
+        evalRow.skills_analysis = analysis;
+      } else if (analysisType === "engine") {
+        evalRow.engine_analysis = analysis;
+      }
     }
 
     const { data: savedEval, error: insertErr } = await supa

@@ -143,6 +143,7 @@ interface ProfileSnapshot {
 
 interface Evaluation {
   id: string;
+  type: string;
   profile_snapshot: ProfileSnapshot;
   lifting_analysis: string | null;
   skills_analysis: string | null;
@@ -228,7 +229,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const fetchEvaluations = async () => {
     const { data } = await supabase
       .from('profile_evaluations')
-      .select('id, profile_snapshot, lifting_analysis, skills_analysis, engine_analysis, created_at')
+      .select('id, type, profile_snapshot, lifting_analysis, skills_analysis, engine_analysis, created_at')
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false })
       .limit(20);
@@ -244,7 +245,7 @@ export default function AthletePage({ session }: { session: Session }) {
         .maybeSingle(),
       supabase
         .from('profile_evaluations')
-        .select('id, profile_snapshot, lifting_analysis, skills_analysis, engine_analysis, created_at')
+        .select('id, type, profile_snapshot, lifting_analysis, skills_analysis, engine_analysis, created_at')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(20),
@@ -560,6 +561,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         const isExpanded = expandedEvalId === ev.id;
                         const prevEval = evaluations[idx + 1] || null;
                         const diffs = prevEval ? buildProfileDiffs(prevEval.profile_snapshot, ev.profile_snapshot) : [];
+                        const typeLabel = ev.type === 'full' ? 'Full' : ev.type === 'lifts' ? 'Lifting' : ev.type === 'skills' ? 'Skills' : ev.type === 'engine' ? 'Engine' : 'Full';
                         const analysisTypes: string[] = [];
                         if (ev.lifting_analysis) analysisTypes.push('Lifting');
                         if (ev.skills_analysis) analysisTypes.push('Skills');
@@ -586,7 +588,8 @@ export default function AthletePage({ session }: { session: Session }) {
                             >
                               <span style={{ fontWeight: 600 }}>{formatDate(ev.created_at)}</span>
                               <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{analysisTypes.join(', ')}</span>
+                                <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--surface2)', color: 'var(--accent)' }}>{typeLabel}</span>
+                                {ev.type === 'full' && <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{analysisTypes.join(', ')}</span>}
                                 <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
                               </span>
                             </button>
