@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -148,19 +149,21 @@ Deno.serve(async (req) => {
 
     const { question, history = [], source_filter, include_profile = false } = await req.json();
 
-    // Generate embedding via OpenAI
-    const embResp = await fetch("https://api.openai.com/v1/embeddings", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + OPENAI_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "text-embedding-3-small",
-        input: question.substring(0, 2000),
-      }),
-    });
-    const embData = await embResp.json();
+    // Generate embedding and (optionally) recent training in parallel
+    const [embData, recentTraining] = await Promise.all([
+      fetch("https://api.openai.com/v1/embeddings", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + OPENAI_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "text-embedding-3-small",
+          input: question.substring(0, 2000),
+        }),
+      }).then((r) => r.json()),
+      include_profile ? fetchAndFormatRecentHistory(supa, user.id) : Promise.resolve(""),
+    ]);
     const queryEmb = embData.data[0].embedding;
 
     // Retrieve matching chunks from vector store, always filtered by category
@@ -223,7 +226,10 @@ Deno.serve(async (req) => {
         stream: true,
         system:
           (source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : source_filter === "strength-science" ? STRENGTH_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT) +
-          (include_profile ? buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units) : "") +
+          (include_profile
+            ? buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units) +
+              (recentTraining ? "\n\n" + recentTraining : "")
+            : "") +
           context,
         messages,
       }),

@@ -4,6 +4,7 @@ import {
   deduplicateChunks,
   formatChunksAsContext,
 } from "../_shared/rag.ts";
+import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -280,11 +281,13 @@ Deno.serve(async (req) => {
       prevEval = await fetchPrevEval(colForType[analysisType]);
     }
 
-    // Build RAG context and comparison in parallel
-    const [ragContext, comparisonContext] = await Promise.all([
+    // Build RAG context, comparison, and recent training in parallel
+    const [ragContext, comparisonContext, recentTraining] = await Promise.all([
       retrieveRAGContext(supa, analysisType, profileData),
       Promise.resolve(buildComparisonContext(prevEval, profileData, analysisType)),
+      fetchAndFormatRecentHistory(supa, user.id),
     ]);
+    const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
 
     let userPrompt: string;
     if (analysisType === "lifts") {
@@ -296,7 +299,7 @@ Deno.serve(async (req) => {
           { headers: { ...cors, "Content-Type": "application/json" } }
         );
       }
-      userPrompt = `Analyze this athlete's strength profile:\n\n${profileStr}\n\nSummarize their strength—what stands out? Identify any imbalances (e.g. squat vs deadlift, press vs bench). Give one clear priority to focus on.${comparisonContext}`;
+      userPrompt = `Analyze this athlete's strength profile:\n\n${profileStr}${trainingBlock}\n\nSummarize their strength—what stands out? Identify any imbalances (e.g. squat vs deadlift, press vs bench). Give one clear priority to focus on.${comparisonContext}`;
     } else if (analysisType === "skills") {
       if (!hasSkills) {
         return new Response(
@@ -306,7 +309,7 @@ Deno.serve(async (req) => {
           { headers: { ...cors, "Content-Type": "application/json" } }
         );
       }
-      userPrompt = `Analyze this athlete's skills:\n\n${profileStr}\n\nBased on their levels, what should they focus on next? Suggest 1–2 skills and a simple progression.${comparisonContext}`;
+      userPrompt = `Analyze this athlete's skills:\n\n${profileStr}${trainingBlock}\n\nBased on their levels, what should they focus on next? Suggest 1–2 skills and a simple progression.${comparisonContext}`;
     } else if (analysisType === "engine") {
       if (!hasConditioning) {
         return new Response(
@@ -317,7 +320,7 @@ Deno.serve(async (req) => {
         );
       }
       const conditioningStr = formatConditioningOnly(profileData);
-      userPrompt = `Analyze this athlete's conditioning/engine. Focus ONLY on these benchmarks:\n\n${conditioningStr}\n\nAssess their work capacity based on these times and calories. What's strong? What limits them? How do running, rowing, and bike compare? One clear priority for conditioning. Do NOT discuss lifts or strength.${comparisonContext}`;
+      userPrompt = `Analyze this athlete's conditioning/engine. Focus ONLY on these benchmarks:\n\n${conditioningStr}${trainingBlock}\n\nAssess their work capacity based on these times and calories. What's strong? What limits them? How do running, rowing, and bike compare? One clear priority for conditioning. Do NOT discuss lifts or strength.${comparisonContext}`;
     } else {
       if (!hasLifts && !hasSkills && !hasConditioning) {
         return new Response(
@@ -383,17 +386,17 @@ Deno.serve(async (req) => {
 
       fullPromises.push(
         hasLifts
-          ? callClaude(`Analyze this athlete's strength profile:\n\n${profileStr}\n\nSummarize their strength—what stands out? Identify any imbalances (e.g. squat vs deadlift, press vs bench). Give one clear priority to focus on.${liftComparison}`)
+          ? callClaude(`Analyze this athlete's strength profile:\n\n${profileStr}${trainingBlock}\n\nSummarize their strength—what stands out? Identify any imbalances (e.g. squat vs deadlift, press vs bench). Give one clear priority to focus on.${liftComparison}`)
           : Promise.resolve(null)
       );
       fullPromises.push(
         hasSkills
-          ? callClaude(`Analyze this athlete's skills:\n\n${profileStr}\n\nBased on their levels, what should they focus on next? Suggest 1–2 skills and a simple progression.${skillComparison}`)
+          ? callClaude(`Analyze this athlete's skills:\n\n${profileStr}${trainingBlock}\n\nBased on their levels, what should they focus on next? Suggest 1–2 skills and a simple progression.${skillComparison}`)
           : Promise.resolve(null)
       );
       fullPromises.push(
         hasConditioning
-          ? callClaude(`Analyze this athlete's conditioning/engine. Focus ONLY on these benchmarks:\n\n${formatConditioningOnly(profileData)}\n\nAssess their work capacity based on these times and calories. What's strong? What limits them? How do running, rowing, and bike compare? One clear priority for conditioning. Do NOT discuss lifts or strength.${engineComparison}`)
+          ? callClaude(`Analyze this athlete's conditioning/engine. Focus ONLY on these benchmarks:\n\n${formatConditioningOnly(profileData)}${trainingBlock}\n\nAssess their work capacity based on these times and calories. What's strong? What limits them? How do running, rowing, and bike compare? One clear priority for conditioning. Do NOT discuss lifts or strength.${engineComparison}`)
           : Promise.resolve(null)
       );
 
