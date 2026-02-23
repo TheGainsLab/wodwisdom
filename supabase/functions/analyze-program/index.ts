@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
 
     const { data: workouts, error: wErr } = await supa
       .from("program_workouts")
-      .select("id, week_num, day_num, day_name, workout_text, sort_order")
+      .select("id, week_num, day_num, workout_text, sort_order")
       .eq("program_id", program_id)
       .order("week_num")
       .order("sort_order");
