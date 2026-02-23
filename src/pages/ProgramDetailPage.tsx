@@ -115,6 +115,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                         <th>Week</th>
                         <th>Day</th>
                         <th>Workout</th>
+                        <th style={{ width: 90 }}>Start</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -123,6 +124,15 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           <td>{w.week_num}</td>
                           <td>{DAY_LABELS[w.day_num] || w.day_num}</td>
                           <td className="workout-text-cell">{w.workout_text}</td>
+                          <td>
+                            <button
+                              className="auth-btn"
+                              onClick={() => navigate('/workout/start', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id } })}
+                              style={{ padding: '8px 14px', fontSize: 13 }}
+                            >
+                              Start
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

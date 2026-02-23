@@ -216,13 +216,22 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                   </div>
                 )}
 
-                <button
-                  className="auth-btn"
-                  onClick={() => { setReview(null); setWorkoutText(''); }}
-                  style={{ marginTop: 24, background: 'var(--surface2)', color: 'var(--text)' }}
-                >
-                  Review Another Workout
-                </button>
+                <div style={{ display: 'flex', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
+                  <button
+                    className="auth-btn"
+                    onClick={() => navigate('/workout/start', { state: { workout_text: workoutText, source_type: 'review', source_id: null } })}
+                    style={{ flex: 1, minWidth: 160 }}
+                  >
+                    Start This Workout
+                  </button>
+                  <button
+                    className="auth-btn"
+                    onClick={() => { setReview(null); setWorkoutText(''); }}
+                    style={{ flex: 1, minWidth: 160, background: 'var(--surface2)', color: 'var(--text)' }}
+                  >
+                    Review Another Workout
+                  </button>
+                </div>
               </div>
             )}
           </div>
