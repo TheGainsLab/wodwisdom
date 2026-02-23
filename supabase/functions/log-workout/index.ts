@@ -1,0 +1,209 @@
+/**
+ * Persist a completed workout to workout_logs and workout_log_entries.
+ * Called by Start Workout page when user taps "Finish Workout".
+ */
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+const WORKOUT_TYPES = ["for_time", "amrap", "emom", "strength", "other"] as const;
+const SOURCE_TYPES = ["review", "program", "manual"] as const;
+const WEIGHT_UNITS = ["lbs", "kg"] as const;
+
+interface LogEntry {
+  movement: string;
+  sets?: number | null;
+  reps?: number | null;
+  weight?: number | null;
+  weight_unit?: "lbs" | "kg";
+  rpe?: number | null;
+  scaling_note?: string | null;
+  sort_order?: number;
+}
+
+interface LogBlock {
+  label?: string;
+  type?: string;
+  text?: string;
+  score?: string | null;
+  entries?: LogEntry[];
+}
+
+interface LogWorkoutBody {
+  workout_date: string;
+  workout_text: string;
+  workout_type: string;
+  score?: string | null;
+  rx?: boolean;
+  source_type: string;
+  source_id?: string | null;
+  notes?: string | null;
+  blocks?: LogBlock[];
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    const supa = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const token = authHeader.replace("Bearer ", "");
+    const {
+      data: { user },
+      error: authErr,
+    } = await supa.auth.getUser(token);
+
+    if (authErr || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    const body = (await req.json()) as LogWorkoutBody;
+
+    const workout_date = body.workout_date;
+    const workout_text = body.workout_text?.trim();
+    const workout_type = body.workout_type;
+    const score = body.score ?? null;
+    const rx = body.rx ?? false;
+    const source_type = body.source_type;
+    const source_id = body.source_id ?? null;
+    const notes = body.notes ?? null;
+    const blocks = body.blocks ?? [];
+
+    if (!workout_date || typeof workout_date !== "string") {
+      return new Response(JSON.stringify({ error: "Missing workout_date" }), {
+        status: 400,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+    if (!workout_text || workout_text.length < 1) {
+      return new Response(JSON.stringify({ error: "Missing workout_text" }), {
+        status: 400,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+    if (!WORKOUT_TYPES.includes(workout_type as (typeof WORKOUT_TYPES)[number])) {
+      return new Response(JSON.stringify({ error: "Invalid workout_type" }), {
+        status: 400,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+    if (!SOURCE_TYPES.includes(source_type as (typeof SOURCE_TYPES)[number])) {
+      return new Response(JSON.stringify({ error: "Invalid source_type" }), {
+        status: 400,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    const dateStr = new Date(workout_date).toISOString().slice(0, 10);
+    if (isNaN(new Date(workout_date).getTime())) {
+      return new Response(JSON.stringify({ error: "Invalid workout_date" }), {
+        status: 400,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: log, error: logErr } = await supa
+      .from("workout_logs")
+      .insert({
+        user_id: user.id,
+        workout_date: dateStr,
+        workout_text,
+        workout_type,
+        score,
+        rx,
+        source_type,
+        source_id,
+        notes,
+        blocks: blocks.length > 0 ? blocks : null,
+      })
+      .select("id")
+      .single();
+
+    if (logErr) {
+      console.error("log-workout insert error:", logErr);
+      return new Response(JSON.stringify({ error: "Failed to save workout" }), {
+        status: 500,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    const entries: {
+      log_id: string;
+      movement: string;
+      sets: number | null;
+      reps: number | null;
+      weight: number | null;
+      weight_unit: string;
+      rpe: number | null;
+      scaling_note: string | null;
+      sort_order: number;
+      block_label: string | null;
+    }[] = [];
+    let sortOrder = 0;
+    for (const block of blocks) {
+      const blockLabel = block.label ?? null;
+      for (const entry of block.entries ?? []) {
+        if (!entry.movement?.trim()) continue;
+        entries.push({
+          log_id: log.id,
+          movement: entry.movement.trim(),
+          sets: entry.sets ?? null,
+          reps: entry.reps ?? null,
+          weight: entry.weight ?? null,
+          weight_unit: WEIGHT_UNITS.includes((entry.weight_unit ?? "lbs") as (typeof WEIGHT_UNITS)[number])
+            ? (entry.weight_unit ?? "lbs")
+            : "lbs",
+          rpe: entry.rpe != null && entry.rpe >= 1 && entry.rpe <= 10 ? entry.rpe : null,
+          scaling_note: entry.scaling_note?.trim() || null,
+          sort_order: sortOrder++,
+          block_label: blockLabel,
+        });
+      }
+    }
+
+    if (entries.length > 0) {
+      const { error: entriesErr } = await supa.from("workout_log_entries").insert(entries);
+      if (entriesErr) {
+        console.error("log-workout entries insert error:", entriesErr);
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        id: log.id,
+        workout_date: dateStr,
+      }),
+      {
+        status: 200,
+        headers: { ...cors, "Content-Type": "application/json" },
+      }
+    );
+  } catch (e) {
+    console.error("log-workout error:", e);
+    return new Response(
+      JSON.stringify({ error: (e as Error).message }),
+      {
+        status: 500,
+        headers: { ...cors, "Content-Type": "application/json" },
+      }
+    );
+  }
+});
