@@ -24,3 +24,15 @@ verify_jwt = false
 
 [functions.profile-analysis]
 verify_jwt = false
+
+[functions.analyze-program]
+verify_jwt = false
+
+[functions.preprocess-program]
+verify_jwt = false
+
+[functions.incorporate-movements]
+verify_jwt = false
+
+[functions.finalize-modification]
+verify_jwt = false

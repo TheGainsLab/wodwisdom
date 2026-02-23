@@ -95,18 +95,22 @@ function validateAgainstLibrary(
   return { valid, unrecognized };
 }
 
+export interface ExtractionResult {
+  movements: ExtractedMovement[][];
+  notices: string[];
+}
+
 /**
  * Extract movements from workouts via Claude.
- * Returns ExtractedMovement[][] in workout order (matched by workout_id, never array order).
- * On API failure, returns null (caller should fall back to regex).
- * Unrecognized canonicals (not in library) are excluded and added to notices.
+ * Returns { movements, notices } where movements is aligned by workout index (matched by workout_id).
+ * Returns null on failure (caller should fall back to regex).
  */
 export async function extractMovementsAI(
   workouts: WorkoutForExtraction[],
   library: LibraryEntry[],
   apiKey: string
-): Promise<{ extracted: ExtractedMovement[][]; notices: string[] } | null> {
-  if (workouts.length === 0) return { extracted: [], notices: [] };
+): Promise<ExtractionResult | null> {
+  if (workouts.length === 0) return { movements: [], notices: [] };
   if (library.length === 0) return null;
 
   const libraryCanonicals = new Set(library.map((e) => e.canonical_name));
@@ -159,26 +163,32 @@ export async function extractMovementsAI(
   for (const item of parsed) {
     if (!item.workout_id || !Array.isArray(item.movements)) continue;
 
-    const rawMoves: ExtractedMovement[] = item.movements.map((m) => ({
-      canonical: m.canonical || "unknown",
-      modality: m.modality || "?",
-      load: m.load ?? "BW",
-    }));
+    const validated = item.movements
+      .filter(
+        (m: { canonical?: unknown; modality?: unknown }) =>
+          typeof m.canonical === "string" && typeof m.modality === "string"
+      )
+      .map((m: { canonical: string; modality: string; load?: string }) => ({
+        canonical: m.canonical,
+        modality: m.modality,
+        load: (m.load?.trim() || "") ? m.load.trim() : "BW",
+      }));
 
-    const { valid, unrecognized } = validateAgainstLibrary(rawMoves, libraryCanonicals);
+    const { valid, unrecognized } = validateAgainstLibrary(validated, libraryCanonicals);
     byId.set(item.workout_id, valid);
     for (const c of unrecognized) allUnrecognized.add(c);
   }
 
   if (allUnrecognized.size > 0) {
-    notices.push(`Unrecognized movements (excluded): ${[...allUnrecognized].join(", ")}`);
+    notices.push(
+      `Unrecognized movements excluded from analysis: ${[...allUnrecognized].join(", ")}`
+    );
   }
 
-  // Match by workout_id — never assume Claude returns in same order as input
   const result: ExtractedMovement[][] = [];
   for (const w of workouts) {
     result.push(byId.get(w.id) ?? []);
   }
 
-  return { extracted: result, notices };
+  return { movements: result, notices };
 }

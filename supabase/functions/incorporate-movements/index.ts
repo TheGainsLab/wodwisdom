@@ -1,45 +1,112 @@
+/**
+ * incorporate-movements edge function
+ * Orchestrates: RAG retrieval → Claude modifications → save → re-analysis
+ */
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { analyzeWorkouts, DEFAULT_MOVEMENT_ALIASES, type MovementsContext, type WorkoutInput } from "../_shared/analyzer.ts";
+import {
+  searchChunks,
+  deduplicateChunks,
+  formatChunksAsContext,
+  type RAGChunk,
+} from "../_shared/rag.ts";
+import { extractMovementsAI } from "../_shared/extract-movements-ai.ts";
+import { analyzeWorkouts } from "../_shared/analyzer.ts";
+import { generateNoticesAI } from "../_shared/generate-notices-ai.ts";
+import {
+  buildMovementsContext,
+  buildLibraryEntries,
+  type MovementsRow,
+} from "../_shared/build-movements-context.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
+const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 
-const INCORPORATE_SYSTEM_PROMPT = `You are a CrossFit programming consultant reviewing a training program.
-You have deep knowledge of CrossFit methodology, programming principles, and periodization from the CrossFit Journal, Level 1-4 seminar materials, and advanced strength training literature.
-
-Your task is to modify an existing program to incorporate specific movements the coach has selected. You must:
-
-1. Place movements intelligently based on programming principles from the source material
-2. Preserve the intent of existing workouts where possible
-3. Consider recovery between similar movement patterns
-4. Progress loading appropriately across the training cycle
-5. Maintain or improve the program's modal balance, time domain spread, and structural variety
-
-Return your response as a JSON array. Do not include any text outside the JSON. Each element represents one modified workout:
-
-[
-  {
-    "week_num": 1,
-    "day_num": 1,
-    "original_text": "the original workout text exactly as provided",
-    "modified_text": "the new workout text",
-    "change_summary": "short description of what changed, e.g. Pushups → HSPU",
-    "rationale": "1-2 sentences explaining why this change was made, referencing programming principles"
-  }
-]
-
-Only include workouts that changed. Do not include unmodified workouts.
-If a movement cannot be reasonably incorporated without compromising the program, explain why in the rationale and omit that modification.`;
-
-const cors = {
+const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
-interface ClaudeModification {
+const SYSTEM_PROMPT = `You are an expert CrossFit programming consultant. A coach has uploaded their training program and wants to incorporate specific movements that are currently missing.
+
+Your job is to modify existing workouts to incorporate the requested movements. You have access to CrossFit methodology and strength science literature to guide your decisions.
+
+Rules:
+- Modify existing workouts only. Do not add new workouts.
+- Preserve the original workout's intent (time domain, stimulus, format).
+- You may substitute a movement, prepend a strength piece, or adjust a workout's structure.
+- Consider recovery. Do not place heavy squats the day after heavy pulls. Do not repeat the same movement pattern on consecutive days.
+- Progress loading across weeks when adding strength work (e.g., 75% → 78% → 80% → 82%).
+- Distribute new movements across the cycle. Do not cluster them all in one week.
+- If a movement cannot be incorporated without compromising the program, omit it and explain why in the rationale.
+- Only modify workouts that need to change. If a workout is fine as-is, leave it out of the response.
+
+Return JSON only. No preamble, no markdown, no explanation outside the JSON structure.
+
+Format:
+[
+  {
+    "workout_id": "uuid of the original workout",
+    "week_num": 1,
+    "day_num": 1,
+    "original_text": "the original workout text",
+    "modified_text": "the modified workout text",
+    "change_summary": "short description e.g. Pushups → HSPU",
+    "rationale": "1-2 sentences explaining why, referencing programming principles"
+  }
+]`;
+
+interface SelectedMovement {
+  canonical_name: string;
+  display_name: string;
+  modality: string;
+  category?: string;
+}
+
+async function retrieveContext(
+  supa: ReturnType<typeof createClient>,
+  movements: SelectedMovement[]
+): Promise<string> {
+  const allChunks: RAGChunk[] = [];
+
+  for (const m of movements) {
+    const journalChunks = await searchChunks(
+      supa,
+      `programming ${m.display_name} in CrossFit training`,
+      "journal",
+      OPENAI_API_KEY,
+      4
+    );
+    allChunks.push(...journalChunks);
+  }
+
+  const generalJournal = await searchChunks(
+    supa,
+    "CrossFit programming principles workout variety modal balance",
+    "journal",
+    OPENAI_API_KEY,
+    4
+  );
+  allChunks.push(...generalJournal);
+
+  const unique = deduplicateChunks(allChunks);
+  return formatChunksAsContext(unique, 20);
+}
+
+interface Workout {
+  id: string;
+  week_num: number;
+  day_num: number;
+  day_name?: string;
+  workout_text: string;
+  sort_order?: number;
+}
+
+interface Modification {
+  workout_id: string;
   week_num: number;
   day_num: number;
   original_text: string;
@@ -48,248 +115,279 @@ interface ClaudeModification {
   rationale: string;
 }
 
+async function callClaude(
+  workouts: Workout[],
+  movements: SelectedMovement[],
+  context: string
+): Promise<Modification[]> {
+  const userPrompt = `## Program
+${JSON.stringify(
+  workouts.map((w) => ({
+    id: w.id,
+    week_num: w.week_num,
+    day_num: w.day_num,
+    day_name: w.day_name,
+    workout_text: w.workout_text,
+  }))
+)}
+
+## Movements to Incorporate
+${JSON.stringify(
+  movements.map((m) => ({
+    canonical_name: m.canonical_name,
+    display_name: m.display_name,
+    modality: m.modality,
+  }))
+)}
+
+## Programming Reference Material
+${context}
+
+Generate modifications to incorporate the requested movements into this program. Return JSON only.`;
+
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 8192,
+      stream: false,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userPrompt }],
+    }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    console.error("Claude API error:", err);
+    throw new Error("Claude API call failed");
+  }
+
+  const data = await resp.json();
+  const rawText =
+    data.content?.[0]?.text?.trim() ||
+    data.content?.[0]?.input?.trim() ||
+    "";
+
+  const jsonMatch = rawText.match(/\[[\s\S]*\]/);
+  const jsonStr = jsonMatch ? jsonMatch[0] : rawText;
+  const parsed = JSON.parse(jsonStr);
+
+  if (!Array.isArray(parsed)) throw new Error("Response is not an array");
+
+  return parsed as Modification[];
+}
+
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
 
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const supa = createClient(SUPABASE_URL, SUPABASE_KEY);
+
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authErr } = await supa.auth.getUser(token);
+
     if (authErr || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Invalid token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const { program_id, selected_movements } = await req.json();
-    if (!program_id || !Array.isArray(selected_movements) || selected_movements.length === 0) {
-      return new Response(JSON.stringify({ error: "Missing program_id or selected_movements array" }), {
-        status: 400,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+
+    if (!program_id || !selected_movements?.length) {
+      return new Response(
+        JSON.stringify({
+          error: "program_id and selected_movements required",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const { data: prog, error: progErr } = await supa
+    const { data: program, error: pErr } = await supa
       .from("programs")
-      .select("id")
+      .select("id, user_id")
       .eq("id", program_id)
-      .eq("user_id", user.id)
       .single();
 
-    if (progErr || !prog) {
-      return new Response(JSON.stringify({ error: "Program not found" }), {
-        status: 404,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+    if (pErr || !program || program.user_id !== user.id) {
+      return new Response(
+        JSON.stringify({ error: "Program not found or not authorized" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const { data: workouts, error: wkErr } = await supa
+    const { data: workouts, error: wErr } = await supa
       .from("program_workouts")
-      .select("id, week_num, day_num, workout_text, sort_order")
+      .select("id, week_num, day_num, day_name, workout_text, sort_order")
       .eq("program_id", program_id)
+      .order("week_num")
       .order("sort_order");
 
-    if (wkErr || !workouts || workouts.length === 0) {
-      return new Response(JSON.stringify({ error: "No workouts in program" }), {
-        status: 400,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+    if (wErr || !workouts?.length) {
+      return new Response(
+        JSON.stringify({ error: "No workouts found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    let movementsContext: MovementsContext | undefined;
-    const { data: movementsRows } = await supa
+    const { data: movementsData } = await supa
       .from("movements")
       .select("canonical_name, display_name, modality, category, aliases, competition_count");
-    if (movementsRows && movementsRows.length > 0) {
-      const library: Record<string, { modality: "W" | "G" | "M"; category: string }> = {};
-      const aliases: Record<string, string> = {};
-      const essentialCanonicals = new Set<string>();
-      for (const row of movementsRows as { canonical_name: string; display_name: string; modality: string; category: string; aliases: string[]; competition_count: number }[]) {
-        const c = row.canonical_name;
-        library[c] = { modality: row.modality as "W" | "G" | "M", category: row.category };
-        if (row.competition_count > 0) essentialCanonicals.add(c);
-        const a = Array.isArray(row.aliases) ? row.aliases : [];
-        for (const al of a) {
-          if (al && typeof al === "string") aliases[al.toLowerCase().trim()] = c;
-        }
-        const displaySpaced = row.display_name?.replace(/_/g, " ").toLowerCase();
-        if (displaySpaced && displaySpaced !== c) aliases[displaySpaced] = c;
-      }
-      for (const [alias, canonical] of Object.entries(DEFAULT_MOVEMENT_ALIASES)) {
-        if (library[canonical] && !aliases[alias]) aliases[alias] = canonical;
-      }
-      movementsContext = { library, aliases, essentialCanonicals };
+
+    const rows: MovementsRow[] = (movementsData || []) as MovementsRow[];
+    const movementsContext = rows.length > 0 ? buildMovementsContext(rows) : undefined;
+    const libraryEntries = rows.length > 0 ? buildLibraryEntries(rows) : [];
+
+    const selectedMovementDetails: SelectedMovement[] = rows
+      .filter((m) => selected_movements.includes(m.canonical_name))
+      .map((m) => ({
+        canonical_name: m.canonical_name,
+        display_name: m.display_name,
+        modality: m.modality,
+        category: m.category,
+      }));
+
+    if (selectedMovementDetails.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "No valid movements found for selected_movements" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const programText = workouts
-      .map(
-        (w: { week_num: number; day_num: number; workout_text: string }) =>
-          `Week ${w.week_num} Day ${w.day_num}: ${w.workout_text}`
-      )
-      .join("\n\n");
+    const context = await retrieveContext(supa, selectedMovementDetails);
 
-    const movementsStr = selected_movements.join(", ");
-
-    const ragQuery = `CrossFit programming principles: how to place and incorporate ${movementsStr}, periodization, movement substitution, strength before metcon, recovery between similar movements, time domain distribution`;
-    const embResp = await fetch("https://api.openai.com/v1/embeddings", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + OPENAI_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ model: "text-embedding-3-small", input: ragQuery.substring(0, 2000) }),
-    });
-    const embData = await embResp.json();
-    const queryEmb = embData.data?.[0]?.embedding;
-
-    let context = "";
-    if (queryEmb) {
-      const { data: chunks } = await supa.rpc("match_chunks_filtered", {
-        query_embedding: queryEmb,
-        match_threshold: 0.2,
-        match_count: 8,
-        filter_category: "journal",
-      });
-      if (chunks && chunks.length > 0) {
-        context =
-          "\n\nRELEVANT METHODOLOGY:\n" +
-          chunks
-            .map(
-              (c: { title: string; author?: string; content: string }) =>
-                `[${c.title}${c.author ? " by " + c.author : ""}]\n${c.content}`
-            )
-            .join("\n\n");
-      }
-    }
-
-    const userPrompt = `Here is a ${workouts.length}-workout program:
-
-${programText}
-
-The coach wants to incorporate these movements: ${movementsStr}
-
-Using CrossFit programming principles, generate modifications to incorporate these movements. Return JSON only.`;
-
-    const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        stream: false,
-        system: INCORPORATE_SYSTEM_PROMPT + context,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
-
-    if (!claudeResp.ok) {
-      const err = await claudeResp.json().catch(() => ({}));
-      console.error("Claude API error:", err);
-      return new Response(JSON.stringify({ error: "Failed to generate modifications" }), {
-        status: 500,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
-    }
-
-    const claudeData = await claudeResp.json();
-    const rawText =
-      claudeData.content?.[0]?.text?.trim() ||
-      claudeData.content?.[0]?.input?.trim() ||
-      "";
-
-    let mods: ClaudeModification[];
-    try {
-      const jsonMatch = rawText.match(/\[[\s\S]*\]/);
-      const jsonStr = jsonMatch ? jsonMatch[0] : rawText;
-      mods = JSON.parse(jsonStr);
-    } catch {
-      return new Response(JSON.stringify({ error: "AI returned invalid JSON. Please try again." }), {
-        status: 500,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
-    }
-
-    const workoutByKey = new Map<string, { id: string; week_num: number; day_num: number; workout_text: string }>();
-    for (const w of workouts as { id: string; week_num: number; day_num: number; workout_text: string }[]) {
-      workoutByKey.set(`${w.week_num}-${w.day_num}`, w);
-    }
+    const modifications = await callClaude(
+      workouts as Workout[],
+      selectedMovementDetails,
+      context
+    );
 
     const { data: modRecord, error: modErr } = await supa
       .from("program_modifications")
       .insert({
         program_id,
         selected_movements: selected_movements,
-        status: "reviewing",
+        status: "draft",
       })
       .select("id")
       .single();
 
     if (modErr || !modRecord) {
-      return new Response(JSON.stringify({ error: "Failed to create modification record" }), {
-        status: 500,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+      throw new Error("Failed to create modification record");
     }
 
-    const modifiedWorkouts: WorkoutInput[] = workouts.map((w: { week_num: number; day_num: number; workout_text: string }) => ({
-      week_num: w.week_num,
-      day_num: w.day_num,
-      workout_text: w.workout_text,
-    }));
+    const workoutById = new Map<string, Workout>();
+    for (const w of workouts as Workout[]) {
+      workoutById.set(w.id, w);
+    }
 
-    for (const m of mods) {
-      const orig = workoutByKey.get(`${m.week_num}-${m.day_num}`);
-      if (!orig) continue;
-
-      await supa.from("modified_workouts").insert({
+    const modifiedRows = modifications
+      .filter((m) => workoutById.has(m.workout_id))
+      .map((m) => ({
         modification_id: modRecord.id,
-        original_workout_id: orig.id,
+        original_workout_id: m.workout_id,
         modified_text: m.modified_text,
         change_summary: m.change_summary,
         rationale: m.rationale,
-        status: "pending",
-      });
+        status: "pending" as const,
+      }));
 
-      const idx = modifiedWorkouts.findIndex((w) => w.week_num === m.week_num && w.day_num === m.day_num);
-      if (idx >= 0) {
-        modifiedWorkouts[idx] = { ...modifiedWorkouts[idx], workout_text: m.modified_text };
+    if (modifiedRows.length > 0) {
+      const { error: insertErr } = await supa
+        .from("modified_workouts")
+        .insert(modifiedRows);
+
+      if (insertErr) {
+        throw new Error("Failed to insert modified workouts");
       }
     }
 
-    const modifiedAnalysis = analyzeWorkouts(modifiedWorkouts, movementsContext);
+    const hypothetical: Workout[] = workouts.map((w) => {
+      const mod = modifications.find((m) => m.workout_id === w.id);
+      return {
+        ...w,
+        workout_text: mod ? mod.modified_text : w.workout_text,
+      };
+    });
+
+    let modifiedAnalysis;
+
+    if (libraryEntries.length > 0 && ANTHROPIC_API_KEY) {
+      const extractionResult = await extractMovementsAI(
+        hypothetical.map((w) => ({ id: w.id, workout_text: w.workout_text })),
+        libraryEntries,
+        ANTHROPIC_API_KEY
+      );
+
+      if (extractionResult) {
+        const analysis = analyzeWorkouts(
+          hypothetical,
+          movementsContext,
+          extractionResult.movements
+        );
+        const notices = await generateNoticesAI(analysis, ANTHROPIC_API_KEY);
+        analysis.notices = [...extractionResult.notices, ...notices];
+        modifiedAnalysis = analysis;
+      } else {
+        console.warn("AI extraction failed for hypothetical, falling back to regex");
+        const analysis = analyzeWorkouts(hypothetical, movementsContext);
+        const notices = await generateNoticesAI(analysis, ANTHROPIC_API_KEY);
+        analysis.notices = [
+          "Modified program analysis used fallback extraction. Some movements may be missed.",
+          ...analysis.notices,
+          ...notices,
+        ];
+        modifiedAnalysis = analysis;
+      }
+    } else {
+      const analysis = analyzeWorkouts(hypothetical, movementsContext);
+      if (ANTHROPIC_API_KEY) {
+        const notices = await generateNoticesAI(analysis, ANTHROPIC_API_KEY);
+        analysis.notices = [...analysis.notices, ...notices];
+      }
+      modifiedAnalysis = analysis;
+    }
 
     await supa
       .from("program_modifications")
-      .update({ modified_analysis: modifiedAnalysis })
+      .update({
+        modified_analysis: modifiedAnalysis,
+        status: "reviewing",
+      })
       .eq("id", modRecord.id);
 
     return new Response(
       JSON.stringify({
         modification_id: modRecord.id,
-        modified_count: mods.length,
+        modifications,
+        modified_analysis: modifiedAnalysis,
       }),
       {
         status: 200,
-        headers: { ...cors, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
-  } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message }), {
-      status: 500,
-      headers: { ...cors, "Content-Type": "application/json" },
-    });
+  } catch (err) {
+    console.error("incorporate-movements error:", err);
+    return new Response(
+      JSON.stringify({ error: (err as Error).message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });
