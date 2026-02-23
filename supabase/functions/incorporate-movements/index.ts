@@ -252,8 +252,11 @@ Deno.serve(async (req) => {
     const movementsContext = rows.length > 0 ? buildMovementsContext(rows) : undefined;
     const libraryEntries = rows.length > 0 ? buildLibraryEntries(rows) : [];
 
+    // not_programmed uses display form (canonical.replace(/_/g, " ")); reverse for matching
+    const toCanonical = (s: string) => String(s || "").trim().replace(/\s+/g, "_");
+    const selectedCanonicals = new Set(selected_movements.map(toCanonical));
     const selectedMovementDetails: SelectedMovement[] = rows
-      .filter((m) => selected_movements.includes(m.canonical_name))
+      .filter((m) => selectedCanonicals.has(m.canonical_name))
       .map((m) => ({
         canonical_name: m.canonical_name,
         display_name: m.display_name,

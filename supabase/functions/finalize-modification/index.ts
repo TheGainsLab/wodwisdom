@@ -68,6 +68,7 @@ Deno.serve(async (req) => {
 
     const { error: fnErr } = await supa.rpc("finalize_program_modification", {
       p_modification_id: modification_id,
+      p_user_id: user.id,
     });
 
     if (fnErr) {
