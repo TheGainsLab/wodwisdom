@@ -12,6 +12,8 @@ import SettingsPage from './pages/SettingsPage';
 import AdminPage from './pages/AdminPage';
 import AthletePage from './pages/AthletePage';
 import WorkoutReviewPage from './pages/WorkoutReviewPage';
+import StartWorkoutPage from './pages/StartWorkoutPage';
+import TrainingLogPage from './pages/TrainingLogPage';
 import ProgramsListPage from './pages/ProgramsListPage';
 import AddProgramPage from './pages/AddProgramPage';
 import ProgramDetailPage from './pages/ProgramDetailPage';
@@ -52,6 +54,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<ChatPage session={session} />} />
       <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
+      <Route path="/workout/start" element={<StartWorkoutPage session={session} />} />
+      <Route path="/training-log" element={<TrainingLogPage session={session} />} />
       <Route path="/programs" element={<ProgramsListPage session={session} />} />
       <Route path="/programs/new" element={<AddProgramPage session={session} />} />
       <Route path="/programs/:id/edit" element={<ProgramEditPage session={session} />} />
