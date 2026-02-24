@@ -4,10 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import InviteBanner from '../components/InviteBanner';
-
-const DAY_LABELS: Record<number, string> = {
-  1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun',
-};
+import WorkoutBlocksDisplay from '../components/WorkoutBlocksDisplay';
 
 interface ModifiedWorkoutRow {
   id: string;
@@ -16,8 +13,7 @@ interface ModifiedWorkoutRow {
   change_summary: string | null;
   rationale: string | null;
   status: 'pending' | 'approved' | 'rejected';
-  week_num: number;
-  day_num: number;
+  sort_order: number;
   original_text: string;
 }
 
@@ -60,20 +56,19 @@ export default function ProgramReviewPage({ session }: { session: Session }) {
     const workoutIds = (mw || []).map((m: { original_workout_id: string }) => m.original_workout_id);
     const { data: orig } = await supabase
       .from('program_workouts')
-      .select('id, week_num, day_num, workout_text')
+      .select('id, sort_order, workout_text')
       .in('id', workoutIds);
 
-    const origMap = new Map((orig || []).map((w: { id: string; week_num: number; day_num: number; workout_text: string }) => [w.id, w]));
+    const origMap = new Map((orig || []).map((w: { id: string; sort_order: number; workout_text: string }) => [w.id, w]));
     type MwRow = { id: string; original_workout_id: string; modified_text: string; change_summary: string | null; rationale: string | null; status: string };
     const rows: ModifiedWorkoutRow[] = (mw || []).map((m: MwRow) => {
       const o = origMap.get(m.original_workout_id);
       return {
         ...m,
-        week_num: o?.week_num ?? 0,
-        day_num: o?.day_num ?? 0,
+        sort_order: o?.sort_order ?? 0,
         original_text: o?.workout_text ?? '',
       } as ModifiedWorkoutRow;
-    }).sort((a, b) => (a.week_num - b.week_num) * 100 + (a.day_num - b.day_num));
+    }).sort((a, b) => a.sort_order - b.sort_order);
 
     setItems(rows);
     setLoading(false);
@@ -143,7 +138,7 @@ export default function ProgramReviewPage({ session }: { session: Session }) {
                   {items.map(item => (
                     <div key={item.id} className={'review-card' + (item.status !== 'pending' ? ` review-card-${item.status}` : '')}>
                       <div className="review-card-header">
-                        <span className="review-card-title">Week {item.week_num} · {DAY_LABELS[item.day_num] || item.day_num}</span>
+                        <span className="review-card-title">Day {item.sort_order + 1}</span>
                         {item.change_summary && (
                           <span className="review-card-summary">{item.change_summary}</span>
                         )}
@@ -151,11 +146,15 @@ export default function ProgramReviewPage({ session }: { session: Session }) {
                       <div className="review-card-body">
                         <div className="review-card-original">
                           <div className="review-card-label">Original</div>
-                          <div className="review-card-text">{item.original_text}</div>
+                          <div className="review-card-text">
+                            <WorkoutBlocksDisplay text={item.original_text} />
+                          </div>
                         </div>
                         <div className="review-card-modified">
                           <div className="review-card-label">Modified</div>
-                          <div className="review-card-text">{item.modified_text}</div>
+                          <div className="review-card-text">
+                            <WorkoutBlocksDisplay text={item.modified_text} />
+                          </div>
                         </div>
                         {item.rationale && (
                           <div className="review-card-rationale">{item.rationale}</div>

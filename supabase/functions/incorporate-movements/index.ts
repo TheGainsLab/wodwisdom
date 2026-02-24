@@ -38,7 +38,7 @@ Rules:
 - Modify existing workouts only. Do not add new workouts.
 - Preserve the original workout's intent (time domain, stimulus, format).
 - You may substitute a movement, prepend a strength piece, or adjust a workout's structure.
-- Consider recovery. Do not place heavy squats the day after heavy pulls. Do not repeat the same movement pattern on consecutive days.
+- Apply recovery principles from the reference material. Avoid repeating the same movement pattern on consecutive training days.
 - Progress loading across weeks when adding strength work (e.g., 75% → 78% → 80% → 82%).
 - Distribute new movements across the cycle. Do not cluster them all in one week.
 - If a movement cannot be incorporated without compromising the program, omit it and explain why in the rationale.
@@ -50,8 +50,6 @@ Format:
 [
   {
     "workout_id": "uuid of the original workout",
-    "week_num": 1,
-    "day_num": 1,
     "original_text": "the original workout text",
     "modified_text": "the modified workout text",
     "change_summary": "short description e.g. Pushups → HSPU",
@@ -83,14 +81,23 @@ async function retrieveContext(
     allChunks.push(...journalChunks);
   }
 
-  const generalJournal = await searchChunks(
-    supa,
-    "CrossFit programming principles workout variety modal balance",
-    "journal",
-    OPENAI_API_KEY,
-    4
-  );
-  allChunks.push(...generalJournal);
+    const generalJournal = await searchChunks(
+      supa,
+      "CrossFit programming principles workout variety modal balance",
+      "journal",
+      OPENAI_API_KEY,
+      4
+    );
+    allChunks.push(...generalJournal);
+
+    const recoveryChunks = await searchChunks(
+      supa,
+      "recovery between workouts consecutive days movement patterns squat deadlift",
+      "journal",
+      OPENAI_API_KEY,
+      2
+    );
+    allChunks.push(...recoveryChunks);
 
   const unique = deduplicateChunks(allChunks);
   return formatChunksAsContext(unique, 20);
@@ -98,16 +105,12 @@ async function retrieveContext(
 
 interface Workout {
   id: string;
-  week_num: number;
-  day_num: number;
   workout_text: string;
   sort_order?: number;
 }
 
 interface Modification {
   workout_id: string;
-  week_num: number;
-  day_num: number;
   original_text: string;
   modified_text: string;
   change_summary: string;
@@ -121,10 +124,9 @@ async function callClaude(
 ): Promise<Modification[]> {
   const userPrompt = `## Program
 ${JSON.stringify(
-  workouts.map((w) => ({
+  workouts.map((w, i) => ({
     id: w.id,
-    week_num: w.week_num,
-    day_num: w.day_num,
+    training_day: (w.sort_order ?? i) + 1,
     workout_text: w.workout_text,
   }))
 )}
@@ -232,9 +234,8 @@ Deno.serve(async (req) => {
 
     const { data: workouts, error: wErr } = await supa
       .from("program_workouts")
-      .select("id, week_num, day_num, workout_text, sort_order")
+      .select("id, workout_text, sort_order")
       .eq("program_id", program_id)
-      .order("week_num")
       .order("sort_order");
 
     if (wErr || !workouts?.length) {
@@ -319,10 +320,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    const hypothetical: Workout[] = workouts.map((w) => {
+    const hypothetical: Workout[] = workouts.map((w, i) => {
       const mod = modifications.find((m) => m.workout_id === w.id);
       return {
         ...w,
+        sort_order: w.sort_order ?? i,
         workout_text: mod ? mod.modified_text : w.workout_text,
       };
     });

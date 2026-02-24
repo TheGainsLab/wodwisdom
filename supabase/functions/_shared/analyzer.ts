@@ -138,8 +138,8 @@ export const DEFAULT_MOVEMENT_ALIASES: Record<string, string> = {
 };
 
 export interface WorkoutInput {
-  week_num: number;
-  day_num: number;
+  week_num?: number;
+  day_num?: number;
   workout_text: string;
   sort_order?: number;
   /** When present, used for AI extraction matching (e.g. program_workouts.id) */
@@ -157,7 +157,7 @@ export interface AnalysisOutput {
   movement_frequency: { name: string; count: number; modality: string; loads: string[] }[];
   notices: string[];
   not_programmed: Record<string, string[]>;
-  consecutive_overlaps: { week: number; days: string; movements: string[] }[];
+  consecutive_overlaps: { days: string; movements: string[] }[];
   loading_ratio: { loaded: number; bodyweight: number };
   distinct_loads: number;
   load_bands: Record<string, number>;
@@ -424,25 +424,26 @@ export function analyzeWorkouts(
     }
   }
 
-  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const overlaps: { week: number; days: string; movements: string[] }[] = [];
-  const sorted = [...workouts].sort((a, b) => (a.week_num - b.week_num) * 100 + (a.day_num - b.day_num));
+  const overlaps: { days: string; movements: string[] }[] = [];
+  const getSortOrder = (w: WorkoutInput, i: number) => (w.sort_order != null ? w.sort_order : i);
+  const sorted = [...workouts]
+    .map((w, i) => ({ w, so: getSortOrder(w, i) }))
+    .sort((a, b) => a.so - b.so);
 
   for (let i = 0; i < sorted.length - 1; i++) {
     const curr = sorted[i];
     const next = sorted[i + 1];
-    const isConsecutive = curr.week_num === next.week_num && next.day_num === curr.day_num + 1;
+    const isConsecutive = next.so === curr.so + 1;
     if (!isConsecutive) continue;
 
-    const idxCurr = workouts.indexOf(curr);
-    const idxNext = workouts.indexOf(next);
+    const idxCurr = workouts.indexOf(curr.w);
+    const idxNext = workouts.indexOf(next.w);
     const currMoves = new Set(getMoves(idxCurr).map((m) => m.canonical));
     const nextMoves = getMoves(idxNext).map((m) => m.canonical);
     const shared = nextMoves.filter((c) => currMoves.has(c));
     if (shared.length > 0) {
       overlaps.push({
-        week: curr.week_num,
-        days: `${dayNames[curr.day_num - 1]}-${dayNames[next.day_num - 1]}`,
+        days: `Days ${curr.so + 1}–${next.so + 1}`,
         movements: shared.map((c) => c.replace(/_/g, " ")),
       });
     }

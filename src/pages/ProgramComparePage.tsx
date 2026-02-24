@@ -4,10 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import InviteBanner from '../components/InviteBanner';
-
-const DAY_LABELS: Record<number, string> = {
-  1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun',
-};
+import WorkoutBlocksDisplay from '../components/WorkoutBlocksDisplay';
 
 interface ProgramWorkout {
   id: string;
@@ -121,7 +118,6 @@ export default function ProgramComparePage({ session }: { session: Session }) {
                   <table className="program-workouts-table">
                     <thead>
                       <tr>
-                        <th>Week</th>
                         <th>Day</th>
                         <th>Workout</th>
                         {showModified && <th>Change</th>}
@@ -132,9 +128,10 @@ export default function ProgramComparePage({ session }: { session: Session }) {
                         const mod = modifiedMap.get(w.id);
                         return (
                           <tr key={w.id} className={w.isModified ? 'compare-row-modified' : ''}>
-                            <td>{w.week_num}</td>
-                            <td>{DAY_LABELS[w.day_num] || w.day_num}</td>
-                            <td className="workout-text-cell">{w.displayText}</td>
+                            <td>{w.sort_order + 1}</td>
+                            <td className="workout-text-cell">
+                              <WorkoutBlocksDisplay text={w.displayText} />
+                            </td>
                             {showModified && (
                               <td className="compare-change-cell">
                                 {mod?.change_summary || (w.isModified ? mod?.rationale : '') || '—'}

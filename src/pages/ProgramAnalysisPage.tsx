@@ -14,7 +14,7 @@ interface ProgramAnalysis {
   movement_frequency: { name: string; count: number; modality: string; loads?: string[]; load?: string }[];
   notices: string[];
   not_programmed: Record<string, string[]>;
-  consecutive_overlaps: { week: number; days: string; movements: string[] }[];
+  consecutive_overlaps: { days: string; movements: string[] }[];
   loading_ratio?: { loaded: number; bodyweight: number };
   distinct_loads?: number;
   load_bands?: Record<string, number>;
@@ -270,7 +270,7 @@ export default function ProgramAnalysisPage({ session }: { session: Session }) {
                     <h2 className="analysis-section-title">Consecutive day overlaps</h2>
                     <ul className="analysis-overlaps">
                       {analysis.consecutive_overlaps.map((o, i) => (
-                        <li key={i}>Week {o.week} {o.days}: {o.movements.join(', ')}</li>
+                        <li key={i}>{o.days}: {o.movements.join(', ')}</li>
                       ))}
                     </ul>
                   </div>

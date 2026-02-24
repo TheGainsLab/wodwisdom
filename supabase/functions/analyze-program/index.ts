@@ -75,7 +75,6 @@ Deno.serve(async (req) => {
       .from("program_workouts")
       .select("id, week_num, day_num, workout_text, sort_order")
       .eq("program_id", program_id)
-      .order("week_num")
       .order("sort_order");
 
     if (wErr || !workouts?.length) {

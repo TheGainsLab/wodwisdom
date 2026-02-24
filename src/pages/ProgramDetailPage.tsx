@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import InviteBanner from '../components/InviteBanner';
+import WorkoutBlocksDisplay from '../components/WorkoutBlocksDisplay';
 
 interface ProgramWorkout {
   id: string;
@@ -12,10 +13,6 @@ interface ProgramWorkout {
   workout_text: string;
   sort_order: number;
 }
-
-const DAY_LABELS: Record<number, string> = {
-  1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun',
-};
 
 export default function ProgramDetailPage({ session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
@@ -128,7 +125,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                   <table className="program-workouts-table">
                     <thead>
                       <tr>
-                        <th>Week</th>
                         <th>Day</th>
                         <th>Workout</th>
                         <th style={{ width: 150 }}>Actions</th>
@@ -137,9 +133,10 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     <tbody>
                       {workouts.map(w => (
                         <tr key={w.id}>
-                          <td>{w.week_num}</td>
-                          <td>{DAY_LABELS[w.day_num] || w.day_num}</td>
-                          <td className="workout-text-cell">{w.workout_text}</td>
+                          <td>{w.sort_order + 1}</td>
+                          <td className="workout-text-cell">
+                            <WorkoutBlocksDisplay text={w.workout_text} />
+                          </td>
                           <td>
                             {completedWorkoutIds.has(w.id) ? (
                               <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Completed</span>

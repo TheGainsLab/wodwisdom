@@ -6,8 +6,6 @@ import Nav from '../components/Nav';
 import InviteBanner from '../components/InviteBanner';
 
 interface EditableWorkout {
-  week_num: number;
-  day_num: number;
   workout_text: string;
   sort_order: number;
 }
@@ -39,10 +37,10 @@ export default function ProgramEditPage({ session }: { session: Session }) {
     setProgramName(prog.name);
     const { data: wk } = await supabase
       .from('program_workouts')
-      .select('week_num, day_num, workout_text, sort_order')
+      .select('workout_text, sort_order')
       .eq('program_id', id)
       .order('sort_order');
-    setWorkouts((wk || []).map((w, i) => ({ ...w, sort_order: i })));
+    setWorkouts((wk || []).map((w, i) => ({ workout_text: w.workout_text, sort_order: i })));
     setError('');
     setLoading(false);
   }, [id, session.user.id]);
@@ -52,7 +50,7 @@ export default function ProgramEditPage({ session }: { session: Session }) {
     loadProgram();
   }, [id, loadProgram]);
 
-  const updateWorkout = (idx: number, field: 'week_num' | 'day_num' | 'workout_text', value: number | string) => {
+  const updateWorkout = (idx: number, field: 'workout_text', value: string) => {
     setWorkouts(prev => prev.map((w, i) => i === idx ? { ...w, [field]: value } : w));
   };
 
@@ -76,8 +74,8 @@ export default function ProgramEditPage({ session }: { session: Session }) {
       if (workouts.length > 0) {
         const rows = workouts.map((w, i) => ({
           program_id: id,
-          week_num: w.week_num,
-          day_num: w.day_num,
+          week_num: 1,
+          day_num: i + 1,
           workout_text: w.workout_text,
           sort_order: i,
         }));
@@ -139,7 +137,6 @@ export default function ProgramEditPage({ session }: { session: Session }) {
                   <table className="program-preview-table">
                     <thead>
                       <tr>
-                        <th>Week</th>
                         <th>Day</th>
                         <th>Workout</th>
                         <th />
@@ -148,25 +145,7 @@ export default function ProgramEditPage({ session }: { session: Session }) {
                     <tbody>
                       {workouts.map((w, i) => (
                         <tr key={i}>
-                          <td>
-                            <input
-                              type="number"
-                              min={1}
-                              value={w.week_num}
-                              onChange={e => updateWorkout(i, 'week_num', parseInt(e.target.value, 10) || 1)}
-                              className="program-edit-num"
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              min={1}
-                              max={7}
-                              value={w.day_num}
-                              onChange={e => updateWorkout(i, 'day_num', parseInt(e.target.value, 10) || 1)}
-                              className="program-edit-num"
-                            />
-                          </td>
+                          <td className="program-edit-day-num">{i + 1}</td>
                           <td>
                             <input
                               type="text"

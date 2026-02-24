@@ -133,8 +133,10 @@ function parseProgramTextAI(text: string): ParsedWorkout[] {
     }
 
     if (isDayHeader) {
-      flushDay();
-      currentDay = dayNum;
+      if (dayNum !== currentDay) {
+        flushDay();
+        currentDay = dayNum;
+      }
       const rest = line.replace(dayPattern, "").trim();
       if (rest.length > 0) dayLines.push(rest);
     } else if (line.length > 0) {
