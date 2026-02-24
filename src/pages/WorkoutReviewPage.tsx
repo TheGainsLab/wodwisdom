@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
-import { WORKOUT_REVIEW_ENDPOINT, supabase } from '../lib/supabase';
+import { supabase, FunctionsHttpError } from '../lib/supabase';
 import Nav from '../components/Nav';
 import InviteBanner from '../components/InviteBanner';
 
@@ -85,25 +85,22 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
     setIsLoading(true);
 
     try {
-      const resp = await fetch(WORKOUT_REVIEW_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          Authorization: 'Bearer ' + session.access_token,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ workout_text: trimmed }),
+      const { data, error } = await supabase.functions.invoke('workout-review', {
+        body: { workout_text: trimmed },
       });
 
-      const data = await resp.json();
-
-      if (!resp.ok) {
-        if (resp.status === 402 && data.code === 'FREE_LIMIT') {
-          setTotalUsage(3);
+      if (error) {
+        if (error instanceof FunctionsHttpError && error.context) {
+          try {
+            const body = await error.context.json();
+            if (body?.code === 'FREE_LIMIT') setTotalUsage(3);
+          } catch {}
         }
-        throw new Error(data.error || 'Something went wrong');
+        throw new Error((error as { message?: string }).message || 'Something went wrong');
       }
+      if (data?.error) throw new Error(data.error || 'Something went wrong');
 
-      setReview(data.review as WorkoutReview);
+      setReview(data?.review as WorkoutReview);
       if (!tierLoaded || tier === 'free') {
         setTotalUsage(prev => prev + 1);
       }

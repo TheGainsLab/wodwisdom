@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
-import { CHAT_ENDPOINT, SUMMARIZE_ENDPOINT, supabase } from '../lib/supabase';
+import { CHAT_ENDPOINT, getAuthHeaders, supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import InviteBanner from '../components/InviteBanner';
 
@@ -118,7 +118,7 @@ export default function ChatPage({ session }: { session: Session }) {
     try {
       const resp = await fetch(CHAT_ENDPOINT, {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ question, history: [...messages, userMsg].slice(-10), source_filter: sourceFilter, include_profile: includeProfile }),
       });
 
@@ -252,14 +252,12 @@ export default function ChatPage({ session }: { session: Session }) {
     if (!msg || !msgId || msg.summary || msg.summarizing) return;
     setMessages(prev => prev.map((m, i) => i === idx ? { ...m, summarizing: true } : m));
     try {
-      const resp = await fetch(SUMMARIZE_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message_id: msgId }),
+      const { data, error } = await supabase.functions.invoke('summarize', {
+        body: { message_id: msgId },
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Failed to summarize');
-      setMessages(prev => prev.map((m, i) => i === idx ? { ...m, summary: data.summary, summarizing: false } : m));
+      if (error) throw new Error(error.message || 'Failed to summarize');
+      if (data?.error) throw new Error(data.error || 'Failed to summarize');
+      setMessages(prev => prev.map((m, i) => i === idx ? { ...m, summary: data?.summary, summarizing: false } : m));
     } catch {
       setMessages(prev => prev.map((m, i) => i === idx ? { ...m, summarizing: false } : m));
     }

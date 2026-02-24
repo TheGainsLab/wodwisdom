@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { FINALIZE_MODIFICATION_ENDPOINT } from '../lib/supabase';
 import Nav from '../components/Nav';
 import InviteBanner from '../components/InviteBanner';
 
@@ -99,19 +98,11 @@ export default function ProgramReviewPage({ session }: { session: Session }) {
     setFinalizing(true);
     setFinalizeError('');
     try {
-      const { data: { session: s } } = await supabase.auth.getSession();
-      const token = s?.access_token;
-      if (!token) throw new Error('Not logged in');
-      const res = await fetch(FINALIZE_MODIFICATION_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ modification_id: modificationId }),
+      const { data, error } = await supabase.functions.invoke('finalize-modification', {
+        body: { modification_id: modificationId },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Finalize failed');
+      if (error) throw new Error(error.message || 'Finalize failed');
+      if (data?.error) throw new Error(data.error || 'Finalize failed');
       navigate(`/programs/${id}`);
     } catch (err: unknown) {
       setFinalizeError(err instanceof Error ? err.message : 'Finalize failed');

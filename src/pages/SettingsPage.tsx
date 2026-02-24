@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, CREATE_PORTAL_ENDPOINT } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 
 interface Profile {
@@ -33,14 +33,18 @@ export default function SettingsPage({ session }: { session: Session }) {
   const openBillingPortal = async () => {
     setPortalLoading(true);
     try {
-      const resp = await fetch(CREATE_PORTAL_ENDPOINT, {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
-        body: '{}',
+      const { data, error } = await supabase.functions.invoke('create-portal-session', {
+        body: {},
       });
-      const data = await resp.json();
-      if (data.url) window.location.href = data.url;
-      else if (data.error) setError(data.error);
+      if (error) {
+        setError(error.message || 'Failed to open billing portal');
+        return;
+      }
+      if (data?.error) {
+        setError(data.error);
+        return;
+      }
+      if (data?.url) window.location.href = data.url;
     } finally {
       setPortalLoading(false);
     }

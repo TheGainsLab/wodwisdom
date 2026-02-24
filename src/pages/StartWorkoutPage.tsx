@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
-import { PARSE_WORKOUT_ENDPOINT, LOG_WORKOUT_ENDPOINT } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import InviteBanner from '../components/InviteBanner';
 
@@ -97,21 +97,16 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     setError('');
     setLoading(true);
     try {
-      const resp = await fetch(PARSE_WORKOUT_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          Authorization: 'Bearer ' + session.access_token,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ workout_text: trimmed }),
+      const { data, error } = await supabase.functions.invoke('parse-workout', {
+        body: { workout_text: trimmed },
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Parse failed');
-      setBlocks(data.blocks || []);
-      setNotices(data.notices || []);
-      setWorkoutType(inferWorkoutType(data.blocks || []));
+      if (error) throw new Error(error.message || 'Parse failed');
+      if (data?.error) throw new Error(data.error);
+      setBlocks(data?.blocks || []);
+      setNotices(data?.notices || []);
+      setWorkoutType(inferWorkoutType(data?.blocks || []));
       const initial: Record<string, EntryValues> = {};
-      (data.blocks || []).forEach((b: Block, bi: number) => {
+      (data?.blocks || []).forEach((b: Block, bi: number) => {
         const { sets, reps } = parseSetsReps(b.text);
         b.movements.forEach((m: BlockMovement, mi: number) => {
           const key = `${bi}-${mi}`;
@@ -168,13 +163,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         };
       });
 
-      const resp = await fetch(LOG_WORKOUT_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          Authorization: 'Bearer ' + session.access_token,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('log-workout', {
+        body: {
           workout_date: workoutDate,
           workout_text: workoutText.trim(),
           workout_type: workoutType,
@@ -184,10 +174,10 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           source_id: sourceState?.source_id || null,
           notes: notes.trim() || null,
           blocks: logBlocks,
-        }),
+        },
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Failed to save');
+      if (error) throw new Error(error.message || 'Failed to save');
+      if (data?.error) throw new Error(data.error || 'Failed to save');
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save workout');

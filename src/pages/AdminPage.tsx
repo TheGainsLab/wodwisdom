@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, ADMIN_ENDPOINT } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 
 type Tab = 'overview' | 'users' | 'knowledge' | 'gyms';
@@ -48,20 +48,13 @@ interface GymMember {
   created_at: string;
 }
 
-async function adminFetch(session: Session, action: string, params: Record<string, any> = {}) {
-  const resp = await fetch(ADMIN_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + session.access_token,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ action, ...params }),
+async function adminFetch(supabase: import('@supabase/supabase-js').SupabaseClient, action: string, params: Record<string, any> = {}) {
+  const { data, error } = await supabase.functions.invoke('admin-data', {
+    body: { action, ...params },
   });
-  if (!resp.ok) {
-    const err = await resp.json();
-    throw new Error(err.error || 'Admin request failed');
-  }
-  return resp.json();
+  if (error) throw new Error(error.message || 'Admin request failed');
+  if (data?.error) throw new Error(data.error || 'Admin request failed');
+  return data;
 }
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
@@ -109,22 +102,22 @@ export default function AdminPage({ session }: { session: Session }) {
     try {
       switch (tab) {
         case 'overview': {
-          const data = await adminFetch(session, 'get_overview');
+          const data = await adminFetch(supabase, 'get_overview');
           setOverview(data);
           break;
         }
         case 'users': {
-          const data = await adminFetch(session, 'get_users');
+          const data = await adminFetch(supabase, 'get_users');
           setUsers(data.users || []);
           break;
         }
         case 'knowledge': {
-          const data = await adminFetch(session, 'get_knowledge_base');
+          const data = await adminFetch(supabase, 'get_knowledge_base');
           setKb(data);
           break;
         }
         case 'gyms': {
-          const data = await adminFetch(session, 'get_gyms');
+          const data = await adminFetch(supabase, 'get_gyms');
           setGyms(data.gyms || []);
           break;
         }
@@ -144,7 +137,7 @@ export default function AdminPage({ session }: { session: Session }) {
   const updateUser = async (userId: string, field: string, value: string) => {
     setError(''); setSuccess('');
     try {
-      await adminFetch(session, 'update_user', { user_id: userId, field, value });
+      await adminFetch(supabase, 'update_user', { user_id: userId, field, value });
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, [field]: value } : u));
       setSuccess('Updated');
       setTimeout(() => setSuccess(''), 3000);
@@ -158,7 +151,7 @@ export default function AdminPage({ session }: { session: Session }) {
     setExpandedGym(gymId);
     if (!gymMembers[gymId]) {
       try {
-        const data = await adminFetch(session, 'get_gym_members', { gym_id: gymId });
+        const data = await adminFetch(supabase, 'get_gym_members', { gym_id: gymId });
         setGymMembers(prev => ({ ...prev, [gymId]: data.members || [] }));
       } catch (e: any) {
         setError(e.message);

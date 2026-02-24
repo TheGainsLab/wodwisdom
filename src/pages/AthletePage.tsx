@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, PROFILE_ANALYSIS_ENDPOINT } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 
 const LIFT_GROUPS = [
@@ -291,17 +291,12 @@ export default function AthletePage({ session }: { session: Session }) {
     setAnalysisResult(null);
     setError('');
     try {
-      const resp = await fetch(PROFILE_ANALYSIS_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          Authorization: 'Bearer ' + session.access_token,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ type }),
+      const { data, error } = await supabase.functions.invoke('profile-analysis', {
+        body: { type },
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Analysis failed');
-      setAnalysisResult({ type, text: data.analysis });
+      if (error) throw new Error(error.message || 'Analysis failed');
+      if (data?.error) throw new Error(data.error || 'Analysis failed');
+      setAnalysisResult({ type, text: data?.analysis });
       // Refresh evaluation history after new analysis is saved
       fetchEvaluations();
     } catch (err) {

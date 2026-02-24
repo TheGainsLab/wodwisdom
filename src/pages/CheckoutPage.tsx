@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { CREATE_CHECKOUT_ENDPOINT } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 
 interface CheckoutPageProps { session: Session; }
 
-export default function CheckoutPage({ session }: CheckoutPageProps) {
+export default function CheckoutPage({ session: _session }: CheckoutPageProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [navOpen, setNavOpen] = useState(false);
@@ -14,17 +14,12 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
     setError('');
     setLoading(true);
     try {
-      const resp = await fetch(CREATE_CHECKOUT_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          Authorization: 'Bearer ' + session.access_token,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ plan: p }),
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { plan: p },
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Failed to create checkout');
-      if (data.url) {
+      if (error) throw new Error(error.message || 'Failed to create checkout');
+      if (data?.error) throw new Error(data.error || 'Failed to create checkout');
+      if (data?.url) {
         window.location.href = data.url;
         return;
       }

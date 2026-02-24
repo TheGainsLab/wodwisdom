@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase, CREATE_PORTAL_ENDPOINT } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 
 interface NavProps { isOpen: boolean; onClose: () => void; }
 
@@ -37,16 +37,18 @@ export default function Nav({ isOpen, onClose }: NavProps) {
   const openBillingPortal = async () => {
     setPortalLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const resp = await fetch(CREATE_PORTAL_ENDPOINT, {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
-        body: '{}',
+      const { data, error } = await supabase.functions.invoke('create-portal-session', {
+        body: {},
       });
-      const data = await resp.json();
-      if (data.url) window.location.href = data.url;
-      else if (data.error) alert(data.error);
+      if (error) {
+        alert(error.message || 'Failed to open billing portal');
+        return;
+      }
+      if (data?.error) {
+        alert(data.error);
+        return;
+      }
+      if (data?.url) window.location.href = data.url;
     } finally {
       setPortalLoading(false);
       onClose();
