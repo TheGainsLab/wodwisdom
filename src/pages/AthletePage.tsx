@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
@@ -219,8 +220,11 @@ export default function AthletePage({ session }: { session: Session }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [analysisResult, setAnalysisResult] = useState<{ type: 'lifts' | 'skills' | 'engine' | 'full'; text: string } | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<{ type: 'lifts' | 'skills' | 'engine' | 'full'; text: string; evaluationId?: string | null } | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState<'lifts' | 'skills' | 'engine' | 'full' | null>(null);
+  const [generateLoading, setGenerateLoading] = useState(false);
+
+  const navigate = useNavigate();
 
   // Evaluation history
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
@@ -296,13 +300,39 @@ export default function AthletePage({ session }: { session: Session }) {
       });
       if (error) throw new Error(error.message || 'Analysis failed');
       if (data?.error) throw new Error(data.error || 'Analysis failed');
-      setAnalysisResult({ type, text: data?.analysis });
+      setAnalysisResult({
+        type,
+        text: data?.analysis,
+        evaluationId: data?.evaluation_id ?? null,
+      });
       // Refresh evaluation history after new analysis is saved
       fetchEvaluations();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
     } finally {
       setAnalysisLoading(null);
+    }
+  };
+
+  const handleGenerateProgram = async () => {
+    setGenerateLoading(true);
+    setError('');
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-program', {
+        body: analysisResult?.evaluationId ? { evaluation_id: analysisResult.evaluationId } : {},
+      });
+      if (error) throw new Error(error.message || 'Failed to generate program');
+      if (data?.error) throw new Error(data.error || 'Failed to generate program');
+      const programId = data?.program_id;
+      if (programId) {
+        navigate(`/programs/${programId}`);
+      } else {
+        throw new Error('No program returned');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate program');
+    } finally {
+      setGenerateLoading(false);
     }
   };
 
@@ -533,6 +563,15 @@ export default function AthletePage({ session }: { session: Session }) {
                         {analysisResult.type === 'lifts' ? 'Lifting' : analysisResult.type === 'skills' ? 'Skills' : analysisResult.type === 'engine' ? 'Engine' : 'Full Profile'}
                       </h3>
                       <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap' }}>{analysisResult.text}</div>
+                      <button
+                        type="button"
+                        className="auth-btn"
+                        onClick={handleGenerateProgram}
+                        disabled={generateLoading}
+                        style={{ marginTop: 14 }}
+                      >
+                        {generateLoading ? 'Generating...' : 'Generate program'}
+                      </button>
                     </div>
                   )}
                 </div>

@@ -37,8 +37,8 @@ const BLOCK_PATTERNS = [
   /^([A-Z])\)\s*/m,
   // 1), 2), 3) numbered sections
   /^(\d+)\)\s*/m,
-  // Labeled sections: Strength:, Metcon:, Accessory:, etc.
-  /^(Strength|Metcon|MetCon|Accessory|Warm-up|Warmup|Conditioning):\s*/im,
+  // Labeled sections: Strength:, Metcon:, Accessory:, Skills:, Cool down:, etc.
+  /^(Strength|Metcon|MetCon|Accessory|Warm-up|Warmup|Conditioning|Skills|Cool\s*down|Cool-down):\s*/im,
 ];
 
 function splitIntoBlocks(workoutText: string): { label: string; text: string }[] {
@@ -78,7 +78,7 @@ function classifyBlockType(label: string, text: string): BlockType {
   const labelLower = label.toLowerCase();
   if (/strength|warm-up|warmup/.test(labelLower)) return "strength";
   if (/metcon|conditioning/.test(labelLower)) return "metcon";
-  if (/accessory/.test(labelLower)) return "accessory";
+  if (/accessory|skills|cool\s*down/.test(labelLower)) return "accessory";
 
   const t = text.trim().toUpperCase();
   if (/AMRAP|AS MANY ROUNDS|FOR TIME|FORTIME|\d+\s*RFT|EMOM|E\d+MOM|DEATH\s+BY|TABATA|BUY\s+IN|CASH\s+OUT/.test(t)) {
