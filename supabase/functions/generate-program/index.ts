@@ -141,10 +141,21 @@ async function retrieveRAGContext(
     );
     allChunks.push(...chunks);
 
+    // Strength Science: evidence-based load prescription, periodization for barbell block
+    const strengthScienceChunks = await searchChunks(
+      supa,
+      liftNames ? `strength programming periodization load prescription ${liftNames}` : "strength programming periodization load prescription squat deadlift",
+      "strength-science",
+      OPENAI_API_KEY,
+      2,
+      0.25
+    );
+    allChunks.push(...strengthScienceChunks);
+
     const unique = deduplicateChunks(allChunks);
     if (unique.length === 0) return "";
 
-    return "\n\nREFERENCE (use to ground programming):\n" + formatChunksAsContext(unique, 8);
+    return "\n\nREFERENCE (Journal and Strength Science — use to ground programming):\n" + formatChunksAsContext(unique, 8);
   } catch (err) {
     console.error("RAG retrieval error:", err);
     return "";
