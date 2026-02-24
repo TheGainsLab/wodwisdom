@@ -41,6 +41,13 @@ function inferWorkoutType(blocks: Block[]): string {
   return 'other';
 }
 
+function getMetconTypeLabel(text: string): string {
+  const t = text.toUpperCase();
+  if (/AMRAP|AS MANY ROUNDS/.test(t)) return 'AMRAP';
+  if (/EMOM|E\d+MOM/.test(t)) return 'EMOM';
+  return 'For Time';
+}
+
 function parseSetsReps(text: string): { sets?: number; reps?: number } {
   const match = text.match(/(\d+)\s*[x×]\s*(\d+)/i);
   if (match) return { sets: parseInt(match[1], 10), reps: parseInt(match[2], 10) };
@@ -73,7 +80,6 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   const [success, setSuccess] = useState(false);
   const [workoutDate, setWorkoutDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [workoutType, setWorkoutType] = useState('strength');
-  const [score, setScore] = useState('');
   const [rx, setRx] = useState(false);
   const [notes, setNotes] = useState('');
   const [entryValues, setEntryValues] = useState<Record<string, EntryValues>>({});
@@ -158,7 +164,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           label: b.label,
           type: b.type,
           text: b.text,
-          score: blockScores[bi]?.trim() || (b.type === 'metcon' ? score.trim() : null),
+          score: blockScores[bi]?.trim() || null,
           entries,
         };
       });
@@ -168,7 +174,10 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           workout_date: workoutDate,
           workout_text: workoutText.trim(),
           workout_type: workoutType,
-          score: score.trim() || null,
+          score: (() => {
+            const firstMetconIdx = blocks.findIndex(b => b.type === 'metcon');
+            return firstMetconIdx >= 0 ? (blockScores[firstMetconIdx]?.trim() || null) : null;
+          })(),
           rx,
           source_type: sourceState?.source_type || 'manual',
           source_id: sourceState?.source_id || null,
@@ -185,8 +194,6 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
       setSaving(false);
     }
   };
-
-  const hasMetcon = blocks.some(b => b.type === 'metcon');
 
   return (
     <div className="app-layout">
@@ -244,42 +251,6 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                       style={{ maxWidth: 180 }}
                     />
                   </div>
-                  <div className="field" style={{ marginBottom: 12 }}>
-                    <label>Workout type</label>
-                    <select
-                      value={workoutType}
-                      onChange={e => setWorkoutType(e.target.value)}
-                      style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', color: 'var(--text)', fontFamily: 'inherit', fontSize: 15, maxWidth: 200 }}
-                    >
-                      <option value="strength">Strength</option>
-                      <option value="for_time">For Time</option>
-                      <option value="amrap">AMRAP</option>
-                      <option value="emom">EMOM</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                  {hasMetcon && (
-                    <>
-                      <div className="field" style={{ marginBottom: 12 }}>
-                        <label>Score (time or rounds+reps)</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. 4:48 or 8+12"
-                          value={score}
-                          onChange={e => setScore(e.target.value)}
-                        />
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                        <input
-                          type="checkbox"
-                          id="rx"
-                          checked={rx}
-                          onChange={e => setRx(e.target.checked)}
-                        />
-                        <label htmlFor="rx" style={{ fontSize: 14, color: 'var(--text-dim)' }}>Rx</label>
-                      </div>
-                    </>
-                  )}
                   <div className="field">
                     <label>Notes</label>
                     <input
@@ -293,7 +264,10 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
 
                 {blocks.map((block, bi) => (
                   <div key={bi} className="workout-review-section" style={{ marginBottom: 16 }}>
-                    <h3>{block.label}) {block.type}</h3>
+                    <h3>
+                      {block.label}) {block.type}
+                      {block.type === 'metcon' && ` — ${getMetconTypeLabel(block.text)}`}
+                    </h3>
                     <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap', marginBottom: 16 }}>{block.text}</div>
 
                     {block.type === 'strength' && block.movements.map((m, mi) => {
@@ -339,29 +313,40 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
 
                     {block.type === 'metcon' && (
                       <>
+                        {bi === blocks.findIndex(b => b.type === 'metcon') && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                            <input
+                              type="checkbox"
+                              id="rx"
+                              checked={rx}
+                              onChange={e => setRx(e.target.checked)}
+                            />
+                            <label htmlFor="rx" style={{ fontSize: 14, color: 'var(--text-dim)' }}>Rx</label>
+                          </div>
+                        )}
                         <div className="field" style={{ marginBottom: 12 }}>
-                          <label>Block score</label>
+                          <label>Score</label>
                           <input
                             type="text"
-                            placeholder="e.g. 14:22"
+                            placeholder="e.g. 4:48 or 8+12"
                             value={blockScores[bi] ?? ''}
                             onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
                           />
                         </div>
-                        {block.movements.map((m, mi) => {
+                        {!rx && block.movements.map((m, mi) => {
                           const key = `${bi}-${mi}`;
                           const ev = entryValues[key] || {};
                           return (
-                          <div key={key} style={{ display: 'flex', gap: 12, marginBottom: 8, alignItems: 'center' }}>
-                            <span style={{ fontWeight: 600, minWidth: 140 }}>{formatMovementName(m.canonical)}</span>
-                            <input
-                              type="text"
-                              placeholder="Scaling (e.g. Rx, banded)"
-                              value={ev.scaling_note ?? ''}
-                              onChange={e => setEntry(key, 'scaling_note', e.target.value)}
-                              style={{ ...compactInputStyle, flex: 1, maxWidth: 200 }}
-                            />
-                          </div>
+                            <div key={key} style={{ display: 'flex', gap: 12, marginBottom: 8, alignItems: 'center' }}>
+                              <span style={{ fontWeight: 600, minWidth: 140 }}>{formatMovementName(m.canonical)}</span>
+                              <input
+                                type="text"
+                                placeholder="Scaling (e.g. banded)"
+                                value={ev.scaling_note ?? ''}
+                                onChange={e => setEntry(key, 'scaling_note', e.target.value)}
+                                style={{ ...compactInputStyle, flex: 1, maxWidth: 200 }}
+                              />
+                            </div>
                           );
                         })}
                       </>
