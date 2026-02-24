@@ -36,3 +36,9 @@ verify_jwt = false
 
 [functions.finalize-modification]
 verify_jwt = false
+
+[functions.parse-workout]
+verify_jwt = false
+
+[functions.log-workout]
+verify_jwt = false
