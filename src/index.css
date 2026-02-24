@@ -51,6 +51,17 @@ body.landing-body{overflow:auto;height:auto}
 .nav-link{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:8px;border:none;background:none;color:var(--text-dim);font-family:'Outfit',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;width:100%;text-align:left}
 .nav-link:hover{background:var(--surface2);color:var(--text)}
 .nav-link.active{background:var(--accent-glow);color:var(--accent)}
+.nav-group{margin:2px 0}
+.nav-group-header{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:8px;border:none;background:none;color:var(--text-dim);font-family:'Outfit',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;width:100%;text-align:left}
+.nav-group-header:hover{background:var(--surface2);color:var(--text)}
+.nav-group-header.active{color:var(--accent)}
+.nav-chevron{margin-left:auto;transition:transform .2s}
+.nav-chevron.expanded{transform:rotate(180deg)}
+.nav-group-items{display:flex;flex-direction:column;gap:2px;padding-left:8px;margin-top:2px;border-left:1px solid var(--border);margin-left:28px}
+.nav-link.sub{padding:8px 12px;padding-left:8px}
+.nav-sub-dot{width:4px;height:4px;border-radius:50%;background:var(--text-dim);opacity:.6;flex-shrink:0;margin-right:8px}
+.nav-link.sub .nav-sub-dot{margin-right:10px}
+.nav-link.sub.active .nav-sub-dot{background:var(--accent);opacity:1}
 .nav-footer{padding:12px 10px;border-top:1px solid var(--border)}
 .nav-link.logout:hover{color:var(--accent)}
 .chat-header,.page-header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
