@@ -29,14 +29,18 @@ interface ProfileData {
   conditioning?: Record<string, string | number> | null;
   bodyweight?: number | null;
   units?: string | null;
+  age?: number | null;
+  height?: number | null;
+  gender?: string | null;
 }
 
 function formatProfile(profile: ProfileData): string {
   const parts: string[] = [];
   const u = profile.units === "kg" ? "kg" : "lbs";
-  if (profile.bodyweight && profile.bodyweight > 0) {
-    parts.push(`Bodyweight: ${profile.bodyweight} ${u}`);
-  }
+  if (profile.age != null && profile.age > 0) parts.push(`Age: ${profile.age}`);
+  if (profile.height != null && profile.height > 0) parts.push(`Height: ${profile.height} ${profile.units === "kg" ? "cm" : "in"}`);
+  if (profile.bodyweight && profile.bodyweight > 0) parts.push(`Bodyweight: ${profile.bodyweight} ${u}`);
+  if (profile.gender) parts.push(`Gender: ${profile.gender}`);
   if (profile.lifts && Object.keys(profile.lifts).length > 0) {
     const liftStr = Object.entries(profile.lifts)
       .filter(([, v]) => v > 0)

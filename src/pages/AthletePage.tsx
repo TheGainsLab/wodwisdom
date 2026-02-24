@@ -134,6 +134,9 @@ interface ProfileSnapshot {
   conditioning?: Record<string, string | number>;
   bodyweight?: number | null;
   units?: string;
+  age?: number | null;
+  height?: number | null;
+  gender?: string;
 }
 
 interface Evaluation {
@@ -151,10 +154,19 @@ function buildProfileDiffs(prev: ProfileSnapshot, current: ProfileSnapshot): str
   const diffs: string[] = [];
   const u = current.units === 'kg' ? 'kg' : 'lbs';
 
-  // Bodyweight
+  // Basics
   if (prev.bodyweight && current.bodyweight && prev.bodyweight !== current.bodyweight) {
     const diff = current.bodyweight - prev.bodyweight;
     diffs.push(`Bodyweight: ${prev.bodyweight} → ${current.bodyweight} ${u} (${diff > 0 ? '+' : ''}${diff})`);
+  }
+  if (prev.age != null && current.age != null && prev.age !== current.age) {
+    diffs.push(`Age: ${prev.age} → ${current.age}`);
+  }
+  if (prev.height != null && current.height != null && prev.height !== current.height) {
+    diffs.push(`Height: ${prev.height} → ${current.height}`);
+  }
+  if (prev.gender !== current.gender) {
+    diffs.push(`Gender: ${prev.gender || '—'} → ${current.gender || '—'}`);
   }
 
   // Lifts
@@ -203,13 +215,46 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function CollapsibleSection({ title, defaultExpanded = false, children }: { title: string; defaultExpanded?: boolean; children: React.ReactNode }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  return (
+    <div className="settings-card">
+      <button
+        type="button"
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: 0,
+          margin: 0,
+          background: 'none',
+          border: 'none',
+          color: 'inherit',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          textAlign: 'left',
+        }}
+      >
+        <h2 className="settings-card-title" style={{ marginBottom: 0 }}>{title}</h2>
+        <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>{expanded ? '▲' : '▼'}</span>
+      </button>
+      {expanded && <div style={{ marginTop: 16 }}>{children}</div>}
+    </div>
+  );
+}
+
 export default function AthletePage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
+  const [age, setAge] = useState<string>('');
+  const [height, setHeight] = useState<string>('');
+  const [bodyweight, setBodyweight] = useState<string>('');
+  const [units, setUnits] = useState<'lbs' | 'kg'>('lbs');
+  const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [lifts, setLifts] = useState<Record<string, number>>({});
   const [skills, setSkills] = useState<Record<string, SkillLevel>>({});
   const [conditioning, setConditioning] = useState<Record<string, string | number>>({});
-  const [bodyweight, setBodyweight] = useState<string>('');
-  const [units, setUnits] = useState<'lbs' | 'kg'>('lbs');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -238,7 +283,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, bodyweight, units')
+        .select('lifts, skills, conditioning, bodyweight, units, age, height, gender')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -252,8 +297,11 @@ export default function AthletePage({ session }: { session: Session }) {
         setLifts(profileRes.data.lifts || {});
         setSkills(profileRes.data.skills || {});
         setConditioning(profileRes.data.conditioning || {});
+        setAge(profileRes.data.age != null ? String(profileRes.data.age) : '');
+        setHeight(profileRes.data.height != null ? String(profileRes.data.height) : '');
         setBodyweight(profileRes.data.bodyweight != null ? String(profileRes.data.bodyweight) : '');
         setUnits((profileRes.data.units as 'lbs' | 'kg') || 'lbs');
+        setGender((profileRes.data.gender as 'male' | 'female') || '');
       }
       if (evalRes.data) {
         setEvaluations(evalRes.data);
@@ -342,6 +390,9 @@ export default function AthletePage({ session }: { session: Session }) {
     }
 
     const bw = bodyweight === '' ? null : parseFloat(bodyweight);
+    const ageNum = age === '' ? null : parseInt(age, 10);
+    const heightNum = height === '' ? null : parseFloat(height);
+    const genderVal = gender === '' ? null : gender;
 
     const cleanConditioning: Record<string, string | number> = {};
     for (const [key, val] of Object.entries(conditioning)) {
@@ -361,6 +412,9 @@ export default function AthletePage({ session }: { session: Session }) {
           conditioning: cleanConditioning,
           bodyweight: bw && !isNaN(bw) ? bw : null,
           units,
+          age: ageNum && !isNaN(ageNum) ? ageNum : null,
+          height: heightNum && !isNaN(heightNum) ? heightNum : null,
+          gender: genderVal,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' }
@@ -373,7 +427,16 @@ export default function AthletePage({ session }: { session: Session }) {
   };
 
   // Build current profile snapshot for diff comparison
-  const currentSnapshot: ProfileSnapshot = { lifts, skills, conditioning, bodyweight: bodyweight ? parseFloat(bodyweight) : null, units };
+  const currentSnapshot: ProfileSnapshot = {
+    lifts,
+    skills,
+    conditioning,
+    bodyweight: bodyweight ? parseFloat(bodyweight) : null,
+    units,
+    age: age ? parseInt(age, 10) : null,
+    height: height ? parseFloat(height) : null,
+    gender: gender || undefined,
+  };
 
   return (
     <div className="app-layout">
@@ -394,13 +457,36 @@ export default function AthletePage({ session }: { session: Session }) {
               <div className="page-loading"><div className="loading-pulse" /></div>
             ) : (
               <>
-                {/* 1RM Lifts */}
+                {/* Basics */}
                 <div className="settings-card">
-                  <h2 className="settings-card-title">1RM Lifts</h2>
-                  <p className="athlete-card-subtitle">Enter your one-rep max weights</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-                    <div className="lift-item" style={{ flex: '0 0 auto' }}>
-                      <span className="lift-label">Bodyweight</span>
+                  <h2 className="settings-card-title">Basics</h2>
+                  <div className="lift-grid" style={{ marginBottom: 16 }}>
+                    <div className="lift-item">
+                      <span className="lift-label">Age</span>
+                      <input
+                        className="lift-input"
+                        type="number"
+                        min="1"
+                        max="120"
+                        placeholder="—"
+                        value={age}
+                        onChange={e => setAge(e.target.value)}
+                      />
+                    </div>
+                    <div className="lift-item">
+                      <span className="lift-label">Height ({units === 'lbs' ? 'in' : 'cm'})</span>
+                      <input
+                        className="lift-input"
+                        type="number"
+                        min="0"
+                        step={units === 'lbs' ? 1 : 0.1}
+                        placeholder="—"
+                        value={height}
+                        onChange={e => setHeight(e.target.value)}
+                      />
+                    </div>
+                    <div className="lift-item">
+                      <span className="lift-label">Weight</span>
                       <input
                         className="lift-input"
                         type="number"
@@ -409,9 +495,10 @@ export default function AthletePage({ session }: { session: Session }) {
                         placeholder="0"
                         value={bodyweight}
                         onChange={e => setBodyweight(e.target.value)}
-                        style={{ width: 90 }}
                       />
                     </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Units</span>
                       <button
@@ -429,7 +516,29 @@ export default function AthletePage({ session }: { session: Session }) {
                         kg
                       </button>
                     </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Gender</span>
+                      <button
+                        type="button"
+                        className={'skill-level-btn' + (gender === 'male' ? ' active' : '')}
+                        onClick={() => setGender('male')}
+                      >
+                        Male
+                      </button>
+                      <button
+                        type="button"
+                        className={'skill-level-btn' + (gender === 'female' ? ' active' : '')}
+                        onClick={() => setGender('female')}
+                      >
+                        Female
+                      </button>
+                    </div>
                   </div>
+                </div>
+
+                {/* 1RM Lifts */}
+                <CollapsibleSection title="1RM Lifts">
+                  <p className="athlete-card-subtitle">Enter your one-rep max weights</p>
                   {LIFT_GROUPS.map(group => (
                     <div key={group.title} style={{ marginBottom: 20 }}>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
@@ -451,11 +560,10 @@ export default function AthletePage({ session }: { session: Session }) {
                       </div>
                     </div>
                   ))}
-                </div>
+                </CollapsibleSection>
 
                 {/* Skills Assessment */}
-                <div className="settings-card">
-                  <h2 className="settings-card-title">Skills Assessment</h2>
+                <CollapsibleSection title="Skills Assessment">
                   <p className="athlete-card-subtitle">Rate your current ability for each skill. {SKILL_LEVEL_GUIDELINE}</p>
                   {SKILL_GROUPS.map(group => (
                     <div key={group.title} style={{ marginBottom: 24 }}>
@@ -481,11 +589,10 @@ export default function AthletePage({ session }: { session: Session }) {
                       </div>
                     </div>
                   ))}
-                </div>
+                </CollapsibleSection>
 
                 {/* Conditioning Benchmarks */}
-                <div className="settings-card">
-                  <h2 className="settings-card-title">Conditioning Benchmarks</h2>
+                <CollapsibleSection title="Conditioning Benchmarks">
                   <p className="athlete-card-subtitle">Running and rowing times (MM:SS), bike in calories.</p>
                   {CONDITIONING_GROUPS.map(group => (
                     <div key={group.title} style={{ marginBottom: 20 }}>
@@ -507,11 +614,11 @@ export default function AthletePage({ session }: { session: Session }) {
                       </div>
                     </div>
                   ))}
-                </div>
+                </CollapsibleSection>
 
                 {/* AI Profile Analysis */}
-                <div className="settings-card" style={{ borderColor: 'rgba(255,58,58,.2)', background: 'var(--accent-glow)' }}>
-                  <h2 className="settings-card-title">AI Profile Analysis</h2>
+                <CollapsibleSection title="AI Profile Analysis">
+                  <div style={{ borderColor: 'rgba(255,58,58,.2)', background: 'var(--accent-glow)', padding: 16, borderRadius: 8, marginBottom: 16 }}>
                   <p className="athlete-card-subtitle">Save your profile first, then analyze. Results are saved for comparison over time.</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
                     <button
@@ -568,7 +675,8 @@ export default function AthletePage({ session }: { session: Session }) {
                       </button>
                     </div>
                   )}
-                </div>
+                  </div>
+                </CollapsibleSection>
 
                 <button
                   className="auth-btn"
@@ -581,10 +689,9 @@ export default function AthletePage({ session }: { session: Session }) {
 
                 {/* Evaluation History */}
                 {evaluations.length > 0 && (
-                  <div className="settings-card">
-                    <h2 className="settings-card-title">Evaluation History</h2>
-                    <p className="athlete-card-subtitle">Past AI evaluations with profile snapshots. Click to expand.</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <CollapsibleSection title="Evaluation History">
+                  <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>Past AI evaluations with profile snapshots. Click to expand.</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {evaluations.map((ev, idx) => {
                         const isExpanded = expandedEvalId === ev.id;
                         const prevEval = evaluations[idx + 1] || null;
@@ -679,7 +786,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         );
                       })}
                     </div>
-                  </div>
+                  </CollapsibleSection>
                 )}
               </>
             )}

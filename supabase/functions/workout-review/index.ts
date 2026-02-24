@@ -15,15 +15,19 @@ interface AthleteProfileData {
   conditioning?: Record<string, string | number> | null;
   bodyweight?: number | null;
   units?: string | null;
+  age?: number | null;
+  height?: number | null;
+  gender?: string | null;
 }
 
 function formatAthleteProfile(profile: AthleteProfileData | null): string {
   if (!profile) return "No profile data. Give general advice and suggest they add lifts/skills on their Profile for personalized scaling.";
   const parts: string[] = [];
   const u = profile.units === "kg" ? "kg" : "lbs";
-  if (profile.bodyweight && profile.bodyweight > 0) {
-    parts.push(`Bodyweight: ${profile.bodyweight} ${u}`);
-  }
+  if (profile.age != null && profile.age > 0) parts.push(`Age: ${profile.age}`);
+  if (profile.height != null && profile.height > 0) parts.push(`Height: ${profile.height} ${profile.units === "kg" ? "cm" : "in"}`);
+  if (profile.bodyweight && profile.bodyweight > 0) parts.push(`Bodyweight: ${profile.bodyweight} ${u}`);
+  if (profile.gender) parts.push(`Gender: ${profile.gender}`);
   if (profile.lifts && Object.keys(profile.lifts).length > 0) {
     const liftStr = Object.entries(profile.lifts)
       .filter(([, v]) => v > 0)
@@ -125,7 +129,7 @@ Deno.serve(async (req) => {
     // Fetch subscription tier, athlete profile, and recent training in parallel
     const [profileRes, athleteRes, recentTraining] = await Promise.all([
       supa.from("profiles").select("subscription_status").eq("id", user.id).single(),
-      supa.from("athlete_profiles").select("lifts, skills, conditioning, bodyweight, units").eq("user_id", user.id).maybeSingle(),
+      supa.from("athlete_profiles").select("lifts, skills, conditioning, bodyweight, units, age, height, gender").eq("user_id", user.id).maybeSingle(),
       fetchAndFormatRecentHistory(supa, user.id, { days: 14, maxLines: 25 }),
     ]);
 
