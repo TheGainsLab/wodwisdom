@@ -49,15 +49,9 @@ const SKILL_GROUPS = [
     ],
   },
   {
-    title: 'Bar',
+    title: 'Bar Skills',
     skills: [
       { key: 'toes_to_bar', label: 'Toes-to-Bar' },
-      { key: 'bar_muscle_ups', label: 'Bar Muscle-Ups' },
-    ],
-  },
-  {
-    title: 'Pull-Ups',
-    skills: [
       { key: 'strict_pull_ups', label: 'Strict Pull-Ups' },
       { key: 'kipping_pull_ups', label: 'Kipping Pull-Ups' },
       { key: 'butterfly_pull_ups', label: 'Butterfly Pull-Ups' },
