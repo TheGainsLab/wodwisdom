@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -8,24 +9,66 @@ const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 const FREE_LIMIT = 3;
 const DAILY_LIMIT = 75;
 
-const WORKOUT_REVIEW_SYSTEM_PROMPT = `You are an expert CrossFit coach reviewing workouts. Given workout text and context from CrossFit Journal articles, produce a structured analysis.
+interface AthleteProfileData {
+  lifts?: Record<string, number> | null;
+  skills?: Record<string, string> | null;
+  conditioning?: Record<string, string | number> | null;
+  bodyweight?: number | null;
+  units?: string | null;
+}
+
+function formatAthleteProfile(profile: AthleteProfileData | null): string {
+  if (!profile) return "No profile data. Give general advice and suggest they add lifts/skills on their Profile for personalized scaling.";
+  const parts: string[] = [];
+  const u = profile.units === "kg" ? "kg" : "lbs";
+  if (profile.bodyweight && profile.bodyweight > 0) {
+    parts.push(`Bodyweight: ${profile.bodyweight} ${u}`);
+  }
+  if (profile.lifts && Object.keys(profile.lifts).length > 0) {
+    const liftStr = Object.entries(profile.lifts)
+      .filter(([, v]) => v > 0)
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v} ${u}`)
+      .join(", ");
+    if (liftStr) parts.push("1RM Lifts — " + liftStr);
+  }
+  if (profile.skills && Object.keys(profile.skills).length > 0) {
+    const skillStr = Object.entries(profile.skills)
+      .filter(([, v]) => v && v !== "none")
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
+      .join(", ");
+    if (skillStr) parts.push("Skills — " + skillStr);
+  }
+  if (profile.conditioning && Object.keys(profile.conditioning).length > 0) {
+    const condStr = Object.entries(profile.conditioning)
+      .filter(([, v]) => v !== "" && v != null)
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
+      .join(", ");
+    if (condStr) parts.push("Conditioning — " + condStr);
+  }
+  if (parts.length === 0) return "No profile data. Give general advice and suggest they add lifts/skills on their Profile for personalized scaling.";
+  return parts.join("\n");
+}
+
+const WORKOUT_REVIEW_SYSTEM_PROMPT = `You are an expert CrossFit coach reviewing this workout for a specific athlete. Give personalized scaling, warm-up, and cues based on their profile and recent training. Ground advice in the provided CrossFit Journal articles when available.
 
 Output valid JSON only, no markdown or extra text, with this exact structure:
 {
-  "time_domain": "Expected duration for most athletes, e.g. 12-18 min. What will limit athletes.",
+  "time_domain": "Expected duration for this athlete given their capacity. What will limit them.",
   "scaling": [
-    { "movement": "Movement name", "suggestions": "Scaling options with reasoning" }
+    { "movement": "Movement name", "suggestions": "Personalized scaling for this athlete with specific loads/options based on their profile" }
   ],
-  "warm_up": "5-7 min warm-up suggestions (mobility, movement prep).",
+  "warm_up": "5-7 min warm-up tailored to this workout and athlete.",
   "cues": [
     { "movement": "Movement name", "cues": ["Cue 1", "Cue 2", "Cue 3"] }
   ],
-  "class_prep": "Equipment, setup, what to brief athletes on.",
+  "class_prep": "Equipment and setup. Brief notes for executing this workout.",
   "sources": []
 }
 
 Rules:
-- Be concise and practical. Coach-to-coach voice.
+- Personalize scaling using their lifts (e.g. "65% of back squat = X lbs"), skills (scale gymnastics they can't Rx), and conditioning.
+- Use recent training to account for fatigue or similar volume.
+- Be concise and practical. Athlete-focused voice.
 - Ground advice in the provided article context when available.
 - Extract movements from the workout and provide scaling/cues for each.
 - If the input is not a recognizable workout, set time_domain to "I couldn't parse this as a workout. Try pasting a complete workout (e.g. 4 RFT: 20 wall balls, 10 T2B, 5 power cleans 135/95)."
@@ -79,12 +122,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check subscription tier
-    const { data: profile } = await supa
-      .from("profiles")
-      .select("subscription_status")
-      .eq("id", user.id)
-      .single();
+    // Fetch subscription tier, athlete profile, and recent training in parallel
+    const [profileRes, athleteRes, recentTraining] = await Promise.all([
+      supa.from("profiles").select("subscription_status").eq("id", user.id).single(),
+      supa.from("athlete_profiles").select("lifts, skills, conditioning, bodyweight, units").eq("user_id", user.id).maybeSingle(),
+      fetchAndFormatRecentHistory(supa, user.id, { days: 14, maxLines: 25 }),
+    ]);
+
+    const profile = profileRes.data;
+    const athleteProfile = athleteRes.data as AthleteProfileData | null;
+    const profileStr = formatAthleteProfile(athleteProfile);
+    const recentStr = recentTraining || "No recent workouts logged.";
 
     const isFreeTier = !profile || profile.subscription_status !== "active";
 
@@ -175,6 +223,15 @@ Deno.serve(async (req) => {
     }
 
     // Call Claude (non-streaming for structured JSON)
+    const userContent = `ATHLETE PROFILE:
+${profileStr}
+
+RECENT TRAINING (last 14 days):
+${recentStr}
+
+WORKOUT:
+${trimmed}`;
+
     const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -187,7 +244,7 @@ Deno.serve(async (req) => {
         max_tokens: 1024,
         stream: false,
         system: WORKOUT_REVIEW_SYSTEM_PROMPT + context,
-        messages: [{ role: "user", content: `Analyze this workout:\n\n${trimmed}` }],
+        messages: [{ role: "user", content: userContent }],
       }),
     });
 
