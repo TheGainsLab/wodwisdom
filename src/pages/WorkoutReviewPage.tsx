@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { WORKOUT_REVIEW_ENDPOINT, supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
@@ -32,6 +32,7 @@ function formatMarkdown(text: string): string {
 
 export default function WorkoutReviewPage({ session }: { session: Session }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [workoutText, setWorkoutText] = useState('');
   const [review, setReview] = useState<WorkoutReview | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,6 +42,9 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
   const [totalUsage, setTotalUsage] = useState(0);
   const freeLimit = 3;
   const [tierLoaded, setTierLoaded] = useState(false);
+
+  const fromProgramState = location.state as { workout_text?: string; source_type?: string; source_id?: string; program_id?: string } | null;
+  const hasAutoAnalyzed = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -64,10 +68,12 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
     })();
   }, [session.user.id]);
 
+  // Auto-analyze when opened from program with workout pre-filled
+
   const isPaywalled = tier === 'free' && totalUsage >= freeLimit;
 
-  const analyzeWorkout = async () => {
-    const trimmed = workoutText.trim();
+  const analyzeWorkout = async (textOverride?: string) => {
+    const trimmed = (textOverride ?? workoutText).trim();
     if (!trimmed || isLoading || isPaywalled) return;
     if (trimmed.length < 10) {
       setError('Paste a complete workout to analyze');
@@ -108,6 +114,16 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
     }
   };
 
+  // Auto-analyze when opened from program with workout pre-filled (runs once)
+  useEffect(() => {
+    const text = fromProgramState?.workout_text?.trim();
+    if (!text || !tierLoaded || hasAutoAnalyzed.current) return;
+    if (tier === 'free' && totalUsage >= freeLimit) return;
+    hasAutoAnalyzed.current = true;
+    setWorkoutText(text);
+    analyzeWorkout(text);
+  }, [fromProgramState?.workout_text, tierLoaded, tier, totalUsage]);
+
   const usagePill = tier === 'free'
     ? <div className="usage-pill">{totalUsage}/{freeLimit} free</div>
     : null;
@@ -127,7 +143,9 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
 
         <div className="page-body">
           <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 0' }}>
-            {!review ? (
+            {fromProgramState?.workout_text && isLoading ? (
+              <div className="page-loading" style={{ padding: 48 }}><div className="loading-pulse" /></div>
+            ) : !review ? (
               <div className="workout-review-input-wrap">
                 <textarea
                   className="workout-review-textarea"
@@ -219,18 +237,34 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                 <div style={{ display: 'flex', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
                   <button
                     className="auth-btn"
-                    onClick={() => navigate('/workout/start', { state: { workout_text: workoutText, source_type: 'review', source_id: null } })}
+                    onClick={() => navigate('/workout/start', {
+                      state: {
+                        workout_text: workoutText,
+                        source_type: fromProgramState?.source_type ?? 'review',
+                        source_id: fromProgramState?.source_id ?? null,
+                      },
+                    })}
                     style={{ flex: 1, minWidth: 160 }}
                   >
                     Start This Workout
                   </button>
-                  <button
-                    className="auth-btn"
-                    onClick={() => { setReview(null); setWorkoutText(''); }}
-                    style={{ flex: 1, minWidth: 160, background: 'var(--surface2)', color: 'var(--text)' }}
-                  >
-                    Review Another Workout
-                  </button>
+                  {fromProgramState?.program_id ? (
+                    <button
+                      className="auth-btn"
+                      onClick={() => navigate(`/programs/${fromProgramState.program_id}`)}
+                      style={{ flex: 1, minWidth: 160, background: 'var(--surface2)', color: 'var(--text)' }}
+                    >
+                      Back to program
+                    </button>
+                  ) : (
+                    <button
+                      className="auth-btn"
+                      onClick={() => { setReview(null); setWorkoutText(''); hasAutoAnalyzed.current = false; }}
+                      style={{ flex: 1, minWidth: 160, background: 'var(--surface2)', color: 'var(--text)' }}
+                    >
+                      Review Another Workout
+                    </button>
+                  )}
                 </div>
               </div>
             )}

@@ -115,7 +115,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                         <th>Week</th>
                         <th>Day</th>
                         <th>Workout</th>
-                        <th style={{ width: 90 }}>Start</th>
+                        <th style={{ width: 150 }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -125,13 +125,22 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           <td>{DAY_LABELS[w.day_num] || w.day_num}</td>
                           <td className="workout-text-cell">{w.workout_text}</td>
                           <td>
-                            <button
-                              className="auth-btn"
-                              onClick={() => navigate('/workout/start', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id } })}
-                              style={{ padding: '8px 14px', fontSize: 13 }}
-                            >
-                              Start
-                            </button>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button
+                                className="auth-btn"
+                                onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id, program_id: id } })}
+                                style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: 'var(--text)' }}
+                              >
+                                Review
+                              </button>
+                              <button
+                                className="auth-btn"
+                                onClick={() => navigate('/workout/start', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id } })}
+                                style={{ padding: '8px 14px', fontSize: 13 }}
+                              >
+                                Start
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}

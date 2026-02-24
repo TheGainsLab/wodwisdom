@@ -18,6 +18,7 @@ interface Message {
 
 const SUGGESTIONS: Record<string, string[]> = {
   journal: [
+    'Paste a workout and ask for scaling and cues',
     'What are the points of performance for the air squat?',
     'How should I scale workouts for beginners?',
     'What is the nutritional prescription?',
