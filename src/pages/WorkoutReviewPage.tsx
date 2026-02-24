@@ -168,7 +168,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                 ) : (
                   <button
                     className="auth-btn"
-                    onClick={analyzeWorkout}
+                    onClick={() => analyzeWorkout()}
                     disabled={isLoading || !workoutText.trim()}
                     style={{ marginTop: 16 }}
                   >
