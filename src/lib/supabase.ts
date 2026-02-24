@@ -26,3 +26,4 @@ export const ADMIN_ENDPOINT = SUPABASE_URL + '/functions/v1/admin-data';
 export const ANALYZE_PROGRAM_ENDPOINT = SUPABASE_URL + '/functions/v1/analyze-program';
 export const INCORPORATE_ENDPOINT = SUPABASE_URL + '/functions/v1/incorporate-movements';
 export const FINALIZE_MODIFICATION_ENDPOINT = SUPABASE_URL + '/functions/v1/finalize-modification';
+export const SYNC_PROGRAM_BLOCKS_ENDPOINT = SUPABASE_URL + '/functions/v1/sync-program-blocks';

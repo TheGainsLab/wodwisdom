@@ -82,6 +82,7 @@ export default function ProgramEditPage({ session }: { session: Session }) {
         const { error: insErr } = await supabase.from('program_workouts').insert(rows);
         if (insErr) throw insErr;
       }
+      await supabase.functions.invoke('sync-program-blocks', { body: { program_id: id } });
       navigate(`/programs/${id}`);
     } catch (err: any) {
       setError(err?.message || 'Failed to save program');

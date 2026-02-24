@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
+import { extractBlocksFromWorkoutText } from "../_shared/parse-workout-blocks.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -133,7 +134,8 @@ function parseProgramTextAI(text: string): ParsedWorkout[] {
     }
 
     if (isDayHeader) {
-      if (dayNum !== currentDay) {
+      const hasCoolDown = dayLines.some((l) => /^cool\s*down\s*:/i.test(l));
+      if (dayNum !== currentDay && (hasCoolDown || dayLines.length === 0)) {
         flushDay();
         currentDay = dayNum;
       }
@@ -484,13 +486,34 @@ Deno.serve(async (req) => {
       sort_order: i,
     }));
 
-    const { error: wkErr } = await supa.from("program_workouts").insert(rows);
+    const { data: insertedWorkouts, error: wkErr } = await supa
+      .from("program_workouts")
+      .insert(rows)
+      .select("id, workout_text");
     if (wkErr) {
       await supa.from("programs").delete().eq("id", prog.id);
       return new Response(JSON.stringify({ error: "Failed to save workouts" }), {
         status: 500,
         headers: { ...cors, "Content-Type": "application/json" },
       });
+    }
+
+    if (insertedWorkouts?.length) {
+      const blockRows: { program_workout_id: string; block_type: string; block_order: number; block_text: string }[] = [];
+      for (const w of insertedWorkouts) {
+        const blocks = extractBlocksFromWorkoutText(w.workout_text);
+        for (const b of blocks) {
+          blockRows.push({
+            program_workout_id: w.id,
+            block_type: b.block_type,
+            block_order: b.block_order,
+            block_text: b.block_text,
+          });
+        }
+      }
+      if (blockRows.length > 0) {
+        await supa.from("program_workout_blocks").insert(blockRows);
+      }
     }
 
     const analyzeUrl = `${SUPABASE_URL}/functions/v1/analyze-program`;
