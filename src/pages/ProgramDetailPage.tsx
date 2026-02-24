@@ -22,6 +22,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const [program, setProgram] = useState<{ id: string; name: string } | null>(null);
   const [workouts, setWorkouts] = useState<ProgramWorkout[]>([]);
+  const [completedWorkoutIds, setCompletedWorkoutIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [navOpen, setNavOpen] = useState(false);
 
@@ -52,6 +53,21 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       .eq('program_id', id)
       .order('sort_order');
     setWorkouts(wk || []);
+
+    if (wk?.length) {
+      const ids = wk.map((w) => w.id);
+      const { data: logs } = await supabase
+        .from('workout_logs')
+        .select('source_id')
+        .eq('user_id', session.user.id)
+        .eq('source_type', 'program')
+        .in('source_id', ids);
+      const completed = new Set((logs || []).map((l) => l.source_id).filter(Boolean));
+      setCompletedWorkoutIds(completed);
+    } else {
+      setCompletedWorkoutIds(new Set());
+    }
+
     setLoading(false);
   };
 
@@ -125,22 +141,26 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           <td>{DAY_LABELS[w.day_num] || w.day_num}</td>
                           <td className="workout-text-cell">{w.workout_text}</td>
                           <td>
-                            <div style={{ display: 'flex', gap: 8 }}>
-                              <button
-                                className="auth-btn"
-                                onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id, program_id: id } })}
-                                style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: 'var(--text)' }}
-                              >
-                                Review
-                              </button>
-                              <button
-                                className="auth-btn"
-                                onClick={() => navigate('/workout/start', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id } })}
-                                style={{ padding: '8px 14px', fontSize: 13 }}
-                              >
-                                Start
-                              </button>
-                            </div>
+                            {completedWorkoutIds.has(w.id) ? (
+                              <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Completed</span>
+                            ) : (
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <button
+                                  className="auth-btn"
+                                  onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id, program_id: id } })}
+                                  style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: 'var(--text)' }}
+                                >
+                                  Review
+                                </button>
+                                <button
+                                  className="auth-btn"
+                                  onClick={() => navigate('/workout/start', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id } })}
+                                  style={{ padding: '8px 14px', fontSize: 13 }}
+                                >
+                                  Start
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ))}
