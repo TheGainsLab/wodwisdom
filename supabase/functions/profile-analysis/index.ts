@@ -94,7 +94,7 @@ async function retrieveRAGContext(
       const liftNames = profileData.lifts
         ? Object.keys(profileData.lifts).map((k) => k.replace(/_/g, " ")).join(", ")
         : "";
-      const chunks = await searchChunks(
+      const journalChunks = await searchChunks(
         supa,
         `strength training programming periodization ${liftNames}`,
         "journal",
@@ -102,7 +102,16 @@ async function retrieveRAGContext(
         4,
         0.25
       );
-      allChunks.push(...chunks);
+      allChunks.push(...journalChunks);
+      const strengthScienceChunks = await searchChunks(
+        supa,
+        liftNames ? `strength training periodization load prescription ${liftNames}` : "strength training periodization load prescription squat deadlift",
+        "strength-science",
+        OPENAI_API_KEY,
+        2,
+        0.25
+      );
+      allChunks.push(...strengthScienceChunks);
     }
 
     if (analysisType === "skills" || analysisType === "full") {
@@ -138,7 +147,7 @@ async function retrieveRAGContext(
     const unique = deduplicateChunks(allChunks);
     if (unique.length === 0) return "";
 
-    return "\n\nREFERENCE MATERIAL (use to ground your advice):\n" + formatChunksAsContext(unique, 10);
+    return "\n\nREFERENCE MATERIAL (Journal and Strength Science — use to ground your advice):\n" + formatChunksAsContext(unique, 10);
   } catch (err) {
     console.error("RAG retrieval error:", err);
     return "";
