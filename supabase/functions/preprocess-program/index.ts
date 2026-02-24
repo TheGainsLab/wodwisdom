@@ -87,6 +87,65 @@ function parseProgramText(text: string): ParsedWorkout[] {
   return result;
 }
 
+/** AI-generated format: group lines by day (Monday:, Tuesday:, etc.). One workout per day. */
+function parseProgramTextAI(text: string): ParsedWorkout[] {
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const lines = normalized.split("\n").map((l) => l.trim()).filter(Boolean);
+  const result: ParsedWorkout[] = [];
+  let currentWeek = 1;
+  let currentDay = 1;
+  let sortOrder = 0;
+  const dayLines: string[] = [];
+
+  const dayPattern = /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\s*:?\s*/i;
+
+  function flushDay() {
+    if (dayLines.length > 0) {
+      result.push({
+        week_num: currentWeek,
+        day_num: currentDay,
+        workout_text: dayLines.join("\n"),
+        sort_order: sortOrder++,
+      });
+      dayLines.length = 0;
+    }
+  }
+
+  for (const line of lines) {
+    const wkMatch = line.match(WEEK_REGEX);
+    if (wkMatch) {
+      flushDay();
+      currentWeek = parseInt(wkMatch[1], 10) || 1;
+      continue;
+    }
+
+    const lower = line.toLowerCase();
+    let isDayHeader = false;
+    let dayNum = currentDay;
+    for (let i = 0; i < DAY_NAMES.length; i++) {
+      const d = DAY_NAMES[i].toLowerCase();
+      const a = DAY_ABBREV[i].toLowerCase();
+      if (lower.startsWith(d + ":") || lower.startsWith(a + ":") || lower.startsWith(d + " ") || lower.startsWith(a + " ")) {
+        dayNum = i + 1;
+        isDayHeader = true;
+        break;
+      }
+    }
+
+    if (isDayHeader) {
+      flushDay();
+      currentDay = dayNum;
+      const rest = line.replace(dayPattern, "").trim();
+      if (rest.length > 0) dayLines.push(rest);
+    } else if (line.length > 0) {
+      dayLines.push(line);
+    }
+  }
+
+  flushDay();
+  return result;
+}
+
 function findHeaderRow(rows: (string | number)[][]): number {
   for (let i = 0; i < Math.min(rows.length, 20); i++) {
     const row = rows[i] || [];
@@ -364,9 +423,10 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { name, text, file_base64, file_type } = body;
+    const { name, text, file_base64, file_type, source } = body;
 
     let workouts: ParsedWorkout[] = [];
+    const useAIParser = source === "generate";
 
     if (file_base64 && file_type) {
       const buf = Uint8Array.from(atob(file_base64), (c) => c.charCodeAt(0));
@@ -376,7 +436,7 @@ Deno.serve(async (req) => {
       } else if (file_type === "txt" || file_type === "csv") {
         const decoder = new TextDecoder("utf-8");
         const str = decoder.decode(buf);
-        workouts = parseProgramText(str);
+        workouts = useAIParser ? parseProgramTextAI(str) : parseProgramText(str);
       } else {
         return new Response(JSON.stringify({ error: "Unsupported file type. Use xlsx, xls, txt, or csv." }), {
           status: 400,
@@ -384,7 +444,7 @@ Deno.serve(async (req) => {
         });
       }
     } else if (text && typeof text === "string") {
-      workouts = parseProgramText(text.trim());
+      workouts = useAIParser ? parseProgramTextAI(text.trim()) : parseProgramText(text.trim());
     } else {
       return new Response(JSON.stringify({ error: "Provide text or file_base64 with file_type" }), {
         status: 400,

@@ -299,7 +299,7 @@ Generate a 4-week program. Follow the format exactly.`;
         "Content-Type": "application/json",
         Authorization: authHeader,
       },
-      body: JSON.stringify({ text: programText, name: programName }),
+      body: JSON.stringify({ text: programText, name: programName, source: "generate" }),
     });
 
     if (!preprocessResp.ok) {
