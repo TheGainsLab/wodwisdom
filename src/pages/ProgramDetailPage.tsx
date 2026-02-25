@@ -147,7 +147,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                   onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id, program_id: id } })}
                                   style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: 'var(--text)' }}
                                 >
-                                  Review
+                                  Prepare
                                 </button>
                                 <button
                                   className="auth-btn"

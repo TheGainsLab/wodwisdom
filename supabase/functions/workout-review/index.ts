@@ -57,6 +57,7 @@ const WORKOUT_REVIEW_SYSTEM_PROMPT = `You are an expert CrossFit coach reviewing
 
 Output valid JSON only, no markdown or extra text, with this exact structure:
 {
+  "intent": "1-2 sentences: the training purpose of this workout — what energy system, stimulus, or adaptation it targets and why it's valuable.",
   "time_domain": "Expected duration for this athlete given their capacity. What will limit them.",
   "scaling": [
     { "movement": "Movement name", "suggestions": "Personalized scaling for this athlete with specific loads/options based on their profile" }
