@@ -19,6 +19,9 @@ const SOURCE_TYPES = ["review", "program", "manual"] as const;
 const WEIGHT_UNITS = ["lbs", "kg"] as const;
 const BLOCK_TYPES = ["warm-up", "skills", "strength", "metcon", "cool-down", "accessory", "other"] as const;
 
+const QUALITY_GRADES = ["A", "B", "C", "D"] as const;
+const DISTANCE_UNITS = ["ft", "m"] as const;
+
 interface LogEntry {
   movement: string;
   sets?: number | null;
@@ -28,6 +31,13 @@ interface LogEntry {
   rpe?: number | null;
   scaling_note?: string | null;
   sort_order?: number;
+  // Skills-specific fields
+  reps_completed?: number | null;
+  hold_seconds?: number | null;
+  distance?: number | null;
+  distance_unit?: "ft" | "m";
+  quality?: "A" | "B" | "C" | "D" | null;
+  variation?: string | null;
 }
 
 interface LogBlock {
@@ -173,6 +183,12 @@ Deno.serve(async (req) => {
       scaling_note: string | null;
       sort_order: number;
       block_label: string | null;
+      reps_completed: number | null;
+      hold_seconds: number | null;
+      distance: number | null;
+      distance_unit: string | null;
+      quality: string | null;
+      variation: string | null;
     }[] = [];
     let sortOrder = 0;
     for (const block of blocks) {
@@ -192,6 +208,23 @@ Deno.serve(async (req) => {
           scaling_note: entry.scaling_note?.trim() || null,
           sort_order: sortOrder++,
           block_label: blockLabel,
+          // Skills-specific fields
+          reps_completed: entry.reps_completed != null && entry.reps_completed >= 0
+            ? entry.reps_completed
+            : null,
+          hold_seconds: entry.hold_seconds != null && entry.hold_seconds > 0
+            ? entry.hold_seconds
+            : null,
+          distance: entry.distance != null && entry.distance > 0
+            ? entry.distance
+            : null,
+          distance_unit: DISTANCE_UNITS.includes((entry.distance_unit ?? "") as (typeof DISTANCE_UNITS)[number])
+            ? entry.distance_unit!
+            : null,
+          quality: QUALITY_GRADES.includes((entry.quality ?? "") as (typeof QUALITY_GRADES)[number])
+            ? entry.quality!
+            : null,
+          variation: entry.variation?.trim() || null,
         });
       }
     }

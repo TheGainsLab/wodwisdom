@@ -23,6 +23,25 @@ interface WorkoutLogBlock {
   sort_order: number;
 }
 
+interface WorkoutLogEntry {
+  log_id: string;
+  movement: string;
+  sets: number | null;
+  reps: number | null;
+  weight: number | null;
+  weight_unit: string;
+  rpe: number | null;
+  scaling_note: string | null;
+  block_label: string | null;
+  reps_completed: number | null;
+  hold_seconds: number | null;
+  distance: number | null;
+  distance_unit: string | null;
+  quality: string | null;
+  variation: string | null;
+  sort_order: number;
+}
+
 const TYPE_LABELS: Record<string, string> = {
   for_time: 'For Time',
   amrap: 'AMRAP',
@@ -41,6 +60,10 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
   other: 'Other',
 };
 
+function formatMovementName(canonical: string): string {
+  return canonical.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 function getMetconTypeLabel(text: string): string {
   const t = text.toUpperCase();
   if (/AMRAP|AS MANY ROUNDS/.test(t)) return 'AMRAP';
@@ -53,6 +76,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [blocksByLog, setBlocksByLog] = useState<Record<string, WorkoutLogBlock[]>>({});
+  const [entriesByLog, setEntriesByLog] = useState<Record<string, WorkoutLogEntry[]>>({});
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -69,21 +93,36 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
       if (logRows.length > 0) {
         const logIds = logRows.map(l => l.id);
-        const { data: blocks } = await supabase
-          .from('workout_log_blocks')
-          .select('log_id, block_type, block_label, block_text, score, rx, sort_order')
-          .in('log_id', logIds);
+        const [{ data: blocks }, { data: entries }] = await Promise.all([
+          supabase
+            .from('workout_log_blocks')
+            .select('log_id, block_type, block_label, block_text, score, rx, sort_order')
+            .in('log_id', logIds),
+          supabase
+            .from('workout_log_entries')
+            .select('log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, block_label, reps_completed, hold_seconds, distance, distance_unit, quality, variation, sort_order')
+            .in('log_id', logIds),
+        ]);
 
         const grouped: Record<string, WorkoutLogBlock[]> = {};
         for (const b of (blocks as WorkoutLogBlock[]) || []) {
           if (!grouped[b.log_id]) grouped[b.log_id] = [];
           grouped[b.log_id].push(b);
         }
-        // Sort each group by sort_order
         for (const logId of Object.keys(grouped)) {
           grouped[logId].sort((a, b) => a.sort_order - b.sort_order);
         }
         setBlocksByLog(grouped);
+
+        const groupedEntries: Record<string, WorkoutLogEntry[]> = {};
+        for (const e of (entries as WorkoutLogEntry[]) || []) {
+          if (!groupedEntries[e.log_id]) groupedEntries[e.log_id] = [];
+          groupedEntries[e.log_id].push(e);
+        }
+        for (const logId of Object.keys(groupedEntries)) {
+          groupedEntries[logId].sort((a, b) => a.sort_order - b.sort_order);
+        }
+        setEntriesByLog(groupedEntries);
       }
 
       setLoading(false);
@@ -182,38 +221,74 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         </div>
                       )}
 
-                      {expandedId === log.id && (
-                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-                          {logBlocks.length > 0 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                              {logBlocks.map((block, i) => (
-                                <div key={i}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                    <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', textTransform: 'uppercase' }}>
-                                      {getBlockLabel(block)}
-                                    </span>
-                                    {block.score && (
-                                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 13, color: 'var(--text-dim)' }}>
-                                        {block.score}
-                                      </span>
-                                    )}
-                                    {block.rx && (
-                                      <span style={{ fontSize: 11, background: 'var(--accent-glow)', color: 'var(--accent)', padding: '1px 6px', borderRadius: 4 }}>Rx</span>
-                                    )}
-                                  </div>
-                                  <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, color: 'var(--text-dim)', paddingLeft: 8 }}>
-                                    {block.block_text}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, color: 'var(--text-dim)' }}>
-                              {log.workout_text}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      {expandedId === log.id && (() => {
+                        const logEntries = entriesByLog[log.id] || [];
+                        return (
+                          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                            {logBlocks.length > 0 ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                {logBlocks.map((block, i) => {
+                                  const blockEntries = logEntries.filter(e => e.block_label === block.block_label);
+                                  const isSkills = block.block_type === 'skills';
+                                  return (
+                                    <div key={i}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', textTransform: 'uppercase' }}>
+                                          {getBlockLabel(block)}
+                                        </span>
+                                        {block.score && (
+                                          <span style={{ fontFamily: 'JetBrains Mono', fontSize: 13, color: 'var(--text-dim)' }}>
+                                            {block.score}
+                                          </span>
+                                        )}
+                                        {block.rx && (
+                                          <span style={{ fontSize: 11, background: 'var(--accent-glow)', color: 'var(--accent)', padding: '1px 6px', borderRadius: 4 }}>Rx</span>
+                                        )}
+                                      </div>
+                                      <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, color: 'var(--text-dim)', paddingLeft: 8 }}>
+                                        {block.block_text}
+                                      </div>
+                                      {isSkills && blockEntries.length > 0 && (
+                                        <div style={{ paddingLeft: 8, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                          {blockEntries.map((entry, ei) => (
+                                            <div key={ei} style={{ fontSize: 13, color: 'var(--text)', background: 'var(--surface2)', padding: '8px 10px', borderRadius: 6 }}>
+                                              <span style={{ fontWeight: 600 }}>{formatMovementName(entry.movement)}</span>
+                                              {entry.variation && <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>({entry.variation})</span>}
+                                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 4, fontSize: 12, color: 'var(--text-dim)' }}>
+                                                {entry.sets != null && <span>{entry.sets} sets</span>}
+                                                {entry.reps != null && entry.reps_completed != null && (
+                                                  <span>{entry.reps_completed}/{entry.reps} reps</span>
+                                                )}
+                                                {entry.reps != null && entry.reps_completed == null && (
+                                                  <span>{entry.reps} reps</span>
+                                                )}
+                                                {entry.hold_seconds != null && <span>{entry.hold_seconds}s hold</span>}
+                                                {entry.distance != null && <span>{entry.distance}{entry.distance_unit || 'ft'}</span>}
+                                                {entry.weight != null && <span>{entry.weight}{entry.weight_unit}</span>}
+                                                {entry.rpe != null && <span>RPE {entry.rpe}</span>}
+                                                {entry.quality && <span>Quality: {entry.quality}</span>}
+                                              </div>
+                                              {entry.scaling_note && (
+                                                <div style={{ fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic', marginTop: 4 }}>
+                                                  {entry.scaling_note}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, color: 'var(--text-dim)' }}>
+                                {log.workout_text}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}

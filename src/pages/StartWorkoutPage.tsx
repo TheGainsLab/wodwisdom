@@ -19,6 +19,8 @@ interface Block {
   movements: BlockMovement[];
 }
 
+type QualityGrade = 'A' | 'B' | 'C' | 'D';
+
 interface EntryValues {
   sets?: number;
   reps?: number;
@@ -26,6 +28,13 @@ interface EntryValues {
   weight_unit: 'lbs' | 'kg';
   rpe?: number;
   scaling_note?: string;
+  // Skills-specific fields
+  reps_completed?: number;
+  hold_seconds?: number;
+  distance?: number;
+  distance_unit?: 'ft' | 'm';
+  quality?: QualityGrade;
+  variation?: string;
 }
 
 function inferWorkoutType(blocks: Block[]): string {
@@ -158,6 +167,12 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             weight_unit: ev.weight_unit || 'lbs',
             rpe: ev.rpe ?? null,
             scaling_note: ev.scaling_note?.trim() || null,
+            reps_completed: ev.reps_completed ?? null,
+            hold_seconds: ev.hold_seconds ?? null,
+            distance: ev.distance ?? null,
+            distance_unit: ev.distance_unit || null,
+            quality: ev.quality || null,
+            variation: ev.variation?.trim() || null,
           };
         });
         return {
@@ -344,6 +359,150 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                           );
                         })}
                       </>
+                    )}
+
+                    {block.type === 'skills' && block.movements.length > 0 && (
+                      block.movements.map((m, mi) => {
+                        const key = `${bi}-${mi}`;
+                        const ev = entryValues[key] || {};
+                        return (
+                          <div key={key} style={{ marginBottom: 16, padding: 12, background: 'var(--surface2)', borderRadius: 8 }}>
+                            <div style={{ fontWeight: 600, marginBottom: 10 }}>{formatMovementName(m.canonical)}</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Sets</label>
+                                <input
+                                  type="number"
+                                  placeholder="—"
+                                  value={ev.sets ?? ''}
+                                  onChange={e => setEntry(key, 'sets', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                  style={{ ...compactInputStyle, width: 56 }}
+                                />
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Reps Rx</label>
+                                <input
+                                  type="number"
+                                  placeholder="—"
+                                  value={ev.reps ?? ''}
+                                  onChange={e => setEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                  style={{ ...compactInputStyle, width: 56 }}
+                                />
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Reps Hit</label>
+                                <input
+                                  type="number"
+                                  placeholder="—"
+                                  value={ev.reps_completed ?? ''}
+                                  onChange={e => setEntry(key, 'reps_completed', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                  style={{ ...compactInputStyle, width: 56 }}
+                                />
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Hold (s)</label>
+                                <input
+                                  type="number"
+                                  placeholder="—"
+                                  value={ev.hold_seconds ?? ''}
+                                  onChange={e => setEntry(key, 'hold_seconds', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                  style={{ ...compactInputStyle, width: 64 }}
+                                />
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Distance</label>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                  <input
+                                    type="number"
+                                    placeholder="—"
+                                    value={ev.distance ?? ''}
+                                    onChange={e => setEntry(key, 'distance', e.target.value ? parseFloat(e.target.value) : undefined)}
+                                    style={{ ...compactInputStyle, width: 64 }}
+                                  />
+                                  <select
+                                    value={ev.distance_unit || 'ft'}
+                                    onChange={e => setEntry(key, 'distance_unit', e.target.value)}
+                                    style={{ ...compactInputStyle, width: 50, padding: '8px 4px' }}
+                                  >
+                                    <option value="ft">ft</option>
+                                    <option value="m">m</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>RPE 1-10</label>
+                                <input
+                                  type="number"
+                                  placeholder="—"
+                                  min={1}
+                                  max={10}
+                                  value={ev.rpe ?? ''}
+                                  onChange={e => setEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                  style={{ ...compactInputStyle, width: 64 }}
+                                />
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Quality</label>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                  {(['A', 'B', 'C', 'D'] as QualityGrade[]).map(g => (
+                                    <button
+                                      key={g}
+                                      type="button"
+                                      onClick={() => setEntry(key, 'quality', ev.quality === g ? undefined : g)}
+                                      style={{
+                                        ...compactInputStyle,
+                                        width: 36,
+                                        textAlign: 'center' as const,
+                                        cursor: 'pointer',
+                                        fontWeight: ev.quality === g ? 700 : 400,
+                                        background: ev.quality === g ? 'var(--accent)' : 'var(--bg)',
+                                        color: ev.quality === g ? '#fff' : 'var(--text)',
+                                      }}
+                                    >
+                                      {g}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Weight</label>
+                                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                  <input
+                                    type="number"
+                                    placeholder="—"
+                                    value={ev.weight ?? ''}
+                                    onChange={e => setEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
+                                    style={{ ...compactInputStyle, width: 72 }}
+                                  />
+                                  <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>{ev.weight_unit || 'lbs'}</span>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 120 }}>
+                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Variation</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. kipping, banded, strict"
+                                  value={ev.variation ?? ''}
+                                  onChange={e => setEntry(key, 'variation', e.target.value)}
+                                  style={{ ...compactInputStyle, width: '100%' }}
+                                />
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Notes</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. connected 2 then singles, grip failed set 4"
+                                value={ev.scaling_note ?? ''}
+                                onChange={e => setEntry(key, 'scaling_note', e.target.value)}
+                                style={{ ...compactInputStyle, width: '100%' }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })
                     )}
 
                     {(block.type === 'accessory' || block.type === 'other') && block.movements.length > 0 && (
