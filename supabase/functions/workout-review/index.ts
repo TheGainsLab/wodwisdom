@@ -170,30 +170,41 @@ async function callClaude(
   userContent: string,
   maxTokens: number
 ): Promise<string> {
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY!,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: maxTokens,
-      stream: false,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userContent }],
-    }),
-  });
+  const delays = [0, 2000, 4000];
+  for (let attempt = 0; attempt < delays.length; attempt++) {
+    if (delays[attempt] > 0) await new Promise((r) => setTimeout(r, delays[attempt]));
 
-  if (!resp.ok) {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY!,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: maxTokens,
+        stream: false,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userContent }],
+      }),
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      return data.content?.[0]?.text?.trim() || "";
+    }
+
     const err = await resp.json().catch(() => ({}));
-    console.error("Claude API error:", err);
-    throw new Error("Claude API call failed");
-  }
+    const isRetryable = resp.status === 429 || resp.status === 529 || err?.error?.type === "overloaded_error";
 
-  const data = await resp.json();
-  return data.content?.[0]?.text?.trim() || "";
+    if (!isRetryable || attempt === delays.length - 1) {
+      console.error("Claude API error:", err);
+      throw new Error("Claude API call failed");
+    }
+    console.warn(`Claude API retry ${attempt + 1}/${delays.length - 1} after ${delays[attempt + 1]}ms`);
+  }
+  throw new Error("Claude API call failed");
 }
 
 function parseJSON(raw: string): Record<string, unknown> | null {
@@ -348,12 +359,13 @@ ${trimmed}`;
         ? "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(allChunks, 4)
         : "";
 
-      // Step 2: 4 parallel Claude calls
+      // Step 2: 4 staggered Claude calls (500ms apart to avoid overload)
+      const stagger = (ms: number) => new Promise((r) => setTimeout(r, ms));
       const [intentRaw, metconRaw, strengthRaw, skillsRaw] = await Promise.all([
         callClaude(INTENT_PROMPT + intentContext, userContent, 384),
-        callClaude(METCON_PROMPT + journalContext, userContent, 1024),
-        callClaude(STRENGTH_PROMPT + strengthContext, userContent, 1024),
-        callClaude(SKILLS_PROMPT + journalContext, userContent, 1024),
+        stagger(500).then(() => callClaude(METCON_PROMPT + journalContext, userContent, 1024)),
+        stagger(1000).then(() => callClaude(STRENGTH_PROMPT + strengthContext, userContent, 1024)),
+        stagger(1500).then(() => callClaude(SKILLS_PROMPT + journalContext, userContent, 1024)),
       ]);
 
       // Step 3: Parse responses and assemble
