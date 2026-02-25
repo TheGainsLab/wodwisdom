@@ -38,6 +38,13 @@ export interface WorkoutLogEntryRow {
   scaling_note: string | null;
   sort_order?: number;
   block_label: string | null;
+  // Skills-specific fields
+  reps_completed: number | null;
+  hold_seconds: number | null;
+  distance: number | null;
+  distance_unit: string | null;
+  quality: string | null;
+  variation: string | null;
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -110,6 +117,26 @@ function formatBlock(
   }
 
   if (block.block_type === "skills") {
+    if (sorted.length > 0) {
+      const parts: string[] = [];
+      for (const e of sorted.slice(0, 4)) {
+        let p = formatMovementName(e.movement);
+        if (e.variation) p += ` (${e.variation})`;
+        if (e.sets != null && e.reps != null && e.reps_completed != null) {
+          p += ` ${e.sets}×${e.reps_completed}/${e.reps}`;
+        } else if (e.sets != null && e.reps != null) {
+          p += ` ${e.sets}×${e.reps}`;
+        }
+        if (e.hold_seconds != null) p += ` ${e.hold_seconds}s hold`;
+        if (e.distance != null) p += ` ${e.distance}${e.distance_unit || "ft"}`;
+        if (e.weight != null) p += ` @${e.weight}${e.weight_unit === "kg" ? "kg" : "lbs"}`;
+        if (e.rpe != null) p += ` RPE ${e.rpe}`;
+        if (e.quality) p += ` Q:${e.quality}`;
+        if (e.scaling_note) p += ` — ${e.scaling_note}`;
+        parts.push(p);
+      }
+      return `Skills: ${parts.join(", ")}`;
+    }
     return `Skills: ${block.block_text.slice(0, 60).replace(/\n/g, " ")}`;
   }
 
@@ -221,7 +248,7 @@ export async function fetchAndFormatRecentHistory(
       .in("log_id", logIds),
     supa
       .from("workout_log_entries")
-      .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_label")
+      .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_label, reps_completed, hold_seconds, distance, distance_unit, quality, variation")
       .in("log_id", logIds),
   ]);
 
