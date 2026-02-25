@@ -1,6 +1,11 @@
 /**
  * Formats recent workout logs into a compact text block for AI prompts.
  * Used by profile-analysis and chat to give the AI context about recent training.
+ *
+ * Outputs one line per block (not per workout) so the AI sees full session structure:
+ *   Mon Feb 24 — Strength: Back Squat 5×3 @275lbs RPE 8
+ *   Mon Feb 24 — For Time: 4:48 Rx (Thruster, Pull Up)
+ *   Mon Feb 24 — AMRAP 7: 6+3 (Burpee, Cal Row)
  */
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -10,8 +15,16 @@ export interface WorkoutLogRow {
   workout_date: string;
   workout_text: string;
   workout_type: string;
+}
+
+export interface WorkoutLogBlockRow {
+  log_id: string;
+  block_type: string;
+  block_label: string | null;
+  block_text: string;
   score: string | null;
   rx: boolean;
+  sort_order: number;
 }
 
 export interface WorkoutLogEntryRow {
@@ -24,17 +37,10 @@ export interface WorkoutLogEntryRow {
   rpe: number | null;
   scaling_note: string | null;
   sort_order?: number;
+  block_label: string | null;
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const TYPE_LABELS: Record<string, string> = {
-  strength: "Strength",
-  metcon: "Metcon",
-  for_time: "For Time",
-  amrap: "AMRAP",
-  emom: "EMOM",
-  other: "Other",
-};
 
 function formatMovementName(canonical: string): string {
   return canonical.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -48,26 +54,108 @@ function formatDate(dateStr: string): string {
   return `${day} ${month} ${date}`;
 }
 
+function getMetconTypeLabel(text: string): string {
+  const t = text.toUpperCase();
+  if (/AMRAP|AS MANY ROUNDS/.test(t)) return "AMRAP";
+  if (/EMOM|E\d+MOM/.test(t)) return "EMOM";
+  return "For Time";
+}
+
 /**
- * Format workout logs and entries into a compact string for AI context.
- * Returns empty string if no logs. Caller should omit the block entirely when empty.
+ * Format a single block into a summary string.
+ */
+function formatBlock(
+  block: WorkoutLogBlockRow,
+  blockEntries: WorkoutLogEntryRow[]
+): string {
+  const sorted = blockEntries.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+  if (block.block_type === "strength") {
+    const parts: string[] = [];
+    for (const e of sorted.slice(0, 3)) {
+      let p = formatMovementName(e.movement);
+      if (e.sets != null && e.reps != null) p += ` ${e.sets}×${e.reps}`;
+      if (e.weight != null) p += ` @${e.weight}${e.weight_unit === "kg" ? "kg" : "lbs"}`;
+      if (e.rpe != null) p += ` RPE ${e.rpe}`;
+      parts.push(p);
+    }
+    return `Strength: ${parts.join(", ") || block.block_text.slice(0, 60).replace(/\n/g, " ")}`;
+  }
+
+  if (block.block_type === "metcon") {
+    const typeLabel = getMetconTypeLabel(block.block_text);
+    const parts: string[] = [];
+    if (block.score) parts.push(block.score);
+    if (block.rx) parts.push("Rx");
+    if (sorted.length > 0) {
+      parts.push(
+        "(" +
+          sorted
+            .slice(0, 3)
+            .map((e) => {
+              let s = formatMovementName(e.movement);
+              if (e.scaling_note) s += ` ${e.scaling_note}`;
+              return s;
+            })
+            .join(", ") +
+          ")"
+      );
+    }
+    return `${typeLabel}: ${parts.length > 0 ? parts.join(" ") : block.block_text.slice(0, 60).replace(/\n/g, " ")}`;
+  }
+
+  if (block.block_type === "warm-up" || block.block_type === "cool-down") {
+    const label = block.block_type === "warm-up" ? "Warm-up" : "Cool-down";
+    return `${label}: ${block.block_text.slice(0, 60).replace(/\n/g, " ")}`;
+  }
+
+  if (block.block_type === "skills") {
+    return `Skills: ${block.block_text.slice(0, 60).replace(/\n/g, " ")}`;
+  }
+
+  // accessory / other
+  const label = block.block_type === "accessory" ? "Accessory" : "Other";
+  if (sorted.length > 0) {
+    const parts = sorted.slice(0, 3).map((e) => {
+      let p = formatMovementName(e.movement);
+      if (e.sets != null && e.reps != null) p += ` ${e.sets}×${e.reps}`;
+      return p;
+    });
+    return `${label}: ${parts.join(", ")}`;
+  }
+  return `${label}: ${block.block_text.slice(0, 60).replace(/\n/g, " ")}`;
+}
+
+/**
+ * Format workout logs with per-block detail.
  *
- * @param logs - Workout logs ordered by workout_date DESC (most recent first)
- * @param entries - Entries for those logs, grouped by log_id via Map
+ * @param logs - Workout logs ordered by workout_date DESC
+ * @param blocks - Block rows for those logs
+ * @param entries - Entry rows for those logs
  * @param options.maxLines - Cap output length (default 30)
  */
 export function formatRecentHistory(
   logs: WorkoutLogRow[],
+  blocks: WorkoutLogBlockRow[],
   entries: WorkoutLogEntryRow[],
   options?: { maxLines?: number }
 ): string {
   if (logs.length === 0) return "";
 
-  const entriesByLog = new Map<string, WorkoutLogEntryRow[]>();
+  const blocksByLog = new Map<string, WorkoutLogBlockRow[]>();
+  for (const b of blocks) {
+    const list = blocksByLog.get(b.log_id) || [];
+    list.push(b);
+    blocksByLog.set(b.log_id, list);
+  }
+
+  const entriesByLabel = new Map<string, WorkoutLogEntryRow[]>();
   for (const e of entries) {
-    const list = entriesByLog.get(e.log_id) || [];
+    // key by log_id + block_label so entries match their block
+    const key = `${e.log_id}::${e.block_label ?? ""}`;
+    const list = entriesByLabel.get(key) || [];
     list.push(e);
-    entriesByLog.set(e.log_id, list);
+    entriesByLabel.set(key, list);
   }
 
   const lines: string[] = [];
@@ -76,54 +164,33 @@ export function formatRecentHistory(
   for (const log of logs) {
     if (lines.length >= maxLines) break;
 
-    const logEntries = (entriesByLog.get(log.id) || []).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     const dateLabel = formatDate(log.workout_date);
-    const typeLabel = TYPE_LABELS[log.workout_type] || log.workout_type;
+    const logBlocks = (blocksByLog.get(log.id) || []).sort(
+      (a, b) => a.sort_order - b.sort_order
+    );
 
-    let summary = "";
-    if (log.workout_type === "strength" && logEntries.length > 0) {
-      const parts: string[] = [];
-      for (const e of logEntries.slice(0, 3)) {
-        let p = formatMovementName(e.movement);
-        if (e.sets != null && e.reps != null) p += ` ${e.sets}×${e.reps}`;
-        if (e.weight != null) p += ` @${e.weight}${e.weight_unit === "kg" ? "kg" : "lbs"}`;
-        if (e.rpe != null) p += ` RPE ${e.rpe}`;
-        parts.push(p);
-      }
-      summary = parts.join(", ");
-    } else if (log.workout_type === "metcon" || log.workout_type === "for_time" || log.workout_type === "amrap" || log.workout_type === "emom") {
-      const parts: string[] = [];
-      if (log.score) parts.push(log.score);
-      if (log.rx) parts.push("Rx");
-      if (logEntries.length > 0) {
-        parts.push(
-          "(" +
-            logEntries
-              .slice(0, 3)
-              .map((e) => {
-                let s = formatMovementName(e.movement);
-                if (e.scaling_note) s += ` ${e.scaling_note}`;
-                return s;
-              })
-              .join(", ") +
-            ")"
-        );
-      }
-      summary = parts.length > 0 ? parts.join(" ") : log.workout_text.slice(0, 60).replace(/\n/g, " ");
-    } else {
-      summary = log.workout_text.slice(0, 80).replace(/\n/g, " ");
+    if (logBlocks.length === 0) {
+      // Fallback for logs without blocks
+      const line = `${dateLabel} — ${log.workout_text.slice(0, 80).replace(/\n/g, " ")}`;
+      lines.push(line);
+      continue;
     }
 
-    const line = `${dateLabel} — ${typeLabel}: ${summary}`.trim();
-    lines.push(line);
+    for (const block of logBlocks) {
+      if (lines.length >= maxLines) break;
+      const key = `${log.id}::${block.block_label ?? ""}`;
+      const blockEntries = entriesByLabel.get(key) || [];
+      const summary = formatBlock(block, blockEntries);
+      lines.push(`${dateLabel} — ${summary}`);
+    }
   }
 
   return "RECENT TRAINING (last 14 days):\n" + lines.join("\n");
 }
 
 /**
- * Fetches last N days of workout logs and entries for a user, formats them for AI context.
- * Returns empty string if no logs. Use with Supabase service-role client (bypasses RLS).
+ * Fetches last N days of workout logs, blocks, and entries for a user.
+ * Formats them for AI context with per-block detail.
  */
 export async function fetchAndFormatRecentHistory(
   supa: SupabaseClient,
@@ -137,7 +204,7 @@ export async function fetchAndFormatRecentHistory(
 
   const { data: logs } = await supa
     .from("workout_logs")
-    .select("id, workout_date, workout_text, workout_type, score, rx")
+    .select("id, workout_date, workout_text, workout_type")
     .eq("user_id", userId)
     .gte("workout_date", cutoffStr)
     .order("workout_date", { ascending: false });
@@ -145,10 +212,23 @@ export async function fetchAndFormatRecentHistory(
   if (!logs || (logs as WorkoutLogRow[]).length === 0) return "";
 
   const logIds = (logs as WorkoutLogRow[]).map((l) => l.id);
-  const { data: entries } = await supa
-    .from("workout_log_entries")
-    .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order")
-    .in("log_id", logIds);
 
-  return formatRecentHistory(logs as WorkoutLogRow[], (entries || []) as WorkoutLogEntryRow[], { maxLines: options?.maxLines });
+  // Fetch blocks and entries in parallel
+  const [{ data: blocks }, { data: entries }] = await Promise.all([
+    supa
+      .from("workout_log_blocks")
+      .select("log_id, block_type, block_label, block_text, score, rx, sort_order")
+      .in("log_id", logIds),
+    supa
+      .from("workout_log_entries")
+      .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_label")
+      .in("log_id", logIds),
+  ]);
+
+  return formatRecentHistory(
+    logs as WorkoutLogRow[],
+    (blocks || []) as WorkoutLogBlockRow[],
+    (entries || []) as WorkoutLogEntryRow[],
+    { maxLines: options?.maxLines }
+  );
 }

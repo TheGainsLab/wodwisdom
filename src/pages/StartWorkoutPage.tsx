@@ -80,10 +80,10 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   const [success, setSuccess] = useState(false);
   const [workoutDate, setWorkoutDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [workoutType, setWorkoutType] = useState('strength');
-  const [rx, setRx] = useState(false);
   const [notes, setNotes] = useState('');
   const [entryValues, setEntryValues] = useState<Record<string, EntryValues>>({});
   const [blockScores, setBlockScores] = useState<Record<number, string>>({});
+  const [blockRx, setBlockRx] = useState<Record<number, boolean>>({});
   const [saving, setSaving] = useState(false);
 
   const sourceState = location.state as { workout_text?: string; source_type?: string; source_id?: string } | null;
@@ -165,6 +165,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           type: b.type,
           text: b.text,
           score: blockScores[bi]?.trim() || null,
+          rx: blockRx[bi] ?? false,
           entries,
         };
       });
@@ -174,11 +175,6 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           workout_date: workoutDate,
           workout_text: workoutText.trim(),
           workout_type: workoutType,
-          score: (() => {
-            const firstMetconIdx = blocks.findIndex(b => b.type === 'metcon');
-            return firstMetconIdx >= 0 ? (blockScores[firstMetconIdx]?.trim() || null) : null;
-          })(),
-          rx,
           source_type: sourceState?.source_type || 'manual',
           source_id: sourceState?.source_id || null,
           notes: notes.trim() || null,
@@ -313,17 +309,15 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
 
                     {block.type === 'metcon' && (
                       <>
-                        {bi === blocks.findIndex(b => b.type === 'metcon') && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                            <input
-                              type="checkbox"
-                              id="rx"
-                              checked={rx}
-                              onChange={e => setRx(e.target.checked)}
-                            />
-                            <label htmlFor="rx" style={{ fontSize: 14, color: 'var(--text-dim)' }}>Rx</label>
-                          </div>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                          <input
+                            type="checkbox"
+                            id={`rx-${bi}`}
+                            checked={blockRx[bi] ?? false}
+                            onChange={e => setBlockRx(prev => ({ ...prev, [bi]: e.target.checked }))}
+                          />
+                          <label htmlFor={`rx-${bi}`} style={{ fontSize: 14, color: 'var(--text-dim)' }}>Rx</label>
+                        </div>
                         <div className="field" style={{ marginBottom: 12 }}>
                           <label>Score</label>
                           <input
@@ -333,7 +327,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                             onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
                           />
                         </div>
-                        {!rx && block.movements.map((m, mi) => {
+                        {!(blockRx[bi] ?? false) && block.movements.map((m, mi) => {
                           const key = `${bi}-${mi}`;
                           const ev = entryValues[key] || {};
                           return (

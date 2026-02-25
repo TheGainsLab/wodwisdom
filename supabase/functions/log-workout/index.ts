@@ -1,5 +1,5 @@
 /**
- * Persist a completed workout to workout_logs and workout_log_entries.
+ * Persist a completed workout to workout_logs, workout_log_blocks, and workout_log_entries.
  * Called by Start Workout page when user taps "Finish Workout".
  */
 
@@ -17,6 +17,7 @@ const cors = {
 const WORKOUT_TYPES = ["for_time", "amrap", "emom", "strength", "other"] as const;
 const SOURCE_TYPES = ["review", "program", "manual"] as const;
 const WEIGHT_UNITS = ["lbs", "kg"] as const;
+const BLOCK_TYPES = ["warm-up", "skills", "strength", "metcon", "cool-down", "accessory", "other"] as const;
 
 interface LogEntry {
   movement: string;
@@ -34,6 +35,7 @@ interface LogBlock {
   type?: string;
   text?: string;
   score?: string | null;
+  rx?: boolean;
   entries?: LogEntry[];
 }
 
@@ -41,8 +43,6 @@ interface LogWorkoutBody {
   workout_date: string;
   workout_text: string;
   workout_type: string;
-  score?: string | null;
-  rx?: boolean;
   source_type: string;
   source_id?: string | null;
   notes?: string | null;
@@ -80,8 +80,6 @@ Deno.serve(async (req) => {
     const workout_date = body.workout_date;
     const workout_text = body.workout_text?.trim();
     const workout_type = body.workout_type;
-    const score = body.score ?? null;
-    const rx = body.rx ?? false;
     const source_type = body.source_type;
     const source_id = body.source_id ?? null;
     const notes = body.notes ?? null;
@@ -120,6 +118,7 @@ Deno.serve(async (req) => {
       });
     }
 
+    // 1. Insert workout_logs row (no score/rx/blocks — those live in workout_log_blocks now)
     const { data: log, error: logErr } = await supa
       .from("workout_logs")
       .insert({
@@ -127,12 +126,9 @@ Deno.serve(async (req) => {
         workout_date: dateStr,
         workout_text,
         workout_type,
-        score,
-        rx,
         source_type,
         source_id,
         notes,
-        blocks: blocks.length > 0 ? blocks : null,
       })
       .select("id")
       .single();
@@ -145,6 +141,27 @@ Deno.serve(async (req) => {
       });
     }
 
+    // 2. Insert workout_log_blocks rows
+    if (blocks.length > 0) {
+      const blockRows = blocks.map((b, i) => ({
+        log_id: log.id,
+        block_type: BLOCK_TYPES.includes((b.type ?? "other") as (typeof BLOCK_TYPES)[number])
+          ? (b.type ?? "other")
+          : "other",
+        block_label: b.label?.trim() || null,
+        block_text: b.text?.trim() || "",
+        score: b.score?.trim() || null,
+        rx: b.rx ?? false,
+        sort_order: i,
+      }));
+
+      const { error: blocksErr } = await supa.from("workout_log_blocks").insert(blockRows);
+      if (blocksErr) {
+        console.error("log-workout blocks insert error:", blocksErr);
+      }
+    }
+
+    // 3. Insert workout_log_entries rows
     const entries: {
       log_id: string;
       movement: string;
