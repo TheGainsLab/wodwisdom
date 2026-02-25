@@ -359,12 +359,13 @@ ${trimmed}`;
         ? "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(allChunks, 4)
         : "";
 
-      // Step 2: 4 parallel Claude calls
+      // Step 2: 4 staggered Claude calls (500ms apart to avoid overload)
+      const stagger = (ms: number) => new Promise((r) => setTimeout(r, ms));
       const [intentRaw, metconRaw, strengthRaw, skillsRaw] = await Promise.all([
         callClaude(INTENT_PROMPT + intentContext, userContent, 384),
-        callClaude(METCON_PROMPT + journalContext, userContent, 1024),
-        callClaude(STRENGTH_PROMPT + strengthContext, userContent, 1024),
-        callClaude(SKILLS_PROMPT + journalContext, userContent, 1024),
+        stagger(500).then(() => callClaude(METCON_PROMPT + journalContext, userContent, 1024)),
+        stagger(1000).then(() => callClaude(STRENGTH_PROMPT + strengthContext, userContent, 1024)),
+        stagger(1500).then(() => callClaude(SKILLS_PROMPT + journalContext, userContent, 1024)),
       ]);
 
       // Step 3: Parse responses and assemble
