@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { searchChunks, deduplicateChunks, formatChunksAsContext } from "../_shared/rag.ts";
+import { callClaude } from "../_shared/call-claude.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -162,50 +163,7 @@ Rules:
 - If the input is not a recognizable workout, set time_domain to "I couldn't parse this as a workout. Try pasting a complete workout (e.g. 4 RFT: 20 wall balls, 10 T2B, 5 power cleans 135/95)."
 - Do not include sources in the JSON - we will add them separately. Leave sources as empty array.`;
 
-// ---------------------------------------------------------------------------
-// Claude call helper
-// ---------------------------------------------------------------------------
-async function callClaude(
-  systemPrompt: string,
-  userContent: string,
-  maxTokens: number
-): Promise<string> {
-  const delays = [0, 2000, 4000];
-  for (let attempt = 0; attempt < delays.length; attempt++) {
-    if (delays[attempt] > 0) await new Promise((r) => setTimeout(r, delays[attempt]));
-
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: maxTokens,
-        stream: false,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userContent }],
-      }),
-    });
-
-    if (resp.ok) {
-      const data = await resp.json();
-      return data.content?.[0]?.text?.trim() || "";
-    }
-
-    const err = await resp.json().catch(() => ({}));
-    const isRetryable = resp.status === 429 || resp.status === 529 || err?.error?.type === "overloaded_error";
-
-    if (!isRetryable || attempt === delays.length - 1) {
-      console.error("Claude API error:", err);
-      throw new Error("Claude API call failed");
-    }
-    console.warn(`Claude API retry ${attempt + 1}/${delays.length - 1} after ${delays[attempt + 1]}ms`);
-  }
-  throw new Error("Claude API call failed");
-}
+// callClaude imported from _shared/call-claude.ts (retry + Haiku fallback)
 
 function parseJSON(raw: string): Record<string, unknown> | null {
   try {
@@ -360,10 +318,13 @@ ${trimmed}`;
         : "";
 
       // Step 2: 4 sequential Claude calls (series to avoid API overload)
-      const intentRaw = await callClaude(INTENT_PROMPT + intentContext, userContent, 384);
-      const metconRaw = await callClaude(METCON_PROMPT + journalContext, userContent, 1024);
-      const strengthRaw = await callClaude(STRENGTH_PROMPT + strengthContext, userContent, 1024);
-      const skillsRaw = await callClaude(SKILLS_PROMPT + journalContext, userContent, 1024);
+      const claudeOpts = (system: string, maxTokens: number) => ({
+        apiKey: ANTHROPIC_API_KEY!, system, userContent, maxTokens,
+      });
+      const intentRaw = await callClaude(claudeOpts(INTENT_PROMPT + intentContext, 384));
+      const metconRaw = await callClaude(claudeOpts(METCON_PROMPT + journalContext, 1024));
+      const strengthRaw = await callClaude(claudeOpts(STRENGTH_PROMPT + strengthContext, 1024));
+      const skillsRaw = await callClaude(claudeOpts(SKILLS_PROMPT + journalContext, 1024));
 
       // Step 3: Parse responses and assemble
       const intentParsed = parseJSON(intentRaw);
@@ -427,11 +388,12 @@ ${trimmed}`;
             .join("\n\n");
       }
 
-      const rawText = await callClaude(
-        WORKOUT_REVIEW_SYSTEM_PROMPT + context,
+      const rawText = await callClaude({
+        apiKey: ANTHROPIC_API_KEY!,
+        system: WORKOUT_REVIEW_SYSTEM_PROMPT + context,
         userContent,
-        1024
-      );
+        maxTokens: 1024,
+      });
 
       review = parseJSON(rawText) || {
         time_domain: rawText || "Unable to parse response.",
