@@ -571,12 +571,18 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                     )}
 
                     {block.type === 'cool-down' && (
-                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>
-                        Logged automatically — no input needed.
+                      <div style={{ marginTop: 8 }}>
+                        <input
+                          type="text"
+                          placeholder="Notes (optional, e.g. extra hip stretching)"
+                          value={blockScores[bi] ?? ''}
+                          onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
+                          style={{ ...compactInputStyle, width: '100%' }}
+                        />
                       </div>
                     )}
 
-                    {(block.type === 'accessory' || block.type === 'other') && block.movements.length > 0 && (
+                    {block.type === 'accessory' && block.movements.length > 0 && (
                       block.movements.map((m, mi) => {
                         const key = `${bi}-${mi}`;
                         const ev = entryValues[key] || {};

@@ -10,7 +10,7 @@ import { extractMovementsAI } from "./extract-movements-ai.ts";
 import { analyzeWorkouts, type MovementsContext } from "./analyzer.ts";
 import type { LibraryEntry } from "./extract-movements-ai.ts";
 
-export type BlockType = "warm-up" | "strength" | "metcon" | "skills" | "accessory" | "cool-down" | "other";
+export type BlockType = "warm-up" | "strength" | "metcon" | "skills" | "accessory" | "cool-down";
 
 export interface ParsedBlockMovement {
   canonical: string;
@@ -76,19 +76,25 @@ function splitIntoBlocks(workoutText: string): { label: string; text: string }[]
 
 function classifyBlockType(label: string, text: string): BlockType {
   const labelLower = label.toLowerCase();
-  if (/warm-up|warmup/.test(labelLower)) return "warm-up";
-  if (/strength/.test(labelLower)) return "strength";
-  if (/metcon|conditioning/.test(labelLower)) return "metcon";
-  if (/^skills$/.test(labelLower)) return "skills";
-  if (/cool[\s-]*down/.test(labelLower)) return "cool-down";
-  if (/accessory/.test(labelLower)) return "accessory";
+  // Check the first line of text body too (handles "A) Warm-up" where label is "A")
+  const firstLine = text.split("\n")[0]?.toLowerCase() ?? "";
+  const combined = labelLower + " " + firstLine;
 
+  if (/warm[\s-]*up/.test(combined)) return "warm-up";
+  if (/cool[\s-]*down/.test(combined)) return "cool-down";
+  if (/strength/.test(combined)) return "strength";
+  if (/metcon|conditioning/.test(combined)) return "metcon";
+  if (/\bskills?\b/.test(combined)) return "skills";
+  if (/accessory/.test(combined)) return "accessory";
+
+  // Text-based heuristics for metcon/strength detection
   const t = text.trim().toUpperCase();
   if (/AMRAP|AS MANY ROUNDS|FOR TIME|FORTIME|\d+\s*RFT|EMOM|E\d+MOM|DEATH\s+BY|TABATA|BUY\s+IN|CASH\s+OUT/.test(t)) {
     return "metcon";
   }
   if (/\d+X\d+|@\d+%/.test(t)) return "strength";
-  return "other";
+  // Default to accessory rather than "other" — every block gets a real type
+  return "accessory";
 }
 
 function extractMovementsRegex(
