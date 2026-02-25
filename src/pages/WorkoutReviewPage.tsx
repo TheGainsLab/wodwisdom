@@ -10,6 +10,7 @@ interface ReviewCues { movement: string; cues: string[]; }
 interface ReviewSource { title: string; author?: string; source?: string; }
 
 interface WorkoutReview {
+  intent: string;
   time_domain: string;
   scaling: ReviewScaling[];
   warm_up: string;
@@ -134,7 +135,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>Review Workout</h1>
+          <h1>Prepare Workout</h1>
           {tierLoaded && usagePill}
         </header>
 
@@ -175,12 +176,26 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
               </div>
             ) : (
               <div className="workout-review-result">
+                {/* Workout text at top for reference */}
+                <div className="workout-review-section" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+                  <h3>Workout</h3>
+                  <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap', fontWeight: 500, color: 'var(--text)' }}>{workoutText}</div>
+                </div>
+
+                {review.intent && (
+                  <div className="workout-review-section">
+                    <h3>Intent</h3>
+                    <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.intent) }} />
+                  </div>
+                )}
+
                 <div className="workout-review-section">
                   <h3>Time Domain</h3>
                   <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.time_domain) }} />
                 </div>
 
-                {review.scaling && review.scaling.length > 0 && (
+                {/* Scaling & warm-up only for paste-your-own (non-program) workouts */}
+                {!fromProgramState?.source_type && review.scaling && review.scaling.length > 0 && (
                   <div className="workout-review-section">
                     <h3>Scaling</h3>
                     {review.scaling.map((s, i) => (
@@ -192,7 +207,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                   </div>
                 )}
 
-                {review.warm_up && (
+                {!fromProgramState?.source_type && review.warm_up && (
                   <div className="workout-review-section">
                     <h3>Warm-up</h3>
                     <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.warm_up) }} />
@@ -215,7 +230,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                   </div>
                 )}
 
-                {review.class_prep && (
+                {!fromProgramState?.source_type && review.class_prep && (
                   <div className="workout-review-section">
                     <h3>Class Prep</h3>
                     <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.class_prep) }} />
@@ -259,7 +274,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                       onClick={() => { setReview(null); setWorkoutText(''); hasAutoAnalyzed.current = false; }}
                       style={{ flex: 1, minWidth: 160, background: 'var(--surface2)', color: 'var(--text)' }}
                     >
-                      Review Another Workout
+                      Prepare Another Workout
                     </button>
                   )}
                 </div>
