@@ -508,7 +508,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                     )}
 
                     {(block.type === 'warm-up' || block.type === 'cool-down') && block.movements.length > 0 && (
-                      block.movements.map((m, mi) => {
+                      block.movements.map((_m, mi) => {
                         const key = `${bi}-${mi}`;
                         const ev = entryValues[key] || {};
                         return (
