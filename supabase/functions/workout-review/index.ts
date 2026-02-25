@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
-import { searchChunks, deduplicateChunks, formatChunksAsContext, type RAGChunk } from "../_shared/rag.ts";
+import { searchChunks, deduplicateChunks, formatChunksAsContext } from "../_shared/rag.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -55,106 +55,86 @@ function formatAthleteProfile(profile: AthleteProfileData | null): string {
 }
 
 // ---------------------------------------------------------------------------
-// Block parsing for program workouts (simplified from workout-parser.ts)
+// Focused prompts for parallel per-block coaching calls
 // ---------------------------------------------------------------------------
-type ReviewBlockType = "strength" | "metcon" | "skills" | "warm-up" | "cool-down" | "accessory" | "other";
 
-interface WorkoutBlock {
-  label: string;
-  type: ReviewBlockType;
-  text: string;
+const INTENT_PROMPT = `You are an expert CrossFit coach. Given a multi-block training session, explain the overall session design in 2-3 sentences: why these blocks are combined, what energy systems or adaptations are targeted across the session, and how the blocks build on each other.
+
+Output valid JSON only, no markdown or extra text:
+{ "intent": "2-3 sentences about the session design." }
+
+Rules:
+- Tie the entire session together — don't just describe one block.
+- Reference specific energy systems, adaptations, or periodization goals.
+- Use recent training to note fatigue or progression context.
+- Be concise and practical. Athlete-focused voice.`;
+
+const METCON_PROMPT = `You are an expert CrossFit coach preparing an athlete for a conditioning workout. Focus ONLY on the Metcon / Conditioning portion of the workout below. Ignore strength, skills, warm-up, and cool-down blocks.
+
+Output valid JSON only, no markdown or extra text:
+{
+  "block_type": "metcon",
+  "block_label": "Metcon",
+  "time_domain": "Expected duration for this athlete. What will be the primary limiter. Pacing strategy.",
+  "cues_and_faults": [
+    { "movement": "Movement name", "cues": ["Cue 1", "Cue 2", "Cue 3"], "common_faults": ["Fault 1", "Fault 2"] }
+  ]
 }
 
-function splitAndClassifyBlocks(workoutText: string): WorkoutBlock[] {
-  const normalized = workoutText.trim().replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  const pattern = /^(Strength|Metcon|MetCon|Accessory|Warm-up|Warmup|Conditioning|Skills|Cool\s*down|Cool-down):\s*/im;
-  const parts = normalized.split(pattern);
+Rules:
+- Provide cues_and_faults for EVERY movement in the metcon.
+- Cues: 2-3 actionable points of performance per movement. Personalize using athlete profile (e.g. specific loads from their 1RMs, scaling based on their skill level).
+- Common faults: 1-2 most common errors at the prescribed intensity/volume.
+- time_domain must include pacing strategy and what will limit this specific athlete.
+- Ground advice in the provided reference material when available.
+- Use recent training to account for fatigue or similar recent volume.
+- Be concise and practical. Athlete-focused voice.`;
 
-  if (parts.length <= 1) {
-    return [{ label: "Metcon", type: "metcon", text: normalized }];
-  }
+const STRENGTH_PROMPT = `You are an expert strength & conditioning coach preparing an athlete for their strength work. Focus ONLY on the Strength portion of the workout below. Ignore metcon, skills, warm-up, and cool-down blocks.
 
-  const blocks: WorkoutBlock[] = [];
-  let i = 1;
-  while (i + 1 < parts.length) {
-    const label = parts[i]?.trim() || "";
-    const text = parts[i + 1]?.trim() || "";
-    i += 2;
-    if (!label || !text) continue;
-
-    const ll = label.toLowerCase();
-    let type: ReviewBlockType;
-    if (/strength/.test(ll)) type = "strength";
-    else if (/metcon|conditioning/.test(ll)) type = "metcon";
-    else if (/skills/.test(ll)) type = "skills";
-    else if (/warm-?up/.test(ll)) type = "warm-up";
-    else if (/cool\s*-?down/.test(ll)) type = "cool-down";
-    else if (/accessory/.test(ll)) type = "accessory";
-    else type = "other";
-
-    blocks.push({ label, type, text });
-  }
-
-  return blocks.length > 0 ? blocks : [{ label: "Metcon", type: "metcon", text: normalized }];
+Output valid JSON only, no markdown or extra text:
+{
+  "block_type": "strength",
+  "block_label": "Strength",
+  "time_domain": "Rest intervals between sets, total block duration, tempo if prescribed.",
+  "cues_and_faults": [
+    { "movement": "Movement name", "cues": ["Cue 1", "Cue 2", "Cue 3"], "common_faults": ["Fault 1", "Fault 2"] }
+  ]
 }
+
+Rules:
+- Provide cues_and_faults for EVERY lift in the strength block.
+- Cues: 2-3 actionable points of performance per lift. Personalize using athlete profile — calculate specific working weights from their 1RMs (e.g. "75% of 300lb back squat = 225lb").
+- Common faults: 1-2 most common errors at the prescribed intensity.
+- time_domain must include recommended rest intervals and RPE expectations.
+- Ground advice in the provided reference material when available (periodization, load management, biomechanics).
+- Use recent training to account for fatigue or similar recent volume.
+- Be concise and practical. Athlete-focused voice.`;
+
+const SKILLS_PROMPT = `You are an expert gymnastics and skills coach preparing an athlete for their skill work. Focus ONLY on the Skills portion of the workout below. Ignore metcon, strength, warm-up, and cool-down blocks.
+
+Output valid JSON only, no markdown or extra text:
+{
+  "block_type": "skills",
+  "block_label": "Skills",
+  "time_domain": "Format/tempo (e.g. EMOM structure), total duration.",
+  "cues_and_faults": [
+    { "movement": "Movement name", "cues": ["Cue 1", "Cue 2", "Cue 3"], "common_faults": ["Fault 1", "Fault 2"] }
+  ]
+}
+
+Rules:
+- Provide cues_and_faults for EVERY movement in the skills block.
+- Cues: 2-3 actionable points of performance per movement. Personalize using athlete profile — if the athlete can't do the movement as written, provide a progression path and scaling option.
+- Common faults: 1-2 most common errors for that movement.
+- time_domain should describe the practice format and total duration.
+- Ground advice in the provided reference material when available (progressions, skill transfer, quality metrics).
+- Use recent training to account for recent practice or fatigue.
+- Be concise and practical. Athlete-focused voice.`;
 
 // ---------------------------------------------------------------------------
 // Prompts
 // ---------------------------------------------------------------------------
-
-/** Prompt for program workouts — per-block analysis with unified intent */
-function buildProgramPrompt(blocks: WorkoutBlock[]): string {
-  const blockDescriptions = blocks
-    .filter((b) => b.type === "skills" || b.type === "strength" || b.type === "metcon")
-    .map((b) => `  - "${b.label}" (${b.type})`)
-    .join("\n");
-
-  const blocksSchema = blocks
-    .filter((b) => b.type === "skills" || b.type === "strength" || b.type === "metcon")
-    .map((b) => {
-      const timeDomainField =
-        b.type === "strength"
-          ? `"time_domain": "Rest intervals, total block duration, tempo if applicable"`
-          : b.type === "skills"
-          ? `"time_domain": "Format/tempo (e.g. EMOM structure), total duration"`
-          : `"time_domain": "Expected duration. What will limit the athlete."`;
-      return `    {
-      "block_type": "${b.type}",
-      "block_label": "${b.label}",
-      ${timeDomainField},
-      "cues_and_faults": [
-        { "movement": "Movement name", "cues": ["Cue 1", "Cue 2"], "common_faults": ["Fault 1"] }
-      ]
-    }`;
-    })
-    .join(",\n");
-
-  return `You are an expert CrossFit coach preparing an athlete for a multi-block training session. Analyze each training block and provide targeted coaching. Ground advice in the provided reference material when available.
-
-The workout has these training blocks:
-${blockDescriptions}
-
-Output valid JSON only, no markdown or extra text, with this exact structure:
-{
-  "intent": "2-3 sentences: the overall session design — why these blocks are combined, what energy systems or adaptations are targeted across the session, and how the blocks build on each other.",
-  "blocks": [
-${blocksSchema}
-  ],
-  "sources": []
-}
-
-Rules:
-- intent should tie the entire session together, not just describe one block.
-- For each block, provide cues_and_faults for every primary movement.
-- Cues: 2-3 actionable coaching cues per movement. Personalize using athlete profile (e.g. specific loads from their 1RMs).
-- Common faults: 1-2 most common errors for that movement at the prescribed intensity/volume.
-- For strength blocks: include rest intervals and RPE expectations in time_domain. Use strength science principles (periodization, load management).
-- For skills blocks: include progression tips and scaling if the athlete can't perform the movement as written.
-- For metcon blocks: include pacing strategy and what will be the primary limiter.
-- Use recent training to account for fatigue or similar volume.
-- Be concise and practical. Athlete-focused voice.
-- Do not include sources in the JSON — leave sources as empty array.`;
-}
 
 const WORKOUT_REVIEW_SYSTEM_PROMPT = `You are an expert CrossFit coach reviewing this workout for a specific athlete. Give personalized scaling, warm-up, and cues based on their profile and recent training. Ground advice in the provided CrossFit Journal articles when available.
 
@@ -181,6 +161,49 @@ Rules:
 - Extract movements from the workout and provide scaling/cues for each.
 - If the input is not a recognizable workout, set time_domain to "I couldn't parse this as a workout. Try pasting a complete workout (e.g. 4 RFT: 20 wall balls, 10 T2B, 5 power cleans 135/95)."
 - Do not include sources in the JSON - we will add them separately. Leave sources as empty array.`;
+
+// ---------------------------------------------------------------------------
+// Claude call helper
+// ---------------------------------------------------------------------------
+async function callClaude(
+  systemPrompt: string,
+  userContent: string,
+  maxTokens: number
+): Promise<string> {
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY!,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: maxTokens,
+      stream: false,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userContent }],
+    }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    console.error("Claude API error:", err);
+    throw new Error("Claude API call failed");
+  }
+
+  const data = await resp.json();
+  return data.content?.[0]?.text?.trim() || "";
+}
+
+function parseJSON(raw: string): Record<string, unknown> | null {
+  try {
+    const match = raw.match(/\{[\s\S]*\}/);
+    return JSON.parse(match ? match[0] : raw);
+  } catch {
+    return null;
+  }
+}
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -281,54 +304,78 @@ Deno.serve(async (req) => {
     }
 
     // -----------------------------------------------------------------------
-    // Program workouts: per-block RAG + per-block analysis
+    // Shared user content for all Claude calls
     // -----------------------------------------------------------------------
     const isProgramWorkout = source_type === "program";
-    const blocks = isProgramWorkout ? splitAndClassifyBlocks(trimmed) : [];
-    const analysisBlocks = blocks.filter(
-      (b) => b.type === "skills" || b.type === "strength" || b.type === "metcon"
-    );
 
-    let systemPrompt: string;
-    let context = "";
+    const userContent = `ATHLETE PROFILE:
+${profileStr}
+
+RECENT TRAINING (last 14 days):
+${recentStr}
+
+WORKOUT:
+${trimmed}`;
+
+    let review: Record<string, unknown>;
     const sources: { title: string; author: string; source: string }[] = [];
 
-    if (isProgramWorkout && analysisBlocks.length > 0) {
-      // Build per-category RAG queries in parallel
-      const skillsMetconText = analysisBlocks
-        .filter((b) => b.type === "skills" || b.type === "metcon")
-        .map((b) => b.text)
-        .join("\n");
-      const strengthText = analysisBlocks
-        .filter((b) => b.type === "strength")
-        .map((b) => b.text)
-        .join("\n");
+    if (isProgramWorkout) {
+      // -------------------------------------------------------------------
+      // Program workouts: 3 parallel RAG queries + 4 parallel Claude calls
+      // -------------------------------------------------------------------
 
-      const ragPromises: Promise<RAGChunk[]>[] = [];
-      if (skillsMetconText) {
-        ragPromises.push(
-          searchChunks(supa, skillsMetconText, "journal", OPENAI_API_KEY!, 4, 0.25)
-        );
-      }
-      if (strengthText) {
-        ragPromises.push(
-          searchChunks(supa, strengthText, "strength-science", OPENAI_API_KEY!, 4, 0.25)
-        );
-      }
+      // Step 1: RAG queries in parallel (journal for metcon/skills, strength-science for strength)
+      const [journalChunks, strengthChunks] = await Promise.all([
+        searchChunks(supa, trimmed, "journal", OPENAI_API_KEY!, 4, 0.25),
+        searchChunks(supa, trimmed, "strength-science", OPENAI_API_KEY!, 4, 0.25),
+      ]);
 
-      const ragResults = await Promise.all(ragPromises);
-      const allChunks = deduplicateChunks(ragResults.flat());
-
+      // Collect all sources
+      const allChunks = deduplicateChunks([...journalChunks, ...strengthChunks]);
       for (const c of allChunks) {
         sources.push({ title: c.title, author: c.author || "", source: c.source || "" });
       }
-      if (allChunks.length > 0) {
-        context = "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(allChunks, 8);
-      }
 
-      systemPrompt = buildProgramPrompt(analysisBlocks);
+      // Build per-block context strings (journal shared by metcon + skills)
+      const journalContext = journalChunks.length > 0
+        ? "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(journalChunks, 4)
+        : "";
+      const strengthContext = strengthChunks.length > 0
+        ? "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(strengthChunks, 4)
+        : "";
+      const intentContext = allChunks.length > 0
+        ? "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(allChunks, 4)
+        : "";
+
+      // Step 2: 4 parallel Claude calls
+      const [intentRaw, metconRaw, strengthRaw, skillsRaw] = await Promise.all([
+        callClaude(INTENT_PROMPT + intentContext, userContent, 384),
+        callClaude(METCON_PROMPT + journalContext, userContent, 1024),
+        callClaude(STRENGTH_PROMPT + strengthContext, userContent, 1024),
+        callClaude(SKILLS_PROMPT + journalContext, userContent, 1024),
+      ]);
+
+      // Step 3: Parse responses and assemble
+      const intentParsed = parseJSON(intentRaw);
+      const metconParsed = parseJSON(metconRaw);
+      const strengthParsed = parseJSON(strengthRaw);
+      const skillsParsed = parseJSON(skillsRaw);
+
+      const blocks: Record<string, unknown>[] = [];
+      if (skillsParsed?.block_type) blocks.push(skillsParsed);
+      if (strengthParsed?.block_type) blocks.push(strengthParsed);
+      if (metconParsed?.block_type) blocks.push(metconParsed);
+
+      review = {
+        intent: intentParsed?.intent || intentRaw || "Unable to parse intent.",
+        blocks,
+        sources: [],
+      };
     } else {
+      // -------------------------------------------------------------------
       // Paste-your-own: single journal RAG query (existing flow)
+      // -------------------------------------------------------------------
       const embResp = await fetch("https://api.openai.com/v1/embeddings", {
         method: "POST",
         headers: {
@@ -356,6 +403,7 @@ Deno.serve(async (req) => {
         filter_category: "journal",
       });
 
+      let context = "";
       if (chunks && chunks.length > 0) {
         context =
           "\n\nRELEVANT ARTICLES:\n" +
@@ -370,73 +418,20 @@ Deno.serve(async (req) => {
             .join("\n\n");
       }
 
-      systemPrompt = WORKOUT_REVIEW_SYSTEM_PROMPT;
-    }
-
-    // Call Claude (non-streaming for structured JSON)
-    const userContent = `ATHLETE PROFILE:
-${profileStr}
-
-RECENT TRAINING (last 14 days):
-${recentStr}
-
-WORKOUT:
-${trimmed}`;
-
-    const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: isProgramWorkout ? 2048 : 1024,
-        stream: false,
-        system: systemPrompt + context,
-        messages: [{ role: "user", content: userContent }],
-      }),
-    });
-
-    if (!claudeResp.ok) {
-      const err = await claudeResp.json().catch(() => ({}));
-      console.error("Claude API error:", err);
-      return new Response(
-        JSON.stringify({ error: "Failed to generate review" }),
-        { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
+      const rawText = await callClaude(
+        WORKOUT_REVIEW_SYSTEM_PROMPT + context,
+        userContent,
+        1024
       );
-    }
 
-    const claudeData = await claudeResp.json();
-    const rawText =
-      claudeData.content?.[0]?.text?.trim() ||
-      claudeData.content?.[0]?.input?.trim() ||
-      "";
-
-    // Parse JSON from response (handle possible markdown code blocks)
-    let review: Record<string, unknown>;
-    try {
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      const jsonStr = jsonMatch ? jsonMatch[0] : rawText;
-      review = JSON.parse(jsonStr);
-    } catch {
-      if (isProgramWorkout) {
-        review = {
-          intent: rawText || "Unable to parse response.",
-          blocks: [],
-          sources: [],
-        };
-      } else {
-        review = {
-          time_domain: rawText || "Unable to parse response.",
-          scaling: [],
-          warm_up: "",
-          cues: [],
-          class_prep: "",
-          sources: [],
-        };
-      }
+      review = parseJSON(rawText) || {
+        time_domain: rawText || "Unable to parse response.",
+        scaling: [],
+        warm_up: "",
+        cues: [],
+        class_prep: "",
+        sources: [],
+      };
     }
 
     // Attach sources to review
