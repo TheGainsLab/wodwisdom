@@ -31,6 +31,7 @@ interface LogEntry {
   rpe?: number | null;
   scaling_note?: string | null;
   sort_order?: number;
+  set_number?: number | null;
   // Skills-specific fields
   reps_completed?: number | null;
   hold_seconds?: number | null;
@@ -183,6 +184,7 @@ Deno.serve(async (req) => {
       scaling_note: string | null;
       sort_order: number;
       block_label: string | null;
+      set_number: number | null;
       reps_completed: number | null;
       hold_seconds: number | null;
       distance: number | null;
@@ -208,6 +210,7 @@ Deno.serve(async (req) => {
           scaling_note: entry.scaling_note?.trim() || null,
           sort_order: sortOrder++,
           block_label: blockLabel,
+          set_number: entry.set_number != null && entry.set_number > 0 ? entry.set_number : null,
           // Skills-specific fields
           reps_completed: entry.reps_completed != null && entry.reps_completed >= 0
             ? entry.reps_completed

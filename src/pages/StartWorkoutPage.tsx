@@ -28,6 +28,7 @@ interface EntryValues {
   weight_unit: 'lbs' | 'kg';
   rpe?: number;
   scaling_note?: string;
+  set_number?: number;
   // Skills-specific fields
   reps_completed?: number;
   hold_seconds?: number;
@@ -124,15 +125,31 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
       (data?.blocks || []).forEach((b: Block, bi: number) => {
         const { sets, reps } = parseSetsReps(b.text);
         b.movements.forEach((m: BlockMovement, mi: number) => {
-          const key = `${bi}-${mi}`;
-          initial[key] = {
-            sets,
-            reps,
-            weight: m.suggested_weight ?? undefined,
-            weight_unit: 'lbs',
-            rpe: undefined,
-            scaling_note: undefined,
-          };
+          if (b.type === 'strength' && sets && sets > 0) {
+            // Expand strength into one entry per set
+            for (let s = 0; s < sets; s++) {
+              const key = `${bi}-${mi}-s${s}`;
+              initial[key] = {
+                sets: 1,
+                reps,
+                weight: m.suggested_weight ?? undefined,
+                weight_unit: 'lbs',
+                rpe: undefined,
+                scaling_note: undefined,
+                set_number: s + 1,
+              };
+            }
+          } else {
+            const key = `${bi}-${mi}`;
+            initial[key] = {
+              sets,
+              reps,
+              weight: m.suggested_weight ?? undefined,
+              weight_unit: 'lbs',
+              rpe: undefined,
+              scaling_note: undefined,
+            };
+          }
         });
       });
       setEntryValues(initial);
@@ -156,6 +173,95 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     setSaving(true);
     try {
       const logBlocks = blocks.map((b, bi) => {
+        // Warm-up and cool-down: no per-movement entries
+        if (b.type === 'warm-up' || b.type === 'cool-down') {
+          return {
+            label: b.label,
+            type: b.type,
+            text: b.text,
+            score: blockScores[bi]?.trim() || null,
+            rx: false,
+            entries: [],
+          };
+        }
+
+        // Strength: collect per-set entries
+        if (b.type === 'strength') {
+          const entries: {
+            movement: string;
+            sets: number | null;
+            reps: number | null;
+            weight: number | null;
+            weight_unit: string;
+            rpe: number | null;
+            scaling_note: string | null;
+            set_number: number | null;
+            reps_completed: null;
+            hold_seconds: null;
+            distance: null;
+            distance_unit: null;
+            quality: null;
+            variation: null;
+          }[] = [];
+          b.movements.forEach((m, mi) => {
+            // Gather per-set keys
+            const setKeys = Object.keys(entryValues)
+              .filter(k => k.startsWith(`${bi}-${mi}-s`))
+              .sort((a, b2) => parseInt(a.split('-s')[1], 10) - parseInt(b2.split('-s')[1], 10));
+
+            if (setKeys.length > 0) {
+              for (const key of setKeys) {
+                const ev = entryValues[key] || {};
+                entries.push({
+                  movement: m.canonical,
+                  sets: 1,
+                  reps: ev.reps ?? null,
+                  weight: ev.weight ?? null,
+                  weight_unit: ev.weight_unit || 'lbs',
+                  rpe: ev.rpe ?? null,
+                  scaling_note: null,
+                  set_number: ev.set_number ?? null,
+                  reps_completed: null,
+                  hold_seconds: null,
+                  distance: null,
+                  distance_unit: null,
+                  quality: null,
+                  variation: null,
+                });
+              }
+            } else {
+              // Legacy single-row fallback
+              const key = `${bi}-${mi}`;
+              const ev = entryValues[key] || {};
+              entries.push({
+                movement: m.canonical,
+                sets: ev.sets ?? null,
+                reps: ev.reps ?? null,
+                weight: ev.weight ?? null,
+                weight_unit: ev.weight_unit || 'lbs',
+                rpe: ev.rpe ?? null,
+                scaling_note: null,
+                set_number: null,
+                reps_completed: null,
+                hold_seconds: null,
+                distance: null,
+                distance_unit: null,
+                quality: null,
+                variation: null,
+              });
+            }
+          });
+          return {
+            label: b.label,
+            type: b.type,
+            text: b.text,
+            score: blockScores[bi]?.trim() || null,
+            rx: false,
+            entries,
+          };
+        }
+
+        // All other block types (metcon, skills, accessory, other)
         const entries = b.movements.map((m, mi) => {
           const key = `${bi}-${mi}`;
           const ev = entryValues[key] || {};
@@ -167,6 +273,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             weight_unit: ev.weight_unit || 'lbs',
             rpe: ev.rpe ?? null,
             scaling_note: ev.scaling_note?.trim() || null,
+            set_number: null as number | null,
             reps_completed: ev.reps_completed ?? null,
             hold_seconds: ev.hold_seconds ?? null,
             distance: ev.distance ?? null,
@@ -282,43 +389,73 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                     <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap', marginBottom: 16 }}>{block.text}</div>
 
                     {block.type === 'strength' && block.movements.map((m, mi) => {
-                      const key = `${bi}-${mi}`;
-                      const ev = entryValues[key] || {};
-                      const showName = block.movements.length > 1;
+                      // Collect per-set keys for this movement
+                      const setKeys = Object.keys(entryValues)
+                        .filter(k => k.startsWith(`${bi}-${mi}-s`))
+                        .sort((a, b) => {
+                          const aNum = parseInt(a.split('-s')[1], 10);
+                          const bNum = parseInt(b.split('-s')[1], 10);
+                          return aNum - bNum;
+                        });
+                      // Fallback: if no per-set keys, show legacy single-row
+                      const legacyKey = `${bi}-${mi}`;
+                      const usePerSet = setKeys.length > 0;
+
                       return (
-                        <div key={key} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12, alignItems: 'center' }}>
-                          {showName && <span style={{ fontWeight: 600, minWidth: 120 }}>{formatMovementName(m.canonical)}</span>}
-                          <input
-                            type="number"
-                            placeholder="Sets"
-                            value={ev.sets ?? ''}
-                            onChange={e => setEntry(key, 'sets', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                            style={{ ...compactInputStyle, width: 60 }}
-                          />
-                          <input
-                            type="number"
-                            placeholder="Reps"
-                            value={ev.reps ?? ''}
-                            onChange={e => setEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                            style={{ ...compactInputStyle, width: 60 }}
-                          />
-                          <input
-                            type="number"
-                            placeholder="Weight"
-                            value={ev.weight ?? ''}
-                            onChange={e => setEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
-                            style={{ ...compactInputStyle, width: 80 }}
-                          />
-                          <span style={{ color: 'var(--text-dim)', fontSize: 14 }}>{ev.weight_unit || 'lbs'}</span>
-                          <input
-                            type="number"
-                            placeholder="RPE 1-10"
-                            min={1}
-                            max={10}
-                            value={ev.rpe ?? ''}
-                            onChange={e => setEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                            style={{ ...compactInputStyle, width: 70 }}
-                          />
+                        <div key={legacyKey} style={{ marginBottom: 16 }}>
+                          {block.movements.length > 1 && (
+                            <div style={{ fontWeight: 600, marginBottom: 8 }}>{formatMovementName(m.canonical)}</div>
+                          )}
+                          {usePerSet ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)', paddingLeft: 40 }}>
+                                <span style={{ width: 60 }}>Reps</span>
+                                <span style={{ width: 80 }}>Weight</span>
+                                <span style={{ width: 32 }}></span>
+                                <span style={{ width: 56 }}>RPE</span>
+                              </div>
+                              {setKeys.map(key => {
+                                const ev = entryValues[key] || {};
+                                return (
+                                  <div key={key} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                    <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 28, textAlign: 'right' }}>S{ev.set_number}</span>
+                                    <input
+                                      type="number"
+                                      placeholder="Reps"
+                                      value={ev.reps ?? ''}
+                                      onChange={e => setEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                      style={{ ...compactInputStyle, width: 60 }}
+                                    />
+                                    <input
+                                      type="number"
+                                      placeholder="Weight"
+                                      value={ev.weight ?? ''}
+                                      onChange={e => setEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
+                                      style={{ ...compactInputStyle, width: 80 }}
+                                    />
+                                    <span style={{ color: 'var(--text-dim)', fontSize: 13, width: 28 }}>{ev.weight_unit || 'lbs'}</span>
+                                    <input
+                                      type="number"
+                                      placeholder="RPE"
+                                      min={1}
+                                      max={10}
+                                      value={ev.rpe ?? ''}
+                                      onChange={e => setEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                      style={{ ...compactInputStyle, width: 56 }}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+                              <input type="number" placeholder="Sets" value={(entryValues[legacyKey] || {}).sets ?? ''} onChange={e => setEntry(legacyKey, 'sets', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 60 }} />
+                              <input type="number" placeholder="Reps" value={(entryValues[legacyKey] || {}).reps ?? ''} onChange={e => setEntry(legacyKey, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 60 }} />
+                              <input type="number" placeholder="Weight" value={(entryValues[legacyKey] || {}).weight ?? ''} onChange={e => setEntry(legacyKey, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)} style={{ ...compactInputStyle, width: 80 }} />
+                              <span style={{ color: 'var(--text-dim)', fontSize: 14 }}>{(entryValues[legacyKey] || {}).weight_unit || 'lbs'}</span>
+                              <input type="number" placeholder="RPE" min={1} max={10} value={(entryValues[legacyKey] || {}).rpe ?? ''} onChange={e => setEntry(legacyKey, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 56 }} />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -343,19 +480,24 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                             onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
                           />
                         </div>
-                        {!(blockRx[bi] ?? false) && block.movements.map((m, mi) => {
+                        {block.movements.map((m, mi) => {
                           const key = `${bi}-${mi}`;
                           const ev = entryValues[key] || {};
+                          const loadLabel = m.suggested_weight ? ` — ${m.suggested_weight} ${ev.weight_unit || 'lbs'}` : '';
                           return (
                             <div key={key} style={{ display: 'flex', gap: 12, marginBottom: 8, alignItems: 'center' }}>
-                              <span style={{ fontWeight: 600, minWidth: 140 }}>{formatMovementName(m.canonical)}</span>
-                              <input
-                                type="text"
-                                placeholder="Scaling (e.g. banded)"
-                                value={ev.scaling_note ?? ''}
-                                onChange={e => setEntry(key, 'scaling_note', e.target.value)}
-                                style={{ ...compactInputStyle, flex: 1, maxWidth: 200 }}
-                              />
+                              <span style={{ fontWeight: 600, minWidth: 160, fontSize: 14 }}>
+                                {formatMovementName(m.canonical)}{loadLabel}
+                              </span>
+                              {!(blockRx[bi] ?? false) && (
+                                <input
+                                  type="text"
+                                  placeholder="Scaling (e.g. 135 lbs, banded)"
+                                  value={ev.scaling_note ?? ''}
+                                  onChange={e => setEntry(key, 'scaling_note', e.target.value)}
+                                  style={{ ...compactInputStyle, flex: 1, maxWidth: 220 }}
+                                />
+                              )}
                             </div>
                           );
                         })}
@@ -366,137 +508,46 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                       block.movements.map((m, mi) => {
                         const key = `${bi}-${mi}`;
                         const ev = entryValues[key] || {};
-                        const showName = block.movements.length > 1;
                         return (
-                          <div key={key} style={{ marginBottom: 16, padding: 12, background: 'var(--surface2)', borderRadius: 8 }}>
-                            {showName && <div style={{ fontWeight: 600, marginBottom: 10 }}>{formatMovementName(m.canonical)}</div>}
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Sets</label>
-                                <input
-                                  type="number"
-                                  placeholder="—"
-                                  value={ev.sets ?? ''}
-                                  onChange={e => setEntry(key, 'sets', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                  style={{ ...compactInputStyle, width: 56 }}
-                                />
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Reps Rx</label>
-                                <input
-                                  type="number"
-                                  placeholder="—"
-                                  value={ev.reps ?? ''}
-                                  onChange={e => setEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                  style={{ ...compactInputStyle, width: 56 }}
-                                />
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Reps Hit</label>
-                                <input
-                                  type="number"
-                                  placeholder="—"
-                                  value={ev.reps_completed ?? ''}
-                                  onChange={e => setEntry(key, 'reps_completed', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                  style={{ ...compactInputStyle, width: 56 }}
-                                />
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Hold (s)</label>
-                                <input
-                                  type="number"
-                                  placeholder="—"
-                                  value={ev.hold_seconds ?? ''}
-                                  onChange={e => setEntry(key, 'hold_seconds', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                  style={{ ...compactInputStyle, width: 64 }}
-                                />
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Distance</label>
-                                <div style={{ display: 'flex', gap: 4 }}>
-                                  <input
-                                    type="number"
-                                    placeholder="—"
-                                    value={ev.distance ?? ''}
-                                    onChange={e => setEntry(key, 'distance', e.target.value ? parseFloat(e.target.value) : undefined)}
-                                    style={{ ...compactInputStyle, width: 64 }}
-                                  />
-                                  <select
-                                    value={ev.distance_unit || 'ft'}
-                                    onChange={e => setEntry(key, 'distance_unit', e.target.value)}
-                                    style={{ ...compactInputStyle, width: 50, padding: '8px 4px' }}
-                                  >
-                                    <option value="ft">ft</option>
-                                    <option value="m">m</option>
-                                  </select>
-                                </div>
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>RPE 1-10</label>
-                                <input
-                                  type="number"
-                                  placeholder="—"
-                                  min={1}
-                                  max={10}
-                                  value={ev.rpe ?? ''}
-                                  onChange={e => setEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                  style={{ ...compactInputStyle, width: 64 }}
-                                />
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Quality</label>
-                                <div style={{ display: 'flex', gap: 4 }}>
-                                  {(['A', 'B', 'C', 'D'] as QualityGrade[]).map(g => (
-                                    <button
-                                      key={g}
-                                      type="button"
-                                      onClick={() => setEntry(key, 'quality', ev.quality === g ? undefined : g)}
-                                      style={{
-                                        ...compactInputStyle,
-                                        width: 36,
-                                        textAlign: 'center' as const,
-                                        cursor: 'pointer',
-                                        fontWeight: ev.quality === g ? 700 : 400,
-                                        background: ev.quality === g ? 'var(--accent)' : 'var(--bg)',
-                                        color: ev.quality === g ? '#fff' : 'var(--text)',
-                                      }}
-                                    >
-                                      {g}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Weight</label>
-                                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                  <input
-                                    type="number"
-                                    placeholder="—"
-                                    value={ev.weight ?? ''}
-                                    onChange={e => setEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
-                                    style={{ ...compactInputStyle, width: 72 }}
-                                  />
-                                  <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>{ev.weight_unit || 'lbs'}</span>
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 120 }}>
-                                <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Variation</label>
-                                <input
-                                  type="text"
-                                  placeholder="e.g. kipping, banded, strict"
-                                  value={ev.variation ?? ''}
-                                  onChange={e => setEntry(key, 'variation', e.target.value)}
-                                  style={{ ...compactInputStyle, width: '100%' }}
-                                />
-                              </div>
+                          <div key={key} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 10, alignItems: 'flex-end' }}>
+                            <span style={{ fontWeight: 600, minWidth: 130, paddingBottom: 10 }}>{formatMovementName(m.canonical)}</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Sets</label>
+                              <input
+                                type="number"
+                                placeholder="—"
+                                value={ev.sets ?? ''}
+                                onChange={e => setEntry(key, 'sets', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                style={{ ...compactInputStyle, width: 56 }}
+                              />
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                              <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Notes</label>
+                              <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Reps</label>
+                              <input
+                                type="number"
+                                placeholder="—"
+                                value={ev.reps_completed ?? ''}
+                                onChange={e => setEntry(key, 'reps_completed', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                style={{ ...compactInputStyle, width: 56 }}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>RPE</label>
+                              <input
+                                type="number"
+                                placeholder="—"
+                                min={1}
+                                max={10}
+                                value={ev.rpe ?? ''}
+                                onChange={e => setEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                style={{ ...compactInputStyle, width: 56 }}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 140 }}>
+                              <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Note</label>
                               <input
                                 type="text"
-                                placeholder="e.g. connected 2 then singles, grip failed set 4"
+                                placeholder="e.g. got 5/5/4/3, used ab mat"
                                 value={ev.scaling_note ?? ''}
                                 onChange={e => setEntry(key, 'scaling_note', e.target.value)}
                                 style={{ ...compactInputStyle, width: '100%' }}
@@ -507,22 +558,22 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                       })
                     )}
 
-                    {(block.type === 'warm-up' || block.type === 'cool-down') && block.movements.length > 0 && (
-                      block.movements.map((_m, mi) => {
-                        const key = `${bi}-${mi}`;
-                        const ev = entryValues[key] || {};
-                        return (
-                          <div key={key} style={{ display: 'flex', gap: 12, marginBottom: 8, alignItems: 'center' }}>
-                            <input
-                              type="text"
-                              placeholder="Notes (optional)"
-                              value={ev.scaling_note ?? ''}
-                              onChange={e => setEntry(key, 'scaling_note', e.target.value)}
-                              style={{ ...compactInputStyle, flex: 1 }}
-                            />
-                          </div>
-                        );
-                      })
+                    {block.type === 'warm-up' && (
+                      <div style={{ marginTop: 8 }}>
+                        <input
+                          type="text"
+                          placeholder="Notes (optional, e.g. subbed row for bike)"
+                          value={blockScores[bi] ?? ''}
+                          onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
+                          style={{ ...compactInputStyle, width: '100%' }}
+                        />
+                      </div>
+                    )}
+
+                    {block.type === 'cool-down' && (
+                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>
+                        Logged automatically — no input needed.
+                      </div>
                     )}
 
                     {(block.type === 'accessory' || block.type === 'other') && block.movements.length > 0 && (

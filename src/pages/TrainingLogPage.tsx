@@ -33,6 +33,7 @@ interface WorkoutLogEntry {
   rpe: number | null;
   scaling_note: string | null;
   block_label: string | null;
+  set_number: number | null;
   reps_completed: number | null;
   hold_seconds: number | null;
   distance: number | null;
@@ -100,7 +101,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
             .in('log_id', logIds),
           supabase
             .from('workout_log_entries')
-            .select('log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, block_label, reps_completed, hold_seconds, distance, distance_unit, quality, variation, sort_order')
+            .select('log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, sort_order')
             .in('log_id', logIds),
         ]);
 
@@ -248,32 +249,74 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                       <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, color: 'var(--text-dim)', paddingLeft: 8 }}>
                                         {block.block_text}
                                       </div>
-                                      {isSkills && blockEntries.length > 0 && (
-                                        <div style={{ paddingLeft: 8, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                          {blockEntries.map((entry, ei) => (
-                                            <div key={ei} style={{ fontSize: 13, color: 'var(--text)', background: 'var(--surface2)', padding: '8px 10px', borderRadius: 6 }}>
-                                              <span style={{ fontWeight: 600 }}>{formatMovementName(entry.movement)}</span>
-                                              {entry.variation && <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>({entry.variation})</span>}
-                                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 4, fontSize: 12, color: 'var(--text-dim)' }}>
-                                                {entry.sets != null && <span>{entry.sets} sets</span>}
-                                                {entry.reps != null && entry.reps_completed != null && (
-                                                  <span>{entry.reps_completed}/{entry.reps} reps</span>
-                                                )}
-                                                {entry.reps != null && entry.reps_completed == null && (
-                                                  <span>{entry.reps} reps</span>
-                                                )}
-                                                {entry.hold_seconds != null && <span>{entry.hold_seconds}s hold</span>}
-                                                {entry.distance != null && <span>{entry.distance}{entry.distance_unit || 'ft'}</span>}
-                                                {entry.weight != null && <span>{entry.weight}{entry.weight_unit}</span>}
-                                                {entry.rpe != null && <span>RPE {entry.rpe}</span>}
-                                                {entry.quality && <span>Quality: {entry.quality}</span>}
-                                              </div>
-                                              {entry.scaling_note && (
-                                                <div style={{ fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic', marginTop: 4 }}>
-                                                  {entry.scaling_note}
+
+                                      {/* Strength: show per-set entries grouped by movement */}
+                                      {block.block_type === 'strength' && blockEntries.length > 0 && (() => {
+                                        const hasPerSet = blockEntries.some(e => e.set_number != null);
+                                        if (!hasPerSet) {
+                                          // Legacy single-row display
+                                          return (
+                                            <div style={{ paddingLeft: 8, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                              {blockEntries.map((entry, ei) => (
+                                                <div key={ei} style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                                                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(entry.movement)}</span>
+                                                  {entry.sets != null && entry.reps != null && <span> {entry.sets}x{entry.reps}</span>}
+                                                  {entry.weight != null && <span> @{entry.weight}{entry.weight_unit}</span>}
+                                                  {entry.rpe != null && <span> RPE {entry.rpe}</span>}
                                                 </div>
-                                              )}
+                                              ))}
                                             </div>
+                                          );
+                                        }
+                                        // Group per-set entries by movement
+                                        const byMovement = new Map<string, WorkoutLogEntry[]>();
+                                        for (const e of blockEntries) {
+                                          const list = byMovement.get(e.movement) || [];
+                                          list.push(e);
+                                          byMovement.set(e.movement, list);
+                                        }
+                                        return (
+                                          <div style={{ paddingLeft: 8, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                            {[...byMovement.entries()].map(([movement, rows]) => (
+                                              <div key={movement}>
+                                                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{formatMovementName(movement)}</div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                                  {rows.map((r, ri) => (
+                                                    <span key={ri} style={{ fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '3px 8px', borderRadius: 4, fontFamily: 'JetBrains Mono' }}>
+                                                      S{r.set_number}: {r.reps ?? '?'}@{r.weight ?? '?'}{r.weight_unit}{r.rpe != null ? ` RPE ${r.rpe}` : ''}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        );
+                                      })()}
+
+                                      {/* Skills: simplified display */}
+                                      {isSkills && blockEntries.length > 0 && (
+                                        <div style={{ paddingLeft: 8, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                          {blockEntries.map((entry, ei) => (
+                                            <div key={ei} style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                                              <span style={{ fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(entry.movement)}</span>
+                                              {entry.sets != null && <span> {entry.sets} sets</span>}
+                                              {entry.reps_completed != null && <span> x{entry.reps_completed} reps</span>}
+                                              {entry.rpe != null && <span> RPE {entry.rpe}</span>}
+                                              {entry.scaling_note && <span style={{ fontStyle: 'italic' }}> — {entry.scaling_note}</span>}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {/* Metcon: show movements with load */}
+                                      {block.block_type === 'metcon' && blockEntries.length > 0 && (
+                                        <div style={{ paddingLeft: 8, marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                          {blockEntries.map((entry, ei) => (
+                                            <span key={ei} style={{ fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '3px 8px', borderRadius: 4 }}>
+                                              {formatMovementName(entry.movement)}
+                                              {entry.weight != null && ` ${entry.weight}${entry.weight_unit}`}
+                                              {entry.scaling_note && ` (${entry.scaling_note})`}
+                                            </span>
                                           ))}
                                         </div>
                                       )}
