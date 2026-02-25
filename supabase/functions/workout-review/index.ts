@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
+import { searchChunks, deduplicateChunks, formatChunksAsContext, type RAGChunk } from "../_shared/rag.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -51,6 +52,108 @@ function formatAthleteProfile(profile: AthleteProfileData | null): string {
   }
   if (parts.length === 0) return "No profile data. Give general advice and suggest they add lifts/skills on their Profile for personalized scaling.";
   return parts.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Block parsing for program workouts (simplified from workout-parser.ts)
+// ---------------------------------------------------------------------------
+type ReviewBlockType = "strength" | "metcon" | "skills" | "warm-up" | "cool-down" | "accessory" | "other";
+
+interface WorkoutBlock {
+  label: string;
+  type: ReviewBlockType;
+  text: string;
+}
+
+function splitAndClassifyBlocks(workoutText: string): WorkoutBlock[] {
+  const normalized = workoutText.trim().replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const pattern = /^(Strength|Metcon|MetCon|Accessory|Warm-up|Warmup|Conditioning|Skills|Cool\s*down|Cool-down):\s*/im;
+  const parts = normalized.split(pattern);
+
+  if (parts.length <= 1) {
+    return [{ label: "Metcon", type: "metcon", text: normalized }];
+  }
+
+  const blocks: WorkoutBlock[] = [];
+  let i = 1;
+  while (i + 1 < parts.length) {
+    const label = parts[i]?.trim() || "";
+    const text = parts[i + 1]?.trim() || "";
+    i += 2;
+    if (!label || !text) continue;
+
+    const ll = label.toLowerCase();
+    let type: ReviewBlockType;
+    if (/strength/.test(ll)) type = "strength";
+    else if (/metcon|conditioning/.test(ll)) type = "metcon";
+    else if (/skills/.test(ll)) type = "skills";
+    else if (/warm-?up/.test(ll)) type = "warm-up";
+    else if (/cool\s*-?down/.test(ll)) type = "cool-down";
+    else if (/accessory/.test(ll)) type = "accessory";
+    else type = "other";
+
+    blocks.push({ label, type, text });
+  }
+
+  return blocks.length > 0 ? blocks : [{ label: "Metcon", type: "metcon", text: normalized }];
+}
+
+// ---------------------------------------------------------------------------
+// Prompts
+// ---------------------------------------------------------------------------
+
+/** Prompt for program workouts — per-block analysis with unified intent */
+function buildProgramPrompt(blocks: WorkoutBlock[]): string {
+  const blockDescriptions = blocks
+    .filter((b) => b.type === "skills" || b.type === "strength" || b.type === "metcon")
+    .map((b) => `  - "${b.label}" (${b.type})`)
+    .join("\n");
+
+  const blocksSchema = blocks
+    .filter((b) => b.type === "skills" || b.type === "strength" || b.type === "metcon")
+    .map((b) => {
+      const timeDomainField =
+        b.type === "strength"
+          ? `"time_domain": "Rest intervals, total block duration, tempo if applicable"`
+          : b.type === "skills"
+          ? `"time_domain": "Format/tempo (e.g. EMOM structure), total duration"`
+          : `"time_domain": "Expected duration. What will limit the athlete."`;
+      return `    {
+      "block_type": "${b.type}",
+      "block_label": "${b.label}",
+      ${timeDomainField},
+      "cues_and_faults": [
+        { "movement": "Movement name", "cues": ["Cue 1", "Cue 2"], "common_faults": ["Fault 1"] }
+      ]
+    }`;
+    })
+    .join(",\n");
+
+  return `You are an expert CrossFit coach preparing an athlete for a multi-block training session. Analyze each training block and provide targeted coaching. Ground advice in the provided reference material when available.
+
+The workout has these training blocks:
+${blockDescriptions}
+
+Output valid JSON only, no markdown or extra text, with this exact structure:
+{
+  "intent": "2-3 sentences: the overall session design — why these blocks are combined, what energy systems or adaptations are targeted across the session, and how the blocks build on each other.",
+  "blocks": [
+${blocksSchema}
+  ],
+  "sources": []
+}
+
+Rules:
+- intent should tie the entire session together, not just describe one block.
+- For each block, provide cues_and_faults for every primary movement.
+- Cues: 2-3 actionable coaching cues per movement. Personalize using athlete profile (e.g. specific loads from their 1RMs).
+- Common faults: 1-2 most common errors for that movement at the prescribed intensity/volume.
+- For strength blocks: include rest intervals and RPE expectations in time_domain. Use strength science principles (periodization, load management).
+- For skills blocks: include progression tips and scaling if the athlete can't perform the movement as written.
+- For metcon blocks: include pacing strategy and what will be the primary limiter.
+- Use recent training to account for fatigue or similar volume.
+- Be concise and practical. Athlete-focused voice.
+- Do not include sources in the JSON — leave sources as empty array.`;
 }
 
 const WORKOUT_REVIEW_SYSTEM_PROMPT = `You are an expert CrossFit coach reviewing this workout for a specific athlete. Give personalized scaling, warm-up, and cues based on their profile and recent training. Ground advice in the provided CrossFit Journal articles when available.
@@ -111,7 +214,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { workout_text } = await req.json();
+    const { workout_text, source_type } = await req.json();
     if (!workout_text || typeof workout_text !== "string") {
       return new Response(JSON.stringify({ error: "Missing workout_text" }), {
         status: 400,
@@ -177,54 +280,97 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Generate embedding
-    const embResp = await fetch("https://api.openai.com/v1/embeddings", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + OPENAI_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "text-embedding-3-small",
-        input: trimmed.substring(0, 2000),
-      }),
-    });
-    const embData = await embResp.json();
-    const queryEmb = embData.data?.[0]?.embedding;
-    if (!queryEmb) {
-      return new Response(JSON.stringify({ error: "Embedding failed" }), {
-        status: 500,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
-    }
+    // -----------------------------------------------------------------------
+    // Program workouts: per-block RAG + per-block analysis
+    // -----------------------------------------------------------------------
+    const isProgramWorkout = source_type === "program";
+    const blocks = isProgramWorkout ? splitAndClassifyBlocks(trimmed) : [];
+    const analysisBlocks = blocks.filter(
+      (b) => b.type === "skills" || b.type === "strength" || b.type === "metcon"
+    );
 
-    // Retrieve matching chunks
-    const { data: chunks } = await supa.rpc("match_chunks_filtered", {
-      query_embedding: queryEmb,
-      match_threshold: 0.25,
-      match_count: 6,
-      filter_category: "journal",
-    });
-
-    const sources: { title: string; author: string; source: string }[] = [];
+    let systemPrompt: string;
     let context = "";
-    if (chunks && chunks.length > 0) {
-      context =
-        "\n\nRELEVANT ARTICLES:\n" +
-        chunks
-          .map((c: any, i: number) => {
-            sources.push({ title: c.title, author: c.author || "", source: c.source || "" });
-            return (
-              "[Source " +
-              (i + 1) +
-              ": " +
-              c.title +
-              (c.author ? " by " + c.author : "") +
-              "]\n" +
-              c.content
-            );
-          })
-          .join("\n\n");
+    const sources: { title: string; author: string; source: string }[] = [];
+
+    if (isProgramWorkout && analysisBlocks.length > 0) {
+      // Build per-category RAG queries in parallel
+      const skillsMetconText = analysisBlocks
+        .filter((b) => b.type === "skills" || b.type === "metcon")
+        .map((b) => b.text)
+        .join("\n");
+      const strengthText = analysisBlocks
+        .filter((b) => b.type === "strength")
+        .map((b) => b.text)
+        .join("\n");
+
+      const ragPromises: Promise<RAGChunk[]>[] = [];
+      if (skillsMetconText) {
+        ragPromises.push(
+          searchChunks(supa, skillsMetconText, "journal", OPENAI_API_KEY!, 4, 0.25)
+        );
+      }
+      if (strengthText) {
+        ragPromises.push(
+          searchChunks(supa, strengthText, "strength-science", OPENAI_API_KEY!, 4, 0.25)
+        );
+      }
+
+      const ragResults = await Promise.all(ragPromises);
+      const allChunks = deduplicateChunks(ragResults.flat());
+
+      for (const c of allChunks) {
+        sources.push({ title: c.title, author: c.author || "", source: c.source || "" });
+      }
+      if (allChunks.length > 0) {
+        context = "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(allChunks, 8);
+      }
+
+      systemPrompt = buildProgramPrompt(analysisBlocks);
+    } else {
+      // Paste-your-own: single journal RAG query (existing flow)
+      const embResp = await fetch("https://api.openai.com/v1/embeddings", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + OPENAI_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "text-embedding-3-small",
+          input: trimmed.substring(0, 2000),
+        }),
+      });
+      const embData = await embResp.json();
+      const queryEmb = embData.data?.[0]?.embedding;
+      if (!queryEmb) {
+        return new Response(JSON.stringify({ error: "Embedding failed" }), {
+          status: 500,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: chunks } = await supa.rpc("match_chunks_filtered", {
+        query_embedding: queryEmb,
+        match_threshold: 0.25,
+        match_count: 6,
+        filter_category: "journal",
+      });
+
+      if (chunks && chunks.length > 0) {
+        context =
+          "\n\nRELEVANT ARTICLES:\n" +
+          chunks
+            .map((c: any, i: number) => {
+              sources.push({ title: c.title, author: c.author || "", source: c.source || "" });
+              return (
+                "[Source " + (i + 1) + ": " + c.title +
+                (c.author ? " by " + c.author : "") + "]\n" + c.content
+              );
+            })
+            .join("\n\n");
+      }
+
+      systemPrompt = WORKOUT_REVIEW_SYSTEM_PROMPT;
     }
 
     // Call Claude (non-streaming for structured JSON)
@@ -246,9 +392,9 @@ ${trimmed}`;
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
+        max_tokens: isProgramWorkout ? 2048 : 1024,
         stream: false,
-        system: WORKOUT_REVIEW_SYSTEM_PROMPT + context,
+        system: systemPrompt + context,
         messages: [{ role: "user", content: userContent }],
       }),
     });
@@ -275,22 +421,26 @@ ${trimmed}`;
       const jsonStr = jsonMatch ? jsonMatch[0] : rawText;
       review = JSON.parse(jsonStr);
     } catch {
-      review = {
-        time_domain: rawText || "Unable to parse response.",
-        scaling: [],
-        warm_up: "",
-        cues: [],
-        class_prep: "",
-        sources: [],
-      };
+      if (isProgramWorkout) {
+        review = {
+          intent: rawText || "Unable to parse response.",
+          blocks: [],
+          sources: [],
+        };
+      } else {
+        review = {
+          time_domain: rawText || "Unable to parse response.",
+          scaling: [],
+          warm_up: "",
+          cues: [],
+          class_prep: "",
+          sources: [],
+        };
+      }
     }
 
     // Attach sources to review
-    if (Array.isArray(review.sources)) {
-      review.sources = sources;
-    } else {
-      review.sources = sources;
-    }
+    review.sources = sources;
 
     // Persist to workout_reviews
     await supa.from("workout_reviews").insert({

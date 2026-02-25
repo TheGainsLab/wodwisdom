@@ -5,20 +5,42 @@ import { supabase, FunctionsHttpError } from '../lib/supabase';
 import Nav from '../components/Nav';
 import InviteBanner from '../components/InviteBanner';
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 interface ReviewScaling { movement: string; suggestions: string; }
 interface ReviewCues { movement: string; cues: string[]; }
 interface ReviewSource { title: string; author?: string; source?: string; }
 
+interface ReviewBlockCue {
+  movement: string;
+  cues: string[];
+  common_faults: string[];
+}
+
+interface ReviewBlock {
+  block_type: string;
+  block_label: string;
+  time_domain: string;
+  cues_and_faults: ReviewBlockCue[];
+}
+
 interface WorkoutReview {
   intent: string;
-  time_domain: string;
-  scaling: ReviewScaling[];
-  warm_up: string;
-  cues: ReviewCues[];
-  class_prep: string;
+  // Flat fields (paste-your-own flow)
+  time_domain?: string;
+  scaling?: ReviewScaling[];
+  warm_up?: string;
+  cues?: ReviewCues[];
+  class_prep?: string;
+  // Per-block fields (program flow)
+  blocks?: ReviewBlock[];
   sources: ReviewSource[];
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 function formatMarkdown(text: string): string {
   return text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -31,6 +53,85 @@ function formatMarkdown(text: string): string {
     .replace(/<p><\/p>/g, '');
 }
 
+const BLOCK_TYPE_LABELS: Record<string, string> = {
+  skills: 'Skills',
+  strength: 'Strength',
+  metcon: 'Metcon',
+};
+
+const CHEVRON_DOWN = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
+// ---------------------------------------------------------------------------
+// Collapsible block component
+// ---------------------------------------------------------------------------
+function CollapsibleBlock({ block, defaultOpen }: { block: ReviewBlock; defaultOpen: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const label = BLOCK_TYPE_LABELS[block.block_type] || block.block_label;
+
+  return (
+    <div className="workout-review-section workout-review-block">
+      <button
+        className="workout-review-block-header"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+      >
+        <div className="workout-review-block-title">
+          <span className={`workout-review-block-badge workout-review-block-badge--${block.block_type}`}>
+            {label}
+          </span>
+          <span className="workout-review-block-summary">{block.block_label}</span>
+        </div>
+        <span className={`workout-review-block-chevron${open ? ' workout-review-block-chevron--open' : ''}`}>
+          {CHEVRON_DOWN}
+        </span>
+      </button>
+
+      {open && (
+        <div className="workout-review-block-body">
+          {block.time_domain && (
+            <div style={{ marginBottom: 16 }}>
+              <div className="workout-review-block-sublabel">Time / Tempo</div>
+              <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(block.time_domain) }} />
+            </div>
+          )}
+
+          {block.cues_and_faults && block.cues_and_faults.length > 0 && (
+            <div>
+              <div className="workout-review-block-sublabel">Cues & Common Faults</div>
+              {block.cues_and_faults.map((cf, i) => (
+                <div key={i} className="workout-review-movement" style={{ marginBottom: i < block.cues_and_faults.length - 1 ? 14 : 0 }}>
+                  <strong>{cf.movement}</strong>
+                  {cf.cues && cf.cues.length > 0 && (
+                    <ul className="workout-review-cues">
+                      {cf.cues.map((cue, j) => (
+                        <li key={j}>{cue}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {cf.common_faults && cf.common_faults.length > 0 && (
+                    <ul className="workout-review-cues workout-review-faults">
+                      {cf.common_faults.map((fault, j) => (
+                        <li key={j}>{fault}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 export default function WorkoutReviewPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -69,8 +170,6 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
     })();
   }, [session.user.id]);
 
-  // Auto-analyze when opened from program with workout pre-filled
-
   const isPaywalled = tier === 'free' && totalUsage >= freeLimit;
 
   const analyzeWorkout = async (textOverride?: string) => {
@@ -87,7 +186,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
 
     try {
       const { data, error } = await supabase.functions.invoke('workout-review', {
-        body: { workout_text: trimmed },
+        body: { workout_text: trimmed, source_type: fromProgramState?.source_type },
       });
 
       if (error) {
@@ -125,6 +224,9 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
   const usagePill = tier === 'free'
     ? <div className="usage-pill">{totalUsage}/{freeLimit} free</div>
     : null;
+
+  const isProgramReview = fromProgramState?.source_type === 'program';
+  const hasBlocks = review?.blocks && review.blocks.length > 0;
 
   return (
     <div className="app-layout">
@@ -182,6 +284,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                   <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap', fontWeight: 500, color: 'var(--text)' }}>{workoutText}</div>
                 </div>
 
+                {/* Intent — always visible */}
                 {review.intent && (
                   <div className="workout-review-section">
                     <h3>Intent</h3>
@@ -189,54 +292,78 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                   </div>
                 )}
 
-                <div className="workout-review-section">
-                  <h3>Time Domain</h3>
-                  <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.time_domain) }} />
-                </div>
-
-                {/* Scaling & warm-up only for paste-your-own (non-program) workouts */}
-                {!fromProgramState?.source_type && review.scaling && review.scaling.length > 0 && (
-                  <div className="workout-review-section">
-                    <h3>Scaling</h3>
-                    {review.scaling.map((s, i) => (
-                      <div key={i} className="workout-review-movement">
-                        <strong>{s.movement}</strong>
-                        <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(s.suggestions) }} />
-                      </div>
+                {/* --------------------------------------------------------- */}
+                {/* Program flow: collapsible per-block sections              */}
+                {/* --------------------------------------------------------- */}
+                {isProgramReview && hasBlocks && (
+                  <>
+                    {review.blocks!.map((block, i) => (
+                      <CollapsibleBlock
+                        key={i}
+                        block={block}
+                        defaultOpen={i === 0}
+                      />
                     ))}
-                  </div>
+                  </>
                 )}
 
-                {!fromProgramState?.source_type && review.warm_up && (
-                  <div className="workout-review-section">
-                    <h3>Warm-up</h3>
-                    <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.warm_up) }} />
-                  </div>
-                )}
-
-                {review.cues && review.cues.length > 0 && (
-                  <div className="workout-review-section">
-                    <h3>Cues</h3>
-                    {review.cues.map((c, i) => (
-                      <div key={i} className="workout-review-movement">
-                        <strong>{c.movement}</strong>
-                        <ul className="workout-review-cues">
-                          {(c.cues || []).map((cue, j) => (
-                            <li key={j}>{cue}</li>
-                          ))}
-                        </ul>
+                {/* --------------------------------------------------------- */}
+                {/* Paste-your-own flow: flat sections (existing behavior)     */}
+                {/* --------------------------------------------------------- */}
+                {!isProgramReview && (
+                  <>
+                    {review.time_domain && (
+                      <div className="workout-review-section">
+                        <h3>Time Domain</h3>
+                        <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.time_domain) }} />
                       </div>
-                    ))}
-                  </div>
+                    )}
+
+                    {review.scaling && review.scaling.length > 0 && (
+                      <div className="workout-review-section">
+                        <h3>Scaling</h3>
+                        {review.scaling.map((s, i) => (
+                          <div key={i} className="workout-review-movement">
+                            <strong>{s.movement}</strong>
+                            <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(s.suggestions) }} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {review.warm_up && (
+                      <div className="workout-review-section">
+                        <h3>Warm-up</h3>
+                        <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.warm_up) }} />
+                      </div>
+                    )}
+
+                    {review.cues && review.cues.length > 0 && (
+                      <div className="workout-review-section">
+                        <h3>Cues</h3>
+                        {review.cues.map((c, i) => (
+                          <div key={i} className="workout-review-movement">
+                            <strong>{c.movement}</strong>
+                            <ul className="workout-review-cues">
+                              {(c.cues || []).map((cue, j) => (
+                                <li key={j}>{cue}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {review.class_prep && (
+                      <div className="workout-review-section">
+                        <h3>Class Prep</h3>
+                        <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.class_prep) }} />
+                      </div>
+                    )}
+                  </>
                 )}
 
-                {!fromProgramState?.source_type && review.class_prep && (
-                  <div className="workout-review-section">
-                    <h3>Class Prep</h3>
-                    <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.class_prep) }} />
-                  </div>
-                )}
-
+                {/* Sources */}
                 {review.sources && review.sources.length > 0 && (
                   <div className="sources-bar" style={{ marginTop: 24 }}>
                     <span className="sources-label">Sources</span>
@@ -246,6 +373,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                   </div>
                 )}
 
+                {/* Actions */}
                 <div style={{ display: 'flex', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
                   <button
                     className="auth-btn"
