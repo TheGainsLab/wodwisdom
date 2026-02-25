@@ -276,7 +276,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                 {blocks.map((block, bi) => (
                   <div key={bi} className="workout-review-section" style={{ marginBottom: 16 }}>
                     <h3>
-                      {block.label}) {block.type}
+                      {block.label}
                       {block.type === 'metcon' && ` — ${getMetconTypeLabel(block.text)}`}
                     </h3>
                     <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap', marginBottom: 16 }}>{block.text}</div>
@@ -284,9 +284,10 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                     {block.type === 'strength' && block.movements.map((m, mi) => {
                       const key = `${bi}-${mi}`;
                       const ev = entryValues[key] || {};
+                      const showName = block.movements.length > 1;
                       return (
                         <div key={key} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12, alignItems: 'center' }}>
-                          <span style={{ fontWeight: 600, minWidth: 120 }}>{formatMovementName(m.canonical)}</span>
+                          {showName && <span style={{ fontWeight: 600, minWidth: 120 }}>{formatMovementName(m.canonical)}</span>}
                           <input
                             type="number"
                             placeholder="Sets"
@@ -365,9 +366,10 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                       block.movements.map((m, mi) => {
                         const key = `${bi}-${mi}`;
                         const ev = entryValues[key] || {};
+                        const showName = block.movements.length > 1;
                         return (
                           <div key={key} style={{ marginBottom: 16, padding: 12, background: 'var(--surface2)', borderRadius: 8 }}>
-                            <div style={{ fontWeight: 600, marginBottom: 10 }}>{formatMovementName(m.canonical)}</div>
+                            {showName && <div style={{ fontWeight: 600, marginBottom: 10 }}>{formatMovementName(m.canonical)}</div>}
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                 <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>Sets</label>
@@ -505,13 +507,32 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                       })
                     )}
 
-                    {(block.type === 'accessory' || block.type === 'other') && block.movements.length > 0 && (
-                      block.movements.map((m, mi) => {
+                    {(block.type === 'warm-up' || block.type === 'cool-down') && block.movements.length > 0 && (
+                      block.movements.map((_m, mi) => {
                         const key = `${bi}-${mi}`;
                         const ev = entryValues[key] || {};
                         return (
                           <div key={key} style={{ display: 'flex', gap: 12, marginBottom: 8, alignItems: 'center' }}>
-                            <span style={{ fontWeight: 600, minWidth: 120 }}>{formatMovementName(m.canonical)}</span>
+                            <input
+                              type="text"
+                              placeholder="Notes (optional)"
+                              value={ev.scaling_note ?? ''}
+                              onChange={e => setEntry(key, 'scaling_note', e.target.value)}
+                              style={{ ...compactInputStyle, flex: 1 }}
+                            />
+                          </div>
+                        );
+                      })
+                    )}
+
+                    {(block.type === 'accessory' || block.type === 'other') && block.movements.length > 0 && (
+                      block.movements.map((m, mi) => {
+                        const key = `${bi}-${mi}`;
+                        const ev = entryValues[key] || {};
+                        const showName = block.movements.length > 1;
+                        return (
+                          <div key={key} style={{ display: 'flex', gap: 12, marginBottom: 8, alignItems: 'center' }}>
+                            {showName && <span style={{ fontWeight: 600, minWidth: 120 }}>{formatMovementName(m.canonical)}</span>}
                             <input type="number" placeholder="Sets" value={ev.sets ?? ''} onChange={e => setEntry(key, 'sets', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 60 }} />
                             <input type="number" placeholder="Reps" value={ev.reps ?? ''} onChange={e => setEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 60 }} />
                           </div>
