@@ -38,6 +38,7 @@ export interface WorkoutLogEntryRow {
   scaling_note: string | null;
   sort_order?: number;
   block_label: string | null;
+  set_number: number | null;
   // Skills-specific fields
   reps_completed: number | null;
   hold_seconds: number | null;
@@ -78,12 +79,43 @@ function formatBlock(
   const sorted = blockEntries.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   if (block.block_type === "strength") {
+    // Group per-set entries by movement for compact summaries
+    const byMovement = new Map<string, WorkoutLogEntryRow[]>();
+    for (const e of sorted) {
+      const list = byMovement.get(e.movement) || [];
+      list.push(e);
+      byMovement.set(e.movement, list);
+    }
+
     const parts: string[] = [];
-    for (const e of sorted.slice(0, 3)) {
-      let p = formatMovementName(e.movement);
-      if (e.sets != null && e.reps != null) p += ` ${e.sets}×${e.reps}`;
-      if (e.weight != null) p += ` @${e.weight}${e.weight_unit === "kg" ? "kg" : "lbs"}`;
-      if (e.rpe != null) p += ` RPE ${e.rpe}`;
+    let count = 0;
+    for (const [movement, rows] of byMovement) {
+      if (count >= 3) break;
+      count++;
+      let p = formatMovementName(movement);
+      const isPerSet = rows.length > 1 && rows.every((r) => r.set_number != null);
+      if (isPerSet) {
+        const totalSets = rows.length;
+        const reps = rows[0].reps;
+        const weights = rows.map((r) => r.weight).filter((w) => w != null);
+        const rpes = rows.map((r) => r.rpe).filter((r) => r != null);
+        if (reps != null) p += ` ${totalSets}×${reps}`;
+        if (weights.length > 0) {
+          const unit = rows[0].weight_unit === "kg" ? "kg" : "lbs";
+          const unique = [...new Set(weights)];
+          p += unique.length === 1 ? ` @${unique[0]}${unit}` : ` @${Math.min(...weights)}-${Math.max(...weights)}${unit}`;
+        }
+        if (rpes.length > 0) {
+          const min = Math.min(...rpes);
+          const max = Math.max(...rpes);
+          p += min === max ? ` RPE ${min}` : ` RPE ${min}-${max}`;
+        }
+      } else {
+        const e = rows[0];
+        if (e.sets != null && e.reps != null) p += ` ${e.sets}×${e.reps}`;
+        if (e.weight != null) p += ` @${e.weight}${e.weight_unit === "kg" ? "kg" : "lbs"}`;
+        if (e.rpe != null) p += ` RPE ${e.rpe}`;
+      }
       parts.push(p);
     }
     return `Strength: ${parts.join(", ") || block.block_text.slice(0, 60).replace(/\n/g, " ")}`;
@@ -248,7 +280,7 @@ export async function fetchAndFormatRecentHistory(
       .in("log_id", logIds),
     supa
       .from("workout_log_entries")
-      .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_label, reps_completed, hold_seconds, distance, distance_unit, quality, variation")
+      .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation")
       .in("log_id", logIds),
   ]);
 
