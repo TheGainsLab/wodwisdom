@@ -273,6 +273,16 @@ export default function ProgramEditPage({ session }: { session: Session }) {
                             : blockSummary(w.blocks)}
                         </span>
                         <span className="block-edit-actions">
+                          {w.expanded && (
+                            <button
+                              type="button"
+                              className="program-save-btn"
+                              onClick={e => { e.stopPropagation(); saveProgram(); }}
+                              disabled={saving}
+                            >
+                              {saving ? 'Saving...' : 'Save'}
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="program-remove-btn"
