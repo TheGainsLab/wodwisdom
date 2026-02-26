@@ -58,7 +58,6 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
   metcon: 'Metcon',
   'cool-down': 'Cool-down',
   accessory: 'Accessory',
-  other: 'Other',
 };
 
 function formatMovementName(canonical: string): string {
