@@ -121,46 +121,81 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
               </div>
             ) : (
               <>
+                {workouts.length > 0 && (
+                  <div className="program-progress">
+                    <div className="program-progress-header">
+                      <span className="program-progress-label">Progress</span>
+                      <span className="program-progress-count">{completedWorkoutIds.size} / {workouts.length} days</span>
+                    </div>
+                    <div className="program-progress-bar">
+                      <div
+                        className="program-progress-fill"
+                        style={{ width: `${(completedWorkoutIds.size / workouts.length) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="program-workouts-table-wrap">
                   <table className="program-workouts-table">
                     <thead>
                       <tr>
-                        <th>Day</th>
+                        <th style={{ width: 60 }}>Day</th>
                         <th>Workout</th>
                         <th style={{ width: 150 }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {workouts.map(w => (
-                        <tr key={w.id}>
-                          <td>{w.sort_order + 1}</td>
-                          <td className="workout-text-cell">
-                            <WorkoutBlocksDisplay text={w.workout_text} />
-                          </td>
-                          <td>
-                            {completedWorkoutIds.has(w.id) ? (
-                              <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Completed</span>
-                            ) : (
-                              <div style={{ display: 'flex', gap: 8 }}>
-                                <button
-                                  className="auth-btn"
-                                  onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id, program_id: id } })}
-                                  style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: 'var(--text)' }}
-                                >
-                                  Coach
-                                </button>
-                                <button
-                                  className="auth-btn"
-                                  onClick={() => navigate('/workout/start', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id } })}
-                                  style={{ padding: '8px 14px', fontSize: 13 }}
-                                >
-                                  Start
-                                </button>
+                      {workouts.map(w => {
+                        const done = completedWorkoutIds.has(w.id);
+                        return (
+                          <tr key={w.id} className={done ? 'program-row-completed' : ''}>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                {done ? (
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+                                ) : (
+                                  <span className="program-day-dot" />
+                                )}
+                                <span>{w.sort_order + 1}</span>
                               </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="workout-text-cell">
+                              <WorkoutBlocksDisplay text={w.workout_text} />
+                            </td>
+                            <td>
+                              {done ? (
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                  <span className="program-completed-badge">Done</span>
+                                  <button
+                                    className="auth-btn"
+                                    onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id, program_id: id } })}
+                                    style={{ padding: '6px 12px', fontSize: 12, background: 'var(--surface2)', color: 'var(--text-dim)' }}
+                                  >
+                                    Coach
+                                  </button>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                  <button
+                                    className="auth-btn"
+                                    onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id, program_id: id } })}
+                                    style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: 'var(--text)' }}
+                                  >
+                                    Coach
+                                  </button>
+                                  <button
+                                    className="auth-btn"
+                                    onClick={() => navigate('/workout/start', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id } })}
+                                    style={{ padding: '8px 14px', fontSize: 13 }}
+                                  >
+                                    Start
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
