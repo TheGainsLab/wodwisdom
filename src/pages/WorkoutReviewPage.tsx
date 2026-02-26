@@ -238,7 +238,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>Prepare Workout</h1>
+          <h1>Coach</h1>
           {tierLoaded && usagePill}
         </header>
 
@@ -403,7 +403,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                       onClick={() => { setReview(null); setWorkoutText(''); hasAutoAnalyzed.current = false; }}
                       style={{ flex: 1, minWidth: 160, background: 'var(--surface2)', color: 'var(--text)' }}
                     >
-                      Prepare Another Workout
+                      Coach Another Workout
                     </button>
                   )}
                 </div>
