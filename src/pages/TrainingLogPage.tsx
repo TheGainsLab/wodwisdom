@@ -14,6 +14,7 @@ interface WorkoutLog {
 }
 
 interface WorkoutLogBlock {
+  id: string;
   log_id: string;
   block_type: string;
   block_label: string | null;
@@ -32,6 +33,7 @@ interface WorkoutLogEntry {
   weight_unit: string;
   rpe: number | null;
   scaling_note: string | null;
+  block_id: string | null;
   block_label: string | null;
   set_number: number | null;
   reps_completed: number | null;
@@ -97,11 +99,11 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         const [{ data: blocks }, { data: entries }] = await Promise.all([
           supabase
             .from('workout_log_blocks')
-            .select('log_id, block_type, block_label, block_text, score, rx, sort_order')
+            .select('id, log_id, block_type, block_label, block_text, score, rx, sort_order')
             .in('log_id', logIds),
           supabase
             .from('workout_log_entries')
-            .select('log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, sort_order')
+            .select('log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, sort_order')
             .in('log_id', logIds),
         ]);
 
@@ -251,7 +253,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                             {logBlocks.length > 0 ? (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                 {logBlocks.map((block, i) => {
-                                  const blockEntries = logEntries.filter(e => e.block_label === block.block_label);
+                                  const blockEntries = logEntries.filter(e => e.block_id ? e.block_id === block.id : e.block_label === block.block_label);
                                   const isSkills = block.block_type === 'skills';
                                   return (
                                     <div key={i}>

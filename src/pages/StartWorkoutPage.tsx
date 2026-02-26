@@ -214,7 +214,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           workout_date: workoutDate,
           workout_text: workoutText,
           workout_type: workoutType,
-          source_type: 'program',
+          source_type: sourceState?.source_type || 'program',
           source_id: sourceState?.source_id || null,
           notes: notes.trim() || null,
           blocks: logBlocks,
