@@ -192,7 +192,10 @@ export default function TrainingLogPage({ session }: { session: Session }) {
               ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {filtered.map(log => {
-                  const logBlocks = blocksByLog[log.id] || [];
+                  const allBlocks = blocksByLog[log.id] || [];
+                  const logBlocks = blockFilter === 'all'
+                    ? allBlocks
+                    : allBlocks.filter(b => b.block_type === blockFilter);
                   const hasScores = logBlocks.some(b => b.score);
                   const hasRx = logBlocks.some(b => b.rx);
 
