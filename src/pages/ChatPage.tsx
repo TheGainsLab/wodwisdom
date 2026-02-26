@@ -297,10 +297,10 @@ export default function ChatPage({ session }: { session: Session }) {
             <div className="welcome-logo">W</div>
             <h2>What do you want to know?</h2>
             <p>{sourceFilter === 'science'
-              ? 'Search medical physiology concepts from the Textbook of Medical Physiology.'
+              ? 'Get answers from physiology and biochemistry texts for more technical, in-depth answers.'
               : sourceFilter === 'strength-science'
-              ? 'Search strength training science, programming, and biomechanics.'
-              : 'Search hundreds of articles on movements, nutrition, coaching methodology, programming, and more.'}</p>
+              ? 'Search strength training science, biomechanics and programming from world-class coaches.'
+              : 'Get answers from study guides, seminar content and journal articles on the methodology.'}</p>
             {!isPaywalled && (
               <div className="suggestions">
                 {activeSuggestions.slice(0, 4).map((s, i) => <button key={i} className="suggestion" onClick={() => sendMessage(s)}>{s}</button>)}
