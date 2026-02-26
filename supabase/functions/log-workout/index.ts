@@ -15,7 +15,6 @@ const cors = {
 };
 
 const WORKOUT_TYPES = ["for_time", "amrap", "emom", "strength", "other"] as const;
-const SOURCE_TYPES = ["review", "program", "manual"] as const;
 const WEIGHT_UNITS = ["lbs", "kg"] as const;
 const BLOCK_TYPES = ["warm-up", "skills", "strength", "metcon", "cool-down", "accessory", "other"] as const;
 
@@ -54,7 +53,6 @@ interface LogWorkoutBody {
   workout_date: string;
   workout_text: string;
   workout_type: string;
-  source_type: string;
   source_id?: string | null;
   notes?: string | null;
   blocks?: LogBlock[];
@@ -91,7 +89,6 @@ Deno.serve(async (req) => {
     const workout_date = body.workout_date;
     const workout_text = body.workout_text?.trim();
     const workout_type = body.workout_type;
-    const source_type = body.source_type;
     const source_id = body.source_id ?? null;
     const notes = body.notes ?? null;
     const blocks = body.blocks ?? [];
@@ -114,13 +111,6 @@ Deno.serve(async (req) => {
         headers: { ...cors, "Content-Type": "application/json" },
       });
     }
-    if (!SOURCE_TYPES.includes(source_type as (typeof SOURCE_TYPES)[number])) {
-      return new Response(JSON.stringify({ error: "Invalid source_type" }), {
-        status: 400,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
-    }
-
     const dateStr = new Date(workout_date).toISOString().slice(0, 10);
     if (isNaN(new Date(workout_date).getTime())) {
       return new Response(JSON.stringify({ error: "Invalid workout_date" }), {
@@ -137,7 +127,6 @@ Deno.serve(async (req) => {
         workout_date: dateStr,
         workout_text,
         workout_type,
-        source_type,
         source_id,
         notes,
       })
