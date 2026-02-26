@@ -55,12 +55,25 @@ export default function WorkoutBlocksDisplay({ text, className = '' }: WorkoutBl
 
   return (
     <div className={`workout-blocks ${className}`.trim()}>
-      {blocks.map((b, i) => (
-        <div key={i} className="workout-block">
-          <div className="workout-block-label">{b.label}</div>
-          <div className="workout-block-content">{b.content}</div>
-        </div>
-      ))}
+      {blocks.map((b, i) => {
+        const lines = b.content.split('\n').map(l => l.trim()).filter(Boolean);
+        return (
+          <div key={i} className="workout-block">
+            <div className="workout-block-label">{b.label}</div>
+            <div className="workout-block-content">
+              {lines.length > 1 ? (
+                <ul className="workout-block-lines">
+                  {lines.map((line, j) => (
+                    <li key={j}>{line}</li>
+                  ))}
+                </ul>
+              ) : (
+                <span>{b.content}</span>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
