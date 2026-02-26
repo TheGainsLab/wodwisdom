@@ -60,6 +60,22 @@ function splitTopLevelCommas(text: string): string[] {
  */
 function parseSkillsContent(content: string): { header: string | null; items: string[] } | null {
   const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // Detect EMOM header on the first line (e.g. "EMOM 8 …", "E2MOM 10 …")
+  const firstLine = lines[0] || '';
+  const emomMatch = firstLine.match(/^(E\d*MOM\s+\d+)(?:\s+(.*))?$/i);
+  if (emomMatch) {
+    const header = emomMatch[1];
+    const remainderOfFirstLine = emomMatch[2] || '';
+    let items: string[];
+    if (lines.length > 1) {
+      items = [remainderOfFirstLine, ...lines.slice(1)].filter(Boolean);
+    } else {
+      items = splitTopLevelCommas(remainderOfFirstLine);
+    }
+    if (items.length > 0) return { header, items };
+  }
+
   if (lines.length > 1) return null; // already multi-line, existing rendering is fine
 
   // Detect "N sets" prefix
