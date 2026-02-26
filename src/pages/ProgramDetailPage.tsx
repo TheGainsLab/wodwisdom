@@ -57,7 +57,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
         .from('workout_logs')
         .select('source_id')
         .eq('user_id', session.user.id)
-        .eq('source_type', 'program')
         .in('source_id', ids);
       const completed = new Set((logs || []).map((l) => l.source_id).filter(Boolean));
       setCompletedWorkoutIds(completed);
@@ -168,7 +167,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                   <span className="program-completed-badge">Done</span>
                                   <button
                                     className="auth-btn"
-                                    onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id, program_id: id } })}
+                                    onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_id: w.id, program_id: id } })}
                                     style={{ padding: '6px 12px', fontSize: 12, background: 'var(--surface2)', color: 'var(--text-dim)' }}
                                   >
                                     Coach
@@ -178,14 +177,14 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                 <div style={{ display: 'flex', gap: 8 }}>
                                   <button
                                     className="auth-btn"
-                                    onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id, program_id: id } })}
+                                    onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_id: w.id, program_id: id } })}
                                     style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: 'var(--text)' }}
                                   >
                                     Coach
                                   </button>
                                   <button
                                     className="auth-btn"
-                                    onClick={() => navigate('/workout/start', { state: { workout_text: w.workout_text, source_type: 'program', source_id: w.id } })}
+                                    onClick={() => navigate('/workout/start', { state: { workout_text: w.workout_text, source_id: w.id } })}
                                     style={{ padding: '8px 14px', fontSize: 13 }}
                                   >
                                     Start

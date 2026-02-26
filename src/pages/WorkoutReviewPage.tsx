@@ -9,8 +9,6 @@ import WorkoutBlocksDisplay from '../components/WorkoutBlocksDisplay';
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-interface ReviewScaling { movement: string; suggestions: string; }
-interface ReviewCues { movement: string; cues: string[]; }
 interface ReviewSource { title: string; author?: string; source?: string; }
 
 interface ReviewBlockCue {
@@ -28,13 +26,6 @@ interface ReviewBlock {
 
 interface WorkoutReview {
   intent: string;
-  // Flat fields (paste-your-own flow)
-  time_domain?: string;
-  scaling?: ReviewScaling[];
-  warm_up?: string;
-  cues?: ReviewCues[];
-  class_prep?: string;
-  // Per-block fields (program flow)
   blocks?: ReviewBlock[];
   sources: ReviewSource[];
 }
@@ -146,7 +137,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
   const freeLimit = 3;
   const [tierLoaded, setTierLoaded] = useState(false);
 
-  const fromProgramState = location.state as { workout_text?: string; source_type?: string; source_id?: string; program_id?: string } | null;
+  const fromProgramState = location.state as { workout_text?: string; source_id?: string; program_id?: string } | null;
   const hasAutoAnalyzed = useRef(false);
 
   useEffect(() => {
@@ -187,7 +178,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
 
     try {
       const { data, error } = await supabase.functions.invoke('workout-review', {
-        body: { workout_text: trimmed, source_type: fromProgramState?.source_type, source_id: fromProgramState?.source_id },
+        body: { workout_text: trimmed, source_id: fromProgramState?.source_id },
       });
 
       if (error) {
@@ -226,7 +217,6 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
     ? <div className="usage-pill">{totalUsage}/{freeLimit} free</div>
     : null;
 
-  const isProgramReview = fromProgramState?.source_type === 'program';
   const hasBlocks = review?.blocks && review.blocks.length > 0;
 
   return (
@@ -293,10 +283,8 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                   </div>
                 )}
 
-                {/* --------------------------------------------------------- */}
-                {/* Program flow: collapsible per-block sections              */}
-                {/* --------------------------------------------------------- */}
-                {isProgramReview && hasBlocks && (
+                {/* Per-block coaching sections */}
+                {hasBlocks && (
                   <>
                     {review.blocks!.map((block, i) => (
                       <CollapsibleBlock
@@ -305,62 +293,6 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                         defaultOpen={i === 0}
                       />
                     ))}
-                  </>
-                )}
-
-                {/* --------------------------------------------------------- */}
-                {/* Paste-your-own flow: flat sections (existing behavior)     */}
-                {/* --------------------------------------------------------- */}
-                {!isProgramReview && (
-                  <>
-                    {review.time_domain && (
-                      <div className="workout-review-section">
-                        <h3>Time Domain</h3>
-                        <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.time_domain) }} />
-                      </div>
-                    )}
-
-                    {review.scaling && review.scaling.length > 0 && (
-                      <div className="workout-review-section">
-                        <h3>Scaling</h3>
-                        {review.scaling.map((s, i) => (
-                          <div key={i} className="workout-review-movement">
-                            <strong>{s.movement}</strong>
-                            <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(s.suggestions) }} />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {review.warm_up && (
-                      <div className="workout-review-section">
-                        <h3>Warm-up</h3>
-                        <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.warm_up) }} />
-                      </div>
-                    )}
-
-                    {review.cues && review.cues.length > 0 && (
-                      <div className="workout-review-section">
-                        <h3>Cues</h3>
-                        {review.cues.map((c, i) => (
-                          <div key={i} className="workout-review-movement">
-                            <strong>{c.movement}</strong>
-                            <ul className="workout-review-cues">
-                              {(c.cues || []).map((cue, j) => (
-                                <li key={j}>{cue}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {review.class_prep && (
-                      <div className="workout-review-section">
-                        <h3>Class Prep</h3>
-                        <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.class_prep) }} />
-                      </div>
-                    )}
                   </>
                 )}
 
@@ -381,7 +313,6 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                     onClick={() => navigate('/workout/start', {
                       state: {
                         workout_text: workoutText,
-                        source_type: fromProgramState?.source_type ?? 'review',
                         source_id: fromProgramState?.source_id ?? null,
                       },
                     })}
