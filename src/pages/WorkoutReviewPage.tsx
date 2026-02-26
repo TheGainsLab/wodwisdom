@@ -244,7 +244,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
 
         <div className="page-body">
           <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 0' }}>
-            {fromProgramState?.workout_text && isLoading ? (
+            {fromProgramState?.workout_text && !review ? (
               <div className="page-loading" style={{ padding: 48 }}><div className="loading-pulse" /></div>
             ) : !review ? (
               <div className="workout-review-input-wrap">
