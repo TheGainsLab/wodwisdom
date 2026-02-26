@@ -94,6 +94,41 @@ function parseSkillsContent(content: string): { header: string | null; items: st
   return { header, items };
 }
 
+/**
+ * Renders a single block's content with the same formatting used in WorkoutBlocksDisplay.
+ * Useful when blocks are already separated (e.g. on the Start Workout page).
+ */
+export function BlockContent({ label, content }: { label: string; content: string }) {
+  if (label === 'Skills') {
+    const parsed = parseSkillsContent(content);
+    if (parsed) {
+      return (
+        <>
+          {parsed.header && <div>{parsed.header}:</div>}
+          <ul className="workout-block-lines">
+            {parsed.items.map((item, j) => (
+              <li key={j}>{item}</li>
+            ))}
+          </ul>
+        </>
+      );
+    }
+  }
+
+  const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length > 1) {
+    return (
+      <ul className="workout-block-lines">
+        {lines.map((line, j) => (
+          <li key={j}>{line}</li>
+        ))}
+      </ul>
+    );
+  }
+
+  return <span>{content}</span>;
+}
+
 interface WorkoutBlocksDisplayProps {
   text: string;
   className?: string;
