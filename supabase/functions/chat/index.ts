@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
+import { fetchAndFormatProgramContext } from "../_shared/training-program.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -149,8 +150,8 @@ Deno.serve(async (req) => {
 
     const { question, history = [], source_filter, include_profile = false } = await req.json();
 
-    // Generate embedding and (optionally) recent training in parallel
-    const [embData, recentTraining] = await Promise.all([
+    // Generate embedding and (optionally) recent training + program in parallel
+    const [embData, recentTraining, programContext] = await Promise.all([
       fetch("https://api.openai.com/v1/embeddings", {
         method: "POST",
         headers: {
@@ -163,6 +164,7 @@ Deno.serve(async (req) => {
         }),
       }).then((r) => r.json()),
       include_profile ? fetchAndFormatRecentHistory(supa, user.id) : Promise.resolve(""),
+      include_profile ? fetchAndFormatProgramContext(supa, user.id) : Promise.resolve(""),
     ]);
     const queryEmb = embData.data[0].embedding;
 
@@ -228,7 +230,8 @@ Deno.serve(async (req) => {
           (source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : source_filter === "strength-science" ? STRENGTH_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT) +
           (include_profile
             ? buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units) +
-              (recentTraining ? "\n\n" + recentTraining : "")
+              (recentTraining ? "\n\n" + recentTraining : "") +
+              (programContext ? "\n\n" + programContext : "")
             : "") +
           context,
         messages,
