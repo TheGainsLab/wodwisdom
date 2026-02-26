@@ -321,17 +321,17 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                     )}
 
                     {(block.type === 'warm-up' || block.type === 'cool-down' || block.type === 'skills') && (
-                      <div style={{ marginTop: 8 }}>
+                      <div className="field" style={{ marginTop: 8 }}>
+                        <label>Notes</label>
                         <input
                           type="text"
                           placeholder={
-                            block.type === 'warm-up' ? 'Notes (optional, e.g. subbed row for bike)' :
-                            block.type === 'cool-down' ? 'Notes (optional, e.g. extra hip stretching)' :
-                            'Notes (optional, e.g. got 5 unbroken kipping)'
+                            block.type === 'warm-up' ? 'Optional, e.g. subbed row for bike' :
+                            block.type === 'cool-down' ? 'Optional, e.g. extra hip stretching' :
+                            'Optional, e.g. got 5 unbroken kipping'
                           }
                           value={blockScores[bi] ?? ''}
                           onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
-                          style={{ ...compactInputStyle, width: '100%' }}
                         />
                       </div>
                     )}
