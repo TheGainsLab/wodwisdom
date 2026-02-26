@@ -119,9 +119,9 @@ body.landing-body{overflow:auto;height:auto}
 .typing span:nth-child(3){animation-delay:.4s}
 .input-area{padding:14px 16px 18px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0}
 .profile-include-row{max-width:800px;margin:0 auto 12px}
-.profile-include-btn{padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text-muted);font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
-.profile-include-btn:hover{color:var(--text-dim);border-color:var(--border-light)}
-.profile-include-btn.active{background:var(--accent);color:white;border-color:var(--accent)}
+.profile-include-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border:1px solid var(--border-light);border-radius:10px;background:var(--surface);color:var(--text-dim);font-family:'Outfit',sans-serif;font-size:13.5px;font-weight:500;cursor:pointer;transition:all .2s}
+.profile-include-btn:hover{color:var(--text);border-color:var(--accent);box-shadow:0 0 12px var(--accent-glow)}
+.profile-include-btn.active{background:rgba(255,58,58,.1);color:var(--accent);border-color:var(--accent);box-shadow:0 0 12px var(--accent-glow)}
 .input-row{display:flex;gap:10px;max-width:800px;margin:0 auto;align-items:flex-end}
 .input-row textarea{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:13px 16px;color:var(--text);font-family:'Outfit',sans-serif;font-size:15px;resize:none;min-height:48px;max-height:120px;line-height:1.4;outline:none;transition:border-color .2s,box-shadow .2s}
 .input-row textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
