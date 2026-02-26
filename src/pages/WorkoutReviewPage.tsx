@@ -186,7 +186,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
 
     try {
       const { data, error } = await supabase.functions.invoke('workout-review', {
-        body: { workout_text: trimmed, source_type: fromProgramState?.source_type },
+        body: { workout_text: trimmed, source_type: fromProgramState?.source_type, source_id: fromProgramState?.source_id },
       });
 
       if (error) {
