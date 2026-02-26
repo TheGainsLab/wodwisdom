@@ -206,7 +206,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { workout_text, source_type } = await req.json();
+    const { workout_text, source_type, source_id } = await req.json();
     if (!workout_text || typeof workout_text !== "string") {
       return new Response(JSON.stringify({ error: "Missing workout_text" }), {
         status: 400,
@@ -273,40 +273,55 @@ Deno.serve(async (req) => {
     }
 
     // -----------------------------------------------------------------------
-    // Shared user content for all Claude calls
+    // Shared user content builder
     // -----------------------------------------------------------------------
     const isProgramWorkout = source_type === "program";
 
-    const userContent = `ATHLETE PROFILE:
-${profileStr}
-
-RECENT TRAINING (last 14 days):
-${recentStr}
-
-WORKOUT:
-${trimmed}`;
+    function buildUserContent(workoutSection: string): string {
+      return `ATHLETE PROFILE:\n${profileStr}\n\nRECENT TRAINING (last 14 days):\n${recentStr}\n\nWORKOUT:\n${workoutSection}`;
+    }
 
     let review: Record<string, unknown>;
     const sources: { title: string; author: string; source: string }[] = [];
 
     if (isProgramWorkout) {
       // -------------------------------------------------------------------
-      // Program workouts: 3 parallel RAG queries + 4 parallel Claude calls
+      // Program workouts: fetch stored blocks, per-block RAG + Claude calls
       // -------------------------------------------------------------------
 
-      // Step 1: RAG queries in parallel (journal for metcon/skills, strength-science for strength)
+      // Fetch pre-extracted blocks from DB (written by preprocess-program)
+      let blockRows: { block_type: string; block_text: string; block_order: number }[] = [];
+      if (source_id) {
+        const { data } = await supa
+          .from("program_workout_blocks")
+          .select("block_type, block_text, block_order")
+          .eq("program_workout_id", source_id)
+          .order("block_order");
+        blockRows = (data || []) as typeof blockRows;
+      }
+
+      // Map block types to their text
+      const blockTextByType: Record<string, string> = {};
+      for (const b of blockRows) {
+        blockTextByType[b.block_type] = b.block_text;
+      }
+
+      // Full workout text for intent call (all blocks)
+      const fullWorkoutText = blockRows.length > 0
+        ? blockRows.map((b) => `${b.block_type}: ${b.block_text}`).join("\n")
+        : trimmed;
+
+      // Step 1: RAG queries in parallel
       const [journalChunks, strengthChunks] = await Promise.all([
-        searchChunks(supa, trimmed, "journal", OPENAI_API_KEY!, 4, 0.25),
-        searchChunks(supa, trimmed, "strength-science", OPENAI_API_KEY!, 4, 0.25),
+        searchChunks(supa, fullWorkoutText, "journal", OPENAI_API_KEY!, 4, 0.25),
+        searchChunks(supa, fullWorkoutText, "strength-science", OPENAI_API_KEY!, 4, 0.25),
       ]);
 
-      // Collect all sources
       const allChunks = deduplicateChunks([...journalChunks, ...strengthChunks]);
       for (const c of allChunks) {
         sources.push({ title: c.title, author: c.author || "", source: c.source || "" });
       }
 
-      // Build per-block context strings (journal shared by metcon + skills)
       const journalContext = journalChunks.length > 0
         ? "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(journalChunks, 4)
         : "";
@@ -317,28 +332,64 @@ ${trimmed}`;
         ? "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(allChunks, 4)
         : "";
 
-      // Step 2: 4 sequential Claude calls (series to avoid API overload)
-      const claudeOpts = (system: string, maxTokens: number) => ({
+      // Step 2: Per-block Claude calls — only for blocks that exist
+      const claudeOpts = (system: string, userContent: string, maxTokens: number) => ({
         apiKey: ANTHROPIC_API_KEY!, system, userContent, maxTokens,
       });
-      const intentRaw = await callClaude(claudeOpts(INTENT_PROMPT + intentContext, 384));
-      const metconRaw = await callClaude(claudeOpts(METCON_PROMPT + journalContext, 1024));
-      const strengthRaw = await callClaude(claudeOpts(STRENGTH_PROMPT + strengthContext, 1024));
-      const skillsRaw = await callClaude(claudeOpts(SKILLS_PROMPT + journalContext, 1024));
+
+      const stagger = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const calls: Promise<[string, string]>[] = [];
+
+      // Intent always runs (full session context)
+      calls.push(
+        callClaude(claudeOpts(INTENT_PROMPT + intentContext, buildUserContent(fullWorkoutText), 384))
+          .then((r): [string, string] => ["intent", r])
+      );
+
+      if (blockTextByType["metcon"]) {
+        calls.push(
+          stagger(500).then(() => callClaude(claudeOpts(METCON_PROMPT + journalContext, buildUserContent(blockTextByType["metcon"]), 1024)))
+            .then((r): [string, string] => ["metcon", r])
+        );
+      }
+      if (blockTextByType["strength"]) {
+        calls.push(
+          stagger(1000).then(() => callClaude(claudeOpts(STRENGTH_PROMPT + strengthContext, buildUserContent(blockTextByType["strength"]), 1024)))
+            .then((r): [string, string] => ["strength", r])
+        );
+      }
+      if (blockTextByType["skills"]) {
+        calls.push(
+          stagger(1500).then(() => callClaude(claudeOpts(SKILLS_PROMPT + journalContext, buildUserContent(blockTextByType["skills"]), 1024)))
+            .then((r): [string, string] => ["skills", r])
+        );
+      }
+
+      const results = await Promise.all(calls);
+      const resultMap: Record<string, string> = {};
+      for (const [key, raw] of results) {
+        resultMap[key] = raw;
+      }
 
       // Step 3: Parse responses and assemble
-      const intentParsed = parseJSON(intentRaw);
-      const metconParsed = parseJSON(metconRaw);
-      const strengthParsed = parseJSON(strengthRaw);
-      const skillsParsed = parseJSON(skillsRaw);
-
+      const intentParsed = parseJSON(resultMap["intent"] || "");
       const blocks: Record<string, unknown>[] = [];
-      if (skillsParsed?.block_type) blocks.push(skillsParsed);
-      if (strengthParsed?.block_type) blocks.push(strengthParsed);
-      if (metconParsed?.block_type) blocks.push(metconParsed);
+
+      if (resultMap["skills"]) {
+        const parsed = parseJSON(resultMap["skills"]);
+        if (parsed?.block_type) blocks.push(parsed);
+      }
+      if (resultMap["strength"]) {
+        const parsed = parseJSON(resultMap["strength"]);
+        if (parsed?.block_type) blocks.push(parsed);
+      }
+      if (resultMap["metcon"]) {
+        const parsed = parseJSON(resultMap["metcon"]);
+        if (parsed?.block_type) blocks.push(parsed);
+      }
 
       review = {
-        intent: intentParsed?.intent || intentRaw || "Unable to parse intent.",
+        intent: intentParsed?.intent || resultMap["intent"] || "Unable to parse intent.",
         blocks,
         sources: [],
       };
@@ -391,7 +442,7 @@ ${trimmed}`;
       const rawText = await callClaude({
         apiKey: ANTHROPIC_API_KEY!,
         system: WORKOUT_REVIEW_SYSTEM_PROMPT + context,
-        userContent,
+        userContent: buildUserContent(trimmed),
         maxTokens: 1024,
       });
 
