@@ -79,6 +79,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [entriesByLog, setEntriesByLog] = useState<Record<string, WorkoutLogEntry[]>>({});
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [blockFilter, setBlockFilter] = useState<string>('all');
 
   useEffect(() => {
     (async () => {
@@ -160,6 +161,17 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
         <div className="page-body">
           <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 0' }}>
+            <div className="source-toggle" style={{ marginBottom: 16 }}>
+              {(['all', 'strength', 'skills', 'metcon', 'accessory'] as const).map(f => (
+                <button
+                  key={f}
+                  className={'source-btn' + (blockFilter === f ? ' active' : '')}
+                  onClick={() => { setBlockFilter(f); setExpandedId(null); }}
+                >
+                  {f === 'all' ? 'All' : BLOCK_TYPE_LABELS[f] || f}
+                </button>
+              ))}
+            </div>
             {loading ? (
               <div className="page-loading"><div className="loading-pulse" /></div>
             ) : logs.length === 0 ? (
@@ -169,9 +181,17 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   Log your first workout
                 </button>
               </div>
-            ) : (
+            ) : (() => {
+              const filtered = blockFilter === 'all'
+                ? logs
+                : logs.filter(log => (blocksByLog[log.id] || []).some(b => b.block_type === blockFilter));
+              return filtered.length === 0 ? (
+                <div className="workout-review-section" style={{ textAlign: 'center', padding: 40 }}>
+                  <p style={{ color: 'var(--text-dim)' }}>No {BLOCK_TYPE_LABELS[blockFilter]?.toLowerCase() || ''} workouts found.</p>
+                </div>
+              ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {logs.map(log => {
+                {filtered.map(log => {
                   const logBlocks = blocksByLog[log.id] || [];
                   const hasScores = logBlocks.some(b => b.score);
                   const hasRx = logBlocks.some(b => b.rx);
@@ -335,7 +355,8 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   );
                 })}
               </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       </div>
