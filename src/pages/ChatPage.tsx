@@ -297,7 +297,7 @@ export default function ChatPage({ session }: { session: Session }) {
             <div className="welcome-logo">W</div>
             <h2>What do you want to know?</h2>
             <p>{sourceFilter === 'science'
-              ? 'Get answers from physiology and biochemistry texts for more technical, in-depth answers.'
+              ? 'Get more technical, in-depth answers from physiology and biochemistry texts.'
               : sourceFilter === 'strength-science'
               ? 'Search strength training science, biomechanics and programming from world-class coaches.'
               : 'Get answers from study guides, seminar content and journal articles on the methodology.'}</p>
