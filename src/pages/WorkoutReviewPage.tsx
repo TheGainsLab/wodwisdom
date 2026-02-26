@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase, FunctionsHttpError } from '../lib/supabase';
 import Nav from '../components/Nav';
 import InviteBanner from '../components/InviteBanner';
+import WorkoutBlocksDisplay from '../components/WorkoutBlocksDisplay';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -281,7 +282,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                 {/* Workout text at top for reference */}
                 <div className="workout-review-section" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
                   <h3>Workout</h3>
-                  <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap', fontWeight: 500, color: 'var(--text)' }}>{workoutText}</div>
+                  <WorkoutBlocksDisplay text={workoutText} />
                 </div>
 
                 {/* Intent — always visible */}
