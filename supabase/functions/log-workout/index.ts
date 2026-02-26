@@ -152,7 +152,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Insert workout_log_blocks rows
+    // 2. Insert workout_log_blocks rows and get back their IDs
+    let insertedBlocks: { id: string }[] = [];
     if (blocks.length > 0) {
       const blockRows = blocks.map((b, i) => ({
         log_id: log.id,
@@ -166,13 +167,17 @@ Deno.serve(async (req) => {
         sort_order: i,
       }));
 
-      const { error: blocksErr } = await supa.from("workout_log_blocks").insert(blockRows);
+      const { data: blockData, error: blocksErr } = await supa
+        .from("workout_log_blocks")
+        .insert(blockRows)
+        .select("id");
       if (blocksErr) {
         console.error("log-workout blocks insert error:", blocksErr);
       }
+      insertedBlocks = (blockData as { id: string }[]) || [];
     }
 
-    // 3. Insert workout_log_entries rows
+    // 3. Insert workout_log_entries rows with block_id FK
     const entries: {
       log_id: string;
       movement: string;
@@ -184,6 +189,7 @@ Deno.serve(async (req) => {
       scaling_note: string | null;
       sort_order: number;
       block_label: string | null;
+      block_id: string | null;
       set_number: number | null;
       reps_completed: number | null;
       hold_seconds: number | null;
@@ -193,8 +199,10 @@ Deno.serve(async (req) => {
       variation: string | null;
     }[] = [];
     let sortOrder = 0;
-    for (const block of blocks) {
+    for (let bi = 0; bi < blocks.length; bi++) {
+      const block = blocks[bi];
       const blockLabel = block.label ?? null;
+      const blockId = insertedBlocks[bi]?.id ?? null;
       for (const entry of block.entries ?? []) {
         if (!entry.movement?.trim()) continue;
         entries.push({
@@ -210,6 +218,7 @@ Deno.serve(async (req) => {
           scaling_note: entry.scaling_note?.trim() || null,
           sort_order: sortOrder++,
           block_label: blockLabel,
+          block_id: blockId,
           set_number: entry.set_number != null && entry.set_number > 0 ? entry.set_number : null,
           // Skills-specific fields
           reps_completed: entry.reps_completed != null && entry.reps_completed >= 0

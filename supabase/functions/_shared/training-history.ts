@@ -18,6 +18,7 @@ export interface WorkoutLogRow {
 }
 
 export interface WorkoutLogBlockRow {
+  id: string;
   log_id: string;
   block_type: string;
   block_label: string | null;
@@ -37,6 +38,7 @@ export interface WorkoutLogEntryRow {
   rpe: number | null;
   scaling_note: string | null;
   sort_order?: number;
+  block_id: string | null;
   block_label: string | null;
   set_number: number | null;
   // Skills-specific fields
@@ -208,13 +210,15 @@ export function formatRecentHistory(
     blocksByLog.set(b.log_id, list);
   }
 
-  const entriesByLabel = new Map<string, WorkoutLogEntryRow[]>();
+  const entriesByBlock = new Map<string, WorkoutLogEntryRow[]>();
   for (const e of entries) {
-    // key by log_id + block_label so entries match their block
-    const key = `${e.log_id}::${e.block_label ?? ""}`;
-    const list = entriesByLabel.get(key) || [];
+    // Prefer block_id FK; fall back to log_id + block_label for old data
+    const key = e.block_id
+      ? `id::${e.block_id}`
+      : `${e.log_id}::${e.block_label ?? ""}`;
+    const list = entriesByBlock.get(key) || [];
     list.push(e);
-    entriesByLabel.set(key, list);
+    entriesByBlock.set(key, list);
   }
 
   const lines: string[] = [];
@@ -237,8 +241,10 @@ export function formatRecentHistory(
 
     for (const block of logBlocks) {
       if (lines.length >= maxLines) break;
-      const key = `${log.id}::${block.block_label ?? ""}`;
-      const blockEntries = entriesByLabel.get(key) || [];
+      // Match entries by block_id FK first, fall back to block_label for old data
+      const byId = entriesByBlock.get(`id::${block.id}`) || [];
+      const byLabel = entriesByBlock.get(`${log.id}::${block.block_label ?? ""}`) || [];
+      const blockEntries = byId.length > 0 ? byId : byLabel;
       const summary = formatBlock(block, blockEntries);
       lines.push(`${dateLabel} — ${summary}`);
     }
@@ -276,11 +282,11 @@ export async function fetchAndFormatRecentHistory(
   const [{ data: blocks }, { data: entries }] = await Promise.all([
     supa
       .from("workout_log_blocks")
-      .select("log_id, block_type, block_label, block_text, score, rx, sort_order")
+      .select("id, log_id, block_type, block_label, block_text, score, rx, sort_order")
       .in("log_id", logIds),
     supa
       .from("workout_log_entries")
-      .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation")
+      .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation")
       .in("log_id", logIds),
   ]);
 
