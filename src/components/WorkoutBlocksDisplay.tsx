@@ -63,7 +63,7 @@ function parseSkillsContent(content: string): { header: string | null; items: st
 
   // Detect EMOM header on the first line (e.g. "EMOM 8 …", "E2MOM 10 …")
   const firstLine = lines[0] || '';
-  const emomMatch = firstLine.match(/^(E\d*MOM\s+\d+)(?:\s+(.*))?$/i);
+  const emomMatch = firstLine.match(/^(E\d*MOM\s+\d+(?:\s*min(?:utes?)?)?)(?:\s+(.*))?$/i);
   if (emomMatch) {
     const header = emomMatch[1];
     const remainderOfFirstLine = emomMatch[2] || '';
