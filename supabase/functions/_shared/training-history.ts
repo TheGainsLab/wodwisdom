@@ -152,14 +152,36 @@ function formatBlock(
 
   if (block.block_type === "skills") {
     if (sorted.length > 0) {
+      const capped = sorted.slice(0, 4);
+
+      // If every entry shares the same sets count, show it once as a header line
+      const setsValues = capped.map((e) => e.sets).filter((s) => s != null);
+      const sharedSets =
+        setsValues.length === capped.length &&
+        new Set(setsValues).size === 1
+          ? setsValues[0]
+          : null;
+
       const parts: string[] = [];
-      for (const e of sorted.slice(0, 4)) {
+      if (sharedSets != null) parts.push(`${sharedSets} sets`);
+
+      for (const e of capped) {
         let p = formatMovementName(e.movement);
         if (e.variation) p += ` (${e.variation})`;
-        if (e.sets != null && e.reps != null && e.reps_completed != null) {
-          p += ` ${e.sets}×${e.reps_completed}/${e.reps}`;
-        } else if (e.sets != null && e.reps != null) {
-          p += ` ${e.sets}×${e.reps}`;
+        // Only show per-task sets×reps when sets aren't shared
+        if (sharedSets == null) {
+          if (e.sets != null && e.reps != null && e.reps_completed != null) {
+            p += ` ${e.sets}×${e.reps_completed}/${e.reps}`;
+          } else if (e.sets != null && e.reps != null) {
+            p += ` ${e.sets}×${e.reps}`;
+          }
+        } else {
+          // Shared sets — still show reps
+          if (e.reps != null && e.reps_completed != null) {
+            p = `${e.reps_completed}/${e.reps} ${p}`;
+          } else if (e.reps != null) {
+            p = `${e.reps} ${p}`;
+          }
         }
         if (e.hold_seconds != null) p += ` ${e.hold_seconds}s hold`;
         if (e.distance != null) p += ` ${e.distance}${e.distance_unit || "ft"}`;
@@ -169,9 +191,9 @@ function formatBlock(
         if (e.scaling_note) p += ` — ${e.scaling_note}`;
         parts.push(p);
       }
-      return `Skills: ${parts.join(", ")}`;
+      return `Skills:\n${parts.join("\n")}`;
     }
-    return `Skills: ${block.block_text.slice(0, 60).replace(/\n/g, " ")}`;
+    return `Skills:\n${block.block_text.slice(0, 80)}`;
   }
 
   // accessory / other
