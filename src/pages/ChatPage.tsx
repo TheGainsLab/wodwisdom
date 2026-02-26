@@ -303,7 +303,7 @@ export default function ChatPage({ session }: { session: Session }) {
               : 'Search hundreds of articles on movements, nutrition, coaching methodology, programming, and more.'}</p>
             {!isPaywalled && (
               <div className="suggestions">
-                {activeSuggestions.map((s, i) => <button key={i} className="suggestion" onClick={() => sendMessage(s)}>{s}</button>)}
+                {activeSuggestions.slice(0, 4).map((s, i) => <button key={i} className="suggestion" onClick={() => sendMessage(s)}>{s}</button>)}
               </div>
             )}
             {isPaywalled && (
