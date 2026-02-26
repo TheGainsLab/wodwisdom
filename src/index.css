@@ -278,6 +278,9 @@ body.landing-body{overflow:auto;height:auto}
 .program-edit-num{width:56px;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text)}
 .program-edit-day-num{font-size:13px;font-weight:600;color:var(--text);min-width:32px}
 .program-edit-text{width:100%;min-width:200px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text)}
+.program-save-btn{background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;padding:4px 10px;border-radius:4px;font-weight:600}
+.program-save-btn:hover{opacity:.85}
+.program-save-btn:disabled{opacity:.5;cursor:not-allowed}
 .program-remove-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:4px}
 .program-remove-btn:hover{text-decoration:underline}
 /* Block-level edit */
