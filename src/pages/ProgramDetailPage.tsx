@@ -57,7 +57,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
         .from('workout_logs')
         .select('source_id')
         .eq('user_id', session.user.id)
-        .eq('source_type', 'program')
         .in('source_id', ids);
       const completed = new Set((logs || []).map((l) => l.source_id).filter(Boolean));
       setCompletedWorkoutIds(completed);
