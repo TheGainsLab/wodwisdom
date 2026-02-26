@@ -37,8 +37,10 @@ const BLOCK_PATTERNS = [
   /^([A-Z])\)\s*/m,
   // 1), 2), 3) numbered sections
   /^(\d+)\)\s*/m,
-  // Labeled sections: Strength:, Metcon:, Accessory:, Skills:, Cool down:, etc.
-  /^(Strength|Metcon|MetCon|Accessory|Warm-up|Warmup|Conditioning|Skills|Cool\s*down|Cool-down):\s*/im,
+  // Labeled sections with colon: Strength:, Metcon:, Warm-up:, Cool down:, etc.
+  /^(Strength|Metcon|MetCon|Accessory|Warm[\s-]*up|Warmup|Conditioning|Skills?|Cool[\s-]*down):\s*/im,
+  // Labeled sections without colon (own line): Warm-up\n, Cool Down\n, Strength\n, etc.
+  /^(Strength|Metcon|MetCon|Accessory|Warm[\s-]*up|Warmup|Conditioning|Skills?|Cool[\s-]*down)\s*\n/im,
 ];
 
 function splitIntoBlocks(workoutText: string): { label: string; text: string }[] {

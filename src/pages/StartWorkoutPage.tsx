@@ -68,6 +68,15 @@ function formatMovementName(canonical: string): string {
   return canonical.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+/** Re-classify block type on the frontend using both label and first line of text.
+ *  Ensures warm-up/cool-down get the right UI even if the server parser is stale. */
+function normalizeBlockType(block: Block): string {
+  const combined = (block.label + ' ' + (block.text.split('\n')[0] ?? '')).toLowerCase();
+  if (/warm[\s-]*up/.test(combined)) return 'warm-up';
+  if (/cool[\s-]*down/.test(combined)) return 'cool-down';
+  return block.type;
+}
+
 const compactInputStyle = {
   background: 'var(--bg)',
   border: '1px solid var(--border)',
@@ -123,6 +132,9 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
       setWorkoutType(inferWorkoutType(data?.blocks || []));
       const initial: Record<string, EntryValues> = {};
       (data?.blocks || []).forEach((b: Block, bi: number) => {
+        // Warm-up and cool-down: notes only, no per-movement entries
+        const bType = normalizeBlockType(b);
+        if (bType === 'warm-up' || bType === 'cool-down') return;
         const { sets, reps } = parseSetsReps(b.text);
         b.movements.forEach((m: BlockMovement, mi: number) => {
           if (b.type === 'strength' && sets && sets > 0) {
@@ -173,11 +185,12 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     setSaving(true);
     try {
       const logBlocks = blocks.map((b, bi) => {
+        const bType = normalizeBlockType(b);
         // Warm-up and cool-down: no per-movement entries
-        if (b.type === 'warm-up' || b.type === 'cool-down') {
+        if (bType === 'warm-up' || bType === 'cool-down') {
           return {
             label: b.label,
-            type: b.type,
+            type: bType,
             text: b.text,
             score: blockScores[bi]?.trim() || null,
             rx: false,
@@ -186,7 +199,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         }
 
         // Strength: collect per-set entries
-        if (b.type === 'strength') {
+        if (bType === 'strength') {
           const entries: {
             movement: string;
             sets: number | null;
@@ -253,7 +266,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           });
           return {
             label: b.label,
-            type: b.type,
+            type: bType,
             text: b.text,
             score: blockScores[bi]?.trim() || null,
             rx: false,
@@ -261,7 +274,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           };
         }
 
-        // All other block types (metcon, skills, accessory, other)
+        // All other block types (metcon, skills, accessory)
         const entries = b.movements.map((m, mi) => {
           const key = `${bi}-${mi}`;
           const ev = entryValues[key] || {};
@@ -284,7 +297,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         });
         return {
           label: b.label,
-          type: b.type,
+          type: bType,
           text: b.text,
           score: blockScores[bi]?.trim() || null,
           rx: blockRx[bi] ?? false,
@@ -380,15 +393,17 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                   </div>
                 </div>
 
-                {blocks.map((block, bi) => (
+                {blocks.map((block, bi) => {
+                  const blockType = normalizeBlockType(block);
+                  return (
                   <div key={bi} className="workout-review-section" style={{ marginBottom: 16 }}>
                     <h3>
                       {block.label}
-                      {block.type === 'metcon' && ` — ${getMetconTypeLabel(block.text)}`}
+                      {blockType === 'metcon' && ` — ${getMetconTypeLabel(block.text)}`}
                     </h3>
                     <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap', marginBottom: 16 }}>{block.text}</div>
 
-                    {block.type === 'strength' && block.movements.map((m, mi) => {
+                    {blockType === 'strength' && block.movements.map((m, mi) => {
                       // Collect per-set keys for this movement
                       const setKeys = Object.keys(entryValues)
                         .filter(k => k.startsWith(`${bi}-${mi}-s`))
@@ -460,7 +475,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                       );
                     })}
 
-                    {block.type === 'metcon' && (
+                    {blockType === 'metcon' && (
                       <>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                           <input
@@ -504,7 +519,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                       </>
                     )}
 
-                    {block.type === 'skills' && block.movements.length > 0 && (
+                    {blockType === 'skills' && block.movements.length > 0 && (
                       block.movements.map((m, mi) => {
                         const key = `${bi}-${mi}`;
                         const ev = entryValues[key] || {};
@@ -558,7 +573,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                       })
                     )}
 
-                    {block.type === 'warm-up' && (
+                    {blockType === 'warm-up' && (
                       <div style={{ marginTop: 8 }}>
                         <input
                           type="text"
@@ -570,7 +585,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                       </div>
                     )}
 
-                    {block.type === 'cool-down' && (
+                    {blockType === 'cool-down' && (
                       <div style={{ marginTop: 8 }}>
                         <input
                           type="text"
@@ -582,7 +597,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                       </div>
                     )}
 
-                    {block.type === 'accessory' && block.movements.length > 0 && (
+                    {blockType === 'accessory' && block.movements.length > 0 && (
                       block.movements.map((m, mi) => {
                         const key = `${bi}-${mi}`;
                         const ev = entryValues[key] || {};
@@ -597,7 +612,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                       })
                     )}
                   </div>
-                ))}
+                  );
+                })}
 
                 {notices.length > 0 && (
                   <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>{notices.join(' ')}</div>
