@@ -336,8 +336,8 @@ body.landing-body{overflow:auto;height:auto}
 .workout-block-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);margin-bottom:4px}
 .workout-block-content{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text);line-height:1.5;white-space:pre-wrap}
 .workout-block-lines{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
-.workout-block-lines li{padding:4px 0;border-bottom:1px solid var(--border)}
-.workout-block-lines li:last-child{border-bottom:none;padding-bottom:0}
+.workout-block-lines li{padding:4px 0}
+.workout-block-lines li:last-child{padding-bottom:0}
 .workout-blocks-fallback{font-family:'JetBrains Mono',monospace;font-size:12px;white-space:pre-wrap;line-height:1.5;color:var(--text)}
 .error-msg{color:var(--accent);font-size:13px}
 /* Program Analysis */
