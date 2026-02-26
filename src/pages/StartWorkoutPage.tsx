@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import InviteBanner from '../components/InviteBanner';
+import { BlockContent } from '../components/WorkoutBlocksDisplay';
 
 interface Block {
   label: string;
@@ -276,7 +277,9 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                       {block.label}
                       {block.type === 'metcon' && ` — ${getMetconTypeLabel(block.text)}`}
                     </h3>
-                    <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap', marginBottom: 16 }}>{block.text}</div>
+                    <div className="workout-review-content" style={{ marginBottom: 16 }}>
+                      <BlockContent label={block.label} content={block.text} />
+                    </div>
 
                     {block.type === 'strength' && (() => {
                       const setKeys = Object.keys(entryValues)
