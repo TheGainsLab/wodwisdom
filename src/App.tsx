@@ -21,6 +21,7 @@ import ProgramEditPage from './pages/ProgramEditPage';
 import ProgramAnalysisPage from './pages/ProgramAnalysisPage';
 import ProgramComparePage from './pages/ProgramComparePage';
 import ProgramReviewPage from './pages/ProgramReviewPage';
+import WorkoutAnalysisPage from './pages/WorkoutAnalysisPage';
 import CheckoutPage from './pages/CheckoutPage';
 import CheckoutCompletePage from './pages/CheckoutCompletePage';
 
@@ -55,6 +56,7 @@ export default function App() {
       <Route path="/" element={<ChatPage session={session} />} />
       <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
       <Route path="/workout/start" element={<StartWorkoutPage session={session} />} />
+      <Route path="/workout-analysis" element={<WorkoutAnalysisPage session={session} />} />
       <Route path="/training-log" element={<TrainingLogPage session={session} />} />
       <Route path="/programs" element={<ProgramsListPage session={session} />} />
       <Route path="/programs/new" element={<AddProgramPage session={session} />} />
