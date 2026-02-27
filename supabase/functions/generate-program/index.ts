@@ -1,6 +1,7 @@
 /**
- * Generate a 4-week program from profile analysis.
+ * Generate a 12-week periodized program from profile analysis.
  * Uses the specified evaluation (or most recent) to produce a personalized program.
+ * Includes 3-week build cycles with deloads at weeks 4, 8, and 12.
  * Program is auto-saved; no preview step.
  */
 
@@ -65,10 +66,32 @@ function formatProfile(profile: ProfileData): string {
   return parts.join("\n") || "No profile data.";
 }
 
-const GENERATE_PROMPT = `You are an expert CrossFit coach. Generate a 4-week program for this athlete based on their profile and analysis.
+const GENERATE_PROMPT = `You are an expert CrossFit coach. Generate a 12-week periodized program for this athlete based on their profile and analysis.
+
+PERIODIZATION STRUCTURE:
+- The program has three 4-week cycles. Each cycle = 3 build weeks + 1 deload week.
+  - Build weeks (1-3, 5-7, 9-11): Progressive intensity increase each week.
+  - Deload weeks (4, 8, 12): Reduce BOTH volume AND intensity. Use 55-65% loads, fewer sets, shorter metcons.
+- Strength loading progression within each 3-week build block:
+  - Week 1 of block: moderate (70-75%)
+  - Week 2 of block: moderate-heavy (75-80%)
+  - Week 3 of block: heavy (80-85%)
+  - Week 4 of block (deload): light (55-65%), reduced volume (3x3-5 instead of 5x5)
+
+FREQUENCY & RECOVERY RULES:
+- No single strength exercise more than 2x per week. Vary the barbell movements across the week (e.g. back squat Mon, front squat Thu — not back squat Mon/Wed/Fri).
+- No single skill more than 2x per week, and never on consecutive days (e.g. muscle-up practice Mon and Thu, not Mon and Tue).
+- Do not program heavy squats and heavy deadlifts on consecutive days. Same for pressing patterns (strict press and push press should not be back-to-back days).
+- The metcon should complement the strength block, not duplicate it. If the strength block is front squats, the metcon should NOT also be thrusters and wall balls. Vary the movement patterns between blocks within a day.
+
+WEAKNESS vs. MAINTENANCE BALANCE:
+- The analysis identifies weaknesses/priorities. Address them consistently but not exclusively.
+- Weakness movements: program 2x per week across the cycle.
+- Strengths and maintenance movements: still program 1x per week to maintain. Do not ignore movements just because they are not a weakness.
+- Distribute weakness work across the full 12 weeks with progression, not just repetition.
 
 OUTPUT FORMAT (strict):
-- Use "Week 1", "Week 2", etc. for week headers.
+- Use "Week 1", "Week 2", etc. through "Week 12" for week headers.
 - Use "Monday:", "Tuesday:", etc. (or "Mon:", "Tue:", etc.) for each training day.
 - Each day has exactly 5 blocks in this order. Put each block on its own line:
   1. Warm-up: (5-8 min movement prep for that day's work)
@@ -76,18 +99,25 @@ OUTPUT FORMAT (strict):
   3. Strength: (barbell work with percentages, e.g. 5x5 @ 75%)
   4. Metcon: (For Time, AMRAP, EMOM etc. - prescribe Rx weights)
   5. Cool down: (3-5 min mobility/stretch)
-- Use 4-5 training days per week (Mon–Fri typical, optional Sat).
+- Use 4-5 training days per week (Mon-Fri typical, optional Sat).
 - Each block must fit on ONE line. Use commas to separate movements within a block.
 - Prescribe weights using their 1RMs (e.g. 75% of back squat). Use / for M/F (e.g. 95/65).
-- Make the program directly address the analysis priorities (imbalances, skill gaps, engine work).
 
-Example format for one day:
+Example format for one day (Week 1, build week):
 Monday:
 Warm-up: 3 rounds 400m run, 10 air squats, 5 PVC pass-throughs, 10 lunges
 Skills: EMOM 10 3 kipping pull-up practice, 5s hang
-Strength: Back Squat 5x5 @ 75%
-Metcon: AMRAP 12 9 thrusters 95/65, 6 pull-ups, 3 burpees
+Strength: Back Squat 5x5 @ 72%
+Metcon: AMRAP 12 9 deadlifts 185/125, 6 bar-facing burpees, 3 rope climbs
 Cool down: 2 min couch stretch each leg, 2 min child's pose
+
+Example format for one day (Week 4, deload week):
+Monday:
+Warm-up: 2 rounds 200m jog, 10 air squats, 10 arm circles, 5 inchworms
+Skills: 3x5 strict pull-ups, focus on control and tempo
+Strength: Back Squat 3x5 @ 60%
+Metcon: 3 rounds for quality (not time) 10 KB swings 53/35, 10 box step-ups, 200m row
+Cool down: 3 min foam roll quads and lats, 2 min pigeon stretch each side
 
 Output ONLY the program text. No preamble or explanation.`;
 
@@ -248,7 +278,7 @@ ANALYSIS TO ADDRESS:
 ${analysisStr}
 ${trainingBlock}
 
-Generate a 4-week program. Follow the format exactly.`;
+Generate a 12-week periodized program. Follow the format and periodization rules exactly.`;
 
     const systemPrompt = GENERATE_PROMPT + ragContext;
 
@@ -268,7 +298,7 @@ Generate a 4-week program. Follow the format exactly.`;
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 8192,
+        max_tokens: 24000,
         stream: false,
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
@@ -302,7 +332,7 @@ Generate a 4-week program. Follow the format exactly.`;
     // Create program via preprocess-program (reuse parsing + insert logic)
     const preprocessUrl = `${SUPABASE_URL}/functions/v1/preprocess-program`;
     const monthYear = new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" });
-    const programName = `Profile Program — ${monthYear}`;
+    const programName = `12-Week Program — ${monthYear}`;
 
     const preprocessResp = await fetch(preprocessUrl, {
       method: "POST",
@@ -310,7 +340,7 @@ Generate a 4-week program. Follow the format exactly.`;
         "Content-Type": "application/json",
         Authorization: authHeader,
       },
-      body: JSON.stringify({ text: programText, name: programName, source: "generate" }),
+      body: JSON.stringify({ text: programText, name: programName, source: "generate", total_phases: 3 }),
     });
 
     if (!preprocessResp.ok) {

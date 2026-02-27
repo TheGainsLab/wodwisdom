@@ -427,7 +427,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { name, text, file_base64, file_type, source } = body;
+    const { name, text, file_base64, file_type, source, total_phases } = body;
 
     let workouts: ParsedWorkout[] = [];
     const useAIParser = source === "generate";
@@ -465,9 +465,13 @@ Deno.serve(async (req) => {
 
     const programName = (name && String(name).trim()) || "Untitled Program";
 
+    const programInsert: Record<string, unknown> = { user_id: user.id, name: programName };
+    if (total_phases != null && Number.isInteger(total_phases) && total_phases > 1) {
+      programInsert.total_phases = total_phases;
+    }
     const { data: prog, error: progErr } = await supa
       .from("programs")
-      .insert({ user_id: user.id, name: programName })
+      .insert(programInsert)
       .select("id")
       .single();
 

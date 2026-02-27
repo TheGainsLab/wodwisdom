@@ -4,7 +4,7 @@
  * for the current week (based on program structure, not calendar).
  *
  * Output example:
- *   TRAINING PROGRAM: "Strength Block" (4 weeks)
+ *   TRAINING PROGRAM: "Strength Block" (12 weeks)
  *   Week 1, Day 1: Back Squat 5×5 @80%, RDL 3×10, Plank 3×45s
  *   Week 1, Day 2: Bench Press 5×5 @80%, Barbell Row 4×8
  */
