@@ -13,7 +13,7 @@ export default function Nav({ isOpen, onClose }: NavProps) {
   const [portalLoading, setPortalLoading] = useState(false);
 
   const isChatActive = location.pathname === '/' || location.pathname === '/history' || location.pathname === '/bookmarks';
-  const isTrainingActive = location.pathname.startsWith('/programs') || location.pathname === '/training-log';
+  const isTrainingActive = location.pathname.startsWith('/programs') || location.pathname === '/training-log' || location.pathname === '/workout-analysis';
   const [chatExpanded, setChatExpanded] = useState(isChatActive);
   const [trainingExpanded, setTrainingExpanded] = useState(isTrainingActive);
 
@@ -98,6 +98,9 @@ export default function Nav({ isOpen, onClose }: NavProps) {
               <div className="nav-group-items">
                 <button className={"nav-link sub " + (location.pathname.startsWith("/programs") ? "active" : "")} onClick={() => goTo("/programs")}>
                   <span className="nav-sub-dot" />Programs
+                </button>
+                <button className={"nav-link sub " + (location.pathname === "/workout-analysis" ? "active" : "")} onClick={() => goTo("/workout-analysis")}>
+                  <span className="nav-sub-dot" />Analyze Workout
                 </button>
                 <button className={"nav-link sub " + (location.pathname === "/training-log" ? "active" : "")} onClick={() => goTo("/training-log")}>
                   <span className="nav-sub-dot" />Training Log
