@@ -24,6 +24,7 @@ import ProgramReviewPage from './pages/ProgramReviewPage';
 import WorkoutAnalysisPage from './pages/WorkoutAnalysisPage';
 import CheckoutPage from './pages/CheckoutPage';
 import CheckoutCompletePage from './pages/CheckoutCompletePage';
+import EngineDashboardPage from './pages/EngineDashboardPage';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -73,6 +74,8 @@ export default function App() {
       <Route path="/settings" element={<SettingsPage session={session} />} />
       <Route path="/profile" element={<AthletePage session={session} />} />
       <Route path="/admin" element={<AdminPage session={session} />} />
+      <Route path="/engine" element={<EngineDashboardPage session={session} />} />
+      <Route path="/engine/dashboard" element={<EngineDashboardPage session={session} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

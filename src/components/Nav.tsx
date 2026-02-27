@@ -14,6 +14,7 @@ export default function Nav({ isOpen, onClose }: NavProps) {
 
   const isChatActive = location.pathname === '/' || location.pathname === '/history' || location.pathname === '/bookmarks';
   const isTrainingActive = location.pathname.startsWith('/programs') || location.pathname === '/training-log' || location.pathname === '/workout-analysis';
+  const isEngineActive = location.pathname.startsWith('/engine');
   const [chatExpanded, setChatExpanded] = useState(isChatActive);
   const [trainingExpanded, setTrainingExpanded] = useState(isTrainingActive);
 
@@ -111,6 +112,10 @@ export default function Nav({ isOpen, onClose }: NavProps) {
           <button className={"nav-link " + (location.pathname === "/dashboard" ? "active" : "")} onClick={() => goTo("/dashboard")}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
             Dashboard
+          </button>
+          <button className={"nav-link " + (isEngineActive ? "active" : "")} onClick={() => goTo("/engine")}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+            Engine
           </button>
           {isAdmin && (
             <button className={"nav-link " + (location.pathname === "/admin" ? "active" : "")} onClick={() => goTo("/admin")}>
