@@ -26,6 +26,7 @@ import CheckoutPage from './pages/CheckoutPage';
 import CheckoutCompletePage from './pages/CheckoutCompletePage';
 import EngineDashboardPage from './pages/EngineDashboardPage';
 import EngineTrainingDayPage from './pages/EngineTrainingDayPage';
+import EngineAnalyticsPage from './pages/EngineAnalyticsPage';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -78,6 +79,7 @@ export default function App() {
       <Route path="/engine" element={<EngineDashboardPage session={session} />} />
       <Route path="/engine/dashboard" element={<EngineDashboardPage session={session} />} />
       <Route path="/engine/training/:dayNumber" element={<EngineTrainingDayPage session={session} />} />
+      <Route path="/engine/analytics" element={<EngineAnalyticsPage session={session} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
