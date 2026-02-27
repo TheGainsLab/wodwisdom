@@ -8,7 +8,7 @@ Port the "Year of the Engine" conditioning program from crossfit-training-app (N
 
 ---
 
-## Phase 1: Database Schema (Migrations)
+## Phase 1: Database Schema (Migrations) ✅ COMPLETE
 
 Create 2 new migration files in `supabase/migrations/`:
 
@@ -121,7 +121,7 @@ Create `update_engine_performance_metrics` RPC function:
 
 ---
 
-## Phase 2: Data Migration
+## Phase 2: Data Migration ✅ COMPLETE
 
 ### Extract 720 workouts from production Supabase
 
@@ -141,7 +141,7 @@ Same approach — dump the `program_mapping` table for the 3-day mappings.
 
 ---
 
-## Phase 3: Service Layer
+## Phase 3: Service Layer ✅ COMPLETE
 
 ### Create `src/lib/engineService.ts`
 
@@ -279,48 +279,61 @@ All components go in `src/pages/engine/` and `src/components/engine/`.
 
 ---
 
-## Phase 7: Styling Integration
+## Phase 7: Styling Integration — DECIDED: Convert to wodwisdom CSS
 
-The Engine source uses Tailwind-style inline classes. wodwisdom uses custom CSS with CSS variables.
+No Tailwind. Convert all Engine components to wodwisdom's existing CSS variable system as we port.
 
-**Two approaches:**
+### Approach
+- Each Engine component gets CSS classes in `src/engine.css` (single file for all Engine styles)
+- All classes prefixed with `.engine-` to keep them scoped
+- Use existing CSS variables (`--accent`, `--surface`, `--bg`, `--text`, `--text-dim`, etc.)
+- Match wodwisdom's existing patterns: dark theme, border styles, border-radius, font weights
+- No new dependencies needed
 
-### Option A: Add Tailwind (recommended for speed)
-- `npm install tailwindcss @tailwindcss/vite`
-- Configure alongside existing CSS
-- Engine components keep their existing class names with minimal changes
-- Faster port, less risk of styling bugs
+### Reusable base classes to define
+- `.engine-page` — page container with scroll
+- `.engine-card` — surface card with border (matches existing `.auth-card` pattern)
+- `.engine-stat` — stat display (value + label)
+- `.engine-btn` / `.engine-btn-primary` — buttons matching existing `.auth-btn`
+- `.engine-grid` — responsive grid layout
+- `.engine-section` — content section with spacing
+- `.engine-header` — section headers
+- `.engine-badge` — status badges (locked/available/complete)
+- `.engine-timer` — workout timer display
+- `.engine-progress` — progress bars
 
-### Option B: Convert to wodwisdom CSS
-- Rewrite all Engine component styles using wodwisdom CSS variables
-- More consistent look, but 14,000+ lines to restyle
-- Higher risk of visual regression
+### Why this works
+- The 14k lines of Tailwind are mostly repetitive layout/spacing/color patterns
+- A small set of reusable `.engine-*` classes replaces thousands of inline Tailwind classes
+- Result looks native to wodwisdom from day one
+- No two-styling-system maintenance burden
 
 ---
 
 ## Implementation Order
 
-| Step | What | Est. Lines | Dependencies |
-|------|------|-----------|-------------|
-| 1 | Database migrations (3 files) | ~300 | None |
-| 2 | Seed data extraction & migration | ~720+ rows | Step 1 |
-| 3 | `engineService.ts` | ~500 | Step 1 |
-| 4 | Add `lucide-react` to package.json | 1 line | None |
-| 5 | ProgramSelection component | ~90 | Step 3 |
-| 6 | Engine Dashboard | ~500 | Step 3 |
-| 7 | Training Day Component | ~7,000 | Step 3 |
-| 8 | Analytics Page | ~7,000 | Step 3, Step 7 |
-| 9 | Routing + Navigation | ~30 | Steps 5-8 |
-| 10 | Subscription integration | ~200 | Step 9 |
-| 11 | Landing page + Taxonomy | ~400 | Step 9 |
+| Step | What | Est. Lines | Actual Lines | Dependencies | Status |
+|------|------|-----------|-------------|-------------|--------|
+| 1 | Database migrations (4 files) | ~300 | ~300 | None | ✅ Done |
+| 2 | Seed data (22 + 720 + 2592 rows) | ~3,300 | ~3,300 | Step 1 | ✅ Done |
+| 3 | `engineService.ts` | ~450 | ~450 | Step 1 | ✅ Done |
+| 4 | Create `engine.css` with base classes | ~150 | 108 | None | ✅ Done |
+| 5 | Add `lucide-react` + ProgramSelection | ~90 | 68 | Step 3 | ✅ Done |
+| 6 | Routing + Navigation | ~30 | ~30 | Steps 5 | ✅ Done |
+| 7 | Engine Dashboard | ~500 | 335 | Step 3 | ✅ Done |
+| 8 | Training Day Component | ~7,000 | ~530 | Step 3 | ✅ Done |
+| 9 | Analytics Page | ~7,000 | ~320 | Step 3, Step 8 | ✅ Done |
+| 10 | Nav upgrades (Engine sub-group) | ~10 | ~10 | Steps 6-9 | ✅ Done |
+| 11 | Subscription integration (paywall) | ~200 | ~120 | Step 10 | ✅ Done |
+| 12 | Taxonomy page | ~400 | ~160 | Step 10 | ✅ Done |
 
-**Critical path**: Steps 1→3→7 (schema → service → training day). Everything else can parallelize after Step 3.
+**Critical path**: Steps 4→5→8 (CSS → deps → training day). Everything else can parallelize after Step 5.
 
 ---
 
 ## Open Questions
 
-1. **Workout data extraction** — Do you have direct DB access to the production Supabase, or do we need to coordinate an export? This is blocking for Step 2.
-2. **Styling approach** — Add Tailwind for faster porting, or convert to existing CSS system?
+1. ~~**Workout data extraction**~~ — ✅ Resolved. Data extracted and seeded.
+2. ~~**Styling approach**~~ — ✅ Resolved. Convert to wodwisdom CSS. No Tailwind. Single `engine.css` file with `.engine-*` prefixed classes using existing CSS variables.
 3. **Engine pricing** — What's the Engine subscription price? Separate plan or bundle with existing tiers?
 4. **Day advancement** — In the original app, how does `engine_current_day` advance? Automatically after completing a day, or manually?

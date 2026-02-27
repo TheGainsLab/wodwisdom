@@ -1,0 +1,108 @@
+/* Strength Program Engine */
+
+/* Page wrapper */
+.engine-page{padding:24px 20px;max-width:900px;margin:0 auto;width:100%;overflow-y:auto;flex:1;animation:fadeUp .4s ease}
+
+/* Card */
+.engine-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px}
+
+/* Section */
+.engine-section{display:flex;flex-direction:column;gap:16px}
+
+/* Header */
+.engine-header{font-size:20px;font-weight:700;letter-spacing:-.3px}
+.engine-subheader{font-size:14px;color:var(--text-dim);line-height:1.6}
+
+/* Divider */
+.engine-divider{border:none;border-top:1px solid var(--border);margin:0}
+
+/* Label */
+.engine-label{display:block;font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+
+/* Input */
+.engine-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:13px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:15px;outline:none;transition:border-color .2s,box-shadow .2s}
+.engine-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.engine-input::placeholder{color:var(--text-muted)}
+
+/* Select (dropdown) */
+.engine-select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:13px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:15px;outline:none;cursor:pointer;transition:border-color .2s,box-shadow .2s;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239090a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
+.engine-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+
+/* Buttons */
+.engine-btn{border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-weight:600;cursor:pointer;transition:background .2s,transform .1s;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.engine-btn:active{transform:scale(.98)}
+.engine-btn:disabled{opacity:.5;cursor:not-allowed}
+.engine-btn:disabled:active{transform:none}
+.engine-btn-primary{background:var(--accent);color:white;padding:14px 32px;font-size:15px}
+.engine-btn-primary:hover:not(:disabled){background:var(--accent-hover)}
+.engine-btn-secondary{background:none;border:1px solid var(--border);color:var(--text-dim);padding:11px 20px;font-size:14px}
+.engine-btn-secondary:hover:not(:disabled){border-color:var(--accent);color:var(--text);background:var(--surface2)}
+.engine-btn-sm{padding:8px 14px;font-size:13px;border-radius:6px}
+
+/* Grid */
+.engine-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+/* Stat card */
+.engine-stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 22px}
+.engine-stat-value{font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:700;color:var(--text);margin-bottom:4px}
+.engine-stat-label{font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px}
+
+/* Badge */
+.engine-badge{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 10px;border-radius:4px;display:inline-flex;align-items:center;gap:4px}
+.engine-badge--strength{background:rgba(239,68,68,.15);color:#f87171}
+.engine-badge--hypertrophy{background:rgba(168,85,247,.15);color:#c084fc}
+.engine-badge--power{background:rgba(59,130,246,.15);color:#60a5fa}
+.engine-badge--endurance{background:rgba(34,197,94,.15);color:#4ade80}
+.engine-badge--default{background:var(--surface2);color:var(--text-dim)}
+
+/* Progress bar */
+.engine-progress{margin-bottom:16px}
+.engine-progress-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.engine-progress-label{font-size:13px;font-weight:600;color:var(--text-dim)}
+.engine-progress-count{font-size:13px;color:var(--text-dim);font-variant-numeric:tabular-nums}
+.engine-progress-bar{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.engine-progress-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s ease}
+
+/* Timer display */
+.engine-timer{font-family:'JetBrains Mono',monospace;font-size:48px;font-weight:700;letter-spacing:2px;color:var(--text);text-align:center;font-variant-numeric:tabular-nums}
+.engine-timer-label{font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;text-align:center;margin-top:4px}
+
+/* Exercise row */
+.engine-exercise{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:10px;transition:background .15s}
+.engine-exercise:hover{background:var(--surface2)}
+.engine-exercise-name{font-size:15px;font-weight:600;color:var(--text);flex:1;min-width:0}
+.engine-exercise-detail{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim)}
+
+/* Set row */
+.engine-set{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;font-size:14px}
+.engine-set:nth-child(odd){background:var(--surface2)}
+.engine-set-num{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);width:28px;flex-shrink:0}
+.engine-set-weight{font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--text);font-weight:500;min-width:60px}
+.engine-set-reps{font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--text-dim);min-width:40px}
+.engine-set-done{width:24px;height:24px;border:2px solid var(--border);border-radius:6px;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;color:transparent}
+.engine-set-done:hover{border-color:var(--accent)}
+.engine-set-done.checked{background:var(--accent);border-color:var(--accent);color:white}
+
+/* Day/week tabs */
+.engine-tabs{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.engine-tab{flex:1;padding:10px 14px;border:none;background:none;color:var(--text-muted);font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .15s}
+.engine-tab:not(:last-child){border-right:1px solid var(--border)}
+.engine-tab:hover:not(.active){color:var(--text-dim)}
+.engine-tab.active{background:var(--accent);color:white}
+
+/* Empty / placeholder state */
+.engine-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;color:var(--text-muted);gap:12px}
+.engine-empty svg{color:var(--text-muted);opacity:.5;margin-bottom:4px}
+.engine-empty-title{font-size:16px;font-weight:600;color:var(--text-dim)}
+.engine-empty-desc{font-size:14px;color:var(--text-muted);max-width:320px;line-height:1.6}
+
+/* Responsive */
+@media(max-width:640px){
+.engine-page{padding:16px 12px}
+.engine-card{padding:18px 16px}
+.engine-grid{grid-template-columns:1fr}
+.engine-timer{font-size:36px}
+.engine-stat-value{font-size:24px}
+.engine-btn-primary{width:100%;padding:14px}
+.engine-exercise{padding:12px 14px}
+}
