@@ -8,7 +8,7 @@ Port the "Year of the Engine" conditioning program from crossfit-training-app (N
 
 ---
 
-## Phase 1: Database Schema (Migrations)
+## Phase 1: Database Schema (Migrations) ✅ COMPLETE
 
 Create 2 new migration files in `supabase/migrations/`:
 
@@ -121,7 +121,7 @@ Create `update_engine_performance_metrics` RPC function:
 
 ---
 
-## Phase 2: Data Migration
+## Phase 2: Data Migration ✅ COMPLETE
 
 ### Extract 720 workouts from production Supabase
 
@@ -141,7 +141,7 @@ Same approach — dump the `program_mapping` table for the 3-day mappings.
 
 ---
 
-## Phase 3: Service Layer
+## Phase 3: Service Layer ✅ COMPLETE
 
 ### Create `src/lib/engineService.ts`
 
@@ -279,48 +279,75 @@ All components go in `src/pages/engine/` and `src/components/engine/`.
 
 ---
 
-## Phase 7: Styling Integration
+## Phase 7: Styling Integration — DECIDED: Tailwind with Prefix
 
-The Engine source uses Tailwind-style inline classes. wodwisdom uses custom CSS with CSS variables.
+Add Tailwind alongside existing CSS using a scoped, non-conflicting setup:
 
-**Two approaches:**
+### Setup Steps
+1. `npm install tailwindcss @tailwindcss/vite`
+2. Configure `tailwind.config.js`:
+   ```js
+   export default {
+     prefix: 'tw-',
+     corePlugins: { preflight: false },
+     content: ['./src/**/*.{ts,tsx}'],
+     theme: {
+       extend: {
+         colors: {
+           accent: 'var(--accent)',
+           'accent-glow': 'var(--accent-glow)',
+           'accent-hover': 'var(--accent-hover)',
+           bg: 'var(--bg)',
+           surface: 'var(--surface)',
+           surface2: 'var(--surface2)',
+           surface3: 'var(--surface3)',
+           border: 'var(--border)',
+           'border-light': 'var(--border-light)',
+           text: 'var(--text)',
+           'text-dim': 'var(--text-dim)',
+           'text-muted': 'var(--text-muted)',
+         }
+       }
+     }
+   }
+   ```
 
-### Option A: Add Tailwind (recommended for speed)
-- `npm install tailwindcss @tailwindcss/vite`
-- Configure alongside existing CSS
-- Engine components keep their existing class names with minimal changes
-- Faster port, less risk of styling bugs
+### Key Decisions
+- **`prefix: 'tw-'`** — All Tailwind classes become `tw-flex`, `tw-p-4`, etc. Zero namespace collisions with existing CSS.
+- **`preflight: false`** — Tailwind won't reset/override existing element styles.
+- **Theme mapped to CSS variables** — Engine components can use `tw-bg-surface`, `tw-text-accent`, etc. to match wodwisdom's design tokens.
 
-### Option B: Convert to wodwisdom CSS
-- Rewrite all Engine component styles using wodwisdom CSS variables
-- More consistent look, but 14,000+ lines to restyle
-- Higher risk of visual regression
+### Migration approach for Engine components
+- Find-and-replace all Tailwind classes to add `tw-` prefix (mechanical, low risk)
+- Swap hardcoded colors for theme tokens where practical (e.g. `tw-bg-gray-900` → `tw-bg-surface`)
+- Existing app CSS is untouched
 
 ---
 
 ## Implementation Order
 
-| Step | What | Est. Lines | Dependencies |
-|------|------|-----------|-------------|
-| 1 | Database migrations (3 files) | ~300 | None |
-| 2 | Seed data extraction & migration | ~720+ rows | Step 1 |
-| 3 | `engineService.ts` | ~500 | Step 1 |
-| 4 | Add `lucide-react` to package.json | 1 line | None |
-| 5 | ProgramSelection component | ~90 | Step 3 |
-| 6 | Engine Dashboard | ~500 | Step 3 |
-| 7 | Training Day Component | ~7,000 | Step 3 |
-| 8 | Analytics Page | ~7,000 | Step 3, Step 7 |
-| 9 | Routing + Navigation | ~30 | Steps 5-8 |
-| 10 | Subscription integration | ~200 | Step 9 |
-| 11 | Landing page + Taxonomy | ~400 | Step 9 |
+| Step | What | Est. Lines | Dependencies | Status |
+|------|------|-----------|-------------|--------|
+| 1 | Database migrations (4 files) | ~300 | None | ✅ Done |
+| 2 | Seed data (22 + 720 + 2592 rows) | ~3,300 | Step 1 | ✅ Done |
+| 3 | `engineService.ts` | ~450 | Step 1 | ✅ Done |
+| 4 | Tailwind setup (`tw-` prefix, no preflight) | ~20 | None | **Next** |
+| 5 | Add `lucide-react` to package.json | 1 line | None | **Next** |
+| 6 | ProgramSelection component | ~90 | Step 3 | Pending |
+| 7 | Engine Dashboard | ~500 | Step 3 | Pending |
+| 8 | Training Day Component | ~7,000 | Step 3 | Pending |
+| 9 | Analytics Page | ~7,000 | Step 3, Step 8 | Pending |
+| 10 | Routing + Navigation | ~30 | Steps 6-9 | Pending |
+| 11 | Subscription integration | ~200 | Step 10 | Pending |
+| 12 | Landing page + Taxonomy | ~400 | Step 10 | Pending |
 
-**Critical path**: Steps 1→3→7 (schema → service → training day). Everything else can parallelize after Step 3.
+**Critical path**: Steps 4→5→8 (Tailwind → deps → training day). Everything else can parallelize after Step 5.
 
 ---
 
 ## Open Questions
 
-1. **Workout data extraction** — Do you have direct DB access to the production Supabase, or do we need to coordinate an export? This is blocking for Step 2.
-2. **Styling approach** — Add Tailwind for faster porting, or convert to existing CSS system?
+1. ~~**Workout data extraction**~~ — ✅ Resolved. Data extracted and seeded.
+2. ~~**Styling approach**~~ — ✅ Resolved. Tailwind with `tw-` prefix, preflight disabled, theme mapped to CSS vars.
 3. **Engine pricing** — What's the Engine subscription price? Separate plan or bundle with existing tiers?
 4. **Day advancement** — In the original app, how does `engine_current_day` advance? Automatically after completing a day, or manually?
