@@ -206,7 +206,7 @@ function totalSegmentDuration(segs: Segment[]): number {
 
 // ── Component ────────────────────────────────────────────────────────
 
-export default function EngineTrainingDayPage({ session }: { session: Session }) {
+export default function EngineTrainingDayPage({ session: _session }: { session: Session }) {
   const { dayNumber: dayParam } = useParams<{ dayNumber: string }>();
   const dayNumber = parseInt(dayParam ?? '1', 10);
   const navigate = useNavigate();

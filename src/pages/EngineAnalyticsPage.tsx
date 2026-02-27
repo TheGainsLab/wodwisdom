@@ -12,7 +12,7 @@ import {
   type EngineTimeTrial,
 } from '../lib/engineService';
 import EnginePaywall from '../components/engine/EnginePaywall';
-import { ChevronLeft, TrendingUp, Clock, Target, Activity } from 'lucide-react';
+import { ChevronLeft, Clock, Target, Activity } from 'lucide-react';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
