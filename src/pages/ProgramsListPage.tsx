@@ -10,6 +10,8 @@ interface Program {
   name: string;
   created_at: string;
   workout_count?: number;
+  phase?: number;
+  total_phases?: number;
 }
 
 export default function ProgramsListPage({ session }: { session: Session }) {
@@ -26,7 +28,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
     setLoading(true);
     const { data: progData } = await supabase
       .from('programs')
-      .select('id, name, created_at')
+      .select('id, name, created_at, phase, total_phases')
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
     if (progData) {
@@ -91,7 +93,10 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                   >
                     <div className="history-item-header">
                       <span className="history-question">{p.name}</span>
-                      <span className="history-time">{p.workout_count} workout{p.workout_count !== 1 ? 's' : ''}</span>
+                      <span className="history-time">
+                        {p.workout_count} workout{p.workout_count !== 1 ? 's' : ''}
+                        {(p.total_phases ?? 1) > 1 && ` — Month ${p.phase ?? 1} of ${p.total_phases}`}
+                      </span>
                       <div className="program-list-actions" onClick={e => e.stopPropagation()}>
                         <button type="button" className="program-list-btn" onClick={() => navigate(`/programs/${p.id}/edit`)} title="Edit">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>

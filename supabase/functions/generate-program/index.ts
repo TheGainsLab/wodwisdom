@@ -340,7 +340,7 @@ Generate a 12-week periodized program. Follow the format and periodization rules
         "Content-Type": "application/json",
         Authorization: authHeader,
       },
-      body: JSON.stringify({ text: programText, name: programName, source: "generate" }),
+      body: JSON.stringify({ text: programText, name: programName, source: "generate", total_phases: 3 }),
     });
 
     if (!preprocessResp.ok) {

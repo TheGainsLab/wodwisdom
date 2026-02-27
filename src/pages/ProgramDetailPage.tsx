@@ -14,14 +14,17 @@ interface ProgramWorkout {
   sort_order: number;
 }
 
+const PHASE_SIZE = 20;
+
 export default function ProgramDetailPage({ session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [program, setProgram] = useState<{ id: string; name: string } | null>(null);
-  const [workouts, setWorkouts] = useState<ProgramWorkout[]>([]);
+  const [program, setProgram] = useState<{ id: string; name: string; phase: number; total_phases: number } | null>(null);
+  const [allWorkouts, setAllWorkouts] = useState<ProgramWorkout[]>([]);
   const [completedWorkoutIds, setCompletedWorkoutIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [navOpen, setNavOpen] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -33,13 +36,13 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     setLoading(true);
     const { data: prog, error: progErr } = await supabase
       .from('programs')
-      .select('id, name')
+      .select('id, name, phase, total_phases')
       .eq('id', id)
       .eq('user_id', session.user.id)
       .single();
     if (progErr || !prog) {
       setProgram(null);
-      setWorkouts([]);
+      setAllWorkouts([]);
       setLoading(false);
       return;
     }
@@ -49,17 +52,22 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       .select('id, week_num, day_num, workout_text, sort_order')
       .eq('program_id', id)
       .order('sort_order');
-    setWorkouts(wk || []);
+    setAllWorkouts(wk || []);
 
     if (wk?.length) {
       const ids = wk.map((w) => w.id);
-      const { data: logs } = await supabase
-        .from('workout_logs')
-        .select('source_id')
-        .eq('user_id', session.user.id)
-        .in('source_id', ids);
-      const completed = new Set((logs || []).map((l) => l.source_id).filter(Boolean));
-      setCompletedWorkoutIds(completed);
+      // Query in batches of 100 to avoid URL length limits
+      const allCompleted = new Set<string>();
+      for (let i = 0; i < ids.length; i += 100) {
+        const batch = ids.slice(i, i + 100);
+        const { data: logs } = await supabase
+          .from('workout_logs')
+          .select('source_id')
+          .eq('user_id', session.user.id)
+          .in('source_id', batch);
+        (logs || []).forEach((l) => { if (l.source_id) allCompleted.add(l.source_id); });
+      }
+      setCompletedWorkoutIds(allCompleted);
     } else {
       setCompletedWorkoutIds(new Set());
     }
@@ -83,6 +91,31 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     if (!id || !program || trimmed === program.name) return;
     const { error } = await supabase.from('programs').update({ name: trimmed }).eq('id', id).eq('user_id', session.user.id);
     if (!error) setProgram(p => p ? { ...p, name: trimmed } : null);
+  };
+
+  // Filter workouts to current phase
+  const isMultiPhase = program != null && program.total_phases > 1;
+  const phase = program?.phase ?? 1;
+  const phaseStart = (phase - 1) * PHASE_SIZE;
+  const workouts = isMultiPhase
+    ? allWorkouts.slice(phaseStart, phaseStart + PHASE_SIZE)
+    : allWorkouts;
+
+  const phaseCompletedCount = workouts.filter(w => completedWorkoutIds.has(w.id)).length;
+
+  const handleAdvancePhase = async () => {
+    if (!program || !id || phase >= program.total_phases) return;
+    setAdvancing(true);
+    const nextPhase = phase + 1;
+    const { error } = await supabase
+      .from('programs')
+      .update({ phase: nextPhase })
+      .eq('id', id)
+      .eq('user_id', session.user.id);
+    if (!error) {
+      setProgram(p => p ? { ...p, phase: nextPhase } : null);
+    }
+    setAdvancing(false);
   };
 
   if (!id) return null;
@@ -122,14 +155,32 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
               <>
                 {workouts.length > 0 && (
                   <div className="program-progress">
+                    {isMultiPhase && (
+                      <div className="program-phase-indicator" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>Month {phase} of {program!.total_phases}</span>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {Array.from({ length: program!.total_phases }, (_, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                background: i < phase ? 'var(--accent)' : 'var(--surface2)',
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="program-progress-header">
                       <span className="program-progress-label">Progress</span>
-                      <span className="program-progress-count">{completedWorkoutIds.size} / {workouts.length} days</span>
+                      <span className="program-progress-count">{phaseCompletedCount} / {workouts.length} days</span>
                     </div>
                     <div className="program-progress-bar">
                       <div
                         className="program-progress-fill"
-                        style={{ width: `${(completedWorkoutIds.size / workouts.length) * 100}%` }}
+                        style={{ width: `${(phaseCompletedCount / workouts.length) * 100}%` }}
                       />
                     </div>
                   </div>
@@ -155,7 +206,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                 ) : (
                                   <span className="program-day-dot" />
                                 )}
-                                <span>{w.sort_order + 1}</span>
+                                <span>{isMultiPhase ? w.sort_order - phaseStart + 1 : w.sort_order + 1}</span>
                               </div>
                             </td>
                             <td className="workout-text-cell">
@@ -198,6 +249,23 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     </tbody>
                   </table>
                 </div>
+                {isMultiPhase && phase < program!.total_phases && (
+                  <div style={{ marginTop: 24, padding: 16, background: 'var(--surface2)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 13, marginBottom: 8, color: 'var(--text-dim)' }}>
+                      {phaseCompletedCount === workouts.length
+                        ? 'All workouts complete! Ready for the next month.'
+                        : `${workouts.length - phaseCompletedCount} workouts remaining this month.`}
+                    </div>
+                    <button
+                      className="auth-btn"
+                      disabled={advancing}
+                      onClick={handleAdvancePhase}
+                      style={{ fontSize: 13 }}
+                    >
+                      {advancing ? 'Advancing...' : `Start Month ${phase + 1}`}
+                    </button>
+                  </div>
+                )}
                 <div className="program-detail-actions" style={{ marginTop: 24 }}>
                   <button className="auth-btn" style={{ background: 'var(--surface2)', color: 'var(--text)' }} onClick={() => navigate('/programs')}>
                     Back
