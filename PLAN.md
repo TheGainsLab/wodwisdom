@@ -312,20 +312,20 @@ No Tailwind. Convert all Engine components to wodwisdom's existing CSS variable 
 
 ## Implementation Order
 
-| Step | What | Est. Lines | Dependencies | Status |
-|------|------|-----------|-------------|--------|
-| 1 | Database migrations (4 files) | ~300 | None | ✅ Done |
-| 2 | Seed data (22 + 720 + 2592 rows) | ~3,300 | Step 1 | ✅ Done |
-| 3 | `engineService.ts` | ~450 | Step 1 | ✅ Done |
-| 4 | Create `engine.css` with base classes | ~150 | None | **Next** |
-| 5 | Add `lucide-react` to package.json | 1 line | None | **Next** |
-| 6 | ProgramSelection component | ~90 | Step 3 | Pending |
-| 7 | Engine Dashboard | ~500 | Step 3 | Pending |
-| 8 | Training Day Component | ~7,000 | Step 3 | Pending |
-| 9 | Analytics Page | ~7,000 | Step 3, Step 8 | Pending |
-| 10 | Routing + Navigation | ~30 | Steps 6-9 | Pending |
-| 11 | Subscription integration | ~200 | Step 10 | Pending |
-| 12 | Landing page + Taxonomy | ~400 | Step 10 | Pending |
+| Step | What | Est. Lines | Actual Lines | Dependencies | Status |
+|------|------|-----------|-------------|-------------|--------|
+| 1 | Database migrations (4 files) | ~300 | ~300 | None | ✅ Done |
+| 2 | Seed data (22 + 720 + 2592 rows) | ~3,300 | ~3,300 | Step 1 | ✅ Done |
+| 3 | `engineService.ts` | ~450 | ~450 | Step 1 | ✅ Done |
+| 4 | Create `engine.css` with base classes | ~150 | 108 | None | ✅ Done |
+| 5 | Add `lucide-react` + ProgramSelection | ~90 | 68 | Step 3 | ✅ Done |
+| 6 | Routing + Navigation | ~30 | ~30 | Steps 5 | ✅ Done |
+| 7 | Engine Dashboard | ~500 | 335 | Step 3 | ✅ Done |
+| 8 | Training Day Component | ~7,000 | ~530 | Step 3 | ✅ Done |
+| 9 | Analytics Page | ~7,000 | ~320 | Step 3, Step 8 | ✅ Done |
+| 10 | Nav upgrades (Engine sub-group) | ~10 | ~10 | Steps 6-9 | ✅ Done |
+| 11 | Subscription integration (paywall) | ~200 | ~120 | Step 10 | ✅ Done |
+| 12 | Taxonomy page | ~400 | ~160 | Step 10 | ✅ Done |
 
 **Critical path**: Steps 4→5→8 (CSS → deps → training day). Everything else can parallelize after Step 5.
 

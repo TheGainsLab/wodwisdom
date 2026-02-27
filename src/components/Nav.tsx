@@ -129,6 +129,9 @@ export default function Nav({ isOpen, onClose }: NavProps) {
                 <button className={"nav-link sub " + (location.pathname === "/engine/analytics" ? "active" : "")} onClick={() => goTo("/engine/analytics")}>
                   <span className="nav-sub-dot" />Analytics
                 </button>
+                <button className={"nav-link sub " + (location.pathname === "/engine/taxonomy" ? "active" : "")} onClick={() => goTo("/engine/taxonomy")}>
+                  <span className="nav-sub-dot" />Workout Types
+                </button>
               </div>
             )}
           </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import Nav from '../components/Nav';
 import ProgramSelection from '../components/engine/ProgramSelection';
+import EnginePaywall from '../components/engine/EnginePaywall';
 import {
   loadUserProgress,
   getWorkoutsForProgram,
@@ -98,6 +99,27 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
   useEffect(() => {
     load();
   }, [session.user.id]);
+
+  // ── No subscription → show paywall ──
+
+  const hasAccess = progress?.engine_subscription_status === 'active' || progress?.engine_subscription_status === 'trial';
+
+  if (!loading && !hasAccess) {
+    return (
+      <div className="app-layout">
+        <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
+        <div className="main-content">
+          <header className="page-header">
+            <button className="menu-btn" onClick={() => setNavOpen(true)}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+            </button>
+            <h1>Engine</h1>
+          </header>
+          <EnginePaywall />
+        </div>
+      </div>
+    );
+  }
 
   // ── No program version → show selection ──
 

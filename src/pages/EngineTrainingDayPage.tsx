@@ -16,6 +16,7 @@ import {
   type EngineWorkout,
   type EngineTimeTrial,
 } from '../lib/engineService';
+import EnginePaywall from '../components/engine/EnginePaywall';
 import { ChevronLeft, Play, Pause, Square, Check, RotateCcw } from 'lucide-react';
 
 // ── Types & Constants ────────────────────────────────────────────────
@@ -218,6 +219,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const [baseline, setBaseline] = useState<EngineTimeTrial | null>(null);
   const [previousSession, setPreviousSession] = useState<boolean>(false);
   const [currentDay, setCurrentDay] = useState(1);
+  const [hasAccess, setHasAccess] = useState(true);
 
   // ── Timer state ──
   const [segments, setSegments] = useState<Segment[]>([]);
@@ -248,6 +250,8 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         setWorkout(wk);
         setCurrentDay(progress?.engine_current_day ?? 1);
         setPreviousSession(!!prevSession);
+        const status = progress?.engine_subscription_status;
+        setHasAccess(status === 'active' || status === 'trial');
 
         // Try to load saved modality preference
         const pref = await loadModalityPreference('row').catch(() => null);
@@ -966,7 +970,8 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           )}
         </header>
 
-        {stage === 'loading' && !workout && (
+        {!hasAccess && stage !== 'loading' && <EnginePaywall />}
+        {hasAccess && stage === 'loading' && !workout && (
           <div className="engine-page">
             <div className="engine-empty">
               <div className="engine-empty-title">Workout not found</div>
@@ -977,14 +982,14 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
             </div>
           </div>
         )}
-        {stage === 'loading' && workout === null && !dayParam && (
+        {hasAccess && stage === 'loading' && workout === null && !dayParam && (
           <div className="page-loading"><div className="loading-pulse" /></div>
         )}
-        {stage === 'equipment' && renderEquipment()}
-        {stage === 'preview' && renderPreview()}
-        {stage === 'active' && renderActive()}
-        {stage === 'logging' && renderLogging()}
-        {stage === 'complete' && renderComplete()}
+        {hasAccess && stage === 'equipment' && renderEquipment()}
+        {hasAccess && stage === 'preview' && renderPreview()}
+        {hasAccess && stage === 'active' && renderActive()}
+        {hasAccess && stage === 'logging' && renderLogging()}
+        {hasAccess && stage === 'complete' && renderComplete()}
       </div>
     </div>
   );
