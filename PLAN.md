@@ -279,48 +279,34 @@ All components go in `src/pages/engine/` and `src/components/engine/`.
 
 ---
 
-## Phase 7: Styling Integration — DECIDED: Tailwind with Prefix
+## Phase 7: Styling Integration — DECIDED: Convert to wodwisdom CSS
 
-Add Tailwind alongside existing CSS using a scoped, non-conflicting setup:
+No Tailwind. Convert all Engine components to wodwisdom's existing CSS variable system as we port.
 
-### Setup Steps
-1. `npm install tailwindcss @tailwindcss/vite`
-2. Configure `tailwind.config.js`:
-   ```js
-   export default {
-     prefix: 'tw-',
-     corePlugins: { preflight: false },
-     content: ['./src/**/*.{ts,tsx}'],
-     theme: {
-       extend: {
-         colors: {
-           accent: 'var(--accent)',
-           'accent-glow': 'var(--accent-glow)',
-           'accent-hover': 'var(--accent-hover)',
-           bg: 'var(--bg)',
-           surface: 'var(--surface)',
-           surface2: 'var(--surface2)',
-           surface3: 'var(--surface3)',
-           border: 'var(--border)',
-           'border-light': 'var(--border-light)',
-           text: 'var(--text)',
-           'text-dim': 'var(--text-dim)',
-           'text-muted': 'var(--text-muted)',
-         }
-       }
-     }
-   }
-   ```
+### Approach
+- Each Engine component gets CSS classes in `src/engine.css` (single file for all Engine styles)
+- All classes prefixed with `.engine-` to keep them scoped
+- Use existing CSS variables (`--accent`, `--surface`, `--bg`, `--text`, `--text-dim`, etc.)
+- Match wodwisdom's existing patterns: dark theme, border styles, border-radius, font weights
+- No new dependencies needed
 
-### Key Decisions
-- **`prefix: 'tw-'`** — All Tailwind classes become `tw-flex`, `tw-p-4`, etc. Zero namespace collisions with existing CSS.
-- **`preflight: false`** — Tailwind won't reset/override existing element styles.
-- **Theme mapped to CSS variables** — Engine components can use `tw-bg-surface`, `tw-text-accent`, etc. to match wodwisdom's design tokens.
+### Reusable base classes to define
+- `.engine-page` — page container with scroll
+- `.engine-card` — surface card with border (matches existing `.auth-card` pattern)
+- `.engine-stat` — stat display (value + label)
+- `.engine-btn` / `.engine-btn-primary` — buttons matching existing `.auth-btn`
+- `.engine-grid` — responsive grid layout
+- `.engine-section` — content section with spacing
+- `.engine-header` — section headers
+- `.engine-badge` — status badges (locked/available/complete)
+- `.engine-timer` — workout timer display
+- `.engine-progress` — progress bars
 
-### Migration approach for Engine components
-- Find-and-replace all Tailwind classes to add `tw-` prefix (mechanical, low risk)
-- Swap hardcoded colors for theme tokens where practical (e.g. `tw-bg-gray-900` → `tw-bg-surface`)
-- Existing app CSS is untouched
+### Why this works
+- The 14k lines of Tailwind are mostly repetitive layout/spacing/color patterns
+- A small set of reusable `.engine-*` classes replaces thousands of inline Tailwind classes
+- Result looks native to wodwisdom from day one
+- No two-styling-system maintenance burden
 
 ---
 
@@ -331,7 +317,7 @@ Add Tailwind alongside existing CSS using a scoped, non-conflicting setup:
 | 1 | Database migrations (4 files) | ~300 | None | ✅ Done |
 | 2 | Seed data (22 + 720 + 2592 rows) | ~3,300 | Step 1 | ✅ Done |
 | 3 | `engineService.ts` | ~450 | Step 1 | ✅ Done |
-| 4 | Tailwind setup (`tw-` prefix, no preflight) | ~20 | None | **Next** |
+| 4 | Create `engine.css` with base classes | ~150 | None | **Next** |
 | 5 | Add `lucide-react` to package.json | 1 line | None | **Next** |
 | 6 | ProgramSelection component | ~90 | Step 3 | Pending |
 | 7 | Engine Dashboard | ~500 | Step 3 | Pending |
@@ -341,13 +327,13 @@ Add Tailwind alongside existing CSS using a scoped, non-conflicting setup:
 | 11 | Subscription integration | ~200 | Step 10 | Pending |
 | 12 | Landing page + Taxonomy | ~400 | Step 10 | Pending |
 
-**Critical path**: Steps 4→5→8 (Tailwind → deps → training day). Everything else can parallelize after Step 5.
+**Critical path**: Steps 4→5→8 (CSS → deps → training day). Everything else can parallelize after Step 5.
 
 ---
 
 ## Open Questions
 
 1. ~~**Workout data extraction**~~ — ✅ Resolved. Data extracted and seeded.
-2. ~~**Styling approach**~~ — ✅ Resolved. Tailwind with `tw-` prefix, preflight disabled, theme mapped to CSS vars.
+2. ~~**Styling approach**~~ — ✅ Resolved. Convert to wodwisdom CSS. No Tailwind. Single `engine.css` file with `.engine-*` prefixed classes using existing CSS variables.
 3. **Engine pricing** — What's the Engine subscription price? Separate plan or bundle with existing tiers?
 4. **Day advancement** — In the original app, how does `engine_current_day` advance? Automatically after completing a day, or manually?
