@@ -223,7 +223,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                         opacity: isLocked ? 0.4 : 1,
                         cursor: isLocked ? 'not-allowed' : 'pointer',
                         border: status === 'current' ? '1px solid var(--accent)' : '1px solid transparent',
-                        background: status === 'current' ? 'var(--accent-glow)' : undefined,
+                        background: status === 'current' ? 'var(--accent-glow)' : 'transparent',
                       }}
                     >
                       {/* Status icon */}

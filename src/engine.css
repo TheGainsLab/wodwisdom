@@ -48,7 +48,7 @@
 .engine-stat-label{font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px}
 
 /* Badge */
-.engine-badge{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 10px;border-radius:4px;display:inline-flex;align-items:center;gap:4px}
+.engine-badge{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 10px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:100px;flex-shrink:0}
 .engine-badge--strength{background:rgba(239,68,68,.15);color:#f87171}
 .engine-badge--hypertrophy{background:rgba(168,85,247,.15);color:#c084fc}
 .engine-badge--power{background:rgba(59,130,246,.15);color:#60a5fa}
@@ -68,10 +68,10 @@
 .engine-timer-label{font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;text-align:center;margin-top:4px}
 
 /* Exercise row */
-.engine-exercise{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:10px;transition:background .15s}
+.engine-exercise{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:10px;transition:background .15s;background:transparent;border:none;width:100%;text-align:left;font-family:inherit;color:inherit}
 .engine-exercise:hover{background:var(--surface2)}
 .engine-exercise-name{font-size:15px;font-weight:600;color:var(--text);flex:1;min-width:0}
-.engine-exercise-detail{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim)}
+.engine-exercise-detail{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim);min-width:48px;text-align:right;flex-shrink:0}
 
 /* Set row */
 .engine-set{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;font-size:14px}
