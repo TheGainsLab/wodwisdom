@@ -518,6 +518,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           total_intervals: workSegs.length,
           total_work_time: totalWorkSeconds,
           total_rest_time: totalRestSeconds,
+          avg_work_rest_ratio: avgWorkRestRatio,
         },
         completed: true,
         program_version: '5-day',
