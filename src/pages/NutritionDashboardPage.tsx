@@ -141,6 +141,11 @@ export default function NutritionDashboardPage({ session }: { session: Session }
   const [favorites, setFavorites] = useState<FavoriteFoodItem[]>([]);
   const [favoritesLoaded, setFavoritesLoaded] = useState(false);
 
+  // Error state
+  const [searchError, setSearchError] = useState('');
+  const [logError, setLogError] = useState('');
+  const [imageError, setImageError] = useState('');
+
   // Load entries for current date
   const loadDay = async () => {
     setLoading(true);
@@ -205,6 +210,9 @@ export default function NutritionDashboardPage({ session }: { session: Session }
     setBarcodeResult(null);
     setBarcodeError('');
     setBarcodeValue('');
+    setSearchError('');
+    setLogError('');
+    setImageError('');
   };
 
   // ── Search ──
@@ -212,32 +220,39 @@ export default function NutritionDashboardPage({ session }: { session: Session }
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     setSearching(true);
+    setSearchError('');
     try {
       const { data, error } = await supabase.functions.invoke('nutrition-search', {
         body: { query: searchQuery.trim(), maxResults: 20 },
       });
-      if (!error && data?.success) {
+      if (error) {
+        setSearchError(`Search failed: ${error.message || 'Unknown error'}`);
+      } else if (!data?.success) {
+        setSearchError(data?.error || 'Search returned no results');
+      } else {
         setSearchResults(data.data.foods || []);
       }
-    } catch {
-      // silently fail
+    } catch (e: any) {
+      setSearchError(`Search failed: ${e.message || 'Network error'}`);
     }
     setSearching(false);
   };
 
   // Log a food from search results
   const logFood = async (food: SearchResult) => {
+    setLogError('');
     try {
-      const { data: detail } = await supabase.functions.invoke('nutrition-food', {
+      const { data: detail, error: detailErr } = await supabase.functions.invoke('nutrition-food', {
         body: { foodId: food.food_id },
       });
 
-      if (!detail?.success || !detail?.data?.food) return;
+      if (detailErr) { setLogError(`Failed to get food details: ${detailErr.message}`); return; }
+      if (!detail?.success || !detail?.data?.food) { setLogError('Could not load food details'); return; }
 
       const serving = detail.data.food.servings?.serving?.[0];
-      if (!serving) return;
+      if (!serving) { setLogError('No serving data available for this food'); return; }
 
-      await supabase.functions.invoke('food-log', {
+      const { error: logErr } = await supabase.functions.invoke('food-log', {
         body: {
           food_id: food.food_id,
           food_name: food.food_name,
@@ -256,30 +271,34 @@ export default function NutritionDashboardPage({ session }: { session: Session }
         },
       });
 
+      if (logErr) { setLogError(`Failed to log food: ${logErr.message}`); return; }
+
       closePanel();
       loadDay();
-    } catch {
-      // silently fail
+    } catch (e: any) {
+      setLogError(`Failed to log food: ${e.message || 'Network error'}`);
     }
   };
 
   // ── Favorites quick-log ──
 
   const logFavorite = async (fav: FavoriteFoodItem) => {
+    setLogError('');
     try {
-      const { data: detail } = await supabase.functions.invoke('nutrition-food', {
+      const { data: detail, error: detailErr } = await supabase.functions.invoke('nutrition-food', {
         body: { foodId: fav.food_id },
       });
 
-      if (!detail?.success || !detail?.data?.food) return;
+      if (detailErr) { setLogError(`Failed to get food details: ${detailErr.message}`); return; }
+      if (!detail?.success || !detail?.data?.food) { setLogError('Could not load food details'); return; }
 
       const servings = detail.data.food.servings?.serving || [];
       const serving = (fav.serving_id && servings.find((s: any) => s.serving_id === fav.serving_id)) || servings[0];
-      if (!serving) return;
+      if (!serving) { setLogError('No serving data available'); return; }
 
       const units = fav.default_amount || 1;
 
-      await supabase.functions.invoke('food-log', {
+      const { error: logErr } = await supabase.functions.invoke('food-log', {
         body: {
           food_id: fav.food_id,
           food_name: fav.food_name,
@@ -298,10 +317,12 @@ export default function NutritionDashboardPage({ session }: { session: Session }
         },
       });
 
+      if (logErr) { setLogError(`Failed to log food: ${logErr.message}`); return; }
+
       closePanel();
       loadDay();
-    } catch {
-      // silently fail
+    } catch (e: any) {
+      setLogError(`Failed to log food: ${e.message || 'Network error'}`);
     }
   };
 
@@ -314,6 +335,7 @@ export default function NutritionDashboardPage({ session }: { session: Session }
     setImageProcessing(true);
     setImageResults([]);
 
+    setImageError('');
     try {
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -328,15 +350,19 @@ export default function NutritionDashboardPage({ session }: { session: Session }
         body: { imageBase64: base64, imageType },
       });
 
-      if (!error && data?.success && data.data.foods?.length > 0) {
+      if (error) {
+        setImageError(`Image analysis failed: ${error.message || 'Unknown error'}`);
+      } else if (!data?.success) {
+        setImageError(data?.error || 'Image analysis returned no results');
+      } else if (data.data.foods?.length > 0) {
         setImageResults(
           data.data.foods.map((f: any) => ({ ...f, selected: f.found }))
         );
       } else {
-        setImageResults([]);
+        setImageError('No foods identified in the image. Try a clearer photo.');
       }
-    } catch {
-      // silently fail
+    } catch (e: any) {
+      setImageError(`Image analysis failed: ${e.message || 'Network error'}`);
     }
     setImageProcessing(false);
     // Reset file input so the same file can be re-selected
@@ -354,8 +380,9 @@ export default function NutritionDashboardPage({ session }: { session: Session }
     if (selected.length === 0) return;
 
     setImageLogging(true);
+    setImageError('');
     try {
-      await Promise.all(
+      const results = await Promise.all(
         selected.map(r =>
           supabase.functions.invoke('food-log', {
             body: {
@@ -366,10 +393,15 @@ export default function NutritionDashboardPage({ session }: { session: Session }
           })
         )
       );
-      closePanel();
-      loadDay();
-    } catch {
-      // silently fail
+      const failed = results.filter(r => r.error);
+      if (failed.length > 0) {
+        setImageError(`Failed to log ${failed.length} item(s)`);
+      } else {
+        closePanel();
+        loadDay();
+      }
+    } catch (e: any) {
+      setImageError(`Failed to log foods: ${e.message || 'Network error'}`);
     }
     setImageLogging(false);
   };
@@ -403,18 +435,20 @@ export default function NutritionDashboardPage({ session }: { session: Session }
   const logBarcodeResult = async () => {
     if (!barcodeResult?.entry_data) return;
 
+    setBarcodeError('');
     try {
-      await supabase.functions.invoke('food-log', {
+      const { error } = await supabase.functions.invoke('food-log', {
         body: {
           ...barcodeResult.entry_data,
           meal_type: selectedMealType,
           logged_at: new Date(formatDate(currentDate) + 'T12:00:00.000Z').toISOString(),
         },
       });
+      if (error) { setBarcodeError(`Failed to log: ${error.message}`); return; }
       closePanel();
       loadDay();
-    } catch {
-      // silently fail
+    } catch (e: any) {
+      setBarcodeError(`Failed to log: ${e.message || 'Network error'}`);
     }
   };
 
@@ -627,6 +661,9 @@ export default function NutritionDashboardPage({ session }: { session: Session }
 
                     {searching && <p style={{ color: 'var(--text-muted)', fontSize: 14, marginTop: 12 }}>Searching...</p>}
 
+                    {searchError && <p style={{ color: 'var(--accent)', fontSize: 13, marginTop: 8 }}>{searchError}</p>}
+                    {logError && <p style={{ color: 'var(--accent)', fontSize: 13, marginTop: 8 }}>{logError}</p>}
+
                     {searchResults.length > 0 && (
                       <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {searchResults.map((food) => {
@@ -687,6 +724,8 @@ export default function NutritionDashboardPage({ session }: { session: Session }
                         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>AI will identify foods and estimate nutrition</span>
                       </button>
                     )}
+
+                    {imageError && <p style={{ color: 'var(--accent)', fontSize: 13, marginTop: 8, textAlign: 'center' }}>{imageError}</p>}
 
                     {imageProcessing && (
                       <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-dim)' }}>

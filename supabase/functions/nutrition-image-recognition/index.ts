@@ -77,21 +77,23 @@ If you cannot identify any food items, return an empty array [].`,
   const data = await response.json();
   const aiResponse = data.content[0].text;
 
-  let jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) {
-    jsonMatch =
+  // Try direct array match first
+  let jsonStr = aiResponse.match(/\[[\s\S]*\]/)?.[0];
+  // Fallback: extract from code fences
+  if (!jsonStr) {
+    const fenceMatch =
       aiResponse.match(/```json\n?([\s\S]*?)\n?```/) ||
       aiResponse.match(/```\n?([\s\S]*?)\n?```/);
-    if (jsonMatch) jsonMatch = [jsonMatch[0], jsonMatch[1]];
+    jsonStr = fenceMatch?.[1];
   }
 
-  if (!jsonMatch) {
+  if (!jsonStr) {
     console.error("Could not extract JSON from Claude response:", aiResponse);
     return [];
   }
 
   try {
-    const parsed = JSON.parse(jsonMatch[0] || jsonMatch[1] || "[]");
+    const parsed = JSON.parse(jsonStr);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     console.error("Failed to parse Claude response as JSON");
