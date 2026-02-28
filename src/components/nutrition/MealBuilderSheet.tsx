@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, ChevronLeft, Search, Trash2, Loader2, Plus, Save } from 'lucide-react';
+import { X, ChevronLeft, Search, Trash2, Loader2, Save } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import FoodDetailSheet from './FoodDetailSheet';
 
