@@ -70,7 +70,7 @@ const compactInputStyle = {
   fontSize: 14,
 };
 
-export default function StartWorkoutPage({ session }: { session: Session }) {
+export default function StartWorkoutPage({ session: _session }: { session: Session }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [navOpen, setNavOpen] = useState(false);

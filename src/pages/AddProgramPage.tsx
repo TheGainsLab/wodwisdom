@@ -16,7 +16,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-export default function AddProgramPage({ session }: { session: Session }) {
+export default function AddProgramPage({ session: _session }: { session: Session }) {
   const navigate = useNavigate();
   const [pasteText, setPasteText] = useState('');
   const [programName, setProgramName] = useState('');

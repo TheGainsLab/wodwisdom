@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import Nav from '../components/Nav';
 import EnginePaywall from '../components/engine/EnginePaywall';
-import { loadDayTypes, loadUserProgress, type EngineDayType } from '../lib/engineService';
+import { loadDayTypes, type EngineDayType } from '../lib/engineService';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { ChevronLeft } from 'lucide-react';
 
