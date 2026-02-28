@@ -17,8 +17,9 @@ interface UserRow {
   email: string;
   full_name: string;
   role: string;
-  subscription_status: string; // from admin_user_list RPC — will be removed after RPC update
-  has_entitlements?: boolean;
+  has_ai_suite: boolean;
+  has_engine: boolean;
+  engine_months_unlocked: number;
   question_count: number;
   total_tokens: number;
   last_active: string | null;
@@ -139,7 +140,13 @@ export default function AdminPage({ session }: { session: Session }) {
     setError(''); setSuccess('');
     try {
       await adminFetch(supabase, 'update_user', { user_id: userId, field, value });
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, [field]: value } : u));
+      setUsers(prev => prev.map(u => {
+        if (u.id !== userId) return u;
+        if (field === 'ai_suite') return { ...u, has_ai_suite: value === 'grant' };
+        if (field === 'engine') return { ...u, has_engine: value === 'grant' };
+        if (field === 'engine_months') return { ...u, engine_months_unlocked: parseInt(value, 10) };
+        return { ...u, [field]: value };
+      }));
       setSuccess('Updated');
       setTimeout(() => setSuccess(''), 3000);
     } catch (e: any) {
@@ -281,17 +288,60 @@ export default function AdminPage({ session }: { session: Session }) {
                       <option value="admin">Admin</option>
                     </select>
                     <button
-                      onClick={() => updateUser(u.id, 'entitlements', u.subscription_status === 'active' ? 'revoke' : 'grant')}
+                      onClick={() => updateUser(u.id, 'ai_suite', u.has_ai_suite ? 'revoke' : 'grant')}
                       style={{
                         fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
-                        color: u.subscription_status === 'active' ? '#2ec486' : '#666',
-                        background: (u.subscription_status === 'active' ? '#2ec486' : '#666') + '20',
+                        color: u.has_ai_suite ? '#2ec486' : '#666',
+                        background: (u.has_ai_suite ? '#2ec486' : '#666') + '20',
                         padding: '3px 10px', borderRadius: 4,
                         border: 'none', cursor: 'pointer', fontFamily: "'Outfit', sans-serif",
                       }}
                     >
-                      {u.subscription_status === 'active' ? 'active' : 'inactive'}
+                      AI Suite
                     </button>
+                    <button
+                      onClick={() => updateUser(u.id, 'engine', u.has_engine ? 'revoke' : 'grant')}
+                      style={{
+                        fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
+                        color: u.has_engine ? '#f0a050' : '#666',
+                        background: (u.has_engine ? '#f0a050' : '#666') + '20',
+                        padding: '3px 10px', borderRadius: 4,
+                        border: 'none', cursor: 'pointer', fontFamily: "'Outfit', sans-serif",
+                      }}
+                    >
+                      Engine
+                    </button>
+                    {u.has_engine && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <button
+                          onClick={() => u.engine_months_unlocked > 1 && updateUser(u.id, 'engine_months', String(u.engine_months_unlocked - 1))}
+                          style={{
+                            width: 20, height: 20, fontSize: 14, lineHeight: '18px',
+                            border: '1px solid var(--border)', borderRadius: 4,
+                            background: 'var(--bg)', color: 'var(--text-muted)',
+                            cursor: u.engine_months_unlocked > 1 ? 'pointer' : 'default',
+                            opacity: u.engine_months_unlocked > 1 ? 1 : 0.3,
+                            fontFamily: "'JetBrains Mono', monospace", padding: 0,
+                          }}
+                        >
+                          -
+                        </button>
+                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: '#f0a050', minWidth: 40, textAlign: 'center' }}>
+                          {u.engine_months_unlocked}mo
+                        </span>
+                        <button
+                          onClick={() => updateUser(u.id, 'engine_months', String(u.engine_months_unlocked + 1))}
+                          style={{
+                            width: 20, height: 20, fontSize: 14, lineHeight: '18px',
+                            border: '1px solid var(--border)', borderRadius: 4,
+                            background: 'var(--bg)', color: 'var(--text-muted)',
+                            cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace", padding: 0,
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    )}
                     <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--text-muted)' }}>
                       {u.question_count} Q
                     </span>

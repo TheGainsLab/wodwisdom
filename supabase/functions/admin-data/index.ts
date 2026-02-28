@@ -85,9 +85,10 @@ Deno.serve(async (req) => {
         if (!user_id || !field) {
           return json({ error: "Missing user_id or field" }, 400);
         }
-        if (!["role", "entitlements"].includes(field)) {
+        if (!["role", "ai_suite", "engine", "engine_months"].includes(field)) {
           return json({ error: "Invalid field" }, 400);
         }
+
         if (field === "role") {
           if (!["user", "admin"].includes(value)) {
             return json({ error: "Invalid role" }, 400);
@@ -101,26 +102,62 @@ Deno.serve(async (req) => {
             .eq("id", user_id);
           if (updateErr) return json({ error: updateErr.message }, 500);
         }
-        if (field === "entitlements") {
-          // value = "grant" or "revoke", params.features = string[]
-          const { features = ["ai_chat", "program_gen", "workout_review", "workout_log"] } = params;
+
+        if (field === "ai_suite") {
+          const features = ["ai_chat", "program_gen", "workout_review", "workout_log"];
           if (value === "grant") {
             for (const feature of features) {
-              await supa.from("user_entitlements").upsert({
+              const { error: upsertErr } = await supa.from("user_entitlements").upsert({
                 user_id,
                 feature,
                 source: "admin",
               }, { onConflict: "user_id,feature,source" });
+              if (upsertErr) return json({ error: upsertErr.message }, 500);
             }
           } else if (value === "revoke") {
-            await supa.from("user_entitlements")
+            const { error: deleteErr } = await supa.from("user_entitlements")
               .delete()
               .eq("user_id", user_id)
-              .eq("source", "admin");
+              .eq("source", "admin")
+              .in("feature", features);
+            if (deleteErr) return json({ error: deleteErr.message }, 500);
           } else {
             return json({ error: "Invalid value, use grant or revoke" }, 400);
           }
         }
+
+        if (field === "engine") {
+          if (value === "grant") {
+            const { error: upsertErr } = await supa.from("user_entitlements").upsert({
+              user_id,
+              feature: "engine",
+              source: "admin",
+            }, { onConflict: "user_id,feature,source" });
+            if (upsertErr) return json({ error: upsertErr.message }, 500);
+          } else if (value === "revoke") {
+            const { error: deleteErr } = await supa.from("user_entitlements")
+              .delete()
+              .eq("user_id", user_id)
+              .eq("source", "admin")
+              .eq("feature", "engine");
+            if (deleteErr) return json({ error: deleteErr.message }, 500);
+          } else {
+            return json({ error: "Invalid value, use grant or revoke" }, 400);
+          }
+        }
+
+        if (field === "engine_months") {
+          const months = parseInt(value, 10);
+          if (isNaN(months) || months < 1) {
+            return json({ error: "Invalid months value" }, 400);
+          }
+          const { error: updateErr } = await supa
+            .from("athlete_profiles")
+            .update({ engine_months_unlocked: months })
+            .eq("user_id", user_id);
+          if (updateErr) return json({ error: updateErr.message }, 500);
+        }
+
         return json({ ok: true });
       }
 
