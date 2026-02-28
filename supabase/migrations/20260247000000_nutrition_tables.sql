@@ -91,7 +91,6 @@ CREATE TABLE food_entries (
 
 CREATE INDEX idx_food_entries_user_id ON food_entries(user_id);
 CREATE INDEX idx_food_entries_logged_at ON food_entries(user_id, logged_at DESC);
-CREATE INDEX idx_food_entries_date ON food_entries(user_id, date(logged_at) DESC);
 CREATE INDEX idx_food_entries_cached_food ON food_entries(cached_food_id) WHERE cached_food_id IS NOT NULL;
 
 CREATE TRIGGER trg_food_entries_updated_at
