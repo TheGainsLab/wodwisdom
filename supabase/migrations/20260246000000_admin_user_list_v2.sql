@@ -2,6 +2,9 @@
 -- Replaces the single subscription_status with has_ai_suite, has_engine,
 -- and engine_months_unlocked for granular admin control.
 
+-- Must drop first because the return type changed
+DROP FUNCTION IF EXISTS admin_user_list();
+
 CREATE OR REPLACE FUNCTION admin_user_list()
 RETURNS TABLE(
   id uuid,
