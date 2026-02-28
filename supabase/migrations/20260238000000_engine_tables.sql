@@ -155,7 +155,7 @@ CREATE TABLE engine_user_performance_metrics (
   learned_max_pace numeric,
   rolling_avg_ratio numeric,
   rolling_count integer NOT NULL DEFAULT 0,
-  last_5_ratios jsonb NOT NULL DEFAULT '[]',
+  last_4_ratios jsonb NOT NULL DEFAULT '[]',
   UNIQUE(user_id, day_type, modality)
 );
 
