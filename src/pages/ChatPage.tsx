@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { CHAT_ENDPOINT, getAuthHeaders, supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
-import InviteBanner from '../components/InviteBanner';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -286,7 +285,6 @@ export default function ChatPage({ session }: { session: Session }) {
     <div className="app-layout">
       <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
       <div className="main-content">
-        <InviteBanner session={session} />
         <header className="chat-header">
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>

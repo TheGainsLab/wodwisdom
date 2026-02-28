@@ -4,11 +4,10 @@ import { supabase } from '../lib/supabase';
 
 export default function AuthPage() {
   const [searchParams] = useSearchParams();
-  const inviteEmail = searchParams.get('invite') || '';
   const nextUrl = searchParams.get('next') || '/';
   const fromTryItFree = searchParams.get('signup') === '1';
-  const [isSignUp, setIsSignUp] = useState(!!inviteEmail || fromTryItFree);
-  const [email, setEmail] = useState(inviteEmail);
+  const [isSignUp, setIsSignUp] = useState(fromTryItFree);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
@@ -43,14 +42,6 @@ export default function AuthPage() {
           options: { data: { full_name: name }, emailRedirectTo: redirectTo },
         });
         if (error) throw error;
-        // If this is an invite sign-up, accept the invite immediately (DB updates apply when they confirm)
-        if (inviteEmail && data.user) {
-          const userId = data.user.id;
-          const normalized = inviteEmail.toLowerCase();
-          await supabase.from('gym_members').update({ user_id: userId, status: 'active' }).eq('invited_email', normalized).eq('status', 'invited');
-          await supabase.from('profiles').update({ role: 'coach', subscription_status: 'active' }).eq('id', userId);
-        }
-        // If no session, confirmation is required — show "check your email"
         if (!data.session) {
           setConfirmSent(true);
           return;
@@ -69,11 +60,10 @@ export default function AuthPage() {
     <div className="auth-screen">
       <div className="auth-card">
         <div className="auth-logo">W</div>
-        <h1>{forgotPassword ? 'Reset Password' : inviteEmail ? 'Welcome to WOD Wisdom' : isSignUp && fromTryItFree ? 'Create Your Account' : isSignUp ? 'Create Account' : 'Sign In'}</h1>
+        <h1>{forgotPassword ? 'Reset Password' : isSignUp && fromTryItFree ? 'Create Your Account' : isSignUp ? 'Create Account' : 'Sign In'}</h1>
         {!(isSignUp && fromTryItFree) && (
-          <p className="auth-subtitle">{forgotPassword ? 'Enter your email and we\'ll send you a reset link' : inviteEmail ? 'Enter your name and a password to create your account' : isSignUp ? 'Start your coaching knowledge journey' : 'Access your coaching knowledge base'}</p>
+          <p className="auth-subtitle">{forgotPassword ? 'Enter your email and we\'ll send you a reset link' : isSignUp ? 'Start your coaching knowledge journey' : 'Access your coaching knowledge base'}</p>
         )}
-        {inviteEmail && <div className="invite-email-badge">{inviteEmail}</div>}
         {error && <div className="auth-error">{error}</div>}
         {forgotPassword ? (
           resetSent ? (
@@ -99,18 +89,16 @@ export default function AuthPage() {
           <>
             <form onSubmit={handleSubmit}>
               {isSignUp && <div className="field"><label>Full Name</label><input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></div>}
-              {!inviteEmail && <div className="field"><label>Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" /></div>}
+              <div className="field"><label>Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" /></div>
               <div className="field"><label>Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={isSignUp ? 'Choose a password (min 6 chars)' : 'Your password'} /></div>
               {isSignUp && <div className="field"><label>Confirm Password</label><input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" /></div>}
-              <button className="auth-btn" type="submit" disabled={loading}>{loading ? (isSignUp ? 'Creating...' : 'Signing in...') : inviteEmail ? 'Create Account & Accept Invite' : (isSignUp ? 'Create Account' : 'Sign In')}</button>
+              <button className="auth-btn" type="submit" disabled={loading}>{loading ? (isSignUp ? 'Creating...' : 'Signing in...') : (isSignUp ? 'Create Account' : 'Sign In')}</button>
             </form>
-            {!inviteEmail && !isSignUp && <div className="auth-toggle"><a onClick={() => { setForgotPassword(true); setError(''); }}>Forgot password?</a></div>}
-            {!inviteEmail && (
-              <div className="auth-toggle">
-                <span>{isSignUp ? 'Already have an account? ' : 'No account? '}</span>
-                <a onClick={() => { setIsSignUp(!isSignUp); setError(''); }}>{isSignUp ? 'Sign in' : 'Sign up'}</a>
-              </div>
-            )}
+            {!isSignUp && <div className="auth-toggle"><a onClick={() => { setForgotPassword(true); setError(''); }}>Forgot password?</a></div>}
+            <div className="auth-toggle">
+              <span>{isSignUp ? 'Already have an account? ' : 'No account? '}</span>
+              <a onClick={() => { setIsSignUp(!isSignUp); setError(''); }}>{isSignUp ? 'Sign in' : 'Sign up'}</a>
+            </div>
           </>
         )}
       </div>
