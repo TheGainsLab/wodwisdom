@@ -48,3 +48,24 @@ verify_jwt = false
 
 [functions.sync-program-blocks]
 verify_jwt = false
+
+[functions.nutrition-search]
+verify_jwt = false
+
+[functions.nutrition-food]
+verify_jwt = false
+
+[functions.nutrition-barcode]
+verify_jwt = false
+
+[functions.nutrition-image-recognition]
+verify_jwt = false
+
+[functions.nutrition-image-complete]
+verify_jwt = false
+
+[functions.food-log]
+verify_jwt = false
+
+[functions.favorites-manage]
+verify_jwt = false
