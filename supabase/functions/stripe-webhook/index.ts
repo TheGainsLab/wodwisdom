@@ -3,10 +3,21 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
 const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET");
-const PRICE_ATHLETE = Deno.env.get("STRIPE_PRICE_ATHLETE");
-const PRICE_GYM = Deno.env.get("STRIPE_PRICE_GYM");
+
+// Product → feature mapping
+// When you add new Stripe products, map them here
+const PRODUCT_FEATURES: Record<string, string[]> = {
+  ai_suite: ["ai_chat", "program_gen", "workout_review", "workout_log"],
+  // engine: ["engine"],
+  // engine_premium: ["engine", "ai_chat"],
+};
+
+// Map Stripe price IDs to product keys above
+const PRICE_TO_PRODUCT: Record<string, string> = {
+  [Deno.env.get("STRIPE_PRICE_ATHLETE") || ""]: "ai_suite",
+  // [Deno.env.get("STRIPE_PRICE_ENGINE") || ""]: "engine",
+};
 
 const cryptoKey = await crypto.subtle.importKey(
   "raw",
@@ -47,66 +58,54 @@ serve(async (req) => {
         const customerId = session.customer;
         const subscriptionId = session.subscription;
 
-        // Determine plan from line items
+        // Look up which product was purchased
         const priceId = session.line_items?.data?.[0]?.price?.id || "";
-        const isGym = priceId === PRICE_GYM;
-        const role = isGym ? "owner" : "individual";
+        const productKey = PRICE_TO_PRODUCT[priceId] || "ai_suite";
+        const features = PRODUCT_FEATURES[productKey] || [];
 
-        // Find user by email and activate
+        // Find user by email
         const { data: profiles } = await supa.from("profiles").select("id").eq("email", email).limit(1);
         if (profiles && profiles.length > 0) {
+          const userId = profiles[0].id;
+          const source = subscriptionId || `stripe_${customerId}`;
+
+          // Store stripe_customer_id on profiles
           await supa.from("profiles").update({
-            subscription_status: "active",
             stripe_customer_id: customerId,
-            role: role,
-          }).eq("id", profiles[0].id);
+          }).eq("id", userId);
+
+          // Grant entitlements for this product
+          for (const feature of features) {
+            await supa.from("user_entitlements").upsert({
+              user_id: userId,
+              feature,
+              source,
+            }, { onConflict: "user_id,feature,source" });
+          }
         }
-        break;
-      }
-
-      case "customer.subscription.updated": {
-        const sub = event.data.object;
-        const customerId = sub.customer;
-        const status = sub.status; // active, past_due, canceled, unpaid
-        const cancelAtPeriodEnd = sub.cancel_at_period_end;
-
-        const subStatus = cancelAtPeriodEnd ? "canceling" : (status === "active" ? "active" : "past_due");
-
-        await supa.from("profiles").update({
-          subscription_status: subStatus,
-        }).eq("stripe_customer_id", customerId);
         break;
       }
 
       case "customer.subscription.deleted": {
         const sub = event.data.object;
         const customerId = sub.customer;
+        const subscriptionId = sub.id;
 
-        await supa.from("profiles").update({
-          subscription_status: "inactive",
-        }).eq("stripe_customer_id", customerId);
+        // Find user by stripe_customer_id
+        const { data: profiles } = await supa.from("profiles").select("id").eq("stripe_customer_id", customerId).limit(1);
+        if (profiles && profiles.length > 0) {
+          // Remove all entitlements granted by this subscription
+          await supa.from("user_entitlements")
+            .delete()
+            .eq("user_id", profiles[0].id)
+            .eq("source", subscriptionId);
+        }
         break;
       }
 
-      case "invoice.paid": {
-        const invoice = event.data.object;
-        const customerId = invoice.customer;
-
-        await supa.from("profiles").update({
-          subscription_status: "active",
-        }).eq("stripe_customer_id", customerId);
-        break;
-      }
-
-      case "invoice.payment_failed": {
-        const invoice = event.data.object;
-        const customerId = invoice.customer;
-
-        await supa.from("profiles").update({
-          subscription_status: "past_due",
-        }).eq("stripe_customer_id", customerId);
-        break;
-      }
+      // subscription.updated, invoice.paid, invoice.payment_failed:
+      // Entitlements persist as long as they exist — no action needed.
+      // When you want grace periods or past_due handling, add logic here.
 
       default:
         console.log("Unhandled event:", event.type);
