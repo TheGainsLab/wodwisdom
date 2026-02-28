@@ -54,10 +54,12 @@ function getDayStatus(
   dayNumber: number,
   currentDay: number,
   completedDays: Set<number>,
+  dayMonth: number,
+  monthsUnlocked: number,
 ): DayStatus {
   if (completedDays.has(dayNumber)) return 'completed';
   if (dayNumber === currentDay) return 'current';
-  if (dayNumber < currentDay) return 'available';
+  if (dayMonth <= monthsUnlocked) return 'available';
   return 'locked';
 }
 
@@ -208,7 +210,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
               {/* Day list */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {monthDays.map((day) => {
-                  const status = getDayStatus(day.day_number, currentDay, completedDays);
+                  const status = getDayStatus(day.day_number, currentDay, completedDays, selectedMonth, monthsUnlocked);
                   const isLocked = status === 'locked';
 
                   return (
@@ -316,17 +318,30 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                       disabled={isLocked}
                       style={{
                         cursor: isLocked ? 'not-allowed' : 'pointer',
-                        opacity: isLocked ? 0.35 : 1,
                         textAlign: 'left',
                         transition: 'all .2s',
-                        borderColor: isCurrent ? 'var(--accent)' : isComplete ? 'rgba(34,197,94,.3)' : undefined,
+                        background: isLocked ? 'var(--bg)' : undefined,
+                        borderColor: isCurrent
+                          ? 'var(--accent)'
+                          : isComplete
+                            ? 'rgba(34,197,94,.3)'
+                            : isLocked
+                              ? 'var(--border)'
+                              : undefined,
+                        borderStyle: isLocked ? 'dashed' : undefined,
                         boxShadow: isCurrent ? '0 0 20px var(--accent-glow)' : undefined,
                         padding: '14px 16px',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <span style={{ fontSize: 14, fontWeight: 700 }}>Month {m}</span>
-                        {isLocked && <Lock size={14} color="var(--text-muted)" />}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isLocked ? 0 : 8 }}>
+                        <span style={{
+                          fontSize: 14,
+                          fontWeight: 700,
+                          color: isLocked ? 'var(--text-muted)' : undefined,
+                        }}>
+                          Month {m}
+                        </span>
+                        {isLocked && <Lock size={14} color="var(--text-dim)" />}
                         {isComplete && <Check size={14} color="#4ade80" />}
                       </div>
                       {!isLocked && (
