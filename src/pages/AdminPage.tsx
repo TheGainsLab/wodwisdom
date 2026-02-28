@@ -139,7 +139,13 @@ export default function AdminPage({ session }: { session: Session }) {
     setError(''); setSuccess('');
     try {
       await adminFetch(supabase, 'update_user', { user_id: userId, field, value });
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, [field]: value } : u));
+      setUsers(prev => prev.map(u => {
+        if (u.id !== userId) return u;
+        if (field === 'entitlements') {
+          return { ...u, subscription_status: value === 'grant' ? 'active' : 'inactive' };
+        }
+        return { ...u, [field]: value };
+      }));
       setSuccess('Updated');
       setTimeout(() => setSuccess(''), 3000);
     } catch (e: any) {

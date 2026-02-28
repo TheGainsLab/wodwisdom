@@ -106,17 +106,19 @@ Deno.serve(async (req) => {
           const { features = ["ai_chat", "program_gen", "workout_review", "workout_log"] } = params;
           if (value === "grant") {
             for (const feature of features) {
-              await supa.from("user_entitlements").upsert({
+              const { error: upsertErr } = await supa.from("user_entitlements").upsert({
                 user_id,
                 feature,
                 source: "admin",
               }, { onConflict: "user_id,feature,source" });
+              if (upsertErr) return json({ error: upsertErr.message }, 500);
             }
           } else if (value === "revoke") {
-            await supa.from("user_entitlements")
+            const { error: deleteErr } = await supa.from("user_entitlements")
               .delete()
               .eq("user_id", user_id)
               .eq("source", "admin");
+            if (deleteErr) return json({ error: deleteErr.message }, 500);
           } else {
             return json({ error: "Invalid value, use grant or revoke" }, 400);
           }
