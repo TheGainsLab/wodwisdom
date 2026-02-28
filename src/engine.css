@@ -99,6 +99,24 @@
 /* Spin animation for loaders */
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 
+/* Category row (Row / Bike / Ski / Treadmill / Run) */
+.engine-category-row{display:flex;gap:8px;flex-wrap:wrap}
+.engine-category-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+.engine-category-btn:hover{border-color:var(--accent);color:var(--text)}
+.engine-category-btn.active{background:var(--accent);border-color:var(--accent);color:white}
+
+/* Equipment sub-menu */
+.engine-equipment-submenu{display:flex;flex-wrap:wrap;gap:8px;padding:12px 0}
+.engine-equipment-btn{padding:8px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
+.engine-equipment-btn:hover{border-color:var(--accent);color:var(--text);background:var(--surface2)}
+.engine-equipment-btn.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent);font-weight:600}
+
+/* Unit selection row */
+.engine-unit-row{display:flex;gap:8px;flex-wrap:wrap}
+.engine-unit-btn{padding:8px 16px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
+.engine-unit-btn:hover{border-color:var(--accent);color:var(--text);background:var(--surface2)}
+.engine-unit-btn.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent);font-weight:600}
+
 /* Responsive */
 @media(max-width:640px){
 .engine-page{padding:16px 12px}

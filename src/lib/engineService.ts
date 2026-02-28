@@ -93,7 +93,7 @@ export interface EnginePerformanceMetrics {
   learned_max_pace: number | null;
   rolling_avg_ratio: number | null;
   rolling_count: number;
-  last_5_ratios: number[];
+  last_4_ratios: number[];
 }
 
 export interface EngineUserProgress {
@@ -262,9 +262,10 @@ export async function saveWorkoutSession(
 
 // ─── Time trials ─────────────────────────────────────────────────────
 
-/** Load current time trial baselines, optionally filtered by modality. */
+/** Load current time trial baselines, optionally filtered by modality and units. */
 export async function loadTimeTrialBaselines(
-  modality?: string
+  modality?: string,
+  units?: string
 ): Promise<EngineTimeTrial[]> {
   let query = supabase
     .from('engine_time_trials')
@@ -274,6 +275,9 @@ export async function loadTimeTrialBaselines(
 
   if (modality) {
     query = query.eq('modality', modality);
+  }
+  if (units) {
+    query = query.eq('units', units);
   }
 
   const { data, error } = await query;
@@ -360,7 +364,7 @@ export async function getPerformanceMetrics(
 ): Promise<EnginePerformanceMetrics | null> {
   const { data, error } = await supabase
     .from('engine_user_performance_metrics')
-    .select('day_type, modality, learned_max_pace, rolling_avg_ratio, rolling_count, last_5_ratios')
+    .select('day_type, modality, learned_max_pace, rolling_avg_ratio, rolling_count, last_4_ratios')
     .eq('day_type', dayType)
     .eq('modality', modality)
     .maybeSingle();
@@ -373,7 +377,7 @@ export async function getPerformanceMetrics(
 export async function getAllPerformanceMetrics(): Promise<EnginePerformanceMetrics[]> {
   const { data, error } = await supabase
     .from('engine_user_performance_metrics')
-    .select('day_type, modality, learned_max_pace, rolling_avg_ratio, rolling_count, last_5_ratios');
+    .select('day_type, modality, learned_max_pace, rolling_avg_ratio, rolling_count, last_4_ratios');
 
   if (error) throw error;
   return data ?? [];

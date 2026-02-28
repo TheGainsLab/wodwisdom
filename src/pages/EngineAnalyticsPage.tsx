@@ -271,10 +271,10 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
                       )}
                     </div>
 
-                    {/* Last 5 ratios mini chart */}
-                    {m.last_5_ratios && m.last_5_ratios.length > 0 && (
+                    {/* Last 4 ratios mini chart */}
+                    {m.last_4_ratios && m.last_4_ratios.length > 0 && (
                       <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 32, marginTop: 8 }}>
-                        {m.last_5_ratios.map((r, i) => (
+                        {m.last_4_ratios.map((r, i) => (
                           <div
                             key={i}
                             style={{

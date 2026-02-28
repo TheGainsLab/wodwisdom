@@ -13,12 +13,14 @@ import {
   advanceCurrentDay,
   loadUserProgress,
   getWorkoutSessionByDay,
+  getPerformanceMetrics,
   type EngineWorkout,
   type EngineTimeTrial,
+  type EnginePerformanceMetrics,
 } from '../lib/engineService';
 import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, Play, Pause, Square, Check, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertTriangle } from 'lucide-react';
 
 // ── Types & Constants ────────────────────────────────────────────────
 
@@ -53,11 +55,51 @@ interface Segment {
   intensity: string;
 }
 
-const MODALITIES = [
-  { id: 'row', label: 'Rower' },
-  { id: 'bike', label: 'Bike' },
-  { id: 'ski', label: 'Ski Erg' },
-  { id: 'run', label: 'Run' },
+// ── Equipment taxonomy (matches mobile app) ──
+
+interface Modality {
+  value: string;
+  label: string;
+  category: string;
+}
+
+const CATEGORIES = ['Rowing', 'Cycling', 'Ski', 'Treadmill', 'Running'] as const;
+const CATEGORY_LABELS: Record<string, string> = {
+  Rowing: 'Row',
+  Cycling: 'Bike',
+  Ski: 'Ski',
+  Treadmill: 'Treadmill',
+  Running: 'Run',
+};
+
+const MODALITIES: Modality[] = [
+  { value: 'c2_row_erg', label: 'C2 Rowing Erg', category: 'Rowing' },
+  { value: 'rogue_row_erg', label: 'Rogue Rowing Erg', category: 'Rowing' },
+  { value: 'c2_bike_erg', label: 'C2 Bike Erg', category: 'Cycling' },
+  { value: 'echo_bike', label: 'Echo Bike', category: 'Cycling' },
+  { value: 'assault_bike', label: 'Assault Bike', category: 'Cycling' },
+  { value: 'airdyne_bike', label: 'AirDyne Bike', category: 'Cycling' },
+  { value: 'other_bike', label: 'Other Bike', category: 'Cycling' },
+  { value: 'outdoor_bike_ride', label: 'Outdoor Ride', category: 'Cycling' },
+  { value: 'c2_ski_erg', label: 'C2 Ski Erg', category: 'Ski' },
+  { value: 'assault_runner', label: 'Assault Runner Treadmill', category: 'Treadmill' },
+  { value: 'trueform_treadmill', label: 'TrueForm Treadmill', category: 'Treadmill' },
+  { value: 'motorized_treadmill', label: 'Motorized Treadmill', category: 'Treadmill' },
+  { value: 'outdoor_run', label: 'Outdoor Run', category: 'Running' },
+  { value: 'road_run', label: 'Road Run', category: 'Running' },
+  { value: 'track_run', label: 'Track Run', category: 'Running' },
+  { value: 'trail_run', label: 'Trail Run', category: 'Running' },
+  { value: 'trueform', label: 'True Form', category: 'Running' },
+  { value: 'assault_runner_run', label: 'Assault Runner', category: 'Running' },
+  { value: 'other_treadmill', label: 'Other Treadmill', category: 'Running' },
+];
+
+const SCORE_UNITS = [
+  { value: 'cal', label: 'Calories' },
+  { value: 'watts', label: 'Watts' },
+  { value: 'meters', label: 'Meters' },
+  { value: 'kilometers', label: 'Kilometers' },
+  { value: 'miles', label: 'Miles' },
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -216,8 +258,11 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   // ── Core state ──
   const [stage, setStage] = useState<Stage>('loading');
   const [workout, setWorkout] = useState<EngineWorkout | null>(null);
-  const [modality, setModality] = useState('row');
+  const [modality, setModality] = useState('');
+  const [expandedCategory, setExpandedCategory] = useState('');
+  const [selectedUnit, setSelectedUnit] = useState('');
   const [baseline, setBaseline] = useState<EngineTimeTrial | null>(null);
+  const [performanceMetrics, setPerformanceMetrics] = useState<EnginePerformanceMetrics | null>(null);
   const [previousSession, setPreviousSession] = useState<boolean>(false);
   const [currentDay, setCurrentDay] = useState(1);
   const { hasFeature } = useEntitlements(session.user.id);
@@ -237,7 +282,6 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const [logAvgHR, setLogAvgHR] = useState('');
   const [logPeakHR, setLogPeakHR] = useState('');
   const [logRPE, setLogRPE] = useState(5);
-  const [logUnits, setLogUnits] = useState('cal');
   const [saving, setSaving] = useState(false);
 
   // ── Load data ──
@@ -253,9 +297,13 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         setCurrentDay(progress?.engine_current_day ?? 1);
         setPreviousSession(!!prevSession);
 
-        // Try to load saved modality preference
-        const pref = await loadModalityPreference('row').catch(() => null);
-        if (pref) setModality(pref.modality);
+        // Try to load saved modality + unit preference
+        const pref = await loadModalityPreference('last_selected').catch(() => null);
+        if (pref) {
+          // secondary_unit stores the actual modality value
+          if (pref.secondary_unit) setModality(pref.secondary_unit);
+          if (pref.primary_unit) setSelectedUnit(pref.primary_unit);
+        }
 
         if (wk) {
           setStage('equipment');
@@ -267,6 +315,30 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
       }
     })();
   }, [dayNumber]);
+
+  // Load baseline + metrics when modality/unit change
+  useEffect(() => {
+    if (!modality || !selectedUnit) {
+      setBaseline(null);
+      return;
+    }
+    (async () => {
+      try {
+        const bl = await loadTimeTrialBaselines(modality, selectedUnit).then(arr => arr[0] ?? null);
+        setBaseline(bl);
+      } catch {
+        setBaseline(null);
+      }
+      if (workout?.day_type) {
+        try {
+          const metrics = await getPerformanceMetrics(workout.day_type, modality);
+          setPerformanceMetrics(metrics);
+        } catch {
+          setPerformanceMetrics(null);
+        }
+      }
+    })();
+  }, [modality, selectedUnit, workout?.day_type]);
 
   // Sync refs
   useEffect(() => { segIndexRef.current = segIndex; }, [segIndex]);
@@ -296,18 +368,52 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
   // ── Handlers ──
 
-  const handleSelectModality = async (mod: string) => {
-    setModality(mod);
-    try {
-      const [bl] = await Promise.all([
-        loadTimeTrialBaselines(mod).then(arr => arr[0] ?? null),
-        saveModalityPreference({ modality: mod, primary_unit: 'cal', secondary_unit: null }),
-      ]);
-      setBaseline(bl);
-    } catch {
-      setBaseline(null);
+  const handleSelectCategory = (category: string) => {
+    if (expandedCategory === category) {
+      setExpandedCategory('');
+    } else {
+      setExpandedCategory(category);
     }
   };
+
+  const saveLastSelected = (mod: string, unit: string) => {
+    // Save per-modality unit preference
+    if (mod && unit) {
+      saveModalityPreference({ modality: mod, primary_unit: unit, secondary_unit: null }).catch(() => {});
+    }
+    // Save last_selected: primary_unit = unit, secondary_unit = modality value
+    saveModalityPreference({
+      modality: 'last_selected',
+      primary_unit: unit || null,
+      secondary_unit: mod || null,
+    }).catch(() => {});
+  };
+
+  const handleSelectModality = async (mod: string) => {
+    setModality(mod);
+    setExpandedCategory('');
+    // Load saved unit preference for this modality
+    const pref = await loadModalityPreference(mod).catch(() => null);
+    if (pref?.primary_unit) {
+      setSelectedUnit(pref.primary_unit);
+      saveLastSelected(mod, pref.primary_unit);
+    } else {
+      saveLastSelected(mod, selectedUnit);
+    }
+  };
+
+  const handleSelectUnit = (unit: string) => {
+    setSelectedUnit(unit);
+    saveLastSelected(modality, unit);
+  };
+
+  const handleContinueToPreview = () => {
+    if (!modality || !selectedUnit) return;
+    saveLastSelected(modality, selectedUnit);
+    setStage('preview');
+  };
+
+  const hasMatchingBaseline = !!(baseline && baseline.units === selectedUnit);
 
   const handleStartWorkout = () => {
     if (!workout) return;
@@ -340,10 +446,56 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
       const durationMin = (workout.total_duration_minutes ?? 0) || Math.round(totalElapsed / 60);
       const rpm = durationMin > 0 ? output / durationMin : 0;
       const baselineRpm = baseline?.calculated_rpm ?? 0;
-      const targetPace = baselineRpm > 0 && workout.base_intensity_percent
-        ? baselineRpm * (workout.base_intensity_percent / 100)
-        : null;
-      const perfRatio = targetPace && targetPace > 0 ? rpm / targetPace : null;
+
+      // Weighted target pace across all work segments (matches mobile app)
+      let targetPace: number | null = null;
+      if (baselineRpm > 0) {
+        const workSegs = segments.filter(s => s.type === 'work');
+        if (workSegs.length > 0) {
+          let totalTargetPace = 0;
+          let totalTargetDuration = 0;
+
+          for (const seg of workSegs) {
+            // Find the block params for this segment's block
+            const raw = [workout.block_1_params, workout.block_2_params, workout.block_3_params, workout.block_4_params][seg.blockIndex];
+            const bp = raw as unknown as BlockParams | null;
+            if (!bp) continue;
+
+            const paceRange = seg.label === 'Flux'
+              ? (bp.fluxPaceRange ?? bp.paceRange)
+              : bp.paceRange;
+
+            const isMaxEffort = paceRange === 'max_effort' || seg.label === 'BURST' || seg.label === 'Max Effort';
+
+            if (!isMaxEffort && Array.isArray(paceRange) && paceRange.length >= 2) {
+              let intensityMult = (paceRange[0] + paceRange[1]) / 2;
+              // Apply rolling average ratio adjustment (matches mobile app)
+              if (performanceMetrics?.rolling_avg_ratio) {
+                intensityMult *= performanceMetrics.rolling_avg_ratio;
+              }
+              const segTarget = baselineRpm * intensityMult;
+              totalTargetPace += segTarget * seg.duration;
+              totalTargetDuration += seg.duration;
+            }
+          }
+
+          if (totalTargetDuration > 0) {
+            targetPace = totalTargetPace / totalTargetDuration;
+          }
+        } else if (workout.base_intensity_percent) {
+          // Fallback for workouts with no segments
+          targetPace = baselineRpm * (workout.base_intensity_percent / 100);
+        }
+      }
+
+      const perfRatio = targetPace && targetPace > 0 && rpm > 0 ? rpm / targetPace : null;
+
+      // Build rich workout_data (matches mobile app)
+      const workSegs = segments.filter(s => s.type === 'work');
+      const restSegs = segments.filter(s => s.type === 'rest' || s.type === 'block-rest');
+      const totalWorkSeconds = workSegs.reduce((sum, s) => sum + s.duration, 0);
+      const totalRestSeconds = restSegs.reduce((sum, s) => sum + s.duration, 0);
+      const avgWorkRestRatio = totalRestSeconds > 0 ? totalWorkSeconds / totalRestSeconds : null;
 
       // Save session
       await saveWorkoutSession({
@@ -352,7 +504,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         program_day_number: dayNumber,
         day_type: workout.day_type,
         modality,
-        units: logUnits,
+        units: selectedUnit,
         target_pace: targetPace,
         actual_pace: rpm,
         total_output: output,
@@ -361,7 +513,13 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         average_heart_rate: parseInt(logAvgHR) || null,
         peak_heart_rate: parseInt(logPeakHR) || null,
         perceived_exertion: logRPE,
-        workout_data: null,
+        workout_data: {
+          intervals_completed: workSegs.length,
+          total_intervals: workSegs.length,
+          total_work_time: totalWorkSeconds,
+          total_rest_time: totalRestSeconds,
+          avg_work_rest_ratio: avgWorkRestRatio,
+        },
         completed: true,
         program_version: '5-day',
       });
@@ -372,7 +530,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           modality,
           total_output: output,
           calculated_rpm: rpm,
-          units: logUnits,
+          units: selectedUnit,
         });
       }
 
@@ -415,6 +573,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   // ── Render: Equipment Selection ──
 
   function renderEquipment() {
+    const selectedMod = MODALITIES.find(m => m.value === modality);
+    const activeCategory = expandedCategory || (selectedMod?.category ?? '');
+
     return (
       <div className="engine-page">
         <div className="engine-section">
@@ -448,34 +609,70 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
               <hr className="engine-divider" />
 
+              {/* Category buttons */}
               <div>
-                <span className="engine-label">Select Equipment</span>
-                <div className="engine-grid">
-                  {MODALITIES.map(m => (
-                    <button
-                      key={m.id}
-                      className="engine-card"
-                      onClick={() => handleSelectModality(m.id)}
-                      style={{
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        padding: '16px 12px',
-                        transition: 'all .2s',
-                        borderColor: modality === m.id ? 'var(--accent)' : undefined,
-                        boxShadow: modality === m.id ? '0 0 20px var(--accent-glow)' : undefined,
-                      }}
-                    >
-                      <div style={{ fontSize: 15, fontWeight: 600, color: modality === m.id ? 'var(--text)' : 'var(--text-dim)' }}>
-                        {m.label}
-                      </div>
-                    </button>
-                  ))}
+                <span className="engine-label">Select Modality</span>
+                <div className="engine-category-row">
+                  {CATEGORIES.map(cat => {
+                    const isSelected = selectedMod?.category === cat;
+                    const isExpanded = expandedCategory === cat;
+                    return (
+                      <button
+                        key={cat}
+                        className={'engine-category-btn' + (isSelected || isExpanded ? ' active' : '')}
+                        onClick={() => handleSelectCategory(cat)}
+                      >
+                        {CATEGORY_LABELS[cat]}
+                        {isSelected && <Check size={12} />}
+                        {!isSelected && isExpanded && <ChevronDown size={12} />}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {baseline && (
+              {/* Equipment sub-menu */}
+              {activeCategory && (
+                <div className="engine-equipment-submenu">
+                  {MODALITIES
+                    .filter(m => m.category === activeCategory)
+                    .map(m => (
+                      <button
+                        key={m.value}
+                        className={'engine-equipment-btn' + (modality === m.value ? ' active' : '')}
+                        onClick={() => handleSelectModality(m.value)}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                </div>
+              )}
+
+              {/* Unit selection — visible when modality selected */}
+              {modality && (
+                <>
+                  <hr className="engine-divider" />
+                  <div>
+                    <span className="engine-label">Select Units</span>
+                    <div className="engine-unit-row">
+                      {SCORE_UNITS.map(u => (
+                        <button
+                          key={u.value}
+                          className={'engine-unit-btn' + (selectedUnit === u.value ? ' active' : '')}
+                          onClick={() => handleSelectUnit(u.value)}
+                        >
+                          {u.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Baseline display */}
+              {hasMatchingBaseline && baseline && (
                 <div className="engine-stat" style={{ textAlign: 'center' }}>
-                  <div className="engine-stat-label">Current Baseline</div>
+                  <div className="engine-stat-label">Current Baseline ({selectedMod?.label})</div>
                   <div className="engine-stat-value" style={{ fontSize: 22 }}>
                     {baseline.total_output} {baseline.units ?? 'cal'}
                   </div>
@@ -485,16 +682,31 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 </div>
               )}
 
-              {!baseline && modality && (
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>
-                  No baseline recorded for {MODALITIES.find(m => m.id === modality)?.label}.
-                  {isTimeTrial ? ' This time trial will set your first baseline.' : ' Complete a time trial to set pace targets.'}
+              {/* Baseline warning */}
+              {modality && selectedUnit && !hasMatchingBaseline && !isTimeTrial && (
+                <div style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                  background: 'rgba(234,179,8,.08)', border: '1px solid rgba(234,179,8,.25)',
+                  borderRadius: 10, padding: '12px 14px',
+                }}>
+                  <AlertTriangle size={16} color="#eab308" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                    No time trial baseline for <strong>{selectedMod?.label}</strong> with <strong>{SCORE_UNITS.find(u => u.value === selectedUnit)?.label}</strong>.
+                    Complete a time trial to see pace targets.
+                  </div>
+                </div>
+              )}
+
+              {modality && selectedUnit && isTimeTrial && !hasMatchingBaseline && (
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0' }}>
+                  This time trial will set your first baseline for {selectedMod?.label} in {SCORE_UNITS.find(u => u.value === selectedUnit)?.label}.
                 </div>
               )}
 
               <button
                 className="engine-btn engine-btn-primary"
-                onClick={() => setStage('preview')}
+                onClick={handleContinueToPreview}
+                disabled={!modality || !selectedUnit}
                 style={{ width: '100%' }}
               >
                 <Play size={18} /> Continue
@@ -564,8 +776,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 const workDur = resolveNum(bp.workDuration, 0);
                 const restDur = resolveRest(bp.restDuration, workDur);
                 const pace = formatPace(bp.paceRange);
+                const rollingAdj = performanceMetrics?.rolling_avg_ratio ?? 1;
                 const targetRpm = baselineRpm > 0 && Array.isArray(bp.paceRange)
-                  ? `${(baselineRpm * bp.paceRange[0]).toFixed(1)}–${(baselineRpm * bp.paceRange[1]).toFixed(1)} ${baseline?.units ?? 'cal'}/min`
+                  ? `${(baselineRpm * bp.paceRange[0] * rollingAdj).toFixed(1)}–${(baselineRpm * bp.paceRange[1] * rollingAdj).toFixed(1)} ${selectedUnit}/min`
                   : null;
 
                 return (
@@ -779,28 +992,15 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
             {/* Output */}
             <div>
-              <span className="engine-label">Total Output</span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  className="engine-input"
-                  type="number"
-                  inputMode="decimal"
-                  placeholder="e.g. 150"
-                  value={logOutput}
-                  onChange={e => setLogOutput(e.target.value)}
-                  style={{ flex: 1 }}
-                />
-                <select
-                  className="engine-select"
-                  value={logUnits}
-                  onChange={e => setLogUnits(e.target.value)}
-                  style={{ width: 100, flex: 'none' }}
-                >
-                  <option value="cal">cal</option>
-                  <option value="meters">m</option>
-                  <option value="miles">mi</option>
-                </select>
-              </div>
+              <span className="engine-label">Total Output ({SCORE_UNITS.find(u => u.value === selectedUnit)?.label ?? selectedUnit})</span>
+              <input
+                className="engine-input"
+                type="number"
+                inputMode="decimal"
+                placeholder="e.g. 150"
+                value={logOutput}
+                onChange={e => setLogOutput(e.target.value)}
+              />
             </div>
 
             {/* Heart rate */}
@@ -864,7 +1064,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
               <span>Duration: {formatTime(totalElapsed)}</span>
               {logOutput && (
                 <span>
-                  Pace: {(parseFloat(logOutput) / Math.max(totalElapsed / 60, 1)).toFixed(1)} {logUnits}/min
+                  Pace: {(parseFloat(logOutput) / Math.max(totalElapsed / 60, 1)).toFixed(1)} {selectedUnit}/min
                 </span>
               )}
             </div>
@@ -917,7 +1117,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   <div className="engine-stat-value" style={{ fontSize: 22 }}>
                     {logOutput}
                   </div>
-                  <div className="engine-stat-label">{logUnits}</div>
+                  <div className="engine-stat-label">{selectedUnit}</div>
                 </div>
               )}
               <div className="engine-stat" style={{ textAlign: 'center' }}>
