@@ -142,13 +142,16 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
 
   useEffect(() => {
     (async () => {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('subscription_status')
-        .eq('id', session.user.id)
-        .single();
+      const [{ data: profile }, { data: entitlements }] = await Promise.all([
+        supabase.from('profiles').select('role').eq('id', session.user.id).single(),
+        supabase.from('user_entitlements').select('id')
+          .eq('user_id', session.user.id)
+          .eq('feature', 'workout_review')
+          .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
+          .limit(1),
+      ]);
 
-      const isPaid = profile?.subscription_status === 'active';
+      const isPaid = profile?.role === 'admin' || (entitlements && entitlements.length > 0);
       setTier(isPaid ? 'paid' : 'free');
 
       if (!isPaid) {

@@ -196,19 +196,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch subscription tier, athlete profile, and recent training in parallel
-    const [profileRes, athleteRes, recentTraining] = await Promise.all([
-      supa.from("profiles").select("subscription_status").eq("id", user.id).single(),
+    // Fetch entitlements, athlete profile, and recent training in parallel
+    const [profileRes, entitlementRes, athleteRes, recentTraining] = await Promise.all([
+      supa.from("profiles").select("role").eq("id", user.id).single(),
+      supa.from("user_entitlements").select("id")
+        .eq("user_id", user.id)
+        .eq("feature", "workout_review")
+        .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
+        .limit(1),
       supa.from("athlete_profiles").select("lifts, skills, conditioning, bodyweight, units, age, height, gender").eq("user_id", user.id).maybeSingle(),
       fetchAndFormatRecentHistory(supa, user.id, { days: 14, maxLines: 25 }),
     ]);
 
-    const profile = profileRes.data;
     const athleteProfile = athleteRes.data as AthleteProfileData | null;
     const profileStr = formatAthleteProfile(athleteProfile);
     const recentStr = recentTraining || "No recent workouts logged.";
 
-    const isFreeTier = !profile || profile.subscription_status !== "active";
+    const isFreeTier = profileRes.data?.role !== "admin" && (!entitlementRes.data || entitlementRes.data.length === 0);
 
     // Usage limits: count chat_messages + workout_reviews
     if (isFreeTier) {

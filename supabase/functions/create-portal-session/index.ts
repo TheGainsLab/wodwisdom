@@ -22,11 +22,8 @@ serve(async (req) => {
     const { data: { user } } = await supa.auth.getUser(token);
     if (!user) throw new Error("Not authenticated");
 
-    const { data: profile } = await supa.from("profiles").select("stripe_customer_id, subscription_status").eq("id", user.id).single();
+    const { data: profile } = await supa.from("profiles").select("stripe_customer_id").eq("id", user.id).single();
     if (!profile?.stripe_customer_id) throw new Error("No subscription to manage");
-    if (profile.subscription_status !== "active" && profile.subscription_status !== "canceling" && profile.subscription_status !== "past_due") {
-      throw new Error("No active subscription");
-    }
 
     const origin = req.headers.get("Origin") || req.headers.get("Referer")?.replace(/\/$/, "") || "https://wodwisdom.com";
     const baseUrl = origin.startsWith("http") ? origin : `https://${origin}`;
