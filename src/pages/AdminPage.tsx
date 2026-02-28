@@ -17,7 +17,8 @@ interface UserRow {
   email: string;
   full_name: string;
   role: string;
-  subscription_status: string;
+  subscription_status: string; // from admin_user_list RPC — will be removed after RPC update
+  has_entitlements?: boolean;
   question_count: number;
   total_tokens: number;
   last_active: string | null;
@@ -277,12 +278,10 @@ export default function AdminPage({ session }: { session: Session }) {
                       style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 8px', color: 'var(--text)', fontFamily: "'Outfit', sans-serif", fontSize: 12 }}
                     >
                       <option value="user">User</option>
-                      <option value="coach">Coach</option>
-                      <option value="owner">Owner</option>
                       <option value="admin">Admin</option>
                     </select>
                     <button
-                      onClick={() => updateUser(u.id, 'subscription_status', u.subscription_status === 'active' ? 'inactive' : 'active')}
+                      onClick={() => updateUser(u.id, 'entitlements', u.subscription_status === 'active' ? 'revoke' : 'grant')}
                       style={{
                         fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
                         color: u.subscription_status === 'active' ? '#2ec486' : '#666',
@@ -291,7 +290,7 @@ export default function AdminPage({ session }: { session: Session }) {
                         border: 'none', cursor: 'pointer', fontFamily: "'Outfit', sans-serif",
                       }}
                     >
-                      {u.subscription_status || 'inactive'}
+                      {u.subscription_status === 'active' ? 'active' : 'inactive'}
                     </button>
                     <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--text-muted)' }}>
                       {u.question_count} Q

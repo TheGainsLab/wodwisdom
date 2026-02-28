@@ -17,6 +17,7 @@ import {
   type EngineTimeTrial,
 } from '../lib/engineService';
 import EnginePaywall from '../components/engine/EnginePaywall';
+import { useEntitlements } from '../hooks/useEntitlements';
 import { ChevronLeft, Play, Pause, Square, Check, RotateCcw } from 'lucide-react';
 
 // ── Types & Constants ────────────────────────────────────────────────
@@ -206,7 +207,7 @@ function totalSegmentDuration(segs: Segment[]): number {
 
 // ── Component ────────────────────────────────────────────────────────
 
-export default function EngineTrainingDayPage({ session: _session }: { session: Session }) {
+export default function EngineTrainingDayPage({ session }: { session: Session }) {
   const { dayNumber: dayParam } = useParams<{ dayNumber: string }>();
   const dayNumber = parseInt(dayParam ?? '1', 10);
   const navigate = useNavigate();
@@ -219,7 +220,8 @@ export default function EngineTrainingDayPage({ session: _session }: { session: 
   const [baseline, setBaseline] = useState<EngineTimeTrial | null>(null);
   const [previousSession, setPreviousSession] = useState<boolean>(false);
   const [currentDay, setCurrentDay] = useState(1);
-  const [hasAccess, setHasAccess] = useState(true);
+  const { hasFeature } = useEntitlements(session.user.id);
+  const hasAccess = hasFeature('engine');
 
   // ── Timer state ──
   const [segments, setSegments] = useState<Segment[]>([]);
@@ -250,8 +252,6 @@ export default function EngineTrainingDayPage({ session: _session }: { session: 
         setWorkout(wk);
         setCurrentDay(progress?.engine_current_day ?? 1);
         setPreviousSession(!!prevSession);
-        const status = progress?.engine_subscription_status;
-        setHasAccess(status === 'active' || status === 'trial');
 
         // Try to load saved modality preference
         const pref = await loadModalityPreference('row').catch(() => null);

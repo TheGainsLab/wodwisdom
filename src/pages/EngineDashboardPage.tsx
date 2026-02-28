@@ -11,6 +11,7 @@ import {
   type EngineWorkout,
   type EngineUserProgress,
 } from '../lib/engineService';
+import { useEntitlements } from '../hooks/useEntitlements';
 import { ChevronLeft, Lock, Check, Play } from 'lucide-react';
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -70,6 +71,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
   const [workouts, setWorkouts] = useState<EngineWorkout[]>([]);
   const [completedDays, setCompletedDays] = useState<Set<number>>(new Set());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const { hasFeature, loading: entLoading } = useEntitlements(session.user.id);
 
   const load = async () => {
     setLoading(true);
@@ -102,9 +104,9 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
 
   // ── No subscription → show paywall ──
 
-  const hasAccess = progress?.engine_subscription_status === 'active' || progress?.engine_subscription_status === 'trial';
+  const hasAccess = hasFeature('engine');
 
-  if (!loading && !hasAccess) {
+  if (!loading && !entLoading && !hasAccess) {
     return (
       <div className="app-layout">
         <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
