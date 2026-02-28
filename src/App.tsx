@@ -28,6 +28,7 @@ import EngineDashboardPage from './pages/EngineDashboardPage';
 import EngineTrainingDayPage from './pages/EngineTrainingDayPage';
 import EngineAnalyticsPage from './pages/EngineAnalyticsPage';
 import EngineTaxonomyPage from './pages/EngineTaxonomyPage';
+import NutritionDashboardPage from './pages/NutritionDashboardPage';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -82,6 +83,7 @@ export default function App() {
       <Route path="/engine/training/:dayNumber" element={<EngineTrainingDayPage session={session} />} />
       <Route path="/engine/analytics" element={<EngineAnalyticsPage session={session} />} />
       <Route path="/engine/taxonomy" element={<EngineTaxonomyPage session={session} />} />
+      <Route path="/nutrition" element={<NutritionDashboardPage session={session} />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
