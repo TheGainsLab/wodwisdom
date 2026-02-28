@@ -265,6 +265,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const [performanceMetrics, setPerformanceMetrics] = useState<EnginePerformanceMetrics | null>(null);
   const [previousSession, setPreviousSession] = useState<boolean>(false);
   const [currentDay, setCurrentDay] = useState(1);
+  const [programVersion, setProgramVersion] = useState('main_5day');
   const { hasFeature } = useEntitlements(session.user.id);
   const hasAccess = hasFeature('engine');
 
@@ -295,6 +296,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         ]);
         setWorkout(wk);
         setCurrentDay(progress?.engine_current_day ?? 1);
+        setProgramVersion(progress?.engine_program_version ?? 'main_5day');
         setPreviousSession(!!prevSession);
 
         // Try to load saved modality + unit preference
@@ -521,7 +523,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           avg_work_rest_ratio: avgWorkRestRatio,
         },
         completed: true,
-        program_version: '5-day',
+        program_version: programVersion,
       });
 
       // Save time trial baseline if this is a time trial

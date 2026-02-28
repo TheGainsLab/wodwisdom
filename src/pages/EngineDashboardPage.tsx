@@ -12,7 +12,7 @@ import {
   type EngineUserProgress,
 } from '../lib/engineService';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, Lock, Check, Play } from 'lucide-react';
+import { ChevronLeft, Lock, Check, Play, Settings } from 'lucide-react';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -73,6 +73,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
   const [workouts, setWorkouts] = useState<EngineWorkout[]>([]);
   const [completedDays, setCompletedDays] = useState<Set<number>>(new Set());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [showSwitcher, setShowSwitcher] = useState(false);
   const { hasFeature, loading: entLoading } = useEntitlements(session.user.id);
 
   const load = async () => {
@@ -144,6 +145,28 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
     );
   }
 
+  // ── Program switcher view ──
+
+  if (showSwitcher) {
+    return (
+      <div className="app-layout">
+        <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
+        <div className="main-content">
+          <header className="page-header">
+            <button className="menu-btn" onClick={() => setShowSwitcher(false)}>
+              <ChevronLeft size={20} />
+            </button>
+            <h1>Engine</h1>
+          </header>
+          <ProgramSelection
+            currentProgram={progress?.engine_program_version}
+            onSelected={() => { setShowSwitcher(false); load(); }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   // ── Derived data ──
 
   const currentDay = progress?.engine_current_day ?? 1;
@@ -175,6 +198,14 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
           {progress && (
             <span className="usage-pill">Day {currentDay} of {totalDays}</span>
           )}
+          <button
+            className="menu-btn"
+            onClick={() => setShowSwitcher(true)}
+            title="Program settings"
+            style={{ marginLeft: 'auto' }}
+          >
+            <Settings size={20} />
+          </button>
         </header>
 
         {loading ? (

@@ -102,6 +102,16 @@ export interface EngineUserProgress {
   engine_months_unlocked: number;
 }
 
+export interface EngineProgram {
+  id: string;
+  name: string;
+  description: string | null;
+  days_per_week: number;
+  total_days: number;
+  sort_order: number;
+  is_active: boolean;
+}
+
 // ─── Workouts (read-only reference data) ─────────────────────────────
 
 /** Load all 720 workouts (or for a specific program_type). */
@@ -157,6 +167,20 @@ export async function loadDayType(id: string): Promise<EngineDayType | null> {
   return data;
 }
 
+// ─── Program registry ────────────────────────────────────────────────
+
+/** Load all active program variants. */
+export async function loadPrograms(): Promise<EngineProgram[]> {
+  const { data, error } = await supabase
+    .from('engine_programs')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order');
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ─── Program mapping ─────────────────────────────────────────────────
 
 /** Get program mapping for a given program variant (e.g. 'main_3day'). */
@@ -174,25 +198,18 @@ export async function getProgramMapping(
 }
 
 /**
- * Get workouts for a program version.
- * For main_5day: returns workouts directly.
- * For others (main_3day, etc.): uses mapping to resolve which workout days to include.
+ * Get workouts for a program version, in the variant's sequence order.
+ * All variants (including main_5day) use the mapping table for uniform handling.
  */
 export async function getWorkoutsForProgram(
   version: string
 ): Promise<EngineWorkout[]> {
-  if (version === 'main_5day' || version === '5-day') {
-    return loadWorkouts('main_5day');
-  }
-
-  // Map version labels to program_id
-  const programId = version === '3-day' ? 'main_3day' : version;
-  const mapping = await getProgramMapping(programId);
+  const mapping = await getProgramMapping(version);
   if (mapping.length === 0) return [];
 
   const dayNumbers = mapping.map((m) => m.engine_workout_day_number);
 
-  // Fetch in batches of 100 to avoid URL length limits
+  // Fetch catalog workouts in batches of 100 to avoid URL length limits
   const workouts: EngineWorkout[] = [];
   for (let i = 0; i < dayNumbers.length; i += 100) {
     const batch = dayNumbers.slice(i, i + 100);
@@ -206,7 +223,7 @@ export async function getWorkoutsForProgram(
     if (data) workouts.push(...data);
   }
 
-  // Return in mapping order
+  // Return in mapping sequence order
   const byDay = new Map(workouts.map((w) => [w.day_number, w]));
   return mapping
     .map((m) => byDay.get(m.engine_workout_day_number))
@@ -417,7 +434,7 @@ export async function loadUserProgress(): Promise<EngineUserProgress | null> {
   return data;
 }
 
-/** Save the user's chosen program version (5-day or 3-day). */
+/** Save the user's chosen program version (initial selection). */
 export async function saveProgramVersion(version: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -435,7 +452,82 @@ export async function saveProgramVersion(version: string): Promise<void> {
 /** Load the user's current program version. */
 export async function loadProgramVersion(): Promise<string> {
   const progress = await loadUserProgress();
-  return progress?.engine_program_version ?? '5-day';
+  return progress?.engine_program_version ?? 'main_5day';
+}
+
+/**
+ * Switch to a different program variant, preserving month position.
+ * Looks up the user's current month, then sets engine_current_day to the
+ * first sequence day of that month in the new variant.
+ */
+export async function switchProgram(newProgramId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Get current progress to find which month the user is in
+  const progress = await loadUserProgress();
+  let targetMonth = 1;
+
+  if (progress && progress.engine_program_version) {
+    // Resolve the current day's catalog workout to find its month
+    const currentMapping = await getProgramMapping(progress.engine_program_version);
+    const currentEntry = currentMapping.find(
+      (m) => m.program_sequence_order === progress.engine_current_day
+    );
+    if (currentEntry) {
+      const workout = await loadWorkoutForDay(currentEntry.engine_workout_day_number);
+      if (workout?.month) {
+        targetMonth = workout.month;
+      }
+    }
+  }
+
+  // Find the first sequence day of that month in the new variant
+  const newMapping = await getProgramMapping(newProgramId);
+  let newCurrentDay = 1;
+
+  if (newMapping.length > 0) {
+    // Fetch all catalog days referenced by the new mapping to find month boundaries
+    const dayNumbers = newMapping.map((m) => m.engine_workout_day_number);
+    const workouts: EngineWorkout[] = [];
+    for (let i = 0; i < dayNumbers.length; i += 100) {
+      const batch = dayNumbers.slice(i, i + 100);
+      const { data, error } = await supabase
+        .from('engine_workouts')
+        .select('day_number, month')
+        .eq('program_type', 'main_5day')
+        .in('day_number', batch);
+      if (error) throw error;
+      if (data) workouts.push(...(data as EngineWorkout[]));
+    }
+
+    const monthByDay = new Map(workouts.map((w) => [w.day_number, w.month]));
+
+    // Walk the new mapping in sequence order and find the first day in targetMonth
+    for (const entry of newMapping) {
+      const month = monthByDay.get(entry.engine_workout_day_number);
+      if (month === targetMonth) {
+        newCurrentDay = entry.program_sequence_order;
+        break;
+      }
+    }
+
+    // If targetMonth doesn't exist in the new variant (e.g. user was beyond its range),
+    // fall back to the last available day
+    if (newCurrentDay === 1 && targetMonth > 1) {
+      newCurrentDay = newMapping[newMapping.length - 1].program_sequence_order;
+    }
+  }
+
+  const { error } = await supabase
+    .from('athlete_profiles')
+    .update({
+      engine_program_version: newProgramId,
+      engine_current_day: newCurrentDay,
+    })
+    .eq('user_id', user.id);
+
+  if (error) throw error;
 }
 
 /** Advance the user's current day (called after completing a workout). */
