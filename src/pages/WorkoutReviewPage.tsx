@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, FunctionsHttpError } from '../lib/supabase';
 import Nav from '../components/Nav';
-import InviteBanner from '../components/InviteBanner';
 import WorkoutBlocksDisplay from '../components/WorkoutBlocksDisplay';
 
 // ---------------------------------------------------------------------------
@@ -142,13 +141,16 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
 
   useEffect(() => {
     (async () => {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('subscription_status')
-        .eq('id', session.user.id)
-        .single();
+      const [{ data: profile }, { data: entitlements }] = await Promise.all([
+        supabase.from('profiles').select('role').eq('id', session.user.id).single(),
+        supabase.from('user_entitlements').select('id')
+          .eq('user_id', session.user.id)
+          .eq('feature', 'workout_review')
+          .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
+          .limit(1),
+      ]);
 
-      const isPaid = profile?.subscription_status === 'active';
+      const isPaid = profile?.role === 'admin' || (entitlements && entitlements.length > 0);
       setTier(isPaid ? 'paid' : 'free');
 
       if (!isPaid) {
@@ -223,7 +225,6 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
     <div className="app-layout">
       <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
       <div className="main-content">
-        <InviteBanner session={session} />
         <header className="page-header">
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>

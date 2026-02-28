@@ -6,12 +6,12 @@ import Nav from '../components/Nav';
 interface Profile {
   full_name: string;
   role: string;
-  subscription_status?: string;
 }
 
 export default function SettingsPage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [profile, setProfile] = useState<Profile>({ full_name: '', role: 'user' });
+  const [hasSubscription, setHasSubscription] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -23,11 +23,17 @@ export default function SettingsPage({ session }: { session: Session }) {
   const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
-    supabase.from('profiles').select('full_name, role, subscription_status').eq('id', session.user.id).single()
-      .then(({ data }) => {
-        if (data) setProfile(data);
-        setLoading(false);
-      });
+    Promise.all([
+      supabase.from('profiles').select('full_name, role').eq('id', session.user.id).single(),
+      supabase.from('user_entitlements').select('id')
+        .eq('user_id', session.user.id)
+        .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
+        .limit(1),
+    ]).then(([{ data: profileData }, { data: entitlements }]) => {
+      if (profileData) setProfile(profileData);
+      setHasSubscription((entitlements && entitlements.length > 0) || false);
+      setLoading(false);
+    });
   }, [session.user.id]);
 
   const openBillingPortal = async () => {
@@ -71,7 +77,7 @@ export default function SettingsPage({ session }: { session: Session }) {
     setTimeout(() => setSuccess(''), 3000);
   };
 
-  const roleBadge = profile.role === 'owner' ? 'Gym Owner' : profile.role === 'coach' ? 'Coach' : 'User';
+  const roleBadge = profile.role === 'admin' ? 'Admin' : 'User';
 
   return (
     <div className="app-layout">
@@ -90,7 +96,7 @@ export default function SettingsPage({ session }: { session: Session }) {
 
             {loading ? <div className="page-loading"><div className="loading-pulse" /></div> : (
               <>
-                {(profile.subscription_status === 'active' || profile.subscription_status === 'canceling' || profile.subscription_status === 'past_due') && (
+                {hasSubscription && (
                   <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
                     <h2 className="settings-card-title">Subscription</h2>
                     <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 16 }}>Update payment method, change plan, or cancel anytime.</p>

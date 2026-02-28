@@ -100,7 +100,6 @@ export interface EngineUserProgress {
   engine_program_version: string;
   engine_current_day: number;
   engine_months_unlocked: number;
-  engine_subscription_status: string;
 }
 
 // ─── Workouts (read-only reference data) ─────────────────────────────
@@ -407,7 +406,7 @@ export async function updatePerformanceMetrics(
 export async function loadUserProgress(): Promise<EngineUserProgress | null> {
   const { data, error } = await supabase
     .from('athlete_profiles')
-    .select('engine_program_version, engine_current_day, engine_months_unlocked, engine_subscription_status')
+    .select('engine_program_version, engine_current_day, engine_months_unlocked')
     .maybeSingle();
 
   if (error) throw error;

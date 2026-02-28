@@ -99,14 +99,17 @@ Deno.serve(async (req) => {
       check_user_id: user.id,
     });
 
-    // Determine subscription tier
-    const { data: profile } = await supa
-      .from("profiles")
-      .select("subscription_status")
-      .eq("id", user.id)
-      .single();
+    // Determine subscription tier via entitlements
+    const [{ data: profile }, { data: entitlements }] = await Promise.all([
+      supa.from("profiles").select("role").eq("id", user.id).single(),
+      supa.from("user_entitlements").select("id")
+        .eq("user_id", user.id)
+        .eq("feature", "ai_chat")
+        .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
+        .limit(1),
+    ]);
 
-    const isFreeTier = !profile || profile.subscription_status !== "active";
+    const isFreeTier = profile?.role !== "admin" && (!entitlements || entitlements.length === 0);
 
     // Fetch athlete profile for prompt personalization
     const { data: athleteProfile } = await supa

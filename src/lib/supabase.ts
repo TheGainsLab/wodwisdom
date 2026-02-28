@@ -21,7 +21,6 @@ export const LOG_WORKOUT_ENDPOINT = SUPABASE_URL + '/functions/v1/log-workout';
 export const PROFILE_ANALYSIS_ENDPOINT = SUPABASE_URL + '/functions/v1/profile-analysis';
 export const CREATE_CHECKOUT_ENDPOINT = SUPABASE_URL + '/functions/v1/create-checkout';
 export const CREATE_PORTAL_ENDPOINT = SUPABASE_URL + '/functions/v1/create-portal-session';
-export const INVITE_ENDPOINT = SUPABASE_URL + '/functions/v1/invite-coach';
 export const ADMIN_ENDPOINT = SUPABASE_URL + '/functions/v1/admin-data';
 export const ANALYZE_PROGRAM_ENDPOINT = SUPABASE_URL + '/functions/v1/analyze-program';
 export const INCORPORATE_ENDPOINT = SUPABASE_URL + '/functions/v1/incorporate-movements';

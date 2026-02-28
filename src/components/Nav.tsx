@@ -28,10 +28,18 @@ export default function Nav({ isOpen, onClose }: NavProps) {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        supabase.from('profiles').select('role, subscription_status').eq('id', user.id).single()
+        // Check admin role
+        supabase.from('profiles').select('role').eq('id', user.id).single()
           .then(({ data }) => {
             if (data?.role === 'admin') setIsAdmin(true);
-            if (data?.subscription_status === 'active' || data?.subscription_status === 'canceling' || data?.subscription_status === 'past_due') setHasSubscription(true);
+          });
+        // Check if user has any entitlements (i.e. is a subscriber)
+        supabase.from('user_entitlements').select('id')
+          .eq('user_id', user.id)
+          .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
+          .limit(1)
+          .then(({ data }) => {
+            if (data && data.length > 0) setHasSubscription(true);
           });
       }
     });

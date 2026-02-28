@@ -12,6 +12,7 @@ import {
   type EngineTimeTrial,
 } from '../lib/engineService';
 import EnginePaywall from '../components/engine/EnginePaywall';
+import { useEntitlements } from '../hooks/useEntitlements';
 import { ChevronLeft, Clock, Target, Activity } from 'lucide-react';
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -58,7 +59,8 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
   const [metrics, setMetrics] = useState<EnginePerformanceMetrics[]>([]);
   const [baselines, setBaselines] = useState<EngineTimeTrial[]>([]);
   const [currentDay, setCurrentDay] = useState(1);
-  const [hasAccess, setHasAccess] = useState(false);
+  const { hasFeature } = useEntitlements(session.user.id);
+  const hasAccess = hasFeature('engine');
 
   useEffect(() => {
     (async () => {
@@ -73,8 +75,6 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
         setMetrics(met);
         setBaselines(bl);
         setCurrentDay(progress?.engine_current_day ?? 1);
-        const status = progress?.engine_subscription_status;
-        setHasAccess(status === 'active' || status === 'trial');
       } catch {
         // degrade gracefully
       }

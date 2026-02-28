@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import Nav from '../components/Nav';
 import EnginePaywall from '../components/engine/EnginePaywall';
-import { loadDayTypes, loadUserProgress, type EngineDayType } from '../lib/engineService';
+import { loadDayTypes, type EngineDayType } from '../lib/engineService';
+import { useEntitlements } from '../hooks/useEntitlements';
 import { ChevronLeft } from 'lucide-react';
 
 // ── Day type descriptions (not stored in DB) ────────────────────────
@@ -83,15 +84,14 @@ export default function EngineTaxonomyPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [hasAccess, setHasAccess] = useState(false);
   const [dayTypes, setDayTypes] = useState<EngineDayType[]>([]);
+  const { hasFeature } = useEntitlements(session.user.id);
+  const hasAccess = hasFeature('engine');
 
   useEffect(() => {
     (async () => {
       try {
-        const [progress, dt] = await Promise.all([loadUserProgress(), loadDayTypes()]);
-        const status = progress?.engine_subscription_status;
-        setHasAccess(status === 'active' || status === 'trial');
+        const dt = await loadDayTypes();
         setDayTypes(dt);
       } catch {
         // degrade

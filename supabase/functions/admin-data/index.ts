@@ -85,31 +85,42 @@ Deno.serve(async (req) => {
         if (!user_id || !field) {
           return json({ error: "Missing user_id or field" }, 400);
         }
-        if (!["subscription_status", "role"].includes(field)) {
+        if (!["role", "entitlements"].includes(field)) {
           return json({ error: "Invalid field" }, 400);
         }
-        if (
-          field === "role" &&
-          !["user", "coach", "owner", "admin"].includes(value)
-        ) {
-          return json({ error: "Invalid role" }, 400);
+        if (field === "role") {
+          if (!["user", "admin"].includes(value)) {
+            return json({ error: "Invalid role" }, 400);
+          }
+          if (user_id === user.id && value !== "admin") {
+            return json({ error: "Cannot remove your own admin role" }, 400);
+          }
+          const { error: updateErr } = await supa
+            .from("profiles")
+            .update({ role: value })
+            .eq("id", user_id);
+          if (updateErr) return json({ error: updateErr.message }, 500);
         }
-        if (
-          field === "subscription_status" &&
-          !["active", "inactive"].includes(value)
-        ) {
-          return json({ error: "Invalid status" }, 400);
+        if (field === "entitlements") {
+          // value = "grant" or "revoke", params.features = string[]
+          const { features = ["ai_chat", "program_gen", "workout_review", "workout_log"] } = params;
+          if (value === "grant") {
+            for (const feature of features) {
+              await supa.from("user_entitlements").upsert({
+                user_id,
+                feature,
+                source: "admin",
+              }, { onConflict: "user_id,feature,source" });
+            }
+          } else if (value === "revoke") {
+            await supa.from("user_entitlements")
+              .delete()
+              .eq("user_id", user_id)
+              .eq("source", "admin");
+          } else {
+            return json({ error: "Invalid value, use grant or revoke" }, 400);
+          }
         }
-        if (user_id === user.id && field === "role" && value !== "admin") {
-          return json({ error: "Cannot remove your own admin role" }, 400);
-        }
-
-        const { error: updateErr } = await supa
-          .from("profiles")
-          .update({ [field]: value })
-          .eq("id", user_id);
-
-        if (updateErr) return json({ error: updateErr.message }, 500);
         return json({ ok: true });
       }
 
