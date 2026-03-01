@@ -309,6 +309,21 @@ export async function loadCompletedSessions(): Promise<EngineWorkoutSession[]> {
   return data ?? [];
 }
 
+/** Load completed sessions filtered by day type (e.g. all past anaerobic days). */
+export async function getSessionsByDayType(
+  dayType: string
+): Promise<EngineWorkoutSession[]> {
+  const { data, error } = await supabase
+    .from('engine_workout_sessions')
+    .select('*')
+    .eq('completed', true)
+    .eq('day_type', dayType)
+    .order('date', { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 /** Get a specific session by program day number. */
 export async function getWorkoutSessionByDay(
   programDayNumber: number
