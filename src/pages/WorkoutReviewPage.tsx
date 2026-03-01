@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, FunctionsHttpError } from '../lib/supabase';
 import Nav from '../components/Nav';
-import WorkoutBlocksDisplay from '../components/WorkoutBlocksDisplay';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -57,6 +56,37 @@ const CHEVRON_DOWN = (
 );
 
 // ---------------------------------------------------------------------------
+// Movement card component
+// ---------------------------------------------------------------------------
+function MovementCard({ cf }: { cf: ReviewBlockCue }) {
+  return (
+    <div className="wr-movement-card">
+      <div className="wr-movement-name">{cf.movement}</div>
+      {cf.cues && cf.cues.length > 0 && (
+        <ul className="wr-cue-list">
+          {cf.cues.map((cue, j) => (
+            <li key={j} className="wr-cue-item">
+              <svg className="wr-cue-icon wr-cue-icon--do" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              <span>{cue}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {cf.common_faults && cf.common_faults.length > 0 && (
+        <ul className="wr-cue-list wr-fault-list">
+          {cf.common_faults.map((fault, j) => (
+            <li key={j} className="wr-cue-item wr-fault-item">
+              <svg className="wr-cue-icon wr-cue-icon--avoid" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              <span>{fault}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Collapsible block component
 // ---------------------------------------------------------------------------
 function CollapsibleBlock({ block, defaultOpen }: { block: ReviewBlock; defaultOpen: boolean }) {
@@ -84,33 +114,16 @@ function CollapsibleBlock({ block, defaultOpen }: { block: ReviewBlock; defaultO
       {open && (
         <div className="workout-review-block-body">
           {block.time_domain && (
-            <div style={{ marginBottom: 16 }}>
-              <div className="workout-review-block-sublabel">Time / Tempo</div>
+            <div className="wr-time-domain">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
               <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(block.time_domain) }} />
             </div>
           )}
 
           {block.cues_and_faults && block.cues_and_faults.length > 0 && (
-            <div>
-              <div className="workout-review-block-sublabel">Cues & Common Faults</div>
+            <div className="wr-movement-cards">
               {block.cues_and_faults.map((cf, i) => (
-                <div key={i} className="workout-review-movement" style={{ marginBottom: i < block.cues_and_faults.length - 1 ? 14 : 0 }}>
-                  <strong>{cf.movement}</strong>
-                  {cf.cues && cf.cues.length > 0 && (
-                    <ul className="workout-review-cues">
-                      {cf.cues.map((cue, j) => (
-                        <li key={j}>{cue}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {cf.common_faults && cf.common_faults.length > 0 && (
-                    <ul className="workout-review-cues workout-review-faults">
-                      {cf.common_faults.map((fault, j) => (
-                        <li key={j}>{fault}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                <MovementCard key={i} cf={cf} />
               ))}
             </div>
           )}
@@ -136,7 +149,13 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
   const freeLimit = 3;
   const [tierLoaded, setTierLoaded] = useState(false);
 
-  const fromProgramState = location.state as { workout_text?: string; source_id?: string; program_id?: string } | null;
+  const fromProgramState = location.state as {
+    workout_text?: string;
+    source_id?: string;
+    program_id?: string;
+    week_num?: number;
+    day_num?: number;
+  } | null;
   const hasAutoAnalyzed = useRef(false);
 
   useEffect(() => {
@@ -195,7 +214,8 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
       if (data?.error) throw new Error(data.error || 'Something went wrong');
 
       setReview(data?.review as WorkoutReview);
-      if (!tierLoaded || tier === 'free') {
+      // Only bump usage counter when it wasn't a cached response
+      if (!data?.cached && (!tierLoaded || tier === 'free')) {
         setTotalUsage(prev => prev + 1);
       }
     } catch (err: unknown) {
@@ -220,6 +240,9 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
     : null;
 
   const hasBlocks = review?.blocks && review.blocks.length > 0;
+  const weekDay = fromProgramState?.week_num != null && fromProgramState?.day_num != null
+    ? `Week ${fromProgramState.week_num} \u00b7 Day ${fromProgramState.day_num}`
+    : null;
 
   return (
     <div className="app-layout">
@@ -235,7 +258,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
 
         <div className="page-body">
           <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 0' }}>
-            {fromProgramState?.workout_text && !review ? (
+            {fromProgramState?.workout_text && !review && !error ? (
               <div className="page-loading" style={{ padding: 48 }}><div className="loading-pulse" /></div>
             ) : !review ? (
               <div className="workout-review-input-wrap">
@@ -270,16 +293,15 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
               </div>
             ) : (
               <div className="workout-review-result">
-                {/* Workout text at top for reference */}
-                <div className="workout-review-section" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
-                  <h3>Workout</h3>
-                  <WorkoutBlocksDisplay text={workoutText} />
-                </div>
+                {/* Week / Day header */}
+                {weekDay && (
+                  <div className="wr-week-day-header">{weekDay}</div>
+                )}
 
-                {/* Intent — always visible */}
+                {/* Intent — always visible at top */}
                 {review.intent && (
-                  <div className="workout-review-section">
-                    <h3>Intent</h3>
+                  <div className="wr-intent-card">
+                    <div className="wr-intent-label">Session Purpose</div>
                     <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.intent) }} />
                   </div>
                 )}
@@ -297,14 +319,9 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                   </>
                 )}
 
-                {/* Sources */}
+                {/* Sources — collapsed at bottom */}
                 {review.sources && review.sources.length > 0 && (
-                  <div className="sources-bar" style={{ marginTop: 24 }}>
-                    <span className="sources-label">Sources</span>
-                    {[...new Set(review.sources.map(s => s.title).filter(Boolean))].map((t, j) => (
-                      <span key={j} className="source-chip">{t}</span>
-                    ))}
-                  </div>
+                  <SourcesSection sources={review.sources} />
                 )}
 
                 {/* Actions */}
@@ -344,6 +361,33 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sources — collapsible at the bottom
+// ---------------------------------------------------------------------------
+function SourcesSection({ sources }: { sources: ReviewSource[] }) {
+  const [open, setOpen] = useState(false);
+  const titles = [...new Set(sources.map(s => s.title).filter(Boolean))];
+  if (titles.length === 0) return null;
+
+  return (
+    <div className="wr-sources-section">
+      <button className="wr-sources-toggle" onClick={() => setOpen(!open)}>
+        <span className="wr-sources-label">Sources ({titles.length})</span>
+        <span className={`workout-review-block-chevron${open ? ' workout-review-block-chevron--open' : ''}`}>
+          {CHEVRON_DOWN}
+        </span>
+      </button>
+      {open && (
+        <div className="wr-sources-list">
+          {titles.map((t, j) => (
+            <span key={j} className="source-chip">{t}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -242,7 +242,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                   <div className="program-day-actions">
                                     <button
                                       className="auth-btn"
-                                      onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_id: w.id, program_id: id } })}
+                                      onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_id: w.id, program_id: id, week_num: week.weekNum, day_num: (w.sort_order % 5) + 1 } })}
                                       style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: done ? 'var(--text-dim)' : 'var(--text)' }}
                                     >
                                       Coach
