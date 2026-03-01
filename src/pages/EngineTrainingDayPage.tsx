@@ -13,8 +13,10 @@ import {
   advanceCurrentDay,
   loadUserProgress,
   getWorkoutSessionByDay,
+  getSessionsByDayType,
   getPerformanceMetrics,
   type EngineWorkout,
+  type EngineWorkoutSession,
   type EngineTimeTrial,
   type EnginePerformanceMetrics,
   calculateWorkDurationMinutes,
@@ -25,7 +27,7 @@ import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertT
 
 // ── Types & Constants ────────────────────────────────────────────────
 
-type Stage = 'loading' | 'equipment' | 'preview' | 'active' | 'logging' | 'complete';
+type Stage = 'loading' | 'equipment' | 'preview' | 'ready' | 'active' | 'logging' | 'complete';
 
 interface BlockParams {
   rounds?: number | number[];
@@ -265,6 +267,8 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const [baseline, setBaseline] = useState<EngineTimeTrial | null>(null);
   const [performanceMetrics, setPerformanceMetrics] = useState<EnginePerformanceMetrics | null>(null);
   const [previousSession, setPreviousSession] = useState<boolean>(false);
+  const [dayTypeHistory, setDayTypeHistory] = useState<EngineWorkoutSession[]>([]);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
   const [currentDay, setCurrentDay] = useState(1);
   const [programVersion, setProgramVersion] = useState('main_5day');
   const { hasFeature } = useEntitlements(session.user.id);
@@ -299,6 +303,13 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         setCurrentDay(progress?.engine_current_day ?? 1);
         setProgramVersion(progress?.engine_program_version ?? 'main_5day');
         setPreviousSession(!!prevSession);
+
+        // Load workout history for this day type
+        if (wk?.day_type) {
+          getSessionsByDayType(wk.day_type)
+            .then(sessions => setDayTypeHistory(sessions))
+            .catch(() => setDayTypeHistory([]));
+        }
 
         // Try to load saved modality + unit preference
         const pref = await loadModalityPreference('last_selected').catch(() => null);
@@ -432,6 +443,11 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
     segIndexRef.current = 0;
     setTimeLeft(segs[0].duration);
     setTotalElapsed(0);
+    setIsPaused(true);
+    setStage('ready');
+  };
+
+  const handleBeginCountdown = () => {
     setIsPaused(false);
     setStage('active');
   };
@@ -835,6 +851,87 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 </div>
               )}
 
+              {/* Workout History — past sessions of same day type */}
+              {dayTypeHistory.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    onClick={() => setHistoryExpanded(!historyExpanded)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: '8px 0',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      color: 'var(--text-dim)',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      fontFamily: 'inherit',
+                      width: '100%',
+                    }}
+                  >
+                    <ChevronDown
+                      size={14}
+                      style={{
+                        transform: historyExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s',
+                      }}
+                    />
+                    Workout History ({dayTypeHistory.length})
+                  </button>
+
+                  {historyExpanded && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                      {dayTypeHistory.slice(0, 10).map(s => {
+                        const modLabel = MODALITIES.find(m => m.value === s.modality)?.label ?? s.modality ?? '—';
+                        return (
+                          <div
+                            key={s.id}
+                            style={{
+                              background: 'var(--bg)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 8,
+                              padding: '10px 14px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              fontSize: 13,
+                            }}
+                          >
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <span style={{ color: 'var(--text)', fontWeight: 500 }}>
+                                {new Date(s.date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </span>
+                              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                                {modLabel}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'right' }}>
+                              {s.total_output != null && (
+                                <span style={{ color: 'var(--text)', fontWeight: 600 }}>
+                                  {s.total_output} {s.units ?? ''}
+                                </span>
+                              )}
+                              {s.perceived_exertion != null && (
+                                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                                  RPE {s.perceived_exertion}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {dayTypeHistory.length > 10 && (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: 4 }}>
+                          +{dayTypeHistory.length - 10} more sessions
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button
                 className="engine-btn engine-btn-primary"
                 onClick={handleStartWorkout}
@@ -844,6 +941,48 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
               </button>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render: Ready (waiting for user to start countdown) ──
+
+  function renderReady() {
+    return (
+      <div className="engine-page" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 32, minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <span
+            className={'engine-badge ' + dayTypeBadge(workout?.day_type ?? '')}
+            style={{ fontSize: 14, padding: '6px 16px' }}
+          >
+            {(workout?.day_type ?? '').replace(/_/g, ' ')}
+          </span>
+        </div>
+
+        <div className="engine-timer" style={{ color: 'var(--text)' }}>
+          {formatTime(timeLeft)}
+        </div>
+
+        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+          {segments.length > 0 && segments[0].label} — Block 1
+        </div>
+
+        <div style={{ display: 'flex', gap: 12, width: '100%', maxWidth: 320 }}>
+          <button
+            className="engine-btn engine-btn-secondary"
+            onClick={() => setStage('preview')}
+            style={{ flex: 1 }}
+          >
+            <ChevronLeft size={16} /> Back
+          </button>
+          <button
+            className="engine-btn engine-btn-primary"
+            onClick={handleBeginCountdown}
+            style={{ flex: 2 }}
+          >
+            <Play size={18} /> Start
+          </button>
         </div>
       </div>
     );
@@ -1190,6 +1329,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         )}
         {hasAccess && stage === 'equipment' && renderEquipment()}
         {hasAccess && stage === 'preview' && renderPreview()}
+        {hasAccess && stage === 'ready' && renderReady()}
         {hasAccess && stage === 'active' && renderActive()}
         {hasAccess && stage === 'logging' && renderLogging()}
         {hasAccess && stage === 'complete' && renderComplete()}
