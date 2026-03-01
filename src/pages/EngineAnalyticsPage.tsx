@@ -64,20 +64,16 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
 
   useEffect(() => {
     (async () => {
-      try {
-        const [sess, met, bl, progress] = await Promise.all([
-          loadCompletedSessions(),
-          getAllPerformanceMetrics(),
-          loadTimeTrialBaselines(),
-          loadUserProgress(),
-        ]);
-        setSessions(sess);
-        setMetrics(met);
-        setBaselines(bl);
-        setCurrentDay(progress?.engine_current_day ?? 1);
-      } catch {
-        // degrade gracefully
-      }
+      const [sessResult, metResult, blResult, progressResult] = await Promise.allSettled([
+        loadCompletedSessions(),
+        getAllPerformanceMetrics(),
+        loadTimeTrialBaselines(),
+        loadUserProgress(),
+      ]);
+      if (sessResult.status === 'fulfilled') setSessions(sessResult.value);
+      if (metResult.status === 'fulfilled') setMetrics(metResult.value);
+      if (blResult.status === 'fulfilled') setBaselines(blResult.value);
+      if (progressResult.status === 'fulfilled') setCurrentDay(progressResult.value?.engine_current_day ?? 1);
       setLoading(false);
     })();
   }, [session.user.id]);
