@@ -237,6 +237,9 @@ body.landing-body{overflow:auto;height:auto}
 /* Intent card */
 .wr-intent-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px}
 .wr-intent-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);margin-bottom:10px}
+/* Prescription (the workout itself) */
+.wr-prescription{margin-bottom:12px;padding:12px 14px;background:var(--bg);border-radius:8px;border-left:3px solid var(--accent)}
+.wr-prescription .workout-review-content{font-size:14px;line-height:1.6;font-weight:600;color:var(--text)}
 /* Time domain with clock icon */
 .wr-time-domain{display:flex;gap:10px;align-items:flex-start;margin-bottom:16px;padding:12px 14px;background:var(--bg);border-radius:8px}
 .wr-time-domain svg{flex-shrink:0;margin-top:3px;color:var(--text-dim)}

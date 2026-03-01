@@ -18,6 +18,7 @@ interface ReviewBlockCue {
 interface ReviewBlock {
   block_type: string;
   block_label: string;
+  prescription?: string;
   time_domain: string;
   cues_and_faults: ReviewBlockCue[];
 }
@@ -113,6 +114,12 @@ function CollapsibleBlock({ block, defaultOpen }: { block: ReviewBlock; defaultO
 
       {open && (
         <div className="workout-review-block-body">
+          {block.prescription && (
+            <div className="wr-prescription">
+              <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(block.prescription) }} />
+            </div>
+          )}
+
           {block.time_domain && (
             <div className="wr-time-domain">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>

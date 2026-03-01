@@ -79,6 +79,7 @@ Output valid JSON only, no markdown or extra text:
 {
   "block_type": "metcon",
   "block_label": "Metcon",
+  "prescription": "The workout as written — format (AMRAP, For Time, EMOM, etc.), rounds, movements, reps, and loads. Personalize loads from athlete 1RMs where applicable (e.g. 'Deadlifts @ 185lb (62% of your 1RM)').",
   "time_domain": "Expected duration for this athlete. What will be the primary limiter. Pacing strategy.",
   "cues_and_faults": [
     { "movement": "Movement name", "cues": ["Cue 1", "Cue 2", "Cue 3"], "common_faults": ["Fault 1", "Fault 2"] }
@@ -86,6 +87,7 @@ Output valid JSON only, no markdown or extra text:
 }
 
 Rules:
+- prescription must restate the full workout clearly so the athlete can read it like a whiteboard. Include all movements, reps, and loads.
 - Provide cues_and_faults for EVERY movement in the metcon.
 - Cues: 2-3 actionable points of performance per movement. Personalize using athlete profile (e.g. specific loads from their 1RMs, scaling based on their skill level).
 - Common faults: 1-2 most common errors at the prescribed intensity/volume.
@@ -100,6 +102,7 @@ Output valid JSON only, no markdown or extra text:
 {
   "block_type": "strength",
   "block_label": "Strength",
+  "prescription": "The strength work as written — exercise, sets x reps, and load. Calculate specific working weights from athlete 1RMs (e.g. 'Back Squat 5x5 @ 225lb (75% of 300lb 1RM)').",
   "time_domain": "Rest intervals between sets, total block duration, tempo if prescribed.",
   "cues_and_faults": [
     { "movement": "Movement name", "cues": ["Cue 1", "Cue 2", "Cue 3"], "common_faults": ["Fault 1", "Fault 2"] }
@@ -107,6 +110,7 @@ Output valid JSON only, no markdown or extra text:
 }
 
 Rules:
+- prescription must restate the strength work clearly with personalized loads calculated from athlete 1RMs.
 - Provide cues_and_faults for EVERY lift in the strength block.
 - Cues: 2-3 actionable points of performance per lift. Personalize using athlete profile — calculate specific working weights from their 1RMs (e.g. "75% of 300lb back squat = 225lb").
 - Common faults: 1-2 most common errors at the prescribed intensity.
@@ -121,6 +125,7 @@ Output valid JSON only, no markdown or extra text:
 {
   "block_type": "skills",
   "block_label": "Skills",
+  "prescription": "The skill work as written — format, movements, sets/reps or time domains. Include scaling or progression if athlete's skill level requires it.",
   "time_domain": "Format/tempo (e.g. EMOM structure), total duration.",
   "cues_and_faults": [
     { "movement": "Movement name", "cues": ["Cue 1", "Cue 2", "Cue 3"], "common_faults": ["Fault 1", "Fault 2"] }
@@ -128,6 +133,7 @@ Output valid JSON only, no markdown or extra text:
 }
 
 Rules:
+- prescription must restate the skill work clearly so the athlete knows exactly what to do.
 - Provide cues_and_faults for EVERY movement in the skills block.
 - Cues: 2-3 actionable points of performance per movement. Personalize using athlete profile — if the athlete can't do the movement as written, provide a progression path and scaling option.
 - Common faults: 1-2 most common errors for that movement.
