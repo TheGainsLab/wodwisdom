@@ -137,6 +137,35 @@ function formatPace(pace: number[] | string | undefined): string {
   return String(pace);
 }
 
+function calculateIntervalGoal(
+  blockParams: BlockParams,
+  segDuration: number,
+  segLabel: string,
+  baselineRpm: number,
+  rollingAdj: number,
+): number | null {
+  if (baselineRpm <= 0) return null;
+
+  let paceRange: number[] | string | undefined;
+  if (segLabel === 'Flux') {
+    paceRange = blockParams.fluxPaceRange ?? blockParams.paceRange;
+  } else if (segLabel === 'Base') {
+    paceRange = blockParams.basePace ?? blockParams.paceRange;
+  } else {
+    paceRange = blockParams.paceRange;
+  }
+
+  const isMaxEffort = paceRange === 'max_effort' || segLabel === 'BURST' || segLabel === 'Max Effort';
+  if (isMaxEffort || !Array.isArray(paceRange) || paceRange.length < 2) return null;
+
+  const centerPace = (paceRange[0] + paceRange[1]) / 2;
+  const adjustedPace = centerPace * rollingAdj;
+  const targetRpm = baselineRpm * adjustedPace;
+  const durationMinutes = segDuration / 60;
+
+  return Math.round(targetRpm * durationMinutes * 10) / 10;
+}
+
 function resolveNum(v: number | number[] | undefined, fallback = 0): number {
   if (v === undefined || v === null) return fallback;
   if (typeof v === 'number') return v;
@@ -799,6 +828,10 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 const targetRpm = baselineRpm > 0 && Array.isArray(bp.paceRange)
                   ? `${(baselineRpm * bp.paceRange[0] * rollingAdj).toFixed(1)}–${(baselineRpm * bp.paceRange[1] * rollingAdj).toFixed(1)} ${selectedUnit}/min`
                   : null;
+                const isStandard = bp.workProgression !== 'continuous_with_bursts' && bp.workProgression !== 'alternating_paces';
+                const intervalGoal = isStandard
+                  ? calculateIntervalGoal(bp, workDur, 'Work', baselineRpm, rollingAdj)
+                  : null;
 
                 return (
                   <div key={index} style={{
@@ -818,28 +851,64 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-dim)' }}>
-                      <span>{rounds} round{rounds !== 1 ? 's' : ''}</span>
-                      <span>Work: {formatDuration(workDur)}</span>
-                      {restDur > 0 && <span>Rest: {formatDuration(restDur)}</span>}
-                    </div>
+                    {intervalGoal != null ? (
+                      <>
+                        {/* Round table with per-interval goals */}
+                        <div style={{ fontSize: 13 }}>
+                          <div style={{ display: 'flex', padding: '4px 0', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            <span style={{ width: 48 }}>Round</span>
+                            <span style={{ flex: 1, textAlign: 'center' }}>Work</span>
+                            <span style={{ flex: 1, textAlign: 'center' }}>Goal</span>
+                            {restDur > 0 && <span style={{ flex: 1, textAlign: 'center' }}>Rest</span>}
+                          </div>
+                          {Array.from({ length: rounds }, (_, r) => (
+                            <div key={r} style={{ display: 'flex', padding: '6px 0', borderBottom: r < rounds - 1 ? '1px solid var(--border)' : 'none', color: 'var(--text-dim)', fontSize: 13, alignItems: 'center' }}>
+                              <span style={{ width: 48 }}>{r + 1}</span>
+                              <span style={{ flex: 1, textAlign: 'center' }}>{formatDuration(workDur)}</span>
+                              <span style={{ flex: 1, textAlign: 'center', color: 'var(--accent)', fontWeight: 600 }}>
+                                ~{intervalGoal % 1 === 0 ? intervalGoal : intervalGoal.toFixed(1)} {selectedUnit}
+                              </span>
+                              {restDur > 0 && (
+                                <span style={{ flex: 1, textAlign: 'center' }}>
+                                  {r < rounds - 1 ? formatDuration(restDur) : '—'}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {targetRpm && (
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+                            Pace: {targetRpm}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {/* Standard summary for no-baseline, max effort, flux, or polarized */}
+                        <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-dim)' }}>
+                          <span>{rounds} round{rounds !== 1 ? 's' : ''}</span>
+                          <span>Work: {formatDuration(workDur)}</span>
+                          {restDur > 0 && <span>Rest: {formatDuration(restDur)}</span>}
+                        </div>
 
-                    {bp.workProgression === 'continuous_with_bursts' && bp.burstTiming && (
-                      <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>
-                        Bursts {bp.burstTiming.replace(/_/g, ' ')} ({bp.burstDuration}s max effort)
-                      </div>
-                    )}
+                        {bp.workProgression === 'continuous_with_bursts' && bp.burstTiming && (
+                          <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>
+                            Bursts {bp.burstTiming.replace(/_/g, ' ')} ({bp.burstDuration}s max effort)
+                          </div>
+                        )}
 
-                    {bp.workProgression === 'alternating_paces' && (
-                      <div style={{ fontSize: 12, color: '#c084fc', marginTop: 6 }}>
-                        Alternating base ({formatDuration(resolveNum(bp.baseDuration))}) / flux ({formatDuration(resolveNum(bp.fluxDuration))})
-                      </div>
-                    )}
+                        {bp.workProgression === 'alternating_paces' && (
+                          <div style={{ fontSize: 12, color: '#c084fc', marginTop: 6 }}>
+                            Alternating base ({formatDuration(resolveNum(bp.baseDuration))}) / flux ({formatDuration(resolveNum(bp.fluxDuration))})
+                          </div>
+                        )}
 
-                    {targetRpm && (
-                      <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>
-                        Target: {targetRpm}
-                      </div>
+                        {targetRpm && (
+                          <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>
+                            Target: {targetRpm}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 );
@@ -1021,6 +1090,17 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         ).length
       : 0;
 
+    // Calculate per-interval goal for current segment
+    let currentGoal: number | null = null;
+    if (seg && seg.type === 'work' && workout) {
+      const raw = [workout.block_1_params, workout.block_2_params, workout.block_3_params, workout.block_4_params][seg.blockIndex];
+      const bp = raw as unknown as BlockParams | null;
+      const rollingAdj = performanceMetrics?.rolling_avg_ratio ?? 1;
+      if (bp) {
+        currentGoal = calculateIntervalGoal(bp, seg.duration, seg.label, baseline?.calculated_rpm ?? 0, rollingAdj);
+      }
+    }
+
     return (
       <div className="engine-page" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         {/* Segment label */}
@@ -1047,11 +1127,15 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
             {formatTime(timeLeft)}
           </div>
 
-          {seg?.intensity && (
+          {currentGoal != null ? (
+            <div style={{ fontSize: 16, fontWeight: 600, color: timerColor, marginTop: 8 }}>
+              Goal: ~{currentGoal % 1 === 0 ? currentGoal : currentGoal.toFixed(1)} {selectedUnit}
+            </div>
+          ) : seg?.intensity ? (
             <div style={{ fontSize: 16, fontWeight: 600, color: timerColor, marginTop: 8 }}>
               {seg.intensity}
             </div>
-          )}
+          ) : null}
 
           {/* Segment progress */}
           <div className="engine-progress-bar" style={{ marginTop: 16, height: 4 }}>
