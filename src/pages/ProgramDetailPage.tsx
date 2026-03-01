@@ -205,7 +205,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     return weeks.map((week, wi) => (
                       <div key={wi} className="program-week-group">
                         <div className="program-week-label">Week {week.weekNum}</div>
-                        {week.days.map((w, di) => {
+                        {week.days.map((w) => {
                           const done = completedWorkoutIds.has(w.id);
                           const dayNum = isMultiPhase ? w.sort_order - phaseStart + 1 : w.sort_order + 1;
                           const isExpanded = expandedDays.has(w.id);
