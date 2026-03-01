@@ -59,14 +59,17 @@ function formatAthleteProfile(profile: AthleteProfileData | null): string {
 // Focused prompts for parallel per-block coaching calls
 // ---------------------------------------------------------------------------
 
-const INTENT_PROMPT = `You are an expert CrossFit coach. Given a multi-block training session, explain the overall session design in 2-3 sentences: why these blocks are combined, what energy systems or adaptations are targeted across the session, and how the blocks build on each other.
+const INTENT_PROMPT = `You are an expert CrossFit coach. Given a multi-block training session, explain the overall session design in 2-3 sentences: why these blocks are combined this way and what the session achieves as a whole.
 
 Output valid JSON only, no markdown or extra text:
 { "intent": "2-3 sentences about the session design." }
 
 Rules:
-- Tie the entire session together — don't just describe one block.
-- Reference specific energy systems, adaptations, or periodization goals.
+- You MUST address EVERY training block present (strength, metcon, AND skills). Do not skip any block.
+- For skills blocks, explain the skill acquisition or neuromuscular goal and why skills are sequenced where they are (e.g. practiced early while the CNS is fresh, or placed after strength to challenge coordination under fatigue).
+- Reference the relevant training targets for each block — energy systems for conditioning, force production for strength, AND motor learning / skill acquisition / movement quality for skills work.
+- Explain how the blocks interact: does one block complement, compete with, or set up another?
+- Warmup and cooldown blocks do not need emphasis — they don't drive adaptation.
 - Use recent training to note fatigue or progression context.
 - Be concise and practical. Athlete-focused voice.`;
 
