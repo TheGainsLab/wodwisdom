@@ -197,6 +197,12 @@ export async function getProgramMapping(
   return data ?? [];
 }
 
+// Legacy version strings → current program IDs
+const VERSION_ALIASES: Record<string, string> = {
+  '5-day': 'main_5day',
+  '3-day': 'main_3day',
+};
+
 /**
  * Get workouts for a program version, in the variant's sequence order.
  * All variants (including main_5day) use the mapping table for uniform handling.
@@ -204,7 +210,8 @@ export async function getProgramMapping(
 export async function getWorkoutsForProgram(
   version: string
 ): Promise<EngineWorkout[]> {
-  const mapping = await getProgramMapping(version);
+  const normalizedVersion = VERSION_ALIASES[version] ?? version;
+  const mapping = await getProgramMapping(normalizedVersion);
   if (mapping.length === 0) return [];
 
   const dayNumbers = mapping.map((m) => m.engine_workout_day_number);
