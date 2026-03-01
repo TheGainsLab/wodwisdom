@@ -251,6 +251,27 @@ Deno.serve(async (req) => {
     }
 
     // -----------------------------------------------------------------------
+    // Cache check: return existing review if we have one for this source_id
+    // -----------------------------------------------------------------------
+    if (source_id) {
+      const { data: cached } = await supa
+        .from("workout_reviews")
+        .select("review")
+        .eq("user_id", user.id)
+        .eq("source_id", source_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (cached?.review) {
+        return new Response(JSON.stringify({ review: cached.review, cached: true }), {
+          status: 200,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // -----------------------------------------------------------------------
     // Shared user content builder
     // -----------------------------------------------------------------------
     function buildUserContent(workoutSection: string): string {
@@ -373,6 +394,7 @@ Deno.serve(async (req) => {
       user_id: user.id,
       workout_text: trimmed,
       review,
+      ...(source_id ? { source_id } : {}),
     });
 
     return new Response(JSON.stringify({ review }), {

@@ -232,6 +232,32 @@ body.landing-body{overflow:auto;height:auto}
 .workout-review-faults{list-style:none;padding-left:20px}
 .workout-review-faults li::before{content:"⚠ ";font-size:12px}
 .workout-review-faults li{color:var(--text-muted);font-style:italic}
+/* Week/Day header */
+.wr-week-day-header{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:12px}
+/* Intent card */
+.wr-intent-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px}
+.wr-intent-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);margin-bottom:10px}
+/* Time domain with clock icon */
+.wr-time-domain{display:flex;gap:10px;align-items:flex-start;margin-bottom:16px;padding:12px 14px;background:var(--bg);border-radius:8px}
+.wr-time-domain svg{flex-shrink:0;margin-top:3px;color:var(--text-dim)}
+.wr-time-domain .workout-review-content{font-size:14px;line-height:1.6}
+/* Movement cards */
+.wr-movement-cards{display:flex;flex-direction:column;gap:10px}
+.wr-movement-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px}
+.wr-movement-name{font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px}
+.wr-cue-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+.wr-cue-item{display:flex;align-items:flex-start;gap:8px;font-size:13px;line-height:1.5;color:var(--text-dim)}
+.wr-cue-icon{flex-shrink:0;margin-top:2px}
+.wr-cue-icon--do{color:#4ade80}
+.wr-cue-icon--avoid{color:#f87171}
+.wr-fault-list{margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
+.wr-fault-item{color:var(--text-muted)}
+/* Sources collapsible */
+.wr-sources-section{margin-top:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.wr-sources-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;padding:14px 20px;background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;color:var(--text-dim);text-align:left}
+.wr-sources-toggle:hover{background:var(--surface2)}
+.wr-sources-label{font-size:13px;font-weight:600}
+.wr-sources-list{display:flex;flex-wrap:wrap;gap:8px;padding:0 20px 16px}
 /* Collapsible block */
 .workout-review-block{padding:0;overflow:hidden}
 .workout-review-block-header{display:flex;align-items:center;justify-content:space-between;width:100%;padding:16px 20px;background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;color:var(--text);text-align:left}
