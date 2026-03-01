@@ -112,6 +112,64 @@ export interface EngineProgram {
   is_active: boolean;
 }
 
+// ─── Work duration calculation ────────────────────────────────────────
+
+/**
+ * Calculate the total work-only duration (in seconds) for a workout,
+ * summing across all blocks. This is the value used for pacing —
+ * rest time is excluded.
+ */
+export function calculateWorkDurationSeconds(workout: EngineWorkout): number {
+  const blockParams: (Record<string, unknown> | null)[] = [
+    workout.block_1_params,
+    workout.block_2_params,
+    workout.block_3_params,
+    workout.block_4_params,
+  ];
+  const blockCount = workout.block_count ?? 1;
+  let totalWork = 0;
+
+  for (let b = 0; b < blockCount; b++) {
+    const raw = blockParams[b];
+    if (!raw) continue;
+
+    const rounds = resolveNumParam(raw.rounds, 1);
+    const workDur = resolveNumParam(raw.workDuration, 0);
+    const workProg = raw.workProgression as string | undefined;
+
+    if (workDur === 0) continue;
+
+    // Flux & polarized: workDuration is the total continuous time (all work)
+    if (workProg === 'alternating_paces' || workProg === 'continuous_with_bursts' || workProg === 'progressive_flux_intensity') {
+      totalWork += workDur;
+
+    // Progressive: work duration increases each round
+    } else if (workProg === 'increasing' && typeof raw.workDurationIncrement === 'number' && raw.workDurationIncrement !== 0) {
+      const inc = raw.workDurationIncrement;
+      // round 0: workDur, round 1: workDur + inc, ..., round n-1: workDur + (n-1)*inc
+      totalWork += rounds * workDur + inc * (rounds * (rounds - 1)) / 2;
+
+    // Single or consistent: simple multiply
+    } else {
+      totalWork += rounds * workDur;
+    }
+  }
+
+  return totalWork;
+}
+
+/** Calculate work duration in minutes (rounded). */
+export function calculateWorkDurationMinutes(workout: EngineWorkout): number {
+  return Math.round(calculateWorkDurationSeconds(workout) / 60);
+}
+
+function resolveNumParam(v: unknown, fallback = 0): number {
+  if (v === undefined || v === null) return fallback;
+  if (typeof v === 'number') return v;
+  if (Array.isArray(v) && typeof v[0] === 'number') return v[0];
+  return fallback;
+}
+
 // ─── Workouts (read-only reference data) ─────────────────────────────
 
 /** Load all 720 workouts (or for a specific program_type). */
