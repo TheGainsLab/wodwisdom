@@ -17,6 +17,7 @@ import {
   type EngineWorkout,
   type EngineTimeTrial,
   type EnginePerformanceMetrics,
+  calculateWorkDurationMinutes,
 } from '../lib/engineService';
 import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
@@ -445,7 +446,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
     setSaving(true);
     try {
       const output = parseFloat(logOutput) || 0;
-      const durationMin = (workout.total_duration_minutes ?? 0) || Math.round(totalElapsed / 60);
+      const durationMin = calculateWorkDurationMinutes(workout) || Math.round(totalElapsed / 60);
       const rpm = durationMin > 0 ? output / durationMin : 0;
       const baselineRpm = baseline?.calculated_rpm ?? 0;
 
@@ -596,9 +597,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   <span className={'engine-badge ' + dayTypeBadge(workout?.day_type ?? '')}>
                     {(workout?.day_type ?? '').replace(/_/g, ' ')}
                   </span>
-                  {workout?.total_duration_minutes && (
+                  {workout && (
                     <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                      {workout.total_duration_minutes} min
+                      {calculateWorkDurationMinutes(workout)} min work
                     </span>
                   )}
                   {previousSession && (
@@ -760,9 +761,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
               <div className="engine-grid">
                 <div className="engine-stat">
                   <div className="engine-stat-value" style={{ fontSize: 22 }}>
-                    {workout?.total_duration_minutes ?? '—'}
+                    {workout ? calculateWorkDurationMinutes(workout) : '—'}
                   </div>
-                  <div className="engine-stat-label">Minutes</div>
+                  <div className="engine-stat-label">Work Min</div>
                 </div>
                 <div className="engine-stat">
                   <div className="engine-stat-value" style={{ fontSize: 22 }}>

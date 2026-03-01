@@ -10,6 +10,7 @@ import {
   loadCompletedSessions,
   type EngineWorkout,
   type EngineUserProgress,
+  calculateWorkDurationMinutes,
 } from '../lib/engineService';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { ChevronLeft, Lock, Check, Play, Settings } from 'lucide-react';
@@ -287,9 +288,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                         {day.day_type.replace(/_/g, ' ')}
                       </span>
 
-                      {day.total_duration_minutes != null && (
-                        <span className="engine-exercise-detail">{day.total_duration_minutes}min</span>
-                      )}
+                      <span className="engine-exercise-detail">{calculateWorkDurationMinutes(day)}min work</span>
 
                       {status === 'current' && (
                         <Play size={16} color="var(--accent)" style={{ flexShrink: 0 }} />
