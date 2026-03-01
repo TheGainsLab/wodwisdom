@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -24,6 +24,16 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [loading, setLoading] = useState(true);
   const [navOpen, setNavOpen] = useState(false);
   const [advancing, setAdvancing] = useState(false);
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+
+  const toggleDay = useCallback((workoutId: string) => {
+    setExpandedDays(prev => {
+      const next = new Set(prev);
+      if (next.has(workoutId)) next.delete(workoutId);
+      else next.add(workoutId);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -183,69 +193,78 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     </div>
                   </div>
                 )}
-                <div className="program-workouts-table-wrap">
-                  <table className="program-workouts-table">
-                    <thead>
-                      <tr>
-                        <th style={{ width: 60 }}>Day</th>
-                        <th>Workout</th>
-                        <th style={{ width: 150 }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {workouts.map(w => {
-                        const done = completedWorkoutIds.has(w.id);
-                        return (
-                          <tr key={w.id} className={done ? 'program-row-completed' : ''}>
-                            <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                {done ? (
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
-                                ) : (
-                                  <span className="program-day-dot" />
-                                )}
-                                <span>{isMultiPhase ? w.sort_order - phaseStart + 1 : w.sort_order + 1}</span>
-                              </div>
-                            </td>
-                            <td className="workout-text-cell">
-                              <WorkoutBlocksDisplay text={w.workout_text} />
-                            </td>
-                            <td>
-                              {done ? (
-                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                  <span className="program-completed-badge">Done</span>
-                                  <button
-                                    className="auth-btn"
-                                    onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_id: w.id, program_id: id } })}
-                                    style={{ padding: '6px 12px', fontSize: 12, background: 'var(--surface2)', color: 'var(--text-dim)' }}
-                                  >
-                                    Coach
-                                  </button>
+                <div className="program-days-accordion">
+                  {(() => {
+                    // Group workouts into weeks of 5
+                    const weeks: { weekNum: number; days: ProgramWorkout[] }[] = [];
+                    workouts.forEach((w, i) => {
+                      const weekIndex = Math.floor(i / 5);
+                      if (!weeks[weekIndex]) weeks[weekIndex] = { weekNum: weekIndex + 1, days: [] };
+                      weeks[weekIndex].days.push(w);
+                    });
+                    return weeks.map((week, wi) => (
+                      <div key={wi} className="program-week-group">
+                        <div className="program-week-label">Week {week.weekNum}</div>
+                        {week.days.map((w) => {
+                          const done = completedWorkoutIds.has(w.id);
+                          const dayNum = isMultiPhase ? w.sort_order - phaseStart + 1 : w.sort_order + 1;
+                          const isExpanded = expandedDays.has(w.id);
+                          return (
+                            <div key={w.id} className={`program-day-row${done ? ' program-day-completed' : ''}`}>
+                              <button
+                                className="program-day-header"
+                                onClick={() => toggleDay(w.id)}
+                                aria-expanded={isExpanded}
+                              >
+                                <div className="program-day-left">
+                                  {done ? (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+                                  ) : (
+                                    <span className="program-day-dot" />
+                                  )}
+                                  <span className="program-day-label">Day {dayNum}</span>
+                                  {done && <span className="program-completed-badge">Done</span>}
                                 </div>
-                              ) : (
-                                <div style={{ display: 'flex', gap: 8 }}>
-                                  <button
-                                    className="auth-btn"
-                                    onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_id: w.id, program_id: id } })}
-                                    style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: 'var(--text)' }}
-                                  >
-                                    Coach
-                                  </button>
-                                  <button
-                                    className="auth-btn"
-                                    onClick={() => navigate('/workout/start', { state: { workout_text: w.workout_text, source_id: w.id } })}
-                                    style={{ padding: '8px 14px', fontSize: 13 }}
-                                  >
-                                    Start
-                                  </button>
+                                <svg
+                                  className={`program-day-chevron${isExpanded ? ' expanded' : ''}`}
+                                  width="16" height="16" viewBox="0 0 24 24"
+                                  fill="none" stroke="currentColor" strokeWidth="2"
+                                  strokeLinecap="round" strokeLinejoin="round"
+                                >
+                                  <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                              </button>
+                              {isExpanded && (
+                                <div className="program-day-body">
+                                  <div className="program-day-blocks">
+                                    <WorkoutBlocksDisplay text={w.workout_text} />
+                                  </div>
+                                  <div className="program-day-actions">
+                                    <button
+                                      className="auth-btn"
+                                      onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_id: w.id, program_id: id } })}
+                                      style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: done ? 'var(--text-dim)' : 'var(--text)' }}
+                                    >
+                                      Coach
+                                    </button>
+                                    {!done && (
+                                      <button
+                                        className="auth-btn"
+                                        onClick={() => navigate('/workout/start', { state: { workout_text: w.workout_text, source_id: w.id } })}
+                                        style={{ padding: '8px 14px', fontSize: 13 }}
+                                      >
+                                        Start
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
                 </div>
                 {isMultiPhase && phase < program!.total_phases && (
                   <div style={{ marginTop: 24, padding: 16, background: 'var(--surface2)', borderRadius: 8 }}>
