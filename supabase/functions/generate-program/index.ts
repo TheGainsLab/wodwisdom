@@ -12,6 +12,9 @@ import {
   formatChunksAsContext,
 } from "../_shared/rag.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
+import { rankSkillPriorities } from "../_shared/skill-priorities.ts";
+import { buildSkillSchedule, formatScheduleForPrompt } from "../_shared/build-skill-schedule.ts";
+import { extractBlocksFromWorkoutText } from "../_shared/parse-workout-blocks.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -80,7 +83,7 @@ PERIODIZATION STRUCTURE:
 
 FREQUENCY & RECOVERY RULES:
 - No single strength exercise more than 2x per week. Vary the barbell movements across the week (e.g. back squat Mon, front squat Thu — not back squat Mon/Wed/Fri).
-- No single skill more than 2x per week, and never on consecutive days (e.g. muscle-up practice Mon and Thu, not Mon and Tue).
+- Follow the SKILL ASSIGNMENTS section exactly. Each day's Skills block must use the assigned skill. Do not substitute or skip assignments.
 - Do not program heavy squats and heavy deadlifts on consecutive days. Same for pressing patterns (strict press and push press should not be back-to-back days).
 - The metcon should complement the strength block, not duplicate it. If the strength block is front squats, the metcon should NOT also be thrusters and wall balls. Vary the movement patterns between blocks within a day.
 
@@ -95,7 +98,7 @@ OUTPUT FORMAT (strict):
 - Use "Monday:", "Tuesday:", etc. (or "Mon:", "Tue:", etc.) for each training day.
 - Each day has exactly 5 blocks in this order. Put each block on its own line:
   1. Warm-up: (5-8 min movement prep for that day's work)
-  2. Skills: (10-15 min gymnastics/skill progressions based on analysis)
+  2. Skills: (10-15 min — use the assigned skill from SKILL ASSIGNMENTS)
   3. Strength: (barbell work with percentages, e.g. 5x5 @ 75%)
   4. Metcon: (For Time, AMRAP, EMOM etc. - prescribe Rx weights)
   5. Cool down: (3-5 min mobility/stretch)
@@ -266,6 +269,19 @@ Deno.serve(async (req) => {
     if (evalRow.engine_analysis) analysisParts.push("ENGINE ANALYSIS:\n" + evalRow.engine_analysis);
     const analysisStr = analysisParts.length > 0 ? analysisParts.join("\n\n") : "No detailed analysis.";
 
+    // Fetch gymnastics movements for priority scoring
+    const { data: movementRows } = await supa
+      .from("movements")
+      .select("canonical_name, display_name, modality, category, aliases, competition_count")
+      .eq("modality", "G");
+
+    // Build deterministic skill schedule
+    const priorities = rankSkillPriorities(profile.skills || {}, movementRows || []);
+    const schedule = buildSkillSchedule(priorities);
+    const scheduleBlock = schedule.length > 0
+      ? `\n\nSKILL ASSIGNMENTS (mandatory — each day's Skills block MUST use the assigned skill):\n${formatScheduleForPrompt(schedule)}\n\nFor each Skills block, write a 10-15 min progression appropriate for the athlete's level with that skill. Vary the format (EMOM, sets, practice + hold, etc.). Progress difficulty across weeks within each 3-week build block. On deload weeks, reduce skill volume (lighter sets, focus on quality).`
+      : "";
+
     const recentTraining = await fetchAndFormatRecentHistory(supa, user.id, { maxLines: 25 });
     const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
 
@@ -276,7 +292,7 @@ ${profileStr}
 
 ANALYSIS TO ADDRESS:
 ${analysisStr}
-${trainingBlock}
+${trainingBlock}${scheduleBlock}
 
 Generate a 12-week periodized program. Follow the format and periodization rules exactly.`;
 
@@ -327,6 +343,33 @@ Generate a 12-week periodized program. Follow the format and periodization rules
         JSON.stringify({ error: "Generated program was empty or too short" }),
         { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
       );
+    }
+
+    // Validate skill assignments compliance
+    if (schedule.length > 0) {
+      const dayPattern = /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Mon|Tue|Wed|Thu|Fri|Sat):/gi;
+      const workoutTexts = programText.split(dayPattern).filter((t) => t.trim().length > 20);
+      let matched = 0;
+      let total = 0;
+      for (const slot of schedule) {
+        total++;
+        // Find the corresponding workout text (approximate by index)
+        const idx = (slot.week - 1) * 5 + (slot.day - 1);
+        const workoutText = workoutTexts[idx];
+        if (!workoutText) continue;
+        const blocks = extractBlocksFromWorkoutText(workoutText);
+        const skillBlock = blocks.find((b) => b.block_type === "skills");
+        if (!skillBlock) continue;
+        // Check if the assigned skill name appears in the block text
+        const display = slot.displayName.toLowerCase();
+        const blockLower = skillBlock.block_text.toLowerCase();
+        // Check display name or key words from it
+        const keywords = display.split(/[\s\-()]+/).filter((w) => w.length > 2);
+        const found = keywords.some((kw) => blockLower.includes(kw));
+        if (found) matched++;
+      }
+      const complianceRate = total > 0 ? matched / total : 1;
+      console.log(`Skill schedule compliance: ${matched}/${total} (${(complianceRate * 100).toFixed(0)}%)`);
     }
 
     // Create program via preprocess-program (reuse parsing + insert logic)
