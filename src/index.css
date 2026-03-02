@@ -433,3 +433,53 @@ body.landing-body{overflow:auto;height:auto}
 .review-card-actions{display:flex;gap:12px;padding:14px 18px;border-top:1px solid var(--border)}
 .review-card-status{padding:14px 18px;border-top:1px solid var(--border);font-size:13px;color:var(--text-dim)}
 @media(max-width:640px){.chat-header{padding:10px 12px}.source-btn{padding:6px 10px;font-size:11px}.messages{padding:16px 12px}.msg.user{max-width:85%}.msg-body.assistant{padding:14px 16px}.input-area{padding:10px 12px 14px}.auth-card{padding:32px 24px}.suggestions{flex-direction:column}.welcome h2{font-size:22px}.welcome-logo{width:52px;height:52px;font-size:26px}.page-header{flex-wrap:wrap}.history-search-wrap{max-width:none;flex-basis:100%;order:3;margin-left:0;margin-top:8px}}
+
+/* ── Workout Calendar Heatmap ────────────────────────────── */
+.wc-container{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
+.wc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.wc-month-label{font-size:15px;font-weight:700;letter-spacing:-.2px}
+.wc-nav-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:8px;background:none;color:var(--text-dim);cursor:pointer;flex-shrink:0}
+.wc-nav-btn:hover:not(:disabled){color:var(--text);border-color:var(--border-light)}
+.wc-nav-btn:disabled{opacity:.3;cursor:not-allowed}
+.wc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.wc-day-label{text-align:center;font-size:11px;font-weight:600;color:var(--text-muted);padding:4px 0;text-transform:uppercase;letter-spacing:.3px}
+.wc-cell{aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;position:relative}
+.wc-cell--empty{background:transparent}
+.wc-cell--i0{background:var(--surface2)}
+.wc-cell--i1{background:rgba(255,58,58,.15)}
+.wc-cell--i2{background:rgba(255,58,58,.35)}
+.wc-cell--i3{background:rgba(255,58,58,.55)}
+.wc-cell--today{outline:2px solid var(--accent);outline-offset:-1px}
+.wc-cell-num{font-size:12px;font-weight:500;color:var(--text-dim);font-family:'JetBrains Mono',monospace}
+.wc-cell--i1 .wc-cell-num,.wc-cell--i2 .wc-cell-num,.wc-cell--i3 .wc-cell-num{color:var(--text)}
+.wc-stats{display:flex;gap:16px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);justify-content:center}
+.wc-stat{display:flex;flex-direction:column;align-items:center;gap:2px}
+.wc-stat-value{font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--accent)}
+.wc-stat-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;font-weight:500}
+
+/* ── Personal Records Cards ────────────────────────────── */
+.pr-container{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
+.pr-title{font-size:15px;font-weight:700;letter-spacing:-.2px;margin-bottom:12px}
+.pr-section{margin-bottom:12px}
+.pr-section:last-child{margin-bottom:0}
+.pr-section-label{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);margin-bottom:8px}
+.pr-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.pr-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:4px}
+.pr-card-movement{font-size:12px;font-weight:600;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr-card-value{font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text)}
+.pr-card-reps{font-size:13px;font-weight:500;color:var(--text-dim)}
+.pr-card-date{font-size:11px;color:var(--text-muted)}
+
+/* ── Training Log Tab Switcher ────────────────────────── */
+.tl-tabs{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px}
+.tl-tab{flex:1;padding:10px 12px;border:none;background:none;color:var(--text-muted);font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s}
+.tl-tab:not(:last-child){border-right:1px solid var(--border)}
+.tl-tab.active{background:var(--accent);color:white}
+.tl-tab:hover:not(.active){color:var(--text-dim)}
+
+@media(max-width:480px){
+  .pr-cards{grid-template-columns:1fr 1fr}
+  .wc-cell-num{font-size:11px}
+  .wc-stats{gap:12px}
+  .wc-stat-value{font-size:16px}
+}
