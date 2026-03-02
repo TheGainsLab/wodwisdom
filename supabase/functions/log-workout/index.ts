@@ -47,6 +47,11 @@ interface LogBlock {
   score?: string | null;
   rx?: boolean;
   entries?: LogEntry[];
+  // Scoring fields (metcon blocks only)
+  percentile?: number | null;
+  performance_tier?: string | null;
+  median_benchmark?: string | null;
+  excellent_benchmark?: string | null;
 }
 
 interface LogWorkoutBody {
@@ -154,6 +159,12 @@ Deno.serve(async (req) => {
         score: b.score?.trim() || null,
         rx: b.rx ?? false,
         sort_order: i,
+        percentile: b.percentile != null && b.percentile >= 1 && b.percentile <= 99
+          ? b.percentile
+          : null,
+        performance_tier: b.performance_tier?.trim() || null,
+        median_benchmark: b.median_benchmark?.trim() || null,
+        excellent_benchmark: b.excellent_benchmark?.trim() || null,
       }));
 
       const { data: blockData, error: blocksErr } = await supa

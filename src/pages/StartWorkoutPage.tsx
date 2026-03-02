@@ -1,9 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import { BlockContent } from '../components/WorkoutBlocksDisplay';
+import {
+  calculateBenchmarks,
+  scoreMetcon,
+  type MovementWorkRate,
+  type BenchmarkResult,
+} from '../lib/metconScoring';
 
 interface Block {
   label: string;
@@ -200,6 +206,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
   const [notes, setNotes] = useState('');
   const [entryValues, setEntryValues] = useState<Record<string, EntryValues>>({});
   const [metconEntries, setMetconEntries] = useState<Record<string, MetconEntryValues>>({});
+  const [workRates, setWorkRates] = useState<MovementWorkRate[]>([]);
   const [blockScores, setBlockScores] = useState<Record<number, string>>({});
   const [blockRx, setBlockRx] = useState<Record<number, boolean>>({});
   const [saving, setSaving] = useState(false);
@@ -219,11 +226,25 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
 
     (async () => {
       setLoading(true);
-      const { data, error: fetchErr } = await supabase
-        .from('program_workout_blocks')
-        .select('block_type, block_text, block_order')
-        .eq('program_workout_id', sourceState.source_id!)
-        .order('block_order');
+
+      // Fetch blocks and work rates in parallel
+      const [blocksRes, ratesRes] = await Promise.all([
+        supabase
+          .from('program_workout_blocks')
+          .select('block_type, block_text, block_order')
+          .eq('program_workout_id', sourceState.source_id!)
+          .order('block_order'),
+        supabase
+          .from('movements')
+          .select('canonical_name, display_name, work_rate, weight_degradation_rate, modality')
+          .not('work_rate', 'is', null),
+      ]);
+
+      if (ratesRes.data) {
+        setWorkRates(ratesRes.data as MovementWorkRate[]);
+      }
+
+      const { data, error: fetchErr } = blocksRes;
 
       if (fetchErr || !data || data.length === 0) {
         setError('Could not load workout blocks');
@@ -287,6 +308,22 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       [key]: { ...prev[key], [field]: value },
     }));
   };
+
+  // Reactively compute benchmarks per metcon block
+  const blockBenchmarks = useMemo<Record<number, BenchmarkResult>>(() => {
+    const result: Record<number, BenchmarkResult> = {};
+    if (workRates.length === 0) return result;
+    blocks.forEach((b, bi) => {
+      if (b.type !== 'metcon') return;
+      const mvKeys = Object.keys(metconEntries)
+        .filter(k => k.startsWith(`${bi}-m`));
+      if (mvKeys.length === 0) return;
+      const entries = mvKeys.map(k => metconEntries[k]).filter(Boolean);
+      const wType = inferWorkoutType([b]);
+      result[bi] = calculateBenchmarks(entries, wType, b.text, workRates);
+    });
+    return result;
+  }, [blocks, metconEntries, workRates]);
 
   const handleFinish = async () => {
     setError('');
@@ -354,13 +391,26 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
               quality: null,
               variation: null,
             }));
+
+          // Compute percentile if benchmarks and score are available
+          const benchmarks = blockBenchmarks[bi];
+          const scoreStr = blockScores[bi]?.trim() || '';
+          const wType = inferWorkoutType([b]);
+          const scoring = benchmarks && scoreStr
+            ? scoreMetcon(scoreStr, wType, benchmarks)
+            : null;
+
           return {
             label: b.label,
             type: b.type,
             text: b.text,
-            score: blockScores[bi]?.trim() || null,
+            score: scoreStr || null,
             rx: blockRx[bi] ?? false,
             entries,
+            percentile: scoring?.percentile ?? null,
+            performance_tier: scoring?.performanceTier ?? null,
+            median_benchmark: benchmarks?.medianScore !== '--' ? benchmarks?.medianScore : null,
+            excellent_benchmark: benchmarks?.excellentScore !== '--' ? benchmarks?.excellentScore : null,
           };
         }
 
@@ -544,6 +594,19 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                   );
                                 })}
                               </div>
+
+                              {blockBenchmarks[bi] && blockBenchmarks[bi].medianScore !== '--' && (
+                                <div style={{ display: 'flex', gap: 24, marginTop: 12, padding: '8px 12px', background: 'var(--surface2)', borderRadius: 8, fontSize: 13 }}>
+                                  <div>
+                                    <span style={{ color: 'var(--text-dim)' }}>Median </span>
+                                    <span style={{ fontWeight: 600 }}>{blockBenchmarks[bi].medianScore}</span>
+                                  </div>
+                                  <div>
+                                    <span style={{ color: 'var(--text-dim)' }}>Excellent </span>
+                                    <span style={{ fontWeight: 600 }}>{blockBenchmarks[bi].excellentScore}</span>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </>
