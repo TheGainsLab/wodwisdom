@@ -19,6 +19,16 @@ interface EntryValues {
   set_number?: number;
 }
 
+interface MetconEntryValues {
+  movement: string;
+  reps?: number;
+  weight?: number;
+  weight_unit: 'lbs' | 'kg';
+  distance?: number;
+  distance_unit?: 'ft' | 'm';
+  scaling_note?: string;
+}
+
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   'warm-up': 'Warm-up',
   skills: 'Skills',
@@ -46,6 +56,113 @@ function extractMovementName(text: string): string {
     .replace(/@\s*\d+%/g, '')
     .replace(/,\s*$/, '')
     .trim() || text.trim();
+}
+
+// ── Metcon movement parser ──────────────────────────────────────────
+
+function parseMetconMovements(blockText: string): MetconEntryValues[] {
+  let text = blockText.trim();
+
+  // Strip format headers (AMRAP N, For Time, N RFT, EMOM N, etc.)
+  text = text
+    .replace(/^(?:AMRAP|As Many Rounds(?:\s+As Possible)?)\s+\d+\s*/i, '')
+    .replace(/^For\s+Time:?\s*/i, '')
+    .replace(/^\d+\s+(?:RFT|Rounds?\s+For\s+Time)\s*/i, '')
+    .replace(/^\d+\s+[Rr]ounds?[^,\n]*[\n,]\s*/i, '')
+    .replace(/^(?:EMOM|E\d+MOM)\s+\d+\s*/i, '')
+    .replace(/^Death\s+By\s*/i, '')
+    .replace(/^Tabata\s*/i, '')
+    .trim();
+
+  // Check for rep scheme (21-15-9, 10-8-6, etc.) on its own line
+  let schemeTotalReps: number | null = null;
+  const schemeMatch = text.match(/^(\d+(?:\s*-\s*\d+)+)\s*[\n,]/);
+  if (schemeMatch) {
+    const rounds = schemeMatch[1].split(/\s*-\s*/).map(Number);
+    schemeTotalReps = rounds.reduce((a, b) => a + b, 0);
+    text = text.slice(schemeMatch[0].length).trim();
+  }
+
+  // Split into segments by newlines then commas
+  const segments: string[] = [];
+  for (const line of text.split('\n')) {
+    for (const seg of line.split(',')) {
+      const trimmed = seg.trim();
+      if (trimmed && !/^(?:for quality|not time|rest\b|then\b)/i.test(trimmed)) {
+        segments.push(trimmed);
+      }
+    }
+  }
+
+  const results: MetconEntryValues[] = [];
+  for (const seg of segments) {
+    const mv = parseMovementSegment(seg);
+    if (mv) {
+      if (schemeTotalReps && !mv.reps) mv.reps = schemeTotalReps;
+      results.push(mv);
+    }
+  }
+  return results;
+}
+
+function parseMovementSegment(raw: string): MetconEntryValues | null {
+  if (!raw) return null;
+  let text = raw.trim();
+  let weight: number | undefined;
+  let weight_unit: 'lbs' | 'kg' = 'lbs';
+  let distance: number | undefined;
+  let distance_unit: 'ft' | 'm' | undefined;
+  let reps: number | undefined;
+
+  // Extract weight in parentheses: (185), (95/65), (53 kg)
+  const parenMatch = text.match(/\((\d+)(?:\/\d+)?\s*(lbs?|kg)?\)/i);
+  if (parenMatch) {
+    weight = parseFloat(parenMatch[1]);
+    if (parenMatch[2] && /^kg$/i.test(parenMatch[2])) weight_unit = 'kg';
+    text = text.replace(parenMatch[0], '').trim();
+  }
+
+  // Extract weight with slash notation: 185/125 (take Rx weight)
+  if (!weight) {
+    const slashMatch = text.match(/\b(\d+)\/(\d+)\b/);
+    if (slashMatch && parseInt(slashMatch[1]) >= 20) {
+      weight = parseInt(slashMatch[1]);
+      text = text.replace(slashMatch[0], '').trim();
+    }
+  }
+
+  // Extract distance: 200m, 400m, 500m, 1000ft
+  const distMatch = text.match(/(\d+)\s*(m|ft|meters?|feet)\b/i);
+  if (distMatch) {
+    distance = parseInt(distMatch[1]);
+    distance_unit = /^(ft|feet)$/i.test(distMatch[2]) ? 'ft' : 'm';
+    text = text.replace(distMatch[0], '').trim();
+  }
+
+  // Extract cal-based monostructural: "30 cal row" → reps=30, movement="Cal Row"
+  const calMatch = text.match(/^(\d+)\s+cal(?:orie)?s?\s+(.+)/i);
+  if (calMatch) {
+    reps = parseInt(calMatch[1]);
+    const mvName = `Cal ${calMatch[2].trim()}`;
+    return { movement: capitalizeWords(mvName), reps, weight, weight_unit, distance, distance_unit };
+  }
+
+  // Extract leading reps: "9 deadlifts" → reps=9
+  const repsMatch = text.match(/^(\d+)\s+/);
+  if (repsMatch && parseInt(repsMatch[1]) < 500) {
+    reps = parseInt(repsMatch[1]);
+    text = text.slice(repsMatch[0].length).trim();
+  }
+
+  // Clean up trailing punctuation
+  text = text.replace(/[,;:]$/, '').replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+
+  return { movement: capitalizeWords(text), reps, weight, weight_unit, distance, distance_unit };
+}
+
+function capitalizeWords(s: string): string {
+  return s.replace(/\b\w/g, c => c.toUpperCase());
 }
 
 function inferWorkoutType(blocks: Block[]): string {
@@ -82,6 +199,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
   const [workoutType, setWorkoutType] = useState('other');
   const [notes, setNotes] = useState('');
   const [entryValues, setEntryValues] = useState<Record<string, EntryValues>>({});
+  const [metconEntries, setMetconEntries] = useState<Record<string, MetconEntryValues>>({});
   const [blockScores, setBlockScores] = useState<Record<number, string>>({});
   const [blockRx, setBlockRx] = useState<Record<number, boolean>>({});
   const [saving, setSaving] = useState(false);
@@ -140,12 +258,31 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
         }
       });
       setEntryValues(initial);
+
+      // Pre-fill metcon per-movement entries
+      const initialMetcon: Record<string, MetconEntryValues> = {};
+      loaded.forEach((b, bi) => {
+        if (b.type === 'metcon') {
+          const parsed = parseMetconMovements(b.text);
+          parsed.forEach((mv, mi) => {
+            initialMetcon[`${bi}-m${mi}`] = mv;
+          });
+        }
+      });
+      setMetconEntries(initialMetcon);
       setLoading(false);
     })();
   }, [sourceState?.source_id]);
 
   const setEntry = (key: string, field: keyof EntryValues, value: unknown) => {
     setEntryValues(prev => ({
+      ...prev,
+      [key]: { ...prev[key], [field]: value },
+    }));
+  };
+
+  const setMetconEntry = (key: string, field: keyof MetconEntryValues, value: unknown) => {
+    setMetconEntries(prev => ({
       ...prev,
       [key]: { ...prev[key], [field]: value },
     }));
@@ -190,6 +327,39 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             text: b.text,
             score: blockScores[bi]?.trim() || null,
             rx: false,
+            entries,
+          };
+        }
+
+        if (b.type === 'metcon') {
+          const mvKeys = Object.keys(metconEntries)
+            .filter(k => k.startsWith(`${bi}-m`))
+            .sort((a, b2) => parseInt(a.split('-m')[1], 10) - parseInt(b2.split('-m')[1], 10));
+          const entries = mvKeys
+            .map(key => metconEntries[key])
+            .filter(mv => mv?.movement?.trim())
+            .map(mv => ({
+              movement: mv.movement.trim(),
+              sets: null,
+              reps: mv.reps ?? null,
+              weight: mv.weight ?? null,
+              weight_unit: mv.weight_unit || 'lbs',
+              rpe: null,
+              scaling_note: mv.scaling_note?.trim() || null,
+              set_number: null,
+              reps_completed: null,
+              hold_seconds: null,
+              distance: mv.distance ?? null,
+              distance_unit: mv.distance_unit || null,
+              quality: null,
+              variation: null,
+            }));
+          return {
+            label: b.label,
+            type: b.type,
+            text: b.text,
+            score: blockScores[bi]?.trim() || null,
+            rx: blockRx[bi] ?? false,
             entries,
           };
         }
@@ -308,18 +478,77 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                       );
                     })()}
 
-                    {block.type === 'metcon' && (
-                      <>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                          <input type="checkbox" id={`rx-${bi}`} checked={blockRx[bi] ?? false} onChange={e => setBlockRx(prev => ({ ...prev, [bi]: e.target.checked }))} />
-                          <label htmlFor={`rx-${bi}`} style={{ fontSize: 14, color: 'var(--text-dim)' }}>Rx</label>
-                        </div>
-                        <div className="field">
-                          <label>Score</label>
-                          <input type="text" placeholder="e.g. 4:48 or 8+12" value={blockScores[bi] ?? ''} onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))} />
-                        </div>
-                      </>
-                    )}
+                    {block.type === 'metcon' && (() => {
+                      const mvKeys = Object.keys(metconEntries)
+                        .filter(k => k.startsWith(`${bi}-m`))
+                        .sort((a, b2) => parseInt(a.split('-m')[1], 10) - parseInt(b2.split('-m')[1], 10));
+
+                      return (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                            <input type="checkbox" id={`rx-${bi}`} checked={blockRx[bi] ?? false} onChange={e => setBlockRx(prev => ({ ...prev, [bi]: e.target.checked }))} />
+                            <label htmlFor={`rx-${bi}`} style={{ fontSize: 14, color: 'var(--text-dim)' }}>Rx</label>
+                          </div>
+                          <div className="field" style={{ marginBottom: 16 }}>
+                            <label>Score</label>
+                            <input type="text" placeholder="e.g. 4:48 or 8+12" value={blockScores[bi] ?? ''} onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))} />
+                          </div>
+
+                          {mvKeys.length > 0 && (
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Movements (confirm or adjust)</div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {mvKeys.map(key => {
+                                  const mv = metconEntries[key];
+                                  if (!mv) return null;
+                                  const hasDistance = mv.distance != null && mv.distance > 0;
+                                  return (
+                                    <div key={key} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                                      <input
+                                        type="text"
+                                        value={mv.movement}
+                                        onChange={e => setMetconEntry(key, 'movement', e.target.value)}
+                                        style={{ ...compactInputStyle, flex: '1 1 120px', minWidth: 120 }}
+                                      />
+                                      {hasDistance ? (
+                                        <>
+                                          <input
+                                            type="number"
+                                            placeholder="Dist"
+                                            value={mv.distance ?? ''}
+                                            onChange={e => setMetconEntry(key, 'distance', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                            style={{ ...compactInputStyle, width: 64 }}
+                                          />
+                                          <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 16 }}>{mv.distance_unit || 'm'}</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <input
+                                            type="number"
+                                            placeholder="Reps"
+                                            value={mv.reps ?? ''}
+                                            onChange={e => setMetconEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                            style={{ ...compactInputStyle, width: 56 }}
+                                          />
+                                          <input
+                                            type="number"
+                                            placeholder="Wt"
+                                            value={mv.weight ?? ''}
+                                            onChange={e => setMetconEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
+                                            style={{ ...compactInputStyle, width: 64 }}
+                                          />
+                                          <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 24 }}>{mv.weight_unit || 'lbs'}</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
 
                     {(block.type === 'warm-up' || block.type === 'cool-down' || block.type === 'skills') && (
                       <div className="field" style={{ marginTop: 8 }}>

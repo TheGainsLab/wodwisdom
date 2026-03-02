@@ -330,13 +330,15 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                         </div>
                                       )}
 
-                                      {/* Metcon: show movements with load */}
+                                      {/* Metcon: show movements with reps/load/distance */}
                                       {block.block_type === 'metcon' && blockEntries.length > 0 && (
                                         <div style={{ paddingLeft: 8, marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                           {blockEntries.map((entry, ei) => (
                                             <span key={ei} style={{ fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '3px 8px', borderRadius: 4 }}>
                                               {formatMovementName(entry.movement)}
-                                              {entry.weight != null && ` ${entry.weight}${entry.weight_unit}`}
+                                              {entry.reps != null && ` x${entry.reps}`}
+                                              {entry.weight != null && ` @${entry.weight}${entry.weight_unit}`}
+                                              {entry.distance != null && ` ${entry.distance}${entry.distance_unit || 'm'}`}
                                               {entry.scaling_note && ` (${entry.scaling_note})`}
                                             </span>
                                           ))}
