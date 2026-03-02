@@ -450,12 +450,29 @@ body.landing-body{overflow:auto;height:auto}
 .wc-cell--i2{background:rgba(255,58,58,.35)}
 .wc-cell--i3{background:rgba(255,58,58,.55)}
 .wc-cell--today{outline:2px solid var(--accent);outline-offset:-1px}
+.wc-cell--clickable{cursor:pointer;transition:transform .1s,box-shadow .15s}
+.wc-cell--clickable:active{transform:scale(.92)}
+.wc-cell--selected{outline:2px solid var(--text);outline-offset:-1px;box-shadow:0 0 8px rgba(255,58,58,.3)}
+.wc-cell--selected.wc-cell--today{outline-color:var(--text)}
 .wc-cell-num{font-size:12px;font-weight:500;color:var(--text-dim);font-family:'JetBrains Mono',monospace}
 .wc-cell--i1 .wc-cell-num,.wc-cell--i2 .wc-cell-num,.wc-cell--i3 .wc-cell-num{color:var(--text)}
 .wc-stats{display:flex;gap:16px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);justify-content:center}
 .wc-stat{display:flex;flex-direction:column;align-items:center;gap:2px}
 .wc-stat-value{font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--accent)}
 .wc-stat-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;font-weight:500}
+
+/* ── Day Detail Panel ──────────────────────────────────── */
+.wc-day-detail{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);animation:fadeUp .2s ease}
+.wc-day-detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.wc-day-detail-date{font-size:14px;font-weight:700}
+.wc-day-detail-close{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:6px;background:none;color:var(--text-dim);cursor:pointer}
+.wc-day-detail-close:hover{color:var(--text);border-color:var(--border-light)}
+.wc-day-detail-block{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.wc-day-detail-block:last-child{margin-bottom:0}
+.wc-day-detail-block-header{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}
+.wc-day-detail-type{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--accent)}
+.wc-day-detail-score{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-dim)}
+.wc-day-detail-text{font-size:13px;color:var(--text-dim);white-space:pre-wrap;line-height:1.5}
 
 /* ── Personal Records Cards ────────────────────────────── */
 .pr-container{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}

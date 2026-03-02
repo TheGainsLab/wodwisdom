@@ -88,6 +88,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [blockFilter, setBlockFilter] = useState<string>('all');
   const [tab, setTab] = useState<'overview' | 'history'>('overview');
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // Flat list of all entries for PR calculation
   const [allEntries, setAllEntries] = useState<(WorkoutLogEntry & { workout_date: string })[]>([]);
@@ -154,6 +155,15 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       counts[key] = (counts[key] || 0) + 1;
     }
     return counts;
+  }, [logs]);
+
+  const logsByDate = useMemo(() => {
+    const map: Record<string, WorkoutLog[]> = {};
+    for (const log of logs) {
+      if (!map[log.workout_date]) map[log.workout_date] = [];
+      map[log.workout_date].push(log);
+    }
+    return map;
   }, [logs]);
 
   const strengthRecords = useMemo(() => {
@@ -246,7 +256,55 @@ export default function TrainingLogPage({ session }: { session: Session }) {
             ) : tab === 'overview' ? (
               /* ── Overview Tab ── */
               <div>
-                <WorkoutCalendar workoutCounts={workoutCounts} />
+                <WorkoutCalendar
+                  workoutCounts={workoutCounts}
+                  selectedDate={selectedDate}
+                  onDayClick={(key) => setSelectedDate(selectedDate === key ? null : key)}
+                />
+
+                {/* Day detail panel */}
+                {selectedDate && logsByDate[selectedDate] && (
+                  <div className="wc-day-detail" style={{ marginBottom: 16 }}>
+                    <div className="wc-day-detail-header">
+                      <span className="wc-day-detail-date">
+                        {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                      </span>
+                      <button className="wc-day-detail-close" onClick={() => setSelectedDate(null)} aria-label="Close">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      </button>
+                    </div>
+                    {logsByDate[selectedDate].map(log => {
+                      const logBlocks = blocksByLog[log.id] || [];
+                      return logBlocks.length > 0 ? (
+                        logBlocks.map((block, i) => (
+                          <div key={`${log.id}-${i}`} className="wc-day-detail-block">
+                            <div className="wc-day-detail-block-header">
+                              <span className="wc-day-detail-type">{getBlockLabel(block)}</span>
+                              {block.score && <span className="wc-day-detail-score">{block.score}</span>}
+                              {block.rx && <span style={{ fontSize: 11, background: 'var(--accent-glow)', color: 'var(--accent)', padding: '1px 6px', borderRadius: 4 }}>Rx</span>}
+                              {block.percentile != null && (
+                                <span style={{
+                                  fontSize: 11, padding: '1px 6px', borderRadius: 4, fontWeight: 600,
+                                  background: block.percentile >= 75 ? 'rgba(34,197,94,0.15)' : block.percentile >= 40 ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
+                                  color: block.percentile >= 75 ? '#22c55e' : block.percentile >= 40 ? '#eab308' : '#ef4444',
+                                }}>{block.percentile}th %ile</span>
+                              )}
+                            </div>
+                            <div className="wc-day-detail-text">{block.block_text}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div key={log.id} className="wc-day-detail-block">
+                          <div className="wc-day-detail-block-header">
+                            <span className="wc-day-detail-type">{TYPE_LABELS[log.workout_type] || log.workout_type}</span>
+                          </div>
+                          <div className="wc-day-detail-text">{log.workout_text}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <PersonalRecords strengthRecords={strengthRecords} metconRecords={metconRecords} />
               </div>
             ) : (
