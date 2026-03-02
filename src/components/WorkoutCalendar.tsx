@@ -3,6 +3,10 @@ import { useState } from 'react';
 interface WorkoutCalendarProps {
   /** Map of "YYYY-MM-DD" → number of workouts that day */
   workoutCounts: Record<string, number>;
+  /** Currently selected date key ("YYYY-MM-DD") */
+  selectedDate?: string | null;
+  /** Called when a day with workouts is tapped */
+  onDayClick?: (dateKey: string) => void;
 }
 
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -22,7 +26,7 @@ function getIntensity(count: number): number {
   return 3;
 }
 
-export default function WorkoutCalendar({ workoutCounts }: WorkoutCalendarProps) {
+export default function WorkoutCalendar({ workoutCounts, selectedDate, onDayClick }: WorkoutCalendarProps) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -85,11 +89,14 @@ export default function WorkoutCalendar({ workoutCounts }: WorkoutCalendarProps)
           const count = workoutCounts[key] || 0;
           const intensity = getIntensity(count);
           const isToday = isCurrentMonth && day === today.getDate();
+          const isSelected = selectedDate === key;
+          const hasWorkouts = count > 0;
           return (
             <div
               key={day}
-              className={`wc-cell wc-cell--i${intensity}${isToday ? ' wc-cell--today' : ''}`}
+              className={`wc-cell wc-cell--i${intensity}${isToday ? ' wc-cell--today' : ''}${isSelected ? ' wc-cell--selected' : ''}${hasWorkouts ? ' wc-cell--clickable' : ''}`}
               title={count ? `${count} workout${count > 1 ? 's' : ''}` : 'Rest day'}
+              onClick={hasWorkouts && onDayClick ? () => onDayClick(key) : undefined}
             >
               <span className="wc-cell-num">{day}</span>
             </div>
