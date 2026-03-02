@@ -21,6 +21,10 @@ interface WorkoutLogBlock {
   score: string | null;
   rx: boolean;
   sort_order: number;
+  percentile: number | null;
+  performance_tier: string | null;
+  median_benchmark: string | null;
+  excellent_benchmark: string | null;
 }
 
 interface WorkoutLogEntry {
@@ -98,7 +102,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         const [{ data: blocks }, { data: entries }] = await Promise.all([
           supabase
             .from('workout_log_blocks')
-            .select('id, log_id, block_type, block_label, block_text, score, rx, sort_order')
+            .select('id, log_id, block_type, block_label, block_text, score, rx, sort_order, percentile, performance_tier, median_benchmark, excellent_benchmark')
             .in('log_id', logIds),
           supabase
             .from('workout_log_entries')
@@ -266,6 +270,18 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                         )}
                                         {block.rx && (
                                           <span style={{ fontSize: 11, background: 'var(--accent-glow)', color: 'var(--accent)', padding: '1px 6px', borderRadius: 4 }}>Rx</span>
+                                        )}
+                                        {block.percentile != null && (
+                                          <span style={{
+                                            fontSize: 11,
+                                            padding: '1px 6px',
+                                            borderRadius: 4,
+                                            fontWeight: 600,
+                                            background: block.percentile >= 75 ? 'rgba(34,197,94,0.15)' : block.percentile >= 40 ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
+                                            color: block.percentile >= 75 ? '#22c55e' : block.percentile >= 40 ? '#eab308' : '#ef4444',
+                                          }}>
+                                            {block.percentile}th %ile
+                                          </span>
                                         )}
                                       </div>
                                       <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, color: 'var(--text-dim)', paddingLeft: 8 }}>
