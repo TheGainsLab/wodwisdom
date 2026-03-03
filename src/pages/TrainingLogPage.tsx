@@ -179,8 +179,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const strengthByMovement = useMemo(() => {
     const map = new Map<string, { entries: (WorkoutLogEntry & { workout_date: string })[]; best: number; bestUnit: string }>();
     for (const e of allEntries) {
-      const blockType = e.block_id ? blockTypeMap.get(e.block_id) : null;
-      if (blockType ? blockType !== 'strength' : !/strength/i.test(e.block_label || '')) continue;
+      if (!e.block_id || blockTypeMap.get(e.block_id) !== 'strength') continue;
       if (e.weight == null || e.weight <= 0) continue;
       const existing = map.get(e.movement);
       if (existing) {
@@ -197,8 +196,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const skillsByMovement = useMemo(() => {
     const map = new Map<string, (WorkoutLogEntry & { workout_date: string })[]>();
     for (const e of allEntries) {
-      const blockType = e.block_id ? blockTypeMap.get(e.block_id) : null;
-      if (blockType ? blockType !== 'skills' : !/skill/i.test(e.block_label || '')) continue;
+      if (!e.block_id || blockTypeMap.get(e.block_id) !== 'skills') continue;
       const list = map.get(e.movement) || [];
       list.push(e);
       map.set(e.movement, list);
