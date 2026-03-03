@@ -185,16 +185,29 @@ function capitalizeWords(s: string): string {
 
 function parseSkillsMovements(blockText: string): SkillsEntryValues[] {
   const results: SkillsEntryValues[] = [];
-  const lines = blockText.split('\n');
 
-  for (const rawLine of lines) {
-    let line = rawLine.trim();
+  // Strip structure headers from the text first, then split into segments
+  let text = blockText.trim();
+  // Strip EMOM/structure headers: "EMOM 8", "E2MOM 10", "Every 2 min", "For quality", etc.
+  text = text.replace(/^(?:e\d*mom\s+\d+|every\s+\d+\s*(?:min(?:utes?)?)?|for\s+quality|not\s+for\s+time)\s*[:\-–—,]?\s*/i, '').trim();
+  // Strip round/time headers: "3 Rounds:", "5 Sets:"
+  text = text.replace(/^\d+\s+(?:rounds?|sets?)\s*:\s*/i, '').trim();
+
+  // Split on newlines first, then commas within each line
+  const segments: string[] = [];
+  for (const line of text.split('\n')) {
+    for (const seg of line.split(',')) {
+      const trimmed = seg.trim();
+      if (trimmed && !/^(?:rest|then)\s*$/i.test(trimmed)) {
+        segments.push(trimmed);
+      }
+    }
+  }
+
+  for (const raw of segments) {
+    // Strip bullet prefixes: "* ", "- ", "• "
+    let line = raw.replace(/^[*\-•]\s*/, '').trim();
     if (!line) continue;
-
-    // Skip structure headers: "EMOM 8:", "E2MOM 10:", "Every 2 min:", "For quality:", "Not for time", "Rest", "Then"
-    if (/^(?:e\d*mom\s+\d+|every\s+\d+|for\s+quality|not\s+for\s+time|rest|then)\b/i.test(line)) continue;
-    // Skip round/time headers: "3 Rounds:", "5 Sets:"
-    if (/^\d+\s+(?:rounds?|sets?)\s*:/i.test(line)) continue;
 
     // Strip minute/round prefixes: "Min 1 —", "Minute 2:", "Odd —", "Even —"
     line = line.replace(/^(?:min(?:ute)?\s*\d+\s*[:\-–—]\s*|(?:odd|even)\s*[:\-–—]\s*)/i, '').trim();
