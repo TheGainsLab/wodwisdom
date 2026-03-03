@@ -35,6 +35,15 @@ interface MetconEntryValues {
   scaling_note?: string;
 }
 
+interface SkillsEntryValues {
+  movement: string;
+  sets?: number;
+  reps_completed?: number;
+  hold_seconds?: number;
+  quality?: 'A' | 'B' | 'C' | 'D';
+  variation?: string;
+}
+
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   'warm-up': 'Warm-up',
   skills: 'Skills',
@@ -171,6 +180,65 @@ function capitalizeWords(s: string): string {
   return s.replace(/\b\w/g, c => c.toUpperCase());
 }
 
+// ── Skills movement parser ──────────────────────────────────────────
+
+function parseSkillsMovements(blockText: string): SkillsEntryValues[] {
+  const results: SkillsEntryValues[] = [];
+  const lines = blockText.split('\n');
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || /^(?:rest|then|for quality|not for time)/i.test(line)) continue;
+
+    let movement = line;
+    let sets: number | undefined;
+    let reps_completed: number | undefined;
+    let hold_seconds: number | undefined;
+
+    // Extract hold: ":20", "20s hold", "20 sec hold"
+    const holdMatch = movement.match(/:(\d+)\b|(\d+)\s*s(?:ec(?:ond)?s?)?\s+hold/i);
+    if (holdMatch) {
+      hold_seconds = parseInt(holdMatch[1] || holdMatch[2], 10);
+      movement = movement.replace(holdMatch[0], '').trim();
+    }
+
+    // Extract sets x reps: "4x5", "4 x 5", "4×5"
+    const setsRepsMatch = movement.match(/(\d+)\s*[x×]\s*(\d+)/i);
+    if (setsRepsMatch) {
+      sets = parseInt(setsRepsMatch[1], 10);
+      reps_completed = parseInt(setsRepsMatch[2], 10);
+      movement = movement.replace(setsRepsMatch[0], '').trim();
+    } else {
+      // Extract sets only: "4x :20" (sets parsed, hold already extracted)
+      const setsOnlyMatch = movement.match(/(\d+)\s*[x×]\s*/i);
+      if (setsOnlyMatch) {
+        sets = parseInt(setsOnlyMatch[1], 10);
+        movement = movement.replace(setsOnlyMatch[0], '').trim();
+      } else {
+        // Extract leading reps: "5 kipping HSPU"
+        const leadingReps = movement.match(/^(\d+)\s+/);
+        if (leadingReps && parseInt(leadingReps[1], 10) < 100) {
+          reps_completed = parseInt(leadingReps[1], 10);
+          movement = movement.slice(leadingReps[0].length).trim();
+        }
+      }
+    }
+
+    // Clean up
+    movement = movement.replace(/^[,\-–—+]+|[,\-–—+]+$/g, '').replace(/\s+/g, ' ').trim();
+    if (!movement) continue;
+
+    results.push({
+      movement: capitalizeWords(movement),
+      sets,
+      reps_completed,
+      hold_seconds,
+    });
+  }
+
+  return results;
+}
+
 function inferWorkoutType(blocks: Block[]): string {
   const metcon = blocks.find(b => b.type === 'metcon');
   if (metcon) {
@@ -206,6 +274,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
   const [notes, setNotes] = useState('');
   const [entryValues, setEntryValues] = useState<Record<string, EntryValues>>({});
   const [metconEntries, setMetconEntries] = useState<Record<string, MetconEntryValues>>({});
+  const [skillsEntries, setSkillsEntries] = useState<Record<string, SkillsEntryValues>>({});
   const [workRates, setWorkRates] = useState<MovementWorkRate[]>([]);
   const [blockScores, setBlockScores] = useState<Record<number, string>>({});
   const [blockRx, setBlockRx] = useState<Record<number, boolean>>({});
@@ -291,6 +360,18 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
         }
       });
       setMetconEntries(initialMetcon);
+
+      // Pre-fill skills per-movement entries
+      const initialSkills: Record<string, SkillsEntryValues> = {};
+      loaded.forEach((b, bi) => {
+        if (b.type === 'skills') {
+          const parsed = parseSkillsMovements(b.text);
+          parsed.forEach((sk, si) => {
+            initialSkills[`${bi}-sk${si}`] = sk;
+          });
+        }
+      });
+      setSkillsEntries(initialSkills);
       setLoading(false);
     })();
   }, [sourceState?.source_id]);
@@ -304,6 +385,13 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
 
   const setMetconEntry = (key: string, field: keyof MetconEntryValues, value: unknown) => {
     setMetconEntries(prev => ({
+      ...prev,
+      [key]: { ...prev[key], [field]: value },
+    }));
+  };
+
+  const setSkillEntry = (key: string, field: keyof SkillsEntryValues, value: unknown) => {
+    setSkillsEntries(prev => ({
       ...prev,
       [key]: { ...prev[key], [field]: value },
     }));
@@ -411,6 +499,39 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             performance_tier: scoring?.performanceTier ?? null,
             median_benchmark: benchmarks?.medianScore !== '--' ? benchmarks?.medianScore : null,
             excellent_benchmark: benchmarks?.excellentScore !== '--' ? benchmarks?.excellentScore : null,
+          };
+        }
+
+        if (b.type === 'skills') {
+          const skKeys = Object.keys(skillsEntries)
+            .filter(k => k.startsWith(`${bi}-sk`))
+            .sort((a, b2) => parseInt(a.split('-sk')[1], 10) - parseInt(b2.split('-sk')[1], 10));
+          const entries = skKeys
+            .map(key => skillsEntries[key])
+            .filter(sk => sk?.movement?.trim())
+            .map(sk => ({
+              movement: sk.movement.trim(),
+              sets: sk.sets ?? null,
+              reps: null,
+              weight: null,
+              weight_unit: 'lbs' as const,
+              rpe: null,
+              scaling_note: sk.variation?.trim() || null,
+              set_number: null,
+              reps_completed: sk.reps_completed ?? null,
+              hold_seconds: sk.hold_seconds ?? null,
+              distance: null,
+              distance_unit: null,
+              quality: sk.quality ?? null,
+              variation: sk.variation?.trim() || null,
+            }));
+          return {
+            label: b.label,
+            type: b.type,
+            text: b.text,
+            score: blockScores[bi]?.trim() || null,
+            rx: false,
+            entries,
           };
         }
 
@@ -613,15 +734,96 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                       );
                     })()}
 
-                    {(block.type === 'warm-up' || block.type === 'cool-down' || block.type === 'skills') && (
+                    {block.type === 'skills' && (() => {
+                      const skKeys = Object.keys(skillsEntries)
+                        .filter(k => k.startsWith(`${bi}-sk`))
+                        .sort((a, b2) => parseInt(a.split('-sk')[1], 10) - parseInt(b2.split('-sk')[1], 10));
+
+                      return (
+                        <>
+                          {skKeys.length > 0 && (
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Skill movements (confirm or adjust)</div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                {skKeys.map(key => {
+                                  const sk = skillsEntries[key];
+                                  if (!sk) return null;
+                                  return (
+                                    <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <input
+                                          type="text"
+                                          value={sk.movement}
+                                          onChange={e => setSkillEntry(key, 'movement', e.target.value)}
+                                          style={{ ...compactInputStyle, flex: '1 1 140px', minWidth: 140 }}
+                                        />
+                                        <input
+                                          type="number"
+                                          placeholder="Sets"
+                                          value={sk.sets ?? ''}
+                                          onChange={e => setSkillEntry(key, 'sets', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                          style={{ ...compactInputStyle, width: 56 }}
+                                        />
+                                        <input
+                                          type="number"
+                                          placeholder="Reps"
+                                          value={sk.reps_completed ?? ''}
+                                          onChange={e => setSkillEntry(key, 'reps_completed', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                          style={{ ...compactInputStyle, width: 56 }}
+                                        />
+                                        <input
+                                          type="number"
+                                          placeholder="Hold (s)"
+                                          value={sk.hold_seconds ?? ''}
+                                          onChange={e => setSkillEntry(key, 'hold_seconds', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                          style={{ ...compactInputStyle, width: 72 }}
+                                        />
+                                        <select
+                                          value={sk.quality ?? ''}
+                                          onChange={e => setSkillEntry(key, 'quality', e.target.value || undefined)}
+                                          style={{ ...compactInputStyle, width: 56, padding: '8px 4px' }}
+                                        >
+                                          <option value="">—</option>
+                                          <option value="A">A</option>
+                                          <option value="B">B</option>
+                                          <option value="C">C</option>
+                                          <option value="D">D</option>
+                                        </select>
+                                      </div>
+                                      <input
+                                        type="text"
+                                        placeholder="Variation / scaling note (optional)"
+                                        value={sk.variation ?? ''}
+                                        onChange={e => setSkillEntry(key, 'variation', e.target.value)}
+                                        style={{ ...compactInputStyle, fontSize: 13 }}
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          <div className="field" style={{ marginTop: 8 }}>
+                            <label>Notes</label>
+                            <input
+                              type="text"
+                              placeholder="Optional, e.g. got 5 unbroken kipping"
+                              value={blockScores[bi] ?? ''}
+                              onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
+                            />
+                          </div>
+                        </>
+                      );
+                    })()}
+
+                    {(block.type === 'warm-up' || block.type === 'cool-down') && (
                       <div className="field" style={{ marginTop: 8 }}>
                         <label>Notes</label>
                         <input
                           type="text"
                           placeholder={
                             block.type === 'warm-up' ? 'Optional, e.g. subbed row for bike' :
-                            block.type === 'cool-down' ? 'Optional, e.g. extra hip stretching' :
-                            'Optional, e.g. got 5 unbroken kipping'
+                            'Optional, e.g. extra hip stretching'
                           }
                           value={blockScores[bi] ?? ''}
                           onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
