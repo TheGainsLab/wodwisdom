@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import WorkoutCalendar from '../components/WorkoutCalendar';
+import MetconHeatmap from '../components/MetconHeatmap';
 
 interface WorkoutLog {
   id: string;
@@ -86,7 +87,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [blockFilter, setBlockFilter] = useState<string>('all');
-  const [tab, setTab] = useState<'overview' | 'strength' | 'skills' | 'history'>('overview');
+  const [tab, setTab] = useState<'overview' | 'strength' | 'skills' | 'metcons' | 'history'>('overview');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [strengthSearch, setStrengthSearch] = useState('');
   const [strengthSort, setStrengthSort] = useState<'weight' | 'date'>('weight');
@@ -238,7 +239,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 0' }}>
             {/* Tab switcher */}
             <div className="tl-tabs">
-              {([['overview', 'Overview'], ['strength', 'Strength'], ['skills', 'Skills'], ['history', 'History']] as const).map(([id, label]) => (
+              {([['overview', 'Overview'], ['strength', 'Strength'], ['skills', 'Skills'], ['metcons', 'Metcons'], ['history', 'History']] as const).map(([id, label]) => (
                 <button
                   key={id}
                   className={`tl-tab${tab === id ? ' active' : ''}`}
@@ -385,6 +386,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   });
                 })()}
               </div>
+            ) : tab === 'metcons' ? (
+              /* ── Metcons Tab ── */
+              <MetconHeatmap userId={session.user.id} />
             ) : tab === 'skills' ? (
               /* ── Skills Tab ── */
               <div>

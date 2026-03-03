@@ -14,11 +14,10 @@ import {
 import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { ChevronLeft, Clock, Target, Activity } from 'lucide-react';
-import MetconHeatmap from '../components/MetconHeatmap';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'performance' | 'history' | 'baselines' | 'metcon-review';
+type Tab = 'overview' | 'performance' | 'history' | 'baselines';
 
 function dayTypeBadge(dayType: string): string {
   switch (dayType) {
@@ -460,7 +459,6 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
                   ['performance', 'Performance'],
                   ['history', 'History'],
                   ['baselines', 'Baselines'],
-                  ['metcon-review', 'Metcon'],
                 ] as [Tab, string][]).map(([id, label]) => (
                   <button
                     key={id}
@@ -477,7 +475,6 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
               {tab === 'performance' && renderPerformance()}
               {tab === 'history' && renderHistory()}
               {tab === 'baselines' && renderBaselines()}
-              {tab === 'metcon-review' && <MetconHeatmap userId={session.user.id} />}
             </div>
           </div>
         )}

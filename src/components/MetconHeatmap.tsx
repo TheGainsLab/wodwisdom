@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 interface HeatmapCell {
   movement: string;
   time_domain: 'short' | 'medium' | 'long';
-  avg_percentile: number;
+  avg_percentile: number | null;
   workout_count: number;
 }
 
@@ -16,11 +16,12 @@ interface DrillDownItem {
   workout_date: string;
 }
 
+type Layer = 'frequency' | 'performance';
+
 const TIME_DOMAINS = ['short', 'medium', 'long'] as const;
 const TD_LABELS: Record<string, string> = { short: 'Short', medium: 'Medium', long: 'Long' };
 
 function percentileColor(p: number): string {
-  // Red (low) → Yellow (mid) → Green (high)
   if (p >= 80) return 'rgba(34,197,94,.7)';
   if (p >= 60) return 'rgba(34,197,94,.35)';
   if (p >= 40) return 'rgba(250,204,21,.35)';
@@ -36,8 +37,23 @@ function percentileTextColor(p: number): string {
   return '#f87171';
 }
 
+function countColor(count: number): string {
+  if (count >= 10) return 'rgba(99,102,241,.6)';
+  if (count >= 5) return 'rgba(99,102,241,.35)';
+  if (count >= 3) return 'rgba(99,102,241,.2)';
+  return 'rgba(99,102,241,.1)';
+}
+
+function countTextColor(count: number): string {
+  if (count >= 10) return '#a5b4fc';
+  if (count >= 5) return '#818cf8';
+  return '#6366f1';
+}
+
 export default function MetconHeatmap({ userId }: { userId: string }) {
-  const [cells, setCells] = useState<HeatmapCell[]>([]);
+  const [layer, setLayer] = useState<Layer>('frequency');
+  const [freqCells, setFreqCells] = useState<HeatmapCell[]>([]);
+  const [perfCells, setPerfCells] = useState<HeatmapCell[]>([]);
   const [loading, setLoading] = useState(true);
   const [drillDown, setDrillDown] = useState<{ movement: string; td: string } | null>(null);
   const [drillItems, setDrillItems] = useState<DrillDownItem[]>([]);
@@ -45,11 +61,17 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase.rpc('get_metcon_heatmap', { p_user_id: userId });
-      if (!error && data) setCells(data as HeatmapCell[]);
+      const [freqResult, perfResult] = await Promise.all([
+        supabase.rpc('get_metcon_frequency', { p_user_id: userId }),
+        supabase.rpc('get_metcon_heatmap', { p_user_id: userId }),
+      ]);
+      if (!freqResult.error && freqResult.data) setFreqCells(freqResult.data as HeatmapCell[]);
+      if (!perfResult.error && perfResult.data) setPerfCells(perfResult.data as HeatmapCell[]);
       setLoading(false);
     })();
   }, [userId]);
+
+  const cells = layer === 'frequency' ? freqCells : perfCells;
 
   // Build grid: unique movements as rows
   const movements = [...new Set(cells.map(c => c.movement))].sort();
@@ -106,7 +128,7 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
     return <div className="page-loading"><div className="loading-pulse" /></div>;
   }
 
-  if (movements.length === 0) {
+  if (freqCells.length === 0 && perfCells.length === 0) {
     return (
       <div className="engine-empty">
         <div className="engine-empty-title">No Metcon Data Yet</div>
@@ -183,104 +205,165 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
   // Heat map grid
   return (
     <div className="engine-section">
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{
-          width: '100%',
-          borderCollapse: 'separate',
-          borderSpacing: 4,
-          fontFamily: "'Outfit', sans-serif",
-        }}>
-          <thead>
-            <tr>
-              <th style={{
-                textAlign: 'left',
-                fontSize: 12,
-                fontWeight: 600,
-                color: 'var(--text-muted)',
-                textTransform: 'uppercase',
-                letterSpacing: '.5px',
-                padding: '8px 12px',
-              }}>
-                Movement
-              </th>
-              {TIME_DOMAINS.map(td => (
-                <th key={td} style={{
-                  textAlign: 'center',
+      {/* Layer toggle */}
+      <div className="source-toggle" style={{ marginBottom: 12 }}>
+        <button
+          className={'source-btn' + (layer === 'frequency' ? ' active' : '')}
+          onClick={() => setLayer('frequency')}
+        >
+          Frequency
+        </button>
+        <button
+          className={'source-btn' + (layer === 'performance' ? ' active' : '')}
+          onClick={() => setLayer('performance')}
+        >
+          Performance
+        </button>
+      </div>
+
+      {movements.length === 0 ? (
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: 24 }}>
+          {layer === 'performance'
+            ? 'No scored metcon data yet. Switch to Frequency to see all logged metcons.'
+            : 'No metcon data for this view.'}
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{
+            width: '100%',
+            borderCollapse: 'separate',
+            borderSpacing: 4,
+            fontFamily: "'Outfit', sans-serif",
+          }}>
+            <thead>
+              <tr>
+                <th style={{
+                  textAlign: 'left',
                   fontSize: 12,
                   fontWeight: 600,
                   color: 'var(--text-muted)',
                   textTransform: 'uppercase',
                   letterSpacing: '.5px',
                   padding: '8px 12px',
-                  minWidth: 80,
                 }}>
-                  {TD_LABELS[td]}
+                  Movement
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {movements.map(movement => (
-              <tr key={movement}>
-                <td style={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: 'var(--text)',
-                  padding: '10px 12px',
-                  whiteSpace: 'nowrap',
-                }}>
-                  {movement}
-                </td>
-                {TIME_DOMAINS.map(td => {
-                  const cell = cellMap.get(`${movement}|${td}`);
-                  if (!cell) {
+                {TIME_DOMAINS.map(td => (
+                  <th key={td} style={{
+                    textAlign: 'center',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: 'var(--text-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '.5px',
+                    padding: '8px 12px',
+                    minWidth: 80,
+                  }}>
+                    {TD_LABELS[td]}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {movements.map(movement => (
+                <tr key={movement}>
+                  <td style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: 'var(--text)',
+                    padding: '10px 12px',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {movement}
+                  </td>
+                  {TIME_DOMAINS.map(td => {
+                    const cell = cellMap.get(`${movement}|${td}`);
+                    if (!cell) {
+                      return (
+                        <td key={td} style={{
+                          textAlign: 'center',
+                          padding: '10px 12px',
+                          borderRadius: 6,
+                          background: 'var(--surface2)',
+                        }}>
+                          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>—</span>
+                        </td>
+                      );
+                    }
+
+                    if (layer === 'frequency') {
+                      return (
+                        <td
+                          key={td}
+                          onClick={() => cell.avg_percentile != null ? openDrillDown(movement, td) : undefined}
+                          style={{
+                            textAlign: 'center',
+                            padding: '10px 12px',
+                            borderRadius: 6,
+                            background: countColor(cell.workout_count),
+                            cursor: cell.avg_percentile != null ? 'pointer' : 'default',
+                            transition: 'opacity .15s',
+                          }}
+                        >
+                          <div style={{
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontSize: 15,
+                            fontWeight: 700,
+                            color: countTextColor(cell.workout_count),
+                          }}>
+                            {cell.workout_count}
+                          </div>
+                          {cell.avg_percentile != null && (
+                            <div style={{
+                              fontSize: 11,
+                              color: percentileTextColor(cell.avg_percentile),
+                              marginTop: 2,
+                            }}>
+                              {cell.avg_percentile}th %ile
+                            </div>
+                          )}
+                        </td>
+                      );
+                    }
+
+                    // Performance layer
                     return (
-                      <td key={td} style={{
-                        textAlign: 'center',
-                        padding: '10px 12px',
-                        borderRadius: 6,
-                        background: 'var(--surface2)',
-                      }}>
-                        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>—</span>
+                      <td
+                        key={td}
+                        onClick={() => openDrillDown(movement, td)}
+                        style={{
+                          textAlign: 'center',
+                          padding: '10px 12px',
+                          borderRadius: 6,
+                          background: cell.avg_percentile != null ? percentileColor(cell.avg_percentile) : 'var(--surface2)',
+                          cursor: 'pointer',
+                          transition: 'opacity .15s',
+                        }}
+                      >
+                        <div style={{
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontSize: 15,
+                          fontWeight: 700,
+                          color: cell.avg_percentile != null ? percentileTextColor(cell.avg_percentile) : 'var(--text-muted)',
+                        }}>
+                          {cell.avg_percentile ?? '—'}
+                        </div>
+                        <div style={{
+                          fontSize: 11,
+                          color: 'var(--text-muted)',
+                          marginTop: 2,
+                        }}>
+                          {cell.workout_count}x
+                        </div>
                       </td>
                     );
-                  }
-                  return (
-                    <td
-                      key={td}
-                      onClick={() => openDrillDown(movement, td)}
-                      style={{
-                        textAlign: 'center',
-                        padding: '10px 12px',
-                        borderRadius: 6,
-                        background: percentileColor(cell.avg_percentile),
-                        cursor: 'pointer',
-                        transition: 'opacity .15s',
-                      }}
-                    >
-                      <div style={{
-                        fontFamily: "'JetBrains Mono', monospace",
-                        fontSize: 15,
-                        fontWeight: 700,
-                        color: percentileTextColor(cell.avg_percentile),
-                      }}>
-                        {cell.avg_percentile}
-                      </div>
-                      <div style={{
-                        fontSize: 11,
-                        color: 'var(--text-muted)',
-                        marginTop: 2,
-                      }}>
-                        {cell.workout_count}x
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
