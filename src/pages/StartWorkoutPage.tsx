@@ -187,16 +187,25 @@ function parseSkillsMovements(blockText: string): SkillsEntryValues[] {
   const lines = blockText.split('\n');
 
   for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line || /^(?:rest|then|for quality|not for time)/i.test(line)) continue;
+    let line = rawLine.trim();
+    if (!line) continue;
+
+    // Skip structure headers: "EMOM 8:", "E2MOM 10:", "Every 2 min:", "For quality:", "Not for time", "Rest", "Then"
+    if (/^(?:e\d*mom\s+\d+|every\s+\d+|for\s+quality|not\s+for\s+time|rest|then)\b/i.test(line)) continue;
+    // Skip round/time headers: "3 Rounds:", "5 Sets:"
+    if (/^\d+\s+(?:rounds?|sets?)\s*:/i.test(line)) continue;
+
+    // Strip minute/round prefixes: "Min 1 —", "Minute 2:", "Odd —", "Even —"
+    line = line.replace(/^(?:min(?:ute)?\s*\d+\s*[:\-–—]\s*|(?:odd|even)\s*[:\-–—]\s*)/i, '').trim();
+    if (!line) continue;
 
     let movement = line;
     let sets: number | undefined;
     let reps_completed: number | undefined;
     let hold_seconds: number | undefined;
 
-    // Extract hold: ":20", "20s hold", "20 sec hold"
-    const holdMatch = movement.match(/:(\d+)\b|(\d+)\s*s(?:ec(?:ond)?s?)?\s+hold/i);
+    // Extract hold: ":20", "25s hold", "20 sec hold", "25s" (followed by space + word)
+    const holdMatch = movement.match(/:(\d+)\b|(\d+)\s*s(?:ec(?:ond)?s?)?\s+(?:hold\b)?/i);
     if (holdMatch) {
       hold_seconds = parseInt(holdMatch[1] || holdMatch[2], 10);
       movement = movement.replace(holdMatch[0], '').trim();
@@ -215,7 +224,7 @@ function parseSkillsMovements(blockText: string): SkillsEntryValues[] {
         sets = parseInt(setsOnlyMatch[1], 10);
         movement = movement.replace(setsOnlyMatch[0], '').trim();
       } else {
-        // Extract leading reps: "5 kipping HSPU"
+        // Extract leading reps: "3 deficit strict HSPU negatives"
         const leadingReps = movement.match(/^(\d+)\s+/);
         if (leadingReps && parseInt(leadingReps[1], 10) < 100) {
           reps_completed = parseInt(leadingReps[1], 10);
@@ -224,7 +233,7 @@ function parseSkillsMovements(blockText: string): SkillsEntryValues[] {
       }
     }
 
-    // Clean up
+    // Clean up leading/trailing punctuation
     movement = movement.replace(/^[,\-–—+]+|[,\-–—+]+$/g, '').replace(/\s+/g, ' ').trim();
     if (!movement) continue;
 
