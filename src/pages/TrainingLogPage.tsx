@@ -437,9 +437,15 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                             <div key={i} className="tl-set-row">
                               <span className="tl-set-date">{new Date(e.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                               <span className="tl-set-value">
-                                {e.sets != null && `${e.sets} sets`}
-                                {e.reps_completed != null && ` x${e.reps_completed}`}
-                                {e.hold_seconds != null && ` ${e.hold_seconds}s hold`}
+                                {e.sets != null || e.reps_completed != null || e.hold_seconds != null ? (
+                                  <>
+                                    {e.sets != null && `${e.sets} sets`}
+                                    {e.reps_completed != null && ` x${e.reps_completed}`}
+                                    {e.hold_seconds != null && ` ${e.hold_seconds}s hold`}
+                                  </>
+                                ) : (
+                                  <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Practiced</span>
+                                )}
                               </span>
                               {e.rpe != null && <span className="tl-set-detail">RPE {e.rpe}</span>}
                               {e.quality && <span className="tl-set-detail">{e.quality}</span>}
