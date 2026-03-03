@@ -619,8 +619,10 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                                   <span style={{ fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(entry.movement)}</span>
                                                   {entry.sets != null && <span> {entry.sets} sets</span>}
                                                   {entry.reps_completed != null && <span> x{entry.reps_completed} reps</span>}
+                                                  {entry.hold_seconds != null && <span> {entry.hold_seconds}s hold</span>}
                                                   {entry.rpe != null && <span> RPE {entry.rpe}</span>}
-                                                  {entry.scaling_note && <span style={{ fontStyle: 'italic' }}> — {entry.scaling_note}</span>}
+                                                  {entry.quality && <span style={{ fontSize: 11, marginLeft: 4, background: 'var(--surface2)', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>{entry.quality}</span>}
+                                                  {entry.variation && <span style={{ fontStyle: 'italic' }}> — {entry.variation}</span>}
                                                 </div>
                                               ))}
                                             </div>
