@@ -40,6 +40,7 @@ interface SkillsEntryValues {
   sets?: number;
   reps_completed?: number;
   hold_seconds?: number;
+  rpe?: number;
   quality?: 'A' | 'B' | 'C' | 'D';
   variation?: string;
 }
@@ -524,7 +525,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
               reps: null,
               weight: null,
               weight_unit: 'lbs' as const,
-              rpe: null,
+              rpe: sk.rpe ?? null,
               scaling_note: sk.variation?.trim() || null,
               set_number: null,
               reps_completed: sk.reps_completed ?? null,
@@ -798,6 +799,15 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                           <option value="C">C</option>
                                           <option value="D">D</option>
                                         </select>
+                                        <input
+                                          type="number"
+                                          placeholder="RPE"
+                                          min={1}
+                                          max={10}
+                                          value={sk.rpe ?? ''}
+                                          onChange={e => setSkillEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                          style={{ ...compactInputStyle, width: 56 }}
+                                        />
                                       </div>
                                       <input
                                         type="text"
