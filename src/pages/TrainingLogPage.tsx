@@ -4,7 +4,6 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import WorkoutCalendar from '../components/WorkoutCalendar';
-import PersonalRecords from '../components/PersonalRecords';
 
 interface WorkoutLog {
   id: string;
@@ -87,11 +86,15 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [blockFilter, setBlockFilter] = useState<string>('all');
-  const [tab, setTab] = useState<'overview' | 'history'>('overview');
+  const [tab, setTab] = useState<'overview' | 'strength' | 'skills' | 'history'>('overview');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [strengthSearch, setStrengthSearch] = useState('');
+  const [strengthSort, setStrengthSort] = useState<'weight' | 'date'>('weight');
+  const [skillsSearch, setSkillsSearch] = useState('');
+  const [skillsSort, setSkillsSort] = useState<'date' | 'name'>('date');
 
-  // Flat list of all entries for PR calculation
   const [allEntries, setAllEntries] = useState<(WorkoutLogEntry & { workout_date: string })[]>([]);
+  const [blockTypeMap, setBlockTypeMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     (async () => {
@@ -126,6 +129,12 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           grouped[logId].sort((a, b) => a.sort_order - b.sort_order);
         }
         setBlocksByLog(grouped);
+
+        const btMap = new Map<string, string>();
+        for (const b of (blocks as WorkoutLogBlock[]) || []) {
+          btMap.set(b.id, b.block_type);
+        }
+        setBlockTypeMap(btMap);
 
         const groupedEntries: Record<string, WorkoutLogEntry[]> = {};
         const dateMap = new Map(logRows.map(l => [l.id, l.workout_date]));
@@ -166,41 +175,34 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     return map;
   }, [logs]);
 
-  const strengthRecords = useMemo(() => {
-    // Find heaviest weight logged per movement (only entries that have weight)
-    const best = new Map<string, { weight: number; weight_unit: string; reps: number | null; date: string }>();
+  // ── Strength data: group entries by movement ──
+  const strengthByMovement = useMemo(() => {
+    const map = new Map<string, { entries: (WorkoutLogEntry & { workout_date: string })[]; best: number; bestUnit: string }>();
     for (const e of allEntries) {
+      if (!e.block_id || blockTypeMap.get(e.block_id) !== 'strength') continue;
       if (e.weight == null || e.weight <= 0) continue;
-      const key = e.movement;
-      const existing = best.get(key);
-      if (!existing || e.weight > existing.weight) {
-        best.set(key, { weight: e.weight, weight_unit: e.weight_unit, reps: e.reps_completed ?? e.reps, date: e.workout_date });
+      const existing = map.get(e.movement);
+      if (existing) {
+        existing.entries.push(e);
+        if (e.weight > existing.best) { existing.best = e.weight; existing.bestUnit = e.weight_unit; }
+      } else {
+        map.set(e.movement, { entries: [e], best: e.weight, bestUnit: e.weight_unit });
       }
     }
-    return [...best.entries()]
-      .map(([movement, data]) => ({ movement, ...data }))
-      .sort((a, b) => b.weight - a.weight)
-      .slice(0, 8);
-  }, [allEntries]);
+    return map;
+  }, [allEntries, blockTypeMap]);
 
-  const metconRecords = useMemo(() => {
-    // Gather scored metcon blocks
-    const scored: { block_label: string; score: string; date: string; block_type: string }[] = [];
-    for (const log of logs) {
-      const blocks = blocksByLog[log.id] || [];
-      for (const block of blocks) {
-        if (block.block_type === 'metcon' && block.score) {
-          scored.push({
-            block_label: block.block_label || getMetconTypeLabel(block.block_text),
-            score: block.score,
-            date: log.workout_date,
-            block_type: block.block_type,
-          });
-        }
-      }
+  // ── Skills data: group entries by movement ──
+  const skillsByMovement = useMemo(() => {
+    const map = new Map<string, (WorkoutLogEntry & { workout_date: string })[]>();
+    for (const e of allEntries) {
+      if (!e.block_id || blockTypeMap.get(e.block_id) !== 'skills') continue;
+      const list = map.get(e.movement) || [];
+      list.push(e);
+      map.set(e.movement, list);
     }
-    return scored.slice(0, 6);
-  }, [logs, blocksByLog]);
+    return map;
+  }, [allEntries, blockTypeMap]);
 
   // ── Helpers ──
 
@@ -236,12 +238,15 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 0' }}>
             {/* Tab switcher */}
             <div className="tl-tabs">
-              <button className={`tl-tab${tab === 'overview' ? ' active' : ''}`} onClick={() => setTab('overview')}>
-                Overview
-              </button>
-              <button className={`tl-tab${tab === 'history' ? ' active' : ''}`} onClick={() => setTab('history')}>
-                History
-              </button>
+              {([['overview', 'Overview'], ['strength', 'Strength'], ['skills', 'Skills'], ['history', 'History']] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  className={`tl-tab${tab === id ? ' active' : ''}`}
+                  onClick={() => setTab(id as typeof tab)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
             {loading ? (
@@ -305,7 +310,152 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   </div>
                 )}
 
-                <PersonalRecords strengthRecords={strengthRecords} metconRecords={metconRecords} />
+              </div>
+            ) : tab === 'strength' ? (
+              /* ── Strength Tab ── */
+              <div>
+                <input
+                  className="tl-search"
+                  type="text"
+                  placeholder="Search movements..."
+                  value={strengthSearch}
+                  onChange={e => setStrengthSearch(e.target.value)}
+                />
+                <div className="tl-sort-bar">
+                  <span>Sort:</span>
+                  <button className={`tl-sort-btn${strengthSort === 'weight' ? ' active' : ''}`} onClick={() => setStrengthSort('weight')}>By Weight</button>
+                  <button className={`tl-sort-btn${strengthSort === 'date' ? ' active' : ''}`} onClick={() => setStrengthSort('date')}>By Date</button>
+                </div>
+                {(() => {
+                  const q = strengthSearch.toLowerCase();
+                  let movements = [...strengthByMovement.entries()]
+                    .filter(([m]) => !q || formatMovementName(m).toLowerCase().includes(q));
+                  if (strengthSort === 'weight') {
+                    movements.sort((a, b) => b[1].best - a[1].best);
+                  } else {
+                    movements.sort((a, b) => {
+                      const latestA = a[1].entries.reduce((d, e) => e.workout_date > d ? e.workout_date : d, '');
+                      const latestB = b[1].entries.reduce((d, e) => e.workout_date > d ? e.workout_date : d, '');
+                      return latestB.localeCompare(latestA);
+                    });
+                  }
+                  if (movements.length === 0) {
+                    return (
+                      <div className="tl-empty">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 6.5h11" /><path d="M6.5 17.5h11" /><path d="M12 2v20" /><path d="M2 12h4" /><path d="M18 12h4" /><circle cx="4.5" cy="6.5" r="2.5" /><circle cx="4.5" cy="17.5" r="2.5" /><circle cx="19.5" cy="6.5" r="2.5" /><circle cx="19.5" cy="17.5" r="2.5" /></svg>
+                        <div className="tl-empty-title">{q ? 'No matching movements' : 'No Strength Data'}</div>
+                        <div className="tl-empty-desc">{q ? 'Try a different search term.' : 'Log a workout with strength blocks to see your lifts here.'}</div>
+                      </div>
+                    );
+                  }
+                  return movements.map(([movement, data]) => {
+                    const sorted = [...data.entries].sort((a, b) =>
+                      strengthSort === 'weight'
+                        ? (b.weight ?? 0) - (a.weight ?? 0)
+                        : b.workout_date.localeCompare(a.workout_date)
+                    );
+                    const recent = sorted.slice(0, 8);
+                    return (
+                      <div key={movement} className="tl-movement-card">
+                        <div className="tl-movement-header">
+                          <span className="tl-movement-name">{formatMovementName(movement)}</span>
+                          <span className="tl-pr-badge">PR: {data.best}{data.bestUnit}</span>
+                        </div>
+                        <div className="tl-session-count">{data.entries.length} set{data.entries.length !== 1 ? 's' : ''} logged</div>
+                        <div style={{ marginTop: 8 }}>
+                          {recent.map((e, i) => (
+                            <div key={i} className="tl-set-row">
+                              <span className="tl-set-date">{new Date(e.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                              <span className="tl-set-value">
+                                {e.weight}{e.weight_unit}
+                                {(e.reps_completed ?? e.reps) != null && ` x${e.reps_completed ?? e.reps}`}
+                              </span>
+                              {e.set_number != null && <span className="tl-set-detail">Set {e.set_number}</span>}
+                              {e.rpe != null && <span className="tl-set-detail">RPE {e.rpe}</span>}
+                            </div>
+                          ))}
+                          {sorted.length > 8 && (
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', paddingTop: 6 }}>
+                              +{sorted.length - 8} more
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            ) : tab === 'skills' ? (
+              /* ── Skills Tab ── */
+              <div>
+                <input
+                  className="tl-search"
+                  type="text"
+                  placeholder="Search movements..."
+                  value={skillsSearch}
+                  onChange={e => setSkillsSearch(e.target.value)}
+                />
+                <div className="tl-sort-bar">
+                  <span>Sort:</span>
+                  <button className={`tl-sort-btn${skillsSort === 'date' ? ' active' : ''}`} onClick={() => setSkillsSort('date')}>By Date</button>
+                  <button className={`tl-sort-btn${skillsSort === 'name' ? ' active' : ''}`} onClick={() => setSkillsSort('name')}>By Name</button>
+                </div>
+                {(() => {
+                  const q = skillsSearch.toLowerCase();
+                  let movements = [...skillsByMovement.entries()]
+                    .filter(([m]) => !q || formatMovementName(m).toLowerCase().includes(q));
+                  if (skillsSort === 'name') {
+                    movements.sort((a, b) => a[0].localeCompare(b[0]));
+                  } else {
+                    movements.sort((a, b) => {
+                      const latestA = a[1].reduce((d, e) => e.workout_date > d ? e.workout_date : d, '');
+                      const latestB = b[1].reduce((d, e) => e.workout_date > d ? e.workout_date : d, '');
+                      return latestB.localeCompare(latestA);
+                    });
+                  }
+                  if (movements.length === 0) {
+                    return (
+                      <div className="tl-empty">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                        <div className="tl-empty-title">{q ? 'No matching movements' : 'No Skills Data'}</div>
+                        <div className="tl-empty-desc">{q ? 'Try a different search term.' : 'Log a workout with skills blocks to track your progress here.'}</div>
+                      </div>
+                    );
+                  }
+                  return movements.map(([movement, entries]) => {
+                    const sorted = [...entries].sort((a, b) => b.workout_date.localeCompare(a.workout_date));
+                    const recent = sorted.slice(0, 8);
+                    const uniqueDates = new Set(entries.map(e => e.workout_date));
+                    return (
+                      <div key={movement} className="tl-movement-card">
+                        <div className="tl-movement-header">
+                          <span className="tl-movement-name">{formatMovementName(movement)}</span>
+                        </div>
+                        <div className="tl-session-count">{uniqueDates.size} session{uniqueDates.size !== 1 ? 's' : ''}</div>
+                        <div style={{ marginTop: 8 }}>
+                          {recent.map((e, i) => (
+                            <div key={i} className="tl-set-row">
+                              <span className="tl-set-date">{new Date(e.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                              <span className="tl-set-value">
+                                {e.sets != null && `${e.sets} sets`}
+                                {e.reps_completed != null && ` x${e.reps_completed}`}
+                                {e.hold_seconds != null && ` ${e.hold_seconds}s hold`}
+                              </span>
+                              {e.rpe != null && <span className="tl-set-detail">RPE {e.rpe}</span>}
+                              {e.quality && <span className="tl-set-detail">{e.quality}</span>}
+                              {e.scaling_note && <span className="tl-set-detail" style={{ fontStyle: 'italic' }}>{e.scaling_note}</span>}
+                            </div>
+                          ))}
+                          {sorted.length > 8 && (
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', paddingTop: 6 }}>
+                              +{sorted.length - 8} more
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             ) : (
               /* ── History Tab ── */

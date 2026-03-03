@@ -474,19 +474,6 @@ body.landing-body{overflow:auto;height:auto}
 .wc-day-detail-score{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-dim)}
 .wc-day-detail-text{font-size:13px;color:var(--text-dim);white-space:pre-wrap;line-height:1.5}
 
-/* ── Personal Records Cards ────────────────────────────── */
-.pr-container{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
-.pr-title{font-size:15px;font-weight:700;letter-spacing:-.2px;margin-bottom:12px}
-.pr-section{margin-bottom:12px}
-.pr-section:last-child{margin-bottom:0}
-.pr-section-label{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);margin-bottom:8px}
-.pr-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-.pr-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:4px}
-.pr-card-movement{font-size:12px;font-weight:600;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pr-card-value{font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text)}
-.pr-card-reps{font-size:13px;font-weight:500;color:var(--text-dim)}
-.pr-card-date{font-size:11px;color:var(--text-muted)}
-
 /* ── Training Log Tab Switcher ────────────────────────── */
 .tl-tabs{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px}
 .tl-tab{flex:1;padding:10px 12px;border:none;background:none;color:var(--text-muted);font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s}
@@ -494,8 +481,30 @@ body.landing-body{overflow:auto;height:auto}
 .tl-tab.active{background:var(--accent);color:white}
 .tl-tab:hover:not(.active){color:var(--text-dim)}
 
+/* ── Training Log Strength / Skills Tabs ─────────────── */
+.tl-search{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;margin-bottom:12px;outline:none;transition:border-color .15s}
+.tl-search:focus{border-color:var(--accent)}
+.tl-search::placeholder{color:var(--text-muted)}
+.tl-sort-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.tl-sort-bar span{font-size:12px;color:var(--text-muted);font-weight:600}
+.tl-sort-btn{padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--text-muted);font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.tl-sort-btn.active{background:var(--accent);color:white;border-color:var(--accent)}
+.tl-movement-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px}
+.tl-movement-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px}
+.tl-movement-name{font-size:15px;font-weight:700;color:var(--text)}
+.tl-pr-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(34,197,94,.15);color:#22c55e;white-space:nowrap}
+.tl-set-row{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:13px;color:var(--text-dim);border-bottom:1px solid var(--border-dim, rgba(255,255,255,.04))}
+.tl-set-row:last-child{border-bottom:none}
+.tl-set-date{font-size:11px;color:var(--text-muted);min-width:60px;flex-shrink:0}
+.tl-set-value{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:var(--text)}
+.tl-set-detail{font-size:12px;color:var(--text-muted)}
+.tl-empty{text-align:center;padding:48px 20px;color:var(--text-muted)}
+.tl-empty svg{margin-bottom:12px;opacity:.5}
+.tl-empty-title{font-size:15px;font-weight:700;color:var(--text-dim);margin-bottom:6px}
+.tl-empty-desc{font-size:13px}
+.tl-session-count{font-size:12px;color:var(--text-muted);font-weight:500}
+
 @media(max-width:480px){
-  .pr-cards{grid-template-columns:1fr 1fr}
   .wc-cell-num{font-size:11px}
   .wc-stats{gap:12px}
   .wc-stat-value{font-size:16px}
