@@ -822,13 +822,6 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                           style={{ ...compactInputStyle, width: 56 }}
                                         />
                                       </div>
-                                      <input
-                                        type="text"
-                                        placeholder="Variation / scaling note (optional)"
-                                        value={sk.variation ?? ''}
-                                        onChange={e => setSkillEntry(key, 'variation', e.target.value)}
-                                        style={{ ...compactInputStyle, fontSize: 13 }}
-                                      />
                                     </div>
                                   );
                                 })}
