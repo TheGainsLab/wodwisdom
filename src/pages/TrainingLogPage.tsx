@@ -179,7 +179,8 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const strengthByMovement = useMemo(() => {
     const map = new Map<string, { entries: (WorkoutLogEntry & { workout_date: string })[]; best: number; bestUnit: string }>();
     for (const e of allEntries) {
-      if (!e.block_id || blockTypeMap.get(e.block_id) !== 'strength') continue;
+      const blockType = e.block_id ? blockTypeMap.get(e.block_id) : null;
+      if (blockType ? blockType !== 'strength' : !/strength/i.test(e.block_label || '')) continue;
       if (e.weight == null || e.weight <= 0) continue;
       const existing = map.get(e.movement);
       if (existing) {
@@ -196,7 +197,8 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const skillsByMovement = useMemo(() => {
     const map = new Map<string, (WorkoutLogEntry & { workout_date: string })[]>();
     for (const e of allEntries) {
-      if (!e.block_id || blockTypeMap.get(e.block_id) !== 'skills') continue;
+      const blockType = e.block_id ? blockTypeMap.get(e.block_id) : null;
+      if (blockType ? blockType !== 'skills' : !/skill/i.test(e.block_label || '')) continue;
       const list = map.get(e.movement) || [];
       list.push(e);
       map.set(e.movement, list);
@@ -437,9 +439,15 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                             <div key={i} className="tl-set-row">
                               <span className="tl-set-date">{new Date(e.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                               <span className="tl-set-value">
-                                {e.sets != null && `${e.sets} sets`}
-                                {e.reps_completed != null && ` x${e.reps_completed}`}
-                                {e.hold_seconds != null && ` ${e.hold_seconds}s hold`}
+                                {e.sets != null || e.reps_completed != null || e.hold_seconds != null ? (
+                                  <>
+                                    {e.sets != null && `${e.sets} sets`}
+                                    {e.reps_completed != null && ` x${e.reps_completed}`}
+                                    {e.hold_seconds != null && ` ${e.hold_seconds}s hold`}
+                                  </>
+                                ) : (
+                                  <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Practiced</span>
+                                )}
                               </span>
                               {e.rpe != null && <span className="tl-set-detail">RPE {e.rpe}</span>}
                               {e.quality && <span className="tl-set-detail">{e.quality}</span>}
