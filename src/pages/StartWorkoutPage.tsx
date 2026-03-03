@@ -103,7 +103,9 @@ function parseMetconMovements(blockText: string): MetconEntryValues[] {
   const segments: string[] = [];
   for (const line of text.split('\n')) {
     for (const seg of line.split(',')) {
-      const trimmed = seg.trim();
+      // Strip minute/round prefixes: "Min 1:", "Minute 2 —", "Odd —", "Even —"
+      let trimmed = seg.trim();
+      trimmed = trimmed.replace(/^(?:min(?:ute)?\s*\d+\s*[:\-–—]\s*|(?:odd|even)\s*[:\-–—]\s*)/i, '').trim();
       if (trimmed && !/^(?:for quality|not time|rest\b|then\b)/i.test(trimmed)) {
         segments.push(trimmed);
       }
@@ -153,6 +155,14 @@ function parseMovementSegment(raw: string): MetconEntryValues | null {
     distance = parseInt(distMatch[1]);
     distance_unit = /^(ft|feet)$/i.test(distMatch[2]) ? 'ft' : 'm';
     text = text.replace(distMatch[0], '').trim();
+  }
+
+  // Strip leading rep scheme: "15-12-9 Power Cleans" → total reps, keep "Power Cleans"
+  const schemeInline = text.match(/^(\d+(?:\s*-\s*\d+)+)\s+/);
+  if (schemeInline) {
+    const rounds = schemeInline[1].split(/\s*-\s*/).map(Number);
+    reps = rounds.reduce((a, b) => a + b, 0);
+    text = text.slice(schemeInline[0].length).trim();
   }
 
   // Extract cal-based monostructural: "30 cal row" → reps=30, movement="Cal Row"
