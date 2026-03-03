@@ -4,6 +4,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { inferTimeDomain } from "../_shared/time-domain.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -149,23 +150,28 @@ Deno.serve(async (req) => {
     // 2. Insert workout_log_blocks rows and get back their IDs
     let insertedBlocks: { id: string }[] = [];
     if (blocks.length > 0) {
-      const blockRows = blocks.map((b, i) => ({
-        log_id: log.id,
-        block_type: BLOCK_TYPES.includes((b.type ?? "other") as (typeof BLOCK_TYPES)[number])
+      const blockRows = blocks.map((b, i) => {
+        const blockType = BLOCK_TYPES.includes((b.type ?? "other") as (typeof BLOCK_TYPES)[number])
           ? (b.type ?? "other")
-          : "other",
-        block_label: b.label?.trim() || null,
-        block_text: b.text?.trim() || "",
-        score: b.score?.trim() || null,
-        rx: b.rx ?? false,
-        sort_order: i,
-        percentile: b.percentile != null && b.percentile >= 1 && b.percentile <= 99
-          ? b.percentile
-          : null,
-        performance_tier: b.performance_tier?.trim() || null,
-        median_benchmark: b.median_benchmark?.trim() || null,
-        excellent_benchmark: b.excellent_benchmark?.trim() || null,
-      }));
+          : "other";
+        const blockText = b.text?.trim() || "";
+        return {
+          log_id: log.id,
+          block_type: blockType,
+          block_label: b.label?.trim() || null,
+          block_text: blockText,
+          score: b.score?.trim() || null,
+          rx: b.rx ?? false,
+          sort_order: i,
+          percentile: b.percentile != null && b.percentile >= 1 && b.percentile <= 99
+            ? b.percentile
+            : null,
+          performance_tier: b.performance_tier?.trim() || null,
+          median_benchmark: b.median_benchmark?.trim() || null,
+          excellent_benchmark: b.excellent_benchmark?.trim() || null,
+          time_domain: blockType === "metcon" && blockText ? inferTimeDomain(blockText) : null,
+        };
+      });
 
       const { data: blockData, error: blocksErr } = await supa
         .from("workout_log_blocks")
