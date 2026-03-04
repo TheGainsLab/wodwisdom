@@ -45,7 +45,6 @@ verify_jwt = false
 
 [functions.generate-program]
 verify_jwt = false
-wall_clock = 300
 
 [functions.sync-program-blocks]
 verify_jwt = false
@@ -66,6 +65,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.food-log]
+verify_jwt = false
+
+[functions.program-job-status]
 verify_jwt = false
 
 [functions.favorites-manage]
