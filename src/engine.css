@@ -174,4 +174,9 @@
 .engine-exercise{padding:12px 14px}
 .ea-menu-grid{grid-template-columns:1fr}
 .ea-bar-label{width:56px;font-size:11px}
+.ea-ratio-bars{gap:16px;height:120px;padding:12px 0}
+.ea-ratio-bar-bg{width:32px;height:80px}
+.ea-ratio-value{font-size:14px}
+.ea-ratio-label{font-size:10px}
+.ea-ratio-col{max-width:80px}
 }
