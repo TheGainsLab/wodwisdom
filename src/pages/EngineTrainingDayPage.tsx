@@ -724,7 +724,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   <div className="engine-stat-value" style={{ fontSize: 22 }}>
                     {baseline.total_output} {baseline.units ?? 'cal'}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>
                     {baseline.calculated_rpm ? `${baseline.calculated_rpm.toFixed(1)} ${baseline.units ?? 'cal'}/min` : ''}
                   </div>
                 </div>
