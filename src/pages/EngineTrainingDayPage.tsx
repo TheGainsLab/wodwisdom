@@ -977,9 +977,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                               </span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'right' }}>
-                              {s.total_output != null && (
-                                <span style={{ color: 'var(--text)', fontWeight: 600 }}>
-                                  {s.total_output} {s.units ?? ''}
+                              {s.actual_pace != null && (
+                                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                                  {Number(s.actual_pace).toFixed(1)} {s.units ?? ''}/min
                                 </span>
                               )}
                               {s.perceived_exertion != null && (
