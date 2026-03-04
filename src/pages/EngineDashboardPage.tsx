@@ -261,6 +261,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                       style={{
                         opacity: isLocked ? 0.4 : 1,
                         cursor: isLocked ? 'not-allowed' : 'pointer',
+                        color: 'var(--text)',
                         border: status === 'current' ? '1px solid var(--accent)' : '1px solid transparent',
                         background: status === 'current' ? 'var(--accent-glow)' : 'transparent',
                       }}
@@ -357,6 +358,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                         cursor: isLocked ? 'not-allowed' : 'pointer',
                         textAlign: 'left',
                         transition: 'all .2s',
+                        color: 'var(--text)',
                         background: isLocked ? 'var(--bg)' : undefined,
                         borderColor: isCurrent
                           ? 'var(--accent)'
