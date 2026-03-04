@@ -67,5 +67,8 @@ verify_jwt = false
 [functions.food-log]
 verify_jwt = false
 
+[functions.program-job-status]
+verify_jwt = false
+
 [functions.favorites-manage]
 verify_jwt = false

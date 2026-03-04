@@ -1,10 +1,10 @@
 /**
  * Generate a 12-week periodized program from profile analysis.
- * Uses the specified evaluation (or most recent) to produce a personalized program.
- * Includes 3-week build cycles with deloads at weeks 4, 8, and 12.
- * Program is auto-saved; no preview step.
+ * Returns a job_id immediately; heavy work runs in background via EdgeRuntime.waitUntil.
+ * Client polls program-job-status for completion.
  */
 
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   searchChunks,
@@ -195,6 +195,169 @@ async function retrieveRAGContext(
   }
 }
 
+/** Background task: generate program and update job row */
+async function processJob(
+  jobId: string,
+  userId: string,
+  authHeader: string,
+  evalRow: {
+    profile_snapshot: ProfileData;
+    lifting_analysis: string | null;
+    skills_analysis: string | null;
+    engine_analysis: string | null;
+  }
+): Promise<void> {
+  const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+  try {
+    // Mark processing
+    await supa.from("program_jobs").update({ status: "processing", updated_at: new Date().toISOString() }).eq("id", jobId);
+
+    const profile = evalRow.profile_snapshot || {};
+    const profileStr = formatProfile(profile);
+    const analysisParts: string[] = [];
+    if (evalRow.lifting_analysis) analysisParts.push("STRENGTH ANALYSIS:\n" + evalRow.lifting_analysis);
+    if (evalRow.skills_analysis) analysisParts.push("SKILLS ANALYSIS:\n" + evalRow.skills_analysis);
+    if (evalRow.engine_analysis) analysisParts.push("ENGINE ANALYSIS:\n" + evalRow.engine_analysis);
+    const analysisStr = analysisParts.length > 0 ? analysisParts.join("\n\n") : "No detailed analysis.";
+
+    // Fetch gymnastics movements for priority scoring
+    const { data: movementRows } = await supa
+      .from("movements")
+      .select("canonical_name, display_name, modality, category, aliases, competition_count")
+      .eq("modality", "G");
+
+    // Build deterministic skill schedule
+    const priorities = rankSkillPriorities(profile.skills || {}, movementRows || []);
+    const schedule = buildSkillSchedule(priorities);
+    const scheduleBlock = schedule.length > 0
+      ? `\n\nSKILL ASSIGNMENTS (mandatory — each day's Skills block MUST use the assigned skill):\n${formatScheduleForPrompt(schedule)}\n\nFor each Skills block, write a 10-15 min progression appropriate for the athlete's level with that skill. Vary the format (EMOM, sets, practice + hold, etc.). Progress difficulty across weeks within each 3-week build block. On deload weeks, reduce skill volume (lighter sets, focus on quality).`
+      : "";
+
+    const recentTraining = await fetchAndFormatRecentHistory(supa, userId, { maxLines: 25 });
+    const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
+
+    const ragContext = await retrieveRAGContext(supa, profile);
+
+    const userPrompt = `ATHLETE PROFILE:
+${profileStr}
+
+ANALYSIS TO ADDRESS:
+${analysisStr}
+${trainingBlock}${scheduleBlock}
+
+Generate a 12-week periodized program. Follow the format and periodization rules exactly.`;
+
+    const systemPrompt = GENERATE_PROMPT + ragContext;
+
+    if (!ANTHROPIC_API_KEY) {
+      throw new Error("Program generation is not configured");
+    }
+
+    const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 24000,
+        stream: false,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    });
+
+    if (!claudeResp.ok) {
+      const err = await claudeResp.json().catch(() => ({}));
+      console.error("Claude API error:", err);
+      throw new Error("Failed to generate program");
+    }
+
+    const claudeData = await claudeResp.json();
+    let programText =
+      claudeData.content?.[0]?.text?.trim() || claudeData.content?.[0]?.input?.trim() || "";
+
+    // Strip markdown code blocks if present
+    const codeMatch = programText.match(/```(?:text)?\s*\n?([\s\S]*?)```/);
+    if (codeMatch) programText = codeMatch[1].trim();
+
+    if (!programText || programText.length < 100) {
+      throw new Error("Generated program was empty or too short");
+    }
+
+    // Validate skill assignments compliance (logging only)
+    if (schedule.length > 0) {
+      const dayPattern = /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Mon|Tue|Wed|Thu|Fri|Sat):/gi;
+      const workoutTexts = programText.split(dayPattern).filter((t) => t.trim().length > 20);
+      let matched = 0;
+      let total = 0;
+      for (const slot of schedule) {
+        total++;
+        const idx = (slot.week - 1) * 5 + (slot.day - 1);
+        const workoutText = workoutTexts[idx];
+        if (!workoutText) continue;
+        const blocks = extractBlocksFromWorkoutText(workoutText);
+        const skillBlock = blocks.find((b) => b.block_type === "skills");
+        if (!skillBlock) continue;
+        const display = slot.displayName.toLowerCase();
+        const blockLower = skillBlock.block_text.toLowerCase();
+        const keywords = display.split(/[\s\-()]+/).filter((w) => w.length > 2);
+        const found = keywords.some((kw) => blockLower.includes(kw));
+        if (found) matched++;
+      }
+      const complianceRate = total > 0 ? matched / total : 1;
+      console.log(`Skill schedule compliance: ${matched}/${total} (${(complianceRate * 100).toFixed(0)}%)`);
+    }
+
+    // Create program via preprocess-program
+    const preprocessUrl = `${SUPABASE_URL}/functions/v1/preprocess-program`;
+    const monthYear = new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" });
+    const programName = `12-Week Program — ${monthYear}`;
+
+    const preprocessResp = await fetch(preprocessUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authHeader,
+      },
+      body: JSON.stringify({ text: programText, name: programName, source: "generate", total_phases: 3 }),
+    });
+
+    if (!preprocessResp.ok) {
+      const errBody = await preprocessResp.text();
+      let errMsg = "Failed to save program";
+      try {
+        const errJson = JSON.parse(errBody);
+        if (errJson?.error) errMsg = errJson.error;
+      } catch {
+        // use default
+      }
+      throw new Error(errMsg);
+    }
+
+    const { program_id, workout_count } = await preprocessResp.json();
+
+    // Mark complete
+    await supa.from("program_jobs").update({
+      status: "complete",
+      program_id,
+      updated_at: new Date().toISOString(),
+    }).eq("id", jobId);
+
+    console.log(`Job ${jobId} complete: program_id=${program_id}, workouts=${workout_count}`);
+  } catch (e) {
+    console.error(`Job ${jobId} failed:`, e);
+    await supa.from("program_jobs").update({
+      status: "failed",
+      error: (e as Error).message,
+      updated_at: new Date().toISOString(),
+    }).eq("id", jobId).catch(() => {});
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
@@ -261,43 +424,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    const profile = evalRow.profile_snapshot || {};
-    const profileStr = formatProfile(profile);
-    const analysisParts: string[] = [];
-    if (evalRow.lifting_analysis) analysisParts.push("STRENGTH ANALYSIS:\n" + evalRow.lifting_analysis);
-    if (evalRow.skills_analysis) analysisParts.push("SKILLS ANALYSIS:\n" + evalRow.skills_analysis);
-    if (evalRow.engine_analysis) analysisParts.push("ENGINE ANALYSIS:\n" + evalRow.engine_analysis);
-    const analysisStr = analysisParts.length > 0 ? analysisParts.join("\n\n") : "No detailed analysis.";
-
-    // Fetch gymnastics movements for priority scoring
-    const { data: movementRows } = await supa
-      .from("movements")
-      .select("canonical_name, display_name, modality, category, aliases, competition_count")
-      .eq("modality", "G");
-
-    // Build deterministic skill schedule
-    const priorities = rankSkillPriorities(profile.skills || {}, movementRows || []);
-    const schedule = buildSkillSchedule(priorities);
-    const scheduleBlock = schedule.length > 0
-      ? `\n\nSKILL ASSIGNMENTS (mandatory — each day's Skills block MUST use the assigned skill):\n${formatScheduleForPrompt(schedule)}\n\nFor each Skills block, write a 10-15 min progression appropriate for the athlete's level with that skill. Vary the format (EMOM, sets, practice + hold, etc.). Progress difficulty across weeks within each 3-week build block. On deload weeks, reduce skill volume (lighter sets, focus on quality).`
-      : "";
-
-    const recentTraining = await fetchAndFormatRecentHistory(supa, user.id, { maxLines: 25 });
-    const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
-
-    const ragContext = await retrieveRAGContext(supa, profile);
-
-    const userPrompt = `ATHLETE PROFILE:
-${profileStr}
-
-ANALYSIS TO ADDRESS:
-${analysisStr}
-${trainingBlock}${scheduleBlock}
-
-Generate a 12-week periodized program. Follow the format and periodization rules exactly.`;
-
-    const systemPrompt = GENERATE_PROMPT + ragContext;
-
     if (!ANTHROPIC_API_KEY) {
       return new Response(
         JSON.stringify({ error: "Program generation is not configured" }),
@@ -305,114 +431,28 @@ Generate a 12-week periodized program. Follow the format and periodization rules
       );
     }
 
-    const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 24000,
-        stream: false,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
+    // Create job row
+    const { data: job, error: jobErr } = await supa
+      .from("program_jobs")
+      .insert({ user_id: user.id, status: "pending" })
+      .select("id")
+      .single();
 
-    if (!claudeResp.ok) {
-      const err = await claudeResp.json().catch(() => ({}));
-      console.error("Claude API error:", err);
+    if (jobErr || !job) {
+      console.error("Failed to create job:", jobErr);
       return new Response(
-        JSON.stringify({ error: "Failed to generate program" }),
+        JSON.stringify({ error: "Failed to start program generation" }),
         { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }
 
-    const claudeData = await claudeResp.json();
-    let programText =
-      claudeData.content?.[0]?.text?.trim() || claudeData.content?.[0]?.input?.trim() || "";
+    // Fire background task — isolate stays alive up to 400s on Pro
+    EdgeRuntime.waitUntil(processJob(job.id, user.id, authHeader, evalRow));
 
-    // Strip markdown code blocks if present
-    const codeMatch = programText.match(/```(?:text)?\s*\n?([\s\S]*?)```/);
-    if (codeMatch) programText = codeMatch[1].trim();
-
-    if (!programText || programText.length < 100) {
-      return new Response(
-        JSON.stringify({ error: "Generated program was empty or too short" }),
-        { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Validate skill assignments compliance
-    if (schedule.length > 0) {
-      const dayPattern = /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Mon|Tue|Wed|Thu|Fri|Sat):/gi;
-      const workoutTexts = programText.split(dayPattern).filter((t) => t.trim().length > 20);
-      let matched = 0;
-      let total = 0;
-      for (const slot of schedule) {
-        total++;
-        // Find the corresponding workout text (approximate by index)
-        const idx = (slot.week - 1) * 5 + (slot.day - 1);
-        const workoutText = workoutTexts[idx];
-        if (!workoutText) continue;
-        const blocks = extractBlocksFromWorkoutText(workoutText);
-        const skillBlock = blocks.find((b) => b.block_type === "skills");
-        if (!skillBlock) continue;
-        // Check if the assigned skill name appears in the block text
-        const display = slot.displayName.toLowerCase();
-        const blockLower = skillBlock.block_text.toLowerCase();
-        // Check display name or key words from it
-        const keywords = display.split(/[\s\-()]+/).filter((w) => w.length > 2);
-        const found = keywords.some((kw) => blockLower.includes(kw));
-        if (found) matched++;
-      }
-      const complianceRate = total > 0 ? matched / total : 1;
-      console.log(`Skill schedule compliance: ${matched}/${total} (${(complianceRate * 100).toFixed(0)}%)`);
-    }
-
-    // Create program via preprocess-program (reuse parsing + insert logic)
-    const preprocessUrl = `${SUPABASE_URL}/functions/v1/preprocess-program`;
-    const monthYear = new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" });
-    const programName = `12-Week Program — ${monthYear}`;
-
-    const preprocessResp = await fetch(preprocessUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: authHeader,
-      },
-      body: JSON.stringify({ text: programText, name: programName, source: "generate", total_phases: 3 }),
-    });
-
-    if (!preprocessResp.ok) {
-      const errBody = await preprocessResp.text();
-      let errMsg = "Failed to save program";
-      try {
-        const errJson = JSON.parse(errBody);
-        if (errJson?.error) errMsg = errJson.error;
-      } catch {
-        // use default
-      }
-      return new Response(JSON.stringify({ error: errMsg }), {
-        status: preprocessResp.status,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
-    }
-
-    const { program_id, workout_count } = await preprocessResp.json();
-
+    // Return immediately with job_id
     return new Response(
-      JSON.stringify({
-        program_id,
-        workout_count: workout_count ?? 0,
-        name: programName,
-      }),
-      {
-        status: 200,
-        headers: { ...cors, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ job_id: job.id }),
+      { status: 202, headers: { ...cors, "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("generate-program error:", e);

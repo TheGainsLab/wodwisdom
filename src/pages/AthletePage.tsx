@@ -360,17 +360,41 @@ export default function AthletePage({ session }: { session: Session }) {
     setGenerateLoading(true);
     setError('');
     try {
+      // Kick off background generation — returns immediately with job_id
       const { data, error } = await supabase.functions.invoke('generate-program', {
         body: analysisResult?.evaluationId ? { evaluation_id: analysisResult.evaluationId } : {},
       });
       if (error) throw new Error(error.message || 'Failed to generate program');
       if (data?.error) throw new Error(data.error || 'Failed to generate program');
-      const programId = data?.program_id;
-      if (programId) {
-        navigate(`/programs/${programId}`);
-      } else {
-        throw new Error('No program returned');
+      const jobId = data?.job_id;
+      if (!jobId) throw new Error('No job ID returned');
+
+      // Poll for completion with backoff: 3s, 4s, 5s, 6s, ... capped at 8s
+      let delay = 3000;
+      const maxDelay = 8000;
+      const maxAttempts = 80; // ~400s worth of polling
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise((r) => setTimeout(r, delay));
+        const { data: status, error: statusErr } = await supabase.functions.invoke('program-job-status', {
+          body: { job_id: jobId },
+        });
+        if (statusErr) throw new Error(statusErr.message || 'Failed to check job status');
+        if (status?.error && status?.status !== 'failed') throw new Error(status.error);
+
+        if (status?.status === 'complete') {
+          if (status.program_id) {
+            navigate(`/programs/${status.program_id}`);
+            return;
+          }
+          throw new Error('Program completed but no ID returned');
+        }
+        if (status?.status === 'failed') {
+          throw new Error(status.error || 'Program generation failed');
+        }
+        // Still pending/processing — back off slightly
+        delay = Math.min(delay + 1000, maxDelay);
       }
+      throw new Error('Program generation timed out');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate program');
     } finally {
