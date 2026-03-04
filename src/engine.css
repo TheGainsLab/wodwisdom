@@ -138,7 +138,7 @@
 
 /* Horizontal bar chart */
 .ea-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.ea-bar-label{font-size:12px;color:var(--text-muted);width:70px;flex-shrink:0;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ea-bar-label{font-size:11px;color:var(--text-muted);width:120px;flex-shrink:0;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ea-bar-track{flex:1;height:20px;background:var(--surface2);border-radius:4px;overflow:hidden}
 .ea-bar-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .3s ease}
 .ea-bar-value{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--text-dim);width:72px;flex-shrink:0;text-align:right}
@@ -173,7 +173,8 @@
 .engine-btn-primary{width:100%;padding:14px}
 .engine-exercise{padding:12px 14px}
 .ea-menu-grid{grid-template-columns:1fr}
-.ea-bar-label{width:56px;font-size:11px}
+.ea-bar-label{width:100px;font-size:10px}
+.ea-bar-value{width:60px;font-size:11px}
 .ea-ratio-bars{gap:16px;height:120px;padding:12px 0}
 .ea-ratio-bar-bg{width:32px;height:80px}
 .ea-ratio-value{font-size:14px}
