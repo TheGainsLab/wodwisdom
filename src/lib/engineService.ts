@@ -382,6 +382,17 @@ export async function loadTimeTrialBaselines(
   return data ?? [];
 }
 
+/** Load ALL time trials (including non-current) for charting history. */
+export async function loadAllTimeTrials(): Promise<EngineTimeTrial[]> {
+  const { data, error } = await supabase
+    .from('engine_time_trials')
+    .select('*')
+    .order('date', { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 /** Save a new time trial result. Marks previous trials for this modality as not current. */
 export async function saveTimeTrial(
   trial: Pick<EngineTimeTrial, 'modality' | 'total_output' | 'calculated_rpm' | 'units'>
