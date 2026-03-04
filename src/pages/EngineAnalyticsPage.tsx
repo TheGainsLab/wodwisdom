@@ -823,7 +823,7 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
                 <div className="engine-stat-value" style={{ fontSize: 28 }}>{bl.total_output}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{bl.units ?? 'cal'} in 10 min</div>
                 {bl.calculated_rpm != null && (
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 700, color: 'var(--accent)', textShadow: '0 0 8px var(--accent-glow)' }}>
                     {bl.calculated_rpm.toFixed(1)} {bl.units ?? 'cal'}/min
                   </div>
                 )}
