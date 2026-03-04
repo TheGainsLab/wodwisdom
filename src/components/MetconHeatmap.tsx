@@ -65,7 +65,9 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
         supabase.rpc('get_metcon_frequency', { p_user_id: userId }),
         supabase.rpc('get_metcon_heatmap', { p_user_id: userId }),
       ]);
+      if (freqResult.error) console.error('get_metcon_frequency error:', freqResult.error);
       if (!freqResult.error && freqResult.data) setFreqCells(freqResult.data as HeatmapCell[]);
+      if (perfResult.error) console.error('get_metcon_heatmap error:', perfResult.error);
       if (!perfResult.error && perfResult.data) setPerfCells(perfResult.data as HeatmapCell[]);
       setLoading(false);
     })();
