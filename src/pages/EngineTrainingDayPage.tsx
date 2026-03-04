@@ -877,7 +877,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                           ))}
                         </div>
                         {targetRpm && (
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+                          <div style={{ fontSize: 13, color: '#ffffff', fontWeight: 700, marginTop: 8 }}>
                             Pace: {targetRpm}
                           </div>
                         )}
