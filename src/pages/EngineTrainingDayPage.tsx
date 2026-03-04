@@ -1190,7 +1190,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
             onClick={handleEndWorkout}
             style={{ flex: 1, maxWidth: 200, borderColor: 'rgba(239,68,68,.3)', color: '#f87171' }}
           >
-            <Square size={18} /> End
+            <Square size={18} /> Skip to End
           </button>
         </div>
       </div>
