@@ -45,6 +45,7 @@ verify_jwt = false
 
 [functions.generate-program]
 verify_jwt = false
+wall_clock = 300
 
 [functions.sync-program-blocks]
 verify_jwt = false
