@@ -131,7 +131,7 @@
 .ea-pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 .ea-pill{padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
 .ea-pill:hover{border-color:var(--accent);color:var(--text);background:var(--surface2)}
-.ea-pill.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent);font-weight:700}
+.ea-pill.active{background:transparent;border:2px solid var(--accent);color:var(--text);font-weight:700;padding:6px 13px}
 
 /* Pill selector label */
 .ea-pill-label{font-size:13px;font-weight:600;color:var(--text-dim);text-align:center;margin-bottom:8px}

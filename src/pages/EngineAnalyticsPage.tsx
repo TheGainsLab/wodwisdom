@@ -4,24 +4,21 @@ import type { Session } from '@supabase/supabase-js';
 import Nav from '../components/Nav';
 import {
   loadCompletedSessions,
-  getAllPerformanceMetrics,
   loadTimeTrialBaselines,
   loadAllTimeTrials,
   loadUserProgress,
   type EngineWorkoutSession,
-  type EnginePerformanceMetrics,
   type EngineTimeTrial,
 } from '../lib/engineService';
 import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, Clock, Target, Activity, ArrowLeft } from 'lucide-react';
+import { ChevronLeft, Clock, Activity, ArrowLeft } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────
 
 type View =
   | 'menu'
   | 'overview'
-  | 'performance'
   | 'history'
   | 'comparisons'
   | 'time-trials'
@@ -189,7 +186,6 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
 
   // Data
   const [sessions, setSessions] = useState<EngineWorkoutSession[]>([]);
-  const [metrics, setMetrics] = useState<EnginePerformanceMetrics[]>([]);
   const [baselines, setBaselines] = useState<EngineTimeTrial[]>([]);
   const [allTrials, setAllTrials] = useState<EngineTimeTrial[]>([]);
   const [currentDay, setCurrentDay] = useState(1);
@@ -205,15 +201,13 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
 
   useEffect(() => {
     (async () => {
-      const [sessResult, metResult, blResult, allTrialResult, progressResult] = await Promise.allSettled([
+      const [sessResult, blResult, allTrialResult, progressResult] = await Promise.allSettled([
         loadCompletedSessions(),
-        getAllPerformanceMetrics(),
         loadTimeTrialBaselines(),
         loadAllTimeTrials(),
         loadUserProgress(),
       ]);
       if (sessResult.status === 'fulfilled') setSessions(sessResult.value);
-      if (metResult.status === 'fulfilled') setMetrics(metResult.value);
       if (blResult.status === 'fulfilled') setBaselines(blResult.value);
       if (allTrialResult.status === 'fulfilled') setAllTrials(allTrialResult.value);
       if (progressResult.status === 'fulfilled') setCurrentDay(progressResult.value?.engine_current_day ?? 1);
@@ -284,16 +278,6 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
   const dayTypes = Array.from(byDayType.keys()).sort();
   const modalities = Array.from(byModality.keys()).sort();
 
-  // Group metrics by day type
-  const metricsByDayType = useMemo(() => {
-    const map = new Map<string, EnginePerformanceMetrics[]>();
-    for (const m of metrics) {
-      if (!map.has(m.day_type)) map.set(m.day_type, []);
-      map.get(m.day_type)!.push(m);
-    }
-    return map;
-  }, [metrics]);
-
   // ── Summary: Energy System Ratios ──
 
   const summaryRatios = useMemo(() => {
@@ -338,7 +322,6 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
   function renderMenu() {
     const options: { id: View; title: string; desc: string }[] = [
       { id: 'overview', title: 'Overview', desc: 'Summary stats, breakdowns, ratios' },
-      { id: 'performance', title: 'Performance', desc: 'Rolling metrics by day type' },
       { id: 'history', title: 'My History', desc: 'Filtered trends by modality & type' },
       { id: 'comparisons', title: 'Comparisons', desc: 'Side-by-side day type analysis' },
       { id: 'time-trials', title: 'Time Trials', desc: 'Baseline progression charts' },
@@ -534,97 +517,6 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
         ) : (
           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Complete workouts to see energy system ratios.</div>
         )}
-      </div>
-    );
-  }
-
-  // ── Render: Performance ──
-
-  function renderPerformance() {
-    if (metrics.length === 0) {
-      return (
-        <div className="engine-section">
-          <ViewHeader title="Performance" onBack={() => goTo('menu')} />
-          <div className="engine-empty">
-            <Target size={32} />
-            <div className="engine-empty-title">No Performance Data</div>
-            <div className="engine-empty-desc">Complete workouts to see performance metrics by day type and equipment.</div>
-          </div>
-        </div>
-      );
-    }
-
-    const allDayTypes = Array.from(metricsByDayType.keys()).sort();
-
-    return (
-      <div className="engine-section">
-        <ViewHeader title="Performance" onBack={() => goTo('menu')} />
-        {allDayTypes.map(dt => {
-          const dtMetrics = metricsByDayType.get(dt) ?? [];
-          return (
-            <div key={dt} className="engine-card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <span className={'engine-badge ' + dayTypeBadge(dt)}>
-                  {dt.replace(/_/g, ' ')}
-                </span>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {dtMetrics.reduce((s, m) => s + m.rolling_count, 0)} total sessions
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {dtMetrics.map(m => (
-                  <div key={m.modality} style={{
-                    background: 'var(--bg)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 8,
-                    padding: '12px 14px',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', textTransform: 'capitalize' }}>
-                        {formatModality(m.modality)}
-                      </span>
-                      <span style={{
-                        fontFamily: "'JetBrains Mono', monospace",
-                        fontSize: 15,
-                        fontWeight: 700,
-                        color: m.rolling_avg_ratio ? pctColor(m.rolling_avg_ratio) : 'var(--text-dim)',
-                      }}>
-                        {m.rolling_avg_ratio ? `${(m.rolling_avg_ratio * 100).toFixed(0)}%` : '—'}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-muted)' }}>
-                      <span>{m.rolling_count} session{m.rolling_count !== 1 ? 's' : ''}</span>
-                      {m.learned_max_pace != null && (
-                        <span>Best: {m.learned_max_pace.toFixed(1)}/min</span>
-                      )}
-                    </div>
-
-                    {m.last_4_ratios && m.last_4_ratios.length > 0 && (
-                      <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 32, marginTop: 8 }}>
-                        {m.last_4_ratios.map((r, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              flex: 1,
-                              height: `${Math.min(r * 100, 100) * 0.32}px`,
-                              minHeight: 4,
-                              background: pctColor(r),
-                              borderRadius: 2,
-                              opacity: 0.8,
-                            }}
-                            title={`${(r * 100).toFixed(0)}%`}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
       </div>
     );
   }
@@ -1208,7 +1100,6 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
 
               {view === 'menu' && renderMenu()}
               {view === 'overview' && renderOverview()}
-              {view === 'performance' && renderPerformance()}
               {view === 'history' && renderHistory()}
               {view === 'comparisons' && renderComparisons()}
               {view === 'time-trials' && renderTimeTrials()}
