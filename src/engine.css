@@ -1,5 +1,8 @@
 /* Strength Program Engine */
 
+/* Override border colors to lighter tones for Engine pages */
+.engine-page{--border:#e0e0e8;--border-light:#f0f0f5}
+
 /* Page wrapper */
 .engine-page{padding:24px 20px;max-width:900px;margin:0 auto;width:100%;overflow-y:auto;flex:1;animation:fadeUp .4s ease}
 
