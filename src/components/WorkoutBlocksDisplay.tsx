@@ -3,32 +3,56 @@
  * Falls back to raw text if parsing fails or format doesn't match.
  */
 
-const BLOCK_LABELS = ['Warm-up', 'Skills', 'Strength', 'Metcon', 'Cool down'] as const;
-
 interface ParsedBlock {
   label: string;
   content: string;
 }
 
+interface BlockDef {
+  label: string;
+  patterns: RegExp[];
+}
+
+const BLOCK_DEFS: BlockDef[] = [
+  { label: 'Warm-up', patterns: [/warm[\s-]*up\s*:/i] },
+  { label: 'Skills', patterns: [/skills?\s*(?:work)?\s*:/i] },
+  { label: 'Strength', patterns: [/strength\s*(?:work)?\s*:/i] },
+  { label: 'Metcon', patterns: [/met[\s-]*con\s*:/i, /wod\s*:/i, /conditioning\s*:/i] },
+  { label: 'Cool down', patterns: [/cool[\s-]*down\s*:/i] },
+];
+
+function findFirstMatch(text: string, patterns: RegExp[]): { index: number; matchLen: number } | null {
+  let best: { index: number; matchLen: number } | null = null;
+  for (const pat of patterns) {
+    const m = text.match(pat);
+    if (m && m.index != null) {
+      if (!best || m.index < best.index) {
+        best = { index: m.index, matchLen: m[0].length };
+      }
+    }
+  }
+  return best;
+}
+
 function parseWorkoutBlocks(text: string): ParsedBlock[] | null {
   if (!text?.trim()) return [];
-  const lower = text.toLowerCase();
   const blocks: ParsedBlock[] = [];
-  const labelsToFind = BLOCK_LABELS.map((l) => ({
-    label: l,
-    needle: (l + ':').toLowerCase(),
-  }));
 
-  for (let i = 0; i < labelsToFind.length; i++) {
-    const { label, needle } = labelsToFind[i];
-    const start = lower.indexOf(needle);
-    if (start < 0) continue;
-    const contentStart = start + needle.length;
-    const next = labelsToFind.slice(i + 1).find((x) => {
-      const idx = lower.indexOf(x.needle, contentStart);
-      return idx >= 0;
-    });
-    const end = next ? lower.indexOf(next.needle, contentStart) : text.length;
+  // Find all block positions
+  const found: { label: string; start: number; contentStart: number }[] = [];
+  for (const def of BLOCK_DEFS) {
+    const match = findFirstMatch(text, def.patterns);
+    if (match) {
+      found.push({ label: def.label, start: match.index, contentStart: match.index + match.matchLen });
+    }
+  }
+
+  // Sort by position in text
+  found.sort((a, b) => a.start - b.start);
+
+  for (let i = 0; i < found.length; i++) {
+    const { label, contentStart } = found[i];
+    const end = i + 1 < found.length ? found[i + 1].start : text.length;
     const content = text.slice(contentStart, end).trim();
     blocks.push({ label, content });
   }
