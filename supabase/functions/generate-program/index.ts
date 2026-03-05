@@ -1,5 +1,5 @@
 /**
- * Generate a 12-week periodized program from profile analysis.
+ * Generate a 4-week (1-month) periodized program from profile analysis.
  * Returns a job_id immediately; heavy work runs in background via EdgeRuntime.waitUntil.
  * Client polls program-job-status for completion.
  */
@@ -69,17 +69,17 @@ function formatProfile(profile: ProfileData): string {
   return parts.join("\n") || "No profile data.";
 }
 
-const GENERATE_PROMPT = `You are an expert CrossFit coach. Generate a 12-week periodized program for this athlete based on their profile and analysis.
+const GENERATE_PROMPT = `You are an expert CrossFit coach. Generate a 4-week (1-month) periodized program for this athlete based on their profile and analysis.
 
 PERIODIZATION STRUCTURE:
-- The program has three 4-week cycles. Each cycle = 3 build weeks + 1 deload week.
-  - Build weeks (1-3, 5-7, 9-11): Progressive intensity increase each week.
-  - Deload weeks (4, 8, 12): Reduce BOTH volume AND intensity. Use 55-65% loads, fewer sets, shorter metcons.
-- Strength loading progression within each 3-week build block:
-  - Week 1 of block: moderate (70-75%)
-  - Week 2 of block: moderate-heavy (75-80%)
-  - Week 3 of block: heavy (80-85%)
-  - Week 4 of block (deload): light (55-65%), reduced volume (3x3-5 instead of 5x5)
+- The program is one 4-week cycle: 3 build weeks + 1 deload week.
+  - Build weeks (1-3): Progressive intensity increase each week.
+  - Deload week (4): Reduce BOTH volume AND intensity. Use 55-65% loads, fewer sets, shorter metcons.
+- Strength loading progression:
+  - Week 1: moderate (70-75%)
+  - Week 2: moderate-heavy (75-80%)
+  - Week 3: heavy (80-85%)
+  - Week 4 (deload): light (55-65%), reduced volume (3x3-5 instead of 5x5)
 
 FREQUENCY & RECOVERY RULES:
 - No single strength exercise more than 2x per week. Vary the barbell movements across the week (e.g. back squat Mon, front squat Thu — not back squat Mon/Wed/Fri).
@@ -91,10 +91,10 @@ WEAKNESS vs. MAINTENANCE BALANCE:
 - The analysis identifies weaknesses/priorities. Address them consistently but not exclusively.
 - Weakness movements: program 2x per week across the cycle.
 - Strengths and maintenance movements: still program 1x per week to maintain. Do not ignore movements just because they are not a weakness.
-- Distribute weakness work across the full 12 weeks with progression, not just repetition.
+- Distribute weakness work across all 4 weeks with progression, not just repetition.
 
 OUTPUT FORMAT (strict):
-- Use "Week 1", "Week 2", etc. through "Week 12" for week headers.
+- Use "Week 1", "Week 2", "Week 3", "Week 4" for week headers.
 - Use "Monday:", "Tuesday:", etc. (or "Mon:", "Tue:", etc.) for each training day.
 - Each day has exactly 5 blocks in this order. Put each block on its own line:
   1. Warm-up: (5-8 min movement prep for that day's work)
@@ -102,7 +102,7 @@ OUTPUT FORMAT (strict):
   3. Strength: (barbell work with percentages, e.g. 5x5 @ 75%)
   4. Metcon: (For Time, AMRAP, EMOM etc. - prescribe Rx weights)
   5. Cool down: (3-5 min mobility/stretch)
-- Use 4-5 training days per week (Mon-Fri typical, optional Sat).
+- Use exactly 5 training days per week (Monday through Friday), every week, no exceptions.
 - Each block must fit on ONE line. Use commas to separate movements within a block.
 - Prescribe weights using their 1RMs (e.g. 75% of back squat). Use / for M/F (e.g. 95/65).
 
@@ -246,7 +246,7 @@ ANALYSIS TO ADDRESS:
 ${analysisStr}
 ${trainingBlock}${scheduleBlock}
 
-Generate a 12-week periodized program. Follow the format and periodization rules exactly.`;
+Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the format and periodization rules exactly.`;
 
     const systemPrompt = GENERATE_PROMPT + ragContext;
 
@@ -254,91 +254,114 @@ Generate a 12-week periodized program. Follow the format and periodization rules
       throw new Error("Program generation is not configured");
     }
 
-    const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 24000,
-        stream: false,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
-
-    if (!claudeResp.ok) {
-      const err = await claudeResp.json().catch(() => ({}));
-      console.error("Claude API error:", err);
-      throw new Error("Failed to generate program");
-    }
-
-    const claudeData = await claudeResp.json();
-    let programText =
-      claudeData.content?.[0]?.text?.trim() || claudeData.content?.[0]?.input?.trim() || "";
-
-    // Strip markdown code blocks if present
-    const codeMatch = programText.match(/```(?:text)?\s*\n?([\s\S]*?)```/);
-    if (codeMatch) programText = codeMatch[1].trim();
-
-    if (!programText || programText.length < 100) {
-      throw new Error("Generated program was empty or too short");
-    }
-
-    // Validate skill assignments compliance (logging only)
-    if (schedule.length > 0) {
-      const dayPattern = /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Mon|Tue|Wed|Thu|Fri|Sat):/gi;
-      const workoutTexts = programText.split(dayPattern).filter((t) => t.trim().length > 20);
-      let matched = 0;
-      let total = 0;
-      for (const slot of schedule) {
-        total++;
-        const idx = (slot.week - 1) * 5 + (slot.day - 1);
-        const workoutText = workoutTexts[idx];
-        if (!workoutText) continue;
-        const blocks = extractBlocksFromWorkoutText(workoutText);
-        const skillBlock = blocks.find((b) => b.block_type === "skills");
-        if (!skillBlock) continue;
-        const display = slot.displayName.toLowerCase();
-        const blockLower = skillBlock.block_text.toLowerCase();
-        const keywords = display.split(/[\s\-()]+/).filter((w) => w.length > 2);
-        const found = keywords.some((kw) => blockLower.includes(kw));
-        if (found) matched++;
-      }
-      const complianceRate = total > 0 ? matched / total : 1;
-      console.log(`Skill schedule compliance: ${matched}/${total} (${(complianceRate * 100).toFixed(0)}%)`);
-    }
-
-    // Create program via preprocess-program
+    const MAX_ATTEMPTS = 3;
     const preprocessUrl = `${SUPABASE_URL}/functions/v1/preprocess-program`;
     const monthYear = new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" });
-    const programName = `12-Week Program — ${monthYear}`;
+    const programName = `Month 1 — ${monthYear}`;
 
-    const preprocessResp = await fetch(preprocessUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: authHeader,
-      },
-      body: JSON.stringify({ text: programText, name: programName, source: "generate", total_phases: 3 }),
-    });
+    let program_id: string | undefined;
+    let workout_count: number | undefined;
 
-    if (!preprocessResp.ok) {
-      const errBody = await preprocessResp.text();
-      let errMsg = "Failed to save program";
-      try {
-        const errJson = JSON.parse(errBody);
-        if (errJson?.error) errMsg = errJson.error;
-      } catch {
-        // use default
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 8000,
+          stream: false,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userPrompt }],
+        }),
+      });
+
+      if (!claudeResp.ok) {
+        const err = await claudeResp.json().catch(() => ({}));
+        console.error("Claude API error:", err);
+        throw new Error("Failed to generate program");
       }
-      throw new Error(errMsg);
+
+      const claudeData = await claudeResp.json();
+      let programText =
+        claudeData.content?.[0]?.text?.trim() || claudeData.content?.[0]?.input?.trim() || "";
+
+      // Strip markdown code blocks if present
+      const codeMatch = programText.match(/```(?:text)?\s*\n?([\s\S]*?)```/);
+      if (codeMatch) programText = codeMatch[1].trim();
+
+      if (!programText || programText.length < 100) {
+        if (attempt < MAX_ATTEMPTS) {
+          console.warn(`Attempt ${attempt}: program too short, retrying...`);
+          continue;
+        }
+        throw new Error("Generated program was empty or too short");
+      }
+
+      // Validate skill assignments compliance (logging only)
+      if (schedule.length > 0) {
+        const dayPattern = /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Mon|Tue|Wed|Thu|Fri|Sat):/gi;
+        const workoutTexts = programText.split(dayPattern).filter((t) => t.trim().length > 20);
+        let matched = 0;
+        let total = 0;
+        for (const slot of schedule) {
+          total++;
+          const idx = (slot.week - 1) * 5 + (slot.day - 1);
+          const workoutText = workoutTexts[idx];
+          if (!workoutText) continue;
+          const blocks = extractBlocksFromWorkoutText(workoutText);
+          const skillBlock = blocks.find((b) => b.block_type === "skills");
+          if (!skillBlock) continue;
+          const display = slot.displayName.toLowerCase();
+          const blockLower = skillBlock.block_text.toLowerCase();
+          const keywords = display.split(/[\s\-()]+/).filter((w) => w.length > 2);
+          const found = keywords.some((kw) => blockLower.includes(kw));
+          if (found) matched++;
+        }
+        const complianceRate = total > 0 ? matched / total : 1;
+        console.log(`Skill schedule compliance: ${matched}/${total} (${(complianceRate * 100).toFixed(0)}%)`);
+      }
+
+      // Create program via preprocess-program
+      const preprocessResp = await fetch(preprocessUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authHeader,
+        },
+        body: JSON.stringify({ text: programText, name: programName, source: "generate" }),
+      });
+
+      if (!preprocessResp.ok) {
+        const errBody = await preprocessResp.text();
+        let errMsg = "Failed to save program";
+        try {
+          const errJson = JSON.parse(errBody);
+          if (errJson?.error) errMsg = errJson.error;
+        } catch {
+          // use default
+        }
+
+        // Retry on workout count mismatch (422), otherwise fail immediately
+        if (preprocessResp.status === 422 && attempt < MAX_ATTEMPTS) {
+          console.warn(`Attempt ${attempt}: ${errMsg}, retrying...`);
+          continue;
+        }
+        throw new Error(errMsg);
+      }
+
+      const result = await preprocessResp.json();
+      program_id = result.program_id;
+      workout_count = result.workout_count;
+      break;
     }
 
-    const { program_id, workout_count } = await preprocessResp.json();
+    if (!program_id) {
+      throw new Error("Failed to generate program after all attempts");
+    }
 
     // Mark complete
     await supa.from("program_jobs").update({

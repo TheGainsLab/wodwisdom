@@ -427,7 +427,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { name, text, file_base64, file_type, source, total_phases } = body;
+    const { name, text, file_base64, file_type, source } = body;
 
     let workouts: ParsedWorkout[] = [];
     const useAIParser = source === "generate";
@@ -463,15 +463,19 @@ Deno.serve(async (req) => {
       });
     }
 
+    // AI-generated programs must produce exactly 20 workouts (5 days × 4 weeks)
+    if (useAIParser && workouts.length !== 20) {
+      return new Response(JSON.stringify({ error: `Expected exactly 20 workouts, got ${workouts.length}` }), {
+        status: 422,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
     const programName = (name && String(name).trim()) || "Untitled Program";
 
-    const programInsert: Record<string, unknown> = { user_id: user.id, name: programName };
-    if (total_phases != null && Number.isInteger(total_phases) && total_phases > 1) {
-      programInsert.total_phases = total_phases;
-    }
     const { data: prog, error: progErr } = await supa
       .from("programs")
-      .insert(programInsert)
+      .insert({ user_id: user.id, name: programName })
       .select("id")
       .single();
 

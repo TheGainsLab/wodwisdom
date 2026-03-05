@@ -9,8 +9,6 @@ interface Program {
   name: string;
   created_at: string;
   workout_count?: number;
-  phase?: number;
-  total_phases?: number;
 }
 
 export default function ProgramsListPage({ session }: { session: Session }) {
@@ -27,7 +25,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
     setLoading(true);
     const { data: progData } = await supabase
       .from('programs')
-      .select('id, name, created_at, phase, total_phases')
+      .select('id, name, created_at')
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
     if (progData) {
@@ -93,7 +91,6 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                       <span className="history-question">{p.name}</span>
                       <span className="history-time">
                         {p.workout_count} workout{p.workout_count !== 1 ? 's' : ''}
-                        {(p.total_phases ?? 1) > 1 && ` — Month ${p.phase ?? 1} of ${p.total_phases}`}
                       </span>
                       <div className="program-list-actions" onClick={e => e.stopPropagation()}>
                         <button type="button" className="program-list-btn" onClick={() => navigate(`/programs/${p.id}/edit`)} title="Edit">
