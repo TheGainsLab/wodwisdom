@@ -293,6 +293,11 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
       const codeMatch = programText.match(/```(?:text)?\s*\n?([\s\S]*?)```/);
       if (codeMatch) programText = codeMatch[1].trim();
 
+      // Diagnostic logging
+      const stopReason = claudeData.stop_reason || "unknown";
+      const dayHeaders = (programText.match(/^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Mon|Tue|Wed|Thu|Fri)\s*:/gmi) || []);
+      console.log(`Attempt ${attempt}: stop_reason=${stopReason}, chars=${programText.length}, day_headers=${dayHeaders.length}, headers=${JSON.stringify(dayHeaders)}`);
+
       if (!programText || programText.length < 100) {
         if (attempt < MAX_ATTEMPTS) {
           console.warn(`Attempt ${attempt}: program too short, retrying...`);
@@ -347,7 +352,7 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
 
         // Retry on workout count mismatch (422), otherwise fail immediately
         if (preprocessResp.status === 422 && attempt < MAX_ATTEMPTS) {
-          console.warn(`Attempt ${attempt}: ${errMsg}, retrying...`);
+          console.warn(`Attempt ${attempt}: ${errMsg}, retrying... (raw day_headers=${dayHeaders.length})`);
           continue;
         }
         throw new Error(errMsg);
