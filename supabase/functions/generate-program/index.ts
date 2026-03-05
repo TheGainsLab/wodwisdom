@@ -272,7 +272,7 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 8000,
+          max_tokens: 16000,
           stream: false,
           system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],
