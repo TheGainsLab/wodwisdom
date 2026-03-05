@@ -382,6 +382,24 @@ if (listResults.length > 0) allResults.push(...listResults);
 }
 return allResults.filter((w) => w.workout_text.length > 0);
 }
+/**
+ * Resolve the acting user ID.
+ * If the bearer token is the service-role key AND user_id is in the body, trust it
+ * (internal service-to-service call). Otherwise validate the JWT as a normal user token.
+ */
+async function resolveUserId(
+  authHeader: string,
+  body: Record<string, unknown>,
+  supa: ReturnType<typeof createClient>
+): Promise<{ userId: string; error?: never } | { userId?: never; error: string }> {
+  const token = authHeader.replace("Bearer ", "");
+  if (token === SUPABASE_SERVICE_KEY && typeof body.user_id === "string" && body.user_id) {
+    return { userId: body.user_id };
+  }
+  const { data: { user }, error: authErr } = await supa.auth.getUser(token);
+  if (authErr || !user) return { error: "Unauthorized" };
+  return { userId: user.id };
+}
 Deno.serve(async (req) => {
 if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 try {
@@ -393,15 +411,15 @@ return new Response(JSON.stringify({ error: "Unauthorized" }), {
 });
 }
 const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-const token = authHeader.replace("Bearer ", "");
-const { data: { user }, error: authErr } = await supa.auth.getUser(token);
-if (authErr || !user) {
-return new Response(JSON.stringify({ error: "Unauthorized" }), {
+const body = await req.json();
+const resolved = await resolveUserId(authHeader, body, supa);
+if (resolved.error) {
+return new Response(JSON.stringify({ error: resolved.error }), {
         status: 401,
         headers: { ...cors, "Content-Type": "application/json" },
 });
 }
-const body = await req.json();
+const userId = resolved.userId;
 const { name, text, file_base64, file_type, source } = body;
 let workouts: ParsedWorkout[] = [];
 const useAIParser = source === "generate";
@@ -444,7 +462,7 @@ return new Response(JSON.stringify({ error: `Expected exactly 20 workouts, got $
 const programName = (name && String(name).trim()) || "Untitled Program";
 const { data: prog, error: progErr } = await supa
 .from("programs")
-.insert({ user_id: user.id, name: programName })
+.insert({ user_id: userId, name: programName })
 .select("id")
 .single();
 if (progErr || !prog) {
@@ -493,9 +511,9 @@ const analyzeResp = await fetch(analyzeUrl, {
       method: "POST",
       headers: {
 "Content-Type": "application/json",
-Authorization: authHeader,
+Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
 },
-      body: JSON.stringify({ program_id: prog.id }),
+      body: JSON.stringify({ program_id: prog.id, user_id: userId }),
 });
 if (!analyzeResp.ok) {
 const errBody = await analyzeResp.text();

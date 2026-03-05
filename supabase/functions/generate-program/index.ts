@@ -313,7 +313,6 @@ async function retrieveRAGContext(
 async function processJob(
   jobId: string,
   userId: string,
-  authHeader: string,
   evalRow: {
     profile_snapshot: ProfileData;
     lifting_analysis: string | null;
@@ -485,14 +484,14 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
         continue;
       }
 
-      // Create program via preprocess-program
+      // Create program via preprocess-program (service-role key — no token expiry risk)
       const preprocessResp = await fetch(preprocessUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: authHeader,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
         },
-        body: JSON.stringify({ text: programText, name: programName, source: "generate" }),
+        body: JSON.stringify({ text: programText, name: programName, source: "generate", user_id: userId }),
       });
 
       if (!preprocessResp.ok) {
@@ -634,7 +633,7 @@ Deno.serve(async (req) => {
     }
 
     // Fire background task — isolate stays alive up to 400s on Pro
-    EdgeRuntime.waitUntil(processJob(job.id, user.id, authHeader, evalRow));
+    EdgeRuntime.waitUntil(processJob(job.id, user.id, evalRow));
 
     // Return immediately with job_id
     return new Response(
