@@ -254,7 +254,7 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
       throw new Error("Program generation is not configured");
     }
 
-    const MAX_ATTEMPTS = 5;
+    const MAX_ATTEMPTS = 3;
     const preprocessUrl = `${SUPABASE_URL}/functions/v1/preprocess-program`;
     const monthYear = new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" });
     const programName = `Month 1 — ${monthYear}`;
