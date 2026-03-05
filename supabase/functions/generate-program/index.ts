@@ -102,7 +102,7 @@ OUTPUT FORMAT (strict):
   3. Strength: (barbell work with percentages, e.g. 5x5 @ 75%)
   4. Metcon: (For Time, AMRAP, EMOM etc. - prescribe Rx weights)
   5. Cool down: (3-5 min mobility/stretch)
-- CRITICAL: Output exactly 20 workouts total — 5 days (Monday, Tuesday, Wednesday, Thursday, Friday) for ALL 4 weeks, including the deload week. Do not skip any day. Deload means lighter loads and shorter metcons, NOT fewer days.
+- CRITICAL: Output exactly 20 workouts total — 5 days (Monday, Tuesday, Wednesday, Thursday, Friday) for ALL 4 weeks, including the deload week. Do not skip any day. Do NOT include Saturday or Sunday. Deload means lighter loads and shorter metcons, NOT fewer days.
 - Each block must fit on ONE line. Use commas to separate movements within a block.
 - Prescribe weights using their 1RMs (e.g. 75% of back squat). Use / for M/F (e.g. 95/65).
 
@@ -209,6 +209,8 @@ async function processJob(
 ): Promise<void> {
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
+  console.log(`=== Job ${jobId} start ===`);
+
   try {
     // Mark processing
     await supa.from("program_jobs").update({ status: "processing", updated_at: new Date().toISOString() }).eq("id", jobId);
@@ -272,7 +274,7 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 8000,
+          max_tokens: 32000,
           stream: false,
           system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],
@@ -292,6 +294,10 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
       // Strip markdown code blocks if present
       const codeMatch = programText.match(/```(?:text)?\s*\n?([\s\S]*?)```/);
       if (codeMatch) programText = codeMatch[1].trim();
+
+      // Diagnostic logging
+      const stopReason = claudeData.stop_reason || "unknown";
+      const dayHeaders = (programText.match(/^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Mon|Tue|Wed|Thu|Fri)\s*:/gmi) || []);
 
       if (!programText || programText.length < 100) {
         if (attempt < MAX_ATTEMPTS) {
@@ -325,6 +331,9 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
         console.log(`Skill schedule compliance: ${matched}/${total} (${(complianceRate * 100).toFixed(0)}%)`);
       }
 
+      // Key diagnostic — one clean line per attempt
+      console.log(`Attempt ${attempt}: stop=${stopReason}, chars=${programText.length}, days=${dayHeaders.length}`);
+
       // Create program via preprocess-program
       const preprocessResp = await fetch(preprocessUrl, {
         method: "POST",
@@ -345,9 +354,9 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
           // use default
         }
 
-        // Retry on workout count mismatch (422), otherwise fail immediately
+        // On 422 log head + tail to see exactly what Claude produced
         if (preprocessResp.status === 422 && attempt < MAX_ATTEMPTS) {
-          console.warn(`Attempt ${attempt}: ${errMsg}, retrying...`);
+          console.warn(`Attempt ${attempt} failed 422: ${errMsg}, days=${dayHeaders.length}, head=${programText.slice(0, 150)}, tail=${programText.slice(-150)}`);
           continue;
         }
         throw new Error(errMsg);

@@ -51,24 +51,30 @@ function parseProgramText(text: string): ParsedWorkout[] {
   let currentDay = 1;
   let sortOrder = 0;
 
-  for (const line of lines) {
+  for (const rawLine of lines) {
+    let line = rawLine;
+
     const wkMatch = line.match(WEEK_REGEX);
     if (wkMatch) {
       currentWeek = parseInt(wkMatch[1], 10) || 1;
-      continue;
+      line = line.replace(WEEK_REGEX, "").replace(/^[\s\-–:]+/, "").trim();
+      if (!line) continue;
     }
+
     let dayNum = currentDay;
     const lower = line.toLowerCase();
     for (let i = 0; i < DAY_NAMES.length; i++) {
-      if (lower.startsWith(DAY_NAMES[i].toLowerCase() + ":") || lower.startsWith(DAY_ABBREV[i].toLowerCase() + ":")) {
-        dayNum = i + 1;
-        break;
-      }
-      if (lower.startsWith(DAY_NAMES[i].toLowerCase() + " ") || lower.startsWith(DAY_ABBREV[i].toLowerCase() + " ")) {
+      if (
+        lower.startsWith(DAY_NAMES[i].toLowerCase() + ":") ||
+        lower.startsWith(DAY_ABBREV[i].toLowerCase() + ":") ||
+        lower.startsWith(DAY_NAMES[i].toLowerCase() + " ") ||
+        lower.startsWith(DAY_ABBREV[i].toLowerCase() + " ")
+      ) {
         dayNum = i + 1;
         break;
       }
     }
+
     const workoutText = line
       .replace(/^(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\s*:?\s*/i, "")
       .trim();
@@ -98,7 +104,7 @@ function parseProgramTextAI(text: string): ParsedWorkout[] {
   let sortOrder = 0;
   const dayLines: string[] = [];
 
-  const dayPattern = /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\s*:?\s*/i;
+  const dayPattern = /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\s*:\s*/i;
 
   function flushDay() {
     if (dayLines.length > 0) {
@@ -112,21 +118,33 @@ function parseProgramTextAI(text: string): ParsedWorkout[] {
     }
   }
 
-  for (const line of lines) {
+  for (const rawLine of lines) {
+    let line = rawLine;
+
+    // --- detect week but KEEP parsing the rest of the line ---
     const wkMatch = line.match(WEEK_REGEX);
     if (wkMatch) {
       flushDay();
       currentWeek = parseInt(wkMatch[1], 10) || 1;
-      continue;
+
+      line = line.replace(WEEK_REGEX, "").replace(/^[\s\-–:]+/, "").trim();
+      if (!line) continue;
     }
 
     const lower = line.toLowerCase();
     let isDayHeader = false;
     let dayNum = currentDay;
+
     for (let i = 0; i < DAY_NAMES.length; i++) {
       const d = DAY_NAMES[i].toLowerCase();
       const a = DAY_ABBREV[i].toLowerCase();
-      if (lower.startsWith(d + ":") || lower.startsWith(a + ":") || lower.startsWith(d + " ") || lower.startsWith(a + " ")) {
+
+      if (
+        lower.startsWith(d + ":") ||
+        lower.startsWith(a + ":") ||
+        lower.startsWith(d + " ") ||
+        lower.startsWith(a + " ")
+      ) {
         dayNum = i + 1;
         isDayHeader = true;
         break;
@@ -134,13 +152,12 @@ function parseProgramTextAI(text: string): ParsedWorkout[] {
     }
 
     if (isDayHeader) {
-      if (dayNum !== currentDay) {
-        flushDay();
-        currentDay = dayNum;
-      }
+      flushDay();
+      currentDay = dayNum;
+
       const rest = line.replace(dayPattern, "").trim();
       if (rest.length > 0) dayLines.push(rest);
-    } else if (line.length > 0) {
+    } else {
       dayLines.push(line);
     }
   }
@@ -462,9 +479,21 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Log detected day slots for debugging
+    const detectedSlots = workouts.map(w => `W${w.week_num}D${w.day_num}`);
+    console.log("Detected day slots:", detectedSlots.join(", "));
+
     // AI-generated programs must produce exactly 20 workouts (5 days × 4 weeks)
     if (useAIParser && workouts.length !== 20) {
-      return new Response(JSON.stringify({ error: `Expected exactly 20 workouts, got ${workouts.length}` }), {
+      const seen = new Set(detectedSlots);
+      const missing: string[] = [];
+      for (let w = 1; w <= 4; w++) {
+        for (let d = 1; d <= 5; d++) {
+          if (!seen.has(`W${w}D${d}`)) missing.push(`W${w}D${d}`);
+        }
+      }
+      const detail = missing.length > 0 ? ` Missing: ${missing.join(", ")}.` : "";
+      return new Response(JSON.stringify({ error: `Expected exactly 20 workouts, got ${workouts.length}.${detail}` }), {
         status: 422,
         headers: { ...cors, "Content-Type": "application/json" },
       });
