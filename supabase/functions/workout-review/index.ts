@@ -496,6 +496,7 @@ Deno.serve(async (req) => {
 
     if (blockTextByType["metcon"]) {
       const metconIntent = detectSessionIntent(blockTextByType["metcon"], "metcon", athleteProfile);
+      console.log(`[workout-review] user=${user.id} block=metcon intent=${metconIntent}`);
       calls.push(
         stagger(500).then(() => callClaude(claudeOpts(applyIntentModifier(METCON_PROMPT, metconIntent) + journalContext, buildUserContent(blockTextByType["metcon"]), 1024)))
           .then((r): [string, string] => ["metcon", r])
@@ -503,6 +504,7 @@ Deno.serve(async (req) => {
     }
     if (blockTextByType["strength"]) {
       const strengthIntent = detectSessionIntent(blockTextByType["strength"], "strength", athleteProfile);
+      console.log(`[workout-review] user=${user.id} block=strength intent=${strengthIntent}`);
       calls.push(
         stagger(1000).then(() => callClaude(claudeOpts(applyIntentModifier(STRENGTH_PROMPT, strengthIntent) + strengthContext, buildUserContent(blockTextByType["strength"]), 1024)))
           .then((r): [string, string] => ["strength", r])
@@ -510,6 +512,7 @@ Deno.serve(async (req) => {
     }
     if (blockTextByType["skills"]) {
       const skillsIntent = detectSessionIntent(blockTextByType["skills"], "skills", athleteProfile);
+      console.log(`[workout-review] user=${user.id} block=skills intent=${skillsIntent}`);
       calls.push(
         stagger(1500).then(() => callClaude(claudeOpts(applyIntentModifier(SKILLS_PROMPT, skillsIntent) + journalContext, buildUserContent(blockTextByType["skills"]), 1024)))
           .then((r): [string, string] => ["skills", r])
