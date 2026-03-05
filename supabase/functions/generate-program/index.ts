@@ -373,11 +373,13 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
     console.log(`Job ${jobId} complete: program_id=${program_id}, workouts=${workout_count}`);
   } catch (e) {
     console.error(`Job ${jobId} failed:`, e);
-    await supa.from("program_jobs").update({
-      status: "failed",
-      error: (e as Error).message,
-      updated_at: new Date().toISOString(),
-    }).eq("id", jobId).catch(() => {});
+    try {
+      await supa.from("program_jobs").update({
+        status: "failed",
+        error: (e as Error).message,
+        updated_at: new Date().toISOString(),
+      }).eq("id", jobId);
+    } catch { /* ignore cleanup errors */ }
   }
 }
 
