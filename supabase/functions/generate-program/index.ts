@@ -330,6 +330,9 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
         console.log(`Skill schedule compliance: ${matched}/${total} (${(complianceRate * 100).toFixed(0)}%)`);
       }
 
+      // Log raw output details before sending to parser
+      console.log(`Attempt ${attempt}: stop=${stopReason}, chars=${programText.length}, days=${dayHeaders.length}, tail=${programText.split("\n").slice(-5).join(" | ")}`);
+
       // Create program via preprocess-program
       const preprocessResp = await fetch(preprocessUrl, {
         method: "POST",
