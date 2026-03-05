@@ -102,7 +102,7 @@ OUTPUT FORMAT (strict):
   3. Strength: (barbell work with percentages, e.g. 5x5 @ 75%)
   4. Metcon: (For Time, AMRAP, EMOM etc. - prescribe Rx weights)
   5. Cool down: (3-5 min mobility/stretch)
-- CRITICAL: Output exactly 20 workouts total — 5 days (Monday, Tuesday, Wednesday, Thursday, Friday) for ALL 4 weeks, including the deload week. Do not skip any day. Deload means lighter loads and shorter metcons, NOT fewer days.
+- CRITICAL: Output exactly 20 workouts total — 5 days (Monday, Tuesday, Wednesday, Thursday, Friday) for ALL 4 weeks, including the deload week. Do not skip any day. Do NOT include Saturday or Sunday. Deload means lighter loads and shorter metcons, NOT fewer days.
 - Each block must fit on ONE line. Use commas to separate movements within a block.
 - Prescribe weights using their 1RMs (e.g. 75% of back squat). Use / for M/F (e.g. 95/65).
 
@@ -208,6 +208,8 @@ async function processJob(
   }
 ): Promise<void> {
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+  console.log(`=== Job ${jobId} start ===`);
 
   try {
     // Mark processing
@@ -329,8 +331,8 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
         console.log(`Skill schedule compliance: ${matched}/${total} (${(complianceRate * 100).toFixed(0)}%)`);
       }
 
-      // Log raw output details before sending to parser
-      console.log(`Attempt ${attempt}: stop=${stopReason}, chars=${programText.length}, days=${dayHeaders.length}, tail=${programText.split("\n").slice(-5).join(" | ")}`);
+      // Key diagnostic — one clean line per attempt
+      console.log(`Attempt ${attempt}: stop=${stopReason}, chars=${programText.length}, days=${dayHeaders.length}`);
 
       // Create program via preprocess-program
       const preprocessResp = await fetch(preprocessUrl, {
@@ -352,10 +354,9 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
           // use default
         }
 
-        // Retry on workout count mismatch (422), otherwise fail immediately
+        // On 422 log head + tail to see exactly what Claude produced
         if (preprocessResp.status === 422 && attempt < MAX_ATTEMPTS) {
-          const lastLines = programText.split("\n").slice(-10).join(" | ");
-          console.warn(`Attempt ${attempt}: ${errMsg}, days=${dayHeaders.length}, tail: ${lastLines.slice(0, 300)}`);
+          console.warn(`Attempt ${attempt} failed 422: ${errMsg}, days=${dayHeaders.length}, head=${programText.slice(0, 150)}, tail=${programText.slice(-150)}`);
           continue;
         }
         throw new Error(errMsg);
