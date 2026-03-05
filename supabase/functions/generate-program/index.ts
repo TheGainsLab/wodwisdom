@@ -93,19 +93,17 @@ WEAKNESS vs. MAINTENANCE BALANCE:
 - Strengths and maintenance movements: still program 1x per week to maintain. Do not ignore movements just because they are not a weakness.
 - Distribute weakness work across all 4 weeks with progression, not just repetition.
 
-OUTPUT FORMAT (strict — follow EXACTLY):
-- Use "Week 1", "Week 2", "Week 3", "Week 4" as week headers on their own line. No markdown, no bold, no colons.
-- Use "Monday:", "Tuesday:", "Wednesday:", "Thursday:", "Friday:" as day headers. Always use the full day name, not abbreviations.
-- Each day has exactly 5 blocks in this order. Each block label and its content must be on ONE line:
+OUTPUT FORMAT (strict):
+- Use "Week 1", "Week 2", "Week 3", "Week 4" for week headers.
+- Use "Monday:", "Tuesday:", etc. (or "Mon:", "Tue:", etc.) for each training day.
+- Each day has exactly 5 blocks in this order. Put each block on its own line:
   1. Warm-up: (5-8 min movement prep for that day's work)
   2. Skills: (10-15 min — use the assigned skill from SKILL ASSIGNMENTS)
   3. Strength: (barbell work with percentages, e.g. 5x5 @ 75%)
   4. Metcon: (For Time, AMRAP, EMOM etc. - prescribe Rx weights)
   5. Cool down: (3-5 min mobility/stretch)
 - CRITICAL: Output exactly 20 workouts total — 5 days (Monday, Tuesday, Wednesday, Thursday, Friday) for ALL 4 weeks, including the deload week. Do not skip any day. Do NOT include Saturday or Sunday. Deload means lighter loads and shorter metcons, NOT fewer days.
-- Use these EXACT block labels: "Warm-up:", "Skills:", "Strength:", "Metcon:", "Cool down:". Do not use alternatives like "Warmup:", "WOD:", "Conditioning:", "Cooldown:", "Skill:", etc.
-- Each block must fit on ONE line. Use commas to separate movements within a block. Never use bullet points, numbered lists, or line breaks within a block.
-- Do not use any markdown formatting (no **, no ##, no *, no -).
+- Each block must fit on ONE line. Use commas to separate movements within a block.
 - Prescribe weights using their 1RMs (e.g. 75% of back squat). Use / for M/F (e.g. 95/65).
 
 Example format for one day (Week 1, build week):
@@ -195,54 +193,6 @@ async function retrieveRAGContext(
     console.error("RAG retrieval error:", err);
     return "";
   }
-}
-
-/**
- * Normalize AI-generated program text to ensure consistent formatting.
- * Handles common variations: label casing, markdown artifacts, block label synonyms.
- */
-function normalizeGeneratedProgram(text: string): string {
-  let out = text;
-
-  // Remove markdown bold/italic markers (e.g. **Week 1**, *Monday:*)
-  out = out.replace(/\*{1,3}(Week\s+\d+)\*{1,3}/gi, "$1");
-  out = out.replace(/\*{1,3}((?:Mon|Tue|Wed|Thu|Fri|Monday|Tuesday|Wednesday|Thursday|Friday)\s*:)/gi, "$1");
-  out = out.replace(/^#{1,4}\s*/gm, ""); // strip markdown headings
-
-  // Remove bullet points / numbered lists at start of lines within blocks
-  out = out.replace(/^[\s]*[-•]\s+/gm, "");
-  out = out.replace(/^[\s]*\d+[.)]\s+/gm, "");
-
-  // Normalize block labels to canonical forms (case-insensitive, handle variants)
-  // Warm-up variants: "Warmup:", "Warm Up:", "WARM-UP:", "Warm up:"
-  out = out.replace(/^(warm[\s-]*up)\s*:/gim, "Warm-up:");
-  // Skills variants: "SKILLS:", "Skill:", "Skill Work:"
-  out = out.replace(/^(skills?(?:\s+work)?)\s*:/gim, "Skills:");
-  // Strength variants: "STRENGTH:", "Strength Work:"
-  out = out.replace(/^(strength(?:\s+work)?)\s*:/gim, "Strength:");
-  // Metcon variants: "METCON:", "MetCon:", "WOD:", "Conditioning:", "Met-Con:"
-  out = out.replace(/^(met[\s-]*con|wod|conditioning)\s*:/gim, "Metcon:");
-  // Cool down variants: "Cooldown:", "Cool Down:", "COOL DOWN:", "Cool-down:"
-  out = out.replace(/^(cool[\s-]*down)\s*:/gim, "Cool down:");
-
-  // Normalize day headers: ensure "Monday:" format (capitalize, add colon)
-  out = out.replace(/^(monday|tuesday|wednesday|thursday|friday)\s*:?\s*$/gim, (_, day) =>
-    day.charAt(0).toUpperCase() + day.slice(1).toLowerCase() + ":"
-  );
-  // Abbreviations to full names
-  out = out.replace(/^mon\s*:/gim, "Monday:");
-  out = out.replace(/^tue(?:s)?\s*:/gim, "Tuesday:");
-  out = out.replace(/^wed\s*:/gim, "Wednesday:");
-  out = out.replace(/^thu(?:r|rs)?\s*:/gim, "Thursday:");
-  out = out.replace(/^fri\s*:/gim, "Friday:");
-
-  // Normalize week headers: "WEEK 1", "week 1", "Week 1:" → "Week 1"
-  out = out.replace(/^week\s+(\d+)\s*:?\s*$/gim, "Week $1");
-
-  // Collapse multiple blank lines into one
-  out = out.replace(/\n{3,}/g, "\n\n");
-
-  return out.trim();
 }
 
 /** Background task: generate program and update job row */
@@ -344,9 +294,6 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
       // Strip markdown code blocks if present
       const codeMatch = programText.match(/```(?:text)?\s*\n?([\s\S]*?)```/);
       if (codeMatch) programText = codeMatch[1].trim();
-
-      // Normalize output format inconsistencies from the AI
-      programText = normalizeGeneratedProgram(programText);
 
       // Diagnostic logging
       const stopReason = claudeData.stop_reason || "unknown";
