@@ -1,10 +1,10 @@
 /**
- * Build a 12×5 skill schedule grid from ranked priorities.
+ * Build a 4×5 skill schedule grid from ranked priorities.
  *
  * Assigns one skill to each (week, day) slot, ensuring:
  * - Top 2 priorities appear 2x/week (non-consecutive days) in build weeks
  * - Lower priorities appear 1x/week
- * - Deload weeks (4, 8, 12) only use top 2 skills at 1x each
+ * - Deload week (4) only uses top 2 skills at 1x each
  * - Same skill never on consecutive day numbers
  * - Remaining slots filled by rotating through lower-priority skills
  */
@@ -19,7 +19,7 @@ export interface SkillSlot {
   level: string;
 }
 
-const DELOAD_WEEKS = new Set([4, 8, 12]);
+const DELOAD_WEEKS = new Set([4]);
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri"] as const;
 
 export function dayName(dayNum: number): string {
@@ -30,12 +30,12 @@ export function dayName(dayNum: number): string {
  * Build the full skill schedule.
  *
  * @param priorities  Sorted output from rankSkillPriorities()
- * @param totalWeeks  Number of weeks (default 12)
+ * @param totalWeeks  Number of weeks (default 4)
  * @param daysPerWeek Number of training days per week (default 5)
  */
 export function buildSkillSchedule(
   priorities: SkillPriority[],
-  totalWeeks = 12,
+  totalWeeks = 4,
   daysPerWeek = 5,
 ): SkillSlot[] {
   if (priorities.length === 0) return [];
