@@ -88,46 +88,57 @@ function parseProgramText(text: string): ParsedWorkout[] {
   return result;
 }
 
-/** AI-generated format: group lines by day (Monday:, Tuesday:, etc.). One workout per day.
- *  Week numbers derived from day sequence (every 5 days = new week), not from "Week X" headers.
- *  This avoids WEEK_REGEX matching inside workout text and eating lines. */
+/** AI-generated format: group lines by day (Monday:, Tuesday:, etc.). One workout per day. */
 function parseProgramTextAI(text: string): ParsedWorkout[] {
   const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = normalized.split("\n").map((l) => l.trim()).filter(Boolean);
   const result: ParsedWorkout[] = [];
-  let dayCount = 0;
+  let currentWeek = 1;
+  let currentDay = 1;
+  let sortOrder = 0;
   const dayLines: string[] = [];
 
-  const dayHeaderPattern = /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\s*:?\s*/i;
-  // Only match standalone week header lines (e.g. "Week 1", "Week 2 (Deload)")
-  const standaloneWeekPattern = /^week\s*\d+/i;
+  const dayPattern = /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\s*:?\s*/i;
 
   function flushDay() {
     if (dayLines.length > 0) {
-      dayCount++;
-      const weekNum = Math.ceil(dayCount / 5);
-      const dayNum = ((dayCount - 1) % 5) + 1;
       result.push({
-        week_num: weekNum,
-        day_num: dayNum,
+        week_num: currentWeek,
+        day_num: currentDay,
         workout_text: dayLines.join("\n"),
-        sort_order: dayCount - 1,
+        sort_order: sortOrder++,
       });
       dayLines.length = 0;
     }
   }
 
   for (const line of lines) {
-    // Skip standalone week header lines (don't eat workout content that mentions "week")
-    if (standaloneWeekPattern.test(line) && line.replace(/^week\s*\d+\s*/i, "").replace(/[^a-zA-Z]/g, "").length < 10) {
+    const wkMatch = line.match(WEEK_REGEX);
+    if (wkMatch) {
+      flushDay();
+      currentWeek = parseInt(wkMatch[1], 10) || 1;
       continue;
     }
 
-    const isDayHeader = dayHeaderPattern.test(line);
+    const lower = line.toLowerCase();
+    let isDayHeader = false;
+    let dayNum = currentDay;
+    for (let i = 0; i < DAY_NAMES.length; i++) {
+      const d = DAY_NAMES[i].toLowerCase();
+      const a = DAY_ABBREV[i].toLowerCase();
+      if (lower.startsWith(d + ":") || lower.startsWith(a + ":") || lower.startsWith(d + " ") || lower.startsWith(a + " ")) {
+        dayNum = i + 1;
+        isDayHeader = true;
+        break;
+      }
+    }
 
     if (isDayHeader) {
-      flushDay();
-      const rest = line.replace(dayHeaderPattern, "").trim();
+      if (dayNum !== currentDay) {
+        flushDay();
+        currentDay = dayNum;
+      }
+      const rest = line.replace(dayPattern, "").trim();
       if (rest.length > 0) dayLines.push(rest);
     } else if (line.length > 0) {
       dayLines.push(line);
