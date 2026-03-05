@@ -320,7 +320,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                       <CollapsibleBlock
                         key={i}
                         block={block}
-                        defaultOpen={i === 0}
+                        defaultOpen={false}
                       />
                     ))}
                   </>
