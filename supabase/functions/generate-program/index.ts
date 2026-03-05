@@ -102,7 +102,7 @@ OUTPUT FORMAT (strict):
   3. Strength: (barbell work with percentages, e.g. 5x5 @ 75%)
   4. Metcon: (For Time, AMRAP, EMOM etc. - prescribe Rx weights)
   5. Cool down: (3-5 min mobility/stretch)
-- Use exactly 5 training days per week (Monday through Friday), every week, no exceptions.
+- CRITICAL: Output exactly 20 workouts total — 5 days (Monday, Tuesday, Wednesday, Thursday, Friday) for ALL 4 weeks, including the deload week. Do not skip any day. Deload means lighter loads and shorter metcons, NOT fewer days.
 - Each block must fit on ONE line. Use commas to separate movements within a block.
 - Prescribe weights using their 1RMs (e.g. 75% of back squat). Use / for M/F (e.g. 95/65).
 

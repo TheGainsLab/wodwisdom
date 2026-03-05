@@ -134,8 +134,7 @@ function parseProgramTextAI(text: string): ParsedWorkout[] {
     }
 
     if (isDayHeader) {
-      const hasCoolDown = dayLines.some((l) => /^cool\s*down\s*:/i.test(l));
-      if (dayNum !== currentDay && (hasCoolDown || dayLines.length === 0)) {
+      if (dayNum !== currentDay) {
         flushDay();
         currentDay = dayNum;
       }
