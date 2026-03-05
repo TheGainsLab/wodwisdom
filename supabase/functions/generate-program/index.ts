@@ -295,6 +295,9 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
       const codeMatch = programText.match(/```(?:text)?\s*\n?([\s\S]*?)```/);
       if (codeMatch) programText = codeMatch[1].trim();
 
+      // Strip "(assigned: ...)" metadata the AI echoes back in Skills blocks
+      programText = programText.replace(/\(assigned:\s*[^)]+\)\s*/gi, "");
+
       // Diagnostic logging
       const stopReason = claudeData.stop_reason || "unknown";
       const dayHeaders = (programText.match(/^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Mon|Tue|Wed|Thu|Fri)\s*:/gmi) || []);
