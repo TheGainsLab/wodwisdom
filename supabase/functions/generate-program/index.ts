@@ -264,6 +264,11 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
     let program_id: string | undefined;
     let workout_count: number | undefined;
 
+    // Build messages array — on retries we append the failed output + correction
+    const messages: { role: string; content: string }[] = [
+      { role: "user", content: userPrompt },
+    ];
+
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -277,7 +282,7 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
           max_tokens: 32000,
           stream: false,
           system: systemPrompt,
-          messages: [{ role: "user", content: userPrompt }],
+          messages,
         }),
       });
 
@@ -302,9 +307,32 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
       if (!programText || programText.length < 100) {
         if (attempt < MAX_ATTEMPTS) {
           console.warn(`Attempt ${attempt}: program too short, retrying...`);
+          messages.push({ role: "assistant", content: programText });
+          messages.push({ role: "user", content: "That output was too short. Please output the COMPLETE 4-week program with exactly 5 days (Monday through Friday) for each of the 4 weeks = 20 total days. Output the full program again." });
           continue;
         }
         throw new Error("Generated program was empty or too short");
+      }
+
+      // Detect which days are missing per week
+      const expectedDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+      const missingDays: string[] = [];
+      for (let w = 1; w <= 4; w++) {
+        const weekPattern = new RegExp(`Week\\s*${w}`, "i");
+        const nextWeekPattern = w < 4 ? new RegExp(`Week\\s*${w + 1}`, "i") : null;
+        const weekStart = programText.search(weekPattern);
+        if (weekStart < 0) {
+          missingDays.push(`Week ${w} (entire week missing)`);
+          continue;
+        }
+        const weekEnd = nextWeekPattern ? programText.search(nextWeekPattern) : programText.length;
+        const weekText = programText.slice(weekStart, weekEnd > weekStart ? weekEnd : programText.length);
+        for (const day of expectedDays) {
+          const dayRe = new RegExp(`^${day}\\s*:`, "mi");
+          if (!dayRe.test(weekText)) {
+            missingDays.push(`Week ${w} ${day}`);
+          }
+        }
       }
 
       // Validate skill assignments compliance (logging only)
@@ -332,7 +360,16 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
       }
 
       // Key diagnostic — one clean line per attempt
-      console.log(`Attempt ${attempt}: stop=${stopReason}, chars=${programText.length}, days=${dayHeaders.length}`);
+      console.log(`Attempt ${attempt}: stop=${stopReason}, chars=${programText.length}, days=${dayHeaders.length}, missing=${missingDays.length > 0 ? missingDays.join(", ") : "none"}`);
+
+      // If we already know days are missing, skip the preprocess call and retry with feedback
+      if (dayHeaders.length !== 20 && attempt < MAX_ATTEMPTS) {
+        const missingList = missingDays.length > 0 ? missingDays.join(", ") : `${dayHeaders.length} days found instead of 20`;
+        console.warn(`Attempt ${attempt}: wrong day count (${dayHeaders.length}), missing: ${missingList}`);
+        messages.push({ role: "assistant", content: programText });
+        messages.push({ role: "user", content: `That program only had ${dayHeaders.length} days but needs exactly 20 (5 days × 4 weeks). Missing: ${missingList}. Please output the COMPLETE program again with all 20 days. Every week (Week 1, Week 2, Week 3, Week 4) must have Monday, Tuesday, Wednesday, Thursday, Friday.` });
+        continue;
+      }
 
       // Create program via preprocess-program
       const preprocessResp = await fetch(preprocessUrl, {
@@ -354,9 +391,11 @@ Generate a 4-week program (20 workouts total: 5 days x 4 weeks). Follow the form
           // use default
         }
 
-        // On 422 log head + tail to see exactly what Claude produced
+        // On 422, retry with feedback about what went wrong
         if (preprocessResp.status === 422 && attempt < MAX_ATTEMPTS) {
           console.warn(`Attempt ${attempt} failed 422: ${errMsg}, days=${dayHeaders.length}, head=${programText.slice(0, 150)}, tail=${programText.slice(-150)}`);
+          messages.push({ role: "assistant", content: programText });
+          messages.push({ role: "user", content: `Error: ${errMsg}. You produced ${dayHeaders.length} day headers. Missing: ${missingDays.length > 0 ? missingDays.join(", ") : "unknown"}. Please output the COMPLETE program again with exactly 20 days — Monday through Friday for each of Week 1, 2, 3, and 4.` });
           continue;
         }
         throw new Error(errMsg);
