@@ -98,7 +98,7 @@ function parseProgramTextAI(text: string): ParsedWorkout[] {
   let sortOrder = 0;
   const dayLines: string[] = [];
 
-  const dayPattern = /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\s*:?\s*/i;
+  const dayPattern = /^(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\s*:\s*/i;
 
   function flushDay() {
     if (dayLines.length > 0) {
@@ -126,7 +126,7 @@ function parseProgramTextAI(text: string): ParsedWorkout[] {
     for (let i = 0; i < DAY_NAMES.length; i++) {
       const d = DAY_NAMES[i].toLowerCase();
       const a = DAY_ABBREV[i].toLowerCase();
-      if (lower.startsWith(d + ":") || lower.startsWith(a + ":") || lower.startsWith(d + " ") || lower.startsWith(a + " ")) {
+      if (lower.startsWith(d + ":") || lower.startsWith(a + ":")) {
         dayNum = i + 1;
         isDayHeader = true;
         break;
@@ -459,6 +459,9 @@ Deno.serve(async (req) => {
         headers: { ...cors, "Content-Type": "application/json" },
       });
     }
+
+    // Log distribution for debugging
+    console.log("Workout distribution:", workouts.map(w => `W${w.week_num}D${w.day_num}`).join(", "));
 
     // AI-generated programs must produce exactly 20 workouts (5 days × 4 weeks)
     if (useAIParser && workouts.length !== 20) {
