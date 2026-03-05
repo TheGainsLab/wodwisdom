@@ -140,6 +140,156 @@ Rules:
 - Be concise and practical. Athlete-focused voice.`;
 
 // ---------------------------------------------------------------------------
+// Session-intent detection & prompt modifiers
+// ---------------------------------------------------------------------------
+
+type StrengthIntent = "assessment" | "build" | "technique" | "recovery";
+type MetconIntent = "sprint" | "endurance" | "mixed";
+type SkillsIntent = "acquisition" | "practice";
+type SessionIntent = StrengthIntent | MetconIntent | SkillsIntent;
+
+const INTENT_MODIFIERS: Record<SessionIntent, string> = {
+  // Strength intents
+  assessment: `\n\nINTENT-SPECIFIC COACHING (Assessment Day):
+- Focus on attempt selection strategy: opening attempt, jumps between attempts, when to call it.
+- Emphasize quality standards — what a "good" rep looks like at max effort and when to stop.
+- Identify signs of positional breakdown that signal the athlete is done.
+- De-emphasize generic positional cues; the athlete knows how to lift — help them peak.`,
+
+  build: `\n\nINTENT-SPECIFIC COACHING (Building Phase):
+- Focus on positional integrity under increasing load — what should stay the same as weight goes up.
+- Provide RPE targets per set where applicable.
+- Emphasize set-to-set consistency: tempo, bar path, bracing.
+- Flag if prescribed percentages interact with recent training volume (fatigue accumulation).`,
+
+  technique: `\n\nINTENT-SPECIFIC COACHING (Technique / Variation Work):
+- Identify the specific positional demand this variation is designed to train (e.g. pause squat trains bottom position, deficit deadlift trains off-the-floor position).
+- Focus ALL cues on that specific demand — do not give generic points of performance for the base movement.
+- Common faults should be specific to the variation, not the parent lift.`,
+
+  recovery: `\n\nINTENT-SPECIFIC COACHING (Recovery / Deload):
+- Emphasize movement quality over intensity — this is a recovery session.
+- Cue breathing, full range of motion, and positions that get neglected when pushing hard.
+- Discourage the athlete from going heavier than prescribed.
+- Note how this session fits recovery within the training week.`,
+
+  // Metcon intents
+  sprint: `\n\nINTENT-SPECIFIC COACHING (Sprint / Short Time Domain):
+- Focus on cycle time and transitions — seconds matter in short workouts.
+- Advise on redline management: when to push and how to recognize the point of no return.
+- Cue aggressive pacing from the start; there is no "settling in" phase.
+- Common faults should focus on breakdown under high intensity (rushed reps, no-reps, sloppy transitions).`,
+
+  endurance: `\n\nINTENT-SPECIFIC COACHING (Endurance / Long Time Domain):
+- Focus on pacing strategy: target split times, sustainable movement patterns, breathing cadence.
+- Identify fatigue indicators and when to expect them (e.g. "wall balls will slow around round 6").
+- Cue movement efficiency over speed — small savings compound over many reps.
+- Common faults should focus on fatigue-induced breakdown (shortened ROM, loss of rhythm, grip failure).`,
+
+  mixed: `\n\nINTENT-SPECIFIC COACHING (Mixed Modal):
+- Balance movement efficiency with transition strategy.
+- Identify which movement will be the bottleneck and advise managing it.
+- Cue energy system management: when to push, when to recover within the workout.
+- Pacing should account for both heavy and light elements.`,
+
+  // Skills intents
+  acquisition: `\n\nINTENT-SPECIFIC COACHING (Skill Acquisition):
+- Provide progressions: what to do if the athlete cannot perform the movement as written.
+- Define what "good enough" looks like — the minimum standard before progressing.
+- Suggest scaling options that preserve the intended stimulus and skill transfer.
+- Common faults should include faults specific to the progression/scaled version, not just the full movement.`,
+
+  practice: `\n\nINTENT-SPECIFIC COACHING (Skill Practice / Refinement):
+- Target specific efficiency gains — what separates "competent" from "proficient" at this movement.
+- Cue timing, rhythm, and positions that unlock the next level of performance.
+- Common faults should focus on efficiency leaks, not basic errors.`,
+};
+
+function detectSessionIntent(
+  blockText: string,
+  blockType: string,
+  athleteProfile: AthleteProfileData | null,
+): SessionIntent {
+  const t = blockText.toLowerCase();
+
+  if (blockType === "strength") {
+    // Assessment: max effort / testing
+    if (/\b(1\s*rm|one.?rep.?max|find a heavy|build to a heavy|max effort|test\b)/.test(t)) {
+      return "assessment";
+    }
+    // Technique: variation work with positional emphasis
+    if (/\b(tempo|pause|deficit|slow eccentric|position work|eccentric|isometric)\b/.test(t)) {
+      return "technique";
+    }
+    // Recovery: deload / light percentages
+    if (/\b(deload|recovery|active rest)\b/.test(t) || /[@\s]([45][05]|5[05])%/.test(t)) {
+      return "recovery";
+    }
+    // Default: building
+    return "build";
+  }
+
+  if (blockType === "metcon") {
+    // Primary signal: explicit time domain
+    const amrapMatch = t.match(/amrap\s+(\d+)/);
+    const capMatch = t.match(/(?:time\s*cap|cap)\s*[:=]?\s*(\d+)/);
+    const emomMatch = t.match(/e(?:very\s*)?(\d+)\s*m(?:in)?(?:\s*o[ntm])?/i) || t.match(/emom\s+(\d+)/);
+
+    const amrapMin = amrapMatch ? parseInt(amrapMatch[1]) : null;
+    const capMin = capMatch ? parseInt(capMatch[1]) : null;
+    const emomMin = emomMatch ? parseInt(emomMatch[1]) : null;
+    const timeDomain = amrapMin ?? capMin ?? emomMin ?? null;
+
+    if (timeDomain !== null) {
+      if (timeDomain <= 7) return "sprint";
+      if (timeDomain >= 15) return "endurance";
+      return "mixed";
+    }
+
+    // Secondary signal: "for time" with round count as proxy
+    if (/for\s+time/i.test(t)) {
+      const roundMatch = t.match(/(\d+)\s*(?:rounds?|rft)/i);
+      const rounds = roundMatch ? parseInt(roundMatch[1]) : null;
+      if (rounds !== null && rounds <= 3) return "sprint";
+      if (rounds !== null && rounds >= 7) return "endurance";
+    }
+
+    // Chipper pattern (long by nature)
+    if (/chipper/i.test(t)) return "endurance";
+
+    // Sprint keyword
+    if (/\bsprint\b/i.test(t)) return "sprint";
+
+    return "mixed";
+  }
+
+  if (blockType === "skills") {
+    // Check athlete profile for skill level on movements in the block
+    if (athleteProfile?.skills) {
+      const skillEntries = Object.entries(athleteProfile.skills);
+      for (const [skillName, level] of skillEntries) {
+        const normalizedSkill = skillName.replace(/_/g, " ").toLowerCase();
+        if (t.includes(normalizedSkill) && (level === "none" || level === "beginner")) {
+          return "acquisition";
+        }
+      }
+    }
+    // Text signals for acquisition
+    if (/\b(progression|scale|build up to|practice|drill|learn)\b/.test(t)) {
+      return "acquisition";
+    }
+    return "practice";
+  }
+
+  return "mixed";
+}
+
+function applyIntentModifier(basePrompt: string, intent: SessionIntent): string {
+  const modifier = INTENT_MODIFIERS[intent];
+  return modifier ? basePrompt + modifier : basePrompt;
+}
+
+// ---------------------------------------------------------------------------
 // Prompts
 // ---------------------------------------------------------------------------
 
@@ -345,20 +495,23 @@ Deno.serve(async (req) => {
     );
 
     if (blockTextByType["metcon"]) {
+      const metconIntent = detectSessionIntent(blockTextByType["metcon"], "metcon", athleteProfile);
       calls.push(
-        stagger(500).then(() => callClaude(claudeOpts(METCON_PROMPT + journalContext, buildUserContent(blockTextByType["metcon"]), 1024)))
+        stagger(500).then(() => callClaude(claudeOpts(applyIntentModifier(METCON_PROMPT, metconIntent) + journalContext, buildUserContent(blockTextByType["metcon"]), 1024)))
           .then((r): [string, string] => ["metcon", r])
       );
     }
     if (blockTextByType["strength"]) {
+      const strengthIntent = detectSessionIntent(blockTextByType["strength"], "strength", athleteProfile);
       calls.push(
-        stagger(1000).then(() => callClaude(claudeOpts(STRENGTH_PROMPT + strengthContext, buildUserContent(blockTextByType["strength"]), 1024)))
+        stagger(1000).then(() => callClaude(claudeOpts(applyIntentModifier(STRENGTH_PROMPT, strengthIntent) + strengthContext, buildUserContent(blockTextByType["strength"]), 1024)))
           .then((r): [string, string] => ["strength", r])
       );
     }
     if (blockTextByType["skills"]) {
+      const skillsIntent = detectSessionIntent(blockTextByType["skills"], "skills", athleteProfile);
       calls.push(
-        stagger(1500).then(() => callClaude(claudeOpts(SKILLS_PROMPT + journalContext, buildUserContent(blockTextByType["skills"]), 1024)))
+        stagger(1500).then(() => callClaude(claudeOpts(applyIntentModifier(SKILLS_PROMPT, skillsIntent) + journalContext, buildUserContent(blockTextByType["skills"]), 1024)))
           .then((r): [string, string] => ["skills", r])
       );
     }
