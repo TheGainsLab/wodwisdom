@@ -51,11 +51,13 @@ function parseProgramText(text: string): ParsedWorkout[] {
   let currentDay = 1;
   let sortOrder = 0;
 
-  for (const line of lines) {
+  for (let line of lines) {
     const wkMatch = line.match(WEEK_REGEX);
     if (wkMatch) {
       currentWeek = parseInt(wkMatch[1], 10) || 1;
-      continue;
+      const rest = line.replace(WEEK_REGEX, "").replace(/^[\s\-–:]+/, "").trim();
+      if (!rest) continue;
+      line = rest;
     }
     let dayNum = currentDay;
     const lower = line.toLowerCase();
@@ -112,12 +114,16 @@ function parseProgramTextAI(text: string): ParsedWorkout[] {
     }
   }
 
-  for (const line of lines) {
+  for (let line of lines) {
     const wkMatch = line.match(WEEK_REGEX);
     if (wkMatch) {
       flushDay();
       currentWeek = parseInt(wkMatch[1], 10) || 1;
-      continue;
+      // Remove the week label and continue parsing the remainder
+      // so "Week 4 Thursday:" is handled as a week marker + day header
+      const rest = line.replace(WEEK_REGEX, "").replace(/^[\s\-–:]+/, "").trim();
+      if (!rest) continue;
+      line = rest;
     }
 
     const lower = line.toLowerCase();
@@ -126,7 +132,9 @@ function parseProgramTextAI(text: string): ParsedWorkout[] {
     for (let i = 0; i < DAY_NAMES.length; i++) {
       const d = DAY_NAMES[i].toLowerCase();
       const a = DAY_ABBREV[i].toLowerCase();
-      if (lower.startsWith(d + ":") || lower.startsWith(a + ":")) {
+      if (lower.startsWith(d + ":") || lower.startsWith(a + ":") ||
+          lower.startsWith(d + " ") || lower.startsWith(a + " ") ||
+          lower === d || lower === a) {
         dayNum = i + 1;
         isDayHeader = true;
         break;
@@ -460,12 +468,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Log distribution for debugging
-    console.log("Workout distribution:", workouts.map(w => `W${w.week_num}D${w.day_num}`).join(", "));
+    // Log detected day slots for debugging
+    const detectedSlots = workouts.map(w => `W${w.week_num}D${w.day_num}`);
+    console.log("Detected day slots:", detectedSlots.join(", "));
 
     // AI-generated programs must produce exactly 20 workouts (5 days × 4 weeks)
     if (useAIParser && workouts.length !== 20) {
-      return new Response(JSON.stringify({ error: `Expected exactly 20 workouts, got ${workouts.length}` }), {
+      const seen = new Set(detectedSlots);
+      const missing: string[] = [];
+      for (let w = 1; w <= 4; w++) {
+        for (let d = 1; d <= 5; d++) {
+          if (!seen.has(`W${w}D${d}`)) missing.push(`W${w}D${d}`);
+        }
+      }
+      const detail = missing.length > 0 ? ` Missing: ${missing.join(", ")}.` : "";
+      return new Response(JSON.stringify({ error: `Expected exactly 20 workouts, got ${workouts.length}.${detail}` }), {
         status: 422,
         headers: { ...cors, "Content-Type": "application/json" },
       });
