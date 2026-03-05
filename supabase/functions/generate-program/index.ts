@@ -110,56 +110,131 @@ You MUST follow this exact skeleton — fill in every single line:
 
 Week 1
 Monday:
-Warm-up: ...
-Skills: ...
-Strength: ...
-Metcon: ...
-Cool down: ...
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
 Tuesday:
-Warm-up: ...
-Skills: ...
-Strength: ...
-Metcon: ...
-Cool down: ...
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
 Wednesday:
-Warm-up: ...
-Skills: ...
-Strength: ...
-Metcon: ...
-Cool down: ...
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
 Thursday:
-Warm-up: ...
-Skills: ...
-Strength: ...
-Metcon: ...
-Cool down: ...
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
 Friday:
-Warm-up: ...
-Skills: ...
-Strength: ...
-Metcon: ...
-Cool down: ...
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
 
 Week 2
-Monday: ... (same 5-block structure)
-Tuesday: ...
-Wednesday: ...
-Thursday: ...
-Friday: ...
+Monday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
+Tuesday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
+Wednesday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
+Thursday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
+Friday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
 
 Week 3
-Monday: ... (same 5-block structure)
-Tuesday: ...
-Wednesday: ...
-Thursday: ...
-Friday: ...
+Monday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
+Tuesday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
+Wednesday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
+Thursday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
+Friday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
 
 Week 4
-Monday: ... (same 5-block structure, deload loads)
-Tuesday: ...
-Wednesday: ...
-Thursday: ...
-Friday: ...
+Monday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
+Tuesday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
+Wednesday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
+Thursday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
+Friday:
+Warm-up:
+Skills:
+Strength:
+Metcon:
+Cool down:
 
 Output ONLY the program text. No preamble or explanation.`;
 
