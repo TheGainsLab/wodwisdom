@@ -261,6 +261,9 @@ function parseSkillsMovements(blockText: string): SkillsEntryValues[] {
     movement = movement.replace(/^[,\-–—+]+|[,\-–—+]+$/g, '').replace(/\s+/g, ' ').trim();
     if (!movement) continue;
 
+    // Skip lines with no sets, reps, or hold — these are coaching cues, not movements
+    if (sets === undefined && reps_completed === undefined && hold_seconds === undefined) continue;
+
     results.push({
       movement: capitalizeWords(movement),
       sets,
