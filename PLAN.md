@@ -1,118 +1,109 @@
-# Engine Analytics Enhancement Plan
+# Plan: Fault Checkboxes on Workout Logging
 
-## Goal
-Add 7 missing analytics views from the mobile app to the wodwisdom web Engine Analytics page. No DB changes needed — all data is already in `engine_workout_sessions` and `engine_time_trials`.
+## Summary
 
-## Current State
-`EngineAnalyticsPage.tsx` has 4 tabs: Overview, Performance, History, Baselines.
-- Overview: stat cards + bar breakdowns by day type / equipment
-- Performance: rolling metrics grouped by day type → modality
-- History: flat chronological list (no filters, no charts)
-- Baselines: flat table of current time trials
+When logging a workout on `StartWorkoutPage`, fetch the cached coach review (via `source_id`) and display the `common_faults` from the review as checkboxes beneath each movement. Checked faults are persisted to `workout_log_entries` and surfaced in training history for downstream AI consumption.
 
-## New Architecture
-Replace the 4-tab layout with a **menu-based navigation** (matching mobile app pattern). The Overview/Summary stays as the landing view with an analytics menu grid below it. Users drill into specific views from the menu.
+---
 
-### Views to Add (7 new views)
+## Step 1 — DB: add `faults_observed` column to `workout_log_entries`
 
-#### 1. Filtered History with Charts
-- **Modality selector** (pill buttons from user's sessions)
-- **Day Type selector** (filtered by chosen modality)
-- **Metric toggle**: Output vs Pace
-- **Horizontal bar chart** showing sessions sorted highest-to-lowest
-- Source: `EngineHistoryView` in mobile
+New migration: `supabase/migrations/20260260000000_faults_observed.sql`
 
-#### 2. Comparisons
-- **Modality selector**
-- **Multi-select day types** (toggle on/off)
-- **Metric toggle**: Avg Output vs Avg Pace
-- **Bar chart** comparing day types within a modality, with session counts
-- Source: `EngineComparisonsView` in mobile
+```sql
+ALTER TABLE workout_log_entries
+  ADD COLUMN faults_observed text[] DEFAULT NULL;
+```
 
-#### 3. Time Trial Charts
-- **Modality selector**
-- **Bar chart** of time trial outputs over time (newest first)
-- Replaces current flat Baselines table
-- Source: `EngineTimeTrialsView` in mobile
+- `text[]` (Postgres native array) — simple, queryable, matches the `common_faults: string[]` shape from the review JSON.
+- NULL when no review was run or no faults checked. Empty array `{}` means "review had faults but none observed."
 
-#### 4. Targets vs Actual
-- **Modality selector** → **Day Type selector**
-- Per-session cards with **dual bar** (blue=target, red=actual pace)
-- Shows date and day number
-- Source: `EngineTargetsView` in mobile
+---
 
-#### 5. Personal Records
-- **Modality selector**
-- **Bar chart** of best pace per day type for that modality
-- Source: `EngineRecordsView` in mobile
+## Step 2 — Frontend: fetch cached review on `StartWorkoutPage`
 
-#### 6. HR Analytics
-- **Modality selector**
-- **Metric selector**: Sessions, Avg HR, Avg Peak HR, Max Peak HR, HR Efficiency, Training Load
-- **Bar chart** by day type for selected metric
-- HR Efficiency = (pace / avgHR) × 1000
-- Training Load = intensity³ × avgHR × √duration
-- Source: `EngineHeartRateView` in mobile
+In `StartWorkoutPage.tsx`, inside the existing `useEffect` that loads blocks (line ~322):
 
-#### 7. Work:Rest Ratio
-- **Modality selector**
-- **Multi-select work:rest ratios** (1:1, 2:1, 3:1, etc.)
-- **Bar chart** comparing avg pace across selected ratios
-- Source: `EngineWorkRestView` in mobile
+- After fetching `program_workout_blocks`, also query `workout_reviews` for the matching `source_id`:
+  ```ts
+  const { data: reviewRow } = await supabase
+    .from('workout_reviews')
+    .select('review')
+    .eq('source_id', sourceState.source_id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  ```
+- Parse the review JSON and build a per-entry fault lookup by matching movement names from the review's `cues_and_faults` to the parsed movements in each block.
+- Store in state: `reviewFaults: Record<string, string[]>` — keyed by the same `${bi}-sk${si}` / `${bi}-m${mi}` / `${bi}-s0` entry keys used for other entry state.
 
-### Enhancement to Summary/Overview
-Add to existing overview:
-- **Energy System Ratios** (per modality): glycolytic, aerobic, systems ratios
-- **Peak & Average Pace** stats per modality
+---
 
-## Implementation Steps
+## Step 3 — Frontend: render fault checkboxes in the logging UI
 
-### Step 1: Update service layer (`engineService.ts`)
-- Add `loadAllTimeTrials()` function (fetch ALL time trials, not just `is_current=true`) — needed for time trial chart history
-- No other service changes needed; existing `loadCompletedSessions()` returns all data
+For each skill/metcon/strength entry that has matching faults from the review:
 
-### Step 2: Create shared UI components
-Add to `EngineAnalyticsPage.tsx` (inline, matching current pattern — no component library):
-- `HorizontalBarChart` — reusable bar chart with labels, values, max scaling
-- `PillSelector` — single-select pill/button group (modality, day type, metric)
-- `PillMultiSelector` — multi-select pill/button group (comparisons, work:rest)
+- Display fault strings as labeled checkboxes below the existing input row.
+- Track checked faults in state: `checkedFaults: Record<string, string[]>` — same entry keys, value is array of checked fault strings.
+- Style: compact, muted text, X icon matching the review page's fault styling.
 
-### Step 3: Add new view render functions
-Each view is a `render*()` function inside the page component (matching existing `renderOverview`, `renderPerformance`, etc.):
-- `renderHistory()` — replace current flat list with filtered + charted version
-- `renderComparisons()` — new
-- `renderTimeTrials()` — replace current Baselines tab
-- `renderTargets()` — new
-- `renderRecords()` — new
-- `renderHeartRate()` — new
-- `renderWorkRest()` — new
+Placement:
+- **Skills blocks** (line ~784): after the existing input row (sets/reps/hold/quality/RPE).
+- **Metcon blocks**: after each movement's inputs.
+- **Strength blocks**: after the set rows for each movement.
 
-### Step 4: Update navigation
-- Change from 4 fixed tabs to a **menu-based nav**
-- Summary/Overview as default landing view with the analytics menu grid below it
-- Analytics menu: grid of cards (title + description) linking to each view
-- Back button to return to menu from any view
-- Keep existing CSS class conventions (engine-card, engine-badge, etc.)
+Only shown when faults exist for that movement. If no review was cached, nothing renders — zero friction added.
 
-### Step 5: Enhance Overview
-- Add modality selector to overview
-- Add Energy System Ratios section (glycolytic, aerobic, systems)
-- Add Peak & Average Pace stats
+---
 
-### Step 6: Add CSS
-Add styles to `engine.css` for:
-- Menu card grid
-- Pill selector buttons (active/inactive states)
-- Dual bar (targets vs actual)
-- Any new layout needs
+## Step 4 — Frontend: include `faults_observed` in the finish payload
 
-## Files Modified
-1. `src/pages/EngineAnalyticsPage.tsx` — main changes (new views, nav, shared components)
-2. `src/lib/engineService.ts` — add `loadAllTimeTrials()`
-3. `src/engine.css` — new styles for pills, menu, dual bars
+In `handleFinish` (line ~449), when constructing entry objects for each block type:
 
-## Not Changing
-- No new files created (keep everything in existing files)
-- No database migrations
-- No new dependencies
-- Mobile app's Variability view is omitted (very niche, can add later)
+- Add `faults_observed: checkedFaults[key]?.length > 0 ? checkedFaults[key] : null` to each entry.
+- NULL means no review or no faults available. Empty array not sent (avoids noise).
+
+---
+
+## Step 5 — Backend: persist `faults_observed` in `log-workout`
+
+In `supabase/functions/log-workout/index.ts`:
+
+- Add `faults_observed?: string[] | null` to the `LogEntry` interface.
+- In the entry insert loop (line ~214), add:
+  ```ts
+  faults_observed: Array.isArray(entry.faults_observed) && entry.faults_observed.length > 0
+    ? entry.faults_observed
+    : null,
+  ```
+
+---
+
+## Step 6 — Backend: include `faults_observed` in training history formatting
+
+In `supabase/functions/_shared/training-history.ts`:
+
+- Add `faults_observed: string[] | null` to `WorkoutLogEntryRow`.
+- In `formatBlock` for skills entries, append observed faults: e.g. `faults: Elbows flaring, Short lockout`.
+- In `fetchAndFormatRecentHistory`, add `faults_observed` to the select column list.
+
+---
+
+## Step 7 — Movement name matching
+
+The review's `cues_and_faults[].movement` and the parsed entry's `movement` may differ (e.g. "Handstand Push-Up" vs "HSPU"). Matching strategy:
+
+- Normalize both: lowercase, strip hyphens/spaces/punctuation.
+- Fuzzy substring check as fallback (e.g. "hspu" matches "handstand push up").
+- Unmatched movements simply don't show fault checkboxes — no friction.
+
+---
+
+## Files changed
+
+| File | Change |
+|------|--------|
+| `supabase/migrations/20260260000000_faults_observed.sql` | New migration adding `faults_observed text[]` column |
+| `src/pages/StartWorkoutPage.tsx` | Fetch review, render fault checkboxes, include in payload |
+| `supabase/functions/log-workout/index.ts` | Accept + persist `faults_observed` |
+| `supabase/functions/_shared/training-history.ts` | Include faults in formatted history output |

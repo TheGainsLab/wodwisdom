@@ -39,6 +39,7 @@ interface LogEntry {
   distance_unit?: "ft" | "m";
   quality?: "A" | "B" | "C" | "D" | null;
   variation?: string | null;
+  faults_observed?: string[] | null;
 }
 
 interface LogBlock {
@@ -203,6 +204,7 @@ Deno.serve(async (req) => {
       distance_unit: string | null;
       quality: string | null;
       variation: string | null;
+      faults_observed: string[] | null;
     }[] = [];
     let sortOrder = 0;
     for (let bi = 0; bi < blocks.length; bi++) {
@@ -243,6 +245,9 @@ Deno.serve(async (req) => {
             ? entry.quality!
             : null,
           variation: entry.variation?.trim() || null,
+          faults_observed: Array.isArray(entry.faults_observed) && entry.faults_observed.length > 0
+            ? entry.faults_observed.map((f) => String(f).trim()).filter(Boolean)
+            : null,
         });
       }
     }
