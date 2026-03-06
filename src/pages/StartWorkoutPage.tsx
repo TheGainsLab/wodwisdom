@@ -603,7 +603,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             type: b.type,
             text: b.text,
             score: scoreStr || null,
-            rx: blockRx[bi] ?? false,
+            rx: blockRx[bi] ?? true,
             entries,
             percentile: scoring?.percentile ?? null,
             performance_tier: scoring?.performanceTier ?? null,
@@ -655,7 +655,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
           type: b.type,
           text: b.text,
           score: blockScores[bi]?.trim() || null,
-          rx: blockRx[bi] ?? false,
+          rx: blockRx[bi] ?? true,
           entries: [],
         };
       });
@@ -720,7 +720,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                   </div>
                   <div className="field">
                     <label>Notes</label>
-                    <input type="text" placeholder="Optional" value={notes} onChange={e => setNotes(e.target.value)} />
+                    <input type="text" placeholder="" value={notes} onChange={e => setNotes(e.target.value)} />
                   </div>
                 </div>
 
@@ -782,7 +782,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                       return (
                         <>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                            <input type="checkbox" id={`rx-${bi}`} checked={blockRx[bi] ?? false} onChange={e => setBlockRx(prev => ({ ...prev, [bi]: e.target.checked }))} />
+                            <input type="checkbox" id={`rx-${bi}`} checked={blockRx[bi] ?? true} onChange={e => setBlockRx(prev => ({ ...prev, [bi]: e.target.checked }))} />
                             <label htmlFor={`rx-${bi}`} style={{ fontSize: 14, color: 'var(--text-dim)' }}>Rx</label>
                           </div>
                           <div className="field" style={{ marginBottom: 16 }}>
@@ -958,7 +958,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                             <label>Notes</label>
                             <input
                               type="text"
-                              placeholder="Optional, e.g. got 5 unbroken kipping"
+                              placeholder=""
                               value={blockScores[bi] ?? ''}
                               onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
                             />
@@ -972,10 +972,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                         <label>Notes</label>
                         <input
                           type="text"
-                          placeholder={
-                            block.type === 'warm-up' ? 'Optional, e.g. subbed row for bike' :
-                            'Optional, e.g. extra hip stretching'
-                          }
+                          placeholder=""
                           value={blockScores[bi] ?? ''}
                           onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
                         />
