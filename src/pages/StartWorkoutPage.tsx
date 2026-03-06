@@ -720,7 +720,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                   </div>
                   <div className="field">
                     <label>Notes</label>
-                    <input type="text" placeholder="Optional" value={notes} onChange={e => setNotes(e.target.value)} />
+                    <input type="text" placeholder="" value={notes} onChange={e => setNotes(e.target.value)} />
                   </div>
                 </div>
 
@@ -958,7 +958,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                             <label>Notes</label>
                             <input
                               type="text"
-                              placeholder="Optional, e.g. got 5 unbroken kipping"
+                              placeholder=""
                               value={blockScores[bi] ?? ''}
                               onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
                             />
@@ -972,10 +972,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                         <label>Notes</label>
                         <input
                           type="text"
-                          placeholder={
-                            block.type === 'warm-up' ? 'Optional, e.g. subbed row for bike' :
-                            'Optional, e.g. extra hip stretching'
-                          }
+                          placeholder=""
                           value={blockScores[bi] ?? ''}
                           onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
                         />
