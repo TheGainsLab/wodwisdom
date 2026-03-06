@@ -47,6 +47,7 @@ interface WorkoutLogEntry {
   distance_unit: string | null;
   quality: string | null;
   variation: string | null;
+  faults_observed: string[] | null;
   sort_order: number;
 }
 
@@ -117,7 +118,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
             .in('log_id', logIds),
           supabase
             .from('workout_log_entries')
-            .select('log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, sort_order')
+            .select('log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, faults_observed, sort_order')
             .in('log_id', logIds),
         ]);
 
@@ -454,6 +455,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                               {e.rpe != null && <span className="tl-set-detail">RPE {e.rpe}</span>}
                               {e.quality && <span className="tl-set-detail">{e.quality}</span>}
                               {e.scaling_note && <span className="tl-set-detail" style={{ fontStyle: 'italic' }}>{e.scaling_note}</span>}
+                              {e.faults_observed && e.faults_observed.length > 0 && (
+                                <span className="tl-set-detail" style={{ color: 'var(--danger, #e74c3c)', fontSize: 11 }}>{e.faults_observed.join(', ')}</span>
+                              )}
                             </div>
                           ))}
                           {sorted.length > 8 && (
@@ -633,6 +637,11 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                                   {entry.rpe != null && <span> RPE {entry.rpe}</span>}
                                                   {entry.quality && <span style={{ fontSize: 11, marginLeft: 4, background: 'var(--surface2)', padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>{entry.quality}</span>}
                                                   {entry.variation && <span style={{ fontStyle: 'italic' }}> — {entry.variation}</span>}
+                                                  {entry.faults_observed && entry.faults_observed.length > 0 && (
+                                                    <span style={{ fontSize: 11, color: 'var(--danger, #e74c3c)', marginLeft: 4 }}>
+                                                      {entry.faults_observed.join(', ')}
+                                                    </span>
+                                                  )}
                                                 </div>
                                               ))}
                                             </div>
