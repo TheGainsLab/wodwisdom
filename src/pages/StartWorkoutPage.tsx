@@ -60,15 +60,23 @@ function getMetconTypeLabel(text: string): string {
   return 'For Time';
 }
 
-function parseSetsReps(text: string): { sets?: number; reps?: number } {
-  const match = text.match(/(\d+)\s*[x×]\s*(\d+)/i);
-  if (match) return { sets: parseInt(match[1], 10), reps: parseInt(match[2], 10) };
+function parseSetsReps(text: string): { sets?: number; reps?: number; perSetReps?: number[] } {
+  // NxN format: "5x5", "3x10"
+  const nxn = text.match(/(\d+)\s*[x×]\s*(\d+)/i);
+  if (nxn) return { sets: parseInt(nxn[1], 10), reps: parseInt(nxn[2], 10) };
+  // Dash-separated format: "5-5-3-3-1"
+  const dash = text.match(/\b(\d+(?:\s*-\s*\d+){1,})\b/);
+  if (dash) {
+    const parts = dash[1].split(/\s*-\s*/).map(Number);
+    return { sets: parts.length, perSetReps: parts };
+  }
   return {};
 }
 
 function extractMovementName(text: string): string {
   return text
     .replace(/\d+\s*[x×]\s*\d+/i, '')
+    .replace(/\b\d+(?:\s*-\s*\d+)+\b/, '')
     .replace(/@\s*\d+%/g, '')
     .replace(/,\s*$/, '')
     .trim() || text.trim();
@@ -378,11 +386,11 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       const initial: Record<string, EntryValues> = {};
       loaded.forEach((b, bi) => {
         if (b.type === 'strength') {
-          const { sets, reps } = parseSetsReps(b.text);
+          const { sets, reps, perSetReps } = parseSetsReps(b.text);
           const numSets = sets && sets > 0 ? sets : 1;
           for (let s = 0; s < numSets; s++) {
             initial[`${bi}-s${s}`] = {
-              reps,
+              reps: perSetReps ? perSetReps[s] : reps,
               weight: undefined,
               weight_unit: 'lbs',
               rpe: undefined,
