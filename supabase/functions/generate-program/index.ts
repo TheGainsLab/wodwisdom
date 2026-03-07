@@ -109,8 +109,7 @@ for (let day = 1; day <= 5; day++) {
 const skill = skillMap.get(`${week}-${day}`) || "coach's choice";
       lines.push(`${dayNames[day - 1]}:`);
       lines.push(`Warm-up: `);
-      lines.push(`[skill: ${skill}]`);
-      lines.push(`Skills: `);
+      lines.push(`Skills: (use ${skill}) `);
       lines.push(`Strength: `);
       lines.push(`Metcon: `);
       lines.push(`Cool down: `);
@@ -294,7 +293,7 @@ const codeMatch = programText.match(/```(?:text)?\s*\n?([\s\S]*?)```/);
 if (codeMatch) programText = codeMatch[1].trim();
 
 // Strip skill assignment annotations that the AI may echo back
-programText = programText.replace(/\[skill:\s*[^\]]+\]\s*/gi, "");
+programText = programText.replace(/\(use\s+[^)]+\)\s*/gi, "");
 
 const stopReason = claudeData.stop_reason || "unknown";
 const dayHeaders = (programText.match(/^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Mon|Tue|Wed|Thu|Fri)\s*:/gmi) || []);
