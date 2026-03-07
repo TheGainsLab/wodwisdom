@@ -65,26 +65,35 @@ if (condStr) parts.push("Conditioning — " + condStr);
 return parts.join("\n") || "No profile data.";
 }
 /* ------------------------------------------------------------------ */
+/*  Fetch active coaching guidelines from DB                          */
+/* ------------------------------------------------------------------ */
+async function fetchCoachingGuidelines(
+  supa: ReturnType<typeof createClient>,
+  scopes: string[]
+): Promise<string> {
+  const { data, error } = await supa
+    .from("coaching_guidelines")
+    .select("guideline_text")
+    .eq("category", "strength")
+    .eq("is_active", true)
+    .in("scope", scopes)
+    .order("priority", { ascending: false });
+
+  if (error) {
+    console.error("Failed to fetch coaching guidelines:", error);
+    return "";
+  }
+  if (!data || data.length === 0) return "";
+
+  return "\n\nSTRENGTH & PROGRAMMING GUIDELINES:\n" +
+    data.map((r: { guideline_text: string }) => `- ${r.guideline_text}`).join("\n");
+}
+
+/* ------------------------------------------------------------------ */
 /*  SYSTEM PROMPT — coherence guardrails only, no methodology         */
 /* ------------------------------------------------------------------ */
-const GENERATE_PROMPT = `Generate a 4-week training program for the athlete described below.
+const GENERATE_PROMPT_BASE = `Generate a 4-week training program for the athlete described below.
 Use the REFERENCE material to guide all programming decisions — periodization approach, loading schemes, skill progressions, metcon design, and deload strategy.
-PROGRAM COHERENCE RULES:
-- No single strength exercise more than 2x per week. Vary barbell movements across the week (e.g. back squat Mon, front squat Thu — not back squat Mon/Wed/Fri).
-- Do not program heavy squats and heavy deadlifts on consecutive days. Same for pressing patterns (strict press and push press should not be back-to-back days).
-- Weakness movements: program 2x per week across the cycle.
-- Strengths and maintenance movements: still program 1x per week. Do not ignore movements just because they are not a weakness.
-- Distribute weakness work across all 4 weeks with progression, not just repetition.
-
-ATHLETE STRENGTH & OLY LEVEL GUIDELINES:
-The user prompt includes per-lift levels (A/B/C for strength, A/B for oly). Apply these guidelines PER MOVEMENT PATTERN:
-- Level A (developing): Use simple barbell movements, conservative percentages (65-75% build weeks, 50-60% deload). No tempo variations or complexes. Prioritize movement quality cues.
-- Level B (intermediate): Standard programming (70-85% build range). Introduce some variations (pause reps, tempo). Moderate complexity.
-- Level C (advanced): Full programming toolbox (70-85% build range). Complexes, clusters, wave loading are fair game.
-For oly lifts:
-- Level A (developing): Higher reps at lower percentages. Emphasize full versions of lifts (full snatch, full clean). Focus on positions.
-- Level B (proficient): Lower reps at higher percentages. Full or power versions. More advanced complexes.
-Apply each level independently — e.g. if Squat=B but Bench=A, squat work uses B guidelines while pressing uses A guidelines.
 
 OUTPUT RULES:
 - Complete every block in the template provided. One line per block.
@@ -231,6 +240,14 @@ const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
     console.log(`[${jobId}] Training history: ${recentTraining ? recentTraining.length + ' chars' : 'none'}`);
 const ragContext = await retrieveRAGContext(supa, profile);
     console.log(`[${jobId}] RAG context: ${ragContext ? ragContext.length + ' chars' : 'none'}`);
+
+// Fetch strength guidelines from coaching_guidelines table
+const guidelineScopes = ["all"];
+const levelValues = [levels.squat_level, levels.bench_level, levels.deadlift_level];
+if (levelValues.some((l) => l === "A")) guidelineScopes.push("beginner");
+if (levelValues.some((l) => l === "C")) guidelineScopes.push("competition");
+const guidelinesBlock = await fetchCoachingGuidelines(supa, guidelineScopes);
+    console.log(`[${jobId}] Guidelines: scopes=${guidelineScopes.join(",")}, ${guidelinesBlock ? guidelinesBlock.length + ' chars' : 'none'}`);
 // Build skeleton with inline skill assignments
 const skeleton = buildProgramSkeleton(schedule);
     console.log(`[${jobId}] Skeleton: ${skeleton.length} chars, ${(skeleton.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday):/gm) || []).length} day headers`);
@@ -244,7 +261,7 @@ ${analysisStr}
 ${trainingBlock}
 Complete the following program template. Fill in every block with one line of programming. Do not add or remove any headers.
 ${skeleton}`;
-const systemPrompt = GENERATE_PROMPT + ragContext;
+const systemPrompt = GENERATE_PROMPT_BASE + guidelinesBlock + ragContext;
     console.log(`[${jobId}] Prompt sizes: system=${systemPrompt.length} chars, user=${userPrompt.length} chars`);
 if (!ANTHROPIC_API_KEY) {
 throw new Error("Program generation is not configured");
