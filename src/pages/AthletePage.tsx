@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { classifyAthlete } from '../utils/classify-athlete';
 import Nav from '../components/Nav';
 
 const LIFT_GROUPS = [
@@ -426,6 +427,13 @@ export default function AthletePage({ session }: { session: Session }) {
       }
     }
 
+    const levels = classifyAthlete({
+      bodyweight: bw && !isNaN(bw) ? bw : null,
+      gender: genderVal,
+      units,
+      lifts: cleanLifts,
+    });
+
     const { error: err } = await supabase
       .from('athlete_profiles')
       .upsert(
@@ -439,6 +447,7 @@ export default function AthletePage({ session }: { session: Session }) {
           age: ageNum && !isNaN(ageNum) ? ageNum : null,
           height: heightNum && !isNaN(heightNum) ? heightNum : null,
           gender: genderVal,
+          ...levels,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' }

@@ -13,6 +13,7 @@ import {
 } from "../_shared/rag.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { rankSkillPriorities } from "../_shared/skill-priorities.ts";
+import { classifyAthlete } from "../_shared/classify-athlete.ts";
 import { buildSkillSchedule, formatScheduleForPrompt } from "../_shared/build-skill-schedule.ts";
 import { extractBlocksFromWorkoutText } from "../_shared/parse-workout-blocks.ts";
 
@@ -86,6 +87,16 @@ FREQUENCY & RECOVERY RULES:
 - Follow the SKILL ASSIGNMENTS section exactly. Each day's Skills block must use the assigned skill. Do not substitute or skip assignments.
 - Do not program heavy squats and heavy deadlifts on consecutive days. Same for pressing patterns (strict press and push press should not be back-to-back days).
 - The metcon should complement the strength block, not duplicate it. If the strength block is front squats, the metcon should NOT also be thrusters and wall balls. Vary the movement patterns between blocks within a day.
+
+ATHLETE STRENGTH & OLY LEVEL GUIDELINES:
+The user prompt includes per-lift levels (A/B/C for strength, A/B for oly). Apply these guidelines PER MOVEMENT PATTERN:
+- Level A (developing): Use simple barbell movements, conservative percentages (65-75% build weeks, 50-60% deload). No tempo variations or complexes. Prioritize movement quality cues.
+- Level B (intermediate): Standard programming (70-85% build range). Introduce some variations (pause reps, tempo). Moderate complexity.
+- Level C (advanced): Full programming toolbox (70-85% build range). Complexes, clusters, wave loading are fair game.
+For oly lifts:
+- Level A (developing): Higher reps at lower percentages. Emphasize full versions of lifts (full snatch, full clean). Focus on positions.
+- Level B (proficient): Lower reps at higher percentages. Full or power versions. More advanced complexes.
+Apply each level independently — e.g. if Squat=B but Bench=A, squat work uses B guidelines while pressing uses A guidelines.
 
 WEAKNESS vs. MAINTENANCE BALANCE:
 - The analysis identifies weaknesses/priorities. Address them consistently but not exclusively.
@@ -330,6 +341,8 @@ async function processJob(
 
     const profile = evalRow.profile_snapshot || {};
     const profileStr = formatProfile(profile);
+    const levels = classifyAthlete(profile);
+    const levelsStr = `Squat: ${levels.squat_level}, Bench: ${levels.bench_level}, Deadlift: ${levels.deadlift_level}, Snatch: ${levels.snatch_level}, C&J: ${levels.clean_jerk_level}`;
     const analysisParts: string[] = [];
     if (evalRow.lifting_analysis) analysisParts.push("STRENGTH ANALYSIS:\n" + evalRow.lifting_analysis);
     if (evalRow.skills_analysis) analysisParts.push("SKILLS ANALYSIS:\n" + evalRow.skills_analysis);
@@ -356,6 +369,8 @@ async function processJob(
 
     const userPrompt = `ATHLETE PROFILE:
 ${profileStr}
+
+STRENGTH & OLY LEVELS: ${levelsStr}
 
 ANALYSIS TO ADDRESS:
 ${analysisStr}
