@@ -73,13 +73,15 @@ function formatProfile(profile: ProfileData): string {
 /*  Fetch active coaching guidelines from DB                          */
 /* ------------------------------------------------------------------ */
 async function fetchCoachingGuidelines(
-  supa: ReturnType<typeof createClient>
+  supa: ReturnType<typeof createClient>,
+  scopes: string[] = ["all"]
 ): Promise<string> {
   const { data, error } = await supa
     .from("coaching_guidelines")
     .select("guideline_text")
     .eq("category", "strength")
     .eq("is_active", true)
+    .in("scope", scopes)
     .order("priority", { ascending: false });
 
   if (error) {
@@ -88,7 +90,7 @@ async function fetchCoachingGuidelines(
   }
   if (!data || data.length === 0) return "";
 
-  return "\n\nSTRENGTH & PROGRAMMING GUIDELINES:\n" +
+  return "\n\nCOACHING GUIDELINES:\n" +
     data.map((r: { guideline_text: string }) => `- ${r.guideline_text}`).join("\n");
 }
 
@@ -97,14 +99,7 @@ async function fetchCoachingGuidelines(
 /* ------------------------------------------------------------------ */
 const GENERATE_PROMPT = `Generate a 4-week training program for the athlete described below.
 
-Use the REFERENCE material to guide all programming decisions — periodization approach, loading schemes, skill progressions, metcon design, and deload strategy.
-
-PROGRAM COHERENCE RULES:
-- No single strength exercise more than 2x per week. Vary barbell movements across the week (e.g. back squat Mon, front squat Thu — not back squat Mon/Wed/Fri).
-- Do not program heavy squats and heavy deadlifts on consecutive days. Same for pressing patterns (strict press and push press should not be back-to-back days).
-- Weakness movements: program 2x per week across the cycle.
-- Strengths and maintenance movements: still program 1x per week. Do not ignore movements just because they are not a weakness.
-- Distribute weakness work across all 4 weeks with progression, not just repetition.
+Use the REFERENCE material and COACHING GUIDELINES below to guide all programming decisions — periodization approach, loading schemes, skill progressions, metcon design, and deload strategy.
 
 OUTPUT RULES:
 - Complete every block in the template provided. One line per block.
@@ -271,8 +266,19 @@ async function processJob(
     const ragContext = await retrieveRAGContext(supa, profile);
     console.log(`[${jobId}] RAG context: ${ragContext ? ragContext.length + ' chars' : 'none'}`);
 
+    // Determine athlete scope for guideline filtering
+    const scopes = ["all"];
+    if (profile.skills) {
+      const levels = Object.values(profile.skills).filter((v) => v && v !== "none");
+      const developing = levels.filter((v) => /developing|beginner|learning/i.test(v)).length;
+      const advanced = levels.filter((v) => /advanced|competition|elite/i.test(v)).length;
+      if (developing > advanced) scopes.push("beginner");
+      else if (advanced > 0) scopes.push("competition");
+    }
+    console.log(`[${jobId}] Guideline scopes: [${scopes.join(", ")}]`);
+
     // Fetch strength guidelines from coaching_guidelines table
-    const guidelinesBlock = await fetchCoachingGuidelines(supa);
+    const guidelinesBlock = await fetchCoachingGuidelines(supa, scopes);
     console.log(`[${jobId}] Guidelines: ${guidelinesBlock ? guidelinesBlock.length + ' chars' : 'none'}`);
 
     // Build skeleton with inline skill assignments
