@@ -48,6 +48,7 @@ export interface WorkoutLogEntryRow {
   distance_unit: string | null;
   quality: string | null;
   variation: string | null;
+  faults_observed: string[] | null;
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -118,6 +119,12 @@ function formatBlock(
         if (e.weight != null) p += ` @${e.weight}${e.weight_unit === "kg" ? "kg" : "lbs"}`;
         if (e.rpe != null) p += ` RPE ${e.rpe}`;
       }
+      // Collect unique faults across all sets of this movement
+      const allFaults = new Set<string>();
+      for (const r of rows) {
+        if (r.faults_observed) r.faults_observed.forEach((f) => allFaults.add(f));
+      }
+      if (allFaults.size > 0) p += ` faults: ${[...allFaults].join(", ")}`;
       parts.push(p);
     }
     return `Strength: ${parts.join(", ") || block.block_text.slice(0, 60).replace(/\n/g, " ")}`;
@@ -136,6 +143,7 @@ function formatBlock(
             .map((e) => {
               let s = formatMovementName(e.movement);
               if (e.scaling_note) s += ` ${e.scaling_note}`;
+              if (e.faults_observed && e.faults_observed.length > 0) s += ` faults: ${e.faults_observed.join(", ")}`;
               return s;
             })
             .join(", ") +
@@ -189,6 +197,9 @@ function formatBlock(
         if (e.rpe != null) p += ` RPE ${e.rpe}`;
         if (e.quality) p += ` Q:${e.quality}`;
         if (e.scaling_note) p += ` — ${e.scaling_note}`;
+        if (e.faults_observed && e.faults_observed.length > 0) {
+          p += ` faults: ${e.faults_observed.join(", ")}`;
+        }
         parts.push(p);
       }
       return `Skills:\n${parts.join("\n")}`;
@@ -308,7 +319,7 @@ export async function fetchAndFormatRecentHistory(
       .in("log_id", logIds),
     supa
       .from("workout_log_entries")
-      .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation")
+      .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, faults_observed")
       .in("log_id", logIds),
   ]);
 

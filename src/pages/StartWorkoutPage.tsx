@@ -60,15 +60,23 @@ function getMetconTypeLabel(text: string): string {
   return 'For Time';
 }
 
-function parseSetsReps(text: string): { sets?: number; reps?: number } {
-  const match = text.match(/(\d+)\s*[x×]\s*(\d+)/i);
-  if (match) return { sets: parseInt(match[1], 10), reps: parseInt(match[2], 10) };
+function parseSetsReps(text: string): { sets?: number; reps?: number; perSetReps?: number[] } {
+  // NxN format: "5x5", "3x10"
+  const nxn = text.match(/(\d+)\s*[x×]\s*(\d+)/i);
+  if (nxn) return { sets: parseInt(nxn[1], 10), reps: parseInt(nxn[2], 10) };
+  // Dash-separated format: "5-5-3-3-1"
+  const dash = text.match(/\b(\d+(?:\s*-\s*\d+){1,})\b/);
+  if (dash) {
+    const parts = dash[1].split(/\s*-\s*/).map(Number);
+    return { sets: parts.length, perSetReps: parts };
+  }
   return {};
 }
 
 function extractMovementName(text: string): string {
   return text
     .replace(/\d+\s*[x×]\s*\d+/i, '')
+    .replace(/\b\d+(?:\s*-\s*\d+)+\b/, '')
     .replace(/@\s*\d+%/g, '')
     .replace(/,\s*$/, '')
     .trim() || text.trim();
@@ -261,6 +269,9 @@ function parseSkillsMovements(blockText: string): SkillsEntryValues[] {
     movement = movement.replace(/^[,\-–—+]+|[,\-–—+]+$/g, '').replace(/\s+/g, ' ').trim();
     if (!movement) continue;
 
+    // Skip lines with no sets, reps, or hold — these are coaching cues, not movements
+    if (sets === undefined && reps_completed === undefined && hold_seconds === undefined) continue;
+
     results.push({
       movement: capitalizeWords(movement),
       sets,
@@ -282,6 +293,11 @@ function inferWorkoutType(blocks: Block[]): string {
   }
   if (blocks.some(b => b.type === 'strength')) return 'strength';
   return 'other';
+}
+
+// Normalize a movement name for fuzzy matching against coach review faults
+function normalizeName(name: string): string {
+  return name.toLowerCase().replace(/[-\s'']/g, '').replace(/[^a-z0-9]/g, '');
 }
 
 const compactInputStyle = {
@@ -312,6 +328,9 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
   const [blockScores, setBlockScores] = useState<Record<number, string>>({});
   const [blockRx, setBlockRx] = useState<Record<number, boolean>>({});
   const [saving, setSaving] = useState(false);
+  // Faults from cached coach review, keyed by entry key (e.g. "0-sk0", "1-m2")
+  const [reviewFaults, setReviewFaults] = useState<Record<string, string[]>>({});
+  const [checkedFaults, setCheckedFaults] = useState<Record<string, string[]>>({});
 
   const sourceState = location.state as {
     workout_text?: string;
@@ -367,11 +386,11 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       const initial: Record<string, EntryValues> = {};
       loaded.forEach((b, bi) => {
         if (b.type === 'strength') {
-          const { sets, reps } = parseSetsReps(b.text);
+          const { sets, reps, perSetReps } = parseSetsReps(b.text);
           const numSets = sets && sets > 0 ? sets : 1;
           for (let s = 0; s < numSets; s++) {
             initial[`${bi}-s${s}`] = {
-              reps,
+              reps: perSetReps ? perSetReps[s] : reps,
               weight: undefined,
               weight_unit: 'lbs',
               rpe: undefined,
@@ -405,6 +424,59 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
         }
       });
       setSkillsEntries(initialSkills);
+
+      // Fetch cached coach review to get common_faults per movement
+      const { data: reviewRow } = await supabase
+        .from('workout_reviews')
+        .select('review')
+        .eq('source_id', sourceState.source_id!)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (reviewRow?.review) {
+        const review = reviewRow.review as { blocks?: { block_type: string; cues_and_faults: { movement: string; common_faults: string[] }[] }[] };
+        const faultsMap: Record<string, string[]> = {};
+
+        // Build a lookup of normalized movement name → faults from the review
+        const reviewFaultsByName: { norm: string; faults: string[] }[] = [];
+        for (const rb of review.blocks ?? []) {
+          for (const cf of rb.cues_and_faults ?? []) {
+            if (cf.common_faults?.length > 0) {
+              reviewFaultsByName.push({ norm: normalizeName(cf.movement), faults: cf.common_faults });
+            }
+          }
+        }
+
+        // Match review faults to entry keys by movement name
+        const matchFaults = (movement: string): string[] => {
+          const n = normalizeName(movement);
+          for (const rf of reviewFaultsByName) {
+            if (rf.norm === n || rf.norm.includes(n) || n.includes(rf.norm)) return rf.faults;
+          }
+          return [];
+        };
+
+        for (const [key, sk] of Object.entries(initialSkills)) {
+          const f = matchFaults(sk.movement);
+          if (f.length > 0) faultsMap[key] = f;
+        }
+        for (const [key, mv] of Object.entries(initialMetcon)) {
+          const f = matchFaults(mv.movement);
+          if (f.length > 0) faultsMap[key] = f;
+        }
+        // Strength: match by extracted movement name per block
+        loaded.forEach((b, bi) => {
+          if (b.type === 'strength') {
+            const moveName = extractMovementName(b.text);
+            const f = matchFaults(moveName);
+            if (f.length > 0) faultsMap[`${bi}-str`] = f;
+          }
+        });
+
+        setReviewFaults(faultsMap);
+      }
+
       setLoading(false);
     })();
   }, [sourceState?.source_id]);
@@ -428,6 +500,16 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       ...prev,
       [key]: { ...prev[key], [field]: value },
     }));
+  };
+
+  const toggleFault = (entryKey: string, fault: string) => {
+    setCheckedFaults(prev => {
+      const current = prev[entryKey] ?? [];
+      const next = current.includes(fault)
+        ? current.filter(f => f !== fault)
+        : [...current, fault];
+      return { ...prev, [entryKey]: next };
+    });
   };
 
   // Reactively compute benchmarks per metcon block
@@ -460,6 +542,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
               const bNum = parseInt(b2.split('-s')[1], 10);
               return aNum - bNum;
             });
+          const strFaults = checkedFaults[`${bi}-str`];
           const entries = setKeys.map(key => {
             const ev = entryValues[key] || {};
             return {
@@ -477,6 +560,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
               distance_unit: null,
               quality: null,
               variation: null,
+              faults_observed: strFaults?.length ? strFaults : null,
             };
           });
           return {
@@ -494,24 +578,28 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             .filter(k => k.startsWith(`${bi}-m`))
             .sort((a, b2) => parseInt(a.split('-m')[1], 10) - parseInt(b2.split('-m')[1], 10));
           const entries = mvKeys
-            .map(key => metconEntries[key])
-            .filter(mv => mv?.movement?.trim())
-            .map(mv => ({
-              movement: mv.movement.trim(),
-              sets: null,
-              reps: mv.reps ?? null,
-              weight: mv.weight ?? null,
-              weight_unit: mv.weight_unit || 'lbs',
-              rpe: null,
-              scaling_note: mv.scaling_note?.trim() || null,
-              set_number: null,
-              reps_completed: null,
-              hold_seconds: null,
-              distance: mv.distance ?? null,
-              distance_unit: mv.distance_unit || null,
-              quality: null,
-              variation: null,
-            }));
+            .filter(key => metconEntries[key]?.movement?.trim())
+            .map(key => {
+              const mv = metconEntries[key];
+              const f = checkedFaults[key];
+              return {
+                movement: mv.movement.trim(),
+                sets: null,
+                reps: mv.reps ?? null,
+                weight: mv.weight ?? null,
+                weight_unit: mv.weight_unit || 'lbs',
+                rpe: null,
+                scaling_note: mv.scaling_note?.trim() || null,
+                set_number: null,
+                reps_completed: null,
+                hold_seconds: null,
+                distance: mv.distance ?? null,
+                distance_unit: mv.distance_unit || null,
+                quality: null,
+                variation: null,
+                faults_observed: f?.length ? f : null,
+              };
+            });
 
           // Compute percentile if benchmarks and score are available
           const benchmarks = blockBenchmarks[bi];
@@ -526,7 +614,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             type: b.type,
             text: b.text,
             score: scoreStr || null,
-            rx: blockRx[bi] ?? false,
+            rx: blockRx[bi] ?? true,
             entries,
             percentile: scoring?.percentile ?? null,
             performance_tier: scoring?.performanceTier ?? null,
@@ -540,24 +628,28 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             .filter(k => k.startsWith(`${bi}-sk`))
             .sort((a, b2) => parseInt(a.split('-sk')[1], 10) - parseInt(b2.split('-sk')[1], 10));
           const entries = skKeys
-            .map(key => skillsEntries[key])
-            .filter(sk => sk?.movement?.trim())
-            .map(sk => ({
-              movement: sk.movement.trim(),
-              sets: sk.sets ?? null,
-              reps: null,
-              weight: null,
-              weight_unit: 'lbs' as const,
-              rpe: sk.rpe ?? null,
-              scaling_note: sk.variation?.trim() || null,
-              set_number: null,
-              reps_completed: sk.reps_completed ?? null,
-              hold_seconds: sk.hold_seconds ?? null,
-              distance: null,
-              distance_unit: null,
-              quality: sk.quality ?? null,
-              variation: sk.variation?.trim() || null,
-            }));
+            .filter(key => skillsEntries[key]?.movement?.trim())
+            .map(key => {
+              const sk = skillsEntries[key];
+              const f = checkedFaults[key];
+              return {
+                movement: sk.movement.trim(),
+                sets: sk.sets ?? null,
+                reps: null,
+                weight: null,
+                weight_unit: 'lbs' as const,
+                rpe: sk.rpe ?? null,
+                scaling_note: sk.variation?.trim() || null,
+                set_number: null,
+                reps_completed: sk.reps_completed ?? null,
+                hold_seconds: sk.hold_seconds ?? null,
+                distance: null,
+                distance_unit: null,
+                quality: sk.quality ?? null,
+                variation: sk.variation?.trim() || null,
+                faults_observed: f?.length ? f : null,
+              };
+            });
           return {
             label: b.label,
             type: b.type,
@@ -574,7 +666,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
           type: b.type,
           text: b.text,
           score: blockScores[bi]?.trim() || null,
-          rx: blockRx[bi] ?? false,
+          rx: blockRx[bi] ?? true,
           entries: [],
         };
       });
@@ -639,7 +731,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                   </div>
                   <div className="field">
                     <label>Notes</label>
-                    <input type="text" placeholder="Optional" value={notes} onChange={e => setNotes(e.target.value)} />
+                    <input type="text" placeholder="" value={notes} onChange={e => setNotes(e.target.value)} />
                   </div>
                 </div>
 
@@ -678,6 +770,17 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                               </div>
                             );
                           })}
+                          {reviewFaults[`${bi}-str`] && reviewFaults[`${bi}-str`].length > 0 && (
+                            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', paddingLeft: 40, marginTop: 6 }}>
+                              {reviewFaults[`${bi}-str`].map(fault => (
+                                <label key={fault} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: (checkedFaults[`${bi}-str`] ?? []).includes(fault) ? 'var(--danger, #e74c3c)' : 'var(--text-dim)', cursor: 'pointer' }}>
+                                  <input type="checkbox" checked={(checkedFaults[`${bi}-str`] ?? []).includes(fault)} onChange={() => toggleFault(`${bi}-str`, fault)} style={{ accentColor: 'var(--danger, #e74c3c)' }} />
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                  {fault}
+                                </label>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -690,7 +793,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                       return (
                         <>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                            <input type="checkbox" id={`rx-${bi}`} checked={blockRx[bi] ?? false} onChange={e => setBlockRx(prev => ({ ...prev, [bi]: e.target.checked }))} />
+                            <input type="checkbox" id={`rx-${bi}`} checked={blockRx[bi] ?? true} onChange={e => setBlockRx(prev => ({ ...prev, [bi]: e.target.checked }))} />
                             <label htmlFor={`rx-${bi}`} style={{ fontSize: 14, color: 'var(--text-dim)' }}>Rx</label>
                           </div>
                           <div className="field" style={{ marginBottom: 16 }}>
@@ -707,42 +810,55 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                   if (!mv) return null;
                                   const hasDistance = mv.distance != null && mv.distance > 0;
                                   return (
-                                    <div key={key} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                                      <input
-                                        type="text"
-                                        value={mv.movement}
-                                        onChange={e => setMetconEntry(key, 'movement', e.target.value)}
-                                        style={{ ...compactInputStyle, flex: '1 1 120px', minWidth: 120 }}
-                                      />
-                                      {hasDistance ? (
-                                        <>
-                                          <input
-                                            type="number"
-                                            placeholder="Dist"
-                                            value={mv.distance ?? ''}
-                                            onChange={e => setMetconEntry(key, 'distance', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                            style={{ ...compactInputStyle, width: 64 }}
-                                          />
-                                          <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 16 }}>{mv.distance_unit || 'm'}</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <input
-                                            type="number"
-                                            placeholder="Reps"
-                                            value={mv.reps ?? ''}
-                                            onChange={e => setMetconEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                            style={{ ...compactInputStyle, width: 56 }}
-                                          />
-                                          <input
-                                            type="number"
-                                            placeholder="Wt"
-                                            value={mv.weight ?? ''}
-                                            onChange={e => setMetconEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
-                                            style={{ ...compactInputStyle, width: 64 }}
-                                          />
-                                          <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 24 }}>{mv.weight_unit || 'lbs'}</span>
-                                        </>
+                                    <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <input
+                                          type="text"
+                                          value={mv.movement}
+                                          onChange={e => setMetconEntry(key, 'movement', e.target.value)}
+                                          style={{ ...compactInputStyle, flex: '1 1 120px', minWidth: 120 }}
+                                        />
+                                        {hasDistance ? (
+                                          <>
+                                            <input
+                                              type="number"
+                                              placeholder="Dist"
+                                              value={mv.distance ?? ''}
+                                              onChange={e => setMetconEntry(key, 'distance', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                              style={{ ...compactInputStyle, width: 64 }}
+                                            />
+                                            <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 16 }}>{mv.distance_unit || 'm'}</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <input
+                                              type="number"
+                                              placeholder="Reps"
+                                              value={mv.reps ?? ''}
+                                              onChange={e => setMetconEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                              style={{ ...compactInputStyle, width: 56 }}
+                                            />
+                                            <input
+                                              type="number"
+                                              placeholder="Wt"
+                                              value={mv.weight ?? ''}
+                                              onChange={e => setMetconEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
+                                              style={{ ...compactInputStyle, width: 64 }}
+                                            />
+                                            <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 24 }}>{mv.weight_unit || 'lbs'}</span>
+                                          </>
+                                        )}
+                                      </div>
+                                      {reviewFaults[key] && reviewFaults[key].length > 0 && (
+                                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', paddingLeft: 4, marginTop: 2 }}>
+                                          {reviewFaults[key].map(fault => (
+                                            <label key={fault} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: (checkedFaults[key] ?? []).includes(fault) ? 'var(--danger, #e74c3c)' : 'var(--text-dim)', cursor: 'pointer' }}>
+                                              <input type="checkbox" checked={(checkedFaults[key] ?? []).includes(fault)} onChange={() => toggleFault(key, fault)} style={{ accentColor: 'var(--danger, #e74c3c)' }} />
+                                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                              {fault}
+                                            </label>
+                                          ))}
+                                        </div>
                                       )}
                                     </div>
                                   );
@@ -832,6 +948,17 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                           style={{ ...compactInputStyle, width: 56 }}
                                         />
                                       </div>
+                                      {reviewFaults[key] && reviewFaults[key].length > 0 && (
+                                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', paddingLeft: 4, marginTop: 2 }}>
+                                          {reviewFaults[key].map(fault => (
+                                            <label key={fault} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: (checkedFaults[key] ?? []).includes(fault) ? 'var(--danger, #e74c3c)' : 'var(--text-dim)', cursor: 'pointer' }}>
+                                              <input type="checkbox" checked={(checkedFaults[key] ?? []).includes(fault)} onChange={() => toggleFault(key, fault)} style={{ accentColor: 'var(--danger, #e74c3c)' }} />
+                                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                              {fault}
+                                            </label>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -842,7 +969,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                             <label>Notes</label>
                             <input
                               type="text"
-                              placeholder="Optional, e.g. got 5 unbroken kipping"
+                              placeholder=""
                               value={blockScores[bi] ?? ''}
                               onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
                             />
@@ -856,10 +983,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                         <label>Notes</label>
                         <input
                           type="text"
-                          placeholder={
-                            block.type === 'warm-up' ? 'Optional, e.g. subbed row for bike' :
-                            'Optional, e.g. extra hip stretching'
-                          }
+                          placeholder=""
                           value={blockScores[bi] ?? ''}
                           onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
                         />
