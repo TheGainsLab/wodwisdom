@@ -12,6 +12,7 @@ import {
 } from "../_shared/rag.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { rankSkillPriorities } from "../_shared/skill-priorities.ts";
+import { classifyAthlete } from "../_shared/classify-athlete.ts";
 import { buildSkillSchedule } from "../_shared/build-skill-schedule.ts";
 import { extractBlocksFromWorkoutText } from "../_shared/parse-workout-blocks.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -74,6 +75,17 @@ PROGRAM COHERENCE RULES:
 - Weakness movements: program 2x per week across the cycle.
 - Strengths and maintenance movements: still program 1x per week. Do not ignore movements just because they are not a weakness.
 - Distribute weakness work across all 4 weeks with progression, not just repetition.
+
+ATHLETE STRENGTH & OLY LEVEL GUIDELINES:
+The user prompt includes per-lift levels (A/B/C for strength, A/B for oly). Apply these guidelines PER MOVEMENT PATTERN:
+- Level A (developing): Use simple barbell movements, conservative percentages (65-75% build weeks, 50-60% deload). No tempo variations or complexes. Prioritize movement quality cues.
+- Level B (intermediate): Standard programming (70-85% build range). Introduce some variations (pause reps, tempo). Moderate complexity.
+- Level C (advanced): Full programming toolbox (70-85% build range). Complexes, clusters, wave loading are fair game.
+For oly lifts:
+- Level A (developing): Higher reps at lower percentages. Emphasize full versions of lifts (full snatch, full clean). Focus on positions.
+- Level B (proficient): Lower reps at higher percentages. Full or power versions. More advanced complexes.
+Apply each level independently — e.g. if Squat=B but Bench=A, squat work uses B guidelines while pressing uses A guidelines.
+
 OUTPUT RULES:
 - Complete every block in the template provided. One line per block.
 - Do not add, remove, or reorder any headers.
@@ -197,7 +209,9 @@ try {
 await supa.from("program_jobs").update({ status: "processing", updated_at: new Date().toISOString() }).eq("id", jobId);
 const profile = evalRow.profile_snapshot || {};
 const profileStr = formatProfile(profile);
-    console.log(`[${jobId}] Profile: ${profileStr.length} chars, lifts=${Object.keys(profile.lifts || {}).length}, skills=${Object.keys(profile.skills || {}).length}`);
+const levels = classifyAthlete(profile);
+const levelsStr = `Squat: ${levels.squat_level}, Bench: ${levels.bench_level}, Deadlift: ${levels.deadlift_level}, Snatch: ${levels.snatch_level}, C&J: ${levels.clean_jerk_level}`;
+    console.log(`[${jobId}] Profile: ${profileStr.length} chars, lifts=${Object.keys(profile.lifts || {}).length}, skills=${Object.keys(profile.skills || {}).length}, levels=${levelsStr}`);
 const analysisParts: string[] = [];
 if (evalRow.lifting_analysis) analysisParts.push("STRENGTH ANALYSIS:\n" + evalRow.lifting_analysis);
 if (evalRow.skills_analysis) analysisParts.push("SKILLS ANALYSIS:\n" + evalRow.skills_analysis);
@@ -223,6 +237,9 @@ const skeleton = buildProgramSkeleton(schedule);
     console.log(`[${jobId}] Skeleton: ${skeleton.length} chars, ${(skeleton.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday):/gm) || []).length} day headers`);
 const userPrompt = `ATHLETE PROFILE:
 ${profileStr}
+
+STRENGTH & OLY LEVELS: ${levelsStr}
+
 ANALYSIS TO ADDRESS:
 ${analysisStr}
 ${trainingBlock}

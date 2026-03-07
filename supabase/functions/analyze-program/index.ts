@@ -23,6 +23,25 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+/**
+ * Resolve the acting user ID.
+ * If the bearer token is the service-role key AND user_id is in the body, trust it
+ * (internal service-to-service call). Otherwise validate the JWT as a normal user token.
+ */
+async function resolveUserId(
+  authHeader: string,
+  body: Record<string, unknown>,
+  supa: ReturnType<typeof createClient>
+): Promise<{ userId: string; error?: never } | { userId?: never; error: string }> {
+  const token = authHeader.replace("Bearer ", "");
+  if (token === SUPABASE_KEY && typeof body.user_id === "string" && body.user_id) {
+    return { userId: body.user_id };
+  }
+  const { data: { user }, error: authErr } = await supa.auth.getUser(token);
+  if (authErr || !user) return { error: "Invalid token" };
+  return { userId: user.id };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -39,17 +58,18 @@ Deno.serve(async (req) => {
 
     const supa = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authErr } = await supa.auth.getUser(token);
+    const body = await req.json();
+    const resolved = await resolveUserId(authHeader, body, supa);
 
-    if (authErr || !user) {
+    if (resolved.error) {
       return new Response(
-        JSON.stringify({ error: "Invalid token" }),
+        JSON.stringify({ error: resolved.error }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { program_id } = await req.json();
+    const userId = resolved.userId;
+    const { program_id } = body;
 
     if (!program_id) {
       return new Response(
@@ -64,7 +84,7 @@ Deno.serve(async (req) => {
       .eq("id", program_id)
       .single();
 
-    if (pErr || !program || program.user_id !== user.id) {
+    if (pErr || !program || program.user_id !== userId) {
       return new Response(
         JSON.stringify({ error: "Program not found or not authorized" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
