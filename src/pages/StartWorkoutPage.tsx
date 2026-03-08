@@ -971,32 +971,32 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                         onChange={e => setSkillEntry(key, 'movement', e.target.value)}
                                         style={{ ...compactInputStyle, width: '100%' }}
                                       />
-                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                         <input
                                           type="number"
                                           placeholder="Sets"
                                           value={sk.sets ?? ''}
                                           onChange={e => setSkillEntry(key, 'sets', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, width: 56 }}
+                                          style={{ ...compactInputStyle, width: 48 }}
                                         />
                                         <input
                                           type="number"
                                           placeholder="Reps"
                                           value={sk.reps_completed ?? ''}
                                           onChange={e => setSkillEntry(key, 'reps_completed', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, width: 56 }}
+                                          style={{ ...compactInputStyle, width: 48 }}
                                         />
                                         <input
                                           type="number"
                                           placeholder="Hold (s)"
                                           value={sk.hold_seconds ?? ''}
                                           onChange={e => setSkillEntry(key, 'hold_seconds', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, width: 72 }}
+                                          style={{ ...compactInputStyle, width: 60 }}
                                         />
                                         <select
                                           value={sk.quality ?? ''}
                                           onChange={e => setSkillEntry(key, 'quality', e.target.value || undefined)}
-                                          style={{ ...compactInputStyle, width: 56, padding: '8px 4px' }}
+                                          style={{ ...compactInputStyle, width: 48, padding: '8px 4px' }}
                                         >
                                           <option value="">—</option>
                                           <option value="A">A</option>
@@ -1011,7 +1011,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                           max={10}
                                           value={sk.rpe ?? ''}
                                           onChange={e => setSkillEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, width: 56 }}
+                                          style={{ ...compactInputStyle, width: 48 }}
                                         />
                                       </div>
                                       {reviewFaults[key] && reviewFaults[key].length > 0 && (
