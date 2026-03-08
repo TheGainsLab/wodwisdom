@@ -830,13 +830,13 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                   const hasCalories = isMonostructural && mv.distance_unit === 'cal';
                                   return (
                                     <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                      <input
+                                        type="text"
+                                        value={mv.movement}
+                                        onChange={e => setMetconEntry(key, 'movement', e.target.value)}
+                                        style={{ ...compactInputStyle, width: '100%' }}
+                                      />
                                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                                        <input
-                                          type="text"
-                                          value={mv.movement}
-                                          onChange={e => setMetconEntry(key, 'movement', e.target.value)}
-                                          style={{ ...compactInputStyle, flex: '1 1 120px', minWidth: 120 }}
-                                        />
                                         {hasDistance && !hasCalories ? (
                                           <>
                                             <input
