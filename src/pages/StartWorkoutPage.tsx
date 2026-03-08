@@ -25,6 +25,7 @@ interface EntryValues {
   weight?: number;
   weight_unit: 'lbs' | 'kg';
   rpe?: number;
+  quality?: 'A' | 'B' | 'C' | 'D';
   set_number?: number;
 }
 
@@ -568,7 +569,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
               hold_seconds: null,
               distance: null,
               distance_unit: null,
-              quality: null,
+              quality: ev.quality ?? null,
               variation: null,
               faults_observed: strFaults?.length ? strFaults : null,
             };
@@ -766,9 +767,10 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)', paddingLeft: 40 }}>
                             <span style={{ width: 60 }}>Reps</span>
-                            <span style={{ width: 80 }}>Weight</span>
-                            <span style={{ width: 32 }}></span>
-                            <span style={{ width: 56 }}>RPE</span>
+                            <span style={{ width: 64 }}>Wt</span>
+                            <span style={{ width: 28 }}></span>
+                            <span style={{ width: 48 }}>RPE</span>
+                            <span style={{ width: 48 }}>Quality</span>
                           </div>
                           {setKeys.map(key => {
                             const ev = entryValues[key] || {};
@@ -776,9 +778,16 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                               <div key={key} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                                 <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 28, textAlign: 'right' }}>S{ev.set_number}</span>
                                 <input type="number" placeholder="Reps" value={ev.reps ?? ''} onChange={e => setEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 60 }} />
-                                <input type="number" placeholder="Weight" value={ev.weight ?? ''} onChange={e => setEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)} style={{ ...compactInputStyle, width: 80 }} />
+                                <input type="number" placeholder="Wt" value={ev.weight ?? ''} onChange={e => setEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)} style={{ ...compactInputStyle, width: 64 }} />
                                 <span style={{ color: 'var(--text-dim)', fontSize: 13, width: 28 }}>{ev.weight_unit || 'lbs'}</span>
-                                <input type="number" placeholder="RPE" min={1} max={10} value={ev.rpe ?? ''} onChange={e => setEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 56 }} />
+                                <input type="number" placeholder="RPE" min={1} max={10} value={ev.rpe ?? ''} onChange={e => setEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 48 }} />
+                                <select value={ev.quality ?? ''} onChange={e => setEntry(key, 'quality', e.target.value || undefined)} style={{ ...compactInputStyle, width: 48, padding: '8px 4px' }}>
+                                  <option value="">—</option>
+                                  <option value="A">A</option>
+                                  <option value="B">B</option>
+                                  <option value="C">C</option>
+                                  <option value="D">D</option>
+                                </select>
                               </div>
                             );
                           })}
