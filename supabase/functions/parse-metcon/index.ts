@@ -151,6 +151,25 @@ Deno.serve(async (req) => {
         distance_unit: typeof m.distance_unit === "string" && VALID_DISTANCE_UNITS.includes(m.distance_unit) ? m.distance_unit : null,
       }));
 
+    // Deduplicate: one row per unique movement (safety net if LLM expands rounds)
+    const seen = new Map<string, number>();
+    const deduped: typeof movements = [];
+    for (const m of movements) {
+      const key = m.movement.toLowerCase();
+      const idx = seen.get(key);
+      if (idx !== undefined) {
+        // Merge: sum reps, keep first entry's weight/distance
+        const existing = deduped[idx];
+        if (existing.reps != null && m.reps != null) {
+          existing.reps += m.reps;
+        }
+      } else {
+        seen.set(key, deduped.length);
+        deduped.push({ ...m });
+      }
+    }
+    movements = deduped;
+
     // Write back to DB if block_id provided
     if (block_id) {
       const { error: updateErr } = await supa
