@@ -53,7 +53,10 @@ Rules:
 - For monostructural movements with distance (500m Row, 400m Run), set distance + distance_unit, reps = null.
 - For calorie-based cardio (30 Cal Row), set reps = 30, distance = null, distance_unit = "cal".
 - For weighted movements, extract the Rx weight (first number in slash notation like 95/65 → 95).
-- Reps should be PER ROUND, not total. For "5 RFT: 15 Thrusters" → reps: 15.
+- Return ONE entry per unique movement, not one per round.
+- For rep-scheme workouts (21-15-9, 10-9-8…1, etc.), SUM all rounds into total reps. Example: "21-15-9 Deadlifts, Box Jumps, HSPU" → Deadlift reps: 45, Box Jump reps: 45, HSPU reps: 45.
+- For rounds-based workouts (5 RFT, 3 RFT), MULTIPLY rounds × reps. Example: "5 RFT: 15 Thrusters, 10 Pull-Ups" → Thruster reps: 75, Pull-Up reps: 50.
+- For AMRAP workouts, report reps PER ROUND (since total rounds are unknown). Example: "20 min AMRAP: 5 Pull-Ups, 10 Push-Ups" → Pull-Up reps: 5, Push-Up reps: 10.
 - Strip format headers (AMRAP, RFT, EMOM, For Time, round counts, time caps) — they are not movements.
 - Do NOT include rest periods, transitions, or coaching cues as movements.
 - Output valid JSON only, no markdown fences.`;
