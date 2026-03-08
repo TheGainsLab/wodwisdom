@@ -374,6 +374,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                               </span>
                               {e.set_number != null && <span className="tl-set-detail">Set {e.set_number}</span>}
                               {e.rpe != null && <span className="tl-set-detail">RPE {e.rpe}</span>}
+                              {e.quality && <span className="tl-set-detail">{e.quality}</span>}
                             </div>
                           ))}
                           {sorted.length > 8 && (
