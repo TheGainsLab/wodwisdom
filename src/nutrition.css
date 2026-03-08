@@ -302,6 +302,48 @@
   white-space: nowrap;
 }
 
+/* Nutrition page body layout */
+.nutrition-page-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Date navigation */
+.nutrition-date-nav {
+  padding: 12px 16px;
+}
+
+/* Nutrition macro grid: 4 columns on desktop, 2x2 on mobile */
+.nutrition-macro-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* Nutrition page mobile layout fixes */
+@media (max-width: 640px) {
+  .nutrition-page-body {
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .nutrition-date-nav {
+    padding: 10px 12px;
+  }
+
+  .nutrition-macro-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .nutrition-macro-grid .engine-stat {
+    padding: 12px 10px;
+  }
+
+  .nutrition-macro-grid .engine-stat-value {
+    font-size: 22px;
+  }
+}
+
 /* Responsive: slightly larger overlay padding on bigger screens */
 @media (min-width: 641px) {
   .nutrition-overlay-body {

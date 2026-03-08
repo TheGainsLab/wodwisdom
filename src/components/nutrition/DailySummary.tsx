@@ -15,7 +15,7 @@ export default function DailySummary({ daily }: { daily: DailyNutrition | null }
 
   return (
     <div className="engine-card">
-      <div className="engine-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+      <div className="engine-grid nutrition-macro-grid">
         <div className="engine-stat" style={{ textAlign: 'center' }}>
           <div className="engine-stat-value">{Math.round(cals)}</div>
           <div className="engine-stat-label">Calories</div>
