@@ -243,7 +243,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
   const [success, setSuccess] = useState(false);
   const workoutDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [workoutType, setWorkoutType] = useState('other');
-  const [metconNotes, setMetconNotes] = useState<Record<number, string>>({});
+  const [blockNotes, setBlockNotes] = useState<Record<number, string>>({});
   const [entryValues, setEntryValues] = useState<Record<string, EntryValues>>({});
   const [metconEntries, setMetconEntries] = useState<Record<string, MetconEntryValues>>({});
   const [skillsEntries, setSkillsEntries] = useState<Record<string, SkillsEntryValues>>({});
@@ -579,6 +579,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             text: b.text,
             score: blockScores[bi]?.trim() || null,
             rx: false,
+            notes: blockNotes[bi]?.trim() || null,
             entries,
           };
         }
@@ -625,6 +626,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             text: b.text,
             score: scoreStr || null,
             rx: blockRx[bi] ?? true,
+            notes: blockNotes[bi]?.trim() || null,
             entries,
             percentile: scoring?.percentile ?? null,
             performance_tier: scoring?.performanceTier ?? null,
@@ -664,19 +666,21 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             label: b.label,
             type: b.type,
             text: b.text,
-            score: blockScores[bi]?.trim() || null,
+            score: null,
             rx: false,
+            notes: blockNotes[bi]?.trim() || null,
             entries,
           };
         }
 
-        // All other block types: no per-movement entries
+        // All other block types (warm-up, cool-down, etc.): no per-movement entries
         return {
           label: b.label,
           type: b.type,
           text: b.text,
-          score: blockScores[bi]?.trim() || null,
+          score: null,
           rx: blockRx[bi] ?? true,
+          notes: blockNotes[bi]?.trim() || null,
           entries: [],
         };
       });
@@ -690,7 +694,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
           workout_text: workoutText,
           workout_type: workoutType,
           source_id: sourceState?.source_id || null,
-          notes: Object.values(metconNotes).filter(n => n.trim()).join('; ').trim() || null,
+          notes: null,
           blocks: logBlocks,
         },
       });
@@ -789,6 +793,15 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                               ))}
                             </div>
                           )}
+                          <div className="field" style={{ marginTop: 8 }}>
+                            <label>Notes</label>
+                            <input
+                              type="text"
+                              placeholder=""
+                              value={blockNotes[bi] ?? ''}
+                              onChange={e => setBlockNotes(prev => ({ ...prev, [bi]: e.target.value }))}
+                            />
+                          </div>
                         </div>
                       );
                     })()}
@@ -923,8 +936,8 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                             <input
                               type="text"
                               placeholder=""
-                              value={metconNotes[bi] ?? ''}
-                              onChange={e => setMetconNotes(prev => ({ ...prev, [bi]: e.target.value }))}
+                              value={blockNotes[bi] ?? ''}
+                              onChange={e => setBlockNotes(prev => ({ ...prev, [bi]: e.target.value }))}
                             />
                           </div>
                         </>
@@ -1023,8 +1036,8 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                             <input
                               type="text"
                               placeholder=""
-                              value={blockScores[bi] ?? ''}
-                              onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
+                              value={blockNotes[bi] ?? ''}
+                              onChange={e => setBlockNotes(prev => ({ ...prev, [bi]: e.target.value }))}
                             />
                           </div>
                         </>
@@ -1037,8 +1050,8 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                         <input
                           type="text"
                           placeholder=""
-                          value={blockScores[bi] ?? ''}
-                          onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
+                          value={blockNotes[bi] ?? ''}
+                          onChange={e => setBlockNotes(prev => ({ ...prev, [bi]: e.target.value }))}
                         />
                       </div>
                     )}

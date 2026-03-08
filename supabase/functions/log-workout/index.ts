@@ -48,6 +48,7 @@ interface LogBlock {
   text?: string;
   score?: string | null;
   rx?: boolean;
+  notes?: string | null;
   entries?: LogEntry[];
   // Scoring fields (metcon blocks only)
   percentile?: number | null;
@@ -163,6 +164,7 @@ Deno.serve(async (req) => {
           block_text: blockText,
           score: b.score?.trim() || null,
           rx: b.rx ?? false,
+          notes: b.notes?.trim() || null,
           sort_order: i,
           percentile: b.percentile != null && b.percentile >= 1 && b.percentile <= 99
             ? b.percentile
