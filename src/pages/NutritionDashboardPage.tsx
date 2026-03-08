@@ -222,10 +222,10 @@ export default function NutritionDashboardPage({ session }: { session: Session }
             </button>
             <button
               className="engine-btn engine-btn-secondary"
-              style={{ flexShrink: 0, padding: '14px 16px' }}
+              style={{ flex: 1 }}
               onClick={() => { if (!favoritesLoaded) loadFavorites(); setShowTemplatesSheet(true); }}
             >
-              <UtensilsCrossed size={18} />
+              <UtensilsCrossed size={18} /> My Meals
             </button>
           </div>
 
