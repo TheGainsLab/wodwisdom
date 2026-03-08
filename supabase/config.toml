@@ -72,3 +72,6 @@ verify_jwt = false
 
 [functions.favorites-manage]
 verify_jwt = false
+
+[functions.parse-skills]
+verify_jwt = false
