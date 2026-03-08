@@ -945,13 +945,13 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                   if (!sk) return null;
                                   return (
                                     <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                      <input
+                                        type="text"
+                                        value={sk.movement}
+                                        onChange={e => setSkillEntry(key, 'movement', e.target.value)}
+                                        style={{ ...compactInputStyle, width: '100%' }}
+                                      />
                                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                                        <input
-                                          type="text"
-                                          value={sk.movement}
-                                          onChange={e => setSkillEntry(key, 'movement', e.target.value)}
-                                          style={{ ...compactInputStyle, flex: '1 1 140px', minWidth: 140 }}
-                                        />
                                         <input
                                           type="number"
                                           placeholder="Sets"
