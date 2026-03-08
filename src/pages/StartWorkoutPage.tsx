@@ -12,9 +12,11 @@ import {
 } from '../lib/metconScoring';
 
 interface Block {
+  id: string;
   label: string;
   type: string;
   text: string;
+  parsed_skills?: SkillsEntryValues[] | null;
 }
 
 interface EntryValues {
@@ -199,89 +201,6 @@ function capitalizeWords(s: string): string {
   return s.replace(/\b\w/g, c => c.toUpperCase());
 }
 
-// ── Skills movement parser ──────────────────────────────────────────
-
-function parseSkillsMovements(blockText: string): SkillsEntryValues[] {
-  const results: SkillsEntryValues[] = [];
-
-  // Strip structure headers from the text first, then split into segments
-  let text = blockText.trim();
-  // Strip EMOM/structure headers: "EMOM 8", "E2MOM 10", "Every 2 min", "For quality", etc.
-  text = text.replace(/^(?:e\d*mom\s+\d+|every\s+\d+\s*(?:min(?:utes?)?)?|for\s+quality|not\s+for\s+time)\s*[:\-–—,]?\s*/i, '').trim();
-  // Strip round/time headers: "3 Rounds:", "5 Sets:"
-  text = text.replace(/^\d+\s+(?:rounds?|sets?)\s*:\s*/i, '').trim();
-
-  // Split on newlines first, then commas within each line
-  const segments: string[] = [];
-  for (const line of text.split('\n')) {
-    for (const seg of line.split(',')) {
-      const trimmed = seg.trim();
-      if (trimmed && !/^(?:rest|then)\s*$/i.test(trimmed)) {
-        segments.push(trimmed);
-      }
-    }
-  }
-
-  for (const raw of segments) {
-    // Strip bullet prefixes: "* ", "- ", "• "
-    let line = raw.replace(/^[*\-•]\s*/, '').trim();
-    if (!line) continue;
-
-    // Strip minute/round prefixes: "Min 1 —", "Minute 2:", "Odd —", "Even —"
-    line = line.replace(/^(?:min(?:ute)?\s*\d+\s*[:\-–—]\s*|(?:odd|even)\s*[:\-–—]\s*)/i, '').trim();
-    if (!line) continue;
-
-    let movement = line;
-    let sets: number | undefined;
-    let reps_completed: number | undefined;
-    let hold_seconds: number | undefined;
-
-    // Extract hold: ":20", "25s hold", "20 sec hold", "25s" (followed by space + word)
-    const holdMatch = movement.match(/:(\d+)\b|(\d+)\s*s(?:ec(?:ond)?s?)?\s+(?:hold\b)?/i);
-    if (holdMatch) {
-      hold_seconds = parseInt(holdMatch[1] || holdMatch[2], 10);
-      movement = movement.replace(holdMatch[0], '').trim();
-    }
-
-    // Extract sets x reps: "4x5", "4 x 5", "4×5"
-    const setsRepsMatch = movement.match(/(\d+)\s*[x×]\s*(\d+)/i);
-    if (setsRepsMatch) {
-      sets = parseInt(setsRepsMatch[1], 10);
-      reps_completed = parseInt(setsRepsMatch[2], 10);
-      movement = movement.replace(setsRepsMatch[0], '').trim();
-    } else {
-      // Extract sets only: "4x :20" (sets parsed, hold already extracted)
-      const setsOnlyMatch = movement.match(/(\d+)\s*[x×]\s*/i);
-      if (setsOnlyMatch) {
-        sets = parseInt(setsOnlyMatch[1], 10);
-        movement = movement.replace(setsOnlyMatch[0], '').trim();
-      } else {
-        // Extract leading reps: "3 deficit strict HSPU negatives"
-        const leadingReps = movement.match(/^(\d+)\s+/);
-        if (leadingReps && parseInt(leadingReps[1], 10) < 100) {
-          reps_completed = parseInt(leadingReps[1], 10);
-          movement = movement.slice(leadingReps[0].length).trim();
-        }
-      }
-    }
-
-    // Clean up leading/trailing punctuation
-    movement = movement.replace(/^[,\-–—+]+|[,\-–—+]+$/g, '').replace(/\s+/g, ' ').trim();
-    if (!movement) continue;
-
-    // Skip lines with no sets, reps, or hold — these are coaching cues, not movements
-    if (sets === undefined && reps_completed === undefined && hold_seconds === undefined) continue;
-
-    results.push({
-      movement: capitalizeWords(movement),
-      sets,
-      reps_completed,
-      hold_seconds,
-    });
-  }
-
-  return results;
-}
 
 function inferWorkoutType(blocks: Block[]): string {
   const metcon = blocks.find(b => b.type === 'metcon');
@@ -328,6 +247,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
   const [blockScores, setBlockScores] = useState<Record<number, string>>({});
   const [blockRx, setBlockRx] = useState<Record<number, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [parsingSkills, setParsingSkills] = useState(false);
   // Faults from cached coach review, keyed by entry key (e.g. "0-sk0", "1-m2")
   const [reviewFaults, setReviewFaults] = useState<Record<string, string[]>>({});
   const [checkedFaults, setCheckedFaults] = useState<Record<string, string[]>>({});
@@ -352,7 +272,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       const [blocksRes, ratesRes] = await Promise.all([
         supabase
           .from('program_workout_blocks')
-          .select('block_type, block_text, block_order')
+          .select('id, block_type, block_text, block_order, parsed_skills')
           .eq('program_workout_id', sourceState.source_id!)
           .order('block_order'),
         supabase
@@ -374,9 +294,11 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       }
 
       const loaded: Block[] = data.map(row => ({
+        id: row.id,
         label: BLOCK_TYPE_LABELS[row.block_type] || row.block_type,
         type: row.block_type,
         text: row.block_text,
+        parsed_skills: row.parsed_skills as SkillsEntryValues[] | null,
       }));
 
       setBlocks(loaded);
@@ -413,17 +335,52 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       });
       setMetconEntries(initialMetcon);
 
-      // Pre-fill skills per-movement entries
+      // Pre-fill skills per-movement entries (LLM parse with lazy caching)
       const initialSkills: Record<string, SkillsEntryValues> = {};
-      loaded.forEach((b, bi) => {
-        if (b.type === 'skills') {
-          const parsed = parseSkillsMovements(b.text);
-          parsed.forEach((sk, si) => {
+      const skillBlocks = loaded
+        .map((b, bi) => ({ block: b, bi }))
+        .filter(({ block }) => block.type === 'skills');
+
+      const needsParse = skillBlocks.some(({ block }) => !block.parsed_skills?.length);
+      if (needsParse) setParsingSkills(true);
+
+      await Promise.all(
+        skillBlocks.map(async ({ block, bi }) => {
+          let skills: SkillsEntryValues[];
+
+          if (block.parsed_skills && block.parsed_skills.length > 0) {
+            // Already cached in DB — use directly
+            skills = block.parsed_skills;
+          } else {
+            // Call LLM to parse, write result back to DB
+            try {
+              const { data: fnData, error: fnErr } = await supabase.functions.invoke('parse-skills', {
+                body: { block_text: block.text, block_id: block.id },
+              });
+              if (fnErr || !fnData?.skills) {
+                console.error('parse-skills failed:', fnErr);
+                skills = [];
+              } else {
+                skills = (fnData.skills as { movement: string; sets: number | null; reps: number | null; hold_seconds: number | null; notes: string | null }[]).map(s => ({
+                  movement: s.movement,
+                  sets: s.sets ?? undefined,
+                  reps_completed: s.reps ?? undefined,
+                  hold_seconds: s.hold_seconds ?? undefined,
+                }));
+              }
+            } catch (e) {
+              console.error('parse-skills call error:', e);
+              skills = [];
+            }
+          }
+
+          skills.forEach((sk, si) => {
             initialSkills[`${bi}-sk${si}`] = sk;
           });
-        }
-      });
+        }),
+      );
       setSkillsEntries(initialSkills);
+      if (needsParse) setParsingSkills(false);
 
       // Fetch cached coach review to get common_faults per movement
       const { data: reviewRow } = await supabase
@@ -890,6 +847,11 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
 
                       return (
                         <>
+                          {parsingSkills && skKeys.length === 0 && (
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Parsing skill movements…</div>
+                            </div>
+                          )}
                           {skKeys.length > 0 && (
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Skill movements (confirm or adjust)</div>
