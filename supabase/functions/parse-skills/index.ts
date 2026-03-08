@@ -4,7 +4,7 @@
  * Input:  { block_text: string, block_id?: string }
  * Output: { skills: ParsedSkill[] }
  *
- * If block_id is provided, writes the result back to program_workout_blocks.parsed_skills.
+ * If block_id is provided, writes the result back to program_workout_blocks.parsed_tasks.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -127,11 +127,11 @@ Deno.serve(async (req) => {
     if (block_id) {
       const { error: updateErr } = await supa
         .from("program_workout_blocks")
-        .update({ parsed_skills: skills })
+        .update({ parsed_tasks: skills })
         .eq("id", block_id);
 
       if (updateErr) {
-        console.error("Failed to write parsed_skills:", updateErr);
+        console.error("Failed to write parsed_tasks:", updateErr);
       }
     }
 
