@@ -16,7 +16,8 @@ interface Block {
   label: string;
   type: string;
   text: string;
-  parsed_skills?: SkillsEntryValues[] | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  parsed_tasks?: any[] | null;
 }
 
 interface EntryValues {
@@ -29,11 +30,14 @@ interface EntryValues {
 
 interface MetconEntryValues {
   movement: string;
+  category?: 'weighted' | 'bodyweight' | 'monostructural';
   reps?: number;
   weight?: number;
   weight_unit: 'lbs' | 'kg';
   distance?: number;
-  distance_unit?: 'ft' | 'm';
+  distance_unit?: 'ft' | 'm' | 'cal';
+  rpe?: number;
+  quality?: 'A' | 'B' | 'C' | 'D';
   scaling_note?: string;
 }
 
@@ -248,6 +252,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
   const [blockRx, setBlockRx] = useState<Record<number, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [parsingSkills, setParsingSkills] = useState(false);
+  const [parsingMetcon, setParsingMetcon] = useState(false);
   // Faults from cached coach review, keyed by entry key (e.g. "0-sk0", "1-m2")
   const [reviewFaults, setReviewFaults] = useState<Record<string, string[]>>({});
   const [checkedFaults, setCheckedFaults] = useState<Record<string, string[]>>({});
@@ -272,7 +277,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       const [blocksRes, ratesRes] = await Promise.all([
         supabase
           .from('program_workout_blocks')
-          .select('id, block_type, block_text, block_order, parsed_skills')
+          .select('id, block_type, block_text, block_order, parsed_tasks')
           .eq('program_workout_id', sourceState.source_id!)
           .order('block_order'),
         supabase
@@ -298,7 +303,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
         label: BLOCK_TYPE_LABELS[row.block_type] || row.block_type,
         type: row.block_type,
         text: row.block_text,
-        parsed_skills: row.parsed_skills as SkillsEntryValues[] | null,
+        parsed_tasks: row.parsed_tasks as any[] | null,
       }));
 
       setBlocks(loaded);
@@ -323,17 +328,65 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       });
       setEntryValues(initial);
 
-      // Pre-fill metcon per-movement entries
+      // Pre-fill metcon per-movement entries (LLM parse with lazy caching)
       const initialMetcon: Record<string, MetconEntryValues> = {};
-      loaded.forEach((b, bi) => {
-        if (b.type === 'metcon') {
-          const parsed = parseMetconMovements(b.text);
-          parsed.forEach((mv, mi) => {
+      const metconBlocks = loaded
+        .map((b, bi) => ({ block: b, bi }))
+        .filter(({ block }) => block.type === 'metcon');
+
+      const needsMetconParse = metconBlocks.some(({ block }) => !block.parsed_tasks?.length);
+      if (needsMetconParse) setParsingMetcon(true);
+
+      await Promise.all(
+        metconBlocks.map(async ({ block, bi }) => {
+          let movements: MetconEntryValues[];
+
+          if (block.parsed_tasks && block.parsed_tasks.length > 0) {
+            // Already cached in DB — use directly
+            movements = (block.parsed_tasks as { movement: string; category?: string; reps: number | null; weight: number | null; weight_unit: string | null; distance: number | null; distance_unit: string | null }[]).map(m => ({
+              movement: m.movement,
+              category: (['weighted', 'bodyweight', 'monostructural'].includes(m.category || '') ? m.category : 'bodyweight') as MetconEntryValues['category'],
+              reps: m.reps ?? undefined,
+              weight: m.weight ?? undefined,
+              weight_unit: (m.weight_unit === 'kg' ? 'kg' : 'lbs') as 'lbs' | 'kg',
+              distance: m.distance ?? undefined,
+              distance_unit: (['ft', 'm', 'cal'].includes(m.distance_unit || '') ? m.distance_unit : undefined) as MetconEntryValues['distance_unit'],
+            }));
+          } else {
+            // Call LLM to parse, write result back to DB
+            try {
+              const { data: fnData, error: fnErr } = await supabase.functions.invoke('parse-metcon', {
+                body: { block_text: block.text, block_id: block.id },
+              });
+              if (fnErr || !fnData?.movements) {
+                console.error('parse-metcon failed:', fnErr);
+                // Fallback to regex parser
+                movements = parseMetconMovements(block.text);
+              } else {
+                movements = (fnData.movements as { movement: string; category?: string; reps: number | null; weight: number | null; weight_unit: string | null; distance: number | null; distance_unit: string | null }[]).map(m => ({
+                  movement: m.movement,
+                  category: (['weighted', 'bodyweight', 'monostructural'].includes(m.category || '') ? m.category : 'bodyweight') as MetconEntryValues['category'],
+                  reps: m.reps ?? undefined,
+                  weight: m.weight ?? undefined,
+                  weight_unit: (m.weight_unit === 'kg' ? 'kg' : 'lbs') as 'lbs' | 'kg',
+                  distance: m.distance ?? undefined,
+                  distance_unit: (['ft', 'm', 'cal'].includes(m.distance_unit || '') ? m.distance_unit : undefined) as MetconEntryValues['distance_unit'],
+                }));
+              }
+            } catch (e) {
+              console.error('parse-metcon call error:', e);
+              // Fallback to regex parser
+              movements = parseMetconMovements(block.text);
+            }
+          }
+
+          movements.forEach((mv, mi) => {
             initialMetcon[`${bi}-m${mi}`] = mv;
           });
-        }
-      });
+        }),
+      );
       setMetconEntries(initialMetcon);
+      if (needsMetconParse) setParsingMetcon(false);
 
       // Pre-fill skills per-movement entries (LLM parse with lazy caching)
       const initialSkills: Record<string, SkillsEntryValues> = {};
@@ -341,16 +394,16 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
         .map((b, bi) => ({ block: b, bi }))
         .filter(({ block }) => block.type === 'skills');
 
-      const needsParse = skillBlocks.some(({ block }) => !block.parsed_skills?.length);
+      const needsParse = skillBlocks.some(({ block }) => !block.parsed_tasks?.length);
       if (needsParse) setParsingSkills(true);
 
       await Promise.all(
         skillBlocks.map(async ({ block, bi }) => {
           let skills: SkillsEntryValues[];
 
-          if (block.parsed_skills && block.parsed_skills.length > 0) {
+          if (block.parsed_tasks && block.parsed_tasks.length > 0) {
             // Already cached in DB — use directly
-            skills = block.parsed_skills;
+            skills = block.parsed_tasks;
           } else {
             // Call LLM to parse, write result back to DB
             try {
@@ -545,14 +598,14 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                 reps: mv.reps ?? null,
                 weight: mv.weight ?? null,
                 weight_unit: mv.weight_unit || 'lbs',
-                rpe: null,
+                rpe: mv.rpe ?? null,
                 scaling_note: mv.scaling_note?.trim() || null,
                 set_number: null,
                 reps_completed: null,
                 hold_seconds: null,
                 distance: mv.distance ?? null,
                 distance_unit: mv.distance_unit || null,
-                quality: null,
+                quality: mv.quality ?? null,
                 variation: null,
                 faults_observed: f?.length ? f : null,
               };
@@ -758,14 +811,23 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                             <input type="text" placeholder="e.g. 4:48 or 8+12" value={blockScores[bi] ?? ''} onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))} />
                           </div>
 
+                          {parsingMetcon && mvKeys.length === 0 && (
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Parsing movements…</div>
+                            </div>
+                          )}
                           {mvKeys.length > 0 && (
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Movements (confirm or adjust)</div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                 {mvKeys.map(key => {
                                   const mv = metconEntries[key];
                                   if (!mv) return null;
-                                  const hasDistance = mv.distance != null && mv.distance > 0;
+                                  const cat = mv.category || 'bodyweight';
+                                  const isMonostructural = cat === 'monostructural';
+                                  const isWeighted = cat === 'weighted';
+                                  const hasDistance = isMonostructural && (mv.distance != null && mv.distance > 0);
+                                  const hasCalories = isMonostructural && mv.distance_unit === 'cal';
                                   return (
                                     <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -775,7 +837,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                           onChange={e => setMetconEntry(key, 'movement', e.target.value)}
                                           style={{ ...compactInputStyle, flex: '1 1 120px', minWidth: 120 }}
                                         />
-                                        {hasDistance ? (
+                                        {hasDistance && !hasCalories ? (
                                           <>
                                             <input
                                               type="number"
@@ -787,14 +849,16 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                             <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 16 }}>{mv.distance_unit || 'm'}</span>
                                           </>
                                         ) : (
+                                          <input
+                                            type="number"
+                                            placeholder={hasCalories ? 'Cal' : 'Reps'}
+                                            value={mv.reps ?? ''}
+                                            onChange={e => setMetconEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                            style={{ ...compactInputStyle, width: 56 }}
+                                          />
+                                        )}
+                                        {isWeighted && (
                                           <>
-                                            <input
-                                              type="number"
-                                              placeholder="Reps"
-                                              value={mv.reps ?? ''}
-                                              onChange={e => setMetconEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                              style={{ ...compactInputStyle, width: 56 }}
-                                            />
                                             <input
                                               type="number"
                                               placeholder="Wt"
@@ -805,6 +869,26 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                             <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 24 }}>{mv.weight_unit || 'lbs'}</span>
                                           </>
                                         )}
+                                        <select
+                                          value={mv.quality ?? ''}
+                                          onChange={e => setMetconEntry(key, 'quality', e.target.value || undefined)}
+                                          style={{ ...compactInputStyle, width: 56, padding: '8px 4px' }}
+                                        >
+                                          <option value="">—</option>
+                                          <option value="A">A</option>
+                                          <option value="B">B</option>
+                                          <option value="C">C</option>
+                                          <option value="D">D</option>
+                                        </select>
+                                        <input
+                                          type="number"
+                                          placeholder="RPE"
+                                          min={1}
+                                          max={10}
+                                          value={mv.rpe ?? ''}
+                                          onChange={e => setMetconEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                          style={{ ...compactInputStyle, width: 56 }}
+                                        />
                                       </div>
                                       {reviewFaults[key] && reviewFaults[key].length > 0 && (
                                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', paddingLeft: 4, marginTop: 2 }}>

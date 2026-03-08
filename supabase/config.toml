@@ -75,3 +75,6 @@ verify_jwt = false
 
 [functions.parse-skills]
 verify_jwt = false
+
+[functions.parse-metcon]
+verify_jwt = false
