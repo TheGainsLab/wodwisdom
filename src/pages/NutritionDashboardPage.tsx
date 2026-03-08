@@ -197,10 +197,10 @@ export default function NutritionDashboardPage({ session }: { session: Session }
           </button>
           <h1>Nutrition</h1>
         </header>
-        <div className="page-body">
+        <div className="page-body nutrition-page-body">
 
           {/* Date nav */}
-          <div className="engine-card" style={{ padding: '12px 16px' }}>
+          <div className="engine-card nutrition-date-nav">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <button className="engine-btn engine-btn-sm" onClick={prevDay}><ChevronLeft size={18} /></button>
               <span style={{ fontWeight: 600, fontSize: 16 }}>{displayDate(currentDate)}</span>

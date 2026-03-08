@@ -76,66 +76,30 @@ const blocks = text.split(/\n\n+/).map((b) => b.trim()).filter((b) => b.length >
 }
 return result;
 }
-/** AI-generated format: group lines by day (Monday:, Tuesday:, etc.). One workout per day. */
+/**
+ * AI-generated format: split on "Day N:" markers (Day 1 through Day 20).
+ * week_num and day_num are derived directly from N — no day name or Week label parsing needed.
+ */
 function parseProgramTextAI(text: string): ParsedWorkout[] {
 const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-const lines = normalized.split("\n").map((l) => l.trim()).filter(Boolean);
+// Split on "Day N:" headers, keeping the number via a capture group
+const parts = normalized.split(/^Day (\d+):/mi);
+// parts layout after split with capture group:
+// [preamble, N, text, N, text, ...]
 const result: ParsedWorkout[] = [];
-let currentWeek = 1;
-let currentDay = 1;
-let sortOrder = 0;
-const dayLines: string[] = [];
-const dayPattern =
-/^(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\s*:?\s*/i;
-function flushDay() {
-if (dayLines.length > 0) {
-      result.push({
-        week_num: currentWeek,
-        day_num: currentDay,
-        workout_text: dayLines.join("\n"),
-        sort_order: sortOrder++,
+for (let i = 1; i < parts.length - 1; i += 2) {
+const n = parseInt(parts[i], 10);
+const workoutText = parts[i + 1].trim();
+if (!workoutText) continue;
+const week_num = Math.ceil(n / 5);
+const day_num = ((n - 1) % 5) + 1;
+    result.push({
+      week_num,
+      day_num,
+      workout_text,
+      sort_order: n - 1,
 });
-      dayLines.length = 0;
 }
-}
-for (let line of lines) {
-const wkMatch = line.match(WEEK_REGEX);
-if (wkMatch) {
-      flushDay();
-      currentWeek = parseInt(wkMatch[1], 10) || 1;
-      line = line
-.replace(WEEK_REGEX, "")
-.replace(/^[\s\-–:]+/, "")
-.trim();
-if (!line) continue;
-}
-const lower = line.toLowerCase();
-let isDayHeader = false;
-let dayNum = currentDay;
-for (let i = 0; i < DAY_NAMES.length; i++) {
-const d = DAY_NAMES[i].toLowerCase();
-const a = DAY_ABBREV[i].toLowerCase();
-if (
-        lower.startsWith(d + ":") ||
-        lower.startsWith(a + ":") ||
-        lower.startsWith(d + " ") ||
-        lower.startsWith(a + " ")
-) {
-        dayNum = i + 1;
-        isDayHeader = true;
-break;
-}
-}
-if (isDayHeader) {
-      flushDay();
-      currentDay = dayNum;
-const rest = line.replace(dayPattern, "").trim();
-if (rest.length > 0) dayLines.push(rest);
-} else {
-      dayLines.push(line);
-}
-}
-  flushDay();
 return result;
 }
 function findHeaderRow(rows: (string | number)[][]): number {
@@ -383,22 +347,24 @@ if (listResults.length > 0) allResults.push(...listResults);
 return allResults.filter((w) => w.workout_text.length > 0);
 }
 /**
- * Resolve the acting user ID.
- * If the bearer token is the service-role key AND user_id is in the body, trust it
- * (internal service-to-service call). Otherwise validate the JWT as a normal user token.
+ * Resolve the calling user's ID.
+ * - If the bearer token IS the service-role key AND body contains user_id, trust it (internal call).
+ * - Otherwise, validate the JWT and extract the user from it (normal user call).
  */
 async function resolveUserId(
+  supa: ReturnType<typeof createClient>,
   authHeader: string,
-  body: Record<string, unknown>,
-  supa: ReturnType<typeof createClient>
+  bodyUserId?: string | null,
 ): Promise<{ userId: string; error?: never } | { userId?: never; error: string }> {
-  const token = authHeader.replace("Bearer ", "");
-  if (token === SUPABASE_SERVICE_KEY && typeof body.user_id === "string" && body.user_id) {
-    return { userId: body.user_id };
-  }
-  const { data: { user }, error: authErr } = await supa.auth.getUser(token);
-  if (authErr || !user) return { error: "Unauthorized" };
-  return { userId: user.id };
+const token = authHeader.replace("Bearer ", "");
+// Internal service-role call with explicit user_id
+if (token === SUPABASE_SERVICE_KEY && bodyUserId) {
+return { userId: bodyUserId };
+}
+// Normal user JWT
+const { data: { user }, error } = await supa.auth.getUser(token);
+if (error || !user) return { error: "Unauthorized" };
+return { userId: user.id };
 }
 Deno.serve(async (req) => {
 if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -412,7 +378,8 @@ return new Response(JSON.stringify({ error: "Unauthorized" }), {
 }
 const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 const body = await req.json();
-const resolved = await resolveUserId(authHeader, body, supa);
+const { name, text, file_base64, file_type, source, user_id: bodyUserId } = body;
+const resolved = await resolveUserId(supa, authHeader, bodyUserId);
 if (resolved.error) {
 return new Response(JSON.stringify({ error: resolved.error }), {
         status: 401,
@@ -420,7 +387,6 @@ return new Response(JSON.stringify({ error: resolved.error }), {
 });
 }
 const userId = resolved.userId;
-const { name, text, file_base64, file_type, source } = body;
 let workouts: ParsedWorkout[] = [];
 const useAIParser = source === "generate";
 if (file_base64 && file_type) {
@@ -506,6 +472,7 @@ if (blockRows.length > 0) {
 await supa.from("program_workout_blocks").insert(blockRows);
 }
 }
+// Call analyze-program with service-role auth + user_id in body
 const analyzeUrl = `${SUPABASE_URL}/functions/v1/analyze-program`;
 const analyzeResp = await fetch(analyzeUrl, {
       method: "POST",
