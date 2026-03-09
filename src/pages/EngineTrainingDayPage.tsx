@@ -151,6 +151,7 @@ function calculateIntervalGoal(
   segLabel: string,
   baselineRpm: number,
   rollingAdj: number,
+  roundPaceOverride?: number,
 ): number | null {
   if (baselineRpm <= 0) return null;
 
@@ -166,7 +167,7 @@ function calculateIntervalGoal(
   const isMaxEffort = paceRange === 'max_effort' || segLabel === 'BURST' || segLabel === 'Max Effort';
   if (isMaxEffort || !Array.isArray(paceRange) || paceRange.length < 2) return null;
 
-  const centerPace = (paceRange[0] + paceRange[1]) / 2;
+  const centerPace = roundPaceOverride ?? (paceRange[0] + paceRange[1]) / 2;
   const adjustedPace = centerPace * rollingAdj;
   const targetRpm = baselineRpm * adjustedPace;
   const durationMinutes = segDuration / 60;
@@ -1070,7 +1071,10 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                               const restInc = bp.restDurationIncrement ?? 0;
                               const roundWorkDur = Math.max(0, workDur + r * workInc);
                               const roundRestDur = Math.max(0, restDur + r * restInc);
-                              const intervalGoal = calculateIntervalGoal(bp, roundWorkDur, 'Work', baselineRpm, rollingAdj);
+                              const roundPace = bp.paceProgression === 'increasing' && Array.isArray(bp.paceRange) && bp.paceIncrement
+                                ? bp.paceRange[0] + r * bp.paceIncrement
+                                : undefined;
+                              const intervalGoal = calculateIntervalGoal(bp, roundWorkDur, 'Work', baselineRpm, rollingAdj, roundPace);
                               const isMax = bp.paceRange === 'max_effort';
                               return (
                                 <div key={r}>
