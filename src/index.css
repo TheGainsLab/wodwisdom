@@ -360,6 +360,8 @@ body.landing-body{overflow:auto;height:auto}
 .program-row-completed .workout-text-cell{opacity:.7}
 .program-day-dot{display:inline-block;width:8px;height:8px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
 .program-completed-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);padding:3px 8px;border-radius:4px;letter-spacing:.3px}
+.program-in-progress-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;color:var(--warning, #f39c12);background:color-mix(in srgb,var(--warning, #f39c12) 12%,transparent);padding:3px 8px;border-radius:4px;letter-spacing:.3px}
+.program-day-in-progress{background:color-mix(in srgb,var(--warning, #f39c12) 4%,transparent)}
 
 /* Collapsible days accordion */
 .program-days-accordion{display:flex;flex-direction:column;gap:0}
