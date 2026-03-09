@@ -265,12 +265,12 @@
 .nutrition-empty-title {
   font-size: 15px;
   font-weight: 600;
-  color: var(--text-dim);
+  color: var(--text);
 }
 
 .nutrition-empty-desc {
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--text-dim);
   max-width: 280px;
   line-height: 1.5;
 }
