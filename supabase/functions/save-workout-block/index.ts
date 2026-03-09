@@ -299,8 +299,44 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── 4. Auto-complete: if all loggable blocks are saved, mark completed ──
+    let autoCompleted = false;
+    const sourceId = body.source_id ?? null;
+    if (sourceId) {
+      // Count saved blocks for this log (exclude warm-up/cool-down)
+      const { count: savedCount } = await supa
+        .from("workout_log_blocks")
+        .select("id", { count: "exact", head: true })
+        .eq("log_id", logId)
+        .not("block_type", "in", '("warm-up","cool-down")');
+
+      // Count total program blocks for this workout (exclude warm-up/cool-down)
+      const { count: totalCount } = await supa
+        .from("program_workout_blocks")
+        .select("id", { count: "exact", head: true })
+        .eq("program_workout_id", sourceId)
+        .not("block_type", "in", '("warm-up","cool-down")');
+
+      if (
+        savedCount != null &&
+        totalCount != null &&
+        totalCount > 0 &&
+        savedCount >= totalCount
+      ) {
+        await supa
+          .from("workout_logs")
+          .update({ status: "completed" })
+          .eq("id", logId);
+        autoCompleted = true;
+      }
+    }
+
     return new Response(
-      JSON.stringify({ log_id: logId, block_id: insertedBlock?.id ?? null }),
+      JSON.stringify({
+        log_id: logId,
+        block_id: insertedBlock?.id ?? null,
+        auto_completed: autoCompleted,
+      }),
       { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
     );
   } catch (e) {

@@ -30,6 +30,7 @@ interface WorkoutLogBlock {
 }
 
 interface WorkoutLogEntry {
+  id: string;
   log_id: string;
   movement: string;
   sets: number | null;
@@ -98,6 +99,91 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [allEntries, setAllEntries] = useState<(WorkoutLogEntry & { workout_date: string })[]>([]);
   const [blockTypeMap, setBlockTypeMap] = useState<Map<string, string>>(new Map());
 
+  // ── Edit state ──
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [editFields, setEditFields] = useState<Record<string, string>>({});
+  const [editSaving, setEditSaving] = useState(false);
+
+  const startEdit = (entry: WorkoutLogEntry) => {
+    setEditingEntryId(entry.id);
+    setEditFields({
+      weight: entry.weight != null ? String(entry.weight) : '',
+      reps: entry.reps != null ? String(entry.reps) : '',
+      rpe: entry.rpe != null ? String(entry.rpe) : '',
+      sets: entry.sets != null ? String(entry.sets) : '',
+      reps_completed: entry.reps_completed != null ? String(entry.reps_completed) : '',
+      hold_seconds: entry.hold_seconds != null ? String(entry.hold_seconds) : '',
+      quality: entry.quality || '',
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingEntryId(null);
+    setEditFields({});
+  };
+
+  const saveEdit = async (entryId: string) => {
+    setEditSaving(true);
+    try {
+      const fields: Record<string, unknown> = {};
+      if (editFields.weight !== undefined) fields.weight = editFields.weight ? Number(editFields.weight) : null;
+      if (editFields.reps !== undefined) fields.reps = editFields.reps ? Number(editFields.reps) : null;
+      if (editFields.rpe !== undefined) fields.rpe = editFields.rpe ? Number(editFields.rpe) : null;
+      if (editFields.sets !== undefined) fields.sets = editFields.sets ? Number(editFields.sets) : null;
+      if (editFields.reps_completed !== undefined) fields.reps_completed = editFields.reps_completed ? Number(editFields.reps_completed) : null;
+      if (editFields.hold_seconds !== undefined) fields.hold_seconds = editFields.hold_seconds ? Number(editFields.hold_seconds) : null;
+      if (editFields.quality !== undefined) fields.quality = editFields.quality || null;
+
+      const { data, error } = await supabase.functions.invoke('update-workout-entry', {
+        body: { entry_id: entryId, fields },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const updated = data.entry;
+      // Update local state so PR badges recalculate
+      setAllEntries(prev => prev.map(e => e.id === entryId ? { ...e, ...updated } : e));
+      setEntriesByLog(prev => {
+        const next = { ...prev };
+        for (const logId of Object.keys(next)) {
+          next[logId] = next[logId].map(e => e.id === entryId ? { ...e, ...updated } : e);
+        }
+        return next;
+      });
+      setEditingEntryId(null);
+    } catch {
+      // silently fail for now — entry stays in edit mode
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const deleteEntry = async (entryId: string) => {
+    if (!window.confirm('Delete this entry?')) return;
+    setEditSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('update-workout-entry', {
+        body: { entry_id: entryId, delete: true },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setAllEntries(prev => prev.filter(e => e.id !== entryId));
+      setEntriesByLog(prev => {
+        const next = { ...prev };
+        for (const logId of Object.keys(next)) {
+          next[logId] = next[logId].filter(e => e.id !== entryId);
+        }
+        return next;
+      });
+      setEditingEntryId(null);
+    } catch {
+      // silently fail
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   useEffect(() => {
     (async () => {
       const { data } = await supabase
@@ -118,7 +204,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
             .in('log_id', logIds),
           supabase
             .from('workout_log_entries')
-            .select('log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, faults_observed, sort_order')
+            .select('id, log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, faults_observed, sort_order')
             .in('log_id', logIds),
         ]);
 
@@ -366,6 +452,18 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         <div className="tl-session-count">{data.entries.length} set{data.entries.length !== 1 ? 's' : ''} logged</div>
                         <div style={{ marginTop: 8 }}>
                           {recent.map((e, i) => (
+                            editingEntryId === e.id ? (
+                              <div key={i} className="tl-set-row" style={{ flexWrap: 'wrap', gap: 6 }}>
+                                <input type="number" value={editFields.weight} onChange={ev => setEditFields(f => ({ ...f, weight: ev.target.value }))} placeholder="Weight" style={{ width: 70, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                <input type="number" value={editFields.reps} onChange={ev => setEditFields(f => ({ ...f, reps: ev.target.value }))} placeholder="Reps" style={{ width: 50, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                <input type="number" value={editFields.rpe} onChange={ev => setEditFields(f => ({ ...f, rpe: ev.target.value }))} placeholder="RPE" style={{ width: 45, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                <button onClick={() => saveEdit(e.id)} disabled={editSaving} style={{ padding: '2px 8px', fontSize: 11, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                                  {editSaving ? '...' : 'Save'}
+                                </button>
+                                <button onClick={cancelEdit} style={{ padding: '2px 8px', fontSize: 11, background: 'var(--surface2)', color: 'var(--text-dim)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Cancel</button>
+                                <button onClick={() => deleteEntry(e.id)} disabled={editSaving} style={{ padding: '2px 8px', fontSize: 11, background: 'transparent', color: 'var(--danger, #e74c3c)', border: 'none', cursor: 'pointer' }}>Delete</button>
+                              </div>
+                            ) : (
                             <div key={i} className="tl-set-row">
                               <span className="tl-set-date">{new Date(e.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                               <span className="tl-set-value">
@@ -375,7 +473,11 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                               {e.set_number != null && <span className="tl-set-detail">Set {e.set_number}</span>}
                               {e.rpe != null && <span className="tl-set-detail">RPE {e.rpe}</span>}
                               {e.quality && <span className="tl-set-detail">{e.quality}</span>}
+                              <button onClick={(ev) => { ev.stopPropagation(); startEdit(e); }} style={{ marginLeft: 'auto', padding: '1px 6px', fontSize: 11, background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', opacity: 0.6 }} title="Edit">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                              </button>
                             </div>
+                            )
                           ))}
                           {sorted.length > 8 && (
                             <div style={{ fontSize: 12, color: 'var(--text-muted)', paddingTop: 6 }}>
@@ -440,6 +542,26 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         <div className="tl-session-count">{uniqueDates.size} session{uniqueDates.size !== 1 ? 's' : ''}</div>
                         <div style={{ marginTop: 8 }}>
                           {recent.map((e, i) => (
+                            editingEntryId === e.id ? (
+                              <div key={i} className="tl-set-row" style={{ flexWrap: 'wrap', gap: 6 }}>
+                                <input type="number" value={editFields.sets} onChange={ev => setEditFields(f => ({ ...f, sets: ev.target.value }))} placeholder="Sets" style={{ width: 50, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                <input type="number" value={editFields.reps_completed} onChange={ev => setEditFields(f => ({ ...f, reps_completed: ev.target.value }))} placeholder="Reps" style={{ width: 50, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                <input type="number" value={editFields.hold_seconds} onChange={ev => setEditFields(f => ({ ...f, hold_seconds: ev.target.value }))} placeholder="Hold(s)" style={{ width: 55, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                <input type="number" value={editFields.rpe} onChange={ev => setEditFields(f => ({ ...f, rpe: ev.target.value }))} placeholder="RPE" style={{ width: 45, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                <select value={editFields.quality} onChange={ev => setEditFields(f => ({ ...f, quality: ev.target.value }))} style={{ padding: '3px 4px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }}>
+                                  <option value="">—</option>
+                                  <option value="A">A</option>
+                                  <option value="B">B</option>
+                                  <option value="C">C</option>
+                                  <option value="D">D</option>
+                                </select>
+                                <button onClick={() => saveEdit(e.id)} disabled={editSaving} style={{ padding: '2px 8px', fontSize: 11, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                                  {editSaving ? '...' : 'Save'}
+                                </button>
+                                <button onClick={cancelEdit} style={{ padding: '2px 8px', fontSize: 11, background: 'var(--surface2)', color: 'var(--text-dim)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Cancel</button>
+                                <button onClick={() => deleteEntry(e.id)} disabled={editSaving} style={{ padding: '2px 8px', fontSize: 11, background: 'transparent', color: 'var(--danger, #e74c3c)', border: 'none', cursor: 'pointer' }}>Delete</button>
+                              </div>
+                            ) : (
                             <div key={i} className="tl-set-row">
                               <span className="tl-set-date">{new Date(e.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                               <span className="tl-set-value">
@@ -459,7 +581,11 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                               {e.faults_observed && e.faults_observed.length > 0 && (
                                 <span className="tl-set-detail" style={{ color: 'var(--danger, #e74c3c)', fontSize: 11 }}>{e.faults_observed.join(', ')}</span>
                               )}
+                              <button onClick={(ev) => { ev.stopPropagation(); startEdit(e); }} style={{ marginLeft: 'auto', padding: '1px 6px', fontSize: 11, background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', opacity: 0.6 }} title="Edit">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                              </button>
                             </div>
+                            )
                           ))}
                           {sorted.length > 8 && (
                             <div style={{ fontSize: 12, color: 'var(--text-muted)', paddingTop: 6 }}>
@@ -593,12 +719,27 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                               return (
                                                 <div style={{ paddingLeft: 8, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
                                                   {blockEntries.map((entry, ei) => (
-                                                    <div key={ei} style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                                                    editingEntryId === entry.id ? (
+                                                      <div key={ei} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                                        <span style={{ fontWeight: 600, fontSize: 13 }}>{formatMovementName(entry.movement)}</span>
+                                                        <input type="number" value={editFields.weight} onChange={ev => setEditFields(f => ({ ...f, weight: ev.target.value }))} placeholder="Weight" style={{ width: 70, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                                        <input type="number" value={editFields.reps} onChange={ev => setEditFields(f => ({ ...f, reps: ev.target.value }))} placeholder="Reps" style={{ width: 50, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                                        <input type="number" value={editFields.rpe} onChange={ev => setEditFields(f => ({ ...f, rpe: ev.target.value }))} placeholder="RPE" style={{ width: 45, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                                        <button onClick={() => saveEdit(entry.id)} disabled={editSaving} style={{ padding: '2px 8px', fontSize: 11, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>{editSaving ? '...' : 'Save'}</button>
+                                                        <button onClick={cancelEdit} style={{ padding: '2px 8px', fontSize: 11, background: 'var(--surface2)', color: 'var(--text-dim)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Cancel</button>
+                                                        <button onClick={() => deleteEntry(entry.id)} disabled={editSaving} style={{ padding: '2px 8px', fontSize: 11, background: 'transparent', color: 'var(--danger, #e74c3c)', border: 'none', cursor: 'pointer' }}>Delete</button>
+                                                      </div>
+                                                    ) : (
+                                                    <div key={ei} style={{ fontSize: 13, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 4 }}>
                                                       <span style={{ fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(entry.movement)}</span>
                                                       {entry.sets != null && entry.reps != null && <span> {entry.sets}x{entry.reps}</span>}
                                                       {entry.weight != null && <span> @{entry.weight}{entry.weight_unit}</span>}
                                                       {entry.rpe != null && <span> RPE {entry.rpe}</span>}
+                                                      <button onClick={(ev) => { ev.stopPropagation(); startEdit(entry); }} style={{ marginLeft: 4, padding: '1px 4px', background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', opacity: 0.5 }} title="Edit">
+                                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                                      </button>
                                                     </div>
+                                                    )
                                                   ))}
                                                 </div>
                                               );
@@ -616,9 +757,21 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                                     <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{formatMovementName(movement)}</div>
                                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                                                       {rows.map((r, ri) => (
-                                                        <span key={ri} style={{ fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '3px 8px', borderRadius: 4, fontFamily: 'JetBrains Mono' }}>
+                                                        editingEntryId === r.id ? (
+                                                          <div key={ri} style={{ display: 'flex', flexWrap: 'wrap', gap: 4, width: '100%', alignItems: 'center' }}>
+                                                            <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>S{r.set_number}:</span>
+                                                            <input type="number" value={editFields.reps} onChange={ev => setEditFields(f => ({ ...f, reps: ev.target.value }))} placeholder="Reps" style={{ width: 50, padding: '2px 5px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                                            <input type="number" value={editFields.weight} onChange={ev => setEditFields(f => ({ ...f, weight: ev.target.value }))} placeholder="Weight" style={{ width: 70, padding: '2px 5px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                                            <input type="number" value={editFields.rpe} onChange={ev => setEditFields(f => ({ ...f, rpe: ev.target.value }))} placeholder="RPE" style={{ width: 45, padding: '2px 5px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                                            <button onClick={() => saveEdit(r.id)} disabled={editSaving} style={{ padding: '2px 6px', fontSize: 11, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>{editSaving ? '...' : 'Save'}</button>
+                                                            <button onClick={cancelEdit} style={{ padding: '2px 6px', fontSize: 11, background: 'var(--surface2)', color: 'var(--text-dim)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Cancel</button>
+                                                            <button onClick={() => deleteEntry(r.id)} disabled={editSaving} style={{ padding: '2px 6px', fontSize: 11, background: 'transparent', color: 'var(--danger, #e74c3c)', border: 'none', cursor: 'pointer' }}>Delete</button>
+                                                          </div>
+                                                        ) : (
+                                                        <span key={ri} onClick={(ev) => { ev.stopPropagation(); startEdit(r); }} style={{ fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '3px 8px', borderRadius: 4, fontFamily: 'JetBrains Mono', cursor: 'pointer' }} title="Click to edit">
                                                           S{r.set_number}: {r.reps ?? '?'}@{r.weight ?? '?'}{r.weight_unit}{r.rpe != null ? ` RPE ${r.rpe}` : ''}
                                                         </span>
+                                                        )
                                                       ))}
                                                     </div>
                                                   </div>
@@ -630,7 +783,19 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                           {isSkills && blockEntries.length > 0 && (
                                             <div style={{ paddingLeft: 8, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
                                               {blockEntries.map((entry, ei) => (
-                                                <div key={ei} style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                                                editingEntryId === entry.id ? (
+                                                  <div key={ei} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                                    <span style={{ fontWeight: 600, fontSize: 13 }}>{formatMovementName(entry.movement)}</span>
+                                                    <input type="number" value={editFields.sets} onChange={ev => setEditFields(f => ({ ...f, sets: ev.target.value }))} placeholder="Sets" style={{ width: 50, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                                    <input type="number" value={editFields.reps_completed} onChange={ev => setEditFields(f => ({ ...f, reps_completed: ev.target.value }))} placeholder="Reps" style={{ width: 50, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                                    <input type="number" value={editFields.hold_seconds} onChange={ev => setEditFields(f => ({ ...f, hold_seconds: ev.target.value }))} placeholder="Hold(s)" style={{ width: 55, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                                    <input type="number" value={editFields.rpe} onChange={ev => setEditFields(f => ({ ...f, rpe: ev.target.value }))} placeholder="RPE" style={{ width: 45, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                                    <button onClick={() => saveEdit(entry.id)} disabled={editSaving} style={{ padding: '2px 8px', fontSize: 11, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>{editSaving ? '...' : 'Save'}</button>
+                                                    <button onClick={cancelEdit} style={{ padding: '2px 8px', fontSize: 11, background: 'var(--surface2)', color: 'var(--text-dim)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Cancel</button>
+                                                    <button onClick={() => deleteEntry(entry.id)} disabled={editSaving} style={{ padding: '2px 8px', fontSize: 11, background: 'transparent', color: 'var(--danger, #e74c3c)', border: 'none', cursor: 'pointer' }}>Delete</button>
+                                                  </div>
+                                                ) : (
+                                                <div key={ei} style={{ fontSize: 13, color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 4 }}>
                                                   <span style={{ fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(entry.movement)}</span>
                                                   {entry.sets != null && <span> {entry.sets} sets</span>}
                                                   {entry.reps_completed != null && <span> x{entry.reps_completed} reps</span>}
@@ -643,7 +808,11 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                                       {entry.faults_observed.join(', ')}
                                                     </span>
                                                   )}
+                                                  <button onClick={(ev) => { ev.stopPropagation(); startEdit(entry); }} style={{ marginLeft: 4, padding: '1px 4px', background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', opacity: 0.5 }} title="Edit">
+                                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                                  </button>
                                                 </div>
+                                                )
                                               ))}
                                             </div>
                                           )}
@@ -651,13 +820,24 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                           {block.block_type === 'metcon' && blockEntries.length > 0 && (
                                             <div style={{ paddingLeft: 8, marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                               {blockEntries.map((entry, ei) => (
-                                                <span key={ei} style={{ fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '3px 8px', borderRadius: 4 }}>
+                                                editingEntryId === entry.id ? (
+                                                  <div key={ei} style={{ display: 'flex', flexWrap: 'wrap', gap: 4, width: '100%', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: 12, fontWeight: 600 }}>{formatMovementName(entry.movement)}</span>
+                                                    <input type="number" value={editFields.reps} onChange={ev => setEditFields(f => ({ ...f, reps: ev.target.value }))} placeholder="Reps" style={{ width: 50, padding: '2px 5px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                                    <input type="number" value={editFields.weight} onChange={ev => setEditFields(f => ({ ...f, weight: ev.target.value }))} placeholder="Weight" style={{ width: 70, padding: '2px 5px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
+                                                    <button onClick={() => saveEdit(entry.id)} disabled={editSaving} style={{ padding: '2px 6px', fontSize: 11, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>{editSaving ? '...' : 'Save'}</button>
+                                                    <button onClick={cancelEdit} style={{ padding: '2px 6px', fontSize: 11, background: 'var(--surface2)', color: 'var(--text-dim)', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Cancel</button>
+                                                    <button onClick={() => deleteEntry(entry.id)} disabled={editSaving} style={{ padding: '2px 6px', fontSize: 11, background: 'transparent', color: 'var(--danger, #e74c3c)', border: 'none', cursor: 'pointer' }}>Delete</button>
+                                                  </div>
+                                                ) : (
+                                                <span key={ei} onClick={(ev) => { ev.stopPropagation(); startEdit(entry); }} style={{ fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '3px 8px', borderRadius: 4, cursor: 'pointer' }} title="Click to edit">
                                                   {formatMovementName(entry.movement)}
                                                   {entry.reps != null && ` x${entry.reps}`}
                                                   {entry.weight != null && ` @${entry.weight}${entry.weight_unit}`}
                                                   {entry.distance != null && ` ${entry.distance}${entry.distance_unit || 'm'}`}
                                                   {entry.scaling_note && ` (${entry.scaling_note})`}
                                                 </span>
+                                                )
                                               ))}
                                             </div>
                                           )}

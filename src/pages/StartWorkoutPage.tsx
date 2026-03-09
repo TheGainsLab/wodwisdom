@@ -784,6 +784,10 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
         setInProgressLogId(data.log_id);
       }
       setSavedBlocks(prev => new Set(prev).add(bi));
+      // Auto-complete: all loggable blocks saved → workout is done
+      if (data?.auto_completed) {
+        setSuccess(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save block');
     } finally {
@@ -818,6 +822,12 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
         if (data?.error) throw new Error(data.error);
         if (data?.log_id && !inProgressLogId) {
           setInProgressLogId(data.log_id);
+        }
+        // Auto-complete: all loggable blocks saved → workout is done
+        if (data?.auto_completed) {
+          setSuccess(true);
+          setSaving(false);
+          return;
         }
       }
       navigate(-1);
