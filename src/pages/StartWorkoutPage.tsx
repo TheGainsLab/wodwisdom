@@ -796,17 +796,12 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
     setError('');
     setSaving(true);
     try {
-      // Save any unsaved blocks
+      // Save any unsaved blocks (skip warm-up/cool-down)
       for (let bi = 0; bi < blocks.length; bi++) {
         if (savedBlocks.has(bi)) continue;
+        if (blocks[bi].type === 'warm-up' || blocks[bi].type === 'cool-down') continue;
         const payload = buildBlockPayload(bi);
         if (!payload) continue;
-        // Only save blocks that have some content
-        const hasContent = payload.entries.length > 0 || payload.notes || payload.score;
-        if (!hasContent && (blocks[bi].type === 'warm-up' || blocks[bi].type === 'cool-down')) {
-          // For warm-up/cool-down, save even without entries if there are notes
-          if (!payload.notes) continue;
-        }
         const workoutText = sourceState?.workout_text?.trim() ||
           blocks.map(b => `${b.label}: ${b.text}`).join('\n');
         const { data, error: fnErr } = await supabase.functions.invoke('save-workout-block', {
@@ -1362,7 +1357,8 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                       </div>
                     )}
 
-                    {/* Per-block save button */}
+                    {/* Per-block save button (not for warm-up/cool-down) */}
+                    {block.type !== 'warm-up' && block.type !== 'cool-down' && (
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
                       <button
                         className="auth-btn"
@@ -1382,6 +1378,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                           : 'Save Block'}
                       </button>
                     </div>
+                    )}
                   </div>
                 ))}
 
