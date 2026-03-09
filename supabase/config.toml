@@ -84,3 +84,6 @@ verify_jwt = false
 
 [functions.complete-workout]
 verify_jwt = false
+
+[functions.update-workout-entry]
+verify_jwt = false
