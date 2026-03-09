@@ -19,17 +19,13 @@ import { ChevronLeft, Lock, Check, Play, Settings } from 'lucide-react';
 
 function dayTypeBadge(dayType: string): string {
   switch (dayType) {
-    case 'endurance':
-    case 'endurance_long':
+    case 'endurance': case 'endurance_long': case 'interval': case 'max_aerobic_power': case 'hybrid_aerobic':
       return 'engine-badge--endurance';
-    case 'threshold':
-    case 'threshold_stepped':
-    case 'anaerobic':
+    case 'threshold': case 'threshold_stepped': case 'anaerobic': case 'descending_devour': case 'ascending':
       return 'engine-badge--strength';
-    case 'polarized':
-    case 'flux':
+    case 'polarized': case 'flux': case 'flux_stages': case 'rocket_races_a': case 'rocket_races_b': case 'afterburner':
       return 'engine-badge--power';
-    case 'time_trial':
+    case 'time_trial': case 'devour': case 'ascending_devour': case 'infinity': case 'towers': case 'synthesis': case 'atomic': case 'hybrid_anaerobic':
       return 'engine-badge--hypertrophy';
     default:
       return 'engine-badge--default';

@@ -30,9 +30,9 @@ import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertT
 type Stage = 'loading' | 'equipment' | 'preview' | 'ready' | 'active' | 'logging' | 'complete';
 
 interface BlockParams {
-  rounds?: number | number[];
+  rounds?: number | number[] | string;
   paceRange?: number[] | string;
-  workDuration?: number | number[];
+  workDuration?: number | number[] | string;
   restDuration?: number | number[] | string;
   workProgression?: string;
   total_intervals?: number;
@@ -47,6 +47,14 @@ interface BlockParams {
   fluxIntensity?: number;
   workDurationOptions?: number[];
   restDurationOptions?: number[];
+  workDurationIncrement?: number;
+  paceProgression?: string;
+  paceIncrement?: number;
+  restProgression?: string;
+  fluxProgression?: string;
+  fluxIncrement?: number;
+  fluxStartIntensity?: number;
+  restDurationIncrement?: number;
 }
 
 interface Segment {
@@ -166,10 +174,10 @@ function calculateIntervalGoal(
   return Math.round(targetRpm * durationMinutes * 10) / 10;
 }
 
-function resolveNum(v: number | number[] | undefined, fallback = 0): number {
+function resolveNum(v: number | number[] | string | undefined, fallback = 0): number {
   if (v === undefined || v === null) return fallback;
   if (typeof v === 'number') return v;
-  if (Array.isArray(v)) return v[0];
+  if (Array.isArray(v) && typeof v[0] === 'number') return v[0];
   return fallback;
 }
 
@@ -180,8 +188,12 @@ function resolveRest(rest: number | number[] | string | undefined, workDur: numb
   if (rest === 'equal_to_work') return workDur;
   if (rest === 'five_times_work') return workDur * 5;
   if (rest === 'half_work') return Math.round(workDur / 2);
+  if (rest === 'half_to_two_thirds_work') return Math.round(workDur * 0.58);
   if (rest === 'double_work') return workDur * 2;
   if (rest === 'one_third_work') return Math.round(workDur / 3);
+  if (rest === 'two_to_three_times_work') return Math.round(workDur * 2.5);
+  if (rest === 'one_to_one_point_five_times_work') return Math.round(workDur * 1.25);
+  if (rest === 'one_point_five_to_three_times_work') return Math.round(workDur * 2.25);
   return 0;
 }
 
@@ -192,10 +204,10 @@ function parseBurstTiming(timing: string): number {
 
 function dayTypeBadge(dayType: string): string {
   switch (dayType) {
-    case 'endurance': case 'endurance_long': return 'engine-badge--endurance';
-    case 'threshold': case 'threshold_stepped': case 'anaerobic': return 'engine-badge--strength';
-    case 'polarized': case 'flux': return 'engine-badge--power';
-    case 'time_trial': return 'engine-badge--hypertrophy';
+    case 'endurance': case 'endurance_long': case 'interval': case 'max_aerobic_power': case 'hybrid_aerobic': return 'engine-badge--endurance';
+    case 'threshold': case 'threshold_stepped': case 'anaerobic': case 'descending_devour': case 'ascending': return 'engine-badge--strength';
+    case 'polarized': case 'flux': case 'flux_stages': case 'rocket_races_a': case 'rocket_races_b': case 'afterburner': return 'engine-badge--power';
+    case 'time_trial': case 'devour': case 'ascending_devour': case 'infinity': case 'towers': case 'synthesis': case 'atomic': case 'hybrid_anaerobic': return 'engine-badge--hypertrophy';
     default: return 'engine-badge--default';
   }
 }
@@ -216,8 +228,8 @@ function generateSegments(workout: EngineWorkout): Segment[] {
     const bp = raw as unknown as BlockParams;
 
     const rounds = resolveNum(bp.rounds, 1);
-    const workDur = resolveNum(bp.workDuration, 0);
-    const restDur = resolveRest(bp.restDuration, workDur);
+    const workDur = resolveNum(bp.workDuration, 0) || (bp.workDurationOptions?.[0] ?? 0);
+    const restDur = resolveRest(bp.restDuration, workDur) || (bp.restDurationOptions?.[0] ?? 0);
 
     if (workDur === 0) continue;
 
@@ -255,13 +267,41 @@ function generateSegments(workout: EngineWorkout): Segment[] {
         round++;
       }
 
-    // ── Standard intervals ──
+    // ── Progressive flux intensity (Flux Stages) ──
+    } else if (bp.workProgression === 'progressive_flux_intensity' && bp.baseDuration && bp.fluxDuration) {
+      const baseDur = resolveNum(bp.baseDuration, 300);
+      const fluxDur = resolveNum(bp.fluxDuration, 60);
+      const startIntensity = bp.fluxStartIntensity ?? 0.75;
+      const increment = bp.fluxIncrement ?? 0.05;
+      let remaining = workDur;
+      let round = 0;
+      while (remaining > 0) {
+        const bSeg = Math.min(baseDur, remaining);
+        segments.push({ type: 'work', duration: bSeg, blockIndex: b, roundIndex: round, label: 'Base', intensity: formatPace(bp.basePace) });
+        remaining -= bSeg;
+        if (remaining <= 0) break;
+        const fSeg = Math.min(fluxDur, remaining);
+        const fluxIntensity = startIntensity + round * increment;
+        segments.push({ type: 'work', duration: fSeg, blockIndex: b, roundIndex: round, label: 'Flux', intensity: `${Math.round(fluxIntensity * 100)}%` });
+        remaining -= fSeg;
+        round++;
+      }
+
+    // ── Continuous (Atomic, Towers — single unbroken work block) ──
+    } else if (bp.workProgression === 'continuous') {
+      segments.push({ type: 'work', duration: workDur * rounds, blockIndex: b, roundIndex: 0, label: 'Work', intensity: formatPace(bp.paceRange) });
+
+    // ── Standard / Increasing / Decreasing intervals ──
     } else {
+      const workInc = bp.workDurationIncrement ?? 0;
+      const restInc = bp.restDurationIncrement ?? 0;
       for (let r = 0; r < rounds; r++) {
+        const roundWorkDur = Math.max(0, workDur + r * workInc);
+        const roundRestDur = Math.max(0, restDur + r * restInc);
         const label = bp.paceRange === 'max_effort' ? 'Max Effort' : 'Work';
-        segments.push({ type: 'work', duration: workDur, blockIndex: b, roundIndex: r, label, intensity: formatPace(bp.paceRange) });
-        if (restDur > 0 && r < rounds - 1) {
-          segments.push({ type: 'rest', duration: restDur, blockIndex: b, roundIndex: r, label: 'Rest', intensity: '' });
+        segments.push({ type: 'work', duration: roundWorkDur, blockIndex: b, roundIndex: r, label, intensity: formatPace(bp.paceRange) });
+        if (roundRestDur > 0 && r < rounds - 1) {
+          segments.push({ type: 'rest', duration: roundRestDur, blockIndex: b, roundIndex: r, label: 'Rest', intensity: '' });
         }
       }
     }
@@ -838,8 +878,8 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 <div className="engine-breakdown">
                   {blocks.map(({ index: blockIdx, bp }, blockArrayIdx) => {
                     const rounds = resolveNum(bp.rounds, 1);
-                    const workDur = resolveNum(bp.workDuration, 0);
-                    const restDur = resolveRest(bp.restDuration, workDur);
+                    const workDur = resolveNum(bp.workDuration, 0) || (bp.workDurationOptions?.[0] ?? 0);
+                    const restDur = resolveRest(bp.restDuration, workDur) || (bp.restDurationOptions?.[0] ?? 0);
                     const pace = formatPace(bp.paceRange);
                     const rollingAdj = performanceMetrics?.rolling_avg_ratio ?? 1;
                     const targetRpm = baselineRpm > 0 && Array.isArray(bp.paceRange)
@@ -959,25 +999,89 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                           return <div className="engine-breakdown-segments">{rows}</div>;
                         })()
 
-                        /* Standard intervals: round-by-round cards */
+                        /* Progressive flux intensity (Flux Stages): expand into WORK/FLUX with increasing intensity */
+                        : bp.workProgression === 'progressive_flux_intensity' && bp.baseDuration && bp.fluxDuration ? (() => {
+                          const baseDur = resolveNum(bp.baseDuration, 300);
+                          const fluxDur = resolveNum(bp.fluxDuration, 60);
+                          const startIntensity = bp.fluxStartIntensity ?? 0.75;
+                          const increment = bp.fluxIncrement ?? 0.05;
+                          const rows: React.ReactNode[] = [];
+                          let remaining = workDur;
+                          let segIdx = 0;
+
+                          while (remaining > 0) {
+                            const bSeg = Math.min(baseDur, remaining);
+                            const baseGoal = calculateIntervalGoal(bp, bSeg, 'Base', baselineRpm, rollingAdj);
+                            rows.push(
+                              <div key={`b-${segIdx}`} className="engine-breakdown-row">
+                                <span className="engine-breakdown-label">WORK</span>
+                                <span className="engine-breakdown-dur">{formatDuration(bSeg)}</span>
+                                <span className="engine-breakdown-goal">
+                                  {baseGoal != null ? `~${baseGoal % 1 === 0 ? baseGoal : baseGoal.toFixed(1)} ${selectedUnit}` : pace || '—'}
+                                </span>
+                              </div>
+                            );
+                            remaining -= bSeg;
+                            if (remaining <= 0) break;
+
+                            const fSeg = Math.min(fluxDur, remaining);
+                            const fluxIntensity = startIntensity + segIdx * increment;
+                            rows.push(
+                              <div key={`f-${segIdx}`} className="engine-breakdown-row engine-breakdown-row--flux">
+                                <span className="engine-breakdown-label engine-breakdown-label--flux">FLUX</span>
+                                <span className="engine-breakdown-dur">{formatDuration(fSeg)}</span>
+                                <span className="engine-breakdown-goal engine-breakdown-goal--flux">
+                                  {`${Math.round(fluxIntensity * 100)}%`}
+                                </span>
+                              </div>
+                            );
+                            remaining -= fSeg;
+                            segIdx++;
+                          }
+
+                          return <div className="engine-breakdown-segments">{rows}</div>;
+                        })()
+
+                        /* Continuous (Atomic, Towers): single unbroken work block */
+                        : bp.workProgression === 'continuous' ? (
+                          <div className="engine-breakdown-segments">
+                            <div className="engine-breakdown-row">
+                              <span className="engine-breakdown-label">WORK</span>
+                              <span className="engine-breakdown-dur">{formatDuration(workDur * rounds)}</span>
+                              <span className="engine-breakdown-goal">
+                                {(() => {
+                                  const goal = calculateIntervalGoal(bp, workDur * rounds, 'Work', baselineRpm, rollingAdj);
+                                  const isMax = bp.paceRange === 'max_effort';
+                                  return isMax ? 'Max Effort' : goal != null ? `~${goal % 1 === 0 ? goal : goal.toFixed(1)} ${selectedUnit}` : pace || '—';
+                                })()}
+                              </span>
+                            </div>
+                          </div>
+                        )
+
+                        /* Standard / Increasing / Decreasing intervals: round-by-round cards */
                         : (
                           <div className="engine-breakdown-segments">
                             {Array.from({ length: rounds }, (_, r) => {
-                              const intervalGoal = calculateIntervalGoal(bp, workDur, 'Work', baselineRpm, rollingAdj);
+                              const workInc = bp.workDurationIncrement ?? 0;
+                              const restInc = bp.restDurationIncrement ?? 0;
+                              const roundWorkDur = Math.max(0, workDur + r * workInc);
+                              const roundRestDur = Math.max(0, restDur + r * restInc);
+                              const intervalGoal = calculateIntervalGoal(bp, roundWorkDur, 'Work', baselineRpm, rollingAdj);
                               const isMax = bp.paceRange === 'max_effort';
                               return (
                                 <div key={r}>
                                   <div className="engine-breakdown-row">
                                     <span className="engine-breakdown-label">R{r + 1}</span>
-                                    <span className="engine-breakdown-dur">{formatDuration(workDur)}</span>
+                                    <span className="engine-breakdown-dur">{formatDuration(roundWorkDur)}</span>
                                     <span className="engine-breakdown-goal">
                                       {isMax ? 'Max Effort' : intervalGoal != null ? `~${intervalGoal % 1 === 0 ? intervalGoal : intervalGoal.toFixed(1)} ${selectedUnit}` : pace || '—'}
                                     </span>
                                   </div>
-                                  {restDur > 0 && r < rounds - 1 && (
+                                  {roundRestDur > 0 && r < rounds - 1 && (
                                     <div className="engine-breakdown-row engine-breakdown-row--rest">
                                       <span className="engine-breakdown-label engine-breakdown-label--rest">REST</span>
-                                      <span className="engine-breakdown-dur">{formatDuration(restDur)}</span>
+                                      <span className="engine-breakdown-dur">{formatDuration(roundRestDur)}</span>
                                       <span className="engine-breakdown-goal">—</span>
                                     </div>
                                   )}
