@@ -4,11 +4,11 @@
 // Strategy:
 //   1. If explicit time cap exists (AMRAP, EMOM, etc), use it directly
 //   2. If no cap (FOR TIME, RFT), estimate from rep volume + load
-//   3. Apply fixed boundaries: <7min = short, 7-15min = medium, >15min = long
+//   3. Apply fixed boundaries: <8min = short, 8-15min = medium, >15min = long
 
 export type TimeDomain = "short" | "medium" | "long";
 
-const TIME_BOUNDARIES = { short: 7, long: 15 }; // minutes
+const TIME_BOUNDARIES = { short: 8, long: 15 }; // minutes
 
 function classifyMinutes(minutes: number): TimeDomain {
   if (minutes < TIME_BOUNDARIES.short) return "short";
