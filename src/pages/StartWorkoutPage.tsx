@@ -781,11 +781,11 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                 <input type="number" placeholder="Wt" value={ev.weight ?? ''} onChange={e => setEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)} style={{ ...compactInputStyle, width: 64 }} />
                                 <span style={{ color: 'var(--text-dim)', fontSize: 13, width: 28 }}>{ev.weight_unit || 'lbs'}</span>
                                 <select value={ev.rpe ?? ''} onChange={e => setEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 48, padding: '8px 4px', border: ev.rpe == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}>
-                                  <option value="">—</option>
+                                  <option value=""></option>
                                   {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
                                 </select>
                                 <select value={ev.quality ?? ''} onChange={e => setEntry(key, 'quality', e.target.value || undefined)} style={{ ...compactInputStyle, width: 48, padding: '8px 4px', border: ev.quality == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}>
-                                  <option value="">—</option>
+                                  <option value=""></option>
                                   <option value="A">A</option>
                                   <option value="B">B</option>
                                   <option value="C">C</option>
@@ -897,7 +897,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                           onChange={e => setMetconEntry(key, 'quality', e.target.value || undefined)}
                                           style={{ ...compactInputStyle, width: 56, padding: '8px 4px', border: mv.quality == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
                                         >
-                                          <option value="">—</option>
+                                          <option value=""></option>
                                           <option value="A">A</option>
                                           <option value="B">B</option>
                                           <option value="C">C</option>
@@ -908,7 +908,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                           onChange={e => setMetconEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
                                           style={{ ...compactInputStyle, width: 56, padding: '8px 4px', border: mv.rpe == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
                                         >
-                                          <option value="">—</option>
+                                          <option value=""></option>
                                           {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
                                         </select>
                                       </div>
@@ -1009,7 +1009,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                           onChange={e => setSkillEntry(key, 'quality', e.target.value || undefined)}
                                           style={{ ...compactInputStyle, width: 48, padding: '8px 4px', border: sk.quality == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
                                         >
-                                          <option value="">—</option>
+                                          <option value=""></option>
                                           <option value="A">A</option>
                                           <option value="B">B</option>
                                           <option value="C">C</option>
@@ -1020,7 +1020,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                           onChange={e => setSkillEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
                                           style={{ ...compactInputStyle, width: 48, padding: '8px 4px', border: sk.rpe == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
                                         >
-                                          <option value="">—</option>
+                                          <option value=""></option>
                                           {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
                                         </select>
                                       </div>
