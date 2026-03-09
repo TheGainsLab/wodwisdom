@@ -258,6 +258,11 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
   const [reviewFaults, setReviewFaults] = useState<Record<string, string[]>>({});
   const [checkedFaults, setCheckedFaults] = useState<Record<string, string[]>>({});
 
+  // In-progress tracking: which blocks have been saved, and the parent log id
+  const [inProgressLogId, setInProgressLogId] = useState<string | null>(null);
+  const [savedBlocks, setSavedBlocks] = useState<Set<number>>(new Set());
+  const [savingBlock, setSavingBlock] = useState<number | null>(null);
+
   const sourceState = location.state as {
     workout_text?: string;
     source_id?: string;
@@ -436,6 +441,104 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       setSkillsEntries(initialSkills);
       if (needsParse) setParsingSkills(false);
 
+      // Check for an existing in-progress workout log to resume
+      {
+        const { data: ipLog } = await supabase
+          .from('workout_logs')
+          .select('id')
+          .eq('source_id', sourceState.source_id!)
+          .eq('status', 'in_progress')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (ipLog) {
+          setInProgressLogId(ipLog.id);
+          // Load previously saved blocks
+          const { data: savedBlockRows } = await supabase
+            .from('workout_log_blocks')
+            .select('sort_order, block_type, block_label, block_text, score, rx, notes')
+            .eq('log_id', ipLog.id)
+            .order('sort_order');
+
+          if (savedBlockRows && savedBlockRows.length > 0) {
+            const savedSet = new Set<number>();
+            for (const sb of savedBlockRows) {
+              savedSet.add(sb.sort_order);
+              // Restore notes
+              if (sb.notes) {
+                setBlockNotes(prev => ({ ...prev, [sb.sort_order]: sb.notes }));
+              }
+              // Restore score/rx for metcon blocks
+              if (sb.block_type === 'metcon') {
+                if (sb.score) setBlockScores(prev => ({ ...prev, [sb.sort_order]: sb.score }));
+                setBlockRx(prev => ({ ...prev, [sb.sort_order]: sb.rx ?? true }));
+              }
+            }
+            setSavedBlocks(savedSet);
+
+            // Load previously saved entries to restore strength/metcon/skills values
+            const { data: savedEntryRows } = await supabase
+              .from('workout_log_entries')
+              .select('block_label, movement, sets, reps, weight, weight_unit, rpe, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, faults_observed, sort_order')
+              .eq('log_id', ipLog.id)
+              .order('sort_order');
+
+            if (savedEntryRows && savedEntryRows.length > 0) {
+              const restoredEntries: Record<string, EntryValues> = { ...initial };
+              const restoredMetcon: Record<string, MetconEntryValues> = { ...initialMetcon };
+              const restoredSkills: Record<string, SkillsEntryValues> = { ...initialSkills };
+
+              // Group entries by block_label to figure out which block index they belong to
+              for (const entry of savedEntryRows) {
+                const bi = loaded.findIndex(b => b.label === entry.block_label);
+                if (bi < 0) continue;
+                const block = loaded[bi];
+
+                if (block.type === 'strength' && entry.set_number != null) {
+                  const key = `${bi}-s${entry.set_number - 1}`;
+                  restoredEntries[key] = {
+                    reps: entry.reps ?? undefined,
+                    weight: entry.weight ?? undefined,
+                    weight_unit: (entry.weight_unit as 'lbs' | 'kg') || 'lbs',
+                    rpe: entry.rpe ?? undefined,
+                    quality: (entry.quality as EntryValues['quality']) ?? undefined,
+                    set_number: entry.set_number,
+                  };
+                } else if (block.type === 'metcon') {
+                  const key = `${bi}-m${entry.sort_order}`;
+                  restoredMetcon[key] = {
+                    movement: entry.movement,
+                    reps: entry.reps ?? undefined,
+                    weight: entry.weight ?? undefined,
+                    weight_unit: (entry.weight_unit as 'lbs' | 'kg') || 'lbs',
+                    distance: entry.distance ?? undefined,
+                    distance_unit: (entry.distance_unit as MetconEntryValues['distance_unit']) ?? undefined,
+                    rpe: entry.rpe ?? undefined,
+                    quality: (entry.quality as MetconEntryValues['quality']) ?? undefined,
+                  };
+                } else if (block.type === 'skills') {
+                  const key = `${bi}-sk${entry.sort_order}`;
+                  restoredSkills[key] = {
+                    movement: entry.movement,
+                    sets: entry.sets ?? undefined,
+                    reps_completed: entry.reps_completed ?? undefined,
+                    hold_seconds: entry.hold_seconds ?? undefined,
+                    rpe: entry.rpe ?? undefined,
+                    quality: (entry.quality as SkillsEntryValues['quality']) ?? undefined,
+                    variation: entry.variation ?? undefined,
+                  };
+                }
+              }
+
+              setEntryValues(restoredEntries);
+              setMetconEntries(restoredMetcon);
+              setSkillsEntries(restoredSkills);
+            }
+          }
+        }
+      }
+
       // Fetch cached coach review to get common_faults per movement
       const { data: reviewRow } = await supabase
         .from('workout_reviews')
@@ -538,6 +641,197 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
     });
     return result;
   }, [blocks, metconEntries, workRates]);
+
+  /** Build a single block's log payload from current form state */
+  const buildBlockPayload = (bi: number) => {
+    const b = blocks[bi];
+    if (!b) return null;
+
+    let entries: any[] = [];
+    let score: string | null = null;
+    let rx = false;
+
+    if (b.type === 'strength') {
+      const movementName = extractMovementName(b.text);
+      const setKeys = Object.keys(entryValues)
+        .filter(k => k.startsWith(`${bi}-s`))
+        .sort((a, b2) => parseInt(a.split('-s')[1], 10) - parseInt(b2.split('-s')[1], 10));
+      const strFaults = checkedFaults[`${bi}-str`];
+      entries = setKeys.map(key => {
+        const ev = entryValues[key] || {};
+        return {
+          movement: movementName,
+          sets: 1,
+          reps: ev.reps ?? null,
+          weight: ev.weight ?? null,
+          weight_unit: ev.weight_unit || 'lbs',
+          rpe: ev.rpe ?? null,
+          scaling_note: null,
+          set_number: ev.set_number ?? null,
+          reps_completed: null,
+          hold_seconds: null,
+          distance: null,
+          distance_unit: null,
+          quality: ev.quality ?? null,
+          variation: null,
+          faults_observed: strFaults?.length ? strFaults : null,
+        };
+      });
+    } else if (b.type === 'metcon') {
+      const mvKeys = Object.keys(metconEntries)
+        .filter(k => k.startsWith(`${bi}-m`))
+        .sort((a, b2) => parseInt(a.split('-m')[1], 10) - parseInt(b2.split('-m')[1], 10));
+      entries = mvKeys
+        .filter(key => metconEntries[key]?.movement?.trim())
+        .map(key => {
+          const mv = metconEntries[key];
+          const f = checkedFaults[key];
+          return {
+            movement: mv.movement.trim(),
+            sets: null,
+            reps: mv.reps ?? null,
+            weight: mv.weight ?? null,
+            weight_unit: mv.weight_unit || 'lbs',
+            rpe: mv.rpe ?? null,
+            scaling_note: mv.scaling_note?.trim() || null,
+            set_number: null,
+            reps_completed: null,
+            hold_seconds: null,
+            distance: mv.distance ?? null,
+            distance_unit: mv.distance_unit || null,
+            quality: mv.quality ?? null,
+            variation: null,
+            faults_observed: f?.length ? f : null,
+          };
+        });
+      score = blockScores[bi]?.trim() || null;
+      rx = blockRx[bi] ?? true;
+    } else if (b.type === 'skills') {
+      const skKeys = Object.keys(skillsEntries)
+        .filter(k => k.startsWith(`${bi}-sk`))
+        .sort((a, b2) => parseInt(a.split('-sk')[1], 10) - parseInt(b2.split('-sk')[1], 10));
+      entries = skKeys
+        .filter(key => skillsEntries[key]?.movement?.trim())
+        .map(key => {
+          const sk = skillsEntries[key];
+          const f = checkedFaults[key];
+          return {
+            movement: sk.movement.trim(),
+            sets: sk.sets ?? null,
+            reps: null,
+            weight: null,
+            weight_unit: 'lbs',
+            rpe: sk.rpe ?? null,
+            scaling_note: sk.variation?.trim() || null,
+            set_number: null,
+            reps_completed: sk.reps_completed ?? null,
+            hold_seconds: sk.hold_seconds ?? null,
+            distance: null,
+            distance_unit: null,
+            quality: sk.quality ?? null,
+            variation: sk.variation?.trim() || null,
+            faults_observed: f?.length ? f : null,
+          };
+        });
+    }
+
+    // Compute scoring for metcon blocks
+    const benchmarks = blockBenchmarks[bi];
+    const scoreStr = blockScores[bi]?.trim() || '';
+    const wType = inferWorkoutType([b]);
+    const scoring = b.type === 'metcon' && benchmarks && scoreStr
+      ? scoreMetcon(scoreStr, wType, benchmarks)
+      : null;
+
+    return {
+      label: b.label,
+      type: b.type,
+      text: b.text,
+      score,
+      rx,
+      notes: blockNotes[bi]?.trim() || null,
+      sort_order: bi,
+      entries,
+      percentile: scoring?.percentile ?? null,
+      performance_tier: scoring?.performanceTier ?? null,
+      median_benchmark: benchmarks?.medianScore !== '--' ? benchmarks?.medianScore : null,
+      excellent_benchmark: benchmarks?.excellentScore !== '--' ? benchmarks?.excellentScore : null,
+    };
+  };
+
+  /** Save a single block (creates in-progress log if needed) */
+  const saveBlock = async (bi: number) => {
+    const payload = buildBlockPayload(bi);
+    if (!payload) return;
+    setSavingBlock(bi);
+    try {
+      const workoutText = sourceState?.workout_text?.trim() ||
+        blocks.map(b => `${b.label}: ${b.text}`).join('\n');
+      const { data, error: fnErr } = await supabase.functions.invoke('save-workout-block', {
+        body: {
+          log_id: inProgressLogId,
+          source_id: sourceState?.source_id || null,
+          workout_date: workoutDate,
+          workout_text: workoutText,
+          workout_type: workoutType,
+          block: payload,
+        },
+      });
+      if (fnErr) throw new Error(fnErr.message || 'Failed to save block');
+      if (data?.error) throw new Error(data.error);
+      // Track the log id for subsequent saves
+      if (data?.log_id && !inProgressLogId) {
+        setInProgressLogId(data.log_id);
+      }
+      setSavedBlocks(prev => new Set(prev).add(bi));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save block');
+    } finally {
+      setSavingBlock(null);
+    }
+  };
+
+  /** Save all current progress and navigate away */
+  const handleSaveAndExit = async () => {
+    setError('');
+    setSaving(true);
+    try {
+      // Save any unsaved blocks
+      for (let bi = 0; bi < blocks.length; bi++) {
+        if (savedBlocks.has(bi)) continue;
+        const payload = buildBlockPayload(bi);
+        if (!payload) continue;
+        // Only save blocks that have some content
+        const hasContent = payload.entries.length > 0 || payload.notes || payload.score;
+        if (!hasContent && (blocks[bi].type === 'warm-up' || blocks[bi].type === 'cool-down')) {
+          // For warm-up/cool-down, save even without entries if there are notes
+          if (!payload.notes) continue;
+        }
+        const workoutText = sourceState?.workout_text?.trim() ||
+          blocks.map(b => `${b.label}: ${b.text}`).join('\n');
+        const { data, error: fnErr } = await supabase.functions.invoke('save-workout-block', {
+          body: {
+            log_id: inProgressLogId,
+            source_id: sourceState?.source_id || null,
+            workout_date: workoutDate,
+            workout_text: workoutText,
+            workout_type: workoutType,
+            block: payload,
+          },
+        });
+        if (fnErr) throw new Error(fnErr.message || 'Failed to save');
+        if (data?.error) throw new Error(data.error);
+        if (data?.log_id && !inProgressLogId) {
+          setInProgressLogId(data.log_id);
+        }
+      }
+      navigate(-1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save progress');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleFinish = async () => {
     setError('');
@@ -697,6 +991,8 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
           source_id: sourceState?.source_id || null,
           notes: null,
           blocks: logBlocks,
+          status: 'completed',
+          existing_log_id: inProgressLogId,
         },
       });
       if (error) throw new Error(error.message || 'Failed to save');
@@ -717,7 +1013,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>Start Workout</h1>
+          <h1>{inProgressLogId ? 'Resume Workout' : 'Start Workout'}</h1>
         </header>
 
         <div className="page-body">
@@ -1065,6 +1361,27 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                         />
                       </div>
                     )}
+
+                    {/* Per-block save button */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                      <button
+                        className="auth-btn"
+                        style={{
+                          padding: '6px 16px',
+                          fontSize: 13,
+                          background: savedBlocks.has(bi) ? 'var(--surface2)' : undefined,
+                          color: savedBlocks.has(bi) ? 'var(--text-dim)' : undefined,
+                        }}
+                        onClick={() => saveBlock(bi)}
+                        disabled={savingBlock === bi}
+                      >
+                        {savingBlock === bi
+                          ? 'Saving...'
+                          : savedBlocks.has(bi)
+                          ? 'Saved'
+                          : 'Save Block'}
+                      </button>
+                    </div>
                   </div>
                 ))}
 
@@ -1073,6 +1390,9 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                 <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
                   <button className="auth-btn" style={{ flex: 1, background: 'var(--surface2)', color: 'var(--text)' }} onClick={() => navigate(-1)}>
                     Back
+                  </button>
+                  <button className="auth-btn" onClick={handleSaveAndExit} disabled={saving} style={{ flex: 1, background: 'var(--surface2)', color: 'var(--text)' }}>
+                    {saving ? 'Saving...' : 'Save & Exit'}
                   </button>
                   <button className="auth-btn" onClick={handleFinish} disabled={saving} style={{ flex: 1 }}>
                     {saving ? 'Saving...' : 'Finish Workout'}

@@ -19,6 +19,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [program, setProgram] = useState<{ id: string; name: string } | null>(null);
   const [allWorkouts, setAllWorkouts] = useState<ProgramWorkout[]>([]);
   const [completedWorkoutIds, setCompletedWorkoutIds] = useState<Set<string>>(new Set());
+  const [inProgressWorkouts, setInProgressWorkouts] = useState<Map<string, { logId: string; savedCount: number; totalBlocks: number }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [navOpen, setNavOpen] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
@@ -64,18 +65,42 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       const ids = wk.map((w) => w.id);
       // Query in batches of 100 to avoid URL length limits
       const allCompleted = new Set<string>();
+      const ipMap = new Map<string, { logId: string; savedCount: number; totalBlocks: number }>();
       for (let i = 0; i < ids.length; i += 100) {
         const batch = ids.slice(i, i + 100);
         const { data: logs } = await supabase
           .from('workout_logs')
-          .select('source_id')
+          .select('id, source_id, status')
           .eq('user_id', session.user.id)
           .in('source_id', batch);
-        (logs || []).forEach((l) => { if (l.source_id) allCompleted.add(l.source_id); });
+        for (const l of logs || []) {
+          if (!l.source_id) continue;
+          if (l.status === 'completed') {
+            allCompleted.add(l.source_id);
+          } else if (l.status === 'in_progress') {
+            // Count saved blocks for this in-progress log
+            const { count } = await supabase
+              .from('workout_log_blocks')
+              .select('id', { count: 'exact', head: true })
+              .eq('log_id', l.id);
+            // Count total blocks for this workout
+            const { count: totalCount } = await supabase
+              .from('program_workout_blocks')
+              .select('id', { count: 'exact', head: true })
+              .eq('program_workout_id', l.source_id);
+            ipMap.set(l.source_id, {
+              logId: l.id,
+              savedCount: count ?? 0,
+              totalBlocks: totalCount ?? 0,
+            });
+          }
+        }
       }
       setCompletedWorkoutIds(allCompleted);
+      setInProgressWorkouts(ipMap);
     } else {
       setCompletedWorkoutIds(new Set());
+      setInProgressWorkouts(new Map());
     }
 
     setLoading(false);
@@ -164,10 +189,11 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                         <div className="program-week-label">Week {week.weekNum}</div>
                         {week.days.map((w) => {
                           const done = completedWorkoutIds.has(w.id);
+                          const ip = inProgressWorkouts.get(w.id);
                           const dayNum = w.sort_order + 1;
                           const isExpanded = expandedDays.has(w.id);
                           return (
-                            <div key={w.id} className={`program-day-row${done ? ' program-day-completed' : ''}`}>
+                            <div key={w.id} className={`program-day-row${done ? ' program-day-completed' : ip ? ' program-day-in-progress' : ''}`}>
                               <button
                                 className="program-day-header"
                                 onClick={() => toggleDay(w.id)}
@@ -176,11 +202,14 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                 <div className="program-day-left">
                                   {done ? (
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+                                  ) : ip ? (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning, #f39c12)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
                                   ) : (
                                     <span className="program-day-dot" />
                                   )}
                                   <span className="program-day-label">Day {dayNum}</span>
                                   {done && <span className="program-completed-badge">Done</span>}
+                                  {ip && <span className="program-in-progress-badge">{ip.savedCount}/{ip.totalBlocks} blocks</span>}
                                 </div>
                                 <svg
                                   className={`program-day-chevron${isExpanded ? ' expanded' : ''}`}
@@ -210,7 +239,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                         onClick={() => navigate('/workout/start', { state: { workout_text: w.workout_text, source_id: w.id } })}
                                         style={{ padding: '8px 14px', fontSize: 13 }}
                                       >
-                                        Start
+                                        {ip ? 'Resume' : 'Start'}
                                       </button>
                                     )}
                                   </div>

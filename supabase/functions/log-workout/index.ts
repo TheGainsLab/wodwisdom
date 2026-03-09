@@ -64,6 +64,9 @@ interface LogWorkoutBody {
   source_id?: string | null;
   notes?: string | null;
   blocks?: LogBlock[];
+  status?: "in_progress" | "completed";
+  /** When resuming an in-progress workout, pass the existing log id */
+  existing_log_id?: string | null;
 }
 
 Deno.serve(async (req) => {
@@ -100,6 +103,8 @@ Deno.serve(async (req) => {
     const source_id = body.source_id ?? null;
     const notes = body.notes ?? null;
     const blocks = body.blocks ?? [];
+    const status = body.status === "in_progress" ? "in_progress" : "completed";
+    const existingLogId = body.existing_log_id ?? null;
 
     if (!workout_date || typeof workout_date !== "string") {
       return new Response(JSON.stringify({ error: "Missing workout_date" }), {
@@ -127,26 +132,65 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 1. Insert workout_logs row (no score/rx/blocks — those live in workout_log_blocks now)
-    const { data: log, error: logErr } = await supa
-      .from("workout_logs")
-      .insert({
-        user_id: user.id,
-        workout_date: dateStr,
-        workout_text,
-        workout_type,
-        source_id,
-        notes,
-      })
-      .select("id")
-      .single();
+    // 1. Create or update the workout_logs row
+    let log: { id: string };
 
-    if (logErr) {
-      console.error("log-workout insert error:", logErr);
-      return new Response(JSON.stringify({ error: "Failed to save workout" }), {
-        status: 500,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+    if (existingLogId) {
+      // Resuming an in-progress workout — update it and wipe old blocks/entries
+      const { data: existing, error: fetchErr } = await supa
+        .from("workout_logs")
+        .select("id")
+        .eq("id", existingLogId)
+        .eq("user_id", user.id)
+        .single();
+
+      if (fetchErr || !existing) {
+        return new Response(JSON.stringify({ error: "In-progress workout not found" }), {
+          status: 404,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+
+      const { error: updErr } = await supa
+        .from("workout_logs")
+        .update({ workout_date: dateStr, workout_text, workout_type, notes, status })
+        .eq("id", existingLogId);
+      if (updErr) {
+        console.error("log-workout update error:", updErr);
+        return new Response(JSON.stringify({ error: "Failed to update workout" }), {
+          status: 500,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+
+      // Delete old child rows — they'll be re-inserted below
+      await supa.from("workout_log_entries").delete().eq("log_id", existingLogId);
+      await supa.from("workout_log_blocks").delete().eq("log_id", existingLogId);
+
+      log = { id: existingLogId };
+    } else {
+      const { data: newLog, error: logErr } = await supa
+        .from("workout_logs")
+        .insert({
+          user_id: user.id,
+          workout_date: dateStr,
+          workout_text,
+          workout_type,
+          source_id,
+          notes,
+          status,
+        })
+        .select("id")
+        .single();
+
+      if (logErr || !newLog) {
+        console.error("log-workout insert error:", logErr);
+        return new Response(JSON.stringify({ error: "Failed to save workout" }), {
+          status: 500,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+      log = newLog;
     }
 
     // 2. Insert workout_log_blocks rows and get back their IDs
