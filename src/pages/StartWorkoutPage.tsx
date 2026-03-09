@@ -802,8 +802,6 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
         if (blocks[bi].type === 'warm-up' || blocks[bi].type === 'cool-down') continue;
         const payload = buildBlockPayload(bi);
         if (!payload) continue;
-        // Only save blocks that have some content
-        const hasContent = payload.entries.length > 0 || payload.notes || payload.score;
         const workoutText = sourceState?.workout_text?.trim() ||
           blocks.map(b => `${b.label}: ${b.text}`).join('\n');
         const { data, error: fnErr } = await supabase.functions.invoke('save-workout-block', {
