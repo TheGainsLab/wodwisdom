@@ -289,7 +289,9 @@ function generateSegments(workout: EngineWorkout): Segment[] {
       }
 
     // ── Continuous (Atomic, Towers — single unbroken work block) ──
-    } else if (bp.workProgression === 'continuous') {
+    // When paceProgression is 'increasing', fall through to standard intervals path
+    // so each round gets its own pace target (intervals with 0 rest).
+    } else if (bp.workProgression === 'continuous' && bp.paceProgression !== 'increasing') {
       segments.push({ type: 'work', duration: workDur * rounds, blockIndex: b, roundIndex: 0, label: 'Work', intensity: formatPace(bp.paceRange) });
 
     // ── Standard / Increasing / Decreasing intervals ──
@@ -1047,7 +1049,8 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                         })()
 
                         /* Continuous (Atomic, Towers): single unbroken work block */
-                        : bp.workProgression === 'continuous' ? (
+                        /* When paceProgression is 'increasing', fall through to round-by-round rendering */
+                        : bp.workProgression === 'continuous' && bp.paceProgression !== 'increasing' ? (
                           <div className="engine-breakdown-segments">
                             <div className="engine-breakdown-row">
                               <span className="engine-breakdown-label">WORK</span>
@@ -1071,8 +1074,12 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                               const restInc = bp.restDurationIncrement ?? 0;
                               const roundWorkDur = Math.max(0, workDur + r * workInc);
                               const roundRestDur = Math.max(0, restDur + r * restInc);
-                              const roundPace = bp.paceProgression === 'increasing' && Array.isArray(bp.paceRange) && bp.paceIncrement
-                                ? bp.paceRange[0] + r * bp.paceIncrement
+                              const effectivePaceInc = bp.paceIncrement
+                                ?? (bp.paceProgression === 'increasing' && Array.isArray(bp.paceRange) && rounds > 1
+                                  ? (bp.paceRange[1] - bp.paceRange[0]) / (rounds - 1)
+                                  : undefined);
+                              const roundPace = bp.paceProgression === 'increasing' && Array.isArray(bp.paceRange) && effectivePaceInc
+                                ? bp.paceRange[0] + r * effectivePaceInc
                                 : undefined;
                               const intervalGoal = calculateIntervalGoal(bp, roundWorkDur, 'Work', baselineRpm, rollingAdj, roundPace);
                               const isMax = bp.paceRange === 'max_effort';
