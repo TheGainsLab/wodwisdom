@@ -54,6 +54,7 @@
   justify-content: space-between;
   padding: 12px 14px;
   background: var(--surface2);
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   cursor: pointer;
