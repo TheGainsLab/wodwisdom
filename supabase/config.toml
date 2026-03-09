@@ -78,3 +78,9 @@ verify_jwt = false
 
 [functions.parse-metcon]
 verify_jwt = false
+
+[functions.save-workout-block]
+verify_jwt = false
+
+[functions.complete-workout]
+verify_jwt = false
