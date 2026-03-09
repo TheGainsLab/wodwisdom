@@ -1026,12 +1026,15 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
                             const fSeg = Math.min(fluxDur, remaining);
                             const fluxIntensity = startIntensity + segIdx * increment;
+                            const fluxGoal = baselineRpm > 0
+                              ? Math.round(baselineRpm * fluxIntensity * rollingAdj * (fSeg / 60) * 10) / 10
+                              : null;
                             rows.push(
                               <div key={`f-${segIdx}`} className="engine-breakdown-row engine-breakdown-row--flux">
                                 <span className="engine-breakdown-label engine-breakdown-label--flux">FLUX</span>
                                 <span className="engine-breakdown-dur">{formatDuration(fSeg)}</span>
                                 <span className="engine-breakdown-goal engine-breakdown-goal--flux">
-                                  {`${Math.round(fluxIntensity * 100)}%`}
+                                  {fluxGoal != null ? `~${fluxGoal % 1 === 0 ? fluxGoal : fluxGoal.toFixed(1)} ${selectedUnit}` : `${Math.round(fluxIntensity * 100)}%`}
                                 </span>
                               </div>
                             );
