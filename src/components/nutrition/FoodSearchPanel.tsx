@@ -81,8 +81,8 @@ export default function FoodSearchPanel({
           placeholder="Search foods..."
           style={{ flex: 1, padding: '10px 14px' }}
         />
-        <button className="engine-btn engine-btn-primary" style={{ padding: '10px 14px' }} onClick={handleSearch} disabled={searching}>
-          <Search size={18} />
+        <button className="engine-btn engine-btn-primary" style={{ padding: 10, width: 'auto', flexShrink: 0 }} onClick={handleSearch} disabled={searching}>
+          <Search size={16} />
         </button>
       </div>
 
