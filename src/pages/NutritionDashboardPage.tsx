@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import NutritionPaywall from '../components/nutrition/NutritionPaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, ChevronRight, Plus, X, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Star, UtensilsCrossed, BookOpen } from 'lucide-react';
 import DailySummary from '../components/nutrition/DailySummary';
 import type { DailyNutrition } from '../components/nutrition/DailySummary';
 import FoodEntryList from '../components/nutrition/FoodEntryList';
@@ -282,13 +282,19 @@ export default function NutritionDashboardPage({ session }: { session: Session }
                 {/* Meal type + quick links */}
                 <MealTypeSelector selected={selectedMealType} onChange={setSelectedMealType} />
 
-                {favorites.length > 0 && (
-                  <div className="nutrition-quick-links">
+                <div className="nutrition-quick-links">
+                  {favorites.length > 0 && (
                     <button className="nutrition-quick-link" onClick={() => setShowFavoritesSheet(true)}>
                       <Star size={12} /> Favorites
                     </button>
-                  </div>
-                )}
+                  )}
+                  <button className="nutrition-quick-link" onClick={() => { if (!favoritesLoaded) loadFavorites(); setShowTemplatesSheet(true); }}>
+                    <BookOpen size={12} /> My Meals
+                  </button>
+                  <button className="nutrition-quick-link" onClick={() => setShowMealBuilder(true)}>
+                    <UtensilsCrossed size={12} /> Build a Meal
+                  </button>
+                </div>
 
               </div>
             </div>
