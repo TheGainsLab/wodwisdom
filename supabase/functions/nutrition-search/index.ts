@@ -57,10 +57,20 @@ Deno.serve(async (req) => {
       );
     }
 
+    // When filtering by brand, include the brand name in the search expression
+    // so FatSecret returns brand-relevant results instead of generic ones.
+    // Also request more results to ensure a good pool after client-side filtering.
+    let searchExpression = query.trim();
+    let apiMaxResults = maxResults;
+    if (brandName && typeof brandName === "string") {
+      searchExpression = `${brandName} ${query.trim()}`;
+      apiMaxResults = Math.max(maxResults, 50);
+    }
+
     const result = await callFatSecretAPI("foods.search", {
-      search_expression: query.trim(),
+      search_expression: searchExpression,
       page_number: pageNumber,
-      max_results: maxResults,
+      max_results: apiMaxResults,
     });
 
     const foods = result?.foods;
@@ -90,10 +100,15 @@ Deno.serve(async (req) => {
     }
 
     if (brandName && typeof brandName === "string") {
-      const search = brandName.toLowerCase();
-      filtered = filtered.filter(
-        (f: any) => f.brand_name && f.brand_name.toLowerCase().includes(search)
-      );
+      // Use flexible matching: check if any word from the brand name appears
+      // in the result's brand_name to handle variations like
+      // "Panera Bread" vs "Panera Bread Co" or "Tyson" vs "Tyson Foods"
+      const brandWords = brandName.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+      filtered = filtered.filter((f: any) => {
+        if (!f.brand_name) return false;
+        const resultBrand = f.brand_name.toLowerCase();
+        return brandWords.some(word => resultBrand.includes(word));
+      });
     }
 
     return new Response(
