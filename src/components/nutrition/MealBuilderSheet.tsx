@@ -22,7 +22,6 @@ interface DefaultItem {
   id: string;
   name: string;
   emoji: string;
-  search_term?: string;
   fatsecret_name?: string;
   category?: string;
 }
@@ -121,8 +120,8 @@ export default function MealBuilderSheet({
 
   // Select an ingredient → search for it
   const handleIngredientTap = (item: DefaultItem) => {
-    setSearchQuery(item.search_term || item.name);
-    doSearch(item.search_term || item.name);
+    setSearchQuery(item.name);
+    doSearch(item.name);
   };
 
   // Select a restaurant/brand → set filter and show search
