@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import NutritionPaywall from '../components/nutrition/NutritionPaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, ChevronRight, Plus, Search, X, Camera, ScanBarcode, UtensilsCrossed } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Search, X, Camera, ScanBarcode, UtensilsCrossed, Star } from 'lucide-react';
 import DailySummary from '../components/nutrition/DailySummary';
 import type { DailyNutrition } from '../components/nutrition/DailySummary';
 import FoodEntryList from '../components/nutrition/FoodEntryList';
@@ -13,7 +13,7 @@ import FoodSearchPanel from '../components/nutrition/FoodSearchPanel';
 import type { SearchResult, FavoriteFoodItem } from '../components/nutrition/FoodSearchPanel';
 import PhotoPanel from '../components/nutrition/PhotoPanel';
 import BarcodePanel from '../components/nutrition/BarcodePanel';
-import MealTypeSelector from '../components/nutrition/MealTypeSelector';
+import MealTypeSelector, { defaultMealType } from '../components/nutrition/MealTypeSelector';
 import FoodDetailSheet from '../components/nutrition/FoodDetailSheet';
 import FavoritesSheet from '../components/nutrition/FavoritesSheet';
 import MealTemplatesSheet from '../components/nutrition/MealTemplatesSheet';
@@ -56,7 +56,7 @@ export default function NutritionDashboardPage({ session }: { session: Session }
   // Panel state
   const [showPanel, setShowPanel] = useState(false);
   const [inputMode, setInputMode] = useState<InputMode>('search');
-  const [selectedMealType, setSelectedMealType] = useState<string>('snack');
+  const [selectedMealType, setSelectedMealType] = useState<string>(defaultMealType);
 
   // Favorites
   const [favorites, setFavorites] = useState<FavoriteFoodItem[]>([]);
@@ -211,65 +211,44 @@ export default function NutritionDashboardPage({ session }: { session: Session }
           {/* Macro summary */}
           <DailySummary daily={daily} />
 
-          {/* Action buttons */}
-          <div style={{ display: 'flex', gap: 8 }}>
+          {/* Add Food toggle */}
+          {!showPanel && (
             <button
               className="engine-btn engine-btn-primary"
-              style={{ flex: 1 }}
-              onClick={() => showPanel ? closePanel() : setShowPanel(true)}
+              style={{ width: '100%' }}
+              onClick={() => setShowPanel(true)}
             >
-              {showPanel ? <><X size={18} /> Close</> : <><Plus size={18} /> Add Food</>}
+              <Plus size={18} /> Add Food
             </button>
-            <button
-              className="engine-btn engine-btn-secondary"
-              style={{ flex: 1 }}
-              onClick={() => { if (!favoritesLoaded) loadFavorites(); setShowTemplatesSheet(true); }}
-            >
-              <UtensilsCrossed size={18} /> My Meals
-            </button>
-          </div>
+          )}
 
           {/* ── Add Food Panel ── */}
           {showPanel && (
-            <div className="engine-card">
-              <div className="engine-section">
+            <div className="engine-card" style={{ padding: 0 }}>
 
-                {/* Input mode tabs */}
-                <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
-                  {([
-                    { mode: 'search' as InputMode, icon: <Search size={16} />, label: 'Search' },
-                    { mode: 'photo' as InputMode, icon: <Camera size={16} />, label: 'Photo' },
-                    { mode: 'barcode' as InputMode, icon: <ScanBarcode size={16} />, label: 'Barcode' },
-                  ]).map(({ mode, icon, label }) => (
-                    <button
-                      key={mode}
-                      onClick={() => setInputMode(mode)}
-                      style={{
-                        flex: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 6,
-                        padding: '10px 0',
-                        background: 'none',
-                        border: 'none',
-                        borderBottom: inputMode === mode ? '2px solid var(--accent)' : '2px solid transparent',
-                        color: inputMode === mode ? 'var(--text)' : 'var(--text-muted)',
-                        fontSize: 13,
-                        fontWeight: inputMode === mode ? 600 : 400,
-                        cursor: 'pointer',
-                        transition: 'color 0.15s, border-color 0.15s',
-                      }}
-                    >
-                      {icon} {label}
-                    </button>
-                  ))}
-                </div>
+              {/* Tab bar with dismiss */}
+              <div className="nutrition-tab-bar">
+                {([
+                  { mode: 'search' as InputMode, icon: <Search size={16} />, label: 'Search' },
+                  { mode: 'photo' as InputMode, icon: <Camera size={16} />, label: 'Photo' },
+                  { mode: 'barcode' as InputMode, icon: <ScanBarcode size={16} />, label: 'Barcode' },
+                ]).map(({ mode, icon, label }) => (
+                  <button
+                    key={mode}
+                    className={`nutrition-tab ${inputMode === mode ? 'active' : ''}`}
+                    onClick={() => setInputMode(mode)}
+                  >
+                    {icon} {label}
+                  </button>
+                ))}
+                <button className="nutrition-tab-dismiss" onClick={closePanel} aria-label="Close">
+                  <X size={18} />
+                </button>
+              </div>
 
-                {/* Meal type selector */}
-                <MealTypeSelector selected={selectedMealType} onChange={setSelectedMealType} />
+              <div className="engine-section" style={{ padding: 16 }}>
 
-                {/* Tab content */}
+                {/* Tab content — search input is first thing the user sees */}
                 {inputMode === 'search' && (
                   <FoodSearchPanel
                     favorites={favorites}
@@ -295,6 +274,23 @@ export default function NutritionDashboardPage({ session }: { session: Session }
                     onLogged={handleFoodLogged}
                   />
                 )}
+
+                {/* Meal type + quick links */}
+                <MealTypeSelector selected={selectedMealType} onChange={setSelectedMealType} />
+
+                <div className="nutrition-quick-links">
+                  {favorites.length > 0 && (
+                    <button className="nutrition-quick-link" onClick={() => setShowFavoritesSheet(true)}>
+                      <Star size={12} /> Favorites
+                    </button>
+                  )}
+                  <button
+                    className="nutrition-quick-link"
+                    onClick={() => { if (!favoritesLoaded) loadFavorites(); setShowTemplatesSheet(true); }}
+                  >
+                    <UtensilsCrossed size={12} /> My Meals
+                  </button>
+                </div>
 
               </div>
             </div>

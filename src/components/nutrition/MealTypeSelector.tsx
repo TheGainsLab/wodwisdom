@@ -5,6 +5,15 @@ export function mealLabel(type: string | null): string {
   return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+/** Returns a sensible default meal type based on time of day. */
+export function defaultMealType(): string {
+  const h = new Date().getHours();
+  if (h < 10) return 'breakfast';
+  if (h < 14) return 'lunch';
+  if (h < 17) return 'snack';
+  return 'dinner';
+}
+
 export { MEAL_TYPES };
 
 export default function MealTypeSelector({
@@ -15,13 +24,12 @@ export default function MealTypeSelector({
   onChange: (type: string) => void;
 }) {
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+    <div className="nutrition-meal-chips">
       {MEAL_TYPES.map(mt => (
         <button
           key={mt}
-          className={`engine-btn engine-btn-sm ${selected === mt ? 'engine-btn-primary' : ''}`}
+          className={`nutrition-meal-chip ${selected === mt ? 'active' : ''}`}
           onClick={() => onChange(mt)}
-          style={{ fontSize: 12 }}
         >
           {mealLabel(mt)}
         </button>
