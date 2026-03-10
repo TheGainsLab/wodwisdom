@@ -378,7 +378,6 @@ CREATE TABLE default_ingredients (
   id serial PRIMARY KEY,
   name text NOT NULL,
   emoji text,
-  search_term text NOT NULL,
   category text NOT NULL,
   sort_order int DEFAULT 0,
   is_active boolean DEFAULT true,
