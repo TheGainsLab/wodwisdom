@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import NutritionPaywall from '../components/nutrition/NutritionPaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, ChevronRight, Plus, Search, X, Camera, ScanBarcode, UtensilsCrossed, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Star } from 'lucide-react';
 import DailySummary from '../components/nutrition/DailySummary';
 import type { DailyNutrition } from '../components/nutrition/DailySummary';
 import FoodEntryList from '../components/nutrition/FoodEntryList';
@@ -36,7 +36,7 @@ function displayDate(date: Date): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-type InputMode = 'search' | 'photo' | 'barcode';
+type InputMode = 'search' | 'photo' | 'barcode' | 'mymeals';
 
 // ── Component ──
 
@@ -229,16 +229,20 @@ export default function NutritionDashboardPage({ session }: { session: Session }
               {/* Tab bar with dismiss */}
               <div className="nutrition-tab-bar">
                 {([
-                  { mode: 'search' as InputMode, icon: <Search size={16} />, label: 'Search' },
-                  { mode: 'photo' as InputMode, icon: <Camera size={16} />, label: 'Photo' },
-                  { mode: 'barcode' as InputMode, icon: <ScanBarcode size={16} />, label: 'Barcode' },
-                ]).map(({ mode, icon, label }) => (
+                  { mode: 'search' as InputMode, label: 'Search' },
+                  { mode: 'photo' as InputMode, label: 'Photo' },
+                  { mode: 'barcode' as InputMode, label: 'Barcode' },
+                  { mode: 'mymeals' as InputMode, label: 'My Meals' },
+                ]).map(({ mode, label }) => (
                   <button
                     key={mode}
                     className={`nutrition-tab ${inputMode === mode ? 'active' : ''}`}
-                    onClick={() => setInputMode(mode)}
+                    onClick={() => {
+                      setInputMode(mode);
+                      if (mode === 'mymeals') { if (!favoritesLoaded) loadFavorites(); setShowTemplatesSheet(true); }
+                    }}
                   >
-                    {icon} {label}
+                    {label}
                   </button>
                 ))}
                 <button className="nutrition-tab-dismiss" onClick={closePanel} aria-label="Close">
@@ -278,19 +282,13 @@ export default function NutritionDashboardPage({ session }: { session: Session }
                 {/* Meal type + quick links */}
                 <MealTypeSelector selected={selectedMealType} onChange={setSelectedMealType} />
 
-                <div className="nutrition-quick-links">
-                  {favorites.length > 0 && (
+                {favorites.length > 0 && (
+                  <div className="nutrition-quick-links">
                     <button className="nutrition-quick-link" onClick={() => setShowFavoritesSheet(true)}>
                       <Star size={12} /> Favorites
                     </button>
-                  )}
-                  <button
-                    className="nutrition-quick-link"
-                    onClick={() => { if (!favoritesLoaded) loadFavorites(); setShowTemplatesSheet(true); }}
-                  >
-                    <UtensilsCrossed size={12} /> My Meals
-                  </button>
-                </div>
+                  </div>
+                )}
 
               </div>
             </div>
