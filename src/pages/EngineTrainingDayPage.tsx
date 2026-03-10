@@ -15,6 +15,7 @@ import {
   getWorkoutSessionByDay,
   getSessionsByDayType,
   getPerformanceMetrics,
+  findPrecedingRocketRacesA,
   type EngineWorkout,
   type EngineWorkoutSession,
   type EngineTimeTrial,
@@ -344,6 +345,8 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const [breakdownExpanded, setBreakdownExpanded] = useState(false);
   const [currentDay, setCurrentDay] = useState(1);
   const [programVersion, setProgramVersion] = useState('main_5day');
+  const [rocketADay, setRocketADay] = useState<number | null>(null);
+  const [rocketASession, setRocketASession] = useState<EngineWorkoutSession | null>(null);
   const { hasFeature } = useEntitlements(session.user.id);
   const hasAccess = hasFeature('engine');
 
@@ -382,6 +385,15 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           getSessionsByDayType(wk.day_type)
             .then(sessions => setDayTypeHistory(sessions))
             .catch(() => setDayTypeHistory([]));
+        }
+
+        // Load preceding Rocket Races A data for Rocket Races B days
+        if (wk?.day_type === 'rocket_races_b') {
+          const result = await findPrecedingRocketRacesA(dayNumber, progress?.engine_program_version ?? 'main_5day').catch(() => null);
+          if (result) {
+            setRocketADay(result.partADay);
+            setRocketASession(result.session);
+          }
         }
 
         // Try to load saved modality + unit preference
@@ -578,6 +590,11 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           // Fallback for workouts with no segments
           targetPace = baselineRpm * (workout.base_intensity_percent / 100);
         }
+      }
+
+      // Rocket Races B: override target pace with the preceding A's actual pace
+      if (workout.day_type === 'rocket_races_b' && rocketASession?.actual_pace) {
+        targetPace = rocketASession.actual_pace;
       }
 
       const perfRatio = targetPace && targetPace > 0 && rpm > 0 ? rpm / targetPace : null;
@@ -1205,13 +1222,29 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 </div>
               )}
 
-              <button
-                className="engine-btn engine-btn-primary"
-                onClick={handleStartWorkout}
-                style={{ width: '100%' }}
-              >
-                <Play size={18} /> Start Workout
-              </button>
+              {workout?.day_type === 'rocket_races_b' && !rocketASession ? (
+                <div className="engine-card" style={{ textAlign: 'center', padding: '20px', background: 'var(--bg-muted, #1a1a2e)' }}>
+                  <p style={{ marginBottom: 12, color: 'var(--text-secondary)' }}>
+                    Complete <strong>Rocket Races A (Day {rocketADay ?? '?'})</strong> first to unlock pacing for this workout.
+                  </p>
+                  {rocketADay && (
+                    <button
+                      className="engine-btn engine-btn-secondary"
+                      onClick={() => navigate(`/engine/day/${rocketADay}`)}
+                    >
+                      Go to Rocket Races A
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button
+                  className="engine-btn engine-btn-primary"
+                  onClick={handleStartWorkout}
+                  style={{ width: '100%' }}
+                >
+                  <Play size={18} /> Start Workout
+                </button>
+              )}
             </div>
           </div>
         </div>
