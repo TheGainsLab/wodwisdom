@@ -90,7 +90,7 @@ export default function NutritionDashboardPage({ session }: { session: Session }
         .order('logged_at', { ascending: true }),
       supabase
         .from('daily_nutrition')
-        .select('total_calories, total_protein, total_carbohydrate, total_fat')
+        .select('total_calories, total_protein, total_carbohydrate, total_fat, tdee_estimate, surplus_deficit')
         .eq('user_id', session.user.id)
         .eq('date', dateStr)
         .single(),

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { classifyAthlete } from '../utils/classify-athlete';
+import { calculateTDEE } from '../utils/tdee';
 import Nav from '../components/Nav';
 
 const LIFT_GROUPS = [
@@ -263,6 +264,8 @@ export default function AthletePage({ session }: { session: Session }) {
   const [analysisResult, setAnalysisResult] = useState<{ type: 'lifts' | 'skills' | 'engine' | 'full'; text: string; evaluationId?: string | null } | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState<'lifts' | 'skills' | 'engine' | 'full' | null>(null);
   const [generateLoading, setGenerateLoading] = useState(false);
+  const [tdeeOverride, setTdeeOverride] = useState<string>('');
+  const [editingTdee, setEditingTdee] = useState(false);
 
   const navigate = useNavigate();
 
@@ -284,7 +287,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, bodyweight, units, age, height, gender')
+        .select('lifts, skills, conditioning, bodyweight, units, age, height, gender, tdee_override')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -303,6 +306,7 @@ export default function AthletePage({ session }: { session: Session }) {
         setBodyweight(profileRes.data.bodyweight != null ? String(profileRes.data.bodyweight) : '');
         setUnits((profileRes.data.units as 'lbs' | 'kg') || 'lbs');
         setGender((profileRes.data.gender as 'male' | 'female') || '');
+        setTdeeOverride(profileRes.data.tdee_override != null ? String(profileRes.data.tdee_override) : '');
       }
       if (evalRes.data) {
         setEvaluations(evalRes.data);
@@ -427,6 +431,8 @@ export default function AthletePage({ session }: { session: Session }) {
       }
     }
 
+    const tdeeOverrideNum = tdeeOverride === '' ? null : parseFloat(tdeeOverride);
+
     const levels = classifyAthlete({
       bodyweight: bw && !isNaN(bw) ? bw : null,
       gender: genderVal,
@@ -447,6 +453,7 @@ export default function AthletePage({ session }: { session: Session }) {
           age: ageNum && !isNaN(ageNum) ? ageNum : null,
           height: heightNum && !isNaN(heightNum) ? heightNum : null,
           gender: genderVal,
+          tdee_override: tdeeOverrideNum && !isNaN(tdeeOverrideNum) ? tdeeOverrideNum : null,
           ...levels,
           updated_at: new Date().toISOString(),
         },
@@ -567,6 +574,63 @@ export default function AthletePage({ session }: { session: Session }) {
                       </button>
                     </div>
                   </div>
+
+                  {/* TDEE estimate */}
+                  {(() => {
+                    const bw = bodyweight ? parseFloat(bodyweight) : null;
+                    const ageNum = age ? parseInt(age, 10) : null;
+                    const heightNum = height ? parseFloat(height) : null;
+                    const calc = calculateTDEE({ bodyweight: bw, height: heightNum, age: ageNum, gender: gender || null, units });
+                    const effectiveTdee = tdeeOverride ? parseInt(tdeeOverride, 10) : calc?.tdee;
+                    const isOverridden = tdeeOverride !== '';
+
+                    return (
+                      <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: editingTdee ? 10 : 0 }}>
+                          <div>
+                            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 2 }}>
+                              Estimated TDEE{isOverridden ? ' (custom)' : ''}
+                            </div>
+                            <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: effectiveTdee ? 'var(--text)' : 'var(--text-muted)' }}>
+                              {effectiveTdee ? `${effectiveTdee.toLocaleString()} cal/day` : 'Enter profile data above'}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="skill-level-btn"
+                            style={{ fontSize: 12 }}
+                            onClick={() => setEditingTdee(e => !e)}
+                          >
+                            {editingTdee ? 'Done' : 'Override'}
+                          </button>
+                        </div>
+                        {editingTdee && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <input
+                              className="lift-input"
+                              type="number"
+                              min="0"
+                              step="50"
+                              placeholder={calc?.tdee ? String(calc.tdee) : 'e.g. 2500'}
+                              value={tdeeOverride}
+                              onChange={e => setTdeeOverride(e.target.value)}
+                              style={{ flex: 1 }}
+                            />
+                            {isOverridden && (
+                              <button
+                                type="button"
+                                className="skill-level-btn"
+                                style={{ fontSize: 11, color: 'var(--accent)' }}
+                                onClick={() => setTdeeOverride('')}
+                              >
+                                Reset
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* 1RM Lifts */}
