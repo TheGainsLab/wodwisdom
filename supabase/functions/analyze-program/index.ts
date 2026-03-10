@@ -1,17 +1,21 @@
 /**
  * analyze-program edge function
- * Orchestrates: AI extraction → deterministic counting → AI notices → upsert
+ * Orchestrates: block-level extraction → deterministic counting → AI notices → upsert
+ *
+ * Uses program_workout_blocks (strength/metcon/skills) instead of workout_text.
+ * Blocks with pre-parsed parsed_tasks skip AI extraction entirely.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractMovementsAI } from "../_shared/extract-movements-ai.ts";
-import { analyzeWorkouts } from "../_shared/analyzer.ts";
+import { analyzeWorkouts, type ExtractedMovementForAnalysis } from "../_shared/analyzer.ts";
 import { generateNoticesAI } from "../_shared/generate-notices-ai.ts";
 import {
   buildMovementsContext,
   buildLibraryEntries,
   type MovementsRow,
 } from "../_shared/build-movements-context.ts";
+import type { LibraryEntry } from "../_shared/extract-movements-ai.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -22,6 +26,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
+
+/** Block types relevant for analysis (excludes warm-up, cool-down, other) */
+const ANALYSIS_BLOCK_TYPES = ["strength", "metcon", "skills"];
+
+interface BlockRow {
+  id: string;
+  program_workout_id: string;
+  block_type: string;
+  block_order: number;
+  block_text: string;
+  parsed_tasks: unknown[] | null;
+}
 
 /**
  * Resolve the acting user ID.
@@ -40,6 +56,84 @@ async function resolveUserId(
   const { data: { user }, error: authErr } = await supa.auth.getUser(token);
   if (authErr || !user) return { error: "Invalid token" };
   return { userId: user.id };
+}
+
+/**
+ * Convert parsed_tasks from a metcon block into ExtractedMovementForAnalysis[].
+ * Metcon parsed_tasks have: { movement, category, weight, weight_unit }
+ */
+function convertMetconTasks(
+  tasks: Record<string, unknown>[],
+  libraryEntries: LibraryEntry[]
+): ExtractedMovementForAnalysis[] {
+  const results: ExtractedMovementForAnalysis[] = [];
+  for (const task of tasks) {
+    const movementName = task.movement as string;
+    if (!movementName) continue;
+
+    const match = resolveToLibrary(movementName, libraryEntries);
+    const canonical = match?.canonical_name ?? toSnakeCase(movementName);
+    const modality = match?.modality ?? categoryToModality(task.category as string);
+
+    let load = "BW";
+    if (task.weight != null && typeof task.weight === "number" && task.weight > 0) {
+      load = String(task.weight);
+    }
+
+    results.push({ canonical, modality, load });
+  }
+  return results;
+}
+
+/**
+ * Convert parsed_tasks from a skills block into ExtractedMovementForAnalysis[].
+ * Skills parsed_tasks have: { movement, sets, reps, hold_seconds, notes }
+ */
+function convertSkillsTasks(
+  tasks: Record<string, unknown>[],
+  libraryEntries: LibraryEntry[]
+): ExtractedMovementForAnalysis[] {
+  const results: ExtractedMovementForAnalysis[] = [];
+  for (const task of tasks) {
+    const movementName = task.movement as string;
+    if (!movementName) continue;
+
+    const match = resolveToLibrary(movementName, libraryEntries);
+    const canonical = match?.canonical_name ?? toSnakeCase(movementName);
+    const modality = match?.modality ?? "G";
+
+    results.push({ canonical, modality, load: "BW" });
+  }
+  return results;
+}
+
+/** Map a display movement name to a library entry via display_name, canonical_name, or aliases. */
+function resolveToLibrary(
+  movementName: string,
+  libraryEntries: LibraryEntry[]
+): LibraryEntry | undefined {
+  const lower = movementName.toLowerCase().trim();
+  const snake = toSnakeCase(movementName);
+
+  for (const entry of libraryEntries) {
+    if (entry.canonical_name === snake) return entry;
+    if (entry.display_name.toLowerCase() === lower) return entry;
+    if (entry.aliases.some((a) => a.toLowerCase() === lower)) return entry;
+  }
+  return undefined;
+}
+
+function toSnakeCase(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+function categoryToModality(category: string | undefined): string {
+  if (category === "weighted") return "W";
+  if (category === "monostructural") return "M";
+  return "G";
 }
 
 Deno.serve(async (req) => {
@@ -91,9 +185,10 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Fetch workouts with their blocks (filtered to analysis-relevant types)
     const { data: workouts, error: wErr } = await supa
       .from("program_workouts")
-      .select("id, week_num, day_num, workout_text, sort_order")
+      .select("id, week_num, day_num, sort_order, program_workout_blocks(id, program_workout_id, block_type, block_order, block_text, parsed_tasks)")
       .eq("program_id", program_id)
       .order("sort_order");
 
@@ -112,26 +207,116 @@ Deno.serve(async (req) => {
     const movementsContext = rows.length > 0 ? buildMovementsContext(rows) : undefined;
     const libraryEntries = rows.length > 0 ? buildLibraryEntries(rows) : [];
 
+    // For each workout, separate blocks into pre-parsed and needs-AI
+    // Also build workout_text from relevant block texts for format/time-domain detection
+    const workoutsForAnalyzer: { week_num?: number; day_num?: number; workout_text: string; sort_order?: number; id?: string }[] = [];
+    const preParsedByWorkout: (ExtractedMovementForAnalysis[] | null)[] = [];
+
+    for (const w of workouts) {
+      const allBlocks: BlockRow[] = (
+        (w.program_workout_blocks as BlockRow[] | null) ?? []
+      ).sort((a, b) => a.block_order - b.block_order);
+
+      const relevantBlocks = allBlocks.filter((b) =>
+        ANALYSIS_BLOCK_TYPES.includes(b.block_type)
+      );
+
+      // Build workout_text from relevant block texts (for detectWorkoutFormat / inferTimeDomain)
+      const workoutText = relevantBlocks.map((b) => b.block_text).join("\n");
+
+      workoutsForAnalyzer.push({
+        id: w.id,
+        week_num: w.week_num,
+        day_num: w.day_num,
+        sort_order: w.sort_order,
+        workout_text: workoutText,
+      });
+
+      // Check if ALL relevant blocks have parsed_tasks
+      const parsedBlocks = relevantBlocks.filter(
+        (b) => Array.isArray(b.parsed_tasks) && b.parsed_tasks.length > 0
+      );
+      const unparsedBlocks = relevantBlocks.filter(
+        (b) => !Array.isArray(b.parsed_tasks) || b.parsed_tasks.length === 0
+      );
+
+      if (unparsedBlocks.length === 0 && parsedBlocks.length > 0) {
+        // All blocks pre-parsed — convert directly
+        const movements: ExtractedMovementForAnalysis[] = [];
+        for (const block of parsedBlocks) {
+          const tasks = block.parsed_tasks as Record<string, unknown>[];
+          if (block.block_type === "metcon") {
+            movements.push(...convertMetconTasks(tasks, libraryEntries));
+          } else if (block.block_type === "skills") {
+            movements.push(...convertSkillsTasks(tasks, libraryEntries));
+          } else if (block.block_type === "strength") {
+            // Strength blocks with parsed_tasks use same shape as skills
+            movements.push(...convertSkillsTasks(tasks, libraryEntries));
+          }
+        }
+        preParsedByWorkout.push(movements);
+      } else {
+        // Some blocks need AI — mark this workout for AI extraction
+        preParsedByWorkout.push(null);
+      }
+    }
+
     let analysis;
     let extractionNotices: string[] = [];
 
-    if (libraryEntries.length > 0 && ANTHROPIC_API_KEY) {
+    // Identify workouts that need AI extraction
+    const needsAiIndices = preParsedByWorkout
+      .map((v, i) => (v === null ? i : -1))
+      .filter((i) => i >= 0);
+
+    if (libraryEntries.length > 0 && ANTHROPIC_API_KEY && needsAiIndices.length > 0) {
+      // Send only unparsed workouts to AI
+      const workoutsForAI = needsAiIndices.map((i) => ({
+        id: workoutsForAnalyzer[i].id!,
+        workout_text: workoutsForAnalyzer[i].workout_text,
+      }));
+
       const extractionResult = await extractMovementsAI(
-        workouts.map((w) => ({ id: w.id, workout_text: w.workout_text })),
+        workoutsForAI,
         libraryEntries,
         ANTHROPIC_API_KEY
       );
 
       if (extractionResult) {
         extractionNotices = extractionResult.notices;
-        analysis = analyzeWorkouts(workouts, movementsContext, extractionResult.movements);
+        // Merge AI results into the pre-parsed array
+        for (let ai = 0; ai < needsAiIndices.length; ai++) {
+          preParsedByWorkout[needsAiIndices[ai]] = extractionResult.movements[ai] ?? [];
+        }
       } else {
-        console.warn("AI extraction failed, falling back to regex");
-        extractionNotices = ["Movement extraction used fallback method. Some movements may be missed."];
-        analysis = analyzeWorkouts(workouts, movementsContext);
+        console.warn("AI extraction failed for unparsed workouts, falling back to regex");
+        extractionNotices = ["Movement extraction used fallback method for some workouts."];
+        // Leave nulls — analyzer will use regex fallback
       }
+    }
+
+    // Build final extractedByWorkout array (nulls become undefined → analyzer uses regex)
+    const extractedByWorkout: ExtractedMovementForAnalysis[][] | undefined =
+      preParsedByWorkout.every((v) => v !== null)
+        ? (preParsedByWorkout as ExtractedMovementForAnalysis[][])
+        : undefined;
+
+    if (extractedByWorkout) {
+      analysis = analyzeWorkouts(workoutsForAnalyzer, movementsContext, extractedByWorkout);
     } else {
-      analysis = analyzeWorkouts(workouts, movementsContext);
+      // Partial: some workouts have extractions, some don't.
+      // Build a mixed array where null slots get regex fallback from analyzer.
+      // We pass the full array and let analyzer's getMoves handle the fallback per-index.
+      const mixed: ExtractedMovementForAnalysis[][] = preParsedByWorkout.map(
+        (v) => v ?? []
+      );
+      // Only pass mixed if we have at least some pre-parsed data
+      const hasAnyData = mixed.some((m) => m.length > 0);
+      analysis = analyzeWorkouts(
+        workoutsForAnalyzer,
+        movementsContext,
+        hasAnyData ? mixed : undefined
+      );
     }
 
     if (ANTHROPIC_API_KEY) {
