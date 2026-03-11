@@ -223,7 +223,7 @@ async function processJob(
     const analysisParts: string[] = [];
     if (evalRow.lifting_analysis) analysisParts.push("STRENGTH ANALYSIS:\n" + evalRow.lifting_analysis);
     if (evalRow.skills_analysis) analysisParts.push("SKILLS ANALYSIS:\n" + evalRow.skills_analysis);
-    if (evalRow.engine_analysis) analysisParts.push("ENGINE ANALYSIS:\n" + evalRow.engine_analysis);
+    // Engine analysis intentionally excluded — it causes the LLM to stuff row/run into every metcon
     const analysisStr = analysisParts.length > 0 ? analysisParts.join("\n\n") : "No detailed analysis.";
     console.log(`[${jobId}] Analysis sections: lifting=${!!evalRow.lifting_analysis}, skills=${!!evalRow.skills_analysis}, engine=${!!evalRow.engine_analysis}, total=${analysisStr.length} chars`);
     // Fetch gymnastics movements for priority scoring
