@@ -11,7 +11,7 @@ import {
   formatChunksAsContext,
 } from "../_shared/rag.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
-import { rankSkillPriorities, SKILL_DISPLAY_NAMES } from "../_shared/skill-priorities.ts";
+import { parseSkillHierarchy, SKILL_DISPLAY_NAMES } from "../_shared/skill-priorities.ts";
 import { buildSkillSchedule } from "../_shared/build-skill-schedule.ts";
 import { extractBlocksFromWorkoutText } from "../_shared/parse-workout-blocks.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -226,15 +226,10 @@ async function processJob(
     // Engine analysis intentionally excluded — it causes the LLM to stuff row/run into every metcon
     const analysisStr = analysisParts.length > 0 ? analysisParts.join("\n\n") : "No detailed analysis.";
     console.log(`[${jobId}] Analysis sections: lifting=${!!evalRow.lifting_analysis}, skills=${!!evalRow.skills_analysis}, engine=${!!evalRow.engine_analysis}, total=${analysisStr.length} chars`);
-    // Fetch gymnastics movements for priority scoring
-    const { data: movementRows } = await supa
-      .from("movements")
-      .select("canonical_name, display_name, modality, category, aliases, competition_count")
-      .eq("modality", "G");
-    // Build deterministic skill schedule
-    const priorities = rankSkillPriorities(profile.skills || {}, movementRows || []);
+    // Parse skill priorities from AI hierarchy in the skills analysis
+    const priorities = parseSkillHierarchy(evalRow.skills_analysis, profile.skills || {});
     const schedule = buildSkillSchedule(priorities);
-    console.log(`[${jobId}] Skill schedule: ${schedule.length} slots, priorities=${priorities.length}, movements_fetched=${(movementRows || []).length}`);
+    console.log(`[${jobId}] Skill schedule: ${schedule.length} slots, priorities=${priorities.length} (from AI hierarchy)`);
     const recentTraining = await fetchAndFormatRecentHistory(supa, userId, { maxLines: 25 });
     const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
     console.log(`[${jobId}] Training history: ${recentTraining ? recentTraining.length + ' chars' : 'none'}`);
@@ -275,9 +270,17 @@ async function processJob(
       : "";
     const userPrompt = `ATHLETE PROFILE:
 ${profileStr}
-ANALYSIS TO ADDRESS:
+
 ${analysisStr}
 ${trainingBlock}${metconEligibility}
+STRENGTH SLOT RULES:
+The STRENGTH HIERARCHY above (if present) dictates how to fill the 5 weekly Strength: slots.
+- HIGH priority movements get 2+ slots per week. These are the athlete's limiters — give them the most volume.
+- MODERATE priority movements get 1 slot per week.
+- LOW priority movements get 0-1 slots per week. Do NOT waste training time on movements the athlete is already strong at.
+- Follow the hierarchy ordering strictly. If the hierarchy says deadlift is LOW, do not program heavy deadlifts twice a week.
+- Vary the specific exercises within a movement pattern across weeks (e.g. for "olympic lifts": clean & jerk one day, snatch complex another, clean pulls another).
+
 Complete the following program template. Fill in every block with one line of programming. Do not add or remove any headers.
 ${skeleton}`;
     const systemPrompt = GENERATE_PROMPT + METCON_GUIDANCE + guidelinesBlock + ragContext;
