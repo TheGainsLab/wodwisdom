@@ -265,7 +265,8 @@ MOVEMENT PATTERN DISTRIBUTION (per week):
 - Squat (back squat, front squat, overhead squat): 1-2 slots per week. Rotate variants across weeks — do not repeat the same squat variant in the same week.
 - Press (strict press, push press, bench press, push jerk): 1 slot per week minimum. Every athlete needs pressing volume.
 - Hinge/Pull (deadlift, RDL, clean pull, snatch pull): 1 slot per week minimum. Posterior chain work is non-negotiable.
-- If the athlete provided a lift, it MUST appear at least once across the 4-week program.
+- If the athlete provided a lift, try to include it at least once across the 4-week program — but not at the expense of cluttering weeks. LOW priority lifts can be omitted if slots are tight.
+- A movement flagged as a mobility limiter in the STRENGTH ANALYSIS (e.g. overhead squat limited by ankle/thoracic mobility) is accessory or warm-up work — it does NOT fulfill a movement-pattern slot. Program it as light technique work alongside the day's main lift, not as the Strength block's primary movement.
 
 PRIORITY RULES (within the pattern constraints above):
 - HIGH priority movements get 2+ slots per week. These are the athlete's limiters — give them the most volume.
