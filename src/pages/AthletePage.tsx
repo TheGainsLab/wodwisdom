@@ -722,33 +722,6 @@ export default function AthletePage({ session }: { session: Session }) {
                       type="button"
                       className="auth-btn"
                       style={{ background: 'var(--surface2)', color: 'var(--text)' }}
-                      onClick={() => fetchProfileAnalysis('lifts')}
-                      disabled={!!analysisLoading}
-                    >
-                      {analysisLoading === 'lifts' ? 'Analyzing...' : 'AI Lifting Analysis'}
-                    </button>
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ background: 'var(--surface2)', color: 'var(--text)' }}
-                      onClick={() => fetchProfileAnalysis('skills')}
-                      disabled={!!analysisLoading}
-                    >
-                      {analysisLoading === 'skills' ? 'Analyzing...' : 'AI Skills Analysis'}
-                    </button>
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ background: 'var(--surface2)', color: 'var(--text)' }}
-                      onClick={() => fetchProfileAnalysis('engine')}
-                      disabled={!!analysisLoading}
-                    >
-                      {analysisLoading === 'engine' ? 'Analyzing...' : 'AI Engine Analysis'}
-                    </button>
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ background: 'var(--surface2)', color: 'var(--text)' }}
                       onClick={() => fetchProfileAnalysis('full')}
                       disabled={!!analysisLoading}
                     >
