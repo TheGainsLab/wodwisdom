@@ -1,12 +1,13 @@
 /**
- * Skill priority parsing from AI-generated hierarchy.
+ * Skill priority parsing from AI-generated profile analysis.
  *
- * The analysis step produces a SKILLS HIERARCHY with ranked priorities.
- * This module parses that hierarchy into a SkillPriority[] array
+ * The analysis step produces a SKILLS PROFILE with three tiers:
+ * Strong, Intermediate, and Needs Attention.
+ * This module parses that profile into a SkillPriority[] array
  * consumed by build-skill-schedule.ts.
  *
- * The deterministic scoring formula has been removed — the AI analysis
- * now makes the coaching decision about which skills matter most.
+ * Also supports the legacy SKILLS HIERARCHY format for backward
+ * compatibility with existing stored evaluations.
  */
 
 // ── Display names for prompt injection ─────────────────────────
@@ -92,14 +93,17 @@ export interface SkillPriority {
 }
 
 /**
- * Parse a SKILLS HIERARCHY block from the AI analysis into SkillPriority[].
+ * Parse a SKILLS PROFILE block from the AI analysis into SkillPriority[].
  *
- * Expected format:
+ * Expected format (new bucket format):
+ *   SKILLS PROFILE:
+ *   Strong: Double-Unders — advanced | Kipping Pull-Ups — advanced
+ *   Intermediate: Toes-to-Bar — improving | Ring Dips — adequate
+ *   Needs Attention: Ring Muscle-Ups — beginner, limiter | Handstand Walk — beginner
+ *
+ * Also supports legacy numbered format:
  *   SKILLS HIERARCHY:
- *   1. Legless Rope Climbs — HIGH — reason text
- *   2. L-Sit — HIGH — reason text
- *   3. HSPU — MODERATE — reason text
- *   ...
+ *   1. Skill Name — HIGH — reason
  *
  * Falls back to a simple level-based ordering if parsing fails.
  */
@@ -109,18 +113,96 @@ export function parseSkillHierarchy(
 ): SkillPriority[] {
   if (!skills || Object.keys(skills).length === 0) return [];
 
-  const parsed = tryParseHierarchy(analysisText, skills);
-  if (parsed.length > 0) return parsed;
+  // Try new bucket format first
+  const bucketParsed = tryParseBucketProfile(analysisText, skills);
+  if (bucketParsed.length > 0) return bucketParsed;
+
+  // Try legacy numbered hierarchy format
+  const legacyParsed = tryParseLegacyHierarchy(analysisText, skills);
+  if (legacyParsed.length > 0) return legacyParsed;
 
   // Fallback: simple level-based ordering (beginner > intermediate)
-  console.warn("[skill-priorities] Failed to parse SKILLS HIERARCHY, using level-based fallback");
+  console.warn("[skill-priorities] Failed to parse skills profile, using level-based fallback");
   return fallbackFromLevels(skills);
 }
 
 // Keep the old function name as an alias for backward compatibility
 export const rankSkillPriorities = parseSkillHierarchy;
 
-function tryParseHierarchy(
+/**
+ * Parse the new bucket format:
+ *   SKILLS PROFILE:
+ *   Strong: Skill — reason | Skill — reason
+ *   Intermediate: Skill — reason | Skill — reason
+ *   Needs Attention: Skill — reason | Skill — reason
+ */
+function tryParseBucketProfile(
+  analysisText: string | null,
+  skills: Record<string, string>,
+): SkillPriority[] {
+  if (!analysisText) return [];
+
+  // Match either SKILLS PROFILE or STRENGTH PROFILE
+  const profileMatch = analysisText.match(/SKILLS PROFILE:\s*\n([\s\S]*?)(?:\n\n|$)/i);
+  if (!profileMatch) return [];
+
+  const block = profileMatch[1];
+  const entries: SkillPriority[] = [];
+  const seen = new Set<string>();
+  let position = 0;
+
+  // Parse each tier line
+  const tierPattern = /^(Strong|Intermediate|Needs Attention):\s*(.+)$/gim;
+  let tierMatch;
+  while ((tierMatch = tierPattern.exec(block)) !== null) {
+    const tier = tierMatch[1].toLowerCase();
+    const itemsStr = tierMatch[2];
+
+    // Determine maxPerWeek based on tier
+    // Needs Attention = highest programming priority (like old HIGH)
+    // Intermediate = moderate priority
+    // Strong = lowest priority
+    const maxPerWeek = tier === "needs attention" ? 2 : 1;
+
+    // Split items by pipe separator
+    const items = itemsStr.split("|");
+    for (const item of items) {
+      const trimmed = item.trim();
+      if (!trimmed) continue;
+
+      // Extract skill name (everything before the first em-dash/dash)
+      const nameMatch = trimmed.match(/^(.+?)\s*[—–-]\s*/);
+      const rawName = nameMatch ? nameMatch[1].trim() : trimmed;
+
+      const skillKey = resolveSkillKey(rawName, skills);
+      if (!skillKey || seen.has(skillKey)) continue;
+      seen.add(skillKey);
+      position++;
+
+      // Score: Needs Attention first (lowest score = highest priority)
+      const tierScore = tier === "needs attention" ? 0 : tier === "intermediate" ? 100 : 200;
+
+      entries.push({
+        skill: skillKey,
+        displayName: SKILL_DISPLAY_NAMES[skillKey] ?? skillKey.replace(/_/g, " "),
+        level: skills[skillKey] ?? "beginner",
+        score: tierScore + position,
+        maxPerWeek,
+      });
+    }
+  }
+
+  // Re-normalize scores to sequential positions
+  entries.sort((a, b) => a.score - b.score);
+  for (let i = 0; i < entries.length; i++) {
+    entries[i].score = i + 1;
+  }
+
+  return entries;
+}
+
+/** Parse legacy numbered hierarchy: "1. Skill — HIGH — reason" */
+function tryParseLegacyHierarchy(
   analysisText: string | null,
   skills: Record<string, string>,
 ): SkillPriority[] {
