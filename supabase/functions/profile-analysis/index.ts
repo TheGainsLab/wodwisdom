@@ -11,7 +11,7 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
-const SYSTEM_PROMPT = `You are an expert CrossFit coach. Give concise, practical analysis. Coach-to-coach voice. 150-200 words max. No bullet lists—use short paragraphs.`;
+const SYSTEM_PROMPT = `You are an expert CrossFit coach. Give concise, practical analysis. Coach-to-coach voice. No bullet lists in the narrative—use short paragraphs.`;
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -312,7 +312,7 @@ Deno.serve(async (req) => {
           { headers: { ...cors, "Content-Type": "application/json" } }
         );
       }
-      userPrompt = `Analyze this athlete's strength profile:\n\n${profileStr}${trainingBlock}\n\nSummarize their strength—what stands out? Identify any imbalances (e.g. squat vs deadlift, press vs bench). Give one clear priority to focus on.${comparisonContext}`;
+      userPrompt = `Analyze this athlete's strength profile:\n\n${profileStr}${trainingBlock}\n\nFirst, write a short narrative (150-200 words): summarize their strength—what stands out? Identify any imbalances (e.g. squat vs deadlift, press vs bench).\n\nThen output a STRENGTH HIERARCHY that categorizes every major movement pattern for programming. This hierarchy tells the program generator how to allocate training volume across 5 weekly strength slots. Use this exact format:\n\nSTRENGTH HIERARCHY:\n1. [Movement pattern] — [HIGH/MODERATE/LOW] — [brief reason]\n2. [Movement pattern] — [HIGH/MODERATE/LOW] — [brief reason]\n...\n\nRules for the hierarchy:\n- Include 5-7 movement patterns (e.g. olympic lifts, front squat, back squat, pressing, deadlift/posterior chain, overhead position, etc.)\n- HIGH = needs most volume, 2+ slots/week. These are the athlete's limiters.\n- MODERATE = needs development, 1 slot/week.\n- LOW = already a strength, 0-1 slots/week. Do not waste training time here.\n- For a CrossFit athlete, olympic lift proficiency matters more than raw deadlift strength.\n- Order from highest to lowest priority.${comparisonContext}`;
     } else if (analysisType === "skills") {
       if (!hasSkills) {
         return new Response(
@@ -322,7 +322,7 @@ Deno.serve(async (req) => {
           { headers: { ...cors, "Content-Type": "application/json" } }
         );
       }
-      userPrompt = `Analyze this athlete's skills:\n\n${profileStr}${trainingBlock}\n\nBased on their levels, what should they focus on next? Suggest 1–2 skills and a simple progression.${comparisonContext}`;
+      userPrompt = `Analyze this athlete's skills:\n\n${profileStr}${trainingBlock}\n\nFirst, write a short narrative (150-200 words): based on their levels, what should they focus on next? What's holding them back in competition?\n\nThen output a SKILLS HIERARCHY that ranks every non-advanced skill for programming. This hierarchy tells the program generator how to allocate skill training across 5 weekly skill slots. Use this exact format:\n\nSKILLS HIERARCHY:\n1. [Skill name] — [HIGH/MODERATE/LOW] — [brief reason]\n2. [Skill name] — [HIGH/MODERATE/LOW] — [brief reason]\n...\n\nRules for the hierarchy:\n- Include ALL skills that are not yet advanced (beginner, intermediate, or developing).\n- HIGH = biggest limiter, 2x/week. Maximum 2 skills at HIGH.\n- MODERATE = needs work, 1x/week.\n- LOW = minor gap or near-proficient, fill remaining slots only.\n- Consider prerequisite chains (e.g. strict pull-ups before kipping, kipping before butterfly).\n- Consider competition frequency — skills that appear often in competition matter more.\n- Order from highest to lowest priority.${comparisonContext}`;
     } else if (analysisType === "engine") {
       if (!hasConditioning) {
         return new Response(
@@ -360,7 +360,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 512,
+          max_tokens: 1024,
           stream: false,
           system: systemPrompt,
           messages: [{ role: "user", content: prompt }],
@@ -402,12 +402,12 @@ Deno.serve(async (req) => {
 
       fullPromises.push(
         hasLifts
-          ? callClaude(`Analyze this athlete's strength profile:\n\n${profileStr}${trainingBlock}\n\nSummarize their strength—what stands out? Identify any imbalances (e.g. squat vs deadlift, press vs bench). Give one clear priority to focus on.${liftComparison}`)
+          ? callClaude(`Analyze this athlete's strength profile:\n\n${profileStr}${trainingBlock}\n\nFirst, write a short narrative (150-200 words): summarize their strength—what stands out? Identify any imbalances (e.g. squat vs deadlift, press vs bench).\n\nThen output a STRENGTH HIERARCHY that categorizes every major movement pattern for programming. This hierarchy tells the program generator how to allocate training volume across 5 weekly strength slots. Use this exact format:\n\nSTRENGTH HIERARCHY:\n1. [Movement pattern] — [HIGH/MODERATE/LOW] — [brief reason]\n2. [Movement pattern] — [HIGH/MODERATE/LOW] — [brief reason]\n...\n\nRules for the hierarchy:\n- Include 5-7 movement patterns (e.g. olympic lifts, front squat, back squat, pressing, deadlift/posterior chain, overhead position, etc.)\n- HIGH = needs most volume, 2+ slots/week. These are the athlete's limiters.\n- MODERATE = needs development, 1 slot/week.\n- LOW = already a strength, 0-1 slots/week. Do not waste training time here.\n- For a CrossFit athlete, olympic lift proficiency matters more than raw deadlift strength.\n- Order from highest to lowest priority.${liftComparison}`)
           : Promise.resolve(null)
       );
       fullPromises.push(
         hasSkills
-          ? callClaude(`Analyze this athlete's skills:\n\n${profileStr}${trainingBlock}\n\nBased on their levels, what should they focus on next? Suggest 1–2 skills and a simple progression.${skillComparison}`)
+          ? callClaude(`Analyze this athlete's skills:\n\n${profileStr}${trainingBlock}\n\nFirst, write a short narrative (150-200 words): based on their levels, what should they focus on next? What's holding them back in competition?\n\nThen output a SKILLS HIERARCHY that ranks every non-advanced skill for programming. This hierarchy tells the program generator how to allocate skill training across 5 weekly skill slots. Use this exact format:\n\nSKILLS HIERARCHY:\n1. [Skill name] — [HIGH/MODERATE/LOW] — [brief reason]\n2. [Skill name] — [HIGH/MODERATE/LOW] — [brief reason]\n...\n\nRules for the hierarchy:\n- Include ALL skills that are not yet advanced (beginner, intermediate, or developing).\n- HIGH = biggest limiter, 2x/week. Maximum 2 skills at HIGH.\n- MODERATE = needs work, 1x/week.\n- LOW = minor gap or near-proficient, fill remaining slots only.\n- Consider prerequisite chains (e.g. strict pull-ups before kipping, kipping before butterfly).\n- Consider competition frequency — skills that appear often in competition matter more.\n- Order from highest to lowest priority.${skillComparison}`)
           : Promise.resolve(null)
       );
       fullPromises.push(
