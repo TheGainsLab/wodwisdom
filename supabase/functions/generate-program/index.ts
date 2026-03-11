@@ -93,7 +93,8 @@ Use the REFERENCE material and COACHING GUIDELINES below to guide all programmin
 OUTPUT RULES:
 - Complete every block in the template provided. One line per block.
 - Do not add, remove, or reorder any headers.
-- Prescribe weights using the athlete's 1RMs where applicable. Use / for M/F Rx (e.g. 95/65).`;
+- Prescribe weights using the athlete's 1RMs where applicable. Use / for M/F Rx (e.g. 95/65).
+- Each Metcon line has a tag "(mono OK)" or "(NO mono)". Obey the tag strictly — if it says NO mono, do not include row, run, bike, or ski erg in that metcon.`;
 
 const METCON_GUIDANCE = `
 
@@ -101,7 +102,7 @@ METCON DESIGN RULES (apply to every Metcon: block):
 
 1. BREADTH OVER WEAKNESS — Metcons draw from movements the athlete is PROFICIENT at (intermediate or advanced). Weaknesses and developing skills belong in the Skills block, not the Metcon. If the athlete is advanced at ring muscle-ups, use them in metcons. If the athlete is beginner at HSPU, never put HSPU in a metcon — that stays in the skill block. See the METCON MOVEMENT ELIGIBILITY section for the explicit lists.
 
-2. MONOSTRUCTURAL CAP — Across the 5 metcons in any single week, at most 2 may include a monostructural cardio element (row, bike, ski erg, run — any of these count). This is a hard cap. Weeks 1-4 each independently enforce this limit.
+2. MONOSTRUCTURAL CAP — Each Metcon line in the template is tagged either "(mono OK)" or "(NO mono)". You MUST obey these tags exactly. If the tag says "(NO mono)", the metcon must NOT contain any rowing, running, biking, or ski erg. Only the days tagged "(mono OK)" may include a monostructural element. This means at most 2 of 5 metcons per week will contain any cardio machine or run.
 
 3. LOADING PREFERENCES — When a metcon calls for a weighted movement, prefer barbells and dumbbells over kettlebells. Kettlebells are acceptable when the movement is inherently KB-based (e.g., Turkish get-ups, KB swings) but do not substitute KBs for movements that can use a barbell or dumbbell.
 
@@ -111,10 +112,17 @@ METCON DESIGN RULES (apply to every Metcon: block):
    - Long: 15+ minutes
    Each week must include at least 1 short, 1 medium, and 1 long metcon. No single category may appear more than 3 times in one week. Design the rep schemes, round counts, and movement complexity to fit the target time domain.
 
-5. COMPLEMENT THE STRENGTH BLOCK — If a day's Strength block is squat-dominant, the Metcon must NOT be squat-dominant. If Strength is pressing, the Metcon should not be press-heavy. The metcon should use complementary movement patterns to avoid overloading the same muscle groups.`;
+5. COMPLEMENT THE STRENGTH BLOCK — If a day's Strength block is squat-dominant, the Metcon must NOT be squat-dominant. If Strength is pressing, the Metcon should not be press-heavy. The metcon should use complementary movement patterns to avoid overloading the same muscle groups.
+
+6. ENGINE WORK ≠ METCON MONO — The ENGINE ANALYSIS may identify conditioning weaknesses (e.g. "improve rowing", "run more"). Address those in Warm-up and Cool-down blocks (e.g. 500m row warm-up, 10min Z2 bike cool-down) — NOT by cramming row/run into every metcon. Metcons should feature varied mixed-modal work (barbell + gymnastics, DBs + bodyweight, etc.). A good metcon tests fitness through movement variety, not by defaulting to a rower or run.`;
 /* ------------------------------------------------------------------ */
 /*  SKELETON BUILDER — full 20-day template with inline skill assigns */
 /* ------------------------------------------------------------------ */
+// Days within each week that are allowed to include a monostructural element
+// in the metcon (row, run, bike, ski erg). Exactly 2 of 5 days per week.
+// Spread across the week: days 2 and 5 (Tuesday & Friday pattern).
+const MONO_ALLOWED_DAYS = new Set([2, 5]);
+
 function buildProgramSkeleton(
   schedule: Array<{ week: number; day: number; displayName: string }>
 ): string {
@@ -129,11 +137,14 @@ function buildProgramSkeleton(
     for (let day = 1; day <= 5; day++) {
       const skill = skillMap.get(`${week}-${day}`) || "coach's choice";
       const dayNum = (week - 1) * 5 + day;
+      const monoTag = MONO_ALLOWED_DAYS.has(day)
+        ? "(mono OK — may include ONE row/run/bike/ski)"
+        : "(NO mono — do NOT use row, run, bike, or ski erg)";
       lines.push(`Day ${dayNum}:`);
       lines.push(`Warm-up: `);
       lines.push(`Skills: (use ${skill}) `);
       lines.push(`Strength: `);
-      lines.push(`Metcon: `);
+      lines.push(`Metcon: ${monoTag} `);
       lines.push(`Cool down: `);
       lines.push(``);
     }
@@ -327,8 +338,10 @@ ${skeleton}`;
       // Strip markdown code blocks if present
       const codeMatch = programText.match(/```(?:text)?\s*\n?([\s\S]*?)```/);
       if (codeMatch) programText = codeMatch[1].trim();
-      // Strip skill assignment hints from output
+      // Strip skill assignment hints and mono tags from output
       programText = programText.replace(/\(use\s+[^)]+\)\s*/gi, "");
+      programText = programText.replace(/\(mono OK[^)]*\)\s*/gi, "");
+      programText = programText.replace(/\(NO mono[^)]*\)\s*/gi, "");
       const stopReason = claudeData.stop_reason || "unknown";
       // FIX 2: dayHeaders regex uses Day N:
       const dayHeaders = (programText.match(/^Day \d+:/gmi) || []);
@@ -387,6 +400,37 @@ ${skeleton}`;
         }
         const complianceRate = total > 0 ? matched / total : 1;
         console.log(`[${jobId}] Skill schedule compliance: ${matched}/${total} (${(complianceRate * 100).toFixed(0)}%)`);
+      }
+      // Validate monostructural cap: max 2 per week
+      {
+        const monoPattern = /\b(\d+m\s+row|row\b|rowing|run\b|running|\d+m\s+run|bike|ski\s*erg|assault\s*bike|echo\s*bike|air\s*bike|c2\s*bike)\b/i;
+        const dayPattern2 = /^Day \d+:/gmi;
+        const dayTexts = programText.split(dayPattern2).slice(1);
+        let worstWeek = 0;
+        let worstCount = 0;
+        for (let w = 0; w < 4; w++) {
+          let monoInWeek = 0;
+          for (let d = 0; d < 5; d++) {
+            const dt = dayTexts[w * 5 + d];
+            if (!dt) continue;
+            // Extract just the Metcon line
+            const metconMatch = dt.match(/^Metcon:\s*(.+)$/mi);
+            if (metconMatch && monoPattern.test(metconMatch[1])) {
+              monoInWeek++;
+            }
+          }
+          console.log(`[${jobId}] Week ${w + 1} mono count: ${monoInWeek}/5 metcons`);
+          if (monoInWeek > worstCount) {
+            worstCount = monoInWeek;
+            worstWeek = w + 1;
+          }
+        }
+        if (worstCount > 2 && attempt < MAX_ATTEMPTS) {
+          console.warn(`[${jobId}] Attempt ${attempt}: Week ${worstWeek} has ${worstCount} metcons with row/run/bike/ski (max 2). Retrying...`);
+          messages.push({ role: "assistant", content: programText });
+          messages.push({ role: "user", content: `Week ${worstWeek} has ${worstCount} metcons containing row/run/bike/ski erg. The hard cap is 2 per week. Replace the excess monostructural elements with mixed-modal movements (barbell + gymnastics combos, dumbbell work, bodyweight circuits, etc.). Keep the rest of the program the same.` });
+          continue;
+        }
       }
       // Create program via preprocess-program (service-role auth, user_id in body)
       console.log(`[${jobId}] Sending to preprocess-program: ${programText.length} chars, name="${programName}"`);
