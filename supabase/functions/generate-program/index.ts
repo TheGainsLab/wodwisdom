@@ -11,7 +11,7 @@ import {
   formatChunksAsContext,
 } from "../_shared/rag.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
-import { rankSkillPriorities } from "../_shared/skill-priorities.ts";
+import { rankSkillPriorities, SKILL_DISPLAY_NAMES } from "../_shared/skill-priorities.ts";
 import { buildSkillSchedule } from "../_shared/build-skill-schedule.ts";
 import { extractBlocksFromWorkoutText } from "../_shared/parse-workout-blocks.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -73,7 +73,7 @@ async function fetchCoachingGuidelines(
   const { data, error } = await supa
     .from("coaching_guidelines")
     .select("guideline_text")
-    .eq("category", "strength")
+    .in("category", ["strength", "metcon"])
     .eq("is_active", true)
     .in("scope", scopes)
     .order("priority", { ascending: false });
@@ -94,6 +94,24 @@ OUTPUT RULES:
 - Complete every block in the template provided. One line per block.
 - Do not add, remove, or reorder any headers.
 - Prescribe weights using the athlete's 1RMs where applicable. Use / for M/F Rx (e.g. 95/65).`;
+
+const METCON_GUIDANCE = `
+
+METCON DESIGN RULES (apply to every Metcon: block):
+
+1. BREADTH OVER WEAKNESS — Metcons draw from movements the athlete is PROFICIENT at (intermediate or advanced). Weaknesses and developing skills belong in the Skills block, not the Metcon. If the athlete is advanced at ring muscle-ups, use them in metcons. If the athlete is beginner at HSPU, never put HSPU in a metcon — that stays in the skill block. See the METCON MOVEMENT ELIGIBILITY section for the explicit lists.
+
+2. MONOSTRUCTURAL CAP — Across the 5 metcons in any single week, at most 2 may include a monostructural cardio element (row, bike, ski erg, run — any of these count). This is a hard cap. Weeks 1-4 each independently enforce this limit.
+
+3. LOADING PREFERENCES — When a metcon calls for a weighted movement, prefer barbells and dumbbells over kettlebells. Kettlebells are acceptable when the movement is inherently KB-based (e.g., Turkish get-ups, KB swings) but do not substitute KBs for movements that can use a barbell or dumbbell.
+
+4. TIME DOMAIN DISTRIBUTION (per week) — Assign a target time domain to each metcon:
+   - Short: sub-8 minutes
+   - Medium: 8-15 minutes
+   - Long: 15+ minutes
+   Each week must include at least 1 short, 1 medium, and 1 long metcon. No single category may appear more than 3 times in one week. Design the rep schemes, round counts, and movement complexity to fit the target time domain.
+
+5. COMPLEMENT THE STRENGTH BLOCK — If a day's Strength block is squat-dominant, the Metcon must NOT be squat-dominant. If Strength is pressing, the Metcon should not be press-heavy. The metcon should use complementary movement patterns to avoid overloading the same muscle groups.`;
 /* ------------------------------------------------------------------ */
 /*  SKELETON BUILDER — full 20-day template with inline skill assigns */
 /* ------------------------------------------------------------------ */
@@ -205,7 +223,7 @@ async function processJob(
     const analysisParts: string[] = [];
     if (evalRow.lifting_analysis) analysisParts.push("STRENGTH ANALYSIS:\n" + evalRow.lifting_analysis);
     if (evalRow.skills_analysis) analysisParts.push("SKILLS ANALYSIS:\n" + evalRow.skills_analysis);
-    if (evalRow.engine_analysis) analysisParts.push("ENGINE ANALYSIS:\n" + evalRow.engine_analysis);
+    // Engine analysis intentionally excluded — it causes the LLM to stuff row/run into every metcon
     const analysisStr = analysisParts.length > 0 ? analysisParts.join("\n\n") : "No detailed analysis.";
     console.log(`[${jobId}] Analysis sections: lifting=${!!evalRow.lifting_analysis}, skills=${!!evalRow.skills_analysis}, engine=${!!evalRow.engine_analysis}, total=${analysisStr.length} chars`);
     // Fetch gymnastics movements for priority scoring
@@ -239,14 +257,30 @@ async function processJob(
     const skeleton = buildProgramSkeleton(schedule);
     // FIX 3: log line uses Day N: regex
     console.log(`[${jobId}] Skeleton: ${skeleton.length} chars, ${(skeleton.match(/^Day \d+:/gm) || []).length} day headers`);
+    // Derive metcon-eligible vs skill-block-only movements
+    const proficientSkills: string[] = [];
+    const developingSkills: string[] = [];
+    if (profile.skills) {
+      for (const [key, level] of Object.entries(profile.skills)) {
+        const display = SKILL_DISPLAY_NAMES[key] || key.replace(/_/g, " ");
+        if (level === "advanced" || level === "intermediate") {
+          proficientSkills.push(display);
+        } else if (level && level !== "none") {
+          developingSkills.push(display);
+        }
+      }
+    }
+    const metconEligibility = proficientSkills.length > 0 || developingSkills.length > 0
+      ? `\nMETCON MOVEMENT ELIGIBILITY:\n- Use in metcons (proficient): ${proficientSkills.join(", ") || "none"}\n- Skill block only (developing): ${developingSkills.join(", ") || "none"}\n`
+      : "";
     const userPrompt = `ATHLETE PROFILE:
 ${profileStr}
 ANALYSIS TO ADDRESS:
 ${analysisStr}
-${trainingBlock}
+${trainingBlock}${metconEligibility}
 Complete the following program template. Fill in every block with one line of programming. Do not add or remove any headers.
 ${skeleton}`;
-    const systemPrompt = GENERATE_PROMPT + guidelinesBlock + ragContext;
+    const systemPrompt = GENERATE_PROMPT + METCON_GUIDANCE + guidelinesBlock + ragContext;
     console.log(`[${jobId}] Prompt sizes: system=${systemPrompt.length} chars, user=${userPrompt.length} chars`);
     if (!ANTHROPIC_API_KEY) {
       throw new Error("Program generation is not configured");
