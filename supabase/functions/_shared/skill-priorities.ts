@@ -121,9 +121,9 @@ export function parseSkillHierarchy(
   const legacyParsed = tryParseLegacyHierarchy(analysisText, skills);
   if (legacyParsed.length > 0) return legacyParsed;
 
-  // Fallback: simple level-based ordering (beginner > intermediate)
-  console.warn("[skill-priorities] Failed to parse skills profile, using level-based fallback");
-  return fallbackFromLevels(skills);
+  // No fallback — if parsing fails, the analysis format is broken and we need to know
+  console.error("[skill-priorities] Failed to parse skills profile from analysis text. Bucket and legacy parsers both returned empty. Analysis text:", analysisText?.slice(0, 200));
+  return [];
 }
 
 // Keep the old function name as an alias for backward compatibility
@@ -283,40 +283,3 @@ function resolveSkillKey(
   return bestKey;
 }
 
-/**
- * Fallback: rank by level (beginner first, then intermediate).
- * Used when AI hierarchy parsing fails.
- */
-function fallbackFromLevels(skills: Record<string, string>): SkillPriority[] {
-  const LEVEL_ORDER: Record<string, number> = {
-    none: 0,
-    beginner: 1,
-    intermediate: 2,
-    advanced: 3,
-  };
-
-  const entries: SkillPriority[] = [];
-  for (const [key, level] of Object.entries(skills)) {
-    const num = LEVEL_ORDER[level] ?? 0;
-    if (num >= 3 || num === 0) continue; // skip advanced and none
-
-    entries.push({
-      skill: key,
-      displayName: SKILL_DISPLAY_NAMES[key] ?? key.replace(/_/g, " "),
-      level,
-      score: num, // lower = higher priority (beginner=1 before intermediate=2)
-      maxPerWeek: 2,
-    });
-  }
-
-  // Sort: beginner first, then intermediate
-  entries.sort((a, b) => a.score - b.score);
-
-  // Top 2 get 2x/week, rest 1x/week
-  for (let i = 0; i < entries.length; i++) {
-    entries[i].maxPerWeek = i < 2 ? 2 : 1;
-    entries[i].score = i + 1; // normalize to position
-  }
-
-  return entries;
-}
