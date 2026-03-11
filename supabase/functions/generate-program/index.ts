@@ -277,7 +277,7 @@ PRIORITY RULES (within the pattern constraints above):
 
 SKILL SLOT RULES:
 Use the SKILLS ANALYSIS above to decide what goes in each day's Skills: block. You are the coach — distribute skills intelligently across 20 days.
-- "Needs Attention" skills are the highest priority. Program them 2-3x per week. These are the athlete's limiters.
+- "Needs Attention" skills are the highest priority. Program their progression track 2x per week — alternate between the foundational and advanced variant across the two slots. Never the same variant twice in a week.
 - "Intermediate" skills get 1-2x per week to keep progressing.
 - "Strong" skills are maintenance only — 0-1x per week or use them as metcon components instead.
 - Never program the same skill on consecutive days (e.g. not Day 3 and Day 4).
