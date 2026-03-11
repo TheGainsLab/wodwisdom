@@ -258,12 +258,21 @@ ${profileStr}
 ${analysisStr}
 ${trainingBlock}${metconEligibility}
 STRENGTH SLOT RULES:
-The STRENGTH HIERARCHY above (if present) dictates how to fill the 5 weekly Strength: slots.
+The STRENGTH HIERARCHY above (if present) dictates priority, but you MUST also ensure movement-pattern diversity across the 5 weekly Strength slots.
+
+MOVEMENT PATTERN DISTRIBUTION (per week):
+- Olympic lifts (snatch variants, clean variants, jerks): 2 slots max per week. Alternate snatch-family and clean-family days.
+- Squat (back squat, front squat, overhead squat): 1-2 slots per week. Rotate variants across weeks — do not repeat the same squat variant in the same week.
+- Press (strict press, push press, bench press, push jerk): 1 slot per week minimum. Every athlete needs pressing volume.
+- Hinge/Pull (deadlift, RDL, clean pull, snatch pull): 1 slot per week minimum. Posterior chain work is non-negotiable.
+- If the athlete provided a lift, it MUST appear at least once across the 4-week program.
+
+PRIORITY RULES (within the pattern constraints above):
 - HIGH priority movements get 2+ slots per week. These are the athlete's limiters — give them the most volume.
 - MODERATE priority movements get 1 slot per week.
 - LOW priority movements get 0-1 slots per week. Do NOT waste training time on movements the athlete is already strong at.
 - Follow the hierarchy ordering strictly. If the hierarchy says deadlift is LOW, do not program heavy deadlifts twice a week.
-- Vary the specific exercises within a movement pattern across weeks (e.g. for "olympic lifts": clean & jerk one day, snatch complex another, clean pulls another).
+- Vary the specific exercises within a movement pattern across weeks (e.g. for "olympic lifts": clean & jerk one day, snatch complex another).
 
 SKILL SLOT RULES:
 Use the SKILLS ANALYSIS above to decide what goes in each day's Skills: block. You are the coach — distribute skills intelligently across 20 days.
