@@ -11,9 +11,7 @@ import {
   formatChunksAsContext,
 } from "../_shared/rag.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
-import { parseSkillHierarchy, SKILL_DISPLAY_NAMES } from "../_shared/skill-priorities.ts";
-import { buildSkillSchedule } from "../_shared/build-skill-schedule.ts";
-import { extractBlocksFromWorkoutText } from "../_shared/parse-workout-blocks.ts";
+import { SKILL_DISPLAY_NAMES } from "../_shared/skill-priorities.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
@@ -113,25 +111,17 @@ METCON DESIGN RULES (apply to every Metcon: block):
 
 5. COMPLEMENT THE STRENGTH BLOCK — If a day's Strength block is squat-dominant, the Metcon must NOT be squat-dominant. If Strength is pressing, the Metcon should not be press-heavy. The metcon should use complementary movement patterns to avoid overloading the same muscle groups.`;
 /* ------------------------------------------------------------------ */
-/*  SKELETON BUILDER — full 20-day template with inline skill assigns */
+/*  SKELETON BUILDER — full 20-day template                           */
 /* ------------------------------------------------------------------ */
-function buildProgramSkeleton(
-  schedule: Array<{ week: number; day: number; displayName: string }>
-): string {
+function buildProgramSkeleton(): string {
   const lines: string[] = [];
-  // Index skill assignments for fast lookup: "week-day" -> displayName
-  const skillMap = new Map<string, string>();
-  for (const slot of schedule) {
-    skillMap.set(`${slot.week}-${slot.day}`, slot.displayName);
-  }
   for (let week = 1; week <= 4; week++) {
     lines.push(`Week ${week}`);
     for (let day = 1; day <= 5; day++) {
-      const skill = skillMap.get(`${week}-${day}`) || "coach's choice";
       const dayNum = (week - 1) * 5 + day;
       lines.push(`Day ${dayNum}:`);
       lines.push(`Warm-up: `);
-      lines.push(`Skills: (use ${skill}) `);
+      lines.push(`Skills: `);
       lines.push(`Strength: `);
       lines.push(`Metcon: `);
       lines.push(`Cool down: `);
@@ -226,10 +216,6 @@ async function processJob(
     // Engine analysis intentionally excluded — it causes the LLM to stuff row/run into every metcon
     const analysisStr = analysisParts.length > 0 ? analysisParts.join("\n\n") : "No detailed analysis.";
     console.log(`[${jobId}] Analysis sections: lifting=${!!evalRow.lifting_analysis}, skills=${!!evalRow.skills_analysis}, engine=${!!evalRow.engine_analysis}, total=${analysisStr.length} chars`);
-    // Parse skill priorities from AI hierarchy in the skills analysis
-    const priorities = parseSkillHierarchy(evalRow.skills_analysis, profile.skills || {});
-    const schedule = buildSkillSchedule(priorities);
-    console.log(`[${jobId}] Skill schedule: ${schedule.length} slots, priorities=${priorities.length} (from AI hierarchy)`);
     const recentTraining = await fetchAndFormatRecentHistory(supa, userId, { maxLines: 25 });
     const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
     console.log(`[${jobId}] Training history: ${recentTraining ? recentTraining.length + ' chars' : 'none'}`);
@@ -248,9 +234,7 @@ async function processJob(
     // Fetch strength guidelines from coaching_guidelines table
     const guidelinesBlock = await fetchCoachingGuidelines(supa, scopes);
     console.log(`[${jobId}] Guidelines: ${guidelinesBlock ? guidelinesBlock.length + ' chars' : 'none'}`);
-    // Build skeleton with inline skill assignments
-    const skeleton = buildProgramSkeleton(schedule);
-    // FIX 3: log line uses Day N: regex
+    const skeleton = buildProgramSkeleton();
     console.log(`[${jobId}] Skeleton: ${skeleton.length} chars, ${(skeleton.match(/^Day \d+:/gm) || []).length} day headers`);
     // Derive metcon-eligible vs skill-block-only movements
     const proficientSkills: string[] = [];
@@ -280,6 +264,16 @@ The STRENGTH HIERARCHY above (if present) dictates how to fill the 5 weekly Stre
 - LOW priority movements get 0-1 slots per week. Do NOT waste training time on movements the athlete is already strong at.
 - Follow the hierarchy ordering strictly. If the hierarchy says deadlift is LOW, do not program heavy deadlifts twice a week.
 - Vary the specific exercises within a movement pattern across weeks (e.g. for "olympic lifts": clean & jerk one day, snatch complex another, clean pulls another).
+
+SKILL SLOT RULES:
+Use the SKILLS ANALYSIS above to decide what goes in each day's Skills: block. You are the coach — distribute skills intelligently across 20 days.
+- "Needs Attention" skills are the highest priority. Program them 2-3x per week. These are the athlete's limiters.
+- "Intermediate" skills get 1-2x per week to keep progressing.
+- "Strong" skills are maintenance only — 0-1x per week or use them as metcon components instead.
+- Never program the same skill on consecutive days (e.g. not Day 3 and Day 4).
+- Related progressions are a single track, not separate skills. For example: strict HSPU, wall-facing HSPU, and deficit HSPU are one progression — pick the variant that matches the athlete's level and periodize across weeks (drill → load → test), don't scatter all three randomly.
+- Week 4 is deload — reduce skill volume, keep only the top 1-2 priority skills at 1x each.
+- Vary the drill, not just the movement. If L-sit appears 3x in a week, each session should have a different focus (e.g. tuck hold for time, single-leg extension, parallette L-sit).
 
 Complete the following program template. Fill in every block with one line of programming. Do not add or remove any headers.
 ${skeleton}`;
@@ -330,8 +324,6 @@ ${skeleton}`;
       // Strip markdown code blocks if present
       const codeMatch = programText.match(/```(?:text)?\s*\n?([\s\S]*?)```/);
       if (codeMatch) programText = codeMatch[1].trim();
-      // Strip skill assignment hints from output
-      programText = programText.replace(/\(use\s+[^)]+\)\s*/gi, "");
       const stopReason = claudeData.stop_reason || "unknown";
       // FIX 2: dayHeaders regex uses Day N:
       const dayHeaders = (programText.match(/^Day \d+:/gmi) || []);
@@ -365,31 +357,6 @@ ${skeleton}`;
           continue;
         }
         throw new Error(`Program contained ${dayHeaders.length}/20 days after ${MAX_ATTEMPTS} attempts`);
-      }
-      // Validate skill assignments compliance (logging only)
-      if (schedule.length > 0) {
-        // FIX 6+7: dayPattern uses Day N: and split includes .slice(1)
-        const dayPattern = /^Day \d+:/gmi;
-        const workoutTexts = programText.split(dayPattern).slice(1).filter((t) => t.trim().length > 20);
-        let matched = 0;
-        let total = 0;
-        for (const slot of schedule) {
-          total++;
-          const idx = (slot.week - 1) * 5 + (slot.day - 1);
-          const workoutText = workoutTexts[idx];
-          if (!workoutText) continue;
-          const blocks = extractBlocksFromWorkoutText(workoutText);
-          const skillBlock = blocks.find((b) => b.block_type === "skills");
-          if (!skillBlock) continue;
-          const display = slot.displayName.toLowerCase();
-          const blockLower = skillBlock.block_text.toLowerCase();
-          const keywords = display.split(/[\s\-()]+/).filter((w) => w.length > 2);
-          const found = keywords.some((kw) => blockLower.includes(kw));
-          if (found) matched++;
-          else console.log(`[${jobId}] Skill mismatch W${slot.week}D${slot.day}: expected="${slot.displayName}", got="${skillBlock.block_text.slice(0, 80)}"`);
-        }
-        const complianceRate = total > 0 ? matched / total : 1;
-        console.log(`[${jobId}] Skill schedule compliance: ${matched}/${total} (${(complianceRate * 100).toFixed(0)}%)`);
       }
       // Create program via preprocess-program (service-role auth, user_id in body)
       console.log(`[${jobId}] Sending to preprocess-program: ${programText.length} chars, name="${programName}"`);
