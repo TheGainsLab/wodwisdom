@@ -301,7 +301,6 @@ ${skeleton}`;
       throw new Error("Program generation is not configured");
     }
     const MAX_ATTEMPTS = 3;
-    const preprocessUrl = `${SUPABASE_URL}/functions/v1/preprocess-program`;
     const monthYear = new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" });
     const programName = `Month 1 — ${monthYear}`;
     let program_id: string | undefined;
@@ -376,39 +375,83 @@ ${skeleton}`;
         }
         throw new Error(`Program contained ${dayHeaders.length}/20 days after ${MAX_ATTEMPTS} attempts`);
       }
-      // Create program via preprocess-program (service-role auth, user_id in body)
-      console.log(`[${jobId}] Sending to preprocess-program: ${programText.length} chars, name="${programName}"`);
-      const preprocessResp = await fetch(preprocessUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-        },
-        body: JSON.stringify({ text: programText, name: programName, source: "generate", user_id: userId }),
-      });
-      if (!preprocessResp.ok) {
-        const errBody = await preprocessResp.text();
-        let errMsg = "Failed to save program";
-        try {
-          const errJson = JSON.parse(errBody);
-          if (errJson?.error) errMsg = errJson.error;
-        } catch {
-          // use default
-        }
-        console.error(`[${jobId}] Preprocess failed: status=${preprocessResp.status}, error="${errMsg}"`);
-        // FIX 5: 422 retry message updated
-        if (preprocessResp.status === 422 && attempt < MAX_ATTEMPTS) {
-          console.warn(`[${jobId}] Attempt ${attempt} failed 422: ${errMsg}, days=${dayHeaders.length}, head=${programText.slice(0, 150)}, tail=${programText.slice(-150)}`);
+      // Save program directly (bypasses preprocess-program HTTP call)
+      console.log(`[${jobId}] Saving program inline: ${programText.length} chars, name="${programName}"`);
+      // Parse AI output into workouts using Day N: markers
+      const dayParts = programText.replace(/\r\n/g, "\n").split(/^Day (\d+):/mi);
+      const parsedWorkouts: { week_num: number; day_num: number; workout_text: string; sort_order: number }[] = [];
+      for (let pi = 1; pi < dayParts.length - 1; pi += 2) {
+        const n = parseInt(dayParts[pi], 10);
+        const wText = dayParts[pi + 1].trim();
+        if (!wText) continue;
+        parsedWorkouts.push({ week_num: Math.ceil(n / 5), day_num: ((n - 1) % 5) + 1, workout_text: wText, sort_order: n - 1 });
+      }
+      if (parsedWorkouts.length !== 20) {
+        if (attempt < MAX_ATTEMPTS) {
+          console.warn(`[${jobId}] Attempt ${attempt}: parsed ${parsedWorkouts.length}/20 workouts, retrying...`);
           messages.push({ role: "assistant", content: programText });
-          messages.push({ role: "user", content: `That program failed validation: ${errMsg}. Please output the complete program with exactly 20 days (Day 1 through Day 20), filling in every block of the template.` });
+          messages.push({ role: "user", content: `That program failed validation: Expected exactly 20 workouts, got ${parsedWorkouts.length}. Please output the complete program with exactly 20 days (Day 1 through Day 20), filling in every block of the template.` });
           continue;
         }
-        throw new Error(errMsg);
+        throw new Error(`Expected 20 workouts, got ${parsedWorkouts.length}`);
       }
-      const result = await preprocessResp.json();
-      program_id = result.program_id;
-      workout_count = result.workout_count;
-      console.log(`[${jobId}] Preprocess success: program_id=${program_id}, workout_count=${workout_count}`);
+      // Insert program
+      const { data: prog, error: progErr } = await supa
+        .from("programs")
+        .insert({ user_id: userId, name: programName })
+        .select("id")
+        .single();
+      if (progErr || !prog) throw new Error("Failed to create program");
+      // Insert workouts
+      const wkRows = parsedWorkouts.map((pw, idx) => ({
+        program_id: prog.id,
+        week_num: pw.week_num,
+        day_num: pw.day_num,
+        workout_text: pw.workout_text,
+        sort_order: idx,
+      }));
+      const { data: insertedWks, error: wkErr } = await supa
+        .from("program_workouts")
+        .insert(wkRows)
+        .select("id, workout_text");
+      if (wkErr) {
+        await supa.from("programs").delete().eq("id", prog.id);
+        throw new Error("Failed to save workouts");
+      }
+      // Extract and insert blocks
+      const BLOCK_LABELS = ["Warm-up", "Mobility", "Skills", "Strength", "Metcon", "Cool down"];
+      const BLOCK_TYPE_MAP: Record<string, string> = { "warm-up": "warm-up", "mobility": "mobility", "skills": "skills", "strength": "strength", "metcon": "metcon", "cool down": "cool-down" };
+      if (insertedWks?.length) {
+        const blockRows: { program_workout_id: string; block_type: string; block_order: number; block_text: string }[] = [];
+        for (const w of insertedWks) {
+          const wLower = (w.workout_text || "").toLowerCase();
+          const labels = BLOCK_LABELS.map((l) => ({ label: l, needle: (l + ":").toLowerCase() }));
+          for (let li = 0; li < labels.length; li++) {
+            const { label, needle } = labels[li];
+            const start = wLower.indexOf(needle);
+            if (start < 0) continue;
+            const cStart = start + needle.length;
+            const nextLabel = labels.slice(li + 1).find((x) => wLower.indexOf(x.needle, cStart) >= 0);
+            const end = nextLabel ? wLower.indexOf(nextLabel.needle, cStart) : w.workout_text.length;
+            const bText = w.workout_text.slice(cStart, end).trim();
+            blockRows.push({ program_workout_id: w.id, block_type: BLOCK_TYPE_MAP[label.toLowerCase()] ?? "other", block_order: blockRows.filter((r) => r.program_workout_id === w.id).length + 1, block_text: bText });
+          }
+        }
+        if (blockRows.length > 0) {
+          await supa.from("program_workout_blocks").insert(blockRows);
+        }
+        console.log(`[${jobId}] Inserted ${blockRows.length} blocks for ${insertedWks.length} workouts`);
+      }
+      // Trigger analysis in background (fire and forget)
+      const analyzeUrl = `${SUPABASE_URL}/functions/v1/analyze-program`;
+      fetch(analyzeUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+        body: JSON.stringify({ program_id: prog.id, user_id: userId }),
+      }).catch((err) => console.error("Analyze-program fire-and-forget failed:", err));
+      program_id = prog.id;
+      workout_count = parsedWorkouts.length;
+      console.log(`[${jobId}] Save success: program_id=${program_id}, workout_count=${workout_count}`);
       break;
     }
     if (!program_id) {
