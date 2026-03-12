@@ -126,7 +126,7 @@ const day_num = ((n - 1) % 5) + 1;
     result.push({
       week_num,
       day_num,
-      workout_text,
+      workout_text: workoutText,
       sort_order: n - 1,
 });
 }
