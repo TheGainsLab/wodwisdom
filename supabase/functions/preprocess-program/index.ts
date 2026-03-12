@@ -1,6 +1,36 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
-import { extractBlocksFromWorkoutText } from "../_shared/parse-workout-blocks.ts";
+
+// Inlined from _shared/parse-workout-blocks.ts to avoid import resolution issues
+const BLOCK_LABELS = ["Warm-up", "Mobility", "Skills", "Strength", "Metcon", "Cool down"] as const;
+const BLOCK_TYPE_MAP: Record<string, string> = {
+  "warm-up": "warm-up",
+  "mobility": "mobility",
+  "skills": "skills",
+  "strength": "strength",
+  "metcon": "metcon",
+  "cool down": "cool-down",
+};
+function extractBlocksFromWorkoutText(
+  text: string
+): { block_type: string; block_order: number; block_text: string }[] {
+  if (!text?.trim()) return [];
+  const lower = text.toLowerCase();
+  const blocks: { block_type: string; block_order: number; block_text: string }[] = [];
+  const labelsToFind = BLOCK_LABELS.map((l) => ({ label: l, needle: (l + ":").toLowerCase() }));
+  for (let i = 0; i < labelsToFind.length; i++) {
+    const { label, needle } = labelsToFind[i];
+    const start = lower.indexOf(needle);
+    if (start < 0) continue;
+    const contentStart = start + needle.length;
+    const next = labelsToFind.slice(i + 1).find((x) => lower.indexOf(x.needle, contentStart) >= 0);
+    const end = next ? lower.indexOf(next.needle, contentStart) : text.length;
+    const blockText = text.slice(contentStart, end).trim();
+    const blockType = BLOCK_TYPE_MAP[label.toLowerCase()] ?? "other";
+    blocks.push({ block_type: blockType, block_order: blocks.length + 1, block_text: blockText });
+  }
+  return blocks;
+}
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const cors = {
