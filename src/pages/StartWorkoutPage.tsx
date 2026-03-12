@@ -7,6 +7,7 @@ import { BlockContent } from '../components/WorkoutBlocksDisplay';
 import {
   calculateBenchmarks,
   scoreMetcon,
+  deriveTimeDomain,
   type MovementWorkRate,
   type BenchmarkResult,
 } from '../lib/metconScoring';
@@ -785,6 +786,9 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       performance_tier: scoring?.performanceTier ?? null,
       median_benchmark: benchmarks?.medianScore !== '--' ? benchmarks?.medianScore : null,
       excellent_benchmark: benchmarks?.excellentScore !== '--' ? benchmarks?.excellentScore : null,
+      time_domain: b.type === 'metcon'
+        ? deriveTimeDomain(wType, b.text, benchmarks?.medianScore ?? null)
+        : null,
     };
   };
 
@@ -961,6 +965,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             performance_tier: scoring?.performanceTier ?? null,
             median_benchmark: benchmarks?.medianScore !== '--' ? benchmarks?.medianScore : null,
             excellent_benchmark: benchmarks?.excellentScore !== '--' ? benchmarks?.excellentScore : null,
+            time_domain: deriveTimeDomain(wType, b.text, benchmarks?.medianScore ?? null),
           };
         }
 
