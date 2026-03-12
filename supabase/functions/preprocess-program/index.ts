@@ -366,9 +366,11 @@ const { data: { user }, error } = await supa.auth.getUser(token);
 if (error || !user) return { error: "Unauthorized" };
 return { userId: user.id };
 }
+console.log("[preprocess-program] v2 loaded");
 Deno.serve(async (req) => {
 if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 try {
+console.log("[preprocess-program] v2 handling request");
 const authHeader = req.headers.get("Authorization");
 if (!authHeader) {
 return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -455,9 +457,11 @@ return new Response(JSON.stringify({ error: "Failed to save workouts" }), {
         headers: { ...cors, "Content-Type": "application/json" },
 });
 }
+console.log(`[preprocess-program] v2 inserted ${insertedWorkouts?.length ?? 0} workouts, prog=${prog.id}`);
 if (insertedWorkouts?.length) {
 const blockRows: { program_workout_id: string; block_type: string; block_order: number; block_text: string }[] = [];
 for (const w of insertedWorkouts) {
+console.log(`[preprocess-program] v2 extracting blocks for workout ${w.id}, has workout_text: ${typeof w.workout_text}, len=${w.workout_text?.length ?? 'null'}`);
 const blocks = extractBlocksFromWorkoutText(w.workout_text);
 for (const b of blocks) {
           blockRows.push({
