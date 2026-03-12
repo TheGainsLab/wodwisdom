@@ -139,6 +139,32 @@ function parseMetconMovements(blockText: string): MetconEntryValues[] {
   return results;
 }
 
+/**
+ * Merge entries that share the same movement name (e.g. 15-12-9 schemes
+ * where the LLM returns separate entries per round). Sums reps/distance,
+ * keeps weight and other fields from the first occurrence.
+ */
+function consolidateMovements(entries: MetconEntryValues[]): MetconEntryValues[] {
+  const seen = new Map<string, number>(); // normalized name → index in result
+  const result: MetconEntryValues[] = [];
+
+  for (const entry of entries) {
+    const key = entry.movement.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const idx = seen.get(key);
+    if (idx !== undefined) {
+      // Merge into existing entry
+      const existing = result[idx];
+      if (entry.reps && existing.reps) existing.reps += entry.reps;
+      if (entry.distance && existing.distance) existing.distance += entry.distance;
+    } else {
+      seen.set(key, result.length);
+      result.push({ ...entry });
+    }
+  }
+
+  return result;
+}
+
 function parseMovementSegment(raw: string): MetconEntryValues | null {
   if (!raw) return null;
   let text = raw.trim();
@@ -387,7 +413,9 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             }
           }
 
-          movements.forEach((mv, mi) => {
+          // Merge duplicate movements (e.g. 15-12-9 expanded per round → single entry with total reps)
+          const consolidated = consolidateMovements(movements);
+          consolidated.forEach((mv, mi) => {
             initialMetcon[`${bi}-m${mi}`] = mv;
           });
         }),
