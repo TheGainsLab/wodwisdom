@@ -280,7 +280,6 @@ export function calculateBenchmarks(
 
   if (workoutType === 'for_time') {
     const rounds = extractRoundCount(blockText);
-    console.log('[metconScoring] blockText:', JSON.stringify(blockText), '→ rounds:', rounds, '→ entries:', entries.length);
     return calculateForTimeBenchmarks(entries, workRates, rounds);
   }
 
