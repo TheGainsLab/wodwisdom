@@ -78,7 +78,7 @@ UPDATE movements SET work_rate = 350.00 WHERE canonical_name = 'biking';
 UPDATE movements SET work_rate = 350.00 WHERE canonical_name = 'echo_bike';
 -- Ski Erg: slightly slower than row ≈ 260 m/min
 UPDATE movements SET work_rate = 260.00 WHERE canonical_name = 'ski_erg';
--- Run: 200m in ~45s at median pace ≈ 267 m/min
-UPDATE movements SET work_rate = 267.00 WHERE canonical_name = 'run';
-UPDATE movements SET work_rate = 267.00 WHERE canonical_name = 'running';
-UPDATE movements SET work_rate = 240.00 WHERE canonical_name = 'shuttle_run';
+-- Run: 200m in ~60s at median metcon pace ≈ 200 m/min
+UPDATE movements SET work_rate = 200.00 WHERE canonical_name = 'run';
+UPDATE movements SET work_rate = 200.00 WHERE canonical_name = 'running';
+UPDATE movements SET work_rate = 180.00 WHERE canonical_name = 'shuttle_run';

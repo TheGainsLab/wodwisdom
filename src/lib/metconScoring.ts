@@ -138,7 +138,7 @@ function entryTimeMinutes(
 
   // Distance-based movement (e.g., 200m run, 500m row)
   if (entry.distance && entry.distance > 0) {
-    const meterRate = match?.work_rate ?? 267; // default to run pace (m/min)
+    const meterRate = match?.work_rate ?? 200; // default to run pace (m/min)
     // Apply time-domain pacing factor (longer workouts = slower pace)
     let repFactor = 1.0;
     if (estimatedDurationMin <= 5) repFactor = 1.0;
