@@ -10,7 +10,7 @@ import { extractMovementsAI } from "./extract-movements-ai.ts";
 import { analyzeWorkouts, type MovementsContext } from "./analyzer.ts";
 import type { LibraryEntry } from "./extract-movements-ai.ts";
 
-export type BlockType = "warm-up" | "strength" | "metcon" | "skills" | "accessory" | "cool-down";
+export type BlockType = "warm-up" | "mobility" | "strength" | "metcon" | "skills" | "accessory" | "cool-down";
 
 export interface ParsedBlockMovement {
   canonical: string;
@@ -83,6 +83,7 @@ function classifyBlockType(label: string, text: string): BlockType {
   const combined = labelLower + " " + firstLine;
 
   if (/warm[\s-]*up/.test(combined)) return "warm-up";
+  if (/\bmobility\b/.test(combined)) return "mobility";
   if (/cool[\s-]*down/.test(combined)) return "cool-down";
   if (/strength/.test(combined)) return "strength";
   if (/metcon|conditioning/.test(combined)) return "metcon";

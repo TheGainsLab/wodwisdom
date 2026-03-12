@@ -121,6 +121,7 @@ function buildProgramSkeleton(): string {
       const dayNum = (week - 1) * 5 + day;
       lines.push(`Day ${dayNum}:`);
       lines.push(`Warm-up: `);
+      lines.push(`Mobility: `);
       lines.push(`Skills: `);
       lines.push(`Strength: `);
       lines.push(`Metcon: `);
@@ -257,6 +258,13 @@ ${profileStr}
 
 ${analysisStr}
 ${trainingBlock}${metconEligibility}
+MOBILITY BLOCK RULES:
+The Mobility: block goes after Warm-up and targets areas needed for that day's training.
+- Keep it brief: 1 focus area and 1-2 suggested drills max (e.g. "Hip mobility — 90/90 switches, couch stretch 1 min/side").
+- Match the focus to the day's movements: hip/ankle for squat days, thoracic/shoulder for overhead days, posterior chain for hinge days.
+- If the athlete has a movement flagged as a mobility limiter, weave that area into relevant days throughout the program.
+- This is advisory — a reminder, not a rigid checklist. Keep the tone casual and coach-like.
+
 STRENGTH SLOT RULES:
 The STRENGTH HIERARCHY above (if present) dictates priority, but you MUST also ensure movement-pattern diversity across the 5 weekly Strength slots.
 

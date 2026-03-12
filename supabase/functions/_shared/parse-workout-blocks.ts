@@ -3,9 +3,10 @@
  * Used by preprocess-program and sync-program-blocks.
  */
 
-const BLOCK_LABELS = ["Warm-up", "Skills", "Strength", "Metcon", "Cool down"] as const;
+const BLOCK_LABELS = ["Warm-up", "Mobility", "Skills", "Strength", "Metcon", "Cool down"] as const;
 const BLOCK_TYPE_MAP: Record<string, string> = {
   "warm-up": "warm-up",
+  "mobility": "mobility",
   "skills": "skills",
   "strength": "strength",
   "metcon": "metcon",

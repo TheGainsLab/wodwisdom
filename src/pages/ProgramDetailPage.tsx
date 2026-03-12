@@ -83,13 +83,13 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
               .from('workout_log_blocks')
               .select('id', { count: 'exact', head: true })
               .eq('log_id', l.id)
-              .not('block_type', 'in', '("warm-up","cool-down")');
+              .not('block_type', 'in', '("warm-up","mobility","cool-down")');
             // Count total blocks for this workout (exclude warm-up/cool-down)
             const { count: totalCount } = await supabase
               .from('program_workout_blocks')
               .select('id', { count: 'exact', head: true })
               .eq('program_workout_id', l.source_id)
-              .not('block_type', 'in', '("warm-up","cool-down")');
+              .not('block_type', 'in', '("warm-up","mobility","cool-down")');
             ipMap.set(l.source_id, {
               logId: l.id,
               savedCount: count ?? 0,

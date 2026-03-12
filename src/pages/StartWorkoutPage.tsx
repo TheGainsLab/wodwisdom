@@ -54,6 +54,7 @@ interface SkillsEntryValues {
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   'warm-up': 'Warm-up',
+  mobility: 'Mobility',
   skills: 'Skills',
   strength: 'Strength',
   metcon: 'Metcon',
@@ -803,7 +804,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       // Save any unsaved blocks (skip warm-up/cool-down)
       for (let bi = 0; bi < blocks.length; bi++) {
         if (savedBlocks.has(bi)) continue;
-        if (blocks[bi].type === 'warm-up' || blocks[bi].type === 'cool-down') continue;
+        if (blocks[bi].type === 'warm-up' || blocks[bi].type === 'mobility' || blocks[bi].type === 'cool-down') continue;
         const payload = buildBlockPayload(bi);
         if (!payload) continue;
         const workoutText = sourceState?.workout_text?.trim() ||
@@ -1355,7 +1356,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                       );
                     })()}
 
-                    {(block.type === 'warm-up' || block.type === 'cool-down') && (
+                    {(block.type === 'warm-up' || block.type === 'mobility' || block.type === 'cool-down') && (
                       <div className="field" style={{ marginTop: 8 }}>
                         <label>Notes</label>
                         <input
@@ -1368,7 +1369,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                     )}
 
                     {/* Per-block save button (not for warm-up/cool-down) */}
-                    {block.type !== 'warm-up' && block.type !== 'cool-down' && (
+                    {block.type !== 'warm-up' && block.type !== 'mobility' && block.type !== 'cool-down' && (
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
                       <button
                         className="auth-btn"
