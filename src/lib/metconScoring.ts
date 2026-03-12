@@ -102,8 +102,9 @@ function getAdjustedRate(
     const isBarbell = BARBELL_MOVEMENTS.has(match.canonical_name);
     if (isBarbell && entry.weight > 0) {
       // Simplified degradation: heavier weight = slower.
-      // Without 1RM data, use weight / 225 as rough intensity proxy.
-      const intensityProxy = Math.min(entry.weight / 225, 1.0);
+      // Without 1RM data, use weight / 165 as rough intensity proxy.
+      // 165lb represents ~100% metcon intensity for a median athlete.
+      const intensityProxy = Math.min(entry.weight / 165, 1.0);
       if (intensityProxy > 0.5) {
         weightMultiplier = 1.0 - ((intensityProxy - 0.5) * match.weight_degradation_rate);
       }
