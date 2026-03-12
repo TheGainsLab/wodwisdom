@@ -65,17 +65,20 @@ UPDATE movements SET work_rate = 20.00 WHERE canonical_name = 'knee_raise';
 -- Monostructural (M)
 UPDATE movements SET work_rate = 60.00 WHERE canonical_name = 'double_under';
 UPDATE movements SET work_rate = 60.00 WHERE canonical_name = 'double_unders';
-UPDATE movements SET work_rate = 18.00 WHERE canonical_name = 'row';
-UPDATE movements SET work_rate = 18.00 WHERE canonical_name = 'rowing';
-UPDATE movements SET work_rate = 18.00 WHERE canonical_name = 'bike';
-UPDATE movements SET work_rate = 18.00 WHERE canonical_name = 'biking';
-UPDATE movements SET work_rate = 18.00 WHERE canonical_name = 'echo_bike';
-UPDATE movements SET work_rate = 15.00 WHERE canonical_name = 'ski_erg';
 UPDATE movements SET work_rate = 120.00 WHERE canonical_name = 'single_under';
 UPDATE movements SET work_rate = 120.00 WHERE canonical_name = 'jump_rope';
 
--- Run: special case — work_rate is meters per minute (not reps)
--- 200m in ~45s at median pace ≈ 267 m/min
+-- Distance-based monostructural: work_rate is meters per minute (not reps)
+-- Row: 500m in ~1:47 at median pace ≈ 280 m/min
+UPDATE movements SET work_rate = 280.00 WHERE canonical_name = 'row';
+UPDATE movements SET work_rate = 280.00 WHERE canonical_name = 'rowing';
+-- Bike/Echo Bike: ~20 cal/min ≈ 350 m/min equivalent
+UPDATE movements SET work_rate = 350.00 WHERE canonical_name = 'bike';
+UPDATE movements SET work_rate = 350.00 WHERE canonical_name = 'biking';
+UPDATE movements SET work_rate = 350.00 WHERE canonical_name = 'echo_bike';
+-- Ski Erg: slightly slower than row ≈ 260 m/min
+UPDATE movements SET work_rate = 260.00 WHERE canonical_name = 'ski_erg';
+-- Run: 200m in ~45s at median pace ≈ 267 m/min
 UPDATE movements SET work_rate = 267.00 WHERE canonical_name = 'run';
 UPDATE movements SET work_rate = 267.00 WHERE canonical_name = 'running';
 UPDATE movements SET work_rate = 240.00 WHERE canonical_name = 'shuttle_run';
