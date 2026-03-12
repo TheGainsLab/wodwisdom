@@ -421,3 +421,32 @@ function extractRoundCount(text: string): number {
   if (match) return parseInt(match[1]);
   return 1;
 }
+
+/**
+ * Derive time_domain from benchmark data and block text.
+ * - AMRAP/EMOM: use the explicit time cap
+ * - For Time: parse the median benchmark time string
+ * Boundaries: <8 min = short, 8-15 min = medium, >15 min = long
+ */
+export function deriveTimeDomain(
+  workoutType: string,
+  blockText: string,
+  medianBenchmark: string | null
+): 'short' | 'medium' | 'long' | null {
+  let minutes: number | null = null;
+
+  if (workoutType === 'amrap' || workoutType === 'emom') {
+    // Use the explicit time cap
+    const cap = extractTimeCap(blockText);
+    if (cap) minutes = cap;
+  } else if (workoutType === 'for_time' && medianBenchmark && medianBenchmark !== '--') {
+    // Parse "MM:SS" median benchmark to minutes
+    const seconds = parseScore(medianBenchmark, 'for_time');
+    if (seconds > 0) minutes = seconds / 60;
+  }
+
+  if (minutes === null) return null;
+  if (minutes < 8) return 'short';
+  if (minutes <= 15) return 'medium';
+  return 'long';
+}

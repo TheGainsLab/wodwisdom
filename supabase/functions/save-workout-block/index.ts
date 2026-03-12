@@ -208,7 +208,9 @@ Deno.serve(async (req) => {
         median_benchmark: block.median_benchmark?.trim() || null,
         excellent_benchmark: block.excellent_benchmark?.trim() || null,
         time_domain:
-          blockType === "metcon" && blockText ? inferTimeDomain(blockText) : null,
+          block.time_domain && ["short", "medium", "long"].includes(block.time_domain)
+            ? block.time_domain
+            : blockType === "metcon" && blockText ? inferTimeDomain(blockText) : null,
       })
       .select("id")
       .single();
