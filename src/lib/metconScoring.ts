@@ -235,18 +235,19 @@ function calculateAMRAPBenchmarks(
  */
 function calculateForTimeBenchmarks(
   entries: MetconEntry[],
-  workRates: MovementWorkRate[]
+  workRates: MovementWorkRate[],
+  rounds: number = 1
 ): BenchmarkResult {
   if (entries.length === 0) return { medianScore: '--', excellentScore: '--' };
 
-  const estDur = estimateDuration(entries, workRates);
+  const estDur = estimateDuration(entries, workRates) * rounds;
 
   const calcTime = (paceFactor: number): string => {
     let total = 0;
     for (const entry of entries) {
       total += entryTimeMinutes(entry, workRates, estDur, paceFactor);
     }
-    return formatMinutesAsTime(total);
+    return formatMinutesAsTime(total * rounds);
   };
 
   return {
@@ -278,7 +279,8 @@ export function calculateBenchmarks(
   }
 
   if (workoutType === 'for_time') {
-    return calculateForTimeBenchmarks(entries, workRates);
+    const rounds = extractRoundCount(blockText);
+    return calculateForTimeBenchmarks(entries, workRates, rounds);
   }
 
   // EMOM and other formats: no scoring for now
@@ -407,4 +409,15 @@ function extractTimeCap(text: string): number | null {
   const match2 = text.match(/(\d+)\s*min/i);
   if (match2) return parseInt(match2[1]);
   return null;
+}
+
+/**
+ * Extract round count from For Time block text.
+ * e.g. "2 Rounds For Time", "3 RFT", "4 rounds of:", "5 rounds:"
+ * Returns 1 if no round count found.
+ */
+function extractRoundCount(text: string): number {
+  const match = text.match(/(\d+)\s+(?:RFT|rounds?\s+for\s+time|rounds?\s+of\b|rounds?\s*[:\n])/i);
+  if (match) return parseInt(match[1]);
+  return 1;
 }
