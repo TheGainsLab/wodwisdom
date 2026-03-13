@@ -99,6 +99,13 @@ export default function ProgramEditPage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const loadedDbIdsRef = useRef<string[]>([]);
 
+  // AI Edit state
+  const [aiEditIdx, setAiEditIdx] = useState<number | null>(null);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiRationale, setAiRationale] = useState<string | null>(null);
+  const [aiPreBlocks, setAiPreBlocks] = useState<WorkoutBlock[] | null>(null); // for revert
+
   const loadProgram = useCallback(async () => {
     if (!id) return;
     setLoading(true);
@@ -186,6 +193,67 @@ export default function ProgramEditPage({ session }: { session: Session }) {
       dbId: null,
       originalText: null,
     }]);
+  };
+
+  /* ── AI Edit ──────────────────────────────────────────────── */
+
+  const handleAiEdit = async (wIdx: number) => {
+    const w = workouts[wIdx];
+    if (!w.dbId || !aiPrompt.trim()) return;
+
+    setAiLoading(true);
+    setAiRationale(null);
+    setAiPreBlocks([...w.blocks.map(b => ({ ...b }))]);
+
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke('adjust-workout', {
+        body: { workout_id: w.dbId, request: aiPrompt.trim() },
+      });
+
+      if (fnErr) throw new Error(fnErr.message || 'AI edit failed');
+      if (data?.error) throw new Error(data.error);
+
+      const aiBlocks: WorkoutBlock[] = (data.blocks || [])
+        .filter((b: { label: string; content: string }) =>
+          BLOCK_LABELS.includes(b.label as BlockLabel) && b.content?.trim()
+        )
+        .map((b: { label: string; content: string }) => ({
+          label: b.label as BlockLabel,
+          content: b.content.trim(),
+        }));
+
+      if (aiBlocks.length > 0) {
+        setWorkouts(prev => prev.map((wo, i) =>
+          i === wIdx ? { ...wo, blocks: aiBlocks } : wo
+        ));
+      }
+
+      setAiRationale(data.rationale || null);
+      setAiPrompt('');
+    } catch (err: any) {
+      setError(err?.message || 'AI edit failed');
+      setAiPreBlocks(null);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const revertAiEdit = (wIdx: number) => {
+    if (!aiPreBlocks) return;
+    setWorkouts(prev => prev.map((wo, i) =>
+      i === wIdx ? { ...wo, blocks: aiPreBlocks } : wo
+    ));
+    setAiPreBlocks(null);
+    setAiRationale(null);
+  };
+
+  const dismissAi = (wIdx: number) => {
+    if (aiEditIdx === wIdx) {
+      setAiEditIdx(null);
+      setAiPrompt('');
+      setAiRationale(null);
+      setAiPreBlocks(null);
+    }
   };
 
   /* ── Save ─────────────────────────────────────────────────── */
@@ -393,6 +461,68 @@ export default function ProgramEditPage({ session }: { session: Session }) {
                                 existingLabels={w.blocks.map(b => b.label)}
                                 onAdd={label => addBlock(i, label)}
                               />
+
+                              {/* AI Edit */}
+                              {w.dbId && (
+                                <div className="ai-edit-section">
+                                  {aiEditIdx === i ? (
+                                    <>
+                                      <div className="ai-edit-input-row">
+                                        <input
+                                          type="text"
+                                          className="ai-edit-input"
+                                          value={aiPrompt}
+                                          onChange={e => setAiPrompt(e.target.value)}
+                                          onKeyDown={e => { if (e.key === 'Enter' && !aiLoading) handleAiEdit(i); }}
+                                          placeholder="e.g. swap snatch for clean & jerk, make metcon shorter..."
+                                          disabled={aiLoading}
+                                          autoFocus
+                                        />
+                                        <button
+                                          type="button"
+                                          className="ai-edit-submit"
+                                          onClick={() => handleAiEdit(i)}
+                                          disabled={aiLoading || !aiPrompt.trim()}
+                                        >
+                                          {aiLoading ? 'Thinking...' : 'Go'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="ai-edit-cancel"
+                                          onClick={() => dismissAi(i)}
+                                          disabled={aiLoading}
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                      {aiRationale && (
+                                        <div className="ai-edit-rationale">
+                                          {aiRationale}
+                                          <button
+                                            type="button"
+                                            className="ai-edit-revert"
+                                            onClick={() => revertAiEdit(i)}
+                                          >
+                                            Revert
+                                          </button>
+                                        </div>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="ai-edit-btn"
+                                      onClick={() => { setAiEditIdx(i); setAiPrompt(''); setAiRationale(null); setAiPreBlocks(null); }}
+                                    >
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.26-2.5 4.13L12 11.5l-1.5-1.37C9.4 9.26 8 7.95 8 6a4 4 0 0 1 4-4z" />
+                                        <path d="M8.5 14h7l1 8h-9l1-8z" />
+                                      </svg>
+                                      AI Edit
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </>
                           )}
                         </div>
