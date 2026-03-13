@@ -17,6 +17,8 @@ interface EditableWorkout {
   rawText: string | null;      // non-null only for unparseable legacy workouts
   sort_order: number;
   expanded: boolean;
+  dbId: string | null;         // existing program_workouts row ID, null for newly added days
+  originalText: string | null; // snapshot at load time for diffing on save, null for new days
 }
 
 /* ── Parsing helpers ─────────────────────────────────────────── */
@@ -95,6 +97,7 @@ export default function ProgramEditPage({ session }: { session: Session }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [navOpen, setNavOpen] = useState(false);
+  const loadedDbIdsRef = useRef<string[]>([]);
 
   const loadProgram = useCallback(async () => {
     if (!id) return;
@@ -113,20 +116,22 @@ export default function ProgramEditPage({ session }: { session: Session }) {
     setProgramName(prog.name);
     const { data: wk } = await supabase
       .from('program_workouts')
-      .select('workout_text, sort_order')
+      .select('id, workout_text, sort_order')
       .eq('program_id', id)
       .order('sort_order');
-    setWorkouts(
-      (wk || []).map((w, i) => {
-        const parsed = parseWorkoutBlocks(w.workout_text);
-        return {
-          blocks: parsed ?? [],
-          rawText: parsed === null ? w.workout_text : null,
-          sort_order: i,
-          expanded: false,
-        };
-      })
-    );
+    const loaded = (wk || []).map((w, i) => {
+      const parsed = parseWorkoutBlocks(w.workout_text);
+      return {
+        blocks: parsed ?? [],
+        rawText: parsed === null ? w.workout_text : null,
+        sort_order: i,
+        expanded: false,
+        dbId: w.id,
+        originalText: w.workout_text,
+      };
+    });
+    setWorkouts(loaded);
+    loadedDbIdsRef.current = loaded.map(w => w.dbId!);
     setError('');
     setLoading(false);
   }, [id, session.user.id]);
@@ -178,6 +183,8 @@ export default function ProgramEditPage({ session }: { session: Session }) {
       rawText: null,
       sort_order: prev.length,
       expanded: true,
+      dbId: null,
+      originalText: null,
     }]);
   };
 
@@ -194,20 +201,65 @@ export default function ProgramEditPage({ session }: { session: Session }) {
         .eq('id', id)
         .eq('user_id', session.user.id);
       if (progErr) throw progErr;
-      const { error: delErr } = await supabase.from('program_workouts').delete().eq('program_id', id);
-      if (delErr) throw delErr;
-      if (workouts.length > 0) {
-        const rows = workouts.map((w, i) => ({
-          program_id: id,
-          week_num: 1,
-          day_num: i + 1,
-          workout_text: w.rawText ?? blocksToText(w.blocks),
-          sort_order: i,
-        }));
-        const { error: insErr } = await supabase.from('program_workouts').insert(rows);
-        if (insErr) throw insErr;
+
+      // Build set of current dbIds to detect removals
+      const currentDbIds = new Set(workouts.filter(w => w.dbId).map(w => w.dbId!));
+
+      // Detect removed workouts: had a dbId at load time but no longer in state
+      // We need the original set of dbIds — gather from workouts that still have dbId
+      // plus any that were removed. We track removals by comparing against the loaded set.
+      // Since removed workouts are filtered out of state, we store original IDs via ref.
+      // For now, collect all IDs we know about and let the remaining logic handle it.
+
+      const changedIds: string[] = [];
+
+      for (let i = 0; i < workouts.length; i++) {
+        const w = workouts[i];
+        const currentText = w.rawText ?? blocksToText(w.blocks);
+
+        if (w.dbId && w.originalText !== null) {
+          // Existing row — check if text or sort_order changed
+          if (currentText !== w.originalText || w.sort_order !== i) {
+            const { error: upErr } = await supabase
+              .from('program_workouts')
+              .update({ workout_text: currentText, sort_order: i, day_num: i + 1 })
+              .eq('id', w.dbId);
+            if (upErr) throw upErr;
+            changedIds.push(w.dbId);
+          }
+        } else {
+          // New row — insert
+          const { data: inserted, error: insErr } = await supabase
+            .from('program_workouts')
+            .insert({
+              program_id: id,
+              week_num: 1,
+              day_num: i + 1,
+              workout_text: currentText,
+              sort_order: i,
+            })
+            .select('id')
+            .single();
+          if (insErr) throw insErr;
+          if (inserted) changedIds.push(inserted.id);
+        }
       }
-      await supabase.functions.invoke('sync-program-blocks', { body: { program_id: id } });
+
+      // Delete removed workouts (rows with dbIds that are no longer in state)
+      // We need the original loaded IDs for this — use loadedDbIds ref
+      for (const origId of loadedDbIdsRef.current) {
+        if (!currentDbIds.has(origId)) {
+          await supabase.from('program_workouts').delete().eq('id', origId);
+        }
+      }
+
+      // Only sync blocks for workouts that actually changed
+      if (changedIds.length > 0) {
+        await supabase.functions.invoke('sync-program-blocks', {
+          body: { program_id: id, workout_ids: changedIds },
+        });
+      }
+
       navigate(`/programs/${id}`);
     } catch (err: any) {
       setError(err?.message || 'Failed to save program');
