@@ -25,6 +25,7 @@ interface ProfileData {
   lifts?: Record<string, number> | null;
   skills?: Record<string, string> | null;
   conditioning?: Record<string, string | number> | null;
+  equipment?: Record<string, boolean> | null;
   bodyweight?: number | null;
   units?: string | null;
   age?: number | null;
@@ -58,6 +59,14 @@ function formatProfile(profile: ProfileData): string {
       .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
       .join(", ");
     if (condStr) parts.push("Conditioning — " + condStr);
+  }
+  if (profile.equipment && Object.keys(profile.equipment).length > 0) {
+    const unavailable = Object.entries(profile.equipment)
+      .filter(([, v]) => v === false)
+      .map(([k]) => k.replace(/_/g, " "));
+    if (unavailable.length > 0) {
+      parts.push("Equipment NOT available — " + unavailable.join(", "));
+    }
   }
   return parts.join("\n") || "No profile data.";
 }
@@ -255,11 +264,21 @@ async function processJob(
     const metconEligibility = proficientSkills.length > 0 || developingSkills.length > 0
       ? `\nMETCON MOVEMENT ELIGIBILITY:\n- Use in metcons (proficient): ${proficientSkills.join(", ") || "none"}\n- Skill block only (developing): ${developingSkills.join(", ") || "none"}\n`
       : "";
+    // Equipment constraints
+    let equipmentConstraint = "";
+    if (profile.equipment && Object.keys(profile.equipment).length > 0) {
+      const unavailable = Object.entries(profile.equipment)
+        .filter(([, v]) => v === false)
+        .map(([k]) => k.replace(/_/g, " "));
+      if (unavailable.length > 0) {
+        equipmentConstraint = `\nEQUIPMENT CONSTRAINTS:\nThe athlete does NOT have the following equipment. NEVER program movements that require them: ${unavailable.join(", ")}.\nSubstitute with movements using available equipment (e.g. if no rower, use bike or run; if no rope, use extra pull-up volume; if no rings, use bar movements).\n`;
+      }
+    }
     const userPrompt = `ATHLETE PROFILE:
 ${profileStr}
 
 ${analysisStr}
-${trainingBlock}${metconEligibility}
+${trainingBlock}${metconEligibility}${equipmentConstraint}
 MOBILITY BLOCK RULES:
 The Mobility: block goes after Warm-up and targets areas needed for that day's training.
 - Keep it brief: 1 focus area and 1-2 suggested drills max (e.g. "Hip mobility — 90/90 switches, couch stretch 1 min/side").

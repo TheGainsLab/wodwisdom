@@ -93,6 +93,45 @@ const SKILL_GROUPS = [
   },
 ];
 
+const EQUIPMENT_GROUPS = [
+  {
+    title: 'Cardio Machines',
+    items: [
+      { key: 'rower', label: 'Rower' },
+      { key: 'assault_bike', label: 'Assault/Echo Bike' },
+      { key: 'ski_erg', label: 'Ski Erg' },
+      { key: 'treadmill', label: 'Treadmill' },
+    ],
+  },
+  {
+    title: 'Barbell & Weights',
+    items: [
+      { key: 'barbell', label: 'Barbell & Plates' },
+      { key: 'dumbbells', label: 'Dumbbells' },
+      { key: 'kettlebells', label: 'Kettlebells' },
+    ],
+  },
+  {
+    title: 'Gymnastics',
+    items: [
+      { key: 'pull_up_bar', label: 'Pull-Up Bar' },
+      { key: 'rings', label: 'Rings' },
+      { key: 'rope', label: 'Rope' },
+      { key: 'ghd', label: 'GHD' },
+      { key: 'parallettes', label: 'Parallettes' },
+      { key: 'pegboard', label: 'Pegboard' },
+    ],
+  },
+  {
+    title: 'Other',
+    items: [
+      { key: 'box', label: 'Plyo Box' },
+      { key: 'wall_ball', label: 'Wall Ball' },
+      { key: 'sled', label: 'Sled/Prowler' },
+    ],
+  },
+];
+
 const SKILL_LEVEL_GUIDELINE = 'Beginner = basic grasp · Intermediate = good unless tired · Advanced = reliable when fatigued';
 
 const CONDITIONING_GROUPS = [
@@ -255,6 +294,15 @@ export default function AthletePage({ session }: { session: Session }) {
   const [units, setUnits] = useState<'lbs' | 'kg'>('lbs');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [lifts, setLifts] = useState<Record<string, number>>({});
+  const [equipment, setEquipment] = useState<Record<string, boolean>>(() => {
+    const defaults: Record<string, boolean> = {};
+    for (const group of EQUIPMENT_GROUPS) {
+      for (const item of group.items) {
+        defaults[item.key] = true;
+      }
+    }
+    return defaults;
+  });
   const [skills, setSkills] = useState<Record<string, SkillLevel>>({});
   const [conditioning, setConditioning] = useState<Record<string, string | number>>({});
   const [loading, setLoading] = useState(true);
@@ -287,7 +335,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, bodyweight, units, age, height, gender, tdee_override')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -299,6 +347,9 @@ export default function AthletePage({ session }: { session: Session }) {
     ]).then(([profileRes, evalRes]) => {
       if (profileRes.data) {
         setLifts(profileRes.data.lifts || {});
+        if (profileRes.data.equipment && Object.keys(profileRes.data.equipment).length > 0) {
+          setEquipment(prev => ({ ...prev, ...profileRes.data.equipment }));
+        }
         setSkills(profileRes.data.skills || {});
         setConditioning(profileRes.data.conditioning || {});
         setAge(profileRes.data.age != null ? String(profileRes.data.age) : '');
@@ -446,6 +497,7 @@ export default function AthletePage({ session }: { session: Session }) {
         {
           user_id: session.user.id,
           lifts: cleanLifts,
+          equipment,
           skills,
           conditioning: cleanConditioning,
           bodyweight: bw && !isNaN(bw) ? bw : null,
@@ -632,6 +684,33 @@ export default function AthletePage({ session }: { session: Session }) {
                     );
                   })()}
                 </div>
+
+                {/* Equipment */}
+                <CollapsibleSection title="Equipment">
+                  <p className="athlete-card-subtitle">Uncheck any equipment you don't have or don't want programmed.</p>
+                  {EQUIPMENT_GROUPS.map(group => (
+                    <div key={group.title} style={{ marginBottom: 20 }}>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
+                      <div className="skill-list">
+                        {group.items.map(item => (
+                          <label
+                            key={item.key}
+                            className="skill-row"
+                            style={{ cursor: 'pointer', userSelect: 'none' }}
+                          >
+                            <span className="skill-name">{item.label}</span>
+                            <input
+                              type="checkbox"
+                              checked={equipment[item.key] ?? true}
+                              onChange={e => setEquipment(prev => ({ ...prev, [item.key]: e.target.checked }))}
+                              style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </CollapsibleSection>
 
                 {/* 1RM Lifts */}
                 <CollapsibleSection title="1RM Lifts">
