@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, getAuthHeaders, ADJUST_WORKOUT_ENDPOINT } from '../lib/supabase';
 import Nav from '../components/Nav';
 
 const BLOCK_LABELS = ['Warm-up', 'Skills', 'Strength', 'Metcon', 'Cool down'] as const;
@@ -105,6 +105,7 @@ export default function ProgramEditPage({ session }: { session: Session }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiRationale, setAiRationale] = useState<string | null>(null);
   const [aiPreBlocks, setAiPreBlocks] = useState<WorkoutBlock[] | null>(null); // for revert
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const loadProgram = useCallback(async () => {
     if (!id) return;
@@ -203,15 +204,19 @@ export default function ProgramEditPage({ session }: { session: Session }) {
 
     setAiLoading(true);
     setAiRationale(null);
+    setAiError(null);
     setAiPreBlocks([...w.blocks.map(b => ({ ...b }))]);
 
     try {
-      const { data, error: fnErr } = await supabase.functions.invoke('adjust-workout', {
-        body: { workout_id: w.dbId, request: aiPrompt.trim() },
+      const headers = await getAuthHeaders();
+      const resp = await fetch(ADJUST_WORKOUT_ENDPOINT, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ workout_id: w.dbId, request: aiPrompt.trim() }),
       });
 
-      if (fnErr) throw new Error(fnErr.message || 'AI edit failed');
-      if (data?.error) throw new Error(data.error);
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || `AI edit failed (${resp.status})`);
 
       const aiBlocks: WorkoutBlock[] = (data.blocks || [])
         .filter((b: { label: string; content: string }) =>
@@ -231,7 +236,7 @@ export default function ProgramEditPage({ session }: { session: Session }) {
       setAiRationale(data.rationale || null);
       setAiPrompt('');
     } catch (err: any) {
-      setError(err?.message || 'AI edit failed');
+      setAiError(err?.message || 'AI edit failed');
       setAiPreBlocks(null);
     } finally {
       setAiLoading(false);
@@ -253,6 +258,7 @@ export default function ProgramEditPage({ session }: { session: Session }) {
       setAiPrompt('');
       setAiRationale(null);
       setAiPreBlocks(null);
+      setAiError(null);
     }
   };
 
@@ -495,6 +501,9 @@ export default function ProgramEditPage({ session }: { session: Session }) {
                                           Cancel
                                         </button>
                                       </div>
+                                      {aiError && (
+                                        <div className="ai-edit-error">{aiError}</div>
+                                      )}
                                       {aiRationale && (
                                         <div className="ai-edit-rationale">
                                           {aiRationale}
@@ -512,7 +521,7 @@ export default function ProgramEditPage({ session }: { session: Session }) {
                                     <button
                                       type="button"
                                       className="ai-edit-btn"
-                                      onClick={() => { setAiEditIdx(i); setAiPrompt(''); setAiRationale(null); setAiPreBlocks(null); }}
+                                      onClick={() => { setAiEditIdx(i); setAiPrompt(''); setAiRationale(null); setAiPreBlocks(null); setAiError(null); }}
                                     >
                                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.26-2.5 4.13L12 11.5l-1.5-1.37C9.4 9.26 8 7.95 8 6a4 4 0 0 1 4-4z" />

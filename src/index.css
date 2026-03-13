@@ -353,6 +353,7 @@ body.landing-body{overflow:auto;height:auto}
 .ai-edit-rationale{margin-top:8px;padding:8px 12px;background:var(--accent-glow);border-radius:6px;font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:10px;line-height:1.4}
 .ai-edit-revert{padding:4px 10px;background:none;border:1px solid var(--border);border-radius:4px;color:var(--text-muted);font-family:'Outfit',sans-serif;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0}
 .ai-edit-revert:hover{border-color:var(--danger);color:var(--danger)}
+.ai-edit-error{margin-top:8px;padding:8px 12px;background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.3);border-radius:6px;font-size:12px;color:#ff6b6b;line-height:1.4}
 .program-detail-wrap,.programs-add-wrap{max-width:900px;margin:0 auto}
 .program-detail-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .program-workouts-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
