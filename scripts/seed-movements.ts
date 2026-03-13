@@ -191,12 +191,7 @@ function toDisplayName(canonical: string): string {
     .join(" ");
 }
 
-// Recognition-only movements (competition_count = 0) — modality comes from movement-modalities.json
-const RECOGNITION_ONLY = [
-  "turkish_get_up", "tgu", "goblet_squat", "farmer_carry", "sdhp", "sumo_deadlift_high_pull",
-  "kettlebell_swing", "kb_swing", "single_under", "jump_rope", "jumping_jack",
-  "echo_bike", "ski_erg", "swim", "swimming",
-];
+// No longer needed — all movements from movement-modalities.json are seeded automatically.
 
 function escapeSql(str: string): string {
   return str.replace(/'/g, "''");
@@ -247,8 +242,9 @@ function main() {
     }
   }
 
-  // Add recognition-only
-  for (const canonical of RECOGNITION_ONLY) {
+  // Seed ALL movements from movement-modalities.json (single source of truth).
+  // Movements not seen in competition data get competition_count = 0.
+  for (const canonical of Object.keys(modalityMap)) {
     if (!byCanonical.has(canonical)) {
       byCanonical.set(canonical, {
         slugs: new Set(),
