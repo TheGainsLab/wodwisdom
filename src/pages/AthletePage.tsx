@@ -348,7 +348,7 @@ export default function AthletePage({ session }: { session: Session }) {
       if (profileRes.data) {
         setLifts(profileRes.data.lifts || {});
         if (profileRes.data.equipment && Object.keys(profileRes.data.equipment).length > 0) {
-          setEquipment(prev => ({ ...prev, ...profileRes.data.equipment }));
+          setEquipment(prev => ({ ...prev, ...profileRes.data!.equipment }));
         }
         setSkills(profileRes.data.skills || {});
         setConditioning(profileRes.data.conditioning || {});
