@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { program_id } = await req.json().catch(() => ({}));
+    const { program_id, workout_ids } = await req.json().catch(() => ({}));
     if (!program_id) {
       return new Response(JSON.stringify({ error: "program_id required" }), {
         status: 400,
@@ -60,10 +60,26 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: workouts, error: wErr } = await supa
-      .from("program_workouts")
-      .select("id, workout_text")
-      .eq("program_id", program_id);
+    // If specific workout_ids provided, only sync those; otherwise sync all
+    let workouts: { id: string; workout_text: string }[] | null;
+    let wErr: unknown;
+
+    if (Array.isArray(workout_ids) && workout_ids.length > 0) {
+      const res = await supa
+        .from("program_workouts")
+        .select("id, workout_text")
+        .eq("program_id", program_id)
+        .in("id", workout_ids);
+      workouts = res.data;
+      wErr = res.error;
+    } else {
+      const res = await supa
+        .from("program_workouts")
+        .select("id, workout_text")
+        .eq("program_id", program_id);
+      workouts = res.data;
+      wErr = res.error;
+    }
 
     if (wErr) {
       return new Response(JSON.stringify({ error: "Failed to fetch workouts" }), {
