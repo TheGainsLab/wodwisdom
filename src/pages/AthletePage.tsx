@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { classifyAthlete } from '../utils/classify-athlete';
 import { calculateTDEE } from '../utils/tdee';
 import Nav from '../components/Nav';
+import { formatMarkdown } from '../lib/formatMarkdown';
 
 const LIFT_GROUPS = [
   {
@@ -813,7 +814,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
                         {analysisResult.type === 'lifts' ? 'Lifting' : analysisResult.type === 'skills' ? 'Skills' : analysisResult.type === 'engine' ? 'Engine' : 'Full Profile'}
                       </h3>
-                      <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap' }}>{analysisResult.text}</div>
+                      <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(analysisResult.text) }} />
                       <button
                         type="button"
                         className="auth-btn"
@@ -915,19 +916,19 @@ export default function AthletePage({ session }: { session: Session }) {
                                 {ev.lifting_analysis && (
                                   <div className="workout-review-section" style={{ marginTop: 0, marginBottom: ev.skills_analysis || ev.engine_analysis ? 12 : 0 }}>
                                     <h3>Lifting</h3>
-                                    <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap' }}>{ev.lifting_analysis}</div>
+                                    <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.lifting_analysis) }} />
                                   </div>
                                 )}
                                 {ev.skills_analysis && (
                                   <div className="workout-review-section" style={{ marginTop: 0, marginBottom: ev.engine_analysis ? 12 : 0 }}>
                                     <h3>Skills</h3>
-                                    <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap' }}>{ev.skills_analysis}</div>
+                                    <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.skills_analysis) }} />
                                   </div>
                                 )}
                                 {ev.engine_analysis && (
                                   <div className="workout-review-section" style={{ marginTop: 0 }}>
                                     <h3>Engine</h3>
-                                    <div className="workout-review-content" style={{ whiteSpace: 'pre-wrap' }}>{ev.engine_analysis}</div>
+                                    <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.engine_analysis) }} />
                                   </div>
                                 )}
                               </div>

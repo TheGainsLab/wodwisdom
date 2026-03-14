@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { CHAT_ENDPOINT, getAuthHeaders, supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
+import { formatMarkdown } from '../lib/formatMarkdown';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -43,18 +44,6 @@ const SUGGESTIONS: Record<string, string[]> = {
   ],
 };
 
-function formatMarkdown(text: string): string {
-  return text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n- /g, '<br>\u2022 ')
-    .replace(/\n(\d+)\. /g, '<br>$1. ')
-    .replace(/\n/g, '<br>')
-    .replace(/^/, '<p>')
-    .replace(/$/, '</p>')
-    .replace(/<p><\/p>/g, '');
-}
 
 export default function ChatPage({ session }: { session: Session }) {
   const navigate = useNavigate();
