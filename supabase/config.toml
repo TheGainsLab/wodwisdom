@@ -93,3 +93,12 @@ verify_jwt = false
 
 [functions.adjust-workout]
 verify_jwt = false
+
+[functions.training-analysis]
+verify_jwt = false
+
+[functions.profile-analysis]
+verify_jwt = false
+
+[functions.generate-program]
+verify_jwt = false
