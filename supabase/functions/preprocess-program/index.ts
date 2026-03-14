@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
+import { callClaude } from "../_shared/call-claude.ts";
 
 // Inlined from _shared/parse-workout-blocks.ts to avoid import resolution issues
 const BLOCK_LABELS = ["Warm-up", "Mobility", "Skills", "Strength", "Metcon", "Cool down"] as const;
@@ -396,6 +397,161 @@ const { data: { user }, error } = await supa.auth.getUser(token);
 if (error || !user) return { error: "Unauthorized" };
 return { userId: user.id };
 }
+// ─── Inline block parsing prompts ────────────────────────────────────
+
+const METCON_PROMPT = `You parse CrossFit/fitness metcon (metabolic conditioning) workout descriptions into individual movements.
+
+Return ONLY a JSON array. Each element:
+{
+  "movement": "Clean, canonical movement name",
+  "category": "weighted" | "bodyweight" | "monostructural",
+  "reps": <number or null>,
+  "weight": <number or null>,
+  "weight_unit": "lbs" | "kg" | null,
+  "distance": <number or null>,
+  "distance_unit": "m" | "ft" | "cal" | null
+}
+
+Rules:
+- Extract each distinct movement from the workout description.
+- Use CANONICAL movement names (title case with hyphens for compound names).
+- Category: "weighted" = external load, "bodyweight" = bodyweight only, "monostructural" = cardio/engine.
+- For distance-based movements (500m Row, 400m Run), set distance + distance_unit, reps = null.
+- For calorie-based cardio (30 Cal Row), set reps = 30, distance = null, distance_unit = "cal".
+- For weighted movements, extract the Rx weight (first number in slash notation like 95/65 → 95).
+- Return ONE entry per unique movement, not one per round.
+- Always report reps PER ROUND, never totaled across rounds.
+- For rep-scheme workouts (21-15-9), report reps as the FIRST round only. Example: "21-15-9 Thrusters, Pull-Ups" → Thruster reps: 21.
+- For rounds-based workouts (5 RFT), report PER-ROUND reps. Example: "5 RFT: 15 Thrusters, 10 Pull-Ups" → Thruster reps: 15.
+- For AMRAP workouts, report reps PER ROUND.
+- Strip format headers. Do NOT include rest periods or coaching cues.
+- Output valid JSON only, no markdown fences.`;
+
+const SKILLS_PROMPT = `You parse CrossFit/fitness skill block descriptions into individual movements.
+
+Return ONLY a JSON array. Each element:
+{
+  "movement": "Clean, capitalized movement name",
+  "sets": <number or null>,
+  "reps": <number or null>,
+  "hold_seconds": <number or null>,
+  "notes": "<any modifier like 'from 10ft', 'deficit', 'strict', etc. or null>"
+}
+
+Rules:
+- Split compound entries (joined by +, &, commas, newlines) into SEPARATE objects.
+- "4x5 Kipping Pull-Ups" → sets: 4, reps: 5.
+- "3 legless rope climb descents from 10ft" → sets: null, reps: 3, notes: "from 10ft".
+- ":30 L-sit hold" → hold_seconds: 30, sets: null, reps: null.
+- Strip structure headers (EMOM, rounds, "for quality", minute markers).
+- Do NOT include rest periods, coaching cues, or tempo prescriptions as separate movements.
+- Output valid JSON only, no markdown fences.`;
+
+const STRENGTH_PROMPT = `You parse CrossFit/fitness strength block descriptions into individual movements.
+
+Return ONLY a JSON array. Each element:
+{
+  "movement": "Clean, canonical movement name",
+  "sets": <number or null>,
+  "reps": <number or null>,
+  "weight": <number or null>,
+  "weight_unit": "lbs" | "kg" | null,
+  "percentage": <number or null>,
+  "notes": "<any modifier like 'tempo 3010', 'from blocks', 'paused', etc. or null>"
+}
+
+Rules:
+- Extract each distinct movement from the strength block.
+- Use CANONICAL movement names (title case).
+- For sets×reps: "5×3" → sets: 5, reps: 3.
+- For percentage: "@80%" or "@ 80-85%" → percentage: 80 (lowest value in range).
+- For absolute weights: "225 lbs" or "(225/155)" → weight: 225, weight_unit: "lbs" (first number in slash).
+- If both percentage and weight are present, include both.
+- Put modifiers (tempo, pauses, deficit, from blocks, build to) in notes.
+- Return ONE entry per unique movement.
+- Do NOT include rest periods, coaching cues, or warm-up instructions.
+- Output valid JSON only, no markdown fences.`;
+
+const VALID_CATEGORIES = ["weighted", "bodyweight", "monostructural"];
+const VALID_WEIGHT_UNITS = ["lbs", "kg"];
+const VALID_DISTANCE_UNITS = ["m", "ft", "cal"];
+
+async function parseBlock(
+  blockType: string,
+  blockText: string,
+  apiKey: string
+): Promise<Record<string, unknown>[] | null> {
+  const prompt =
+    blockType === "metcon" ? METCON_PROMPT :
+    blockType === "skills" ? SKILLS_PROMPT :
+    STRENGTH_PROMPT;
+
+  const raw = await callClaude({
+    apiKey,
+    system: prompt,
+    userContent: blockText,
+    maxTokens: 1024,
+  });
+
+  const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+  let items: Record<string, unknown>[];
+  try {
+    items = JSON.parse(cleaned);
+    if (!Array.isArray(items)) return null;
+  } catch {
+    console.error(`[preprocess-program] failed to parse ${blockType} response:`, raw);
+    return null;
+  }
+
+  // Filter to items with a movement name
+  items = items.filter((m) => m.movement && typeof m.movement === "string");
+
+  // Normalize per block type
+  if (blockType === "metcon") {
+    items = items.map((m) => ({
+      movement: (m.movement as string).trim(),
+      category: VALID_CATEGORIES.includes(m.category as string) ? m.category : "bodyweight",
+      reps: typeof m.reps === "number" ? m.reps : null,
+      weight: typeof m.weight === "number" ? m.weight : null,
+      weight_unit: typeof m.weight_unit === "string" && VALID_WEIGHT_UNITS.includes(m.weight_unit) ? m.weight_unit : null,
+      distance: typeof m.distance === "number" ? m.distance : null,
+      distance_unit: typeof m.distance_unit === "string" && VALID_DISTANCE_UNITS.includes(m.distance_unit) ? m.distance_unit : null,
+    }));
+  } else if (blockType === "skills") {
+    items = items.map((m) => ({
+      movement: (m.movement as string).trim(),
+      sets: typeof m.sets === "number" ? m.sets : null,
+      reps: typeof m.reps === "number" ? m.reps : null,
+      hold_seconds: typeof m.hold_seconds === "number" ? m.hold_seconds : null,
+      notes: typeof m.notes === "string" && (m.notes as string).trim() ? (m.notes as string).trim() : null,
+    }));
+  } else {
+    // strength
+    items = items.map((m) => ({
+      movement: (m.movement as string).trim(),
+      sets: typeof m.sets === "number" ? m.sets : null,
+      reps: typeof m.reps === "number" ? m.reps : null,
+      weight: typeof m.weight === "number" ? m.weight : null,
+      weight_unit: typeof m.weight_unit === "string" && VALID_WEIGHT_UNITS.includes(m.weight_unit as string) ? m.weight_unit : null,
+      percentage: typeof m.percentage === "number" ? m.percentage : null,
+      notes: typeof m.notes === "string" && (m.notes as string).trim() ? (m.notes as string).trim() : null,
+    }));
+  }
+
+  // Deduplicate: keep first occurrence per movement name
+  const seen = new Set<string>();
+  const deduped: typeof items = [];
+  for (const m of items) {
+    const key = (m.movement as string).toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(m);
+    }
+  }
+
+  return deduped;
+}
+
 console.log("[preprocess-program] v2 loaded");
 Deno.serve(async (req) => {
 if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -508,35 +664,32 @@ const { data: insertedBlocks } = await supa
   .insert(blockRows)
   .select("id, block_type, block_text");
 
-// Parse all blocks in parallel (metcon, skills, strength)
+// Parse blocks inline using callClaude (10 concurrent)
 if (insertedBlocks?.length) {
   const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
   if (ANTHROPIC_API_KEY) {
-    const parsePromises = insertedBlocks
-      .filter((b) => ["metcon", "skills", "strength"].includes(b.block_type))
-      .map(async (b) => {
-        const fnName =
-          b.block_type === "metcon" ? "parse-metcon" :
-          b.block_type === "skills" ? "parse-skills" :
-          "parse-strength";
+    const parseable = insertedBlocks.filter((b) =>
+      ["metcon", "skills", "strength"].includes(b.block_type)
+    );
+
+    const CONCURRENCY = 3;
+    for (let i = 0; i < parseable.length; i += CONCURRENCY) {
+      const batch = parseable.slice(i, i + CONCURRENCY);
+      await Promise.all(batch.map(async (b) => {
         try {
-          const resp = await fetch(`${SUPABASE_URL}/functions/v1/${fnName}`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-            },
-            body: JSON.stringify({ block_text: b.block_text, block_id: b.id }),
-          });
-          if (!resp.ok) {
-            console.error(`[preprocess-program] ${fnName} failed for block ${b.id}:`, resp.status);
+          const parsed = await parseBlock(b.block_type, b.block_text, ANTHROPIC_API_KEY);
+          if (parsed) {
+            await supa
+              .from("program_workout_blocks")
+              .update({ parsed_tasks: parsed })
+              .eq("id", b.id);
           }
         } catch (e) {
-          console.error(`[preprocess-program] ${fnName} error for block ${b.id}:`, e);
+          console.error(`[preprocess-program] parse ${b.block_type} error for block ${b.id}:`, e);
         }
-      });
-    await Promise.all(parsePromises);
-    console.log(`[preprocess-program] parsed ${parsePromises.length} blocks`);
+      }));
+    }
+    console.log(`[preprocess-program] parsed ${parseable.length} blocks`);
   }
 }
 }
