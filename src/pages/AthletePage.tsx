@@ -346,18 +346,19 @@ export default function AthletePage({ session }: { session: Session }) {
         .limit(20),
     ]).then(([profileRes, evalRes]) => {
       if (profileRes.data) {
-        setLifts(profileRes.data.lifts || {});
-        if (profileRes.data.equipment && Object.keys(profileRes.data.equipment).length > 0) {
-          setEquipment(prev => ({ ...prev, ...profileRes.data.equipment }));
+        const d = profileRes.data;
+        setLifts(d.lifts || {});
+        if (d.equipment && Object.keys(d.equipment).length > 0) {
+          setEquipment(prev => ({ ...prev, ...d.equipment }));
         }
-        setSkills(profileRes.data.skills || {});
-        setConditioning(profileRes.data.conditioning || {});
-        setAge(profileRes.data.age != null ? String(profileRes.data.age) : '');
-        setHeight(profileRes.data.height != null ? String(profileRes.data.height) : '');
-        setBodyweight(profileRes.data.bodyweight != null ? String(profileRes.data.bodyweight) : '');
-        setUnits((profileRes.data.units as 'lbs' | 'kg') || 'lbs');
-        setGender((profileRes.data.gender as 'male' | 'female') || '');
-        setTdeeOverride(profileRes.data.tdee_override != null ? String(profileRes.data.tdee_override) : '');
+        setSkills(d.skills || {});
+        setConditioning(d.conditioning || {});
+        setAge(d.age != null ? String(d.age) : '');
+        setHeight(d.height != null ? String(d.height) : '');
+        setBodyweight(d.bodyweight != null ? String(d.bodyweight) : '');
+        setUnits((d.units as 'lbs' | 'kg') || 'lbs');
+        setGender((d.gender as 'male' | 'female') || '');
+        setTdeeOverride(d.tdee_override != null ? String(d.tdee_override) : '');
       }
       if (evalRes.data) {
         setEvaluations(evalRes.data);
