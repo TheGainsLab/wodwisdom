@@ -6,7 +6,6 @@
  * consistent data shapes for the analyzer and AI extraction.
  */
 
-import { DEFAULT_MOVEMENT_ALIASES } from "./analyzer.ts";
 import type { MovementsContext } from "./analyzer.ts";
 import type { LibraryEntry } from "./extract-movements-ai.ts";
 
@@ -48,12 +47,6 @@ export function buildMovementsContext(rows: MovementsRow[]): MovementsContext {
     }
   }
 
-  for (const [alias, canonical] of Object.entries(DEFAULT_MOVEMENT_ALIASES)) {
-    if (library[canonical] && !aliases[alias]) {
-      aliases[alias] = canonical;
-    }
-  }
-
   return { library, aliases, essentialCanonicals };
 }
 
@@ -63,15 +56,10 @@ export function buildMovementsContext(rows: MovementsRow[]): MovementsContext {
  */
 export function buildLibraryEntries(rows: MovementsRow[]): LibraryEntry[] {
   return rows.map((row) => {
-    const defaultAliases = Object.entries(DEFAULT_MOVEMENT_ALIASES)
-      .filter(([, c]) => c === row.canonical_name)
-      .map(([a]) => a);
-
     const dbAliases = Array.isArray(row.aliases) ? row.aliases : [];
-    const allAliases = [...new Set([
-      ...dbAliases.map((a) => a.toLowerCase().trim()),
-      ...defaultAliases,
-    ])].filter(Boolean);
+    const allAliases = dbAliases
+      .map((a) => a.toLowerCase().trim())
+      .filter(Boolean);
 
     return {
       canonical_name: row.canonical_name,

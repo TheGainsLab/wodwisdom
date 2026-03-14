@@ -1,0 +1,338 @@
+// Legacy regex-based movement extraction — used by incorporate-movements and workout-parser.
+// analyze-program uses analyzeBlocks (parsed_tasks only, no regex).
+
+import { inferTimeDomain } from "./time-domain.ts";
+
+export interface MovementsContext {
+  library: Record<string, { modality: "W" | "G" | "M"; category: string }>;
+  aliases: Record<string, string>;
+  essentialCanonicals: Set<string>;
+}
+
+export interface WorkoutInput {
+  week_num?: number;
+  day_num?: number;
+  workout_text: string;
+  sort_order?: number;
+  id?: string;
+}
+
+export type ExtractedMovementForAnalysis = { canonical: string; modality: string; load: string };
+
+export interface AnalysisOutput {
+  modal_balance: Record<string, number>;
+  time_domains: Record<string, number>;
+  workout_structure: Record<string, number>;
+  workout_formats: Record<string, number>;
+  movement_frequency: { name: string; count: number; modality: string; loads: string[] }[];
+  notices: string[];
+  not_programmed: Record<string, string[]>;
+  consecutive_overlaps: { days: string; movements: string[] }[];
+  loading_ratio: { loaded: number; bodyweight: number };
+  distinct_loads: number;
+  load_bands: Record<string, number>;
+}
+
+const LOAD_PATTERNS: { regex: RegExp; toLabel: (m: RegExpMatchArray) => string; filter?: (m: RegExpMatchArray) => boolean }[] = [
+  { regex: /\((\d+)\s*\/\s*(\d+)\)/g, toLabel: (m) => `${m[1]}/${m[2]}` },
+  { regex: /\((\d+)\)/g, toLabel: (m) => m[1] },
+  { regex: /@\s*(\d+)\s*%/gi, toLabel: (m) => `${m[1]}%` },
+  { regex: /\b(\d+)\s*\/\s*(\d+)\b/g, toLabel: (m) => `${m[1]}/${m[2]}` },
+  { regex: /\b(\d+)\b/g, toLabel: (m) => m[1], filter: (m) => {
+    const n = parseInt(m[1], 10);
+    return n >= 20;
+  } },
+];
+
+function findAllLoadsInSegment(segment: string): { label: string; start: number; end: number }[] {
+  const loads: { label: string; start: number; end: number }[] = [];
+  const usedRanges = new Set<string>();
+  for (const { regex, toLabel, filter } of LOAD_PATTERNS) {
+    regex.lastIndex = 0;
+    let match: RegExpMatchArray | null;
+    while ((match = regex.exec(segment)) !== null) {
+      if (filter && !filter(match)) continue;
+      const label = toLabel(match);
+      const rangeKey = `${match.index}-${match.index + match[0].length}`;
+      if (usedRanges.has(rangeKey)) continue;
+      usedRanges.add(rangeKey);
+      loads.push({ label, start: match.index, end: match.index + match[0].length });
+    }
+  }
+  return loads;
+}
+
+function assignLoadsToMovements(
+  movementMatches: { canonical: string; start: number; end: number }[],
+  loads: { label: string; start: number; end: number }[]
+): Map<number, string> {
+  const assignment = new Map<number, { label: string; dist: number }>();
+
+  for (const load of loads) {
+    let bestMov: { idx: number; dist: number } | null = null;
+    for (let mi = 0; mi < movementMatches.length; mi++) {
+      const mov = movementMatches[mi];
+      const dist = Math.min(
+        Math.abs(load.start - mov.end),
+        Math.abs(load.end - mov.start)
+      );
+      if (!bestMov || dist < bestMov.dist) {
+        bestMov = { idx: mi, dist };
+      }
+    }
+    if (bestMov) {
+      const existing = assignment.get(bestMov.idx);
+      if (!existing || bestMov.dist < existing.dist) {
+        assignment.set(bestMov.idx, { label: load.label, dist: bestMov.dist });
+      }
+    }
+  }
+  return new Map([...assignment].map(([k, v]) => [k, v.label]));
+}
+
+type ExtractedMovement = { name: string; canonical: string; modality: string; load: string };
+
+function extractMovementsImpl(
+  text: string,
+  library: Record<string, { modality: "W" | "G" | "M"; category: string }>,
+  aliases: Record<string, string>
+): ExtractedMovement[] {
+  const segments = text.split(/\s*,\s*/).map((s) => s.trim()).filter(Boolean);
+  const result: ExtractedMovement[] = [];
+  const seenInSegment = new Set<string>();
+
+  for (const segment of segments) {
+    const lower = segment.toLowerCase();
+    seenInSegment.clear();
+    const movementMatches: { canonical: string; start: number; end: number }[] = [];
+
+    for (const [canonical] of Object.entries(library)) {
+      const spaced = canonical.replace(/_/g, " ");
+      const patterns = [`\\b${spaced}s?\\b`, `\\b${canonical}\\b`];
+      for (const p of patterns) {
+        const regex = new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+        let m: RegExpMatchArray | null;
+        while ((m = regex.exec(lower)) !== null) {
+          movementMatches.push({ canonical, start: m.index, end: m.index + m[0].length });
+        }
+      }
+    }
+    for (const [alias, canonical] of Object.entries(aliases)) {
+      if (!library[canonical]) continue;
+      const regex = new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}s?\\b`, "gi");
+      let m: RegExpMatchArray | null;
+      while ((m = regex.exec(lower)) !== null) {
+        movementMatches.push({ canonical, start: m.index, end: m.index + m[0].length });
+      }
+    }
+
+    const loads = findAllLoadsInSegment(segment);
+    const loadAssignment = assignLoadsToMovements(movementMatches, loads);
+
+    for (let i = 0; i < movementMatches.length; i++) {
+      const { canonical, start } = movementMatches[i];
+      const key = `${canonical}-${start}`;
+      if (seenInSegment.has(key)) continue;
+      seenInSegment.add(key);
+
+      const loadLabel = loadAssignment.get(i) ?? "BW";
+      const info = library[canonical] || { modality: "?" as const, category: "Other" };
+      result.push({
+        name: canonical.replace(/_/g, " "),
+        canonical,
+        modality: info.modality,
+        load: loadLabel,
+      });
+    }
+  }
+
+  return result;
+}
+
+function detectWorkoutFormat(text: string): string {
+  const t = text.trim().toUpperCase();
+  if (/AMRAP|AS MANY ROUNDS/.test(t)) return "AMRAP";
+  if (/FOR TIME|FORTIME/.test(t)) return "FOR TIME";
+  if (/\d+\s*RFT|\d+\s*ROUNDS?\s+FOR\s+TIME/.test(t)) return "Rounds For Time";
+  if (/EMOM|E\d+MOM|EVERY\s+\d+\s+MIN/.test(t)) return "EMOM";
+  if (/DEATH\s+BY/.test(t)) return "Death By";
+  if (/TABATA/.test(t)) return "Tabata";
+  if (/BUY\s+IN|CASH\s+OUT/.test(t)) return "Buy-In/Cash-Out";
+  if (/\d+X\d+|@\d+%/.test(t)) return "Strength";
+  return "Other";
+}
+
+export function analyzeWorkouts(
+  workouts: WorkoutInput[],
+  movements: MovementsContext,
+  extractedByWorkout?: ExtractedMovementForAnalysis[][]
+): AnalysisOutput {
+  const { library, aliases, essentialCanonicals } = movements;
+  const extract = (text: string) => extractMovementsImpl(text, library, aliases);
+
+  const getMoves = (idx: number): ExtractedMovementForAnalysis[] =>
+    extractedByWorkout?.[idx] ?? extract(workouts[idx].workout_text);
+
+  const modalCounts: Record<string, number> = { Weightlifting: 0, Gymnastics: 0, Monostructural: 0 };
+  const timeDomainCounts: Record<string, number> = { short: 0, medium: 0, long: 0 };
+  const structureCounts: Record<string, number> = { couplets: 0, triplets: 0, chipper: 0, other: 0 };
+  const formatCounts: Record<string, number> = {};
+  const movementTotals = new Map<string, { count: number; modality: string; loads: string[] }>();
+  const allFoundMovements = new Set<string>();
+  const notices: string[] = [];
+  let loadedCount = 0;
+  let bodyweightCount = 0;
+  const allLoads = new Set<string>();
+
+  for (let i = 0; i < workouts.length; i++) {
+    const w = workouts[i];
+    const text = w.workout_text;
+    const format = detectWorkoutFormat(text);
+    formatCounts[format] = (formatCounts[format] || 0) + 1;
+
+    if (format !== "Strength") {
+      const domain = inferTimeDomain(text);
+      timeDomainCounts[domain] = (timeDomainCounts[domain] || 0) + 1;
+
+      const movesForStructure = getMoves(i);
+      const mc = new Set(movesForStructure.map((m) => m.canonical)).size;
+      if (mc === 2) structureCounts.couplets++;
+      else if (mc === 3) structureCounts.triplets++;
+      else if (mc >= 4) structureCounts.chipper++;
+      else structureCounts.other++;
+    } else {
+      structureCounts.other++;
+    }
+
+    const moves = getMoves(i);
+    for (const m of moves) {
+      allFoundMovements.add(m.canonical);
+      const modLabel = m.modality === "W" ? "Weightlifting" : m.modality === "G" ? "Gymnastics" : "Monostructural";
+      modalCounts[modLabel] = (modalCounts[modLabel] || 0) + 1;
+
+      if (m.load === "BW") {
+        bodyweightCount++;
+      } else {
+        loadedCount++;
+        allLoads.add(m.load);
+      }
+
+      const existing = movementTotals.get(m.canonical);
+      if (existing) {
+        existing.count++;
+        existing.loads.push(m.load);
+      } else {
+        movementTotals.set(m.canonical, { count: 1, modality: m.modality, loads: [m.load] });
+      }
+    }
+  }
+
+  const modalBalance = {
+    Weightlifting: modalCounts.Weightlifting,
+    Gymnastics: modalCounts.Gymnastics,
+    Monostructural: modalCounts.Monostructural,
+  };
+
+  const movementFreq = Array.from(movementTotals.entries())
+    .map(([canonical, v]) => ({
+      name: canonical.replace(/_/g, " "),
+      count: v.count,
+      modality: v.modality,
+      loads: v.loads,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  function toNumericLoad(load: string): number | null {
+    if (load === "BW") return null;
+    const pct = load.match(/^(\d+)%$/);
+    if (pct) return parseInt(pct[1], 10);
+    const slash = load.match(/^(\d+)\/\d+$/);
+    if (slash) return parseInt(slash[1], 10);
+    const n = parseInt(load, 10);
+    return isNaN(n) ? null : n;
+  }
+
+  const loadBands: Record<string, number> = {
+    "0–95": 0,
+    "135–185": 0,
+    "225+": 0,
+  };
+  for (const [, v] of movementTotals) {
+    for (const load of v.loads) {
+      if (load === "BW") continue;
+      const num = toNumericLoad(load);
+      if (num !== null) {
+        if (num <= 95) loadBands["0–95"]++;
+        else if (num <= 185) loadBands["135–185"]++;
+        else loadBands["225+"]++;
+      }
+    }
+  }
+
+  const notProgrammed: Record<string, string[]> = {
+    Weightlifting: [],
+    Gymnastics: [],
+    Monostructural: [],
+  };
+  for (const canonical of essentialCanonicals) {
+    if (allFoundMovements.has(canonical)) continue;
+    const info = library[canonical];
+    const category = info?.category ?? "Weightlifting";
+    if (notProgrammed[category]) {
+      notProgrammed[category].push(canonical.replace(/_/g, " "));
+    }
+  }
+
+  const overlaps: { days: string; movements: string[] }[] = [];
+  const getSortOrder = (w: WorkoutInput, i: number) => (w.sort_order != null ? w.sort_order : i);
+  const sorted = [...workouts]
+    .map((w, i) => ({ w, so: getSortOrder(w, i) }))
+    .sort((a, b) => a.so - b.so);
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const curr = sorted[i];
+    const next = sorted[i + 1];
+    const isConsecutive = next.so === curr.so + 1;
+    if (!isConsecutive) continue;
+
+    const idxCurr = workouts.indexOf(curr.w);
+    const idxNext = workouts.indexOf(next.w);
+    const currMoves = new Set(getMoves(idxCurr).map((m) => m.canonical));
+    const nextMoves = getMoves(idxNext).map((m) => m.canonical);
+    const shared = nextMoves.filter((c) => currMoves.has(c));
+    if (shared.length > 0) {
+      overlaps.push({
+        days: `Days ${curr.so + 1}–${next.so + 1}`,
+        movements: shared.map((c) => c.replace(/_/g, " ")),
+      });
+    }
+  }
+
+  if (timeDomainCounts.long === 0 && workouts.length >= 5) {
+    notices.push("No workouts exceed 15 minutes. Consider adding at least one long time domain.");
+  }
+  if (modalCounts.Weightlifting === 0 && workouts.length >= 5) {
+    notices.push("No dedicated strength work detected. Consider adding barbell or loaded movements.");
+  }
+  if (overlaps.length > 0) {
+    notices.push(`${overlaps.length} day pair(s) share movements. Review for recovery.`);
+  }
+  const totalNotProg = Object.values(notProgrammed).reduce((s, arr) => s + arr.length, 0);
+  if (totalNotProg > 20) {
+    notices.push("Many movements from the CrossFit canon are not programmed. Consider variety.");
+  }
+
+  return {
+    modal_balance: modalBalance,
+    time_domains: timeDomainCounts,
+    workout_structure: structureCounts,
+    workout_formats: formatCounts,
+    movement_frequency: movementFreq,
+    notices,
+    not_programmed: notProgrammed,
+    consecutive_overlaps: overlaps,
+    loading_ratio: { loaded: loadedCount, bodyweight: bodyweightCount },
+    distinct_loads: allLoads.size,
+    load_bands: loadBands,
+  };
+}

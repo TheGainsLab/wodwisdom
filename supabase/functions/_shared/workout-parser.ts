@@ -7,7 +7,7 @@
  */
 
 import { extractMovementsAI } from "./extract-movements-ai.ts";
-import { analyzeWorkouts, type MovementsContext } from "./analyzer.ts";
+import { analyzeWorkouts, type MovementsContext } from "./analyzer-regex.ts";
 import type { LibraryEntry } from "./extract-movements-ai.ts";
 
 export type BlockType = "warm-up" | "mobility" | "strength" | "metcon" | "skills" | "accessory" | "cool-down";
@@ -104,6 +104,7 @@ function extractMovementsRegex(
   text: string,
   movementsContext?: MovementsContext
 ): ParsedBlockMovement[] {
+  if (!movementsContext) return [];
   const workouts = [{ week_num: 1, day_num: 1, workout_text: text }];
   const analysis = analyzeWorkouts(workouts, movementsContext);
   return analysis.movement_frequency.map((m) => ({
