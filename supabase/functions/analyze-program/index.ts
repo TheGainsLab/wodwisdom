@@ -80,7 +80,7 @@ function convertMetconTasks(
       load = String(task.weight);
     }
 
-    results.push({ canonical, modality, load });
+    results.push({ canonical, modality, load, block_type: "metcon" });
   }
   return results;
 }
@@ -102,9 +102,75 @@ function convertSkillsTasks(
     const canonical = match?.canonical_name ?? toSnakeCase(movementName);
     const modality = match?.modality ?? "G";
 
-    results.push({ canonical, modality, load: "BW" });
+    results.push({ canonical, modality, load: "BW", block_type: "skills" });
   }
   return results;
+}
+
+/**
+ * Convert parsed_tasks from a strength block into ExtractedMovementForAnalysis[].
+ * Strength parsed_tasks have: { movement, sets, reps, hold_seconds, notes }
+ * Loads are extracted from notes field and block_text since parsed_tasks schema
+ * doesn't include weight fields.
+ */
+function convertStrengthTasks(
+  tasks: Record<string, unknown>[],
+  blockText: string,
+  libraryEntries: LibraryEntry[]
+): ExtractedMovementForAnalysis[] {
+  const results: ExtractedMovementForAnalysis[] = [];
+  const lines = blockText.split(/\n/);
+
+  for (const task of tasks) {
+    const movementName = task.movement as string;
+    if (!movementName) continue;
+
+    const match = resolveToLibrary(movementName, libraryEntries);
+    const canonical = match?.canonical_name ?? toSnakeCase(movementName);
+    const modality = match?.modality ?? "W";
+
+    let load = extractLoadFromText(task.notes as string | null);
+
+    // If no load from notes, search block_text for lines mentioning this movement
+    if (load === "BW") {
+      const moveLower = movementName.toLowerCase();
+      for (const line of lines) {
+        if (line.toLowerCase().includes(moveLower)) {
+          const extracted = extractLoadFromText(line);
+          if (extracted !== "BW") {
+            load = extracted;
+            break;
+          }
+        }
+      }
+    }
+
+    results.push({ canonical, modality, load, block_type: "strength" });
+  }
+  return results;
+}
+
+/** Extract a numeric load from a text string using common weight patterns. */
+function extractLoadFromText(text: string | null | undefined): string {
+  if (!text) return "BW";
+  // Percentage patterns: @85%, 85%
+  const pct = text.match(/@?\s*(\d+)\s*%/);
+  if (pct) return `${pct[1]}%`;
+  // Explicit weight with unit: 185 lbs, 225#, 100kg
+  const withUnit = text.match(/(\d+)\s*(?:lbs?|#|kg)\b/i);
+  if (withUnit) return withUnit[1];
+  // Slash notation for M/F: (185/135), 185/135
+  const slash = text.match(/\(?(\d+)\s*\/\s*(\d+)\)?/);
+  if (slash) return `${slash[1]}/${slash[2]}`;
+  // Parenthesized weight: (185)
+  const parens = text.match(/\((\d+)\)/);
+  if (parens) return parens[1];
+  // Bare number after @ or following sets×reps pattern: @185, 5x5 185
+  const atNum = text.match(/@\s*(\d+)/);
+  if (atNum) return atNum[1];
+  const afterScheme = text.match(/\d+\s*[x×]\s*\d+\s+(\d{2,})/i);
+  if (afterScheme) return afterScheme[1];
+  return "BW";
 }
 
 /** Map a display movement name to a library entry via display_name, canonical_name, or aliases. */
@@ -209,7 +275,7 @@ Deno.serve(async (req) => {
 
     // For each workout, separate blocks into pre-parsed and needs-AI
     // Also build workout_text from relevant block texts for format/time-domain detection
-    const workoutsForAnalyzer: { week_num?: number; day_num?: number; workout_text: string; sort_order?: number; id?: string }[] = [];
+    const workoutsForAnalyzer: { week_num?: number; day_num?: number; workout_text: string; sort_order?: number; id?: string; metcon_text?: string; block_types?: string[] }[] = [];
     const preParsedByWorkout: (ExtractedMovementForAnalysis[] | null)[] = [];
 
     for (const w of workouts) {
@@ -223,6 +289,9 @@ Deno.serve(async (req) => {
 
       // Build workout_text from relevant block texts (for detectWorkoutFormat / inferTimeDomain)
       const workoutText = relevantBlocks.map((b) => b.block_text).join("\n");
+      const metconBlocks = relevantBlocks.filter((b) => b.block_type === "metcon");
+      const metconText = metconBlocks.map((b) => b.block_text).join("\n");
+      const blockTypes = [...new Set(relevantBlocks.map((b) => b.block_type))];
 
       workoutsForAnalyzer.push({
         id: w.id,
@@ -230,6 +299,8 @@ Deno.serve(async (req) => {
         day_num: w.day_num,
         sort_order: w.sort_order,
         workout_text: workoutText,
+        metcon_text: metconText || undefined,
+        block_types: blockTypes,
       });
 
       // Check if ALL relevant blocks have parsed_tasks
@@ -250,8 +321,7 @@ Deno.serve(async (req) => {
           } else if (block.block_type === "skills") {
             movements.push(...convertSkillsTasks(tasks, libraryEntries));
           } else if (block.block_type === "strength") {
-            // Strength blocks with parsed_tasks use same shape as skills
-            movements.push(...convertSkillsTasks(tasks, libraryEntries));
+            movements.push(...convertStrengthTasks(tasks, block.block_text, libraryEntries));
           }
         }
         preParsedByWorkout.push(movements);

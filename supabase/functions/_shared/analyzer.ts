@@ -65,10 +65,14 @@ export interface WorkoutInput {
   sort_order?: number;
   /** When present, used for AI extraction matching (e.g. program_workouts.id) */
   id?: string;
+  /** Text from metcon blocks only — used for time domain and structure analysis */
+  metcon_text?: string;
+  /** Block types present in this workout (e.g. ["strength","metcon"]) */
+  block_types?: string[];
 }
 
 /** Shape from extractor (regex or AI). canonical, modality, load required. */
-export type ExtractedMovementForAnalysis = { canonical: string; modality: string; load: string };
+export type ExtractedMovementForAnalysis = { canonical: string; modality: string; load: string; block_type?: string };
 
 export interface AnalysisOutput {
   modal_balance: Record<string, number>;
@@ -221,6 +225,34 @@ function countMetconMovements(
   return new Set(extract(text).map((m) => m.canonical)).size;
 }
 
+/**
+ * Compute load bands dynamically from actual data using tercile splits.
+ * Adapts to any program's weight range instead of hardcoded thresholds.
+ */
+function computeLoadBands(numericLoads: number[]): Record<string, number> {
+  if (numericLoads.length === 0) return {};
+  const sorted = [...numericLoads].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+
+  // All loads identical — single band
+  if (min === max) return { [String(min)]: sorted.length };
+
+  // Split into 3 bands at tercile boundaries
+  const p33 = sorted[Math.floor(sorted.length / 3)];
+  const p66 = sorted[Math.floor((2 * sorted.length) / 3)];
+
+  const bands: Record<string, number> = {};
+  for (const n of sorted) {
+    let key: string;
+    if (n <= p33) key = `≤${p33}`;
+    else if (n <= p66) key = `${p33 + 1}–${p66}`;
+    else key = `${p66 + 1}+`;
+    bands[key] = (bands[key] || 0) + 1;
+  }
+  return bands;
+}
+
 export function analyzeWorkouts(
   workouts: WorkoutInput[],
   movements?: MovementsContext,
@@ -254,18 +286,22 @@ export function analyzeWorkouts(
     const format = detectWorkoutFormat(text);
     formatCounts[format] = (formatCounts[format] || 0) + 1;
 
-    if (format !== "Strength") {
-      const domain = inferTimeDomain(text);
+    // Time domains and workout structure: only for metcon work
+    const hasMetcon = w.block_types ? w.block_types.includes("metcon") : format !== "Strength";
+    const metconText = w.metcon_text ?? text;
+
+    if (hasMetcon) {
+      const domain = inferTimeDomain(metconText);
       timeDomainCounts[domain] = (timeDomainCounts[domain] || 0) + 1;
 
-      const movesForStructure = getMoves(i);
-      const mc = new Set(movesForStructure.map((m) => m.canonical)).size;
+      // Structure counts only from metcon movements
+      const allMoves = getMoves(i);
+      const metconMoves = allMoves.filter((m) => !m.block_type || m.block_type === "metcon");
+      const mc = new Set(metconMoves.map((m) => m.canonical)).size;
       if (mc === 2) structureCounts.couplets++;
       else if (mc === 3) structureCounts.triplets++;
       else if (mc >= 4) structureCounts.chipper++;
-      else structureCounts.other++;
-    } else {
-      structureCounts.other++;
+      else if (mc > 0) structureCounts.other++;
     }
 
     const moves = getMoves(i);
@@ -316,22 +352,16 @@ export function analyzeWorkouts(
     return isNaN(n) ? null : n;
   }
 
-  const loadBands: Record<string, number> = {
-    "0–95": 0,
-    "135–185": 0,
-    "225+": 0,
-  };
+  // Collect all numeric loads for dynamic band computation
+  const numericLoads: number[] = [];
   for (const [, v] of movementTotals) {
     for (const load of v.loads) {
       if (load === "BW") continue;
       const num = toNumericLoad(load);
-      if (num !== null) {
-        if (num <= 95) loadBands["0–95"]++;
-        else if (num <= 185) loadBands["135–185"]++;
-        else loadBands["225+"]++;
-      }
+      if (num !== null) numericLoads.push(num);
     }
   }
+  const loadBands = computeLoadBands(numericLoads);
 
   const notProgrammed: Record<string, string[]> = {
     Weightlifting: [],
