@@ -12,7 +12,7 @@ const SONNET_MODEL = "claude-sonnet-4-20250514";
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
 const MAX_RETRIES = 5;
-const RETRY_DELAYS = [0, 1000, 2000, 4000, 8000];
+const RETRY_DELAYS = [0, 2000, 8000, 30000, 60000];
 
 function isRetryable(status: number, errorBody: Record<string, unknown>): boolean {
   return (
@@ -20,6 +20,20 @@ function isRetryable(status: number, errorBody: Record<string, unknown>): boolea
     status === 529 ||
     (errorBody?.error as Record<string, unknown>)?.type === "overloaded_error"
   );
+}
+
+/** Extract retry delay from Retry-After header or error body, in ms */
+function getRetryAfterMs(resp: Response, errorBody: Record<string, unknown>): number | null {
+  // Check Retry-After header (seconds)
+  const retryAfter = resp.headers.get("retry-after");
+  if (retryAfter) {
+    const secs = parseInt(retryAfter, 10);
+    if (!isNaN(secs) && secs > 0) return secs * 1000;
+  }
+  // Check error body for retryAfterMs
+  const bodyMs = (errorBody as Record<string, unknown>)?.retryAfterMs;
+  if (typeof bodyMs === "number" && bodyMs > 0) return bodyMs;
+  return null;
 }
 
 async function attempt(
@@ -59,7 +73,7 @@ export async function callClaude(opts: {
   const { apiKey, system, userContent, maxTokens } = opts;
   const msgs = [{ role: "user", content: userContent }];
 
-  // Sonnet retries with exponential backoff
+  // Sonnet retries with exponential backoff, respecting Retry-After
   for (let i = 0; i < MAX_RETRIES; i++) {
     if (RETRY_DELAYS[i] > 0) await new Promise((r) => setTimeout(r, RETRY_DELAYS[i]));
 
@@ -77,7 +91,12 @@ export async function callClaude(opts: {
     }
 
     if (i < MAX_RETRIES - 1) {
-      console.warn(`Claude Sonnet retry ${i + 1}/${MAX_RETRIES} in ${RETRY_DELAYS[i + 1]}ms`);
+      const serverDelay = getRetryAfterMs(resp, err);
+      const nextDelay = serverDelay ?? RETRY_DELAYS[i + 1];
+      console.warn(`Claude Sonnet retry ${i + 1}/${MAX_RETRIES} in ${nextDelay}ms`);
+      if (serverDelay && serverDelay > RETRY_DELAYS[i + 1]) {
+        await new Promise((r) => setTimeout(r, serverDelay - RETRY_DELAYS[i + 1]));
+      }
     }
   }
 

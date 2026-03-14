@@ -672,7 +672,7 @@ if (insertedBlocks?.length) {
       ["metcon", "skills", "strength"].includes(b.block_type)
     );
 
-    const CONCURRENCY = 10;
+    const CONCURRENCY = 3;
     for (let i = 0; i < parseable.length; i += CONCURRENCY) {
       const batch = parseable.slice(i, i + CONCURRENCY);
       await Promise.all(batch.map(async (b) => {
