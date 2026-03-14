@@ -54,9 +54,10 @@ Rules:
 - For calorie-based cardio (30 Cal Row), set reps = 30, distance = null, distance_unit = "cal".
 - For weighted movements, extract the Rx weight (first number in slash notation like 95/65 → 95).
 - Return ONE entry per unique movement, not one per round.
-- For rep-scheme workouts (21-15-9, 10-9-8…1, etc.), SUM all rounds into total reps. Example: "21-15-9 Deadlifts, Box Jumps, HSPU" → Deadlift reps: 45, Box Jump reps: 45, HSPU reps: 45.
-- For rounds-based workouts (5 RFT, 3 RFT), MULTIPLY rounds × reps. Example: "5 RFT: 15 Thrusters, 10 Pull-Ups" → Thruster reps: 75, Pull-Up reps: 50.
-- For AMRAP workouts, report reps PER ROUND (since total rounds are unknown). Example: "20 min AMRAP: 5 Pull-Ups, 10 Push-Ups" → Pull-Up reps: 5, Push-Up reps: 10.
+- Always report reps PER ROUND, never totaled across rounds.
+- For rep-scheme workouts (21-15-9, 10-9-8…1, etc.), report reps as the FIRST round only. Example: "21-15-9 Thrusters, Pull-Ups" → Thruster reps: 21, Pull-Up reps: 21.
+- For rounds-based workouts (5 RFT, 3 RFT), report the PER-ROUND reps. Example: "5 RFT: 15 Thrusters, 10 Pull-Ups" → Thruster reps: 15, Pull-Up reps: 10.
+- For AMRAP workouts, report reps PER ROUND. Example: "20 min AMRAP: 5 Pull-Ups, 10 Push-Ups" → Pull-Up reps: 5, Push-Up reps: 10.
 - Strip format headers (AMRAP, RFT, EMOM, For Time, round counts, time caps) — they are not movements.
 - Do NOT include rest periods, transitions, or coaching cues as movements.
 - Output valid JSON only, no markdown fences.`;
@@ -155,20 +156,13 @@ Deno.serve(async (req) => {
         distance_unit: typeof m.distance_unit === "string" && VALID_DISTANCE_UNITS.includes(m.distance_unit) ? m.distance_unit : null,
       }));
 
-    // Deduplicate: one row per unique movement (safety net if LLM expands rounds)
-    const seen = new Map<string, number>();
+    // Deduplicate: one row per unique movement (safety net if LLM returns duplicates)
+    const seen = new Set<string>();
     const deduped: typeof movements = [];
     for (const m of movements) {
       const key = m.movement.toLowerCase();
-      const idx = seen.get(key);
-      if (idx !== undefined) {
-        // Merge: sum reps, keep first entry's weight/distance
-        const existing = deduped[idx];
-        if (existing.reps != null && m.reps != null) {
-          existing.reps += m.reps;
-        }
-      } else {
-        seen.set(key, deduped.length);
+      if (!seen.has(key)) {
+        seen.add(key);
         deduped.push({ ...m });
       }
     }
