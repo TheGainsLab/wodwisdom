@@ -22,6 +22,19 @@ export interface WorkoutInput {
 /** Shape from extractor (regex or AI). canonical, modality, load required. */
 export type ExtractedMovementForAnalysis = { canonical: string; modality: string; load: string };
 
+/** A block with its type, parent workout context, and parsed movement data. */
+export interface BlockInput {
+  block_type: string;
+  block_text: string;
+  parsed_tasks: Record<string, unknown>[] | null;
+  /** Parent workout sort_order — used for consecutive day overlap detection */
+  sort_order: number;
+  /** Parent workout week_num */
+  week_num?: number;
+  /** Parent workout day_num */
+  day_num?: number;
+}
+
 export interface AnalysisOutput {
   modal_balance: Record<string, number>;
   time_domains: Record<string, number>;
@@ -166,12 +179,54 @@ function detectWorkoutFormat(text: string): string {
   return "Other";
 }
 
-function countMetconMovements(
-  text: string,
-  extract: (t: string) => ExtractedMovement[]
-): number {
-  return new Set(extract(text).map((m) => m.canonical)).size;
+/** Convert parsed_tasks items to ExtractedMovementForAnalysis using the movements library. */
+function parsedTasksToMovements(
+  tasks: Record<string, unknown>[],
+  blockType: string,
+  library: Record<string, { modality: "W" | "G" | "M"; category: string }>,
+): ExtractedMovementForAnalysis[] {
+  const results: ExtractedMovementForAnalysis[] = [];
+
+  for (const task of tasks) {
+    const movementName = task.movement as string | undefined;
+    if (!movementName) continue;
+
+    // Canonicalize: lowercase, replace spaces/hyphens with underscores
+    const canonical = movementName.toLowerCase().replace(/[\s-]+/g, "_");
+
+    // Look up modality from library, fall back to block type hint
+    const info = library[canonical];
+    let modality: string;
+    if (info) {
+      modality = info.modality;
+    } else if (blockType === "strength") {
+      modality = "W";
+    } else {
+      // Try category from parsed task
+      const cat = task.category as string | undefined;
+      modality = cat === "weighted" ? "W" : cat === "monostructural" ? "M" : "G";
+    }
+
+    // Build load string from structured data
+    let load = "BW";
+    if (blockType === "strength") {
+      const weight = task.weight as number | null;
+      const pct = task.percentage as number | null;
+      if (weight) load = String(weight);
+      else if (pct) load = `${pct}%`;
+    } else {
+      // metcon / skills
+      const weight = task.weight as number | null;
+      if (weight) load = String(weight);
+    }
+
+    results.push({ canonical, modality, load });
+  }
+
+  return results;
 }
+
+// ─── Legacy: workout-level analysis (used by workout-parser, incorporate-movements) ──
 
 export function analyzeWorkouts(
   workouts: WorkoutInput[],
@@ -323,6 +378,201 @@ export function analyzeWorkouts(
     notices.push("No workouts exceed 15 minutes. Consider adding at least one long time domain.");
   }
   if (modalCounts.Weightlifting === 0 && workouts.length >= 5) {
+    notices.push("No dedicated strength work detected. Consider adding barbell or loaded movements.");
+  }
+  if (overlaps.length > 0) {
+    notices.push(`${overlaps.length} day pair(s) share movements. Review for recovery.`);
+  }
+  const totalNotProg = Object.values(notProgrammed).reduce((s, arr) => s + arr.length, 0);
+  if (totalNotProg > 20) {
+    notices.push("Many movements from the CrossFit canon are not programmed. Consider variety.");
+  }
+
+  return {
+    modal_balance: modalBalance,
+    time_domains: timeDomainCounts,
+    workout_structure: structureCounts,
+    workout_formats: formatCounts,
+    movement_frequency: movementFreq,
+    notices,
+    not_programmed: notProgrammed,
+    consecutive_overlaps: overlaps,
+    loading_ratio: { loaded: loadedCount, bodyweight: bodyweightCount },
+    distinct_loads: allLoads.size,
+    load_bands: loadBands,
+  };
+}
+
+// ─── New: block-level analysis (used by analyze-program) ─────────────────────
+
+/**
+ * Analyze program using pre-parsed blocks with block_type routing:
+ * - strength/skills: modal balance + movement frequency only
+ * - metcon: full analysis (format, time domain, structure, modal balance, movement frequency)
+ * - warm-up/cool-down: skipped entirely
+ */
+export function analyzeBlocks(
+  blocks: BlockInput[],
+  movements: MovementsContext,
+): AnalysisOutput {
+  const { library, essentialCanonicals } = movements;
+
+  const modalCounts: Record<string, number> = { Weightlifting: 0, Gymnastics: 0, Monostructural: 0 };
+  const timeDomainCounts: Record<string, number> = { short: 0, medium: 0, long: 0 };
+  const structureCounts: Record<string, number> = { couplets: 0, triplets: 0, chipper: 0, other: 0 };
+  const formatCounts: Record<string, number> = {};
+  const movementTotals = new Map<string, { count: number; modality: string; loads: string[] }>();
+  const allFoundMovements = new Set<string>();
+  const notices: string[] = [];
+  let loadedCount = 0;
+  let bodyweightCount = 0;
+  const allLoads = new Set<string>();
+
+  // Group blocks by parent workout sort_order for overlap detection
+  const blocksBySortOrder = new Map<number, ExtractedMovementForAnalysis[]>();
+
+  for (const block of blocks) {
+    const { block_type, block_text, parsed_tasks, sort_order } = block;
+
+    // Skip warm-up, cool-down, mobility
+    if (["warm-up", "cool-down", "mobility"].includes(block_type)) continue;
+
+    // Get movements from parsed_tasks
+    if (!parsed_tasks || !Array.isArray(parsed_tasks) || parsed_tasks.length === 0) continue;
+
+    const moves = parsedTasksToMovements(parsed_tasks, block_type, library);
+
+    // Metcon blocks: full analysis (format, time domain, structure)
+    if (block_type === "metcon") {
+      const format = detectWorkoutFormat(block_text);
+      formatCounts[format] = (formatCounts[format] || 0) + 1;
+
+      const domain = inferTimeDomain(block_text);
+      timeDomainCounts[domain] = (timeDomainCounts[domain] || 0) + 1;
+
+      const mc = new Set(moves.map((m) => m.canonical)).size;
+      if (mc === 2) structureCounts.couplets++;
+      else if (mc === 3) structureCounts.triplets++;
+      else if (mc >= 4) structureCounts.chipper++;
+      else structureCounts.other++;
+    }
+
+    // Strength blocks: count format
+    if (block_type === "strength") {
+      formatCounts["Strength"] = (formatCounts["Strength"] || 0) + 1;
+    }
+
+    // All non-skipped blocks: modal balance + movement frequency
+    for (const m of moves) {
+      allFoundMovements.add(m.canonical);
+      const modLabel = m.modality === "W" ? "Weightlifting" : m.modality === "G" ? "Gymnastics" : "Monostructural";
+      modalCounts[modLabel] = (modalCounts[modLabel] || 0) + 1;
+
+      if (m.load === "BW") {
+        bodyweightCount++;
+      } else {
+        loadedCount++;
+        allLoads.add(m.load);
+      }
+
+      const existing = movementTotals.get(m.canonical);
+      if (existing) {
+        existing.count++;
+        existing.loads.push(m.load);
+      } else {
+        movementTotals.set(m.canonical, { count: 1, modality: m.modality, loads: [m.load] });
+      }
+    }
+
+    // Accumulate moves per sort_order for overlap detection
+    const existing = blocksBySortOrder.get(sort_order) ?? [];
+    existing.push(...moves);
+    blocksBySortOrder.set(sort_order, existing);
+  }
+
+  const modalBalance = {
+    Weightlifting: modalCounts.Weightlifting,
+    Gymnastics: modalCounts.Gymnastics,
+    Monostructural: modalCounts.Monostructural,
+  };
+
+  const movementFreq = Array.from(movementTotals.entries())
+    .map(([canonical, v]) => ({
+      name: canonical.replace(/_/g, " "),
+      count: v.count,
+      modality: v.modality,
+      loads: v.loads,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  function toNumericLoad(load: string): number | null {
+    if (load === "BW") return null;
+    const pct = load.match(/^(\d+)%$/);
+    if (pct) return parseInt(pct[1], 10);
+    const slash = load.match(/^(\d+)\/\d+$/);
+    if (slash) return parseInt(slash[1], 10);
+    const n = parseInt(load, 10);
+    return isNaN(n) ? null : n;
+  }
+
+  const loadBands: Record<string, number> = {
+    "0–95": 0,
+    "96–134": 0,
+    "135–185": 0,
+    "186–225": 0,
+    "226+": 0,
+  };
+  for (const [, v] of movementTotals) {
+    for (const load of v.loads) {
+      if (load === "BW") continue;
+      const num = toNumericLoad(load);
+      if (num !== null) {
+        if (num <= 95) loadBands["0–95"]++;
+        else if (num <= 134) loadBands["96–134"]++;
+        else if (num <= 185) loadBands["135–185"]++;
+        else if (num <= 225) loadBands["186–225"]++;
+        else loadBands["226+"]++;
+      }
+    }
+  }
+
+  const notProgrammed: Record<string, string[]> = {
+    Weightlifting: [],
+    Gymnastics: [],
+    Monostructural: [],
+  };
+  for (const canonical of essentialCanonicals) {
+    if (allFoundMovements.has(canonical)) continue;
+    const info = library[canonical];
+    const category = info?.category ?? "Weightlifting";
+    if (notProgrammed[category]) {
+      notProgrammed[category].push(canonical.replace(/_/g, " "));
+    }
+  }
+
+  // Consecutive day overlap detection
+  const overlaps: { days: string; movements: string[] }[] = [];
+  const sortOrders = [...blocksBySortOrder.keys()].sort((a, b) => a - b);
+  for (let i = 0; i < sortOrders.length - 1; i++) {
+    const curr = sortOrders[i];
+    const next = sortOrders[i + 1];
+    if (next !== curr + 1) continue;
+
+    const currMoves = new Set(blocksBySortOrder.get(curr)!.map((m) => m.canonical));
+    const nextMoves = blocksBySortOrder.get(next)!.map((m) => m.canonical);
+    const shared = [...new Set(nextMoves.filter((c) => currMoves.has(c)))];
+    if (shared.length > 0) {
+      overlaps.push({
+        days: `Days ${curr + 1}–${next + 1}`,
+        movements: shared.map((c) => c.replace(/_/g, " ")),
+      });
+    }
+  }
+
+  if (timeDomainCounts.long === 0 && sortOrders.length >= 5) {
+    notices.push("No workouts exceed 15 minutes. Consider adding at least one long time domain.");
+  }
+  if (modalCounts.Weightlifting === 0 && sortOrders.length >= 5) {
     notices.push("No dedicated strength work detected. Consider adding barbell or loaded movements.");
   }
   if (overlaps.length > 0) {
