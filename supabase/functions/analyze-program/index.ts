@@ -71,11 +71,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: workouts, error: wErr } = await supa
-      .from("program_workouts")
-      .select("id, week_num, day_num, workout_text, sort_order")
-      .eq("program_id", program_id)
-      .order("sort_order");
+    // Fetch workouts (for sort_order/week/day) and movements in parallel
+    const [workoutsResult, movementsResult] = await Promise.all([
+      supa
+        .from("program_workouts")
+        .select("id, week_num, day_num, sort_order")
+        .eq("program_id", program_id)
+        .order("sort_order"),
+      supa
+        .from("movements")
+        .select("canonical_name, display_name, modality, category, aliases, competition_count"),
+    ]);
+
+    const { data: workouts, error: wErr } = workoutsResult;
+    const { data: movementsData } = movementsResult;
 
     if (wErr || !workouts?.length) {
       return new Response(
@@ -84,9 +93,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: movementsData } = await supa
-      .from("movements")
-      .select("canonical_name, display_name, modality, category, aliases, competition_count");
+    // Fetch blocks for these workouts
+    const workoutIds = workouts.map((w: { id: string }) => w.id);
+    const { data: blocks, error: bErr } = await supa
+      .from("program_workout_blocks")
+      .select("id, program_workout_id, block_type, block_order, block_text, parsed_tasks")
+      .in("program_workout_id", workoutIds)
+      .order("block_order");
+
+    if (bErr || !blocks?.length) {
+      return new Response(
+        JSON.stringify({ error: "No workout blocks found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const rows: MovementsRow[] = (movementsData || []) as MovementsRow[];
     const movementsContext = rows.length > 0 ? buildMovementsContext(rows) : undefined;
