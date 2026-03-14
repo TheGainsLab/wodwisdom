@@ -503,7 +503,42 @@ for (const b of blocks) {
 }
 }
 if (blockRows.length > 0) {
-await supa.from("program_workout_blocks").insert(blockRows);
+const { data: insertedBlocks } = await supa
+  .from("program_workout_blocks")
+  .insert(blockRows)
+  .select("id, block_type, block_text");
+
+// Parse all blocks in parallel (metcon, skills, strength)
+if (insertedBlocks?.length) {
+  const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+  if (ANTHROPIC_API_KEY) {
+    const parsePromises = insertedBlocks
+      .filter((b) => ["metcon", "skills", "strength"].includes(b.block_type))
+      .map(async (b) => {
+        const fnName =
+          b.block_type === "metcon" ? "parse-metcon" :
+          b.block_type === "skills" ? "parse-skills" :
+          "parse-strength";
+        try {
+          const resp = await fetch(`${SUPABASE_URL}/functions/v1/${fnName}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+            },
+            body: JSON.stringify({ block_text: b.block_text, block_id: b.id }),
+          });
+          if (!resp.ok) {
+            console.error(`[preprocess-program] ${fnName} failed for block ${b.id}:`, resp.status);
+          }
+        } catch (e) {
+          console.error(`[preprocess-program] ${fnName} error for block ${b.id}:`, e);
+        }
+      });
+    await Promise.all(parsePromises);
+    console.log(`[preprocess-program] parsed ${parsePromises.length} blocks`);
+  }
+}
 }
 }
 // Call analyze-program with service-role auth + user_id in body

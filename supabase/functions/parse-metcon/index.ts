@@ -89,16 +89,20 @@ Deno.serve(async (req) => {
 
     const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const token = authHeader.replace("Bearer ", "");
-    const {
-      data: { user },
-      error: authErr,
-    } = await supa.auth.getUser(token);
 
-    if (authErr || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+    // Allow service-role calls (from preprocess-program) without user validation
+    if (token !== SUPABASE_SERVICE_KEY) {
+      const {
+        data: { user },
+        error: authErr,
+      } = await supa.auth.getUser(token);
+
+      if (authErr || !user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const { block_text, block_id } = await req.json();

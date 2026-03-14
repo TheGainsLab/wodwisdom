@@ -1,8 +1,8 @@
 /**
- * parse-skills: Parse a skills block text into individual structured movements.
+ * parse-strength: Parse a strength block text into individual structured movements.
  *
  * Input:  { block_text: string, block_id?: string }
- * Output: { skills: ParsedSkill[] }
+ * Output: { movements: ParsedStrengthMovement[] }
  *
  * If block_id is provided, writes the result back to program_workout_blocks.parsed_tasks.
  */
@@ -21,33 +21,51 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const SYSTEM_PROMPT = `You parse CrossFit/fitness skill block descriptions into individual movements.
+const SYSTEM_PROMPT = `You parse CrossFit/fitness strength block descriptions into individual movements.
 
 Return ONLY a JSON array. Each element:
 {
-  "movement": "Clean, capitalized movement name",
+  "movement": "Clean, canonical movement name",
   "sets": <number or null>,
   "reps": <number or null>,
-  "hold_seconds": <number or null>,
-  "notes": "<any modifier like 'from 10ft', 'deficit', 'strict', etc. or null>"
+  "weight": <number or null>,
+  "weight_unit": "lbs" | "kg" | null,
+  "percentage": <number or null>,
+  "notes": "<any modifier like 'tempo 3010', 'from blocks', 'paused', etc. or null>"
 }
 
 Rules:
-- Split compound entries (joined by +, &, commas, newlines) into SEPARATE objects.
-- "4x5 Kipping Pull-Ups" → sets: 4, reps: 5.
-- "3 legless rope climb descents from 10ft" → sets: null, reps: 3, notes: "from 10ft".
-- ":30 L-sit hold" → hold_seconds: 30, sets: null, reps: null.
-- Strip structure headers (EMOM, rounds, "for quality", minute markers) — they are not movements.
-- Do NOT include rest periods, coaching cues, or tempo prescriptions as separate movements.
+- Extract each distinct movement from the strength block.
+- Use CANONICAL movement names. Normalize variations:
+  - "Back Squat", "Back Squats", "BSQ" → "Back Squat"
+  - "Deadlift", "Deadlifts", "DL" → "Deadlift"
+  - "Bench Press", "Bench" → "Bench Press"
+  - "Front Squat", "Front Squats", "FSQ" → "Front Squat"
+  - "Strict Press", "Shoulder Press", "Press" → "Strict Press"
+  - "Power Clean", "P. Clean", "PC" → "Power Clean"
+  - Use title case for movement names.
+- For sets×reps notation: "5×3" → sets: 5, reps: 3. "3x5" → sets: 3, reps: 5.
+- For percentage prescriptions: "@80%" or "@ 80-85%" → percentage: 80 (use lowest value in range).
+- For absolute weights: "225 lbs" or "(225/155)" → weight: 225, weight_unit: "lbs".
+  - For slash notation like "225/155" (male/female), use the FIRST number as weight.
+- For weight in parentheses after percentage like "@ 80% (315/225)" → percentage: 80, weight: 315.
+- If both percentage and weight are present, include both.
+- Put modifiers (tempo, pauses, deficit, from blocks, build to, etc.) in notes.
+- Return ONE entry per unique movement.
+- Do NOT include rest periods, coaching cues, or warm-up instructions as movements.
 - Output valid JSON only, no markdown fences.`;
 
-interface ParsedSkill {
+interface ParsedStrengthMovement {
   movement: string;
   sets: number | null;
   reps: number | null;
-  hold_seconds: number | null;
+  weight: number | null;
+  weight_unit: "lbs" | "kg" | null;
+  percentage: number | null;
   notes: string | null;
 }
+
+const VALID_WEIGHT_UNITS = ["lbs", "kg"];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -103,35 +121,49 @@ Deno.serve(async (req) => {
     });
 
     // Parse and validate
-    let skills: ParsedSkill[];
+    let movements: ParsedStrengthMovement[];
     try {
       const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
-      skills = JSON.parse(cleaned);
-      if (!Array.isArray(skills)) throw new Error("Expected array");
+      movements = JSON.parse(cleaned);
+      if (!Array.isArray(movements)) throw new Error("Expected array");
     } catch {
       console.error("Failed to parse Claude response:", raw);
       return new Response(
-        JSON.stringify({ error: "Failed to parse skills", raw }),
+        JSON.stringify({ error: "Failed to parse movements", raw }),
         { status: 502, headers: { ...cors, "Content-Type": "application/json" } },
       );
     }
 
-    // Normalize
-    skills = skills
-      .filter((s) => s.movement && typeof s.movement === "string")
-      .map((s) => ({
-        movement: s.movement.trim(),
-        sets: typeof s.sets === "number" ? s.sets : null,
-        reps: typeof s.reps === "number" ? s.reps : null,
-        hold_seconds: typeof s.hold_seconds === "number" ? s.hold_seconds : null,
-        notes: typeof s.notes === "string" && s.notes.trim() ? s.notes.trim() : null,
+    // Normalize and validate
+    movements = movements
+      .filter((m) => m.movement && typeof m.movement === "string")
+      .map((m) => ({
+        movement: m.movement.trim(),
+        sets: typeof m.sets === "number" ? m.sets : null,
+        reps: typeof m.reps === "number" ? m.reps : null,
+        weight: typeof m.weight === "number" ? m.weight : null,
+        weight_unit: typeof m.weight_unit === "string" && VALID_WEIGHT_UNITS.includes(m.weight_unit) ? m.weight_unit as "lbs" | "kg" : null,
+        percentage: typeof m.percentage === "number" ? m.percentage : null,
+        notes: typeof m.notes === "string" && m.notes.trim() ? m.notes.trim() : null,
       }));
+
+    // Deduplicate: one row per unique movement
+    const seen = new Map<string, number>();
+    const deduped: typeof movements = [];
+    for (const m of movements) {
+      const key = m.movement.toLowerCase();
+      if (!seen.has(key)) {
+        seen.set(key, deduped.length);
+        deduped.push({ ...m });
+      }
+    }
+    movements = deduped;
 
     // Write back to DB if block_id provided
     if (block_id) {
       const { error: updateErr } = await supa
         .from("program_workout_blocks")
-        .update({ parsed_tasks: skills })
+        .update({ parsed_tasks: movements })
         .eq("id", block_id);
 
       if (updateErr) {
@@ -139,11 +171,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ skills }), {
+    return new Response(JSON.stringify({ movements }), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error("parse-skills error:", err);
+    console.error("parse-strength error:", err);
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...cors, "Content-Type": "application/json" } },

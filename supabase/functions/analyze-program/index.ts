@@ -109,17 +109,14 @@ function convertSkillsTasks(
 
 /**
  * Convert parsed_tasks from a strength block into ExtractedMovementForAnalysis[].
- * Strength parsed_tasks have: { movement, sets, reps, hold_seconds, notes }
- * Loads are extracted from notes field and block_text since parsed_tasks schema
- * doesn't include weight fields.
+ * Strength parsed_tasks have: { movement, sets, reps, weight, weight_unit, percentage, notes }
  */
 function convertStrengthTasks(
   tasks: Record<string, unknown>[],
-  blockText: string,
+  _blockText: string,
   libraryEntries: LibraryEntry[]
 ): ExtractedMovementForAnalysis[] {
   const results: ExtractedMovementForAnalysis[] = [];
-  const lines = blockText.split(/\n/);
 
   for (const task of tasks) {
     const movementName = task.movement as string;
@@ -129,48 +126,19 @@ function convertStrengthTasks(
     const canonical = match?.canonical_name ?? toSnakeCase(movementName);
     const modality = match?.modality ?? "W";
 
-    let load = extractLoadFromText(task.notes as string | null);
+    let load = "BW";
+    const percentage = task.percentage as number | null;
+    const weight = task.weight as number | null;
 
-    // If no load from notes, search block_text for lines mentioning this movement
-    if (load === "BW") {
-      const moveLower = movementName.toLowerCase();
-      for (const line of lines) {
-        if (line.toLowerCase().includes(moveLower)) {
-          const extracted = extractLoadFromText(line);
-          if (extracted !== "BW") {
-            load = extracted;
-            break;
-          }
-        }
-      }
+    if (percentage != null && percentage > 0) {
+      load = `${percentage}%`;
+    } else if (weight != null && weight > 0) {
+      load = String(weight);
     }
 
     results.push({ canonical, modality, load, block_type: "strength" });
   }
   return results;
-}
-
-/** Extract a numeric load from a text string using common weight patterns. */
-function extractLoadFromText(text: string | null | undefined): string {
-  if (!text) return "BW";
-  // Percentage patterns: @85%, 85%
-  const pct = text.match(/@?\s*(\d+)\s*%/);
-  if (pct) return `${pct[1]}%`;
-  // Explicit weight with unit: 185 lbs, 225#, 100kg
-  const withUnit = text.match(/(\d+)\s*(?:lbs?|#|kg)\b/i);
-  if (withUnit) return withUnit[1];
-  // Slash notation for M/F: (185/135), 185/135
-  const slash = text.match(/\(?(\d+)\s*\/\s*(\d+)\)?/);
-  if (slash) return `${slash[1]}/${slash[2]}`;
-  // Parenthesized weight: (185)
-  const parens = text.match(/\((\d+)\)/);
-  if (parens) return parens[1];
-  // Bare number after @ or following sets×reps pattern: @185, 5x5 185
-  const atNum = text.match(/@\s*(\d+)/);
-  if (atNum) return atNum[1];
-  const afterScheme = text.match(/\d+\s*[x×]\s*\d+\s+(\d{2,})/i);
-  if (afterScheme) return afterScheme[1];
-  return "BW";
 }
 
 /** Map a display movement name to a library entry via display_name, canonical_name, or aliases. */
@@ -276,7 +244,8 @@ Deno.serve(async (req) => {
     // For each workout, separate blocks into pre-parsed and needs-AI
     // Also build workout_text from relevant block texts for format/time-domain detection
     const workoutsForAnalyzer: { week_num?: number; day_num?: number; workout_text: string; sort_order?: number; id?: string; metcon_text?: string; block_types?: string[] }[] = [];
-    const preParsedByWorkout: (ExtractedMovementForAnalysis[] | null)[] = [];
+    const preParsedByWorkout: ExtractedMovementForAnalysis[][] = [];
+    const unparsedByWorkout: { index: number; text: string }[] = [];
 
     for (const w of workouts) {
       const allBlocks: BlockRow[] = (
@@ -303,18 +272,12 @@ Deno.serve(async (req) => {
         block_types: blockTypes,
       });
 
-      // Check if ALL relevant blocks have parsed_tasks
-      const parsedBlocks = relevantBlocks.filter(
-        (b) => Array.isArray(b.parsed_tasks) && b.parsed_tasks.length > 0
-      );
-      const unparsedBlocks = relevantBlocks.filter(
-        (b) => !Array.isArray(b.parsed_tasks) || b.parsed_tasks.length === 0
-      );
+      // Convert all parsed blocks; collect unparsed block texts for fallback
+      const movements: ExtractedMovementForAnalysis[] = [];
+      const unparsedTexts: string[] = [];
 
-      if (unparsedBlocks.length === 0 && parsedBlocks.length > 0) {
-        // All blocks pre-parsed — convert directly
-        const movements: ExtractedMovementForAnalysis[] = [];
-        for (const block of parsedBlocks) {
+      for (const block of relevantBlocks) {
+        if (Array.isArray(block.parsed_tasks) && block.parsed_tasks.length > 0) {
           const tasks = block.parsed_tasks as Record<string, unknown>[];
           if (block.block_type === "metcon") {
             movements.push(...convertMetconTasks(tasks, libraryEntries));
@@ -323,27 +286,25 @@ Deno.serve(async (req) => {
           } else if (block.block_type === "strength") {
             movements.push(...convertStrengthTasks(tasks, block.block_text, libraryEntries));
           }
+        } else {
+          unparsedTexts.push(block.block_text);
         }
-        preParsedByWorkout.push(movements);
-      } else {
-        // Some blocks need AI — mark this workout for AI extraction
-        preParsedByWorkout.push(null);
       }
+
+      if (unparsedTexts.length > 0) {
+        // Some blocks lack parsed_tasks — mark for AI/regex fallback on unparsed text only
+        unparsedByWorkout.push({ index: workoutsForAnalyzer.length - 1, text: unparsedTexts.join("\n") });
+      }
+      preParsedByWorkout.push(movements);
     }
 
-    let analysis;
     let extractionNotices: string[] = [];
 
-    // Identify workouts that need AI extraction
-    const needsAiIndices = preParsedByWorkout
-      .map((v, i) => (v === null ? i : -1))
-      .filter((i) => i >= 0);
-
-    if (libraryEntries.length > 0 && ANTHROPIC_API_KEY && needsAiIndices.length > 0) {
-      // Send only unparsed workouts to AI
-      const workoutsForAI = needsAiIndices.map((i) => ({
-        id: workoutsForAnalyzer[i].id!,
-        workout_text: workoutsForAnalyzer[i].workout_text,
+    // AI extraction for workouts with unparsed blocks (legacy data without parsed_tasks)
+    if (libraryEntries.length > 0 && ANTHROPIC_API_KEY && unparsedByWorkout.length > 0) {
+      const workoutsForAI = unparsedByWorkout.map((u) => ({
+        id: workoutsForAnalyzer[u.index].id!,
+        workout_text: u.text,
       }));
 
       const extractionResult = await extractMovementsAI(
@@ -354,40 +315,24 @@ Deno.serve(async (req) => {
 
       if (extractionResult) {
         extractionNotices = extractionResult.notices;
-        // Merge AI results into the pre-parsed array
-        for (let ai = 0; ai < needsAiIndices.length; ai++) {
-          preParsedByWorkout[needsAiIndices[ai]] = extractionResult.movements[ai] ?? [];
+        for (let ai = 0; ai < unparsedByWorkout.length; ai++) {
+          const idx = unparsedByWorkout[ai].index;
+          const aiMoves = extractionResult.movements[ai] ?? [];
+          preParsedByWorkout[idx].push(...aiMoves);
         }
       } else {
-        console.warn("AI extraction failed for unparsed workouts, falling back to regex");
+        console.warn("AI extraction failed for unparsed blocks, falling back to regex");
         extractionNotices = ["Movement extraction used fallback method for some workouts."];
-        // Leave nulls — analyzer will use regex fallback
+        // Unparsed blocks left empty — analyzer's regex fallback will handle them
+        // only if no pre-extracted data is provided for that workout
       }
     }
 
-    // Build final extractedByWorkout array (nulls become undefined → analyzer uses regex)
-    const extractedByWorkout: ExtractedMovementForAnalysis[][] | undefined =
-      preParsedByWorkout.every((v) => v !== null)
-        ? (preParsedByWorkout as ExtractedMovementForAnalysis[][])
-        : undefined;
-
-    if (extractedByWorkout) {
-      analysis = analyzeWorkouts(workoutsForAnalyzer, movementsContext, extractedByWorkout);
-    } else {
-      // Partial: some workouts have extractions, some don't.
-      // Build a mixed array where null slots get regex fallback from analyzer.
-      // We pass the full array and let analyzer's getMoves handle the fallback per-index.
-      const mixed: ExtractedMovementForAnalysis[][] = preParsedByWorkout.map(
-        (v) => v ?? []
-      );
-      // Only pass mixed if we have at least some pre-parsed data
-      const hasAnyData = mixed.some((m) => m.length > 0);
-      analysis = analyzeWorkouts(
-        workoutsForAnalyzer,
-        movementsContext,
-        hasAnyData ? mixed : undefined
-      );
-    }
+    const analysis = analyzeWorkouts(
+      workoutsForAnalyzer,
+      movementsContext,
+      preParsedByWorkout
+    );
 
     if (ANTHROPIC_API_KEY) {
       const notices = await generateNoticesAI(analysis, ANTHROPIC_API_KEY);
