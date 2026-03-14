@@ -208,9 +208,7 @@ async function processJob(
   userId: string,
   evalRow: {
     profile_snapshot: ProfileData;
-    lifting_analysis: string | null;
-    skills_analysis: string | null;
-    engine_analysis: string | null;
+    analysis: string | null;
   }
 ): Promise<void> {
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -222,12 +220,8 @@ async function processJob(
     const profile = evalRow.profile_snapshot || {};
     const profileStr = formatProfile(profile);
     console.log(`[${jobId}] Profile: ${profileStr.length} chars, lifts=${Object.keys(profile.lifts || {}).length}, skills=${Object.keys(profile.skills || {}).length}`);
-    const analysisParts: string[] = [];
-    if (evalRow.lifting_analysis) analysisParts.push("STRENGTH ANALYSIS:\n" + evalRow.lifting_analysis);
-    if (evalRow.skills_analysis) analysisParts.push("SKILLS ANALYSIS:\n" + evalRow.skills_analysis);
-    // Engine analysis intentionally excluded — it causes the LLM to stuff row/run into every metcon
-    const analysisStr = analysisParts.length > 0 ? analysisParts.join("\n\n") : "No detailed analysis.";
-    console.log(`[${jobId}] Analysis sections: lifting=${!!evalRow.lifting_analysis}, skills=${!!evalRow.skills_analysis}, engine=${!!evalRow.engine_analysis}, total=${analysisStr.length} chars`);
+    const analysisStr = evalRow.analysis || "No detailed analysis.";
+    console.log(`[${jobId}] Analysis: ${analysisStr.length} chars`);
     const recentTraining = await fetchAndFormatRecentHistory(supa, userId, { maxLines: 25 });
     const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
     console.log(`[${jobId}] Training history: ${recentTraining ? recentTraining.length + ' chars' : 'none'}`);
@@ -525,14 +519,12 @@ Deno.serve(async (req) => {
     // Fetch evaluation: use provided id, or most recent
     let evalRow: {
       profile_snapshot: ProfileData;
-      lifting_analysis: string | null;
-      skills_analysis: string | null;
-      engine_analysis: string | null;
+      analysis: string | null;
     } | null = null;
     if (evaluationId) {
       const { data } = await supa
         .from("profile_evaluations")
-        .select("profile_snapshot, lifting_analysis, skills_analysis, engine_analysis")
+        .select("profile_snapshot, analysis")
         .eq("id", evaluationId)
         .eq("user_id", user.id)
         .maybeSingle();
@@ -541,7 +533,7 @@ Deno.serve(async (req) => {
     if (!evalRow) {
       const { data } = await supa
         .from("profile_evaluations")
-        .select("profile_snapshot, lifting_analysis, skills_analysis, engine_analysis")
+        .select("profile_snapshot, analysis")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)

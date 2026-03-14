@@ -183,11 +183,16 @@ interface ProfileSnapshot {
 
 interface Evaluation {
   id: string;
-  type: string;
   profile_snapshot: ProfileSnapshot;
-  lifting_analysis: string | null;
-  skills_analysis: string | null;
-  engine_analysis: string | null;
+  analysis: string | null;
+  created_at: string;
+}
+
+interface TrainingEvaluation {
+  id: string;
+  profile_snapshot: ProfileSnapshot;
+  training_snapshot: string | null;
+  analysis: string | null;
   created_at: string;
 }
 
@@ -310,8 +315,8 @@ export default function AthletePage({ session }: { session: Session }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [analysisResult, setAnalysisResult] = useState<{ type: 'lifts' | 'skills' | 'engine' | 'full'; text: string; evaluationId?: string | null } | null>(null);
-  const [analysisLoading, setAnalysisLoading] = useState<'lifts' | 'skills' | 'engine' | 'full' | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<{ kind: 'profile' | 'training'; text: string; evaluationId?: string | null } | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState<'profile' | 'training' | null>(null);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [tdeeOverride, setTdeeOverride] = useState<string>('');
   const [editingTdee, setEditingTdee] = useState(false);
@@ -320,16 +325,26 @@ export default function AthletePage({ session }: { session: Session }) {
 
   // Evaluation history
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+  const [trainingEvaluations, setTrainingEvaluations] = useState<TrainingEvaluation[]>([]);
   const [expandedEvalId, setExpandedEvalId] = useState<string | null>(null);
 
   const fetchEvaluations = async () => {
-    const { data } = await supabase
-      .from('profile_evaluations')
-      .select('id, type, profile_snapshot, lifting_analysis, skills_analysis, engine_analysis, created_at')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    if (data) setEvaluations(data);
+    const [profileRes, trainingRes] = await Promise.all([
+      supabase
+        .from('profile_evaluations')
+        .select('id, profile_snapshot, analysis, created_at')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(20),
+      supabase
+        .from('training_evaluations')
+        .select('id, profile_snapshot, training_snapshot, analysis, created_at')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(20),
+    ]);
+    if (profileRes.data) setEvaluations(profileRes.data);
+    if (trainingRes.data) setTrainingEvaluations(trainingRes.data);
   };
 
   useEffect(() => {
@@ -341,11 +356,17 @@ export default function AthletePage({ session }: { session: Session }) {
         .maybeSingle(),
       supabase
         .from('profile_evaluations')
-        .select('id, type, profile_snapshot, lifting_analysis, skills_analysis, engine_analysis, created_at')
+        .select('id, profile_snapshot, analysis, created_at')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(20),
-    ]).then(([profileRes, evalRes]) => {
+      supabase
+        .from('training_evaluations')
+        .select('id, profile_snapshot, training_snapshot, analysis, created_at')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(20),
+    ]).then(([profileRes, evalRes, trainingEvalRes]) => {
       if (profileRes.data) {
         const d = profileRes.data;
         setLifts(d.lifts || {});
@@ -361,9 +382,8 @@ export default function AthletePage({ session }: { session: Session }) {
         setGender((d.gender as 'male' | 'female') || '');
         setTdeeOverride(d.tdee_override != null ? String(d.tdee_override) : '');
       }
-      if (evalRes.data) {
-        setEvaluations(evalRes.data);
-      }
+      if (evalRes.data) setEvaluations(evalRes.data);
+      if (trainingEvalRes.data) setTrainingEvaluations(trainingEvalRes.data);
       setLoading(false);
     });
   }, [session.user.id]);
@@ -390,22 +410,44 @@ export default function AthletePage({ session }: { session: Session }) {
     }
   };
 
-  const fetchProfileAnalysis = async (type: 'lifts' | 'skills' | 'engine' | 'full') => {
-    setAnalysisLoading(type);
+  const fetchProfileAnalysis = async () => {
+    setAnalysisLoading('profile');
     setAnalysisResult(null);
     setError('');
     try {
       const { data, error } = await supabase.functions.invoke('profile-analysis', {
-        body: { type },
+        body: {},
       });
       if (error) throw new Error(error.message || 'Analysis failed');
       if (data?.error) throw new Error(data.error || 'Analysis failed');
       setAnalysisResult({
-        type,
+        kind: 'profile',
         text: data?.analysis,
         evaluationId: data?.evaluation_id ?? null,
       });
-      // Refresh evaluation history after new analysis is saved
+      fetchEvaluations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Analysis failed');
+    } finally {
+      setAnalysisLoading(null);
+    }
+  };
+
+  const fetchTrainingAnalysis = async () => {
+    setAnalysisLoading('training');
+    setAnalysisResult(null);
+    setError('');
+    try {
+      const { data, error } = await supabase.functions.invoke('training-analysis', {
+        body: {},
+      });
+      if (error) throw new Error(error.message || 'Analysis failed');
+      if (data?.error) throw new Error(data.error || 'Analysis failed');
+      setAnalysisResult({
+        kind: 'training',
+        text: data?.analysis,
+        evaluationId: data?.evaluation_id ?? null,
+      });
       fetchEvaluations();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
@@ -794,8 +836,8 @@ export default function AthletePage({ session }: { session: Session }) {
                   ))}
                 </CollapsibleSection>
 
-                {/* AI Profile Analysis */}
-                <CollapsibleSection title="AI Profile Analysis">
+                {/* AI Analysis */}
+                <CollapsibleSection title="AI Analysis">
                   <div style={{ borderColor: 'rgba(255,58,58,.2)', background: 'var(--accent-glow)', padding: 16, borderRadius: 8, marginBottom: 16 }}>
                   <p className="athlete-card-subtitle">Save your profile first, then analyze. Results are saved for comparison over time.</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
@@ -803,27 +845,38 @@ export default function AthletePage({ session }: { session: Session }) {
                       type="button"
                       className="auth-btn"
                       style={{ background: 'var(--surface2)', color: 'var(--text)' }}
-                      onClick={() => fetchProfileAnalysis('full')}
+                      onClick={fetchProfileAnalysis}
                       disabled={!!analysisLoading}
                     >
-                      {analysisLoading === 'full' ? 'Analyzing...' : 'AI Full Profile'}
+                      {analysisLoading === 'profile' ? 'Analyzing...' : 'Profile Analysis'}
+                    </button>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      style={{ background: 'var(--surface2)', color: 'var(--text)' }}
+                      onClick={fetchTrainingAnalysis}
+                      disabled={!!analysisLoading}
+                    >
+                      {analysisLoading === 'training' ? 'Analyzing...' : 'Training Analysis'}
                     </button>
                   </div>
                   {analysisResult && (
                     <div className="workout-review-section" style={{ marginTop: 0 }}>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
-                        {analysisResult.type === 'lifts' ? 'Lifting' : analysisResult.type === 'skills' ? 'Skills' : analysisResult.type === 'engine' ? 'Engine' : 'Full Profile'}
+                        {analysisResult.kind === 'profile' ? 'Profile Evaluation' : 'Training Evaluation'}
                       </h3>
                       <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(analysisResult.text) }} />
-                      <button
-                        type="button"
-                        className="auth-btn"
-                        onClick={handleGenerateProgram}
-                        disabled={generateLoading}
-                        style={{ marginTop: 14 }}
-                      >
-                        {generateLoading ? 'Generating...' : 'Generate program'}
-                      </button>
+                      {analysisResult.kind === 'profile' && (
+                        <button
+                          type="button"
+                          className="auth-btn"
+                          onClick={handleGenerateProgram}
+                          disabled={generateLoading}
+                          style={{ marginTop: 14 }}
+                        >
+                          {generateLoading ? 'Generating...' : 'Generate program'}
+                        </button>
+                      )}
                     </div>
                   )}
                   </div>
@@ -839,104 +892,128 @@ export default function AthletePage({ session }: { session: Session }) {
                 </button>
 
                 {/* Evaluation History */}
-                {evaluations.length > 0 && (
+                {(evaluations.length > 0 || trainingEvaluations.length > 0) && (
                   <CollapsibleSection title="Evaluation History">
-                  <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>Past AI evaluations with profile snapshots. Click to expand.</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {evaluations.map((ev, idx) => {
-                        const isExpanded = expandedEvalId === ev.id;
-                        const prevEval = evaluations[idx + 1] || null;
-                        const diffs = prevEval ? buildProfileDiffs(prevEval.profile_snapshot, ev.profile_snapshot) : [];
-                        const typeLabel = ev.type === 'full' ? 'Full' : ev.type === 'lifts' ? 'Lifting' : ev.type === 'skills' ? 'Skills' : ev.type === 'engine' ? 'Engine' : 'Full';
-                        const analysisTypes: string[] = [];
-                        if (ev.lifting_analysis) analysisTypes.push('Lifting');
-                        if (ev.skills_analysis) analysisTypes.push('Skills');
-                        if (ev.engine_analysis) analysisTypes.push('Engine');
+                  <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>Past AI evaluations. Click to expand.</p>
 
-                        return (
-                          <div key={ev.id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                            <button
-                              type="button"
-                              onClick={() => setExpandedEvalId(isExpanded ? null : ev.id)}
-                              style={{
-                                width: '100%',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                padding: '12px 16px',
-                                background: 'var(--bg)',
-                                border: 'none',
-                                color: 'var(--text)',
-                                cursor: 'pointer',
-                                fontFamily: 'inherit',
-                                fontSize: 14,
-                              }}
-                            >
-                              <span style={{ fontWeight: 600 }}>{formatDate(ev.created_at)}</span>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--surface2)', color: 'var(--accent)' }}>{typeLabel}</span>
-                                {ev.type === 'full' && <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{analysisTypes.join(', ')}</span>}
+                  {evaluations.length > 0 && (
+                    <>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>Profile Evaluations</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: trainingEvaluations.length > 0 ? 20 : 0 }}>
+                        {evaluations.map((ev, idx) => {
+                          const isExpanded = expandedEvalId === ev.id;
+                          const prevEval = evaluations[idx + 1] || null;
+                          const diffs = prevEval ? buildProfileDiffs(prevEval.profile_snapshot, ev.profile_snapshot) : [];
+
+                          return (
+                            <div key={ev.id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedEvalId(isExpanded ? null : ev.id)}
+                                style={{
+                                  width: '100%',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  padding: '12px 16px',
+                                  background: 'var(--bg)',
+                                  border: 'none',
+                                  color: 'var(--text)',
+                                  cursor: 'pointer',
+                                  fontFamily: 'inherit',
+                                  fontSize: 14,
+                                }}
+                              >
+                                <span style={{ fontWeight: 600 }}>{formatDate(ev.created_at)}</span>
                                 <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
-                              </span>
-                            </button>
-                            {isExpanded && (
-                              <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-                                {/* Profile changes since previous eval */}
-                                {diffs.length > 0 && (
-                                  <div style={{ marginBottom: 16 }}>
-                                    <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: '#2ec486', marginBottom: 8 }}>
-                                      Changes since {formatDate(prevEval!.created_at)}
-                                    </h4>
-                                    <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-dim)' }}>
-                                      {diffs.map((d, i) => <div key={i}>{d}</div>)}
-                                    </div>
-                                  </div>
-                                )}
-                                {idx === evaluations.length - 1 && diffs.length === 0 && (
-                                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12, fontStyle: 'italic' }}>First evaluation — no prior data to compare.</div>
-                                )}
-
-                                {/* Compare snapshot to current profile */}
-                                {idx > 0 || true ? (() => {
-                                  const currentDiffs = buildProfileDiffs(ev.profile_snapshot, currentSnapshot);
-                                  if (currentDiffs.length === 0) return null;
-                                  return (
+                              </button>
+                              {isExpanded && (
+                                <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                                  {diffs.length > 0 && (
                                     <div style={{ marginBottom: 16 }}>
-                                      <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 8 }}>
-                                        Changes since then (vs current)
+                                      <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: '#2ec486', marginBottom: 8 }}>
+                                        Changes since {formatDate(prevEval!.created_at)}
                                       </h4>
                                       <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-dim)' }}>
-                                        {currentDiffs.map((d, i) => <div key={i}>{d}</div>)}
+                                        {diffs.map((d, i) => <div key={i}>{d}</div>)}
                                       </div>
                                     </div>
-                                  );
-                                })() : null}
+                                  )}
+                                  {idx === evaluations.length - 1 && diffs.length === 0 && (
+                                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12, fontStyle: 'italic' }}>First evaluation — no prior data to compare.</div>
+                                  )}
+                                  {(() => {
+                                    const currentDiffs = buildProfileDiffs(ev.profile_snapshot, currentSnapshot);
+                                    if (currentDiffs.length === 0) return null;
+                                    return (
+                                      <div style={{ marginBottom: 16 }}>
+                                        <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 8 }}>
+                                          Changes since then (vs current)
+                                        </h4>
+                                        <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-dim)' }}>
+                                          {currentDiffs.map((d, i) => <div key={i}>{d}</div>)}
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                  {ev.analysis && (
+                                    <div className="workout-review-section" style={{ marginTop: 0 }}>
+                                      <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.analysis) }} />
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
 
-                                {/* Analysis text */}
-                                {ev.lifting_analysis && (
-                                  <div className="workout-review-section" style={{ marginTop: 0, marginBottom: ev.skills_analysis || ev.engine_analysis ? 12 : 0 }}>
-                                    <h3>Lifting</h3>
-                                    <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.lifting_analysis) }} />
-                                  </div>
-                                )}
-                                {ev.skills_analysis && (
-                                  <div className="workout-review-section" style={{ marginTop: 0, marginBottom: ev.engine_analysis ? 12 : 0 }}>
-                                    <h3>Skills</h3>
-                                    <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.skills_analysis) }} />
-                                  </div>
-                                )}
-                                {ev.engine_analysis && (
-                                  <div className="workout-review-section" style={{ marginTop: 0 }}>
-                                    <h3>Engine</h3>
-                                    <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.engine_analysis) }} />
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                  {trainingEvaluations.length > 0 && (
+                    <>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>Training Evaluations</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {trainingEvaluations.map((ev) => {
+                          const isExpanded = expandedEvalId === ev.id;
+
+                          return (
+                            <div key={ev.id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedEvalId(isExpanded ? null : ev.id)}
+                                style={{
+                                  width: '100%',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  padding: '12px 16px',
+                                  background: 'var(--bg)',
+                                  border: 'none',
+                                  color: 'var(--text)',
+                                  cursor: 'pointer',
+                                  fontFamily: 'inherit',
+                                  fontSize: 14,
+                                }}
+                              >
+                                <span style={{ fontWeight: 600 }}>{formatDate(ev.created_at)}</span>
+                                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
+                              </button>
+                              {isExpanded && (
+                                <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                                  {ev.analysis && (
+                                    <div className="workout-review-section" style={{ marginTop: 0 }}>
+                                      <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.analysis) }} />
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                   </CollapsibleSection>
                 )}
               </>
