@@ -95,11 +95,15 @@ export interface SkillPriority {
 /**
  * Parse a SKILLS PROFILE block from the AI analysis into SkillPriority[].
  *
- * Expected format (new bucket format):
+ * Expected format (markdown bullet format):
  *   SKILLS PROFILE:
- *   Strong: Double-Unders — advanced | Kipping Pull-Ups — advanced
- *   Intermediate: Toes-to-Bar — improving | Ring Dips — adequate
- *   Needs Attention: Ring Muscle-Ups — beginner, limiter | Handstand Walk — beginner
+ *   **Strong:**
+ *   - Double-Unders — advanced
+ *   - Kipping Pull-Ups — advanced
+ *   **Intermediate:**
+ *   - Toes-to-Bar — improving
+ *   **Needs Attention:**
+ *   - Ring Muscle-Ups — beginner, limiter
  *
  * Also supports legacy numbered format:
  *   SKILLS HIERARCHY:
@@ -130,7 +134,19 @@ export function parseSkillHierarchy(
 export const rankSkillPriorities = parseSkillHierarchy;
 
 /**
- * Parse the new bucket format:
+ * Parse the bucket format. Supports two sub-formats:
+ *
+ * New markdown bullet format:
+ *   SKILLS PROFILE:
+ *   **Strong:**
+ *   - Skill — reason
+ *   - Skill — reason
+ *   **Intermediate:**
+ *   - Skill — reason
+ *   **Needs Attention:**
+ *   - Skill — reason
+ *
+ * Legacy pipe-delimited format:
  *   SKILLS PROFILE:
  *   Strong: Skill — reason | Skill — reason
  *   Intermediate: Skill — reason | Skill — reason
@@ -142,8 +158,8 @@ function tryParseBucketProfile(
 ): SkillPriority[] {
   if (!analysisText) return [];
 
-  // Match either SKILLS PROFILE or STRENGTH PROFILE
-  const profileMatch = analysisText.match(/SKILLS PROFILE:\s*\n([\s\S]*?)(?:\n\n|$)/i);
+  // Match SKILLS PROFILE block (grab everything after the header)
+  const profileMatch = analysisText.match(/SKILLS PROFILE:\s*\n([\s\S]*?)(?:\n\n\n|$)/i);
   if (!profileMatch) return [];
 
   const block = profileMatch[1];
@@ -151,26 +167,24 @@ function tryParseBucketProfile(
   const seen = new Set<string>();
   let position = 0;
 
-  // Parse each tier line
-  const tierPattern = /^(Strong|Intermediate|Needs Attention):\s*(.+)$/gim;
-  let tierMatch;
-  while ((tierMatch = tierPattern.exec(block)) !== null) {
-    const tier = tierMatch[1].toLowerCase();
-    const itemsStr = tierMatch[2];
+  // Try markdown bullet format first: **Strong:** followed by bullet lines
+  const bulletTierPattern = /\*\*(Strong|Intermediate|Needs Attention)\*\*:?\s*\n((?:\s*-\s+.+\n?)*)/gi;
+  let bulletMatch;
+  let usedBulletFormat = false;
 
-    // Determine maxPerWeek based on tier
-    // Needs Attention = highest programming priority (like old HIGH)
-    // Intermediate = moderate priority
-    // Strong = lowest priority
+  while ((bulletMatch = bulletTierPattern.exec(block)) !== null) {
+    usedBulletFormat = true;
+    const tier = bulletMatch[1].toLowerCase();
+    const bulletBlock = bulletMatch[2];
     const maxPerWeek = tier === "needs attention" ? 2 : 1;
 
-    // Split items by pipe separator
-    const items = itemsStr.split("|");
-    for (const item of items) {
-      const trimmed = item.trim();
-      if (!trimmed) continue;
+    // Parse each bullet line
+    const bulletLines = bulletBlock.split("\n");
+    for (const line of bulletLines) {
+      const bulletMatch2 = line.match(/^\s*-\s+(.+)/);
+      if (!bulletMatch2) continue;
 
-      // Extract skill name (everything before the first em-dash/dash)
+      const trimmed = bulletMatch2[1].trim();
       const nameMatch = trimmed.match(/^(.+?)\s*[—–-]\s*/);
       const rawName = nameMatch ? nameMatch[1].trim() : trimmed;
 
@@ -179,7 +193,6 @@ function tryParseBucketProfile(
       seen.add(skillKey);
       position++;
 
-      // Score: Needs Attention first (lowest score = highest priority)
       const tierScore = tier === "needs attention" ? 0 : tier === "intermediate" ? 100 : 200;
 
       entries.push({
@@ -189,6 +202,41 @@ function tryParseBucketProfile(
         score: tierScore + position,
         maxPerWeek,
       });
+    }
+  }
+
+  // Fall back to legacy pipe-delimited format if no bullet matches
+  if (!usedBulletFormat) {
+    const tierPattern = /^(Strong|Intermediate|Needs Attention):\s*(.+)$/gim;
+    let tierMatch;
+    while ((tierMatch = tierPattern.exec(block)) !== null) {
+      const tier = tierMatch[1].toLowerCase();
+      const itemsStr = tierMatch[2];
+      const maxPerWeek = tier === "needs attention" ? 2 : 1;
+
+      const items = itemsStr.split("|");
+      for (const item of items) {
+        const trimmed = item.trim();
+        if (!trimmed) continue;
+
+        const nameMatch = trimmed.match(/^(.+?)\s*[—–-]\s*/);
+        const rawName = nameMatch ? nameMatch[1].trim() : trimmed;
+
+        const skillKey = resolveSkillKey(rawName, skills);
+        if (!skillKey || seen.has(skillKey)) continue;
+        seen.add(skillKey);
+        position++;
+
+        const tierScore = tier === "needs attention" ? 0 : tier === "intermediate" ? 100 : 200;
+
+        entries.push({
+          skill: skillKey,
+          displayName: SKILL_DISPLAY_NAMES[skillKey] ?? skillKey.replace(/_/g, " "),
+          level: skills[skillKey] ?? "beginner",
+          score: tierScore + position,
+          maxPerWeek,
+        });
+      }
     }
   }
 
