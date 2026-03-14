@@ -196,6 +196,13 @@ interface TrainingEvaluation {
   created_at: string;
 }
 
+interface NutritionEvaluation {
+  id: string;
+  nutrition_snapshot: Record<string, unknown> | null;
+  analysis: string | null;
+  created_at: string;
+}
+
 /** Build human-readable diff lines between two profile snapshots */
 function buildProfileDiffs(prev: ProfileSnapshot, current: ProfileSnapshot): string[] {
   const diffs: string[] = [];
@@ -315,8 +322,8 @@ export default function AthletePage({ session }: { session: Session }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [analysisResult, setAnalysisResult] = useState<{ kind: 'profile' | 'training'; text: string; evaluationId?: string | null } | null>(null);
-  const [analysisLoading, setAnalysisLoading] = useState<'profile' | 'training' | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<{ kind: 'profile' | 'training' | 'nutrition'; text: string; evaluationId?: string | null } | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState<'profile' | 'training' | 'nutrition' | null>(null);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [tdeeOverride, setTdeeOverride] = useState<string>('');
   const [editingTdee, setEditingTdee] = useState(false);
@@ -326,10 +333,11 @@ export default function AthletePage({ session }: { session: Session }) {
   // Evaluation history
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [trainingEvaluations, setTrainingEvaluations] = useState<TrainingEvaluation[]>([]);
+  const [nutritionEvaluations, setNutritionEvaluations] = useState<NutritionEvaluation[]>([]);
   const [expandedEvalId, setExpandedEvalId] = useState<string | null>(null);
 
   const fetchEvaluations = async () => {
-    const [profileRes, trainingRes] = await Promise.all([
+    const [profileRes, trainingRes, nutritionRes] = await Promise.all([
       supabase
         .from('profile_evaluations')
         .select('id, profile_snapshot, analysis, created_at')
@@ -342,9 +350,16 @@ export default function AthletePage({ session }: { session: Session }) {
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(20),
+      supabase
+        .from('nutrition_evaluations')
+        .select('id, nutrition_snapshot, analysis, created_at')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(20),
     ]);
     if (profileRes.data) setEvaluations(profileRes.data);
     if (trainingRes.data) setTrainingEvaluations(trainingRes.data);
+    if (nutritionRes.data) setNutritionEvaluations(nutritionRes.data);
   };
 
   useEffect(() => {
@@ -445,6 +460,29 @@ export default function AthletePage({ session }: { session: Session }) {
       if (data?.error) throw new Error(data.error || 'Analysis failed');
       setAnalysisResult({
         kind: 'training',
+        text: data?.analysis,
+        evaluationId: data?.evaluation_id ?? null,
+      });
+      fetchEvaluations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Analysis failed');
+    } finally {
+      setAnalysisLoading(null);
+    }
+  };
+
+  const fetchNutritionAnalysis = async () => {
+    setAnalysisLoading('nutrition');
+    setAnalysisResult(null);
+    setError('');
+    try {
+      const { data, error } = await supabase.functions.invoke('nutrition-analysis', {
+        body: {},
+      });
+      if (error) throw new Error(error.message || 'Analysis failed');
+      if (data?.error) throw new Error(data.error || 'Analysis failed');
+      setAnalysisResult({
+        kind: 'nutrition',
         text: data?.analysis,
         evaluationId: data?.evaluation_id ?? null,
       });
@@ -859,11 +897,20 @@ export default function AthletePage({ session }: { session: Session }) {
                     >
                       {analysisLoading === 'training' ? 'Analyzing...' : 'Training Analysis'}
                     </button>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      style={{ background: 'var(--surface2)', color: 'var(--text)' }}
+                      onClick={fetchNutritionAnalysis}
+                      disabled={!!analysisLoading}
+                    >
+                      {analysisLoading === 'nutrition' ? 'Analyzing...' : 'Nutrition Analysis'}
+                    </button>
                   </div>
                   {analysisResult && (
                     <div className="workout-review-section" style={{ marginTop: 0 }}>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
-                        {analysisResult.kind === 'profile' ? 'Profile Evaluation' : 'Training Evaluation'}
+                        {analysisResult.kind === 'profile' ? 'Profile Evaluation' : analysisResult.kind === 'training' ? 'Training Evaluation' : 'Nutrition Evaluation'}
                       </h3>
                       <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(analysisResult.text) }} />
                       {analysisResult.kind === 'profile' && (
@@ -892,7 +939,7 @@ export default function AthletePage({ session }: { session: Session }) {
                 </button>
 
                 {/* Evaluation History */}
-                {(evaluations.length > 0 || trainingEvaluations.length > 0) && (
+                {(evaluations.length > 0 || trainingEvaluations.length > 0 || nutritionEvaluations.length > 0) && (
                   <CollapsibleSection title="Evaluation History">
                   <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>Past AI evaluations. Click to expand.</p>
 
@@ -973,8 +1020,53 @@ export default function AthletePage({ session }: { session: Session }) {
                   {trainingEvaluations.length > 0 && (
                     <>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>Training Evaluations</h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: nutritionEvaluations.length > 0 ? 20 : 0 }}>
                         {trainingEvaluations.map((ev) => {
+                          const isExpanded = expandedEvalId === ev.id;
+
+                          return (
+                            <div key={ev.id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedEvalId(isExpanded ? null : ev.id)}
+                                style={{
+                                  width: '100%',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  padding: '12px 16px',
+                                  background: 'var(--bg)',
+                                  border: 'none',
+                                  color: 'var(--text)',
+                                  cursor: 'pointer',
+                                  fontFamily: 'inherit',
+                                  fontSize: 14,
+                                }}
+                              >
+                                <span style={{ fontWeight: 600 }}>{formatDate(ev.created_at)}</span>
+                                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
+                              </button>
+                              {isExpanded && (
+                                <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                                  {ev.analysis && (
+                                    <div className="workout-review-section" style={{ marginTop: 0 }}>
+                                      <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.analysis) }} />
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+
+                  {nutritionEvaluations.length > 0 && (
+                    <>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>Nutrition Evaluations</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {nutritionEvaluations.map((ev) => {
                           const isExpanded = expandedEvalId === ev.id;
 
                           return (
