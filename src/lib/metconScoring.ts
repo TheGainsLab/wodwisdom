@@ -102,8 +102,9 @@ function getAdjustedRate(
     const isBarbell = BARBELL_MOVEMENTS.has(match.canonical_name);
     if (isBarbell && entry.weight > 0) {
       // Simplified degradation: heavier weight = slower.
-      // Without 1RM data, use weight / 225 as rough intensity proxy.
-      const intensityProxy = Math.min(entry.weight / 225, 1.0);
+      // Without 1RM data, use weight / 165 as rough intensity proxy.
+      // 165lb represents ~100% metcon intensity for a median athlete.
+      const intensityProxy = Math.min(entry.weight / 165, 1.0);
       if (intensityProxy > 0.5) {
         weightMultiplier = 1.0 - ((intensityProxy - 0.5) * match.weight_degradation_rate);
       }
@@ -136,10 +137,17 @@ function entryTimeMinutes(
 
   if (adjustedRate <= 0) return 0;
 
-  // Distance-based movement (e.g., 200m run)
+  // Distance-based movement (e.g., 200m run, 500m row)
   if (entry.distance && entry.distance > 0) {
-    const meterRate = match?.work_rate ?? 267; // default to run pace
-    const adjustedMeterRate = meterRate * paceFactor;
+    const meterRate = match?.work_rate ?? 200; // default to run pace (m/min)
+    // Apply time-domain pacing factor (longer workouts = slower pace)
+    let repFactor = 1.0;
+    if (estimatedDurationMin <= 5) repFactor = 1.0;
+    else if (estimatedDurationMin <= 10) repFactor = 0.85;
+    else if (estimatedDurationMin <= 15) repFactor = 0.75;
+    else if (estimatedDurationMin <= 20) repFactor = 0.65;
+    else repFactor = 0.55;
+    const adjustedMeterRate = meterRate * paceFactor * repFactor;
     // Convert distance_unit to meters if needed
     let meters = entry.distance;
     if (entry.distance_unit === 'ft') meters = entry.distance * 0.3048;
@@ -228,18 +236,19 @@ function calculateAMRAPBenchmarks(
  */
 function calculateForTimeBenchmarks(
   entries: MetconEntry[],
-  workRates: MovementWorkRate[]
+  workRates: MovementWorkRate[],
+  rounds: number = 1
 ): BenchmarkResult {
   if (entries.length === 0) return { medianScore: '--', excellentScore: '--' };
 
-  const estDur = estimateDuration(entries, workRates);
+  const estDur = estimateDuration(entries, workRates) * rounds;
 
   const calcTime = (paceFactor: number): string => {
     let total = 0;
     for (const entry of entries) {
       total += entryTimeMinutes(entry, workRates, estDur, paceFactor);
     }
-    return formatMinutesAsTime(total);
+    return formatMinutesAsTime(total * rounds);
   };
 
   return {
@@ -271,7 +280,8 @@ export function calculateBenchmarks(
   }
 
   if (workoutType === 'for_time') {
-    return calculateForTimeBenchmarks(entries, workRates);
+    const rounds = extractRoundCount(blockText);
+    return calculateForTimeBenchmarks(entries, workRates, rounds);
   }
 
   // EMOM and other formats: no scoring for now
@@ -400,4 +410,44 @@ function extractTimeCap(text: string): number | null {
   const match2 = text.match(/(\d+)\s*min/i);
   if (match2) return parseInt(match2[1]);
   return null;
+}
+
+/**
+ * Extract round count from For Time block text.
+ * e.g. "2 Rounds For Time", "3 RFT", "4 rounds of:", "5 rounds:"
+ * Returns 1 if no round count found.
+ */
+function extractRoundCount(text: string): number {
+  const match = text.match(/(\d+)\s+(?:RFT|rounds?\s+for\s+time|rounds?\s+of\b|rounds?\s*[:\n])/i);
+  if (match) return parseInt(match[1]);
+  return 1;
+}
+
+/**
+ * Derive time_domain from benchmark data and block text.
+ * - AMRAP/EMOM: use the explicit time cap
+ * - For Time: parse the median benchmark time string
+ * Boundaries: <8 min = short, 8-15 min = medium, >15 min = long
+ */
+export function deriveTimeDomain(
+  workoutType: string,
+  blockText: string,
+  medianBenchmark: string | null
+): 'short' | 'medium' | 'long' | null {
+  let minutes: number | null = null;
+
+  if (workoutType === 'amrap' || workoutType === 'emom') {
+    // Use the explicit time cap
+    const cap = extractTimeCap(blockText);
+    if (cap) minutes = cap;
+  } else if (workoutType === 'for_time' && medianBenchmark && medianBenchmark !== '--') {
+    // Parse "MM:SS" median benchmark to minutes
+    const seconds = parseScore(medianBenchmark, 'for_time');
+    if (seconds > 0) minutes = seconds / 60;
+  }
+
+  if (minutes === null) return null;
+  if (minutes < 8) return 'short';
+  if (minutes <= 15) return 'medium';
+  return 'long';
 }

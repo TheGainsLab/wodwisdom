@@ -7,14 +7,18 @@ import { BlockContent } from '../components/WorkoutBlocksDisplay';
 import {
   calculateBenchmarks,
   scoreMetcon,
+  deriveTimeDomain,
   type MovementWorkRate,
   type BenchmarkResult,
 } from '../lib/metconScoring';
 
 interface Block {
+  id: string;
   label: string;
   type: string;
   text: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  parsed_tasks?: any[] | null;
 }
 
 interface EntryValues {
@@ -22,16 +26,20 @@ interface EntryValues {
   weight?: number;
   weight_unit: 'lbs' | 'kg';
   rpe?: number;
+  quality?: 'A' | 'B' | 'C' | 'D';
   set_number?: number;
 }
 
 interface MetconEntryValues {
   movement: string;
+  category?: 'weighted' | 'bodyweight' | 'monostructural';
   reps?: number;
   weight?: number;
   weight_unit: 'lbs' | 'kg';
   distance?: number;
-  distance_unit?: 'ft' | 'm';
+  distance_unit?: 'ft' | 'm' | 'cal';
+  rpe?: number;
+  quality?: 'A' | 'B' | 'C' | 'D';
   scaling_note?: string;
 }
 
@@ -47,6 +55,7 @@ interface SkillsEntryValues {
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   'warm-up': 'Warm-up',
+  mobility: 'Mobility',
   skills: 'Skills',
   strength: 'Strength',
   metcon: 'Metcon',
@@ -131,6 +140,32 @@ function parseMetconMovements(blockText: string): MetconEntryValues[] {
   return results;
 }
 
+/**
+ * Merge entries that share the same movement name (e.g. 15-12-9 schemes
+ * where the LLM returns separate entries per round). Sums reps/distance,
+ * keeps weight and other fields from the first occurrence.
+ */
+function consolidateMovements(entries: MetconEntryValues[]): MetconEntryValues[] {
+  const seen = new Map<string, number>(); // normalized name → index in result
+  const result: MetconEntryValues[] = [];
+
+  for (const entry of entries) {
+    const key = entry.movement.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const idx = seen.get(key);
+    if (idx !== undefined) {
+      // Merge into existing entry
+      const existing = result[idx];
+      if (entry.reps && existing.reps) existing.reps += entry.reps;
+      if (entry.distance && existing.distance) existing.distance += entry.distance;
+    } else {
+      seen.set(key, result.length);
+      result.push({ ...entry });
+    }
+  }
+
+  return result;
+}
+
 function parseMovementSegment(raw: string): MetconEntryValues | null {
   if (!raw) return null;
   let text = raw.trim();
@@ -199,89 +234,6 @@ function capitalizeWords(s: string): string {
   return s.replace(/\b\w/g, c => c.toUpperCase());
 }
 
-// ── Skills movement parser ──────────────────────────────────────────
-
-function parseSkillsMovements(blockText: string): SkillsEntryValues[] {
-  const results: SkillsEntryValues[] = [];
-
-  // Strip structure headers from the text first, then split into segments
-  let text = blockText.trim();
-  // Strip EMOM/structure headers: "EMOM 8", "E2MOM 10", "Every 2 min", "For quality", etc.
-  text = text.replace(/^(?:e\d*mom\s+\d+|every\s+\d+\s*(?:min(?:utes?)?)?|for\s+quality|not\s+for\s+time)\s*[:\-–—,]?\s*/i, '').trim();
-  // Strip round/time headers: "3 Rounds:", "5 Sets:"
-  text = text.replace(/^\d+\s+(?:rounds?|sets?)\s*:\s*/i, '').trim();
-
-  // Split on newlines first, then commas within each line
-  const segments: string[] = [];
-  for (const line of text.split('\n')) {
-    for (const seg of line.split(',')) {
-      const trimmed = seg.trim();
-      if (trimmed && !/^(?:rest|then)\s*$/i.test(trimmed)) {
-        segments.push(trimmed);
-      }
-    }
-  }
-
-  for (const raw of segments) {
-    // Strip bullet prefixes: "* ", "- ", "• "
-    let line = raw.replace(/^[*\-•]\s*/, '').trim();
-    if (!line) continue;
-
-    // Strip minute/round prefixes: "Min 1 —", "Minute 2:", "Odd —", "Even —"
-    line = line.replace(/^(?:min(?:ute)?\s*\d+\s*[:\-–—]\s*|(?:odd|even)\s*[:\-–—]\s*)/i, '').trim();
-    if (!line) continue;
-
-    let movement = line;
-    let sets: number | undefined;
-    let reps_completed: number | undefined;
-    let hold_seconds: number | undefined;
-
-    // Extract hold: ":20", "25s hold", "20 sec hold", "25s" (followed by space + word)
-    const holdMatch = movement.match(/:(\d+)\b|(\d+)\s*s(?:ec(?:ond)?s?)?\s+(?:hold\b)?/i);
-    if (holdMatch) {
-      hold_seconds = parseInt(holdMatch[1] || holdMatch[2], 10);
-      movement = movement.replace(holdMatch[0], '').trim();
-    }
-
-    // Extract sets x reps: "4x5", "4 x 5", "4×5"
-    const setsRepsMatch = movement.match(/(\d+)\s*[x×]\s*(\d+)/i);
-    if (setsRepsMatch) {
-      sets = parseInt(setsRepsMatch[1], 10);
-      reps_completed = parseInt(setsRepsMatch[2], 10);
-      movement = movement.replace(setsRepsMatch[0], '').trim();
-    } else {
-      // Extract sets only: "4x :20" (sets parsed, hold already extracted)
-      const setsOnlyMatch = movement.match(/(\d+)\s*[x×]\s*/i);
-      if (setsOnlyMatch) {
-        sets = parseInt(setsOnlyMatch[1], 10);
-        movement = movement.replace(setsOnlyMatch[0], '').trim();
-      } else {
-        // Extract leading reps: "3 deficit strict HSPU negatives"
-        const leadingReps = movement.match(/^(\d+)\s+/);
-        if (leadingReps && parseInt(leadingReps[1], 10) < 100) {
-          reps_completed = parseInt(leadingReps[1], 10);
-          movement = movement.slice(leadingReps[0].length).trim();
-        }
-      }
-    }
-
-    // Clean up leading/trailing punctuation
-    movement = movement.replace(/^[,\-–—+]+|[,\-–—+]+$/g, '').replace(/\s+/g, ' ').trim();
-    if (!movement) continue;
-
-    // Skip lines with no sets, reps, or hold — these are coaching cues, not movements
-    if (sets === undefined && reps_completed === undefined && hold_seconds === undefined) continue;
-
-    results.push({
-      movement: capitalizeWords(movement),
-      sets,
-      reps_completed,
-      hold_seconds,
-    });
-  }
-
-  return results;
-}
 
 function inferWorkoutType(blocks: Block[]): string {
   const metcon = blocks.find(b => b.type === 'metcon');
@@ -318,9 +270,9 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [workoutDate, setWorkoutDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const workoutDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [workoutType, setWorkoutType] = useState('other');
-  const [notes, setNotes] = useState('');
+  const [blockNotes, setBlockNotes] = useState<Record<number, string>>({});
   const [entryValues, setEntryValues] = useState<Record<string, EntryValues>>({});
   const [metconEntries, setMetconEntries] = useState<Record<string, MetconEntryValues>>({});
   const [skillsEntries, setSkillsEntries] = useState<Record<string, SkillsEntryValues>>({});
@@ -328,9 +280,16 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
   const [blockScores, setBlockScores] = useState<Record<number, string>>({});
   const [blockRx, setBlockRx] = useState<Record<number, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [parsingSkills, setParsingSkills] = useState(false);
+  const [parsingMetcon, setParsingMetcon] = useState(false);
   // Faults from cached coach review, keyed by entry key (e.g. "0-sk0", "1-m2")
   const [reviewFaults, setReviewFaults] = useState<Record<string, string[]>>({});
   const [checkedFaults, setCheckedFaults] = useState<Record<string, string[]>>({});
+
+  // In-progress tracking: which blocks have been saved, and the parent log id
+  const [inProgressLogId, setInProgressLogId] = useState<string | null>(null);
+  const [savedBlocks, setSavedBlocks] = useState<Set<number>>(new Set());
+  const [savingBlock, setSavingBlock] = useState<number | null>(null);
 
   const sourceState = location.state as {
     workout_text?: string;
@@ -352,7 +311,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       const [blocksRes, ratesRes] = await Promise.all([
         supabase
           .from('program_workout_blocks')
-          .select('block_type, block_text, block_order')
+          .select('id, block_type, block_text, block_order, parsed_tasks')
           .eq('program_workout_id', sourceState.source_id!)
           .order('block_order'),
         supabase
@@ -374,9 +333,11 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       }
 
       const loaded: Block[] = data.map(row => ({
+        id: row.id,
         label: BLOCK_TYPE_LABELS[row.block_type] || row.block_type,
         type: row.block_type,
         text: row.block_text,
+        parsed_tasks: row.parsed_tasks as any[] | null,
       }));
 
       setBlocks(loaded);
@@ -401,29 +362,212 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
       });
       setEntryValues(initial);
 
-      // Pre-fill metcon per-movement entries
+      // Pre-fill metcon per-movement entries (LLM parse with lazy caching)
       const initialMetcon: Record<string, MetconEntryValues> = {};
-      loaded.forEach((b, bi) => {
-        if (b.type === 'metcon') {
-          const parsed = parseMetconMovements(b.text);
-          parsed.forEach((mv, mi) => {
+      const metconBlocks = loaded
+        .map((b, bi) => ({ block: b, bi }))
+        .filter(({ block }) => block.type === 'metcon');
+
+      const needsMetconParse = metconBlocks.some(({ block }) => !block.parsed_tasks?.length);
+      if (needsMetconParse) setParsingMetcon(true);
+
+      await Promise.all(
+        metconBlocks.map(async ({ block, bi }) => {
+          let movements: MetconEntryValues[];
+
+          if (block.parsed_tasks && block.parsed_tasks.length > 0) {
+            // Already cached in DB — use directly
+            movements = (block.parsed_tasks as { movement: string; category?: string; reps: number | null; weight: number | null; weight_unit: string | null; distance: number | null; distance_unit: string | null }[]).map(m => ({
+              movement: m.movement,
+              category: (['weighted', 'bodyweight', 'monostructural'].includes(m.category || '') ? m.category : 'bodyweight') as MetconEntryValues['category'],
+              reps: m.reps ?? undefined,
+              weight: m.weight ?? undefined,
+              weight_unit: (m.weight_unit === 'kg' ? 'kg' : 'lbs') as 'lbs' | 'kg',
+              distance: m.distance ?? undefined,
+              distance_unit: (['ft', 'm', 'cal'].includes(m.distance_unit || '') ? m.distance_unit : undefined) as MetconEntryValues['distance_unit'],
+            }));
+          } else {
+            // Call LLM to parse, write result back to DB
+            try {
+              const { data: fnData, error: fnErr } = await supabase.functions.invoke('parse-metcon', {
+                body: { block_text: block.text, block_id: block.id },
+              });
+              if (fnErr || !fnData?.movements) {
+                console.error('parse-metcon failed:', fnErr);
+                // Fallback to regex parser
+                movements = parseMetconMovements(block.text);
+              } else {
+                movements = (fnData.movements as { movement: string; category?: string; reps: number | null; weight: number | null; weight_unit: string | null; distance: number | null; distance_unit: string | null }[]).map(m => ({
+                  movement: m.movement,
+                  category: (['weighted', 'bodyweight', 'monostructural'].includes(m.category || '') ? m.category : 'bodyweight') as MetconEntryValues['category'],
+                  reps: m.reps ?? undefined,
+                  weight: m.weight ?? undefined,
+                  weight_unit: (m.weight_unit === 'kg' ? 'kg' : 'lbs') as 'lbs' | 'kg',
+                  distance: m.distance ?? undefined,
+                  distance_unit: (['ft', 'm', 'cal'].includes(m.distance_unit || '') ? m.distance_unit : undefined) as MetconEntryValues['distance_unit'],
+                }));
+              }
+            } catch (e) {
+              console.error('parse-metcon call error:', e);
+              // Fallback to regex parser
+              movements = parseMetconMovements(block.text);
+            }
+          }
+
+          // Merge duplicate movements (e.g. 15-12-9 expanded per round → single entry with total reps)
+          const consolidated = consolidateMovements(movements);
+          consolidated.forEach((mv, mi) => {
             initialMetcon[`${bi}-m${mi}`] = mv;
           });
-        }
-      });
+        }),
+      );
       setMetconEntries(initialMetcon);
+      if (needsMetconParse) setParsingMetcon(false);
 
-      // Pre-fill skills per-movement entries
+      // Pre-fill skills per-movement entries (LLM parse with lazy caching)
       const initialSkills: Record<string, SkillsEntryValues> = {};
-      loaded.forEach((b, bi) => {
-        if (b.type === 'skills') {
-          const parsed = parseSkillsMovements(b.text);
-          parsed.forEach((sk, si) => {
+      const skillBlocks = loaded
+        .map((b, bi) => ({ block: b, bi }))
+        .filter(({ block }) => block.type === 'skills');
+
+      const needsParse = skillBlocks.some(({ block }) => !block.parsed_tasks?.length);
+      if (needsParse) setParsingSkills(true);
+
+      await Promise.all(
+        skillBlocks.map(async ({ block, bi }) => {
+          let skills: SkillsEntryValues[];
+
+          if (block.parsed_tasks && block.parsed_tasks.length > 0) {
+            // Already cached in DB — use directly
+            skills = block.parsed_tasks;
+          } else {
+            // Call LLM to parse, write result back to DB
+            try {
+              const { data: fnData, error: fnErr } = await supabase.functions.invoke('parse-skills', {
+                body: { block_text: block.text, block_id: block.id },
+              });
+              if (fnErr || !fnData?.skills) {
+                console.error('parse-skills failed:', fnErr);
+                skills = [];
+              } else {
+                skills = (fnData.skills as { movement: string; sets: number | null; reps: number | null; hold_seconds: number | null; notes: string | null }[]).map(s => ({
+                  movement: s.movement,
+                  sets: s.sets ?? undefined,
+                  reps_completed: s.reps ?? undefined,
+                  hold_seconds: s.hold_seconds ?? undefined,
+                }));
+              }
+            } catch (e) {
+              console.error('parse-skills call error:', e);
+              skills = [];
+            }
+          }
+
+          skills.forEach((sk, si) => {
             initialSkills[`${bi}-sk${si}`] = sk;
           });
-        }
-      });
+        }),
+      );
       setSkillsEntries(initialSkills);
+      if (needsParse) setParsingSkills(false);
+
+      // Check for an existing in-progress workout log to resume
+      {
+        const { data: ipLog } = await supabase
+          .from('workout_logs')
+          .select('id')
+          .eq('source_id', sourceState.source_id!)
+          .eq('status', 'in_progress')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (ipLog) {
+          setInProgressLogId(ipLog.id);
+          // Load previously saved blocks
+          const { data: savedBlockRows } = await supabase
+            .from('workout_log_blocks')
+            .select('sort_order, block_type, block_label, block_text, score, rx, notes')
+            .eq('log_id', ipLog.id)
+            .order('sort_order');
+
+          if (savedBlockRows && savedBlockRows.length > 0) {
+            const savedSet = new Set<number>();
+            for (const sb of savedBlockRows) {
+              savedSet.add(sb.sort_order);
+              // Restore notes
+              if (sb.notes) {
+                setBlockNotes(prev => ({ ...prev, [sb.sort_order]: sb.notes }));
+              }
+              // Restore score/rx for metcon blocks
+              if (sb.block_type === 'metcon') {
+                if (sb.score) setBlockScores(prev => ({ ...prev, [sb.sort_order]: sb.score }));
+                setBlockRx(prev => ({ ...prev, [sb.sort_order]: sb.rx ?? true }));
+              }
+            }
+            setSavedBlocks(savedSet);
+
+            // Load previously saved entries to restore strength/metcon/skills values
+            const { data: savedEntryRows } = await supabase
+              .from('workout_log_entries')
+              .select('block_label, movement, sets, reps, weight, weight_unit, rpe, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, faults_observed, sort_order')
+              .eq('log_id', ipLog.id)
+              .order('sort_order');
+
+            if (savedEntryRows && savedEntryRows.length > 0) {
+              const restoredEntries: Record<string, EntryValues> = { ...initial };
+              const restoredMetcon: Record<string, MetconEntryValues> = { ...initialMetcon };
+              const restoredSkills: Record<string, SkillsEntryValues> = { ...initialSkills };
+
+              // Group entries by block_label to figure out which block index they belong to
+              for (const entry of savedEntryRows) {
+                const bi = loaded.findIndex(b => b.label === entry.block_label);
+                if (bi < 0) continue;
+                const block = loaded[bi];
+
+                if (block.type === 'strength' && entry.set_number != null) {
+                  const key = `${bi}-s${entry.set_number - 1}`;
+                  restoredEntries[key] = {
+                    reps: entry.reps ?? undefined,
+                    weight: entry.weight ?? undefined,
+                    weight_unit: (entry.weight_unit as 'lbs' | 'kg') || 'lbs',
+                    rpe: entry.rpe ?? undefined,
+                    quality: (entry.quality as EntryValues['quality']) ?? undefined,
+                    set_number: entry.set_number,
+                  };
+                } else if (block.type === 'metcon') {
+                  const key = `${bi}-m${entry.sort_order}`;
+                  restoredMetcon[key] = {
+                    movement: entry.movement,
+                    reps: entry.reps ?? undefined,
+                    weight: entry.weight ?? undefined,
+                    weight_unit: (entry.weight_unit as 'lbs' | 'kg') || 'lbs',
+                    distance: entry.distance ?? undefined,
+                    distance_unit: (entry.distance_unit as MetconEntryValues['distance_unit']) ?? undefined,
+                    rpe: entry.rpe ?? undefined,
+                    quality: (entry.quality as MetconEntryValues['quality']) ?? undefined,
+                  };
+                } else if (block.type === 'skills') {
+                  const key = `${bi}-sk${entry.sort_order}`;
+                  restoredSkills[key] = {
+                    movement: entry.movement,
+                    sets: entry.sets ?? undefined,
+                    reps_completed: entry.reps_completed ?? undefined,
+                    hold_seconds: entry.hold_seconds ?? undefined,
+                    rpe: entry.rpe ?? undefined,
+                    quality: (entry.quality as SkillsEntryValues['quality']) ?? undefined,
+                    variation: entry.variation ?? undefined,
+                  };
+                }
+              }
+
+              setEntryValues(restoredEntries);
+              setMetconEntries(restoredMetcon);
+              setSkillsEntries(restoredSkills);
+            }
+          }
+        }
+      }
 
       // Fetch cached coach review to get common_faults per movement
       const { data: reviewRow } = await supabase
@@ -528,6 +672,205 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
     return result;
   }, [blocks, metconEntries, workRates]);
 
+  /** Build a single block's log payload from current form state */
+  const buildBlockPayload = (bi: number) => {
+    const b = blocks[bi];
+    if (!b) return null;
+
+    let entries: any[] = [];
+    let score: string | null = null;
+    let rx = false;
+
+    if (b.type === 'strength') {
+      const movementName = extractMovementName(b.text);
+      const setKeys = Object.keys(entryValues)
+        .filter(k => k.startsWith(`${bi}-s`))
+        .sort((a, b2) => parseInt(a.split('-s')[1], 10) - parseInt(b2.split('-s')[1], 10));
+      const strFaults = checkedFaults[`${bi}-str`];
+      entries = setKeys.map(key => {
+        const ev = entryValues[key] || {};
+        return {
+          movement: movementName,
+          sets: 1,
+          reps: ev.reps ?? null,
+          weight: ev.weight ?? null,
+          weight_unit: ev.weight_unit || 'lbs',
+          rpe: ev.rpe ?? null,
+          scaling_note: null,
+          set_number: ev.set_number ?? null,
+          reps_completed: null,
+          hold_seconds: null,
+          distance: null,
+          distance_unit: null,
+          quality: ev.quality ?? null,
+          variation: null,
+          faults_observed: strFaults?.length ? strFaults : null,
+        };
+      });
+    } else if (b.type === 'metcon') {
+      const mvKeys = Object.keys(metconEntries)
+        .filter(k => k.startsWith(`${bi}-m`))
+        .sort((a, b2) => parseInt(a.split('-m')[1], 10) - parseInt(b2.split('-m')[1], 10));
+      entries = mvKeys
+        .filter(key => metconEntries[key]?.movement?.trim())
+        .map(key => {
+          const mv = metconEntries[key];
+          const f = checkedFaults[key];
+          return {
+            movement: mv.movement.trim(),
+            sets: null,
+            reps: mv.reps ?? null,
+            weight: mv.weight ?? null,
+            weight_unit: mv.weight_unit || 'lbs',
+            rpe: mv.rpe ?? null,
+            scaling_note: mv.scaling_note?.trim() || null,
+            set_number: null,
+            reps_completed: null,
+            hold_seconds: null,
+            distance: mv.distance ?? null,
+            distance_unit: mv.distance_unit || null,
+            quality: mv.quality ?? null,
+            variation: null,
+            faults_observed: f?.length ? f : null,
+          };
+        });
+      score = blockScores[bi]?.trim() || null;
+      rx = blockRx[bi] ?? true;
+    } else if (b.type === 'skills') {
+      const skKeys = Object.keys(skillsEntries)
+        .filter(k => k.startsWith(`${bi}-sk`))
+        .sort((a, b2) => parseInt(a.split('-sk')[1], 10) - parseInt(b2.split('-sk')[1], 10));
+      entries = skKeys
+        .filter(key => skillsEntries[key]?.movement?.trim())
+        .map(key => {
+          const sk = skillsEntries[key];
+          const f = checkedFaults[key];
+          return {
+            movement: sk.movement.trim(),
+            sets: sk.sets ?? null,
+            reps: null,
+            weight: null,
+            weight_unit: 'lbs',
+            rpe: sk.rpe ?? null,
+            scaling_note: sk.variation?.trim() || null,
+            set_number: null,
+            reps_completed: sk.reps_completed ?? null,
+            hold_seconds: sk.hold_seconds ?? null,
+            distance: null,
+            distance_unit: null,
+            quality: sk.quality ?? null,
+            variation: sk.variation?.trim() || null,
+            faults_observed: f?.length ? f : null,
+          };
+        });
+    }
+
+    // Compute scoring for metcon blocks
+    const benchmarks = blockBenchmarks[bi];
+    const scoreStr = blockScores[bi]?.trim() || '';
+    const wType = inferWorkoutType([b]);
+    const scoring = b.type === 'metcon' && benchmarks && scoreStr
+      ? scoreMetcon(scoreStr, wType, benchmarks)
+      : null;
+
+    return {
+      label: b.label,
+      type: b.type,
+      text: b.text,
+      score,
+      rx,
+      notes: blockNotes[bi]?.trim() || null,
+      sort_order: bi,
+      entries,
+      percentile: scoring?.percentile ?? null,
+      performance_tier: scoring?.performanceTier ?? null,
+      median_benchmark: benchmarks?.medianScore !== '--' ? benchmarks?.medianScore : null,
+      excellent_benchmark: benchmarks?.excellentScore !== '--' ? benchmarks?.excellentScore : null,
+      time_domain: b.type === 'metcon'
+        ? deriveTimeDomain(wType, b.text, benchmarks?.medianScore ?? null)
+        : null,
+    };
+  };
+
+  /** Save a single block (creates in-progress log if needed) */
+  const saveBlock = async (bi: number) => {
+    const payload = buildBlockPayload(bi);
+    if (!payload) return;
+    setSavingBlock(bi);
+    try {
+      const workoutText = sourceState?.workout_text?.trim() ||
+        blocks.map(b => `${b.label}: ${b.text}`).join('\n');
+      const { data, error: fnErr } = await supabase.functions.invoke('save-workout-block', {
+        body: {
+          log_id: inProgressLogId,
+          source_id: sourceState?.source_id || null,
+          workout_date: workoutDate,
+          workout_text: workoutText,
+          workout_type: workoutType,
+          block: payload,
+        },
+      });
+      if (fnErr) throw new Error(fnErr.message || 'Failed to save block');
+      if (data?.error) throw new Error(data.error);
+      // Track the log id for subsequent saves
+      if (data?.log_id && !inProgressLogId) {
+        setInProgressLogId(data.log_id);
+      }
+      setSavedBlocks(prev => new Set(prev).add(bi));
+      // Auto-complete: all loggable blocks saved → workout is done
+      if (data?.auto_completed) {
+        setSuccess(true);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save block');
+    } finally {
+      setSavingBlock(null);
+    }
+  };
+
+  /** Save all current progress and navigate away */
+  const handleSaveAndExit = async () => {
+    setError('');
+    setSaving(true);
+    try {
+      // Save any unsaved blocks (skip warm-up/cool-down)
+      for (let bi = 0; bi < blocks.length; bi++) {
+        if (savedBlocks.has(bi)) continue;
+        if (blocks[bi].type === 'warm-up' || blocks[bi].type === 'mobility' || blocks[bi].type === 'cool-down') continue;
+        const payload = buildBlockPayload(bi);
+        if (!payload) continue;
+        const workoutText = sourceState?.workout_text?.trim() ||
+          blocks.map(b => `${b.label}: ${b.text}`).join('\n');
+        const { data, error: fnErr } = await supabase.functions.invoke('save-workout-block', {
+          body: {
+            log_id: inProgressLogId,
+            source_id: sourceState?.source_id || null,
+            workout_date: workoutDate,
+            workout_text: workoutText,
+            workout_type: workoutType,
+            block: payload,
+          },
+        });
+        if (fnErr) throw new Error(fnErr.message || 'Failed to save');
+        if (data?.error) throw new Error(data.error);
+        if (data?.log_id && !inProgressLogId) {
+          setInProgressLogId(data.log_id);
+        }
+        // Auto-complete: all loggable blocks saved → workout is done
+        if (data?.auto_completed) {
+          setSuccess(true);
+          setSaving(false);
+          return;
+        }
+      }
+      navigate(-1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save progress');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleFinish = async () => {
     setError('');
     setSaving(true);
@@ -558,7 +901,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
               hold_seconds: null,
               distance: null,
               distance_unit: null,
-              quality: null,
+              quality: ev.quality ?? null,
               variation: null,
               faults_observed: strFaults?.length ? strFaults : null,
             };
@@ -569,6 +912,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             text: b.text,
             score: blockScores[bi]?.trim() || null,
             rx: false,
+            notes: blockNotes[bi]?.trim() || null,
             entries,
           };
         }
@@ -588,14 +932,14 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                 reps: mv.reps ?? null,
                 weight: mv.weight ?? null,
                 weight_unit: mv.weight_unit || 'lbs',
-                rpe: null,
+                rpe: mv.rpe ?? null,
                 scaling_note: mv.scaling_note?.trim() || null,
                 set_number: null,
                 reps_completed: null,
                 hold_seconds: null,
                 distance: mv.distance ?? null,
                 distance_unit: mv.distance_unit || null,
-                quality: null,
+                quality: mv.quality ?? null,
                 variation: null,
                 faults_observed: f?.length ? f : null,
               };
@@ -615,11 +959,13 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             text: b.text,
             score: scoreStr || null,
             rx: blockRx[bi] ?? true,
+            notes: blockNotes[bi]?.trim() || null,
             entries,
             percentile: scoring?.percentile ?? null,
             performance_tier: scoring?.performanceTier ?? null,
             median_benchmark: benchmarks?.medianScore !== '--' ? benchmarks?.medianScore : null,
             excellent_benchmark: benchmarks?.excellentScore !== '--' ? benchmarks?.excellentScore : null,
+            time_domain: deriveTimeDomain(wType, b.text, benchmarks?.medianScore ?? null),
           };
         }
 
@@ -654,19 +1000,21 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             label: b.label,
             type: b.type,
             text: b.text,
-            score: blockScores[bi]?.trim() || null,
+            score: null,
             rx: false,
+            notes: blockNotes[bi]?.trim() || null,
             entries,
           };
         }
 
-        // All other block types: no per-movement entries
+        // All other block types (warm-up, cool-down, etc.): no per-movement entries
         return {
           label: b.label,
           type: b.type,
           text: b.text,
-          score: blockScores[bi]?.trim() || null,
+          score: null,
           rx: blockRx[bi] ?? true,
+          notes: blockNotes[bi]?.trim() || null,
           entries: [],
         };
       });
@@ -680,8 +1028,10 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
           workout_text: workoutText,
           workout_type: workoutType,
           source_id: sourceState?.source_id || null,
-          notes: notes.trim() || null,
+          notes: null,
           blocks: logBlocks,
+          status: 'completed',
+          existing_log_id: inProgressLogId,
         },
       });
       if (error) throw new Error(error.message || 'Failed to save');
@@ -702,7 +1052,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>Start Workout</h1>
+          <h1>{inProgressLogId ? 'Resume Workout' : 'Start Workout'}</h1>
         </header>
 
         <div className="page-body">
@@ -725,13 +1075,11 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             ) : (
               <>
                 <div className="workout-review-section" style={{ marginBottom: 16 }}>
-                  <div className="field" style={{ marginBottom: 12 }}>
-                    <label>Date</label>
-                    <input type="date" value={workoutDate} onChange={e => setWorkoutDate(e.target.value)} style={{ maxWidth: 180 }} />
-                  </div>
                   <div className="field">
-                    <label>Notes</label>
-                    <input type="text" placeholder="" value={notes} onChange={e => setNotes(e.target.value)} />
+                    <label>Date</label>
+                    <div style={{ fontSize: 16, padding: '10px 0' }}>
+                      {new Date(workoutDate + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </div>
                   </div>
                 </div>
 
@@ -754,9 +1102,10 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)', paddingLeft: 40 }}>
                             <span style={{ width: 60 }}>Reps</span>
-                            <span style={{ width: 80 }}>Weight</span>
-                            <span style={{ width: 32 }}></span>
-                            <span style={{ width: 56 }}>RPE</span>
+                            <span style={{ width: 64 }}>Wt</span>
+                            <span style={{ width: 28 }}></span>
+                            <span style={{ width: 48 }}>RPE</span>
+                            <span style={{ width: 48 }}>Quality</span>
                           </div>
                           {setKeys.map(key => {
                             const ev = entryValues[key] || {};
@@ -764,9 +1113,19 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                               <div key={key} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                                 <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 28, textAlign: 'right' }}>S{ev.set_number}</span>
                                 <input type="number" placeholder="Reps" value={ev.reps ?? ''} onChange={e => setEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 60 }} />
-                                <input type="number" placeholder="Weight" value={ev.weight ?? ''} onChange={e => setEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)} style={{ ...compactInputStyle, width: 80 }} />
+                                <input type="number" placeholder="Wt" value={ev.weight ?? ''} onChange={e => setEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)} style={{ ...compactInputStyle, width: 64, border: ev.weight == null ? '1px solid var(--accent)' : '1px solid var(--border)' }} />
                                 <span style={{ color: 'var(--text-dim)', fontSize: 13, width: 28 }}>{ev.weight_unit || 'lbs'}</span>
-                                <input type="number" placeholder="RPE" min={1} max={10} value={ev.rpe ?? ''} onChange={e => setEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 56 }} />
+                                <select value={ev.rpe ?? ''} onChange={e => setEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 48, padding: '8px 4px', border: ev.rpe == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}>
+                                  <option value=""></option>
+                                  {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
+                                </select>
+                                <select value={ev.quality ?? ''} onChange={e => setEntry(key, 'quality', e.target.value || undefined)} style={{ ...compactInputStyle, width: 48, padding: '8px 4px', border: ev.quality == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}>
+                                  <option value=""></option>
+                                  <option value="A">A</option>
+                                  <option value="B">B</option>
+                                  <option value="C">C</option>
+                                  <option value="D">D</option>
+                                </select>
                               </div>
                             );
                           })}
@@ -781,6 +1140,15 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                               ))}
                             </div>
                           )}
+                          <div className="field" style={{ marginTop: 8 }}>
+                            <label>Notes</label>
+                            <input
+                              type="text"
+                              placeholder=""
+                              value={blockNotes[bi] ?? ''}
+                              onChange={e => setBlockNotes(prev => ({ ...prev, [bi]: e.target.value }))}
+                            />
+                          </div>
                         </div>
                       );
                     })()}
@@ -801,24 +1169,33 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                             <input type="text" placeholder="e.g. 4:48 or 8+12" value={blockScores[bi] ?? ''} onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))} />
                           </div>
 
+                          {parsingMetcon && mvKeys.length === 0 && (
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Parsing movements…</div>
+                            </div>
+                          )}
                           {mvKeys.length > 0 && (
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Movements (confirm or adjust)</div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                 {mvKeys.map(key => {
                                   const mv = metconEntries[key];
                                   if (!mv) return null;
-                                  const hasDistance = mv.distance != null && mv.distance > 0;
+                                  const cat = mv.category || 'bodyweight';
+                                  const isMonostructural = cat === 'monostructural';
+                                  const isWeighted = cat === 'weighted';
+                                  const hasDistance = isMonostructural && (mv.distance != null && mv.distance > 0);
+                                  const hasCalories = isMonostructural && mv.distance_unit === 'cal';
                                   return (
                                     <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                      <input
+                                        type="text"
+                                        value={mv.movement}
+                                        onChange={e => setMetconEntry(key, 'movement', e.target.value)}
+                                        style={{ ...compactInputStyle, width: '100%' }}
+                                      />
                                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                                        <input
-                                          type="text"
-                                          value={mv.movement}
-                                          onChange={e => setMetconEntry(key, 'movement', e.target.value)}
-                                          style={{ ...compactInputStyle, flex: '1 1 120px', minWidth: 120 }}
-                                        />
-                                        {hasDistance ? (
+                                        {hasDistance && !hasCalories ? (
                                           <>
                                             <input
                                               type="number"
@@ -830,14 +1207,16 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                             <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 16 }}>{mv.distance_unit || 'm'}</span>
                                           </>
                                         ) : (
+                                          <input
+                                            type="number"
+                                            placeholder={hasCalories ? 'Cal' : 'Reps'}
+                                            value={mv.reps ?? ''}
+                                            onChange={e => setMetconEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                            style={{ ...compactInputStyle, width: 56 }}
+                                          />
+                                        )}
+                                        {isWeighted && (
                                           <>
-                                            <input
-                                              type="number"
-                                              placeholder="Reps"
-                                              value={mv.reps ?? ''}
-                                              onChange={e => setMetconEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                              style={{ ...compactInputStyle, width: 56 }}
-                                            />
                                             <input
                                               type="number"
                                               placeholder="Wt"
@@ -848,6 +1227,25 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                             <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 24 }}>{mv.weight_unit || 'lbs'}</span>
                                           </>
                                         )}
+                                        <select
+                                          value={mv.quality ?? ''}
+                                          onChange={e => setMetconEntry(key, 'quality', e.target.value || undefined)}
+                                          style={{ ...compactInputStyle, width: 56, padding: '8px 4px', border: mv.quality == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
+                                        >
+                                          <option value=""></option>
+                                          <option value="A">A</option>
+                                          <option value="B">B</option>
+                                          <option value="C">C</option>
+                                          <option value="D">D</option>
+                                        </select>
+                                        <select
+                                          value={mv.rpe ?? ''}
+                                          onChange={e => setMetconEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                          style={{ ...compactInputStyle, width: 56, padding: '8px 4px', border: mv.rpe == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
+                                        >
+                                          <option value=""></option>
+                                          {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
+                                        </select>
                                       </div>
                                       {reviewFaults[key] && reviewFaults[key].length > 0 && (
                                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', paddingLeft: 4, marginTop: 2 }}>
@@ -879,6 +1277,15 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                               )}
                             </div>
                           )}
+                          <div className="field" style={{ marginTop: 12 }}>
+                            <label>Notes</label>
+                            <input
+                              type="text"
+                              placeholder=""
+                              value={blockNotes[bi] ?? ''}
+                              onChange={e => setBlockNotes(prev => ({ ...prev, [bi]: e.target.value }))}
+                            />
+                          </div>
                         </>
                       );
                     })()}
@@ -890,6 +1297,11 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
 
                       return (
                         <>
+                          {parsingSkills && skKeys.length === 0 && (
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Parsing skill movements…</div>
+                            </div>
+                          )}
                           {skKeys.length > 0 && (
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Skill movements (confirm or adjust)</div>
@@ -899,54 +1311,53 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                   if (!sk) return null;
                                   return (
                                     <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                                        <input
-                                          type="text"
-                                          value={sk.movement}
-                                          onChange={e => setSkillEntry(key, 'movement', e.target.value)}
-                                          style={{ ...compactInputStyle, flex: '1 1 140px', minWidth: 140 }}
-                                        />
+                                      <input
+                                        type="text"
+                                        value={sk.movement}
+                                        onChange={e => setSkillEntry(key, 'movement', e.target.value)}
+                                        style={{ ...compactInputStyle, width: '100%' }}
+                                      />
+                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                         <input
                                           type="number"
                                           placeholder="Sets"
                                           value={sk.sets ?? ''}
                                           onChange={e => setSkillEntry(key, 'sets', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, width: 56 }}
+                                          style={{ ...compactInputStyle, width: 48 }}
                                         />
                                         <input
                                           type="number"
                                           placeholder="Reps"
                                           value={sk.reps_completed ?? ''}
                                           onChange={e => setSkillEntry(key, 'reps_completed', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, width: 56 }}
+                                          style={{ ...compactInputStyle, width: 48 }}
                                         />
                                         <input
                                           type="number"
                                           placeholder="Hold (s)"
                                           value={sk.hold_seconds ?? ''}
                                           onChange={e => setSkillEntry(key, 'hold_seconds', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, width: 72 }}
+                                          style={{ ...compactInputStyle, width: 60 }}
                                         />
                                         <select
                                           value={sk.quality ?? ''}
                                           onChange={e => setSkillEntry(key, 'quality', e.target.value || undefined)}
-                                          style={{ ...compactInputStyle, width: 56, padding: '8px 4px' }}
+                                          style={{ ...compactInputStyle, width: 48, padding: '8px 4px', border: sk.quality == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
                                         >
-                                          <option value="">—</option>
+                                          <option value=""></option>
                                           <option value="A">A</option>
                                           <option value="B">B</option>
                                           <option value="C">C</option>
                                           <option value="D">D</option>
                                         </select>
-                                        <input
-                                          type="number"
-                                          placeholder="RPE"
-                                          min={1}
-                                          max={10}
+                                        <select
                                           value={sk.rpe ?? ''}
                                           onChange={e => setSkillEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, width: 56 }}
-                                        />
+                                          style={{ ...compactInputStyle, width: 48, padding: '8px 4px', border: sk.rpe == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
+                                        >
+                                          <option value=""></option>
+                                          {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
+                                        </select>
                                       </div>
                                       {reviewFaults[key] && reviewFaults[key].length > 0 && (
                                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', paddingLeft: 4, marginTop: 2 }}>
@@ -970,24 +1381,47 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                             <input
                               type="text"
                               placeholder=""
-                              value={blockScores[bi] ?? ''}
-                              onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
+                              value={blockNotes[bi] ?? ''}
+                              onChange={e => setBlockNotes(prev => ({ ...prev, [bi]: e.target.value }))}
                             />
                           </div>
                         </>
                       );
                     })()}
 
-                    {(block.type === 'warm-up' || block.type === 'cool-down') && (
+                    {(block.type === 'warm-up' || block.type === 'mobility' || block.type === 'cool-down') && (
                       <div className="field" style={{ marginTop: 8 }}>
                         <label>Notes</label>
                         <input
                           type="text"
                           placeholder=""
-                          value={blockScores[bi] ?? ''}
-                          onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))}
+                          value={blockNotes[bi] ?? ''}
+                          onChange={e => setBlockNotes(prev => ({ ...prev, [bi]: e.target.value }))}
                         />
                       </div>
+                    )}
+
+                    {/* Per-block save button (not for warm-up/cool-down) */}
+                    {block.type !== 'warm-up' && block.type !== 'mobility' && block.type !== 'cool-down' && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                      <button
+                        className="auth-btn"
+                        style={{
+                          padding: '6px 16px',
+                          fontSize: 13,
+                          background: savedBlocks.has(bi) ? 'var(--surface2)' : undefined,
+                          color: savedBlocks.has(bi) ? 'var(--text-dim)' : undefined,
+                        }}
+                        onClick={() => saveBlock(bi)}
+                        disabled={savingBlock === bi}
+                      >
+                        {savingBlock === bi
+                          ? 'Saving...'
+                          : savedBlocks.has(bi)
+                          ? 'Saved'
+                          : 'Save Block'}
+                      </button>
+                    </div>
                     )}
                   </div>
                 ))}
@@ -997,6 +1431,9 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                 <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
                   <button className="auth-btn" style={{ flex: 1, background: 'var(--surface2)', color: 'var(--text)' }} onClick={() => navigate(-1)}>
                     Back
+                  </button>
+                  <button className="auth-btn" onClick={handleSaveAndExit} disabled={saving} style={{ flex: 1, background: 'var(--surface2)', color: 'var(--text)' }}>
+                    {saving ? 'Saving...' : 'Save & Exit'}
                   </button>
                   <button className="auth-btn" onClick={handleFinish} disabled={saving} style={{ flex: 1 }}>
                     {saving ? 'Saving...' : 'Finish Workout'}

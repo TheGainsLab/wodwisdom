@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { CHAT_ENDPOINT, getAuthHeaders, supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
+import { formatMarkdown } from '../lib/formatMarkdown';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -43,18 +44,6 @@ const SUGGESTIONS: Record<string, string[]> = {
   ],
 };
 
-function formatMarkdown(text: string): string {
-  return text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n- /g, '<br>\u2022 ')
-    .replace(/\n(\d+)\. /g, '<br>$1. ')
-    .replace(/\n/g, '<br>')
-    .replace(/^/, '<p>')
-    .replace(/$/, '</p>')
-    .replace(/<p><\/p>/g, '');
-}
 
 export default function ChatPage({ session }: { session: Session }) {
   const navigate = useNavigate();
@@ -386,7 +375,7 @@ export default function ChatPage({ session }: { session: Session }) {
               </button>
             </div>
             <div className="input-row">
-              <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} rows={1} placeholder="Ask about movements, nutrition, coaching, programming..." />
+              <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} rows={1} placeholder="" />
               <button className="send-btn" onClick={() => sendMessage()} disabled={isLoading || !input.trim()}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
               </button>

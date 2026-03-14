@@ -1,5 +1,6 @@
 import { Trash2 } from 'lucide-react';
 import { mealLabel } from './MealTypeSelector';
+import { cleanServing } from './cleanServing';
 
 export interface FoodEntry {
   id: string;
@@ -70,7 +71,7 @@ export default function FoodEntryList({
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 500, fontSize: 14 }}>{entry.food_name}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                    {entry.number_of_units} {entry.serving_description || 'serving'}
+                    {cleanServing(entry.number_of_units, entry.serving_description)}
                     {' — '}
                     {Math.round(entry.calories ?? 0)} cal | {Math.round(entry.protein ?? 0)}g P | {Math.round(entry.carbohydrate ?? 0)}g C | {Math.round(entry.fat ?? 0)}g F
                   </div>

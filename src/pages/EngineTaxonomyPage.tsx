@@ -57,25 +57,33 @@ const DESCRIPTIONS: Record<string, string> = {
 };
 
 function badgeClass(name: string): string {
-  const n = name.toLowerCase();
-  if (n === 'endurance') return 'engine-badge--endurance';
-  if (['threshold', 'anaerobic', 'ascending', 'interval', 'max_aerobic_power'].includes(n))
-    return 'engine-badge--strength';
-  if (['polarized', 'flux', 'flux_stages', 'rocket_races_a', 'rocket_races_b'].includes(n))
-    return 'engine-badge--power';
-  if (n === 'time_trial') return 'engine-badge--hypertrophy';
-  return 'engine-badge--default';
+  switch (name.toLowerCase()) {
+    case 'endurance': case 'endurance_long': case 'interval': case 'max_aerobic_power': case 'hybrid_aerobic':
+      return 'engine-badge--endurance';
+    case 'threshold': case 'threshold_stepped': case 'anaerobic': case 'descending_devour': case 'ascending':
+      return 'engine-badge--strength';
+    case 'polarized': case 'flux': case 'flux_stages': case 'rocket_races_a': case 'rocket_races_b': case 'afterburner':
+      return 'engine-badge--power';
+    case 'time_trial': case 'devour': case 'ascending_devour': case 'infinity': case 'towers': case 'synthesis': case 'atomic': case 'hybrid_anaerobic':
+      return 'engine-badge--hypertrophy';
+    default:
+      return 'engine-badge--default';
+  }
 }
 
 function categoryLabel(name: string): string {
-  const n = name.toLowerCase();
-  if (n === 'endurance') return 'Aerobic';
-  if (['threshold', 'anaerobic', 'ascending', 'interval', 'max_aerobic_power'].includes(n))
-    return 'Threshold / Anaerobic';
-  if (['polarized', 'flux', 'flux_stages', 'rocket_races_a', 'rocket_races_b'].includes(n))
-    return 'Variable Intensity';
-  if (n === 'time_trial') return 'Assessment';
-  return 'Multi-Block';
+  switch (name.toLowerCase()) {
+    case 'endurance': case 'endurance_long': case 'interval': case 'max_aerobic_power': case 'hybrid_aerobic':
+      return 'Aerobic';
+    case 'threshold': case 'threshold_stepped': case 'anaerobic': case 'descending_devour': case 'ascending':
+      return 'Threshold / Anaerobic';
+    case 'polarized': case 'flux': case 'flux_stages': case 'rocket_races_a': case 'rocket_races_b': case 'afterburner':
+      return 'Variable Intensity';
+    case 'time_trial': case 'devour': case 'ascending_devour': case 'infinity': case 'towers': case 'synthesis': case 'atomic': case 'hybrid_anaerobic':
+      return 'Multi-Block';
+    default:
+      return 'Multi-Block';
+  }
 }
 
 // ── Component ────────────────────────────────────────────────────────

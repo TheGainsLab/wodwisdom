@@ -153,8 +153,8 @@ function formatBlock(
     return `${typeLabel}: ${parts.length > 0 ? parts.join(" ") : block.block_text.slice(0, 60).replace(/\n/g, " ")}`;
   }
 
-  if (block.block_type === "warm-up" || block.block_type === "cool-down") {
-    const label = block.block_type === "warm-up" ? "Warm-up" : "Cool-down";
+  if (block.block_type === "warm-up" || block.block_type === "mobility" || block.block_type === "cool-down") {
+    const label = block.block_type === "warm-up" ? "Warm-up" : block.block_type === "mobility" ? "Mobility" : "Cool-down";
     return `${label}: ${block.block_text.slice(0, 60).replace(/\n/g, " ")}`;
   }
 

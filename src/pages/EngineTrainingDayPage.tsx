@@ -15,6 +15,7 @@ import {
   getWorkoutSessionByDay,
   getSessionsByDayType,
   getPerformanceMetrics,
+  findPrecedingRocketRacesA,
   type EngineWorkout,
   type EngineWorkoutSession,
   type EngineTimeTrial,
@@ -30,9 +31,9 @@ import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertT
 type Stage = 'loading' | 'equipment' | 'preview' | 'ready' | 'active' | 'logging' | 'complete';
 
 interface BlockParams {
-  rounds?: number | number[];
+  rounds?: number | number[] | string;
   paceRange?: number[] | string;
-  workDuration?: number | number[];
+  workDuration?: number | number[] | string;
   restDuration?: number | number[] | string;
   workProgression?: string;
   total_intervals?: number;
@@ -47,6 +48,14 @@ interface BlockParams {
   fluxIntensity?: number;
   workDurationOptions?: number[];
   restDurationOptions?: number[];
+  workDurationIncrement?: number;
+  paceProgression?: string;
+  paceIncrement?: number;
+  restProgression?: string;
+  fluxProgression?: string;
+  fluxIncrement?: number;
+  fluxStartIntensity?: number;
+  restDurationIncrement?: number;
 }
 
 interface Segment {
@@ -143,6 +152,7 @@ function calculateIntervalGoal(
   segLabel: string,
   baselineRpm: number,
   rollingAdj: number,
+  roundPaceOverride?: number,
 ): number | null {
   if (baselineRpm <= 0) return null;
 
@@ -158,7 +168,7 @@ function calculateIntervalGoal(
   const isMaxEffort = paceRange === 'max_effort' || segLabel === 'BURST' || segLabel === 'Max Effort';
   if (isMaxEffort || !Array.isArray(paceRange) || paceRange.length < 2) return null;
 
-  const centerPace = (paceRange[0] + paceRange[1]) / 2;
+  const centerPace = roundPaceOverride ?? (paceRange[0] + paceRange[1]) / 2;
   const adjustedPace = centerPace * rollingAdj;
   const targetRpm = baselineRpm * adjustedPace;
   const durationMinutes = segDuration / 60;
@@ -166,10 +176,10 @@ function calculateIntervalGoal(
   return Math.round(targetRpm * durationMinutes * 10) / 10;
 }
 
-function resolveNum(v: number | number[] | undefined, fallback = 0): number {
+function resolveNum(v: number | number[] | string | undefined, fallback = 0): number {
   if (v === undefined || v === null) return fallback;
   if (typeof v === 'number') return v;
-  if (Array.isArray(v)) return v[0];
+  if (Array.isArray(v) && typeof v[0] === 'number') return v[0];
   return fallback;
 }
 
@@ -180,8 +190,12 @@ function resolveRest(rest: number | number[] | string | undefined, workDur: numb
   if (rest === 'equal_to_work') return workDur;
   if (rest === 'five_times_work') return workDur * 5;
   if (rest === 'half_work') return Math.round(workDur / 2);
+  if (rest === 'half_to_two_thirds_work') return Math.round(workDur * 0.58);
   if (rest === 'double_work') return workDur * 2;
   if (rest === 'one_third_work') return Math.round(workDur / 3);
+  if (rest === 'two_to_three_times_work') return Math.round(workDur * 2.5);
+  if (rest === 'one_to_one_point_five_times_work') return Math.round(workDur * 1.25);
+  if (rest === 'one_point_five_to_three_times_work') return Math.round(workDur * 2.25);
   return 0;
 }
 
@@ -192,10 +206,10 @@ function parseBurstTiming(timing: string): number {
 
 function dayTypeBadge(dayType: string): string {
   switch (dayType) {
-    case 'endurance': case 'endurance_long': return 'engine-badge--endurance';
-    case 'threshold': case 'threshold_stepped': case 'anaerobic': return 'engine-badge--strength';
-    case 'polarized': case 'flux': return 'engine-badge--power';
-    case 'time_trial': return 'engine-badge--hypertrophy';
+    case 'endurance': case 'endurance_long': case 'interval': case 'max_aerobic_power': case 'hybrid_aerobic': return 'engine-badge--endurance';
+    case 'threshold': case 'threshold_stepped': case 'anaerobic': case 'descending_devour': case 'ascending': return 'engine-badge--strength';
+    case 'polarized': case 'flux': case 'flux_stages': case 'rocket_races_a': case 'rocket_races_b': case 'afterburner': return 'engine-badge--power';
+    case 'time_trial': case 'devour': case 'ascending_devour': case 'infinity': case 'towers': case 'synthesis': case 'atomic': case 'hybrid_anaerobic': return 'engine-badge--hypertrophy';
     default: return 'engine-badge--default';
   }
 }
@@ -216,8 +230,8 @@ function generateSegments(workout: EngineWorkout): Segment[] {
     const bp = raw as unknown as BlockParams;
 
     const rounds = resolveNum(bp.rounds, 1);
-    const workDur = resolveNum(bp.workDuration, 0);
-    const restDur = resolveRest(bp.restDuration, workDur);
+    const workDur = resolveNum(bp.workDuration, 0) || (bp.workDurationOptions?.[0] ?? 0);
+    const restDur = resolveRest(bp.restDuration, workDur) || (bp.restDurationOptions?.[0] ?? 0);
 
     if (workDur === 0) continue;
 
@@ -255,13 +269,43 @@ function generateSegments(workout: EngineWorkout): Segment[] {
         round++;
       }
 
-    // ── Standard intervals ──
+    // ── Progressive flux intensity (Flux Stages) ──
+    } else if (bp.workProgression === 'progressive_flux_intensity' && bp.baseDuration && bp.fluxDuration) {
+      const baseDur = resolveNum(bp.baseDuration, 300);
+      const fluxDur = resolveNum(bp.fluxDuration, 60);
+      const startIntensity = bp.fluxStartIntensity ?? 0.75;
+      const increment = bp.fluxIncrement ?? 0.05;
+      let remaining = workDur;
+      let round = 0;
+      while (remaining > 0) {
+        const bSeg = Math.min(baseDur, remaining);
+        segments.push({ type: 'work', duration: bSeg, blockIndex: b, roundIndex: round, label: 'Base', intensity: formatPace(bp.basePace) });
+        remaining -= bSeg;
+        if (remaining <= 0) break;
+        const fSeg = Math.min(fluxDur, remaining);
+        const fluxIntensity = startIntensity + round * increment;
+        segments.push({ type: 'work', duration: fSeg, blockIndex: b, roundIndex: round, label: 'Flux', intensity: `${Math.round(fluxIntensity * 100)}%` });
+        remaining -= fSeg;
+        round++;
+      }
+
+    // ── Continuous (Atomic, Towers — single unbroken work block) ──
+    // When paceProgression is 'increasing', fall through to standard intervals path
+    // so each round gets its own pace target (intervals with 0 rest).
+    } else if (bp.workProgression === 'continuous' && bp.paceProgression !== 'increasing') {
+      segments.push({ type: 'work', duration: workDur * rounds, blockIndex: b, roundIndex: 0, label: 'Work', intensity: formatPace(bp.paceRange) });
+
+    // ── Standard / Increasing / Decreasing intervals ──
     } else {
+      const workInc = bp.workDurationIncrement ?? 0;
+      const restInc = bp.restDurationIncrement ?? 0;
       for (let r = 0; r < rounds; r++) {
+        const roundWorkDur = Math.max(0, workDur + r * workInc);
+        const roundRestDur = Math.max(0, restDur + r * restInc);
         const label = bp.paceRange === 'max_effort' ? 'Max Effort' : 'Work';
-        segments.push({ type: 'work', duration: workDur, blockIndex: b, roundIndex: r, label, intensity: formatPace(bp.paceRange) });
-        if (restDur > 0 && r < rounds - 1) {
-          segments.push({ type: 'rest', duration: restDur, blockIndex: b, roundIndex: r, label: 'Rest', intensity: '' });
+        segments.push({ type: 'work', duration: roundWorkDur, blockIndex: b, roundIndex: r, label, intensity: formatPace(bp.paceRange) });
+        if (roundRestDur > 0 && r < rounds - 1) {
+          segments.push({ type: 'rest', duration: roundRestDur, blockIndex: b, roundIndex: r, label: 'Rest', intensity: '' });
         }
       }
     }
@@ -298,8 +342,11 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const [previousSession, setPreviousSession] = useState<boolean>(false);
   const [dayTypeHistory, setDayTypeHistory] = useState<EngineWorkoutSession[]>([]);
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [breakdownExpanded, setBreakdownExpanded] = useState(false);
   const [currentDay, setCurrentDay] = useState(1);
   const [programVersion, setProgramVersion] = useState('main_5day');
+  const [rocketADay, setRocketADay] = useState<number | null>(null);
+  const [rocketASession, setRocketASession] = useState<EngineWorkoutSession | null>(null);
   const { hasFeature } = useEntitlements(session.user.id);
   const hasAccess = hasFeature('engine');
 
@@ -338,6 +385,15 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           getSessionsByDayType(wk.day_type)
             .then(sessions => setDayTypeHistory(sessions))
             .catch(() => setDayTypeHistory([]));
+        }
+
+        // Load preceding Rocket Races A data for Rocket Races B days
+        if (wk?.day_type === 'rocket_races_b') {
+          const result = await findPrecedingRocketRacesA(dayNumber, progress?.engine_program_version ?? 'main_5day').catch(() => null);
+          if (result) {
+            setRocketADay(result.partADay);
+            setRocketASession(result.session);
+          }
         }
 
         // Try to load saved modality + unit preference
@@ -534,6 +590,11 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           // Fallback for workouts with no segments
           targetPace = baselineRpm * (workout.base_intensity_percent / 100);
         }
+      }
+
+      // Rocket Races B: override target pace with the preceding A's actual pace
+      if (workout.day_type === 'rocket_races_b' && rocketASession?.actual_pace) {
+        targetPace = rocketASession.actual_pace;
       }
 
       const perfRatio = targetPace && targetPace > 0 && rpm > 0 ? rpm / targetPace : null;
@@ -818,105 +879,265 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 </div>
               </div>
 
-              {/* Block breakdown */}
-              {blocks.map(({ index, bp }) => {
-                const rounds = resolveNum(bp.rounds, 1);
-                const workDur = resolveNum(bp.workDuration, 0);
-                const restDur = resolveRest(bp.restDuration, workDur);
-                const pace = formatPace(bp.paceRange);
-                const rollingAdj = performanceMetrics?.rolling_avg_ratio ?? 1;
-                const targetRpm = baselineRpm > 0 && Array.isArray(bp.paceRange)
-                  ? `${(baselineRpm * bp.paceRange[0] * rollingAdj).toFixed(1)}–${(baselineRpm * bp.paceRange[1] * rollingAdj).toFixed(1)} ${selectedUnit}/min`
-                  : null;
-                const isStandard = bp.workProgression !== 'continuous_with_bursts' && bp.workProgression !== 'alternating_paces';
-                const intervalGoal = isStandard
-                  ? calculateIntervalGoal(bp, workDur, 'Work', baselineRpm, rollingAdj)
-                  : null;
+              {/* Workout Breakdown — collapsible segment-by-segment preview */}
+              <button
+                onClick={() => setBreakdownExpanded(!breakdownExpanded)}
+                className="engine-breakdown-toggle"
+              >
+                <ChevronDown
+                  size={14}
+                  style={{
+                    transform: breakdownExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s',
+                  }}
+                />
+                Workout Breakdown
+              </button>
 
-                return (
-                  <div key={index} style={{
-                    background: 'var(--bg)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 10,
-                    padding: '14px 16px',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-dim)' }}>
-                        Block {index + 1}
-                      </span>
-                      {pace && (
-                        <span className={'engine-badge ' + (pace === 'MAX' ? 'engine-badge--strength' : 'engine-badge--default')}>
-                          {pace}
-                        </span>
-                      )}
-                    </div>
+              {breakdownExpanded && (
+                <div className="engine-breakdown">
+                  {blocks.map(({ index: blockIdx, bp }, blockArrayIdx) => {
+                    const rounds = resolveNum(bp.rounds, 1);
+                    const workDur = resolveNum(bp.workDuration, 0) || (bp.workDurationOptions?.[0] ?? 0);
+                    const restDur = resolveRest(bp.restDuration, workDur) || (bp.restDurationOptions?.[0] ?? 0);
+                    const pace = formatPace(bp.paceRange);
+                    const rollingAdj = performanceMetrics?.rolling_avg_ratio ?? 1;
+                    const targetRpm = baselineRpm > 0 && Array.isArray(bp.paceRange)
+                      ? `${(baselineRpm * bp.paceRange[0] * rollingAdj).toFixed(1)}–${(baselineRpm * bp.paceRange[1] * rollingAdj).toFixed(1)} ${selectedUnit}/min`
+                      : null;
 
-                    {intervalGoal != null ? (
-                      <>
-                        {/* Round table with per-interval goals */}
-                        <div style={{ fontSize: 13 }}>
-                          <div style={{ display: 'flex', padding: '4px 0', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                            <span style={{ width: 48 }}>Round</span>
-                            <span style={{ flex: 1, textAlign: 'center' }}>Work</span>
-                            <span style={{ flex: 1, textAlign: 'center' }}>Goal</span>
-                            {restDur > 0 && <span style={{ flex: 1, textAlign: 'center' }}>Rest</span>}
-                          </div>
-                          {Array.from({ length: rounds }, (_, r) => (
-                            <div key={r} style={{ display: 'flex', padding: '6px 0', borderBottom: r < rounds - 1 ? '1px solid var(--border)' : 'none', color: 'var(--text-dim)', fontSize: 13, alignItems: 'center' }}>
-                              <span style={{ width: 48 }}>{r + 1}</span>
-                              <span style={{ flex: 1, textAlign: 'center' }}>{formatDuration(workDur)}</span>
-                              <span style={{ flex: 1, textAlign: 'center', color: 'var(--accent)', fontWeight: 600 }}>
-                                ~{intervalGoal % 1 === 0 ? intervalGoal : intervalGoal.toFixed(1)} {selectedUnit}
+                    return (
+                      <div key={blockIdx}>
+                        {/* Block header (only when multiple blocks) */}
+                        {blocks.length > 1 && (
+                          <div className="engine-breakdown-block-header">
+                            <span>Block {blockIdx + 1}</span>
+                            {pace && (
+                              <span className={'engine-badge ' + (pace === 'MAX' ? 'engine-badge--strength' : 'engine-badge--default')}>
+                                {pace}
                               </span>
-                              {restDur > 0 && (
-                                <span style={{ flex: 1, textAlign: 'center' }}>
-                                  {r < rounds - 1 ? formatDuration(restDur) : '—'}
+                            )}
+                          </div>
+                        )}
+
+                        {/* Flux — alternating_paces: expand into WORK/FLUX segments */}
+                        {bp.workProgression === 'alternating_paces' && bp.baseDuration && bp.fluxDuration ? (() => {
+                          const baseDur = resolveNum(bp.baseDuration, 300);
+                          const fluxDur = resolveNum(bp.fluxDuration, 60);
+                          const rows: React.ReactNode[] = [];
+                          let remaining = workDur;
+                          let segIdx = 0;
+
+                          while (remaining > 0) {
+                            const bSeg = Math.min(baseDur, remaining);
+                            const baseGoal = calculateIntervalGoal(bp, bSeg, 'Base', baselineRpm, rollingAdj);
+                            rows.push(
+                              <div key={`b-${segIdx}`} className="engine-breakdown-row">
+                                <span className="engine-breakdown-label">WORK</span>
+                                <span className="engine-breakdown-dur">{formatDuration(bSeg)}</span>
+                                <span className="engine-breakdown-goal">
+                                  {baseGoal != null ? `~${baseGoal % 1 === 0 ? baseGoal : baseGoal.toFixed(1)} ${selectedUnit}` : pace || '—'}
                                 </span>
-                              )}
+                              </div>
+                            );
+                            remaining -= bSeg;
+                            if (remaining <= 0) break;
+
+                            const fSeg = Math.min(fluxDur, remaining);
+                            const fluxGoal = calculateIntervalGoal(bp, fSeg, 'Flux', baselineRpm, rollingAdj);
+                            rows.push(
+                              <div key={`f-${segIdx}`} className="engine-breakdown-row engine-breakdown-row--flux">
+                                <span className="engine-breakdown-label engine-breakdown-label--flux">FLUX</span>
+                                <span className="engine-breakdown-dur">{formatDuration(fSeg)}</span>
+                                <span className="engine-breakdown-goal engine-breakdown-goal--flux">
+                                  {fluxGoal != null ? `~${fluxGoal % 1 === 0 ? fluxGoal : fluxGoal.toFixed(1)} ${selectedUnit}` : formatPace(bp.fluxPaceRange ?? bp.paceRange) || '—'}
+                                </span>
+                              </div>
+                            );
+                            remaining -= fSeg;
+                            segIdx++;
+                          }
+
+                          if (restDur > 0) {
+                            rows.push(
+                              <div key="rest" className="engine-breakdown-row engine-breakdown-row--rest">
+                                <span className="engine-breakdown-label engine-breakdown-label--rest">REST</span>
+                                <span className="engine-breakdown-dur">{formatDuration(restDur)}</span>
+                                <span className="engine-breakdown-goal">—</span>
+                              </div>
+                            );
+                          }
+
+                          return <div className="engine-breakdown-segments">{rows}</div>;
+                        })()
+
+                        /* Polarized — continuous_with_bursts: expand into Base/BURST segments */
+                        : bp.workProgression === 'continuous_with_bursts' && bp.burstTiming && bp.burstDuration ? (() => {
+                          const burstInterval = parseBurstTiming(bp.burstTiming);
+                          const burstDur = bp.burstDuration;
+                          const rows: React.ReactNode[] = [];
+                          let remaining = workDur;
+                          let segIdx = 0;
+
+                          while (remaining > 0) {
+                            const baseSeg = Math.min(burstInterval, remaining);
+                            const baseGoal = calculateIntervalGoal(bp, baseSeg, 'Base', baselineRpm, rollingAdj);
+                            rows.push(
+                              <div key={`base-${segIdx}`} className="engine-breakdown-row">
+                                <span className="engine-breakdown-label">BASE</span>
+                                <span className="engine-breakdown-dur">{formatDuration(baseSeg)}</span>
+                                <span className="engine-breakdown-goal">
+                                  {baseGoal != null ? `~${baseGoal % 1 === 0 ? baseGoal : baseGoal.toFixed(1)} ${selectedUnit}` : pace || '—'}
+                                </span>
+                              </div>
+                            );
+                            remaining -= baseSeg;
+                            if (remaining <= 0) break;
+
+                            const bSeg = Math.min(burstDur, remaining);
+                            rows.push(
+                              <div key={`burst-${segIdx}`} className="engine-breakdown-row engine-breakdown-row--burst">
+                                <span className="engine-breakdown-label engine-breakdown-label--burst">BURST</span>
+                                <span className="engine-breakdown-dur">{formatDuration(bSeg)}</span>
+                                <span className="engine-breakdown-goal engine-breakdown-goal--burst">Max Effort</span>
+                              </div>
+                            );
+                            remaining -= bSeg;
+                            segIdx++;
+                          }
+
+                          if (restDur > 0) {
+                            rows.push(
+                              <div key="rest" className="engine-breakdown-row engine-breakdown-row--rest">
+                                <span className="engine-breakdown-label engine-breakdown-label--rest">REST</span>
+                                <span className="engine-breakdown-dur">{formatDuration(restDur)}</span>
+                                <span className="engine-breakdown-goal">—</span>
+                              </div>
+                            );
+                          }
+
+                          return <div className="engine-breakdown-segments">{rows}</div>;
+                        })()
+
+                        /* Progressive flux intensity (Flux Stages): expand into WORK/FLUX with increasing intensity */
+                        : bp.workProgression === 'progressive_flux_intensity' && bp.baseDuration && bp.fluxDuration ? (() => {
+                          const baseDur = resolveNum(bp.baseDuration, 300);
+                          const fluxDur = resolveNum(bp.fluxDuration, 60);
+                          const startIntensity = bp.fluxStartIntensity ?? 0.75;
+                          const increment = bp.fluxIncrement ?? 0.05;
+                          const rows: React.ReactNode[] = [];
+                          let remaining = workDur;
+                          let segIdx = 0;
+
+                          while (remaining > 0) {
+                            const bSeg = Math.min(baseDur, remaining);
+                            const baseGoal = calculateIntervalGoal(bp, bSeg, 'Base', baselineRpm, rollingAdj);
+                            rows.push(
+                              <div key={`b-${segIdx}`} className="engine-breakdown-row">
+                                <span className="engine-breakdown-label">WORK</span>
+                                <span className="engine-breakdown-dur">{formatDuration(bSeg)}</span>
+                                <span className="engine-breakdown-goal">
+                                  {baseGoal != null ? `~${baseGoal % 1 === 0 ? baseGoal : baseGoal.toFixed(1)} ${selectedUnit}` : pace || '—'}
+                                </span>
+                              </div>
+                            );
+                            remaining -= bSeg;
+                            if (remaining <= 0) break;
+
+                            const fSeg = Math.min(fluxDur, remaining);
+                            const fluxIntensity = startIntensity + segIdx * increment;
+                            const fluxGoal = baselineRpm > 0
+                              ? Math.round(baselineRpm * fluxIntensity * rollingAdj * (fSeg / 60) * 10) / 10
+                              : null;
+                            rows.push(
+                              <div key={`f-${segIdx}`} className="engine-breakdown-row engine-breakdown-row--flux">
+                                <span className="engine-breakdown-label engine-breakdown-label--flux">FLUX</span>
+                                <span className="engine-breakdown-dur">{formatDuration(fSeg)}</span>
+                                <span className="engine-breakdown-goal engine-breakdown-goal--flux">
+                                  {fluxGoal != null ? `~${fluxGoal % 1 === 0 ? fluxGoal : fluxGoal.toFixed(1)} ${selectedUnit}` : `${Math.round(fluxIntensity * 100)}%`}
+                                </span>
+                              </div>
+                            );
+                            remaining -= fSeg;
+                            segIdx++;
+                          }
+
+                          return <div className="engine-breakdown-segments">{rows}</div>;
+                        })()
+
+                        /* Continuous (Atomic, Towers): single unbroken work block */
+                        /* When paceProgression is 'increasing', fall through to round-by-round rendering */
+                        : bp.workProgression === 'continuous' && bp.paceProgression !== 'increasing' ? (
+                          <div className="engine-breakdown-segments">
+                            <div className="engine-breakdown-row">
+                              <span className="engine-breakdown-label">WORK</span>
+                              <span className="engine-breakdown-dur">{formatDuration(workDur * rounds)}</span>
+                              <span className="engine-breakdown-goal">
+                                {(() => {
+                                  const goal = calculateIntervalGoal(bp, workDur * rounds, 'Work', baselineRpm, rollingAdj);
+                                  const isMax = bp.paceRange === 'max_effort';
+                                  return isMax ? 'Max Effort' : goal != null ? `~${goal % 1 === 0 ? goal : goal.toFixed(1)} ${selectedUnit}` : pace || '—';
+                                })()}
+                              </span>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        )
+
+                        /* Standard / Increasing / Decreasing intervals: round-by-round cards */
+                        : (
+                          <div className="engine-breakdown-segments">
+                            {Array.from({ length: rounds }, (_, r) => {
+                              const workInc = bp.workDurationIncrement ?? 0;
+                              const restInc = bp.restDurationIncrement ?? 0;
+                              const roundWorkDur = Math.max(0, workDur + r * workInc);
+                              const roundRestDur = Math.max(0, restDur + r * restInc);
+                              const effectivePaceInc = bp.paceIncrement
+                                ?? (bp.paceProgression === 'increasing' && Array.isArray(bp.paceRange) && rounds > 1
+                                  ? (bp.paceRange[1] - bp.paceRange[0]) / (rounds - 1)
+                                  : undefined);
+                              const roundPace = bp.paceProgression === 'increasing' && Array.isArray(bp.paceRange) && effectivePaceInc
+                                ? bp.paceRange[0] + r * effectivePaceInc
+                                : undefined;
+                              const intervalGoal = calculateIntervalGoal(bp, roundWorkDur, 'Work', baselineRpm, rollingAdj, roundPace);
+                              const isMax = bp.paceRange === 'max_effort';
+                              return (
+                                <div key={r}>
+                                  <div className="engine-breakdown-row">
+                                    <span className="engine-breakdown-label">R{r + 1}</span>
+                                    <span className="engine-breakdown-dur">{formatDuration(roundWorkDur)}</span>
+                                    <span className="engine-breakdown-goal">
+                                      {isMax ? 'Max Effort' : intervalGoal != null ? `~${intervalGoal % 1 === 0 ? intervalGoal : intervalGoal.toFixed(1)} ${selectedUnit}` : pace || '—'}
+                                    </span>
+                                  </div>
+                                  {roundRestDur > 0 && r < rounds - 1 && (
+                                    <div className="engine-breakdown-row engine-breakdown-row--rest">
+                                      <span className="engine-breakdown-label engine-breakdown-label--rest">REST</span>
+                                      <span className="engine-breakdown-dur">{formatDuration(roundRestDur)}</span>
+                                      <span className="engine-breakdown-goal">—</span>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Target pace line */}
                         {targetRpm && (
-                          <div style={{ fontSize: 13, color: '#ffffff', fontWeight: 700, marginTop: 8 }}>
-                            Pace: {targetRpm}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        {/* Standard summary for no-baseline, max effort, flux, or polarized */}
-                        <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'var(--text-dim)' }}>
-                          <span>{rounds} round{rounds !== 1 ? 's' : ''}</span>
-                          <span>Work: {formatDuration(workDur)}</span>
-                          {restDur > 0 && <span>Rest: {formatDuration(restDur)}</span>}
-                        </div>
-
-                        {bp.workProgression === 'continuous_with_bursts' && bp.burstTiming && (
-                          <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>
-                            Bursts {bp.burstTiming.replace(/_/g, ' ')} ({bp.burstDuration}s max effort)
-                          </div>
+                          <div className="engine-breakdown-pace">Pace: {targetRpm}</div>
                         )}
 
-                        {bp.workProgression === 'alternating_paces' && (
-                          <div style={{ fontSize: 12, color: '#c084fc', marginTop: 6 }}>
-                            Alternating base ({formatDuration(resolveNum(bp.baseDuration))}) / flux ({formatDuration(resolveNum(bp.fluxDuration))})
+                        {/* Block rest between blocks */}
+                        {workout?.set_rest_seconds && blockArrayIdx < blocks.length - 1 && (
+                          <div className="engine-breakdown-row engine-breakdown-row--block-rest">
+                            <span className="engine-breakdown-label engine-breakdown-label--rest">BLOCK REST</span>
+                            <span className="engine-breakdown-dur">{formatDuration(workout.set_rest_seconds)}</span>
+                            <span className="engine-breakdown-goal">—</span>
                           </div>
                         )}
-
-                        {targetRpm && (
-                          <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 6 }}>
-                            Target: {targetRpm}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-
-              {workout?.set_rest_seconds && blocks.length > 1 && (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
-                  {workout.set_rest_seconds}s rest between blocks
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
@@ -1001,13 +1222,29 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 </div>
               )}
 
-              <button
-                className="engine-btn engine-btn-primary"
-                onClick={handleStartWorkout}
-                style={{ width: '100%' }}
-              >
-                <Play size={18} /> Start Workout
-              </button>
+              {workout?.day_type === 'rocket_races_b' && !rocketASession ? (
+                <div className="engine-card" style={{ textAlign: 'center', padding: '20px', background: 'var(--bg-muted, #1a1a2e)' }}>
+                  <p style={{ marginBottom: 12, color: 'var(--text-secondary)' }}>
+                    Complete <strong>Rocket Races A (Day {rocketADay ?? '?'})</strong> first to unlock pacing for this workout.
+                  </p>
+                  {rocketADay && (
+                    <button
+                      className="engine-btn engine-btn-secondary"
+                      onClick={() => navigate(`/engine/day/${rocketADay}`)}
+                    >
+                      Go to Rocket Races A
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button
+                  className="engine-btn engine-btn-primary"
+                  onClick={handleStartWorkout}
+                  style={{ width: '100%' }}
+                >
+                  <Play size={18} /> Start Workout
+                </button>
+              )}
             </div>
           </div>
         </div>

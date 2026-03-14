@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Camera, Check, Loader2, Pencil } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import FoodDetailSheet from './FoodDetailSheet';
+import { cleanServing } from './cleanServing';
 
 export interface ImageFoodResult {
   identified: { food_name: string; serving_size: string; description: string };
@@ -255,7 +256,7 @@ export default function PhotoPanel({
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
                   {result.found ? (
                     <>
-                      {result.entry_data!.number_of_units} {result.entry_data!.serving_description || 'serving'}
+                      {cleanServing(result.entry_data!.number_of_units, result.entry_data!.serving_description)}
                       {' — '}
                       {Math.round(result.entry_data!.calories)} cal | {Math.round(result.entry_data!.protein)}g P | {Math.round(result.entry_data!.carbohydrate)}g C | {Math.round(result.entry_data!.fat)}g F
                     </>

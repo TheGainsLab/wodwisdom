@@ -119,6 +119,16 @@ function computeLoadBands(numericLoads: number[]): Record<string, number> {
   return bands;
 }
 
+function toNumericLoad(load: string): number | null {
+  if (load === "BW") return null;
+  const pct = load.match(/^(\d+)%$/);
+  if (pct) return parseInt(pct[1], 10);
+  const slash = load.match(/^(\d+)\/\d+$/);
+  if (slash) return parseInt(slash[1], 10);
+  const n = parseInt(load, 10);
+  return isNaN(n) ? null : n;
+}
+
 /**
  * Analyze program using pre-parsed blocks.
  * - strength/skills: modal balance + movement frequency only
@@ -275,14 +285,4 @@ export function analyzeBlocks(
     distinct_loads: allLoads.size,
     load_bands: loadBands,
   };
-}
-
-function toNumericLoad(load: string): number | null {
-  if (load === "BW") return null;
-  const pct = load.match(/^(\d+)%$/);
-  if (pct) return parseInt(pct[1], 10);
-  const slash = load.match(/^(\d+)\/\d+$/);
-  if (slash) return parseInt(slash[1], 10);
-  const n = parseInt(load, 10);
-  return isNaN(n) ? null : n;
 }

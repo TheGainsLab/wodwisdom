@@ -72,3 +72,30 @@ verify_jwt = false
 
 [functions.favorites-manage]
 verify_jwt = false
+
+[functions.parse-skills]
+verify_jwt = false
+
+[functions.parse-metcon]
+verify_jwt = false
+
+[functions.parse-strength]
+verify_jwt = false
+
+[functions.save-workout-block]
+verify_jwt = false
+
+[functions.complete-workout]
+verify_jwt = false
+
+[functions.update-workout-entry]
+verify_jwt = false
+
+[functions.adjust-workout]
+verify_jwt = false
+
+[functions.training-analysis]
+verify_jwt = false
+
+[functions.nutrition-analysis]
+verify_jwt = false

@@ -54,6 +54,7 @@
   justify-content: space-between;
   padding: 12px 14px;
   background: var(--surface2);
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   cursor: pointer;
@@ -264,12 +265,12 @@
 .nutrition-empty-title {
   font-size: 15px;
   font-weight: 600;
-  color: var(--text-dim);
+  color: var(--text);
 }
 
 .nutrition-empty-desc {
   font-size: 13px;
-  color: var(--text-muted);
+  color: var(--text-dim);
   max-width: 280px;
   line-height: 1.5;
 }
@@ -300,6 +301,195 @@
   font-size: 11px;
   color: var(--text-dim);
   white-space: nowrap;
+}
+
+/* ── Add Food panel ── */
+
+/* Tab bar with dismiss */
+.nutrition-tab-bar {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.nutrition-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.nutrition-tab.active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+.nutrition-tab-dismiss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.nutrition-tab-dismiss:hover {
+  color: var(--text);
+}
+
+/* Compact meal type chip row */
+.nutrition-meal-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+
+.nutrition-meal-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.nutrition-meal-chip {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.nutrition-meal-chip:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.nutrition-meal-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  font-weight: 600;
+}
+
+/* Quick links row (Favorites, My Meals) */
+.nutrition-quick-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.nutrition-quick-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.nutrition-quick-link:hover {
+  color: var(--accent);
+}
+
+/* Nutrition page body layout */
+.nutrition-page-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Date navigation */
+.nutrition-date-nav {
+  padding: 12px 16px;
+}
+
+/* Nutrition macro grid: 4 columns on desktop, 2x2 on mobile */
+.nutrition-macro-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* Nutrition page mobile layout fixes */
+@media (max-width: 640px) {
+  .nutrition-page-body {
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .nutrition-date-nav {
+    padding: 10px 12px;
+  }
+
+  .nutrition-macro-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .nutrition-macro-grid .engine-stat {
+    padding: 12px 10px;
+  }
+
+  .nutrition-macro-grid .engine-stat-value {
+    font-size: 22px;
+  }
+}
+
+/* Surplus / deficit row inside DailySummary */
+.nutrition-surplus-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.nutrition-surplus-bar-track {
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.nutrition-surplus-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.nutrition-surplus-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 /* Responsive: slightly larger overlay padding on bigger screens */

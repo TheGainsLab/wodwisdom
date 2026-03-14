@@ -339,6 +339,21 @@ body.landing-body{overflow:auto;height:auto}
 .block-edit-add-option{display:block;width:100%;padding:8px 14px;background:none;border:none;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;text-align:left;cursor:pointer;transition:background .15s}
 .block-edit-add-option:hover{background:var(--accent-glow);color:var(--accent)}
 .block-edit-add-option:not(:last-child){border-bottom:1px solid var(--border)}
+.ai-edit-section{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.ai-edit-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;background:none;border:1px dashed var(--accent);border-radius:6px;color:var(--accent);font-family:'Outfit',sans-serif;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;opacity:.7}
+.ai-edit-btn:hover{opacity:1;background:var(--accent-glow)}
+.ai-edit-input-row{display:flex;gap:8px;align-items:center}
+.ai-edit-input{flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px}
+.ai-edit-input:focus{outline:none;border-color:var(--accent)}
+.ai-edit-input::placeholder{color:var(--text-muted)}
+.ai-edit-submit{padding:8px 16px;background:var(--accent);border:none;border-radius:6px;color:#fff;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.ai-edit-submit:disabled{opacity:.5;cursor:not-allowed}
+.ai-edit-cancel{padding:8px 12px;background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-muted);font-family:'Outfit',sans-serif;font-size:13px;cursor:pointer}
+.ai-edit-cancel:hover{border-color:var(--text-dim);color:var(--text-dim)}
+.ai-edit-rationale{margin-top:8px;padding:8px 12px;background:var(--accent-glow);border-radius:6px;font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:10px;line-height:1.4}
+.ai-edit-revert{padding:4px 10px;background:none;border:1px solid var(--border);border-radius:4px;color:var(--text-muted);font-family:'Outfit',sans-serif;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.ai-edit-revert:hover{border-color:var(--danger);color:var(--danger)}
+.ai-edit-error{margin-top:8px;padding:8px 12px;background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.3);border-radius:6px;font-size:12px;color:#ff6b6b;line-height:1.4}
 .program-detail-wrap,.programs-add-wrap{max-width:900px;margin:0 auto}
 .program-detail-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .program-workouts-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
@@ -360,6 +375,8 @@ body.landing-body{overflow:auto;height:auto}
 .program-row-completed .workout-text-cell{opacity:.7}
 .program-day-dot{display:inline-block;width:8px;height:8px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
 .program-completed-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);padding:3px 8px;border-radius:4px;letter-spacing:.3px}
+.program-in-progress-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;color:var(--warning, #f39c12);background:color-mix(in srgb,var(--warning, #f39c12) 12%,transparent);padding:3px 8px;border-radius:4px;letter-spacing:.3px}
+.program-day-in-progress{background:color-mix(in srgb,var(--warning, #f39c12) 4%,transparent)}
 
 /* Collapsible days accordion */
 .program-days-accordion{display:flex;flex-direction:column;gap:0}

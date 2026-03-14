@@ -340,6 +340,28 @@ export async function getWorkoutSessionByDay(
   return data;
 }
 
+/** Find the nearest preceding Rocket Races A day and its completed session (if any). */
+export async function findPrecedingRocketRacesA(
+  dayNumber: number,
+  programType = 'main_5day'
+): Promise<{ partADay: number; session: EngineWorkoutSession | null } | null> {
+  const { data: workoutData, error: wErr } = await supabase
+    .from('engine_workouts')
+    .select('day_number')
+    .eq('program_type', programType)
+    .eq('day_type', 'rocket_races_a')
+    .lt('day_number', dayNumber)
+    .order('day_number', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (wErr || !workoutData) return null;
+
+  const partADay = workoutData.day_number;
+  const session = await getWorkoutSessionByDay(partADay);
+  return { partADay, session };
+}
+
 /** Save a completed workout session. */
 export async function saveWorkoutSession(
   session: Omit<EngineWorkoutSession, 'id' | 'user_id' | 'created_at'>

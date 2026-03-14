@@ -308,7 +308,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                 {/* Intent — always visible at top */}
                 {review.intent && (
                   <div className="wr-intent-card">
-                    <div className="wr-intent-label">Session Purpose</div>
+                    <div className="wr-intent-label">Training Intent</div>
                     <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(review.intent) }} />
                   </div>
                 )}

@@ -11,22 +11,21 @@ import {
   formatChunksAsContext,
 } from "../_shared/rag.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
-import { rankSkillPriorities } from "../_shared/skill-priorities.ts";
-import { buildSkillSchedule } from "../_shared/build-skill-schedule.ts";
-import { extractBlocksFromWorkoutText } from "../_shared/parse-workout-blocks.ts";
+import { SKILL_DISPLAY_NAMES } from "../_shared/skill-priorities.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 const cors = {
-"Access-Control-Allow-Origin": "*",
-"Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-"Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 interface ProfileData {
   lifts?: Record<string, number> | null;
   skills?: Record<string, string> | null;
   conditioning?: Record<string, string | number> | null;
+  equipment?: Record<string, boolean> | null;
   bodyweight?: number | null;
   units?: string | null;
   age?: number | null;
@@ -34,149 +33,174 @@ interface ProfileData {
   gender?: string | null;
 }
 function formatProfile(profile: ProfileData): string {
-const parts: string[] = [];
-const u = profile.units === "kg" ? "kg" : "lbs";
-if (profile.age != null && profile.age > 0) parts.push(`Age: ${profile.age}`);
-if (profile.height != null && profile.height > 0) parts.push(`Height: ${profile.height} ${profile.units === "kg" ? "cm" : "in"}`);
-if (profile.bodyweight && profile.bodyweight > 0) parts.push(`Bodyweight: ${profile.bodyweight} ${u}`);
-if (profile.gender) parts.push(`Gender: ${profile.gender}`);
-if (profile.lifts && Object.keys(profile.lifts).length > 0) {
-const liftStr = Object.entries(profile.lifts)
-.filter(([, v]) => v > 0)
-.map(([k, v]) => `${k.replace(/_/g, " ")}: ${v} ${u}`)
-.join(", ");
-if (liftStr) parts.push("1RM Lifts — " + liftStr);
+  const parts: string[] = [];
+  const u = profile.units === "kg" ? "kg" : "lbs";
+  if (profile.age != null && profile.age > 0) parts.push(`Age: ${profile.age}`);
+  if (profile.height != null && profile.height > 0) parts.push(`Height: ${profile.height} ${profile.units === "kg" ? "cm" : "in"}`);
+  if (profile.bodyweight && profile.bodyweight > 0) parts.push(`Bodyweight: ${profile.bodyweight} ${u}`);
+  if (profile.gender) parts.push(`Gender: ${profile.gender}`);
+  if (profile.lifts && Object.keys(profile.lifts).length > 0) {
+    const liftStr = Object.entries(profile.lifts)
+      .filter(([, v]) => v > 0)
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v} ${u}`)
+      .join(", ");
+    if (liftStr) parts.push("1RM Lifts — " + liftStr);
+  }
+  if (profile.skills && Object.keys(profile.skills).length > 0) {
+    const skillStr = Object.entries(profile.skills)
+      .filter(([, v]) => v && v !== "none")
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
+      .join(", ");
+    if (skillStr) parts.push("Skills — " + skillStr);
+  }
+  if (profile.conditioning && Object.keys(profile.conditioning).length > 0) {
+    const condStr = Object.entries(profile.conditioning)
+      .filter(([, v]) => v !== "" && v != null)
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
+      .join(", ");
+    if (condStr) parts.push("Conditioning — " + condStr);
+  }
+  if (profile.equipment && Object.keys(profile.equipment).length > 0) {
+    const unavailable = Object.entries(profile.equipment)
+      .filter(([, v]) => v === false)
+      .map(([k]) => k.replace(/_/g, " "));
+    if (unavailable.length > 0) {
+      parts.push("Equipment NOT available — " + unavailable.join(", "));
+    }
+  }
+  return parts.join("\n") || "No profile data.";
 }
-if (profile.skills && Object.keys(profile.skills).length > 0) {
-const skillStr = Object.entries(profile.skills)
-.filter(([, v]) => v && v !== "none")
-.map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
-.join(", ");
-if (skillStr) parts.push("Skills — " + skillStr);
-}
-if (profile.conditioning && Object.keys(profile.conditioning).length > 0) {
-const condStr = Object.entries(profile.conditioning)
-.filter(([, v]) => v !== "" && v != null)
-.map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
-.join(", ");
-if (condStr) parts.push("Conditioning — " + condStr);
-}
-return parts.join("\n") || "No profile data.";
+/* ------------------------------------------------------------------ */
+/*  Fetch active coaching guidelines from DB                          */
+/* ------------------------------------------------------------------ */
+async function fetchCoachingGuidelines(
+  supa: ReturnType<typeof createClient>,
+  scopes: string[] = ["all"]
+): Promise<string> {
+  const { data, error } = await supa
+    .from("coaching_guidelines")
+    .select("guideline_text")
+    .in("category", ["strength", "metcon"])
+    .eq("is_active", true)
+    .in("scope", scopes)
+    .order("priority", { ascending: false });
+  if (error) {
+    console.error("Failed to fetch coaching guidelines:", error);
+    return "";
+  }
+  if (!data || data.length === 0) return "";
+  return "\n\nCOACHING GUIDELINES:\n" +
+    data.map((r: { guideline_text: string }) => `- ${r.guideline_text}`).join("\n");
 }
 /* ------------------------------------------------------------------ */
 /*  SYSTEM PROMPT — coherence guardrails only, no methodology         */
 /* ------------------------------------------------------------------ */
 const GENERATE_PROMPT = `Generate a 4-week training program for the athlete described below.
-Use the REFERENCE material to guide all programming decisions — periodization approach, loading schemes, skill progressions, metcon design, and deload strategy.
-PROGRAM COHERENCE RULES:
-- No single strength exercise more than 2x per week. Vary barbell movements across the week (e.g. back squat Mon, front squat Thu — not back squat Mon/Wed/Fri).
-- Do not program heavy squats and heavy deadlifts on consecutive days. Same for pressing patterns (strict press and push press should not be back-to-back days).
-- Weakness movements: program 2x per week across the cycle.
-- Strengths and maintenance movements: still program 1x per week. Do not ignore movements just because they are not a weakness.
-- Distribute weakness work across all 4 weeks with progression, not just repetition.
+Use the REFERENCE material and COACHING GUIDELINES below to guide all programming decisions — periodization approach, loading schemes, skill progressions, metcon design, and deload strategy.
 OUTPUT RULES:
 - Complete every block in the template provided. One line per block.
+- Each block header (Warm-up:, Mobility:, Skills:, Strength:, Metcon:, Cool down:) MUST appear on its own line starting at position 0. Never nest one block inside another.
+- Warm-up: and Mobility: are SEPARATE blocks. Do NOT put mobility content inside the Warm-up block. Warm-up is general preparation; Mobility is targeted drills on a separate line.
 - Do not add, remove, or reorder any headers.
 - Prescribe weights using the athlete's 1RMs where applicable. Use / for M/F Rx (e.g. 95/65).`;
+
+const METCON_GUIDANCE = `
+
+METCON DESIGN RULES (apply to every Metcon: block):
+
+1. BREADTH OVER WEAKNESS — Metcons draw from movements the athlete is PROFICIENT at (intermediate or advanced). Weaknesses and developing skills belong in the Skills block, not the Metcon. If the athlete is advanced at ring muscle-ups, use them in metcons. If the athlete is beginner at HSPU, never put HSPU in a metcon — that stays in the skill block. See the METCON MOVEMENT ELIGIBILITY section for the explicit lists.
+
+2. MONOSTRUCTURAL CAP — Across the 5 metcons in any single week, at most 2 may include a monostructural cardio element (row, bike, ski erg, run — any of these count). This is a hard cap. Weeks 1-4 each independently enforce this limit.
+
+3. LOADING PREFERENCES — When a metcon calls for a weighted movement, prefer barbells and dumbbells over kettlebells. Kettlebells are acceptable when the movement is inherently KB-based (e.g., Turkish get-ups, KB swings) but do not substitute KBs for movements that can use a barbell or dumbbell.
+
+4. TIME DOMAIN DISTRIBUTION (per week) — Assign a target time domain to each metcon:
+   - Short: sub-8 minutes
+   - Medium: 8-15 minutes
+   - Long: 15+ minutes
+   Each week must include at least 1 short, 1 medium, and 1 long metcon. No single category may appear more than 3 times in one week. Design the rep schemes, round counts, and movement complexity to fit the target time domain.
+
+5. COMPLEMENT THE STRENGTH BLOCK — If a day's Strength block is squat-dominant, the Metcon must NOT be squat-dominant. If Strength is pressing, the Metcon should not be press-heavy. The metcon should use complementary movement patterns to avoid overloading the same muscle groups.`;
 /* ------------------------------------------------------------------ */
-/*  SKELETON BUILDER — full 20-day template with inline skill assigns */
+/*  SKELETON BUILDER — full 20-day template                           */
 /* ------------------------------------------------------------------ */
-function buildProgramSkeleton(
-  schedule: Array<{ week: number; day: number; displayName: string }>
-): string {
-const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-const lines: string[] = [];
-// Index skill assignments for fast lookup: "week-day" -> displayName
-const skillMap = new Map<string, string>();
-for (const slot of schedule) {
-    skillMap.set(`${slot.week}-${slot.day}`, slot.displayName);
-}
-for (let week = 1; week <= 4; week++) {
+function buildProgramSkeleton(): string {
+  const lines: string[] = [];
+  for (let week = 1; week <= 4; week++) {
     lines.push(`Week ${week}`);
-for (let day = 1; day <= 5; day++) {
-const skill = skillMap.get(`${week}-${day}`) || "coach's choice";
-      lines.push(`${dayNames[day - 1]}:`);
+    for (let day = 1; day <= 5; day++) {
+      const dayNum = (week - 1) * 5 + day;
+      lines.push(`Day ${dayNum}:`);
       lines.push(`Warm-up: `);
-      lines.push(`[skill: ${skill}]`);
+      lines.push(`Mobility: `);
       lines.push(`Skills: `);
       lines.push(`Strength: `);
       lines.push(`Metcon: `);
       lines.push(`Cool down: `);
       lines.push(``);
-}
-}
-return lines.join("\n");
+    }
+  }
+  return lines.join("\n");
 }
 async function retrieveRAGContext(
   supa: ReturnType<typeof createClient>,
   profileData: ProfileData
 ): Promise<string> {
-if (!OPENAI_API_KEY) return "";
-try {
-const allChunks: import("../_shared/rag.ts").RAGChunk[] = [];
-const liftNames = profileData.lifts
-? Object.keys(profileData.lifts).map((k) => k.replace(/_/g, " ")).join(", ")
-: "";
-const skillNames = profileData.skills
-? Object.entries(profileData.skills)
-.filter(([, v]) => v && v !== "none")
-.map(([k]) => k.replace(/_/g, " "))
-.join(", ")
-: "";
+  if (!OPENAI_API_KEY) return "";
+  try {
+    const liftNames = profileData.lifts
+      ? Object.keys(profileData.lifts).map((k) => k.replace(/_/g, " ")).join(", ")
+      : "";
+    const skillNames = profileData.skills
+      ? Object.entries(profileData.skills)
+          .filter(([, v]) => v && v !== "none")
+          .map(([k]) => k.replace(/_/g, " "))
+          .join(", ")
+      : "";
     console.log(`[RAG] Searching with lifts="${liftNames}", skills="${skillNames}"`);
-if (liftNames) {
-const chunks = await searchChunks(
+    // FIX 8: Run all searches in parallel
+    const queries: Promise<import("../_shared/rag.ts").RAGChunk[]>[] = [];
+    if (liftNames) {
+      queries.push(
+        searchChunks(supa, `strength training programming periodization ${liftNames}`, "journal", OPENAI_API_KEY, 3, 0.25)
+      );
+    }
+    if (skillNames) {
+      queries.push(
+        searchChunks(supa, `CrossFit gymnastics skill progression ${skillNames}`, "journal", OPENAI_API_KEY, 3, 0.25)
+      );
+    }
+    queries.push(
+      searchChunks(supa, "CrossFit conditioning engine metcon programming", "journal", OPENAI_API_KEY, 3, 0.25)
+    );
+    queries.push(
+      searchChunks(
         supa,
-`strength training programming periodization ${liftNames}`,
-"journal",
-OPENAI_API_KEY,
-3,
-0.25
-);
-      console.log(`[RAG] journal/strength: ${chunks.length} chunks`);
-      allChunks.push(...chunks);
-}
-if (skillNames) {
-const chunks = await searchChunks(
-        supa,
-`CrossFit gymnastics skill progression ${skillNames}`,
-"journal",
-OPENAI_API_KEY,
-3,
-0.25
-);
-      console.log(`[RAG] journal/skills: ${chunks.length} chunks`);
-      allChunks.push(...chunks);
-}
-const chunks = await searchChunks(
-      supa,
-"CrossFit conditioning engine metcon programming",
-"journal",
-OPENAI_API_KEY,
-3,
-0.25
-);
-    console.log(`[RAG] journal/conditioning: ${chunks.length} chunks`);
-    allChunks.push(...chunks);
-// Strength Science: evidence-based load prescription, periodization for barbell block
-const strengthScienceChunks = await searchChunks(
-      supa,
-      liftNames ? `strength programming periodization load prescription ${liftNames}` : "strength programming periodization load prescription squat deadlift",
-"strength-science",
-OPENAI_API_KEY,
-2,
-0.25
-);
-    console.log(`[RAG] strength-science: ${strengthScienceChunks.length} chunks`);
-    allChunks.push(...strengthScienceChunks);
-const unique = deduplicateChunks(allChunks);
+        liftNames
+          ? `strength programming periodization load prescription ${liftNames}`
+          : "strength programming periodization load prescription squat deadlift",
+        "strength-science",
+        OPENAI_API_KEY,
+        2,
+        0.25
+      )
+    );
+    const results = await Promise.all(queries);
+    const allChunks = results.flat();
+    // Log individual counts in the same order as queries were pushed
+    let i = 0;
+    if (liftNames) console.log(`[RAG] journal/strength: ${results[i++].length} chunks`);
+    if (skillNames) console.log(`[RAG] journal/skills: ${results[i++].length} chunks`);
+    console.log(`[RAG] journal/conditioning: ${results[i++].length} chunks`);
+    console.log(`[RAG] strength-science: ${results[i++].length} chunks`);
+    const unique = deduplicateChunks(allChunks);
     console.log(`[RAG] Total: ${allChunks.length} raw → ${unique.length} deduplicated`);
-if (unique.length === 0) return "";
-return "\n\nREFERENCE (use to guide all programming decisions):\n" + formatChunksAsContext(unique, 8);
-} catch (err) {
+    if (unique.length === 0) return "";
+    return "\n\nREFERENCE (use to guide all programming decisions):\n" + formatChunksAsContext(unique, 8);
+  } catch (err) {
     console.error("RAG retrieval error:", err);
-return "";
-}
+    return "";
+  }
 }
 /** Background task: generate program and update job row */
 async function processJob(
@@ -184,302 +208,375 @@ async function processJob(
   userId: string,
   evalRow: {
     profile_snapshot: ProfileData;
-    lifting_analysis: string | null;
-    skills_analysis: string | null;
-    engine_analysis: string | null;
-}
+    analysis: string | null;
+  }
 ): Promise<void> {
-const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   console.log(`=== Job ${jobId} start ===`);
-const jobStart = Date.now();
-try {
-// Mark processing
-await supa.from("program_jobs").update({ status: "processing", updated_at: new Date().toISOString() }).eq("id", jobId);
-const profile = evalRow.profile_snapshot || {};
-const profileStr = formatProfile(profile);
+  const jobStart = Date.now();
+  try {
+    // Mark processing
+    await supa.from("program_jobs").update({ status: "processing", updated_at: new Date().toISOString() }).eq("id", jobId);
+    const profile = evalRow.profile_snapshot || {};
+    const profileStr = formatProfile(profile);
     console.log(`[${jobId}] Profile: ${profileStr.length} chars, lifts=${Object.keys(profile.lifts || {}).length}, skills=${Object.keys(profile.skills || {}).length}`);
-const analysisParts: string[] = [];
-if (evalRow.lifting_analysis) analysisParts.push("STRENGTH ANALYSIS:\n" + evalRow.lifting_analysis);
-if (evalRow.skills_analysis) analysisParts.push("SKILLS ANALYSIS:\n" + evalRow.skills_analysis);
-if (evalRow.engine_analysis) analysisParts.push("ENGINE ANALYSIS:\n" + evalRow.engine_analysis);
-const analysisStr = analysisParts.length > 0 ? analysisParts.join("\n\n") : "No detailed analysis.";
-    console.log(`[${jobId}] Analysis sections: lifting=${!!evalRow.lifting_analysis}, skills=${!!evalRow.skills_analysis}, engine=${!!evalRow.engine_analysis}, total=${analysisStr.length} chars`);
-// Fetch gymnastics movements for priority scoring
-const { data: movementRows } = await supa
-.from("movements")
-.select("canonical_name, display_name, modality, category, aliases, competition_count")
-.eq("modality", "G");
-// Build deterministic skill schedule
-const priorities = rankSkillPriorities(profile.skills || {}, movementRows || []);
-const schedule = buildSkillSchedule(priorities);
-    console.log(`[${jobId}] Skill schedule: ${schedule.length} slots, priorities=${priorities.length}, movements_fetched=${(movementRows || []).length}`);
-const recentTraining = await fetchAndFormatRecentHistory(supa, userId, { maxLines: 25 });
-const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
+    const analysisStr = evalRow.analysis || "No detailed analysis.";
+    console.log(`[${jobId}] Analysis: ${analysisStr.length} chars`);
+    const recentTraining = await fetchAndFormatRecentHistory(supa, userId, { maxLines: 25 });
+    const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
     console.log(`[${jobId}] Training history: ${recentTraining ? recentTraining.length + ' chars' : 'none'}`);
-const ragContext = await retrieveRAGContext(supa, profile);
+    const ragContext = await retrieveRAGContext(supa, profile);
     console.log(`[${jobId}] RAG context: ${ragContext ? ragContext.length + ' chars' : 'none'}`);
-// Build skeleton with inline skill assignments
-const skeleton = buildProgramSkeleton(schedule);
-    console.log(`[${jobId}] Skeleton: ${skeleton.length} chars, ${(skeleton.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday):/gm) || []).length} day headers`);
-const userPrompt = `ATHLETE PROFILE:
+    // Determine athlete scope for guideline filtering
+    const scopes = ["all"];
+    if (profile.skills) {
+      const levels = Object.values(profile.skills).filter((v) => v && v !== "none");
+      const developing = levels.filter((v) => /developing|beginner|learning/i.test(v)).length;
+      const advanced = levels.filter((v) => /advanced|competition|elite/i.test(v)).length;
+      if (developing > advanced) scopes.push("beginner");
+      else if (advanced > 0) scopes.push("competition");
+    }
+    console.log(`[${jobId}] Guideline scopes: [${scopes.join(", ")}]`);
+    // Fetch strength guidelines from coaching_guidelines table
+    const guidelinesBlock = await fetchCoachingGuidelines(supa, scopes);
+    console.log(`[${jobId}] Guidelines: ${guidelinesBlock ? guidelinesBlock.length + ' chars' : 'none'}`);
+    const skeleton = buildProgramSkeleton();
+    console.log(`[${jobId}] Skeleton: ${skeleton.length} chars, ${(skeleton.match(/^Day \d+:/gm) || []).length} day headers`);
+    // Derive metcon-eligible vs skill-block-only movements
+    const proficientSkills: string[] = [];
+    const developingSkills: string[] = [];
+    if (profile.skills) {
+      for (const [key, level] of Object.entries(profile.skills)) {
+        const display = SKILL_DISPLAY_NAMES[key] || key.replace(/_/g, " ");
+        if (level === "advanced" || level === "intermediate") {
+          proficientSkills.push(display);
+        } else if (level && level !== "none") {
+          developingSkills.push(display);
+        }
+      }
+    }
+    const metconEligibility = proficientSkills.length > 0 || developingSkills.length > 0
+      ? `\nMETCON MOVEMENT ELIGIBILITY:\n- Use in metcons (proficient): ${proficientSkills.join(", ") || "none"}\n- Skill block only (developing): ${developingSkills.join(", ") || "none"}\n`
+      : "";
+    // Equipment constraints
+    let equipmentConstraint = "";
+    if (profile.equipment && Object.keys(profile.equipment).length > 0) {
+      const unavailable = Object.entries(profile.equipment)
+        .filter(([, v]) => v === false)
+        .map(([k]) => k.replace(/_/g, " "));
+      if (unavailable.length > 0) {
+        equipmentConstraint = `\nEQUIPMENT CONSTRAINTS:\nThe athlete does NOT have the following equipment. NEVER program movements that require them: ${unavailable.join(", ")}.\nSubstitute with movements using available equipment (e.g. if no rower, use bike or run; if no rope, use extra pull-up volume; if no rings, use bar movements).\n`;
+      }
+    }
+    const userPrompt = `ATHLETE PROFILE:
 ${profileStr}
-ANALYSIS TO ADDRESS:
+
 ${analysisStr}
-${trainingBlock}
+${trainingBlock}${metconEligibility}${equipmentConstraint}
+MOBILITY BLOCK RULES:
+The Mobility: block goes after Warm-up and targets areas needed for that day's training.
+- Keep it brief: 1 focus area and 1-2 suggested drills max (e.g. "Hip mobility — 90/90 switches, couch stretch 1 min/side").
+- Match the focus to the day's movements: hip/ankle for squat days, thoracic/shoulder for overhead days, posterior chain for hinge days.
+- If the athlete has a movement flagged as a mobility limiter, weave that area into relevant days throughout the program.
+- This is advisory — a reminder, not a rigid checklist. Keep the tone casual and coach-like.
+
+STRENGTH SLOT RULES:
+The STRENGTH HIERARCHY above (if present) dictates priority, but you MUST also ensure movement-pattern diversity across the 5 weekly Strength slots.
+
+MOVEMENT PATTERN DISTRIBUTION (per week):
+- Olympic lifts (snatch variants, clean variants, jerks): 2 slots max per week. Alternate snatch-family and clean-family days.
+- Squat (back squat, front squat, overhead squat): 1-2 slots per week. Rotate variants across weeks — do not repeat the same squat variant in the same week.
+- Press (strict press, push press, bench press, push jerk): 1 slot per week minimum. Every athlete needs pressing volume.
+- Hinge/Pull (deadlift, RDL, clean pull, snatch pull): 1 slot per week minimum. Posterior chain work is non-negotiable.
+- If the athlete provided a lift, try to include it at least once across the 4-week program — but not at the expense of cluttering weeks. LOW priority lifts can be omitted if slots are tight.
+- A movement flagged as a mobility limiter in the STRENGTH ANALYSIS (e.g. overhead squat limited by ankle/thoracic mobility) is accessory or warm-up work — it does NOT fulfill a movement-pattern slot. Program it as light technique work alongside the day's main lift, not as the Strength block's primary movement.
+
+PRIORITY RULES (within the pattern constraints above):
+- HIGH priority movements get 2+ slots per week. These are the athlete's limiters — give them the most volume.
+- MODERATE priority movements get 1 slot per week.
+- LOW priority movements get 0-1 slots per week. Do NOT waste training time on movements the athlete is already strong at.
+- Follow the hierarchy ordering strictly. If the hierarchy says deadlift is LOW, do not program heavy deadlifts twice a week.
+- Vary the specific exercises within a movement pattern across weeks (e.g. for "olympic lifts": clean & jerk one day, snatch complex another).
+
+SKILL SLOT RULES:
+Use the SKILLS ANALYSIS above to decide what goes in each day's Skills: block. You are the coach — distribute skills intelligently across 20 days.
+- "Needs Attention" skills are the highest priority. Program their progression track 2x per week — alternate between the foundational and advanced variant across the two slots. Never the same variant twice in a week.
+- "Intermediate" skills get 1-2x per week to keep progressing.
+- "Strong" skills are maintenance only — 0-1x per week or use them as metcon components instead.
+- Never program the same skill on consecutive days (e.g. not Day 3 and Day 4).
+- Related progressions are a single track, not separate skills. For example: strict HSPU, wall-facing HSPU, and deficit HSPU are one progression — pick the variant that matches the athlete's level and periodize across weeks (drill → load → test), don't scatter all three randomly.
+- Week 4 is deload — reduce skill volume, keep only the top 1-2 priority skills at 1x each.
+- Vary the drill, not just the movement. If L-sit appears 3x in a week, each session should have a different focus (e.g. tuck hold for time, single-leg extension, parallette L-sit).
+
 Complete the following program template. Fill in every block with one line of programming. Do not add or remove any headers.
 ${skeleton}`;
-const systemPrompt = GENERATE_PROMPT + ragContext;
+    const systemPrompt = GENERATE_PROMPT + METCON_GUIDANCE + guidelinesBlock + ragContext;
     console.log(`[${jobId}] Prompt sizes: system=${systemPrompt.length} chars, user=${userPrompt.length} chars`);
-if (!ANTHROPIC_API_KEY) {
-throw new Error("Program generation is not configured");
-}
-const MAX_ATTEMPTS = 3;
-const preprocessUrl = `${SUPABASE_URL}/functions/v1/preprocess-program`;
-const monthYear = new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" });
-const programName = `Month 1 — ${monthYear}`;
-let program_id: string | undefined;
-let workout_count: number | undefined;
-const messages: Array<{ role: string; content: string }> = [
-{ role: "user", content: userPrompt },
-];
-for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    if (!ANTHROPIC_API_KEY) {
+      throw new Error("Program generation is not configured");
+    }
+    const MAX_ATTEMPTS = 3;
+    const monthYear = new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" });
+    const programName = `Month 1 — ${monthYear}`;
+    let program_id: string | undefined;
+    let workout_count: number | undefined;
+    const messages: Array<{ role: string; content: string }> = [
+      { role: "user", content: userPrompt },
+    ];
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       console.log(`[${jobId}] Attempt ${attempt}/${MAX_ATTEMPTS}: sending ${messages.length} messages to Claude...`);
-const apiStart = Date.now();
-const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
+      const apiStart = Date.now();
+      const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
-"Content-Type": "application/json",
-"x-api-key": ANTHROPIC_API_KEY,
-"anthropic-version": "2023-06-01",
-},
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 32000,
           stream: false,
           system: systemPrompt,
           messages,
-}),
+        }),
         signal: AbortSignal.timeout(180_000),
-});
-const apiElapsed = ((Date.now() - apiStart) / 1000).toFixed(1);
-if (!claudeResp.ok) {
-const err = await claudeResp.json().catch(() => ({}));
+      });
+      const apiElapsed = ((Date.now() - apiStart) / 1000).toFixed(1);
+      if (!claudeResp.ok) {
+        const err = await claudeResp.json().catch(() => ({}));
         console.error(`[${jobId}] Attempt ${attempt}: Claude API error after ${apiElapsed}s, status=${claudeResp.status}:`, JSON.stringify(err));
-throw new Error("Failed to generate program");
-}
-const claudeData = await claudeResp.json();
-const inputTokens = claudeData.usage?.input_tokens || 0;
-const outputTokens = claudeData.usage?.output_tokens || 0;
-let programText =
+        throw new Error("Failed to generate program");
+      }
+      const claudeData = await claudeResp.json();
+      const inputTokens = claudeData.usage?.input_tokens || 0;
+      const outputTokens = claudeData.usage?.output_tokens || 0;
+      let programText =
         claudeData.content?.[0]?.text?.trim() || claudeData.content?.[0]?.input?.trim() || "";
-// Strip markdown code blocks if present
-const codeMatch = programText.match(/```(?:text)?\s*\n?([\s\S]*?)```/);
-if (codeMatch) programText = codeMatch[1].trim();
-
-// Strip skill assignment annotations that the AI may echo back
-programText = programText.replace(/\[skill:\s*[^\]]+\]\s*/gi, "");
-
-const stopReason = claudeData.stop_reason || "unknown";
-const dayHeaders = (programText.match(/^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Mon|Tue|Wed|Thu|Fri)\s*:/gmi) || []);
-// Count blocks per type for diagnostics
-const warmupCount = (programText.match(/^Warm-up:/gmi) || []).length;
-const skillsCount = (programText.match(/^Skills:/gmi) || []).length;
-const strengthCount = (programText.match(/^Strength:/gmi) || []).length;
-const metconCount = (programText.match(/^Metcon:/gmi) || []).length;
-const cooldownCount = (programText.match(/^Cool\s*down:/gmi) || []).length;
+      // Strip markdown code blocks if present
+      const codeMatch = programText.match(/```(?:text)?\s*\n?([\s\S]*?)```/);
+      if (codeMatch) programText = codeMatch[1].trim();
+      const stopReason = claudeData.stop_reason || "unknown";
+      // FIX 2: dayHeaders regex uses Day N:
+      const dayHeaders = (programText.match(/^Day \d+:/gmi) || []);
+      // Count blocks per type for diagnostics
+      const warmupCount = (programText.match(/^Warm-up:/gmi) || []).length;
+      const skillsCount = (programText.match(/^Skills:/gmi) || []).length;
+      const strengthCount = (programText.match(/^Strength:/gmi) || []).length;
+      const metconCount = (programText.match(/^Metcon:/gmi) || []).length;
+      const cooldownCount = (programText.match(/^Cool\s*down:/gmi) || []).length;
       console.log(`[${jobId}] Attempt ${attempt}: ${apiElapsed}s, stop=${stopReason}, tokens=${inputTokens}in/${outputTokens}out, chars=${programText.length}, days=${dayHeaders.length}, blocks=[warmup=${warmupCount},skills=${skillsCount},strength=${strengthCount},metcon=${metconCount},cooldown=${cooldownCount}]`);
-if (dayHeaders.length > 0) {
+      if (dayHeaders.length > 0) {
         console.log(`[${jobId}] Attempt ${attempt} head: ${programText.slice(0, 200)}`);
         console.log(`[${jobId}] Attempt ${attempt} tail: ${programText.slice(-200)}`);
-}
-// Too short — retry with context
-if (!programText || programText.length < 100) {
-if (attempt < MAX_ATTEMPTS) {
+      }
+      // Too short — retry with context
+      if (!programText || programText.length < 100) {
+        if (attempt < MAX_ATTEMPTS) {
           console.warn(`[${jobId}] Attempt ${attempt}: program too short (${programText.length} chars), retrying with correction...`);
           messages.push({ role: "assistant", content: programText || "(empty)" });
           messages.push({ role: "user", content: "That output was too short or empty. Please generate the complete program filling in every block of the template." });
-continue;
-}
-throw new Error("Generated program was empty or too short");
-}
-// Wrong day count — retry with specific correction
-if (dayHeaders.length < 20) {
-if (attempt < MAX_ATTEMPTS) {
+          continue;
+        }
+        throw new Error("Generated program was empty or too short");
+      }
+      // FIX 4: Wrong day count retry message updated
+      if (dayHeaders.length < 20) {
+        if (attempt < MAX_ATTEMPTS) {
           console.warn(`[${jobId}] Attempt ${attempt}: only ${dayHeaders.length}/20 days, retrying with correction...`);
           messages.push({ role: "assistant", content: programText });
-          messages.push({ role: "user", content: `That program only contained ${dayHeaders.length} days. It must have exactly 20 days (Monday–Friday for all 4 weeks). Please output the complete program with all 20 days.` });
-continue;
-}
-throw new Error(`Program contained ${dayHeaders.length}/20 days after ${MAX_ATTEMPTS} attempts`);
-}
-// Validate skill assignments compliance (logging only)
-if (schedule.length > 0) {
-const dayPattern = /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Mon|Tue|Wed|Thu|Fri|Sat):/gi;
-const workoutTexts = programText.split(dayPattern).filter((t) => t.trim().length > 20);
-let matched = 0;
-let total = 0;
-for (const slot of schedule) {
-          total++;
-const idx = (slot.week - 1) * 5 + (slot.day - 1);
-const workoutText = workoutTexts[idx];
-if (!workoutText) continue;
-const blocks = extractBlocksFromWorkoutText(workoutText);
-const skillBlock = blocks.find((b) => b.block_type === "skills");
-if (!skillBlock) continue;
-const display = slot.displayName.toLowerCase();
-const blockLower = skillBlock.block_text.toLowerCase();
-const keywords = display.split(/[\s\-()]+/).filter((w) => w.length > 2);
-const found = keywords.some((kw) => blockLower.includes(kw));
-if (found) matched++;
-else console.log(`[${jobId}] Skill mismatch W${slot.week}D${slot.day}: expected="${slot.displayName}", got="${skillBlock.block_text.slice(0, 80)}"`);
-}
-const complianceRate = total > 0 ? matched / total : 1;
-        console.log(`[${jobId}] Skill schedule compliance: ${matched}/${total} (${(complianceRate * 100).toFixed(0)}%)`);
-}
-// Create program via preprocess-program (service-role auth, user_id in body)
-      console.log(`[${jobId}] Sending to preprocess-program: ${programText.length} chars, name="${programName}"`);
-const preprocessResp = await fetch(preprocessUrl, {
-        method: "POST",
-        headers: {
-"Content-Type": "application/json",
-Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-},
-        body: JSON.stringify({ text: programText, name: programName, source: "generate", user_id: userId }),
-});
-if (!preprocessResp.ok) {
-const errBody = await preprocessResp.text();
-let errMsg = "Failed to save program";
-try {
-const errJson = JSON.parse(errBody);
-if (errJson?.error) errMsg = errJson.error;
-} catch {
-// use default
-}
-        console.error(`[${jobId}] Preprocess failed: status=${preprocessResp.status}, error="${errMsg}"`);
-if (preprocessResp.status === 422 && attempt < MAX_ATTEMPTS) {
-          console.warn(`[${jobId}] Attempt ${attempt} failed 422: ${errMsg}, days=${dayHeaders.length}, head=${programText.slice(0, 150)}, tail=${programText.slice(-150)}`);
+          messages.push({ role: "user", content: `That program only contained ${dayHeaders.length} days. It must have exactly 20 days (Day 1 through Day 20). Please output the complete program with all 20 days.` });
+          continue;
+        }
+        throw new Error(`Program contained ${dayHeaders.length}/20 days after ${MAX_ATTEMPTS} attempts`);
+      }
+      // Save program directly (bypasses preprocess-program HTTP call)
+      console.log(`[${jobId}] Saving program inline: ${programText.length} chars, name="${programName}"`);
+      // Parse AI output into workouts using Day N: markers
+      const dayParts = programText.replace(/\r\n/g, "\n").split(/^Day (\d+):/mi);
+      const parsedWorkouts: { week_num: number; day_num: number; workout_text: string; sort_order: number }[] = [];
+      for (let pi = 1; pi < dayParts.length - 1; pi += 2) {
+        const n = parseInt(dayParts[pi], 10);
+        const wText = dayParts[pi + 1].trim();
+        if (!wText) continue;
+        parsedWorkouts.push({ week_num: Math.ceil(n / 5), day_num: ((n - 1) % 5) + 1, workout_text: wText, sort_order: n - 1 });
+      }
+      if (parsedWorkouts.length !== 20) {
+        if (attempt < MAX_ATTEMPTS) {
+          console.warn(`[${jobId}] Attempt ${attempt}: parsed ${parsedWorkouts.length}/20 workouts, retrying...`);
           messages.push({ role: "assistant", content: programText });
-          messages.push({ role: "user", content: `That program failed validation: ${errMsg}. Please output the complete program with exactly 20 days (Monday–Friday for all 4 weeks), filling in every block of the template.` });
-continue;
-}
-throw new Error(errMsg);
-}
-const result = await preprocessResp.json();
-      program_id = result.program_id;
-      workout_count = result.workout_count;
-      console.log(`[${jobId}] Preprocess success: program_id=${program_id}, workout_count=${workout_count}`);
-break;
-}
-if (!program_id) {
-throw new Error("Failed to generate program after all attempts");
-}
-// Mark complete
-await supa.from("program_jobs").update({
+          messages.push({ role: "user", content: `That program failed validation: Expected exactly 20 workouts, got ${parsedWorkouts.length}. Please output the complete program with exactly 20 days (Day 1 through Day 20), filling in every block of the template.` });
+          continue;
+        }
+        throw new Error(`Expected 20 workouts, got ${parsedWorkouts.length}`);
+      }
+      // Insert program
+      const { data: prog, error: progErr } = await supa
+        .from("programs")
+        .insert({ user_id: userId, name: programName })
+        .select("id")
+        .single();
+      if (progErr || !prog) throw new Error("Failed to create program");
+      // Insert workouts
+      const wkRows = parsedWorkouts.map((pw, idx) => ({
+        program_id: prog.id,
+        week_num: pw.week_num,
+        day_num: pw.day_num,
+        workout_text: pw.workout_text,
+        sort_order: idx,
+      }));
+      const { data: insertedWks, error: wkErr } = await supa
+        .from("program_workouts")
+        .insert(wkRows)
+        .select("id, workout_text");
+      if (wkErr) {
+        await supa.from("programs").delete().eq("id", prog.id);
+        throw new Error("Failed to save workouts");
+      }
+      // Extract and insert blocks
+      const BLOCK_LABELS = ["Warm-up", "Mobility", "Skills", "Strength", "Metcon", "Cool down"];
+      const BLOCK_TYPE_MAP: Record<string, string> = { "warm-up": "warm-up", "mobility": "mobility", "skills": "skills", "strength": "strength", "metcon": "metcon", "cool down": "cool-down" };
+      if (insertedWks?.length) {
+        const blockRows: { program_workout_id: string; block_type: string; block_order: number; block_text: string }[] = [];
+        for (const w of insertedWks) {
+          const wLower = (w.workout_text || "").toLowerCase();
+          const labels = BLOCK_LABELS.map((l) => ({ label: l, needle: (l + ":").toLowerCase() }));
+          for (let li = 0; li < labels.length; li++) {
+            const { label, needle } = labels[li];
+            const start = wLower.indexOf(needle);
+            if (start < 0) continue;
+            const cStart = start + needle.length;
+            const nextLabel = labels.slice(li + 1).find((x) => wLower.indexOf(x.needle, cStart) >= 0);
+            const end = nextLabel ? wLower.indexOf(nextLabel.needle, cStart) : w.workout_text.length;
+            const bText = w.workout_text.slice(cStart, end).trim();
+            blockRows.push({ program_workout_id: w.id, block_type: BLOCK_TYPE_MAP[label.toLowerCase()] ?? "other", block_order: blockRows.filter((r) => r.program_workout_id === w.id).length + 1, block_text: bText });
+          }
+        }
+        if (blockRows.length > 0) {
+          await supa.from("program_workout_blocks").insert(blockRows);
+        }
+        console.log(`[${jobId}] Inserted ${blockRows.length} blocks for ${insertedWks.length} workouts`);
+      }
+      // Trigger analysis in background (fire and forget)
+      const analyzeUrl = `${SUPABASE_URL}/functions/v1/analyze-program`;
+      fetch(analyzeUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+        body: JSON.stringify({ program_id: prog.id, user_id: userId }),
+      }).catch((err) => console.error("Analyze-program fire-and-forget failed:", err));
+      program_id = prog.id;
+      workout_count = parsedWorkouts.length;
+      console.log(`[${jobId}] Save success: program_id=${program_id}, workout_count=${workout_count}`);
+      break;
+    }
+    if (!program_id) {
+      throw new Error("Failed to generate program after all attempts");
+    }
+    // Mark complete
+    await supa.from("program_jobs").update({
       status: "complete",
       program_id,
       updated_at: new Date().toISOString(),
-}).eq("id", jobId);
+    }).eq("id", jobId);
     console.log(`[${jobId}] Complete: program_id=${program_id}, workouts=${workout_count}, elapsed=${((Date.now() - jobStart) / 1000).toFixed(1)}s`);
-} catch (e) {
+  } catch (e) {
     console.error(`[${jobId}] FAILED after ${((Date.now() - jobStart) / 1000).toFixed(1)}s:`, e);
-try {
-await supa.from("program_jobs").update({
+    try {
+      await supa.from("program_jobs").update({
         status: "failed",
         error: (e as Error).message,
         updated_at: new Date().toISOString(),
-}).eq("id", jobId);
-} catch (cleanupErr) { console.warn("Failed to update job as failed:", cleanupErr); }
-}
+      }).eq("id", jobId);
+    } catch (cleanupErr) { console.warn("Failed to update job as failed:", cleanupErr); }
+  }
 }
 Deno.serve(async (req) => {
-if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-try {
-const authHeader = req.headers.get("Authorization");
-if (!authHeader) {
-return new Response(JSON.stringify({ error: "Unauthorized" }), {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...cors, "Content-Type": "application/json" },
-});
-}
-const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-const token = authHeader.replace("Bearer ", "");
-const { data: { user }, error: authErr } = await supa.auth.getUser(token);
-if (authErr || !user) {
-return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      });
+    }
+    const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authErr } = await supa.auth.getUser(token);
+    if (authErr || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...cors, "Content-Type": "application/json" },
-});
-}
-let evaluationId: string | null = null;
-try {
-const body = await req.json().catch(() => ({}));
+      });
+    }
+    let evaluationId: string | null = null;
+    try {
+      const body = await req.json().catch(() => ({}));
       evaluationId = body?.evaluation_id ?? null;
-} catch {
-// no body
-}
-// Fetch evaluation: use provided id, or most recent
-let evalRow: {
+    } catch {
+      // no body
+    }
+    // Fetch evaluation: use provided id, or most recent
+    let evalRow: {
       profile_snapshot: ProfileData;
-      lifting_analysis: string | null;
-      skills_analysis: string | null;
-      engine_analysis: string | null;
-} | null = null;
-if (evaluationId) {
-const { data } = await supa
-.from("profile_evaluations")
-.select("profile_snapshot, lifting_analysis, skills_analysis, engine_analysis")
-.eq("id", evaluationId)
-.eq("user_id", user.id)
-.maybeSingle();
+      analysis: string | null;
+    } | null = null;
+    if (evaluationId) {
+      const { data } = await supa
+        .from("profile_evaluations")
+        .select("profile_snapshot, analysis")
+        .eq("id", evaluationId)
+        .eq("user_id", user.id)
+        .maybeSingle();
       evalRow = data;
-}
-if (!evalRow) {
-const { data } = await supa
-.from("profile_evaluations")
-.select("profile_snapshot, lifting_analysis, skills_analysis, engine_analysis")
-.eq("user_id", user.id)
-.order("created_at", { ascending: false })
-.limit(1)
-.maybeSingle();
+    }
+    if (!evalRow) {
+      const { data } = await supa
+        .from("profile_evaluations")
+        .select("profile_snapshot, analysis")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       evalRow = data;
-}
-if (!evalRow) {
-return new Response(
-JSON.stringify({ error: "No profile analysis found. Run AI analysis first, then generate program." }),
-{ status: 400, headers: { ...cors, "Content-Type": "application/json" } }
-);
-}
-if (!ANTHROPIC_API_KEY) {
-return new Response(
-JSON.stringify({ error: "Program generation is not configured" }),
-{ status: 500, headers: { ...cors, "Content-Type": "application/json" } }
-);
-}
-// Create job row
-const { data: job, error: jobErr } = await supa
-.from("program_jobs")
-.insert({ user_id: user.id, status: "pending" })
-.select("id")
-.single();
-if (jobErr || !job) {
+    }
+    if (!evalRow) {
+      return new Response(
+        JSON.stringify({ error: "No profile analysis found. Run AI analysis first, then generate program." }),
+        { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
+      );
+    }
+    if (!ANTHROPIC_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "Program generation is not configured" }),
+        { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
+      );
+    }
+    // Create job row
+    const { data: job, error: jobErr } = await supa
+      .from("program_jobs")
+      .insert({ user_id: user.id, status: "pending" })
+      .select("id")
+      .single();
+    if (jobErr || !job) {
       console.error("Failed to create job:", jobErr);
-return new Response(
-JSON.stringify({ error: "Failed to start program generation" }),
-{ status: 500, headers: { ...cors, "Content-Type": "application/json" } }
-);
-}
-// Fire background task — no user token needed, uses service-role key
-EdgeRuntime.waitUntil(processJob(job.id, user.id, evalRow));
-// Return immediately with job_id
-return new Response(
-JSON.stringify({ job_id: job.id }),
-{ status: 202, headers: { ...cors, "Content-Type": "application/json" } }
-);
-} catch (e) {
+      return new Response(
+        JSON.stringify({ error: "Failed to start program generation" }),
+        { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
+      );
+    }
+    // Fire background task — no user token needed, uses service-role key
+    EdgeRuntime.waitUntil(processJob(job.id, user.id, evalRow));
+    // Return immediately with job_id
+    return new Response(
+      JSON.stringify({ job_id: job.id }),
+      { status: 202, headers: { ...cors, "Content-Type": "application/json" } }
+    );
+  } catch (e) {
     console.error("generate-program error:", e);
-return new Response(
-JSON.stringify({ error: (e as Error).message }),
-{ status: 500, headers: { ...cors, "Content-Type": "application/json" } }
-);
-}
+    return new Response(
+      JSON.stringify({ error: (e as Error).message }),
+      { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
+    );
+  }
 });
