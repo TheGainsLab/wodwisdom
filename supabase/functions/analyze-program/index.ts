@@ -7,7 +7,6 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { extractMovementsAI } from "../_shared/extract-movements-ai.ts";
 import { analyzeWorkouts, type ExtractedMovementForAnalysis } from "../_shared/analyzer.ts";
 import { generateNoticesAI } from "../_shared/generate-notices-ai.ts";
 import {
@@ -245,7 +244,6 @@ Deno.serve(async (req) => {
     // Also build workout_text from relevant block texts for format/time-domain detection
     const workoutsForAnalyzer: { week_num?: number; day_num?: number; workout_text: string; sort_order?: number; id?: string; metcon_text?: string; block_types?: string[] }[] = [];
     const preParsedByWorkout: ExtractedMovementForAnalysis[][] = [];
-    const unparsedByWorkout: { index: number; text: string }[] = [];
 
     for (const w of workouts) {
       const allBlocks: BlockRow[] = (
@@ -272,9 +270,9 @@ Deno.serve(async (req) => {
         block_types: blockTypes,
       });
 
-      // Convert all parsed blocks; collect unparsed block texts for fallback
+      // Convert all parsed blocks; unparsed blocks fall through to regex in analyzer
       const movements: ExtractedMovementForAnalysis[] = [];
-      const unparsedTexts: string[] = [];
+      let hasUnparsed = false;
 
       for (const block of relevantBlocks) {
         if (Array.isArray(block.parsed_tasks) && block.parsed_tasks.length > 0) {
@@ -287,58 +285,31 @@ Deno.serve(async (req) => {
             movements.push(...convertStrengthTasks(tasks, block.block_text, libraryEntries));
           }
         } else {
-          unparsedTexts.push(block.block_text);
+          hasUnparsed = true;
         }
       }
 
-      if (unparsedTexts.length > 0) {
-        // Some blocks lack parsed_tasks — mark for AI/regex fallback on unparsed text only
-        unparsedByWorkout.push({ index: workoutsForAnalyzer.length - 1, text: unparsedTexts.join("\n") });
-      }
-      preParsedByWorkout.push(movements);
-    }
-
-    let extractionNotices: string[] = [];
-
-    // AI extraction for workouts with unparsed blocks (legacy data without parsed_tasks)
-    if (libraryEntries.length > 0 && ANTHROPIC_API_KEY && unparsedByWorkout.length > 0) {
-      const workoutsForAI = unparsedByWorkout.map((u) => ({
-        id: workoutsForAnalyzer[u.index].id!,
-        workout_text: u.text,
-      }));
-
-      const extractionResult = await extractMovementsAI(
-        workoutsForAI,
-        libraryEntries,
-        ANTHROPIC_API_KEY
-      );
-
-      if (extractionResult) {
-        extractionNotices = extractionResult.notices;
-        for (let ai = 0; ai < unparsedByWorkout.length; ai++) {
-          const idx = unparsedByWorkout[ai].index;
-          const aiMoves = extractionResult.movements[ai] ?? [];
-          preParsedByWorkout[idx].push(...aiMoves);
-        }
+      if (hasUnparsed && movements.length === 0) {
+        // No parsed data at all — let analyzer use regex fallback for this workout
+        preParsedByWorkout.push(null as unknown as ExtractedMovementForAnalysis[]);
       } else {
-        console.warn("AI extraction failed for unparsed blocks, falling back to regex");
-        extractionNotices = ["Movement extraction used fallback method for some workouts."];
-        // Unparsed blocks left empty — analyzer's regex fallback will handle them
-        // only if no pre-extracted data is provided for that workout
+        preParsedByWorkout.push(movements);
       }
     }
+
+    // If any workouts have null (fully unparsed), pass undefined to let analyzer use regex
+    const hasNulls = preParsedByWorkout.some((v) => v === null);
+    const extractedArg = hasNulls ? undefined : preParsedByWorkout;
 
     const analysis = analyzeWorkouts(
       workoutsForAnalyzer,
       movementsContext,
-      preParsedByWorkout
+      extractedArg
     );
 
     if (ANTHROPIC_API_KEY) {
       const notices = await generateNoticesAI(analysis, ANTHROPIC_API_KEY);
-      analysis.notices = [...extractionNotices, ...analysis.notices, ...notices];
-    } else {
-      analysis.notices = [...extractionNotices, ...analysis.notices];
+      analysis.notices = [...analysis.notices, ...notices];
     }
 
     const { error: upsertErr } = await supa
