@@ -103,6 +103,7 @@ function extractMovementsRegex(
   text: string,
   movementsContext?: MovementsContext
 ): ParsedBlockMovement[] {
+  if (!movementsContext) return [];
   const workouts = [{ week_num: 1, day_num: 1, workout_text: text }];
   const analysis = analyzeWorkouts(workouts, movementsContext);
   return analysis.movement_frequency.map((m) => ({

@@ -2,140 +2,13 @@
 
 import { inferTimeDomain } from "./time-domain.ts";
 
-/** Passed when movements table is used. Drives recognition + essential-only not_programmed. */
+/** Movements context from DB. Required — no hardcoded fallback. */
 export interface MovementsContext {
   library: Record<string, { modality: "W" | "G" | "M"; category: string }>;
   aliases: Record<string, string>;
   /** Canonical names with competition_count > 0 — only these appear in not_programmed */
   essentialCanonicals: Set<string>;
 }
-
-const MOVEMENT_LIBRARY: Record<string, { modality: "W" | "G" | "M"; category: string }> = {
-  back_squat: { modality: "W", category: "Weightlifting" },
-  front_squat: { modality: "W", category: "Weightlifting" },
-  overhead_squat: { modality: "W", category: "Weightlifting" },
-  squat: { modality: "W", category: "Weightlifting" },
-  deadlift: { modality: "W", category: "Weightlifting" },
-  sumo_deadlift: { modality: "W", category: "Weightlifting" },
-  clean: { modality: "W", category: "Weightlifting" },
-  power_clean: { modality: "W", category: "Weightlifting" },
-  clean_and_jerk: { modality: "W", category: "Weightlifting" },
-  jerk: { modality: "W", category: "Weightlifting" },
-  snatch: { modality: "W", category: "Weightlifting" },
-  power_snatch: { modality: "W", category: "Weightlifting" },
-  push_jerk: { modality: "W", category: "Weightlifting" },
-  press: { modality: "W", category: "Weightlifting" },
-  push_press: { modality: "W", category: "Weightlifting" },
-  bench_press: { modality: "W", category: "Weightlifting" },
-  thruster: { modality: "W", category: "Weightlifting" },
-  hang_power_clean: { modality: "W", category: "Weightlifting" },
-  hang_squat_clean: { modality: "W", category: "Weightlifting" },
-  sdhp: { modality: "W", category: "Weightlifting" },
-  sumo_deadlift_high_pull: { modality: "W", category: "Weightlifting" },
-  strict_press: { modality: "W", category: "Weightlifting" },
-  strict_pull_up: { modality: "G", category: "Gymnastics" },
-  pull_up: { modality: "G", category: "Gymnastics" },
-  kipping_pull_up: { modality: "G", category: "Gymnastics" },
-  chest_to_bar: { modality: "G", category: "Gymnastics" },
-  bar_muscle_up: { modality: "G", category: "Gymnastics" },
-  muscle_up: { modality: "G", category: "Gymnastics" },
-  ring_muscle_up: { modality: "G", category: "Gymnastics" },
-  toes_to_bar: { modality: "G", category: "Gymnastics" },
-  knee_raise: { modality: "G", category: "Gymnastics" },
-  l_sit: { modality: "G", category: "Gymnastics" },
-  hspu: { modality: "G", category: "Gymnastics" },
-  handstand_push_up: { modality: "G", category: "Gymnastics" },
-  wall_facing_hspu: { modality: "G", category: "Gymnastics" },
-  strict_hspu: { modality: "G", category: "Gymnastics" },
-  push_up: { modality: "G", category: "Gymnastics" },
-  pushup: { modality: "G", category: "Gymnastics" },
-  ring_dip: { modality: "G", category: "Gymnastics" },
-  ring_dips: { modality: "G", category: "Gymnastics" },
-  bar_dip: { modality: "G", category: "Gymnastics" },
-  dip: { modality: "G", category: "Gymnastics" },
-  pistol: { modality: "G", category: "Gymnastics" },
-  pistols: { modality: "G", category: "Gymnastics" },
-  handstand_walk: { modality: "G", category: "Gymnastics" },
-  lunge: { modality: "G", category: "Gymnastics" },
-  walking_lunge: { modality: "G", category: "Gymnastics" },
-  burpee: { modality: "G", category: "Gymnastics" },
-  burpees: { modality: "G", category: "Gymnastics" },
-  box_jump: { modality: "G", category: "Gymnastics" },
-  box_jumps: { modality: "G", category: "Gymnastics" },
-  wall_ball: { modality: "G", category: "Gymnastics" },
-  wall_balls: { modality: "G", category: "Gymnastics" },
-  double_under: { modality: "G", category: "Gymnastics" },
-  double_unders: { modality: "G", category: "Gymnastics" },
-  single_under: { modality: "G", category: "Gymnastics" },
-  rope_climb: { modality: "G", category: "Gymnastics" },
-  rope_climbs: { modality: "G", category: "Gymnastics" },
-  legless_rope_climb: { modality: "G", category: "Gymnastics" },
-  kettlebell_swing: { modality: "W", category: "Weightlifting" },
-  kb_swing: { modality: "W", category: "Weightlifting" },
-  kettlebell_swings: { modality: "W", category: "Weightlifting" },
-  goblet_squat: { modality: "W", category: "Weightlifting" },
-  turkish_get_up: { modality: "W", category: "Weightlifting" },
-  tgu: { modality: "W", category: "Weightlifting" },
-  farmer_carry: { modality: "W", category: "Weightlifting" },
-  running: { modality: "M", category: "Monostructural" },
-  run: { modality: "M", category: "Monostructural" },
-  rowing: { modality: "M", category: "Monostructural" },
-  row: { modality: "M", category: "Monostructural" },
-  bike: { modality: "M", category: "Monostructural" },
-  biking: { modality: "M", category: "Monostructural" },
-  assault_bike: { modality: "M", category: "Monostructural" },
-  echo_bike: { modality: "M", category: "Monostructural" },
-  ski_erg: { modality: "M", category: "Monostructural" },
-  swimming: { modality: "M", category: "Monostructural" },
-  swim: { modality: "M", category: "Monostructural" },
-  jumping_jack: { modality: "G", category: "Gymnastics" },
-  jump_rope: { modality: "G", category: "Gymnastics" },
-};
-
-/** Default shorthand and common aliases; merged into DB aliases when using movements table */
-export const DEFAULT_MOVEMENT_ALIASES: Record<string, string> = {
-  t2b: "toes_to_bar",
-  "toes to bar": "toes_to_bar",
-  "toes to bars": "toes_to_bar",
-  c2b: "chest_to_bar",
-  "chest to bar": "chest_to_bar",
-  mu: "muscle_up",
-  "muscle ups": "muscle_up",
-  "ring muscle up": "ring_muscle_up",
-  "bar muscle up": "bar_muscle_up",
-  pc: "power_clean",
-  "power cleans": "power_clean",
-  "power clean": "power_clean",
-  cj: "clean_and_jerk",
-  "clean and jerk": "clean_and_jerk",
-  "cleans and jerks": "clean_and_jerk",
-  "clean & jerk": "clean_and_jerk",
-  wb: "wall_ball",
-  "wall balls": "wall_ball",
-  du: "double_under",
-  "double unders": "double_unders",
-  sdhp: "sdhp",
-  "sumo deadlift high pull": "sdhp",
-  hpc: "hang_power_clean",
-  hsc: "hang_squat_clean",
-  "hang power clean": "hang_power_clean",
-  "hang squat clean": "hang_squat_clean",
-  bj: "box_jump",
-  "box jumps": "box_jump",
-  "calorie row": "row",
-  "row calorie": "row",
-  "rowing calorie": "row",
-  "row calories": "row",
-  "bike calorie": "bike",
-  "calorie bike": "bike",
-  "assault bike": "assault_bike",
-  "echo bike": "echo_bike",
-  "run 400": "run",
-  "400m run": "run",
-  "400 m run": "run",
-  "800m run": "run",
-  "1 mile run": "run",
-};
 
 export interface WorkoutInput {
   week_num?: number;
@@ -302,13 +175,10 @@ function countMetconMovements(
 
 export function analyzeWorkouts(
   workouts: WorkoutInput[],
-  movements?: MovementsContext,
+  movements: MovementsContext,
   extractedByWorkout?: ExtractedMovementForAnalysis[][]
 ): AnalysisOutput {
-  const library = movements?.library ?? MOVEMENT_LIBRARY;
-  const aliases = movements?.aliases ?? DEFAULT_MOVEMENT_ALIASES;
-  const essentialCanonicals =
-    movements?.essentialCanonicals ?? new Set(Object.keys(MOVEMENT_LIBRARY));
+  const { library, aliases, essentialCanonicals } = movements;
   const extract = (text: string) => extractMovementsImpl(text, library, aliases);
 
   const getMoves = (idx: number): ExtractedMovementForAnalysis[] =>
