@@ -263,8 +263,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch workouts (for sort_order/week/day) and movements in parallel
-    const [workoutsResult, movementsResult] = await Promise.all([
+    // Fetch workouts, movements, and athlete profile in parallel
+    const [workoutsResult, movementsResult, profileResult] = await Promise.all([
       supa
         .from("program_workouts")
         .select("id, week_num, day_num, sort_order")
@@ -273,10 +273,16 @@ Deno.serve(async (req) => {
       supa
         .from("movements")
         .select("canonical_name, display_name, modality, category, aliases, competition_count"),
+      supa
+        .from("athlete_profiles")
+        .select("gender")
+        .eq("user_id", userId)
+        .maybeSingle(),
     ]);
 
     const { data: workouts, error: wErr } = workoutsResult;
     const { data: movementsData } = movementsResult;
+    const gender = profileResult.data?.gender as string | null;
 
     if (wErr || !workouts?.length) {
       return new Response(
@@ -360,7 +366,7 @@ Deno.serve(async (req) => {
     });
 
     // ─── Run block-level analysis ────────────────────────────────────────
-    const analysis = analyzeBlocks(blockInputs, movementsContext);
+    const analysis = analyzeBlocks(blockInputs, movementsContext, gender);
 
     // ─── AI notices ──────────────────────────────────────────────────────
     if (ANTHROPIC_API_KEY) {
