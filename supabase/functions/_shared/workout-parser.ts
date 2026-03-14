@@ -7,7 +7,7 @@
  */
 
 import { extractMovementsAI } from "./extract-movements-ai.ts";
-import { analyzeWorkouts, type MovementsContext } from "./analyzer.ts";
+import { analyzeWorkouts, type MovementsContext } from "./analyzer-regex.ts";
 import type { LibraryEntry } from "./extract-movements-ai.ts";
 
 export type BlockType = "warm-up" | "strength" | "metcon" | "skills" | "accessory" | "cool-down";

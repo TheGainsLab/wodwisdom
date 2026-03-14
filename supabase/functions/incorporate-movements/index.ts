@@ -11,7 +11,7 @@ import {
   type RAGChunk,
 } from "../_shared/rag.ts";
 import { extractMovementsAI } from "../_shared/extract-movements-ai.ts";
-import { analyzeWorkouts } from "../_shared/analyzer.ts";
+import { analyzeWorkouts } from "../_shared/analyzer-regex.ts";
 import { generateNoticesAI } from "../_shared/generate-notices-ai.ts";
 import {
   buildMovementsContext,

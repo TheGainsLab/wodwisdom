@@ -1,26 +1,15 @@
-// Shared program analyzer - used by analyze-program and incorporate-movements
+// Block-level program analyzer — used by analyze-program.
+// No regex. Counts from parsed_tasks only.
 
 import { inferTimeDomain } from "./time-domain.ts";
 
-/** Movements context from DB. Required — no hardcoded fallback. */
+/** Movements context from DB. */
 export interface MovementsContext {
   library: Record<string, { modality: "W" | "G" | "M"; category: string }>;
   aliases: Record<string, string>;
   /** Canonical names with competition_count > 0 — only these appear in not_programmed */
   essentialCanonicals: Set<string>;
 }
-
-export interface WorkoutInput {
-  week_num?: number;
-  day_num?: number;
-  workout_text: string;
-  sort_order?: number;
-  /** When present, used for AI extraction matching (e.g. program_workouts.id) */
-  id?: string;
-}
-
-/** Shape from extractor (regex or AI). canonical, modality, load required. */
-export type ExtractedMovementForAnalysis = { canonical: string; modality: string; load: string };
 
 /** A block with its type, parent workout context, and parsed movement data. */
 export interface BlockInput {
@@ -34,6 +23,8 @@ export interface BlockInput {
   /** Parent workout day_num */
   day_num?: number;
 }
+
+export type ExtractedMovementForAnalysis = { canonical: string; modality: string; load: string };
 
 export interface AnalysisOutput {
   modal_balance: Record<string, number>;
@@ -49,123 +40,6 @@ export interface AnalysisOutput {
   load_bands: Record<string, number>;
 }
 
-// Load patterns: regex and label extractor. Specific patterns first; bare numbers last (to avoid rep counts).
-const LOAD_PATTERNS: { regex: RegExp; toLabel: (m: RegExpMatchArray) => string; filter?: (m: RegExpMatchArray) => boolean }[] = [
-  { regex: /\((\d+)\s*\/\s*(\d+)\)/g, toLabel: (m) => `${m[1]}/${m[2]}` },
-  { regex: /\((\d+)\)/g, toLabel: (m) => m[1] },
-  { regex: /@\s*(\d+)\s*%/gi, toLabel: (m) => `${m[1]}%` },
-  { regex: /\b(\d+)\s*\/\s*(\d+)\b/g, toLabel: (m) => `${m[1]}/${m[2]}` },
-  { regex: /\b(\d+)\b/g, toLabel: (m) => m[1], filter: (m) => {
-    const n = parseInt(m[1], 10);
-    return n >= 20;
-  } },
-];
-
-function findAllLoadsInSegment(segment: string): { label: string; start: number; end: number }[] {
-  const loads: { label: string; start: number; end: number }[] = [];
-  const usedRanges = new Set<string>();
-  for (const { regex, toLabel, filter } of LOAD_PATTERNS) {
-    regex.lastIndex = 0;
-    let match: RegExpMatchArray | null;
-    while ((match = regex.exec(segment)) !== null) {
-      if (filter && !filter(match)) continue;
-      const label = toLabel(match);
-      const rangeKey = `${match.index}-${match.index + match[0].length}`;
-      if (usedRanges.has(rangeKey)) continue;
-      usedRanges.add(rangeKey);
-      loads.push({ label, start: match.index, end: match.index + match[0].length });
-    }
-  }
-  return loads;
-}
-
-function assignLoadsToMovements(
-  movementMatches: { canonical: string; start: number; end: number }[],
-  loads: { label: string; start: number; end: number }[]
-): Map<number, string> {
-  const assignment = new Map<number, { label: string; dist: number }>();
-
-  for (const load of loads) {
-    let bestMov: { idx: number; dist: number } | null = null;
-    for (let mi = 0; mi < movementMatches.length; mi++) {
-      const mov = movementMatches[mi];
-      const dist = Math.min(
-        Math.abs(load.start - mov.end),
-        Math.abs(load.end - mov.start)
-      );
-      if (!bestMov || dist < bestMov.dist) {
-        bestMov = { idx: mi, dist };
-      }
-    }
-    if (bestMov) {
-      const existing = assignment.get(bestMov.idx);
-      if (!existing || bestMov.dist < existing.dist) {
-        assignment.set(bestMov.idx, { label: load.label, dist: bestMov.dist });
-      }
-    }
-  }
-  return new Map([...assignment].map(([k, v]) => [k, v.label]));
-}
-
-type ExtractedMovement = { name: string; canonical: string; modality: string; load: string };
-
-function extractMovementsImpl(
-  text: string,
-  library: Record<string, { modality: "W" | "G" | "M"; category: string }>,
-  aliases: Record<string, string>
-): ExtractedMovement[] {
-  const segments = text.split(/\s*,\s*/).map((s) => s.trim()).filter(Boolean);
-  const result: ExtractedMovement[] = [];
-  const seenInSegment = new Set<string>();
-
-  for (const segment of segments) {
-    const lower = segment.toLowerCase();
-    seenInSegment.clear();
-    const movementMatches: { canonical: string; start: number; end: number }[] = [];
-
-    for (const [canonical] of Object.entries(library)) {
-      const spaced = canonical.replace(/_/g, " ");
-      const patterns = [`\\b${spaced}s?\\b`, `\\b${canonical}\\b`];
-      for (const p of patterns) {
-        const regex = new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-        let m: RegExpMatchArray | null;
-        while ((m = regex.exec(lower)) !== null) {
-          movementMatches.push({ canonical, start: m.index, end: m.index + m[0].length });
-        }
-      }
-    }
-    for (const [alias, canonical] of Object.entries(aliases)) {
-      if (!library[canonical]) continue;
-      const regex = new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}s?\\b`, "gi");
-      let m: RegExpMatchArray | null;
-      while ((m = regex.exec(lower)) !== null) {
-        movementMatches.push({ canonical, start: m.index, end: m.index + m[0].length });
-      }
-    }
-
-    const loads = findAllLoadsInSegment(segment);
-    const loadAssignment = assignLoadsToMovements(movementMatches, loads);
-
-    for (let i = 0; i < movementMatches.length; i++) {
-      const { canonical, start } = movementMatches[i];
-      const key = `${canonical}-${start}`;
-      if (seenInSegment.has(key)) continue;
-      seenInSegment.add(key);
-
-      const loadLabel = loadAssignment.get(i) ?? "BW";
-      const info = library[canonical] || { modality: "?" as const, category: "Other" };
-      result.push({
-        name: canonical.replace(/_/g, " "),
-        canonical,
-        modality: info.modality,
-        load: loadLabel,
-      });
-    }
-  }
-
-  return result;
-}
-
 function detectWorkoutFormat(text: string): string {
   const t = text.trim().toUpperCase();
   if (/AMRAP|AS MANY ROUNDS/.test(t)) return "AMRAP";
@@ -175,11 +49,10 @@ function detectWorkoutFormat(text: string): string {
   if (/DEATH\s+BY/.test(t)) return "Death By";
   if (/TABATA/.test(t)) return "Tabata";
   if (/BUY\s+IN|CASH\s+OUT/.test(t)) return "Buy-In/Cash-Out";
-  if (/\d+X\d+|@\d+%/.test(t)) return "Strength";
   return "Other";
 }
 
-/** Convert parsed_tasks items to ExtractedMovementForAnalysis using the movements library. */
+/** Convert parsed_tasks items to movements using the movements library. */
 function parsedTasksToMovements(
   tasks: Record<string, unknown>[],
   blockType: string,
@@ -191,10 +64,8 @@ function parsedTasksToMovements(
     const movementName = task.movement as string | undefined;
     if (!movementName) continue;
 
-    // Canonicalize: lowercase, replace spaces/hyphens with underscores
     const canonical = movementName.toLowerCase().replace(/[\s-]+/g, "_");
 
-    // Look up modality from library, fall back to block type hint
     const info = library[canonical];
     let modality: string;
     if (info) {
@@ -202,12 +73,10 @@ function parsedTasksToMovements(
     } else if (blockType === "strength") {
       modality = "W";
     } else {
-      // Try category from parsed task
       const cat = task.category as string | undefined;
       modality = cat === "weighted" ? "W" : cat === "monostructural" ? "M" : "G";
     }
 
-    // Build load string from structured data
     let load = "BW";
     if (blockType === "strength") {
       const weight = task.weight as number | null;
@@ -215,7 +84,6 @@ function parsedTasksToMovements(
       if (weight) load = String(weight);
       else if (pct) load = `${pct}%`;
     } else {
-      // metcon / skills
       const weight = task.weight as number | null;
       if (weight) load = String(weight);
     }
@@ -226,190 +94,36 @@ function parsedTasksToMovements(
   return results;
 }
 
-// ─── Legacy: workout-level analysis (used by workout-parser, incorporate-movements) ──
+/**
+ * Compute load bands dynamically from actual data using tercile splits.
+ */
+function computeLoadBands(numericLoads: number[]): Record<string, number> {
+  if (numericLoads.length === 0) return {};
+  const sorted = [...numericLoads].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
 
-export function analyzeWorkouts(
-  workouts: WorkoutInput[],
-  movements: MovementsContext,
-  extractedByWorkout?: ExtractedMovementForAnalysis[][]
-): AnalysisOutput {
-  const { library, aliases, essentialCanonicals } = movements;
-  const extract = (text: string) => extractMovementsImpl(text, library, aliases);
+  if (min === max) return { [String(min)]: sorted.length };
 
-  const getMoves = (idx: number): ExtractedMovementForAnalysis[] =>
-    extractedByWorkout?.[idx] ?? extract(workouts[idx].workout_text);
+  const p33 = sorted[Math.floor(sorted.length / 3)];
+  const p66 = sorted[Math.floor((2 * sorted.length) / 3)];
 
-  const modalCounts: Record<string, number> = { Weightlifting: 0, Gymnastics: 0, Monostructural: 0 };
-  const timeDomainCounts: Record<string, number> = { short: 0, medium: 0, long: 0 };
-  const structureCounts: Record<string, number> = { couplets: 0, triplets: 0, chipper: 0, other: 0 };
-  const formatCounts: Record<string, number> = {};
-  const movementTotals = new Map<string, { count: number; modality: string; loads: string[] }>();
-  const allFoundMovements = new Set<string>();
-  const notices: string[] = [];
-  let loadedCount = 0;
-  let bodyweightCount = 0;
-  const allLoads = new Set<string>();
-
-  for (let i = 0; i < workouts.length; i++) {
-    const w = workouts[i];
-    const text = w.workout_text;
-    const format = detectWorkoutFormat(text);
-    formatCounts[format] = (formatCounts[format] || 0) + 1;
-
-    if (format !== "Strength") {
-      const domain = inferTimeDomain(text);
-      timeDomainCounts[domain] = (timeDomainCounts[domain] || 0) + 1;
-
-      const movesForStructure = getMoves(i);
-      const mc = new Set(movesForStructure.map((m) => m.canonical)).size;
-      if (mc === 2) structureCounts.couplets++;
-      else if (mc === 3) structureCounts.triplets++;
-      else if (mc >= 4) structureCounts.chipper++;
-      else structureCounts.other++;
-    } else {
-      structureCounts.other++;
-    }
-
-    const moves = getMoves(i);
-    for (const m of moves) {
-      allFoundMovements.add(m.canonical);
-      const modLabel = m.modality === "W" ? "Weightlifting" : m.modality === "G" ? "Gymnastics" : "Monostructural";
-      modalCounts[modLabel] = (modalCounts[modLabel] || 0) + 1;
-
-      if (m.load === "BW") {
-        bodyweightCount++;
-      } else {
-        loadedCount++;
-        allLoads.add(m.load);
-      }
-
-      const existing = movementTotals.get(m.canonical);
-      if (existing) {
-        existing.count++;
-        existing.loads.push(m.load);
-      } else {
-        movementTotals.set(m.canonical, { count: 1, modality: m.modality, loads: [m.load] });
-      }
-    }
+  const bands: Record<string, number> = {};
+  for (const n of sorted) {
+    let key: string;
+    if (n <= p33) key = `≤${p33}`;
+    else if (n <= p66) key = `${p33 + 1}–${p66}`;
+    else key = `${p66 + 1}+`;
+    bands[key] = (bands[key] || 0) + 1;
   }
-
-  const modalBalance = {
-    Weightlifting: modalCounts.Weightlifting,
-    Gymnastics: modalCounts.Gymnastics,
-    Monostructural: modalCounts.Monostructural,
-  };
-
-  const movementFreq = Array.from(movementTotals.entries())
-    .map(([canonical, v]) => ({
-      name: canonical.replace(/_/g, " "),
-      count: v.count,
-      modality: v.modality,
-      loads: v.loads,
-    }))
-    .sort((a, b) => b.count - a.count);
-
-  function toNumericLoad(load: string): number | null {
-    if (load === "BW") return null;
-    const pct = load.match(/^(\d+)%$/);
-    if (pct) return parseInt(pct[1], 10);
-    const slash = load.match(/^(\d+)\/\d+$/);
-    if (slash) return parseInt(slash[1], 10);
-    const n = parseInt(load, 10);
-    return isNaN(n) ? null : n;
-  }
-
-  const loadBands: Record<string, number> = {
-    "0–95": 0,
-    "135–185": 0,
-    "225+": 0,
-  };
-  for (const [, v] of movementTotals) {
-    for (const load of v.loads) {
-      if (load === "BW") continue;
-      const num = toNumericLoad(load);
-      if (num !== null) {
-        if (num <= 95) loadBands["0–95"]++;
-        else if (num <= 185) loadBands["135–185"]++;
-        else loadBands["225+"]++;
-      }
-    }
-  }
-
-  const notProgrammed: Record<string, string[]> = {
-    Weightlifting: [],
-    Gymnastics: [],
-    Monostructural: [],
-  };
-  for (const canonical of essentialCanonicals) {
-    if (allFoundMovements.has(canonical)) continue;
-    const info = library[canonical];
-    const category = info?.category ?? "Weightlifting";
-    if (notProgrammed[category]) {
-      notProgrammed[category].push(canonical.replace(/_/g, " "));
-    }
-  }
-
-  const overlaps: { days: string; movements: string[] }[] = [];
-  const getSortOrder = (w: WorkoutInput, i: number) => (w.sort_order != null ? w.sort_order : i);
-  const sorted = [...workouts]
-    .map((w, i) => ({ w, so: getSortOrder(w, i) }))
-    .sort((a, b) => a.so - b.so);
-
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const curr = sorted[i];
-    const next = sorted[i + 1];
-    const isConsecutive = next.so === curr.so + 1;
-    if (!isConsecutive) continue;
-
-    const idxCurr = workouts.indexOf(curr.w);
-    const idxNext = workouts.indexOf(next.w);
-    const currMoves = new Set(getMoves(idxCurr).map((m) => m.canonical));
-    const nextMoves = getMoves(idxNext).map((m) => m.canonical);
-    const shared = nextMoves.filter((c) => currMoves.has(c));
-    if (shared.length > 0) {
-      overlaps.push({
-        days: `Days ${curr.so + 1}–${next.so + 1}`,
-        movements: shared.map((c) => c.replace(/_/g, " ")),
-      });
-    }
-  }
-
-  if (timeDomainCounts.long === 0 && workouts.length >= 5) {
-    notices.push("No workouts exceed 15 minutes. Consider adding at least one long time domain.");
-  }
-  if (modalCounts.Weightlifting === 0 && workouts.length >= 5) {
-    notices.push("No dedicated strength work detected. Consider adding barbell or loaded movements.");
-  }
-  if (overlaps.length > 0) {
-    notices.push(`${overlaps.length} day pair(s) share movements. Review for recovery.`);
-  }
-  const totalNotProg = Object.values(notProgrammed).reduce((s, arr) => s + arr.length, 0);
-  if (totalNotProg > 20) {
-    notices.push("Many movements from the CrossFit canon are not programmed. Consider variety.");
-  }
-
-  return {
-    modal_balance: modalBalance,
-    time_domains: timeDomainCounts,
-    workout_structure: structureCounts,
-    workout_formats: formatCounts,
-    movement_frequency: movementFreq,
-    notices,
-    not_programmed: notProgrammed,
-    consecutive_overlaps: overlaps,
-    loading_ratio: { loaded: loadedCount, bodyweight: bodyweightCount },
-    distinct_loads: allLoads.size,
-    load_bands: loadBands,
-  };
+  return bands;
 }
 
-// ─── New: block-level analysis (used by analyze-program) ─────────────────────
-
 /**
- * Analyze program using pre-parsed blocks with block_type routing:
+ * Analyze program using pre-parsed blocks.
  * - strength/skills: modal balance + movement frequency only
- * - metcon: full analysis (format, time domain, structure, modal balance, movement frequency)
- * - warm-up/cool-down: skipped entirely
+ * - metcon: full analysis (format, time domain, structure)
+ * - warm-up/cool-down: skipped
  */
 export function analyzeBlocks(
   blocks: BlockInput[],
@@ -427,22 +141,18 @@ export function analyzeBlocks(
   let loadedCount = 0;
   let bodyweightCount = 0;
   const allLoads = new Set<string>();
+  const numericLoads: number[] = [];
 
-  // Group blocks by parent workout sort_order for overlap detection
   const blocksBySortOrder = new Map<number, ExtractedMovementForAnalysis[]>();
 
   for (const block of blocks) {
     const { block_type, block_text, parsed_tasks, sort_order } = block;
 
-    // Skip warm-up, cool-down, mobility
     if (["warm-up", "cool-down", "mobility"].includes(block_type)) continue;
-
-    // Get movements from parsed_tasks
     if (!parsed_tasks || !Array.isArray(parsed_tasks) || parsed_tasks.length === 0) continue;
 
     const moves = parsedTasksToMovements(parsed_tasks, block_type, library);
 
-    // Metcon blocks: full analysis (format, time domain, structure)
     if (block_type === "metcon") {
       const format = detectWorkoutFormat(block_text);
       formatCounts[format] = (formatCounts[format] || 0) + 1;
@@ -457,12 +167,10 @@ export function analyzeBlocks(
       else structureCounts.other++;
     }
 
-    // Strength blocks: count format
     if (block_type === "strength") {
       formatCounts["Strength"] = (formatCounts["Strength"] || 0) + 1;
     }
 
-    // All non-skipped blocks: modal balance + movement frequency
     for (const m of moves) {
       allFoundMovements.add(m.canonical);
       const modLabel = m.modality === "W" ? "Weightlifting" : m.modality === "G" ? "Gymnastics" : "Monostructural";
@@ -473,6 +181,8 @@ export function analyzeBlocks(
       } else {
         loadedCount++;
         allLoads.add(m.load);
+        const num = toNumericLoad(m.load);
+        if (num !== null) numericLoads.push(num);
       }
 
       const existing = movementTotals.get(m.canonical);
@@ -484,7 +194,6 @@ export function analyzeBlocks(
       }
     }
 
-    // Accumulate moves per sort_order for overlap detection
     const existing = blocksBySortOrder.get(sort_order) ?? [];
     existing.push(...moves);
     blocksBySortOrder.set(sort_order, existing);
@@ -505,36 +214,7 @@ export function analyzeBlocks(
     }))
     .sort((a, b) => b.count - a.count);
 
-  function toNumericLoad(load: string): number | null {
-    if (load === "BW") return null;
-    const pct = load.match(/^(\d+)%$/);
-    if (pct) return parseInt(pct[1], 10);
-    const slash = load.match(/^(\d+)\/\d+$/);
-    if (slash) return parseInt(slash[1], 10);
-    const n = parseInt(load, 10);
-    return isNaN(n) ? null : n;
-  }
-
-  const loadBands: Record<string, number> = {
-    "0–95": 0,
-    "96–134": 0,
-    "135–185": 0,
-    "186–225": 0,
-    "226+": 0,
-  };
-  for (const [, v] of movementTotals) {
-    for (const load of v.loads) {
-      if (load === "BW") continue;
-      const num = toNumericLoad(load);
-      if (num !== null) {
-        if (num <= 95) loadBands["0–95"]++;
-        else if (num <= 134) loadBands["96–134"]++;
-        else if (num <= 185) loadBands["135–185"]++;
-        else if (num <= 225) loadBands["186–225"]++;
-        else loadBands["226+"]++;
-      }
-    }
-  }
+  const loadBands = computeLoadBands(numericLoads);
 
   const notProgrammed: Record<string, string[]> = {
     Weightlifting: [],
@@ -550,7 +230,6 @@ export function analyzeBlocks(
     }
   }
 
-  // Consecutive day overlap detection
   const overlaps: { days: string; movements: string[] }[] = [];
   const sortOrders = [...blocksBySortOrder.keys()].sort((a, b) => a - b);
   for (let i = 0; i < sortOrders.length - 1; i++) {
@@ -596,4 +275,14 @@ export function analyzeBlocks(
     distinct_loads: allLoads.size,
     load_bands: loadBands,
   };
+}
+
+function toNumericLoad(load: string): number | null {
+  if (load === "BW") return null;
+  const pct = load.match(/^(\d+)%$/);
+  if (pct) return parseInt(pct[1], 10);
+  const slash = load.match(/^(\d+)\/\d+$/);
+  if (slash) return parseInt(slash[1], 10);
+  const n = parseInt(load, 10);
+  return isNaN(n) ? null : n;
 }
