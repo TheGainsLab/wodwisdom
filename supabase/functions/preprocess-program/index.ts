@@ -694,20 +694,6 @@ if (insertedBlocks?.length) {
 }
 }
 }
-// Call analyze-program with service-role auth + user_id in body
-const analyzeUrl = `${SUPABASE_URL}/functions/v1/analyze-program`;
-const analyzeResp = await fetch(analyzeUrl, {
-      method: "POST",
-      headers: {
-"Content-Type": "application/json",
-Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-},
-      body: JSON.stringify({ program_id: prog.id, user_id: userId }),
-});
-if (!analyzeResp.ok) {
-const errBody = await analyzeResp.text();
-      console.error("Analyze-program call failed:", analyzeResp.status, errBody);
-}
 return new Response(
 JSON.stringify({
         program_id: prog.id,

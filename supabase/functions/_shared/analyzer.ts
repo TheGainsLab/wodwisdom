@@ -94,27 +94,36 @@ function parsedTasksToMovements(
   return results;
 }
 
-/**
- * Compute load bands dynamically from actual data using tercile splits.
- */
-function computeLoadBands(numericLoads: number[]): Record<string, number> {
-  if (numericLoads.length === 0) return {};
-  const sorted = [...numericLoads].sort((a, b) => a - b);
-  const min = sorted[0];
-  const max = sorted[sorted.length - 1];
+const MALE_LOAD_BANDS: [string, number, number][] = [
+  ["≤95", 0, 95],
+  ["96–135", 96, 135],
+  ["136–185", 136, 185],
+  ["186–225", 186, 225],
+  ["226–315", 226, 315],
+  ["316+", 316, Infinity],
+];
 
-  if (min === max) return { [String(min)]: sorted.length };
+const FEMALE_LOAD_BANDS: [string, number, number][] = [
+  ["≤65", 0, 65],
+  ["66–85", 66, 85],
+  ["86–125", 86, 125],
+  ["126–185", 126, 185],
+  ["186+", 186, Infinity],
+];
 
-  const p33 = sorted[Math.floor(sorted.length / 3)];
-  const p66 = sorted[Math.floor((2 * sorted.length) / 3)];
-
+function computeLoadBands(numericLoads: number[], gender?: string | null): Record<string, number> {
+  const bandDefs = gender === "female" ? FEMALE_LOAD_BANDS : MALE_LOAD_BANDS;
   const bands: Record<string, number> = {};
-  for (const n of sorted) {
-    let key: string;
-    if (n <= p33) key = `≤${p33}`;
-    else if (n <= p66) key = `${p33 + 1}–${p66}`;
-    else key = `${p66 + 1}+`;
-    bands[key] = (bands[key] || 0) + 1;
+  for (const [label] of bandDefs) {
+    bands[label] = 0;
+  }
+  for (const n of numericLoads) {
+    for (const [label, min, max] of bandDefs) {
+      if (n >= min && n <= max) {
+        bands[label]++;
+        break;
+      }
+    }
   }
   return bands;
 }
@@ -138,6 +147,7 @@ function toNumericLoad(load: string): number | null {
 export function analyzeBlocks(
   blocks: BlockInput[],
   movements: MovementsContext,
+  gender?: string | null,
 ): AnalysisOutput {
   const { library, essentialCanonicals } = movements;
 
@@ -224,7 +234,7 @@ export function analyzeBlocks(
     }))
     .sort((a, b) => b.count - a.count);
 
-  const loadBands = computeLoadBands(numericLoads);
+  const loadBands = computeLoadBands(numericLoads, gender);
 
   const notProgrammed: Record<string, string[]> = {
     Weightlifting: [],
