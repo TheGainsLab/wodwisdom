@@ -108,11 +108,11 @@ const METCON_GUIDANCE = `
 
 METCON DESIGN RULES (apply to every Metcon: block):
 
-1. BREADTH OVER WEAKNESS — Metcons draw from movements the athlete is PROFICIENT at (intermediate or advanced). Weaknesses and developing skills belong in the Skills block, not the Metcon. If the athlete is advanced at ring muscle-ups, use them in metcons. If the athlete is beginner at HSPU, never put HSPU in a metcon — that stays in the skill block. See the METCON MOVEMENT ELIGIBILITY section for the explicit lists.
+1. BREADTH OVER WEAKNESS — Metcons draw from movements the athlete is PROFICIENT at (intermediate or advanced). Weaknesses and developing skills belong in the Skills block, not the Metcon. If the athlete is advanced at ring muscle-ups, use them in metcons. If the athlete is beginner at HSPU, never put HSPU in a metcon — that stays in the skill block. See the METCON MOVEMENT ELIGIBILITY section for the explicit lists. FREQUENCY CAP: No single movement may appear in more than 6 of the 20 metcons across the program. Spread variety — if you reach 6 uses, pick a different movement.
 
 2. MONOSTRUCTURAL CAP — Across the 5 metcons in any single week, at most 2 may include a monostructural cardio element (row, bike, ski erg, run — any of these count). This is a hard cap. Weeks 1-4 each independently enforce this limit.
 
-3. LOADING PREFERENCES — When a metcon calls for a weighted movement, prefer barbells and dumbbells over kettlebells. Kettlebells are acceptable when the movement is inherently KB-based (e.g., Turkish get-ups, KB swings) but do not substitute KBs for movements that can use a barbell or dumbbell.
+3. LOADING PREFERENCES — When a metcon calls for a weighted movement, prefer barbells and dumbbells over kettlebells. Kettlebells are acceptable when the movement is inherently KB-based (e.g., Turkish get-ups, KB swings) but do not substitute KBs for movements that can use a barbell or dumbbell. BARBELL CYCLING: Do not repeat the same barbell movement in back-to-back metcons (e.g., if Day 3's metcon has thrusters, Day 4's metcon should not). Rotate barbell movements across days.
 
 4. TIME DOMAIN DISTRIBUTION (per week) — Assign a target time domain to each metcon:
    - Short: sub-8 minutes
@@ -120,7 +120,10 @@ METCON DESIGN RULES (apply to every Metcon: block):
    - Long: 15+ minutes
    Each week must include at least 1 short, 1 medium, and 1 long metcon. No single category may appear more than 3 times in one week. Design the rep schemes, round counts, and movement complexity to fit the target time domain.
 
-5. COMPLEMENT THE STRENGTH BLOCK — If a day's Strength block is squat-dominant, the Metcon must NOT be squat-dominant. If Strength is pressing, the Metcon should not be press-heavy. The metcon should use complementary movement patterns to avoid overloading the same muscle groups.`;
+5. COMPLEMENT THE STRENGTH BLOCK — If a day's Strength block is squat-dominant, the Metcon must NOT be squat-dominant. If Strength is pressing, the Metcon should not be press-heavy. The metcon should use complementary movement patterns to avoid overloading the same muscle groups.
+
+6. DEVELOPING SKILLS BAN (HARD CONSTRAINT) — The following movements are NOT allowed in any Metcon: block. They belong exclusively in the Skills: block. This is non-negotiable — zero exceptions.
+   BANNED FROM METCONS: {developingSkills}`;
 /* ------------------------------------------------------------------ */
 /*  SKELETON BUILDER — full 20-day template                           */
 /* ------------------------------------------------------------------ */
@@ -202,6 +205,121 @@ async function retrieveRAGContext(
     return "";
   }
 }
+/* ------------------------------------------------------------------ */
+/*  POST-GENERATION METCON VALIDATOR                                   */
+/* ------------------------------------------------------------------ */
+interface MetconViolation {
+  rule: string;
+  detail: string;
+}
+
+/**
+ * Validate metcon blocks extracted from parsed workouts.
+ * Returns an array of violations. Empty array = all good.
+ */
+function validateMetcons(
+  parsedWorkouts: { week_num: number; day_num: number; workout_text: string; sort_order: number }[],
+  developingSkills: string[],
+): MetconViolation[] {
+  const violations: MetconViolation[] = [];
+
+  // Extract metcon text from each workout
+  const metcons: { day: number; week: number; text: string }[] = [];
+  for (const w of parsedWorkouts) {
+    const lower = w.workout_text.toLowerCase();
+    const mIdx = lower.indexOf("metcon:");
+    if (mIdx < 0) continue;
+    const afterMetcon = w.workout_text.slice(mIdx + 7);
+    // Find next block header to delimit metcon text
+    const nextHeader = afterMetcon.search(/^(Warm-up|Mobility|Skills|Strength|Cool\s*down):/mi);
+    const metconText = nextHeader >= 0 ? afterMetcon.slice(0, nextHeader).trim() : afterMetcon.trim();
+    metcons.push({ day: w.sort_order + 1, week: w.week_num, text: metconText });
+  }
+
+  // Rule 6 check: developing skills banned from metcons
+  const devLower = developingSkills.map((s) => s.toLowerCase());
+  for (const m of metcons) {
+    const mLower = m.text.toLowerCase();
+    for (let i = 0; i < devLower.length; i++) {
+      if (mLower.includes(devLower[i])) {
+        violations.push({
+          rule: "Rule 6 (Developing Skills Ban)",
+          detail: `Day ${m.day}: "${developingSkills[i]}" is a developing skill and must not appear in a metcon.`,
+        });
+      }
+    }
+  }
+
+  // Rule 1 frequency cap: no movement in more than 6 of 20 metcons
+  // Build a simple word-frequency map of full metcon texts
+  // We check for known movement patterns rather than individual words
+  const movementDayCount = new Map<string, number[]>();
+  const MOVEMENT_PATTERNS = [
+    "thruster", "clean and jerk", "clean & jerk", "power clean", "squat clean", "hang clean",
+    "clean", "snatch", "power snatch", "squat snatch", "hang snatch",
+    "deadlift", "front squat", "back squat", "overhead squat",
+    "push press", "push jerk", "split jerk", "strict press", "shoulder to overhead",
+    "wall ball", "box jump", "burpee", "pull-up", "pull up", "chest-to-bar", "c2b",
+    "toes-to-bar", "toes to bar", "t2b", "muscle-up", "muscle up",
+    "ring dip", "handstand push-up", "handstand push up", "hspu",
+    "handstand walk", "pistol", "rope climb", "double-under", "double under",
+    "row", "bike", "ski erg", "run",
+    "kettlebell swing", "kb swing", "turkish get-up",
+    "dumbbell snatch", "db snatch", "dumbbell clean", "db clean",
+    "devil press", "man maker",
+    "lunge", "step-up", "step up", "ghd sit-up", "ghd sit up",
+  ];
+
+  for (const m of metcons) {
+    const mLower = m.text.toLowerCase();
+    for (const pattern of MOVEMENT_PATTERNS) {
+      if (mLower.includes(pattern)) {
+        const days = movementDayCount.get(pattern) || [];
+        days.push(m.day);
+        movementDayCount.set(pattern, days);
+      }
+    }
+  }
+
+  for (const [movement, days] of movementDayCount) {
+    if (days.length > 6) {
+      violations.push({
+        rule: "Rule 1 (Frequency Cap)",
+        detail: `"${movement}" appears in ${days.length}/20 metcons (max 6). Days: ${days.join(", ")}.`,
+      });
+    }
+  }
+
+  // Rule 3 barbell cycling: no same barbell movement in back-to-back metcons
+  const BARBELL_MOVEMENTS = [
+    "thruster", "clean and jerk", "clean & jerk", "power clean", "squat clean", "hang clean",
+    "clean", "snatch", "power snatch", "squat snatch", "hang snatch",
+    "deadlift", "front squat", "back squat", "overhead squat",
+    "push press", "push jerk", "split jerk", "strict press", "shoulder to overhead",
+  ];
+
+  // Sort metcons by day order
+  const sorted = [...metcons].sort((a, b) => a.day - b.day);
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1];
+    const curr = sorted[i];
+    // Only check consecutive training days (within same week or sequential)
+    if (curr.day - prev.day !== 1) continue;
+    const prevLower = prev.text.toLowerCase();
+    const currLower = curr.text.toLowerCase();
+    for (const bm of BARBELL_MOVEMENTS) {
+      if (prevLower.includes(bm) && currLower.includes(bm)) {
+        violations.push({
+          rule: "Rule 3 (Barbell Cycling)",
+          detail: `"${bm}" appears in consecutive metcons on Day ${prev.day} and Day ${curr.day}.`,
+        });
+      }
+    }
+  }
+
+  return violations;
+}
+
 /** Background task: generate program and update job row */
 async function processJob(
   jobId: string,
@@ -255,8 +373,8 @@ async function processJob(
         }
       }
     }
-    const metconEligibility = proficientSkills.length > 0 || developingSkills.length > 0
-      ? `\nMETCON MOVEMENT ELIGIBILITY:\n- Use in metcons (proficient): ${proficientSkills.join(", ") || "none"}\n- Skill block only (developing): ${developingSkills.join(", ") || "none"}\n`
+    const metconEligibility = proficientSkills.length > 0
+      ? `\nMETCON MOVEMENT ELIGIBILITY:\n- Use in metcons (proficient): ${proficientSkills.join(", ")}\n`
       : "";
     // Equipment constraints
     let equipmentConstraint = "";
@@ -310,7 +428,10 @@ Use the SKILLS ANALYSIS above to decide what goes in each day's Skills: block. Y
 
 Complete the following program template. Fill in every block with one line of programming. Do not add or remove any headers.
 ${skeleton}`;
-    const systemPrompt = GENERATE_PROMPT + METCON_GUIDANCE + guidelinesBlock + ragContext;
+    // Inject developing skills into Rule 6 of METCON_GUIDANCE
+    const developingList = developingSkills.length > 0 ? developingSkills.join(", ") : "none";
+    const metconGuidance = METCON_GUIDANCE.replace("{developingSkills}", developingList);
+    const systemPrompt = GENERATE_PROMPT + metconGuidance + guidelinesBlock + ragContext;
     console.log(`[${jobId}] Prompt sizes: system=${systemPrompt.length} chars, user=${userPrompt.length} chars`);
     if (!ANTHROPIC_API_KEY) {
       throw new Error("Program generation is not configured");
@@ -409,6 +530,22 @@ ${skeleton}`;
           continue;
         }
         throw new Error(`Expected 20 workouts, got ${parsedWorkouts.length}`);
+      }
+      // Validate metcon blocks against rules
+      const metconViolations = validateMetcons(parsedWorkouts, developingSkills);
+      if (metconViolations.length > 0) {
+        console.warn(`[${jobId}] Attempt ${attempt}: ${metconViolations.length} metcon violations found`);
+        for (const v of metconViolations) {
+          console.warn(`  [${v.rule}] ${v.detail}`);
+        }
+        if (attempt < MAX_ATTEMPTS) {
+          const violationList = metconViolations.map((v) => `- ${v.rule}: ${v.detail}`).join("\n");
+          messages.push({ role: "assistant", content: programText });
+          messages.push({ role: "user", content: `That program has metcon rule violations:\n${violationList}\n\nPlease fix these violations and output the complete 20-day program again.` });
+          continue;
+        }
+        // On final attempt, log but proceed — partial compliance is better than failure
+        console.warn(`[${jobId}] Final attempt still has ${metconViolations.length} violations — saving anyway`);
       }
       // Insert program
       const { data: prog, error: progErr } = await supa
