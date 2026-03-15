@@ -187,9 +187,6 @@ export function analyzeBlocks(
       else structureCounts.other++;
     }
 
-    if (block_type === "strength") {
-      formatCounts["Strength"] = (formatCounts["Strength"] || 0) + 1;
-    }
 
     for (const m of moves) {
       allFoundMovements.add(m.canonical);
