@@ -254,14 +254,9 @@ function validateMetcons(
   // Build a simple word-frequency map of full metcon texts
   // We check for known movement patterns rather than individual words
   const movementDayCount = new Map<string, number[]>();
-  // Longer compound patterns MUST come before shorter base patterns so that
-  // "power clean" is matched before bare "clean", etc.  We sort by descending
-  // length so the first match wins for each family.
   const MOVEMENT_PATTERNS = [
-    "clean and jerk", "clean & jerk", "power clean", "squat clean", "hang clean",
-    "power snatch", "squat snatch", "hang snatch", "dumbbell snatch", "db snatch",
-    "dumbbell clean", "db clean",
-    "thruster", "clean", "snatch",
+    "thruster", "clean and jerk", "clean & jerk", "power clean", "squat clean", "hang clean",
+    "power snatch", "squat snatch", "hang snatch",
     "deadlift", "front squat", "back squat", "overhead squat",
     "push press", "push jerk", "split jerk", "strict press", "shoulder to overhead",
     "wall ball", "box jump", "burpee", "pull-up", "pull up", "chest-to-bar", "c2b",
@@ -270,35 +265,15 @@ function validateMetcons(
     "handstand walk", "pistol", "rope climb", "double-under", "double under",
     "row", "bike", "ski erg", "run",
     "kettlebell swing", "kb swing", "turkish get-up",
+    "dumbbell snatch", "db snatch", "dumbbell clean", "db clean",
     "devil press", "man maker",
     "lunge", "step-up", "step up", "ghd sit-up", "ghd sit up",
   ];
 
-  // Bare base movements that should NOT match when a compound variant already
-  // matched for the same metcon (prevents "hang clean" also counting as "clean").
-  const BASE_MOVEMENTS: Record<string, string[]> = {
-    clean: ["clean and jerk", "clean & jerk", "power clean", "squat clean", "hang clean", "dumbbell clean", "db clean"],
-    snatch: ["power snatch", "squat snatch", "hang snatch", "dumbbell snatch", "db snatch"],
-  };
-
-  // Pre-compile word-boundary regexes for each pattern (escaped for regex safety)
-  const patternRegexes = new Map<string, RegExp>();
-  for (const p of MOVEMENT_PATTERNS) {
-    const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    patternRegexes.set(p, new RegExp(`\\b${escaped}\\b`, "i"));
-  }
-
   for (const m of metcons) {
     const mLower = m.text.toLowerCase();
-    const matchedForThisMetcon = new Set<string>();
     for (const pattern of MOVEMENT_PATTERNS) {
-      // Skip bare base movement if a compound variant already matched
-      if (BASE_MOVEMENTS[pattern]) {
-        const dominated = BASE_MOVEMENTS[pattern].some((cp) => matchedForThisMetcon.has(cp));
-        if (dominated) continue;
-      }
-      if (patternRegexes.get(pattern)!.test(mLower)) {
-        matchedForThisMetcon.add(pattern);
+      if (mLower.includes(pattern)) {
         const days = movementDayCount.get(pattern) || [];
         days.push(m.day);
         movementDayCount.set(pattern, days);
@@ -316,17 +291,12 @@ function validateMetcons(
   }
 
   // Rule 3 barbell cycling: no same barbell movement in back-to-back metcons
-  // Compound patterns first, bare base patterns last (same ordering principle)
   const BARBELL_MOVEMENTS = [
-    "clean and jerk", "clean & jerk", "power clean", "squat clean", "hang clean",
+    "thruster", "clean and jerk", "clean & jerk", "power clean", "squat clean", "hang clean",
     "power snatch", "squat snatch", "hang snatch",
-    "thruster", "clean", "snatch",
     "deadlift", "front squat", "back squat", "overhead squat",
     "push press", "push jerk", "split jerk", "strict press", "shoulder to overhead",
   ];
-
-  // Re-use BASE_MOVEMENTS and patternRegexes from above (all barbell patterns
-  // are a subset of MOVEMENT_PATTERNS so their regexes are already compiled).
 
   // Sort metcons by day order
   const sorted = [...metcons].sort((a, b) => a.day - b.day);
@@ -337,21 +307,8 @@ function validateMetcons(
     if (curr.day - prev.day !== 1) continue;
     const prevLower = prev.text.toLowerCase();
     const currLower = curr.text.toLowerCase();
-    const prevMatched = new Set<string>();
-    const currMatched = new Set<string>();
     for (const bm of BARBELL_MOVEMENTS) {
-      const re = patternRegexes.get(bm) ?? new RegExp(`\\b${bm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
-      // Skip bare base if compound already matched for that day
-      if (BASE_MOVEMENTS[bm]) {
-        const prevDom = BASE_MOVEMENTS[bm].some((cp) => prevMatched.has(cp));
-        const currDom = BASE_MOVEMENTS[bm].some((cp) => currMatched.has(cp));
-        if (prevDom || currDom) continue;
-      }
-      const inPrev = re.test(prevLower);
-      const inCurr = re.test(currLower);
-      if (inPrev) prevMatched.add(bm);
-      if (inCurr) currMatched.add(bm);
-      if (inPrev && inCurr) {
+      if (prevLower.includes(bm) && currLower.includes(bm)) {
         violations.push({
           rule: "Rule 3 (Barbell Cycling)",
           detail: `"${bm}" appears in consecutive metcons on Day ${prev.day} and Day ${curr.day}.`,
