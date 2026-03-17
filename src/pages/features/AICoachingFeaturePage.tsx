@@ -76,82 +76,43 @@ export default function AICoachingFeaturePage() {
             This is an actual AI-generated evaluation from WodWisdom. Every insight is specific to the athlete's profile.
           </p>
 
-          <div className="feature-app-frame">
-            <div className="feature-app-frame-bar">
-              <div className="feature-app-frame-dot" />
-              <div className="feature-app-frame-dot" />
-              <div className="feature-app-frame-dot" />
-            </div>
-            <div className="feature-app-frame-body">
-              <div className="feature-eval-header">
-                <div className="feature-eval-avatar">W</div>
-                <span className="feature-eval-label">WodWisdom</span>
-              </div>
-              <div className="feature-eval-body">
-                <p>
-                  Looking at your profile, you're a well-rounded athlete with impressive strength numbers and solid gymnastics skills.
-                  Your back squat of 1.8x bodyweight and deadlift of 2.47x bodyweight put you in strong territory for your age.
-                  Your overhead lifts are particularly impressive — that 315 jerk is solid work, and your gymnastics strength shows
-                  with advanced handstand push-ups and muscle-ups.
-                </p>
+          <div className="workout-review-section" style={{ maxWidth: 720, margin: '0 auto' }}>
+            <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
+              Profile Evaluation
+            </h3>
+            <div className="workout-review-content">
+              <p>
+                Looking at your profile, you're a well-rounded athlete with some clear strengths and specific areas that need work.
+              </p>
 
-                <p><strong>Strength Assessment</strong></p>
-                <p>
-                  Your lift ratios tell an interesting story. Your front squat at 88% of back squat is excellent — most athletes
-                  struggle to hit 85%. However, your overhead squat at 65% of back squat suggests some mobility limitations that
-                  are likely holding back your Olympic lifts. Your snatch at only 60% of back squat (should be closer to 65–70%)
-                  and the gap between your clean (325) and jerk (315) indicates the overhead position is your limiter. Your push press
-                  and push jerk being identical at 275 also suggests you're not getting full benefit from the dip-and-drive mechanics.
-                </p>
+              <p><strong>Your Strength Foundation is Solid</strong></p>
+              <p>
+                Your squat pattern is strong across the board. Back squat at 1.8x bodyweight and front squat at 1.6x are solid numbers for a 50-year-old. Your front squat to back squat ratio of 88% is excellent — most athletes struggle to get above 85%. Your deadlift at 2.5x bodyweight shows good posterior chain strength. The Olympic lifts tell an interesting story though — your clean at 325 is respectable, but your jerk at 315 means you're leaving weight on the platform. That 10-pound gap suggests your overhead strength or receiving position needs work.
+              </p>
 
-                <p><strong>Skills Profile</strong></p>
-                <p>
-                  Your gymnastics game is strong. Advanced butterfly pull-ups, muscle-ups, and HSPUs put you ahead of most athletes.
-                  The progression makes sense — you've got the strict strength foundation (intermediate strict pull-ups/HSPUs)
-                  supporting your advanced kipping skills. Your rope climb and handstand walk being intermediate fits the pattern.
-                  The one outlier is beginner L-sits, which suggests core strength endurance could use work.
-                </p>
+              <p><strong>Skills Show Experience but Gaps</strong></p>
+              <p>
+                You've clearly put time into the high-skill movements. Advanced HSPU and muscle-ups indicate good pressing strength and coordination. Your butterfly pull-ups being advanced while kipping are intermediate suggests you rushed the progression — the reference material emphasizes mastering the controlled shoulder kip before adding complexity. Your L-sit being beginner level is a red flag for core strength and shoulder stability, especially given your advanced upper body gymnastics work.
+              </p>
 
-                <p><strong>Conditioning Reality Check</strong></p>
-                <p>
-                  Your engine shows some imbalances. That 6:30 mile and 2:59 1K row are solid numbers, but your 5K times reveal
-                  different stories. Your 5K run at 19:11 (6:10 pace) is much stronger relative to your mile than your 5K row at 16:54.
-                  This suggests better running economy than rowing technique. Your bike numbers (34 cals/min peak, 21.3 average
-                  over 10 minutes) are respectable but not standout.
-                </p>
+              <p><strong>Conditioning Reveals Your Athletic Background</strong></p>
+              <p>
+                Your conditioning profile screams "former athlete who stayed fit." That 6:30 mile suggests good aerobic capacity, but your rowing times are inconsistent with your running — a 6:20 2K row is solid but your 5K row at 16:54 shows you fade on longer pieces. Your bike output is respectable but nothing special. The gap between your short and long efforts suggests you rely more on strength than aerobic development.
+              </p>
 
-                <p><strong>The Connections</strong></p>
-                <p>
-                  Your overhead mobility limitations are bleeding into both your Olympic lifting and potentially affecting your
-                  wall-facing HSPU progression (intermediate vs advanced regular HSPU). Your strong deadlift and back squat
-                  foundation should support better clean and snatch numbers, but that overhead squat tells the story. Your advanced
-                  pulling strength in gymnastics pairs well with your rowing capability, but technique refinement would serve you
-                  better than just grinding harder.
-                </p>
+              <p><strong>The Bigger Picture</strong></p>
+              <p>
+                Your strength supports your gymnastics skills well, but there are technical gaps that limit your ceiling. That jerk being 40 pounds behind your clean, combined with your overhead squat being only 65% of your back squat, points to overhead mobility or receiving position issues. Your advanced butterfly pull-ups paired with beginner L-sits suggests you've prioritized flashy skills over foundational midline strength.
+              </p>
 
-                <p><strong>Your Priorities</strong></p>
-                <p>
-                  First, attack that overhead mobility. Your overhead squat should be 75–80% of your back squat, not 65%.
-                  This will unlock your Olympic lifts and help your wall-facing HSPU progression. Daily overhead positioning work
-                  and thoracic mobility will pay dividends across multiple domains.
-                </p>
-                <p>
-                  Second, refine your rowing technique. Your 1K and 2K times show you can generate power, but your 5K row relative
-                  to your 5K run suggests stroke efficiency issues. Better rowing mechanics will improve your work capacity in
-                  longer conditioning pieces and complement your strong pulling strength.
-                </p>
-                <p>
-                  Third, address that L-sit progression. For someone with your pressing and pulling strength, beginner L-sits
-                  indicate a weak link in core strength endurance that could be limiting your overall gymnastics progression
-                  and Olympic lift stability.
-                </p>
-              </div>
-              <div className="feature-eval-sources">
-                <span className="feature-eval-sources-label">Sources</span>
-                <span className="feature-eval-chip">CrossFit Level 2 Training Guide</span>
-                <span className="feature-eval-chip">CrossFit Journal — Programming</span>
-                <span className="feature-eval-chip">Guyton & Hall — Medical Physiology</span>
-              </div>
+              <p><strong>Your Priorities</strong></p>
+              <p>
+                First priority: Fix your jerk mechanics and overhead position. Work push jerks from stands, overhead squats, and get that jerk closer to your clean. Second priority: Address the L-sit deficiency — it's limiting your midline strength for everything else. Third priority: Build aerobic capacity through longer, controlled efforts to match your anaerobic power with sustainable work capacity.
+              </p>
+
+              <p>
+                You've got the strength and skill base of a competitive master's athlete. Clean up these technical gaps and you'll see everything improve.
+              </p>
             </div>
           </div>
         </div>
