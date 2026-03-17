@@ -29,6 +29,11 @@ import EngineTrainingDayPage from './pages/EngineTrainingDayPage';
 import EngineAnalyticsPage from './pages/EngineAnalyticsPage';
 import EngineTaxonomyPage from './pages/EngineTaxonomyPage';
 import NutritionDashboardPage from './pages/NutritionDashboardPage';
+import FeaturesHubPage from './pages/features/FeaturesHubPage';
+import AICoachingFeaturePage from './pages/features/AICoachingFeaturePage';
+import ProgramsFeaturePage from './pages/features/ProgramsFeaturePage';
+import EngineFeaturePage from './pages/features/EngineFeaturePage';
+import NutritionFeaturePage from './pages/features/NutritionFeaturePage';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -52,6 +57,11 @@ export default function App() {
   if (!session) return (
     <Routes>
       <Route path="/auth" element={<AuthPage />} />
+      <Route path="/features" element={<FeaturesHubPage />} />
+      <Route path="/features/ai-coaching" element={<AICoachingFeaturePage />} />
+      <Route path="/features/programs" element={<ProgramsFeaturePage />} />
+      <Route path="/features/engine" element={<EngineFeaturePage />} />
+      <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
       <Route path="*" element={<LandingPage />} />
     </Routes>
   );
