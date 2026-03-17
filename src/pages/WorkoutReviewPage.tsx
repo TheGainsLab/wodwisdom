@@ -105,7 +105,7 @@ function CollapsibleBlock({ block, defaultOpen }: { block: ReviewBlock; defaultO
           <span className={`workout-review-block-badge workout-review-block-badge--${block.block_type}`}>
             {label}
           </span>
-          <span className="workout-review-block-summary">{block.block_label}</span>
+
         </div>
         <span className={`workout-review-block-chevron${open ? ' workout-review-block-chevron--open' : ''}`}>
           {CHEVRON_DOWN}
