@@ -1,5 +1,8 @@
 /* ===== Features Pages — All classes prefixed feature- ===== */
 
+/* ===== Body Override — unlock scroll for standalone feature pages ===== */
+body.feature-body{overflow:auto;height:auto}
+
 /* ===== Shared Layout ===== */
 .feature-page{scroll-behavior:smooth;min-height:100vh}
 .feature-container{max-width:1080px;margin:0 auto;padding:0 24px}
