@@ -146,8 +146,16 @@ function CollapsibleBlock({ block, defaultOpen }: { block: ReviewBlock; defaultO
 export default function WorkoutReviewPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [workoutText, setWorkoutText] = useState('');
-  const [review, setReview] = useState<WorkoutReview | null>(null);
+  // Restore last review from sessionStorage so a page refresh doesn't lose it
+  const savedSession = (() => {
+    try {
+      const raw = sessionStorage.getItem('wr_last_review');
+      if (raw) return JSON.parse(raw) as { workoutText: string; review: WorkoutReview };
+    } catch {}
+    return null;
+  })();
+  const [workoutText, setWorkoutText] = useState(savedSession?.workoutText ?? '');
+  const [review, setReview] = useState<WorkoutReview | null>(savedSession?.review ?? null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [navOpen, setNavOpen] = useState(false);
@@ -220,7 +228,12 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
       }
       if (data?.error) throw new Error(data.error || 'Something went wrong');
 
-      setReview(data?.review as WorkoutReview);
+      const reviewData = data?.review as WorkoutReview;
+      setReview(reviewData);
+      // Persist to sessionStorage so a page refresh restores the review
+      try {
+        sessionStorage.setItem('wr_last_review', JSON.stringify({ workoutText: trimmed, review: reviewData }));
+      } catch {}
       // Only bump usage counter when it wasn't a cached response
       if (!data?.cached && (!tierLoaded || tier === 'free')) {
         setTotalUsage(prev => prev + 1);
@@ -356,7 +369,7 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                   ) : (
                     <button
                       className="auth-btn"
-                      onClick={() => { setReview(null); setWorkoutText(''); hasAutoAnalyzed.current = false; }}
+                      onClick={() => { setReview(null); setWorkoutText(''); hasAutoAnalyzed.current = false; try { sessionStorage.removeItem('wr_last_review'); } catch {} }}
                       style={{ flex: 1, minWidth: 160, background: 'var(--surface2)', color: 'var(--text)' }}
                     >
                       Coach Another Workout
