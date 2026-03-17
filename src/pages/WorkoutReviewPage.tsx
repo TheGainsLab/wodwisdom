@@ -115,7 +115,7 @@ function CollapsibleBlock({ block, defaultOpen }: { block: ReviewBlock; defaultO
       {open && (
         <div className="workout-review-block-body">
           {block.prescription && (
-            <div className="wr-prescription">
+            <div className={`wr-prescription wr-prescription--${block.block_type}`}>
               <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(block.prescription) }} />
             </div>
           )}
