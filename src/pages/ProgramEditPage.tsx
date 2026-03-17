@@ -366,17 +366,13 @@ export default function ProgramEditPage({ session }: { session: Session }) {
             ) : (
               <>
                 <div className="program-preview-header">
-                  <div className="program-edit-name-row">
-                    <label className="program-edit-name-label">Program name</label>
-                    <input
-                      type="text"
-                      className="program-name-input"
-                      placeholder="Program name"
-                      value={programName}
-                      onChange={e => setProgramName(e.target.value)}
-                      style={{ flex: 1, minWidth: 200 }}
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    className="program-name-input"
+                    placeholder="Program name"
+                    value={programName}
+                    onChange={e => setProgramName(e.target.value)}
+                  />
                   <div className="program-preview-header-right">
                     <span className="program-edit-workout-count">{workouts.length} workout{workouts.length !== 1 ? 's' : ''}</span>
                     <button type="button" className="link-btn" onClick={() => navigate(`/programs/${id}`)}>

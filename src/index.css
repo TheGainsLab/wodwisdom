@@ -293,12 +293,10 @@ body.landing-body{overflow:auto;height:auto}
 .program-paste-zone textarea{width:100%;min-height:200px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.6;resize:vertical;outline:none}
 .program-paste-zone textarea:focus{border-color:var(--accent)}
 .program-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-.program-name-input{flex:1;min-width:180px;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px}
-.program-preview-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px}
+.program-name-input{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px}
+.program-preview-header{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
 .program-preview-header h2{font-size:16px;font-weight:700}
-.program-edit-name-row{display:flex;align-items:center;gap:12px;flex:1;min-width:200px}
-.program-edit-name-label{font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
-.program-preview-header-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.program-preview-header-right{display:flex;align-items:center;justify-content:space-between}
 .program-edit-workout-count{font-size:14px;color:var(--text-dim)}
 .link-btn{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;font-weight:500}
 .link-btn:hover{text-decoration:underline}
