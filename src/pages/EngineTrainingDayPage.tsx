@@ -137,8 +137,8 @@ function formatDuration(seconds: number): string {
 
 function formatGoalWithPace(goal: number, durationSeconds: number, unit: string): string {
   const durationMinutes = durationSeconds / 60;
-  const perMin = durationMinutes > 0 ? (goal / durationMinutes).toFixed(1) : null;
-  const goalStr = goal % 1 === 0 ? String(goal) : goal.toFixed(1);
+  const perMin = durationMinutes > 0 ? Math.round(goal / durationMinutes) : null;
+  const goalStr = Math.round(goal);
   return perMin ? `~${goalStr} ${unit} (${perMin} ${unit}/min)` : `~${goalStr} ${unit}`;
 }
 
@@ -894,9 +894,6 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                     const restDur = resolveRest(bp.restDuration, workDur) || (bp.restDurationOptions?.[0] ?? 0);
                     const pace = formatPace(bp.paceRange);
                     const rollingAdj = performanceMetrics?.rolling_avg_ratio ?? 1;
-                    const targetRpm = baselineRpm > 0 && Array.isArray(bp.paceRange)
-                      ? `${(baselineRpm * bp.paceRange[0] * rollingAdj).toFixed(1)}–${(baselineRpm * bp.paceRange[1] * rollingAdj).toFixed(1)} ${selectedUnit}/min`
-                      : null;
 
                     return (
                       <div key={blockIdx}>
@@ -1115,10 +1112,6 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                           </div>
                         )}
 
-                        {/* Target pace line */}
-                        {targetRpm && (
-                          <div className="engine-breakdown-pace">Pace: {targetRpm}</div>
-                        )}
 
                         {/* Block rest between blocks */}
                         {workout?.set_rest_seconds && blockArrayIdx < blocks.length - 1 && (
