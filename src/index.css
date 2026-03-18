@@ -65,7 +65,7 @@ body.landing-body{overflow:auto;height:auto}
 .nav-footer{padding:12px 10px;border-top:1px solid var(--border)}
 .nav-link.logout:hover{color:var(--accent)}
 .chat-header,.page-header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
-.page-header h1{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.page-header h1{font-size:18px;font-weight:700;letter-spacing:-.3px;flex:1;text-align:center}
 .program-detail-name-input{flex:1;min-width:0;background:none;border:none;font-family:inherit;font-size:18px;font-weight:700;letter-spacing:-.3px;color:var(--text);outline:none;padding:4px 8px;margin:-4px -8px;border-radius:6px}
 .program-detail-name-input:hover,.program-detail-name-input:focus{background:var(--surface2)}
 .menu-btn{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:8px;background:none;color:var(--text-dim);cursor:pointer;flex-shrink:0}
