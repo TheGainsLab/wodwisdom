@@ -164,6 +164,7 @@ export default function MealBuilderSheet({
         setError(`Failed to log ${failed.length} item(s)`);
         setLogging(false);
       } else {
+        setLogging(false);
         onLogged();
       }
     } catch (e: any) {

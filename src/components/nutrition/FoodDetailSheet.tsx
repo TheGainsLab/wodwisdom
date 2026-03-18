@@ -111,6 +111,7 @@ export default function FoodDetailSheet({
         },
       });
       if (logErr) { setError(`Failed to log: ${logErr.message}`); setLogging(false); return; }
+      setLogging(false);
       onLogged();
     } catch (e: any) {
       setError(`Failed to log: ${e.message || 'Network error'}`);
