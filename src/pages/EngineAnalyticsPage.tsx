@@ -400,18 +400,18 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
 
         <hr className="engine-divider" />
 
-        {/* Sessions by day type */}
-        <h3 className="engine-header">Sessions by Day Type</h3>
-        {dayTypes.length === 0 ? (
+        {/* Sessions by modality */}
+        <h3 className="engine-header">Sessions by Equipment</h3>
+        {modalities.length === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No sessions recorded yet.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {dayTypes.map(dt => {
-              const count = byDayType.get(dt)?.length ?? 0;
+            {modalities.map(mod => {
+              const count = byModality.get(mod)?.length ?? 0;
               return (
-                <div key={dt} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span className={'engine-badge ' + dayTypeBadge(dt)} style={{ minWidth: 90, textAlign: 'center' }}>
-                    {dt.replace(/_/g, ' ')}
+                <div key={mod} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', minWidth: 90, textTransform: 'capitalize' }}>
+                    {formatModality(mod)}
                   </span>
                   <div style={{ flex: 1 }}>
                     <div className="engine-progress-bar" style={{ height: 8 }}>
@@ -429,18 +429,18 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
 
         <hr className="engine-divider" />
 
-        {/* Sessions by modality */}
-        <h3 className="engine-header">Sessions by Equipment</h3>
-        {modalities.length === 0 ? (
+        {/* Sessions by day type */}
+        <h3 className="engine-header">Sessions by Day Type</h3>
+        {dayTypes.length === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No sessions recorded yet.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {modalities.map(mod => {
-              const count = byModality.get(mod)?.length ?? 0;
+            {dayTypes.map(dt => {
+              const count = byDayType.get(dt)?.length ?? 0;
               return (
-                <div key={mod} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)', minWidth: 90, textTransform: 'capitalize' }}>
-                    {formatModality(mod)}
+                <div key={dt} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span className={'engine-badge ' + dayTypeBadge(dt)} style={{ width: 160, textAlign: 'center', flexShrink: 0 }}>
+                    {dt.replace(/_/g, ' ')}
                   </span>
                   <div style={{ flex: 1 }}>
                     <div className="engine-progress-bar" style={{ height: 8 }}>
