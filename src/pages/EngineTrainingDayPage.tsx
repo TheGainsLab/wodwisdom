@@ -952,7 +952,6 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                               <div key="rest" className="engine-breakdown-row engine-breakdown-row--rest">
                                 <span className="engine-breakdown-label engine-breakdown-label--rest">REST</span>
                                 <span className="engine-breakdown-dur">{formatDuration(restDur)}</span>
-                                <span className="engine-breakdown-goal">—</span>
                               </div>
                             );
                           }
@@ -1000,7 +999,6 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                               <div key="rest" className="engine-breakdown-row engine-breakdown-row--rest">
                                 <span className="engine-breakdown-label engine-breakdown-label--rest">REST</span>
                                 <span className="engine-breakdown-dur">{formatDuration(restDur)}</span>
-                                <span className="engine-breakdown-goal">—</span>
                               </div>
                             );
                           }
@@ -1103,7 +1101,6 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                     <div className="engine-breakdown-row engine-breakdown-row--rest">
                                       <span className="engine-breakdown-label engine-breakdown-label--rest">REST</span>
                                       <span className="engine-breakdown-dur">{formatDuration(roundRestDur)}</span>
-                                      <span className="engine-breakdown-goal">—</span>
                                     </div>
                                   )}
                                 </div>
@@ -1118,7 +1115,6 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                           <div className="engine-breakdown-row engine-breakdown-row--block-rest">
                             <span className="engine-breakdown-label engine-breakdown-label--rest">BLOCK REST</span>
                             <span className="engine-breakdown-dur">{formatDuration(workout.set_rest_seconds)}</span>
-                            <span className="engine-breakdown-goal">—</span>
                           </div>
                         )}
                       </div>
