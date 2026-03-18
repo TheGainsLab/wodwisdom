@@ -107,6 +107,7 @@
 .engine-category-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
 .engine-category-btn:hover{border-color:var(--accent);color:var(--text)}
 .engine-category-btn.active{background:var(--accent);border-color:var(--accent);color:white}
+.engine-category-btn.expanded{border-color:var(--accent);color:var(--accent);background:transparent}
 
 /* Equipment sub-menu */
 .engine-equipment-submenu{display:flex;flex-wrap:wrap;gap:8px;padding:12px 0}
