@@ -164,6 +164,9 @@
 /* View header with back button */
 .ea-view-header{display:flex;align-items:center;gap:12px;margin-bottom:4px}
 
+/* Collapsible card wrapper (Workout Breakdown, Workout History) */
+.engine-collapsible-card{border:1px solid var(--border-light);border-radius:12px;padding:4px 16px}
+
 /* Workout Breakdown — collapsible segment preview */
 .engine-breakdown-toggle{background:none;border:none;padding:10px 0;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--text-dim);font-size:13px;font-weight:600;font-family:inherit;width:100%}
 .engine-breakdown-toggle:hover{color:var(--text)}

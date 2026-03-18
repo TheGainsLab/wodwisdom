@@ -878,6 +878,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
               </div>
 
               {/* Workout Breakdown — collapsible segment-by-segment preview */}
+              <div className="engine-collapsible-card">
               <button
                 onClick={() => setBreakdownExpanded(!breakdownExpanded)}
                 className="engine-breakdown-toggle"
@@ -1128,26 +1129,14 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   })}
                 </div>
               )}
+              </div>
 
               {/* Workout History — past sessions of same day type */}
               {dayTypeHistory.length > 0 && (
-                <div style={{ marginTop: 8 }}>
+                <div className="engine-collapsible-card">
                   <button
                     onClick={() => setHistoryExpanded(!historyExpanded)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: '8px 0',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      color: 'var(--text-dim)',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      fontFamily: 'inherit',
-                      width: '100%',
-                    }}
+                    className="engine-breakdown-toggle"
                   >
                     <ChevronDown
                       size={14}
