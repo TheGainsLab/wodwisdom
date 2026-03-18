@@ -893,6 +893,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                     const workDur = resolveNum(bp.workDuration, 0) || (bp.workDurationOptions?.[0] ?? 0);
                     const restDur = resolveRest(bp.restDuration, workDur) || (bp.restDurationOptions?.[0] ?? 0);
                     const pace = formatPace(bp.paceRange);
+                    const rollingAdj = performanceMetrics?.rolling_avg_ratio ?? 1;
 
                     return (
                       <div key={blockIdx}>
