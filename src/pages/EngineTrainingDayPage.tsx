@@ -704,23 +704,17 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
           <div className="engine-card">
             <div className="engine-section">
-              <div>
-                <h2 className="engine-header">Day {dayNumber}</h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                  <span className={'engine-badge ' + dayTypeBadge(workout?.day_type ?? '')}>
-                    {(workout?.day_type ?? '').replace(/_/g, ' ')}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {workout && (
+                  <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                    {calculateWorkDurationMinutes(workout)} min work
                   </span>
-                  {workout && (
-                    <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                      {calculateWorkDurationMinutes(workout)} min work
-                    </span>
-                  )}
-                  {previousSession && (
-                    <span className="engine-badge engine-badge--endurance">
-                      <Check size={10} /> Done
-                    </span>
-                  )}
-                </div>
+                )}
+                {previousSession && (
+                  <span className="engine-badge engine-badge--endurance">
+                    <Check size={10} /> Done
+                  </span>
+                )}
               </div>
 
               <hr className="engine-divider" />
@@ -852,15 +846,6 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
           <div className="engine-card">
             <div className="engine-section">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <h2 className="engine-header">
-                  {isTimeTrial ? 'Time Trial' : `Day ${dayNumber}`}
-                </h2>
-                <span className={'engine-badge ' + dayTypeBadge(workout?.day_type ?? '')}>
-                  {(workout?.day_type ?? '').replace(/_/g, ' ')}
-                </span>
-              </div>
-
               {isTimeTrial && (
                 <p className="engine-subheader">
                   All-out effort for {formatDuration(resolveNum(blocks[0]?.bp.workDuration, 600))}.

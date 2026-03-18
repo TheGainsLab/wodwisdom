@@ -189,7 +189,7 @@
 @media(max-width:640px){
 .engine-page{padding:16px 12px}
 .engine-card{padding:18px 16px}
-.engine-grid{grid-template-columns:1fr}
+.engine-grid{grid-template-columns:1fr 1fr}
 .engine-timer{font-size:36px}
 .engine-stat-value{font-size:24px}
 .engine-btn-primary{width:100%;padding:14px}

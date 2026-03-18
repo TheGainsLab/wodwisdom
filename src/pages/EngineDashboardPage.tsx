@@ -198,15 +198,11 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>Engine</h1>
-          {progress && (
-            <span className="usage-pill">Day {currentDay} of {totalDays}</span>
-          )}
+          <h1 style={{ flex: 1, textAlign: 'center' }}>Engine</h1>
           <button
             className="menu-btn"
             onClick={() => setShowSwitcher(true)}
             title="Program settings"
-            style={{ marginLeft: 'auto' }}
           >
             <Settings size={20} />
           </button>
