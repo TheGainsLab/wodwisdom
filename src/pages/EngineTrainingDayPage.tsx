@@ -475,9 +475,15 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   // ── Handlers ──
 
   const handleSelectCategory = (category: string) => {
-    if (expandedCategory === category) {
-      setExpandedCategory('');
+    const modsInCategory = MODALITIES.filter(m => m.category === category);
+    if (modsInCategory.length === 1) {
+      // Single-equipment category: auto-select immediately
+      handleSelectModality(modsInCategory[0].value);
     } else {
+      // Multi-equipment: expand to show options, clear previous modality so
+      // only the newly-tapped category appears active
+      setModality('');
+      setSelectedUnit('');
       setExpandedCategory(category);
     }
   };
@@ -725,16 +731,16 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 <div className="engine-category-row">
                   {CATEGORIES.map(cat => {
                     const isSelected = selectedMod?.category === cat;
-                    const isExpanded = expandedCategory === cat;
+                    const isExpanded = expandedCategory === cat && !isSelected;
                     return (
                       <button
                         key={cat}
-                        className={'engine-category-btn' + (isSelected || isExpanded ? ' active' : '')}
+                        className={'engine-category-btn' + (isSelected ? ' active' : '') + (isExpanded ? ' expanded' : '')}
                         onClick={() => handleSelectCategory(cat)}
                       >
                         {CATEGORY_LABELS[cat]}
                         {isSelected && <Check size={12} />}
-                        {!isSelected && isExpanded && <ChevronDown size={12} />}
+                        {isExpanded && <ChevronDown size={12} />}
                       </button>
                     );
                   })}
