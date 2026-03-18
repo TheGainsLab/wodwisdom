@@ -1089,14 +1089,16 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
         ) : (
           <div className="engine-page">
             <div className="engine-section">
-              {/* Back link to dashboard */}
-              <button
-                className="engine-btn engine-btn-secondary engine-btn-sm"
-                onClick={() => navigate('/engine')}
-                style={{ alignSelf: 'flex-start' }}
-              >
-                <ChevronLeft size={16} /> Dashboard
-              </button>
+              {/* Back link to dashboard – only shown on the analytics menu */}
+              {view === 'menu' && (
+                <button
+                  className="engine-btn engine-btn-secondary engine-btn-sm"
+                  onClick={() => navigate('/engine')}
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  <ChevronLeft size={16} /> Dashboard
+                </button>
+              )}
 
               {view === 'menu' && renderMenu()}
               {view === 'overview' && renderOverview()}
