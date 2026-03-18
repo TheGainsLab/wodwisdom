@@ -137,8 +137,8 @@ function formatDuration(seconds: number): string {
 
 function formatGoalWithPace(goal: number, durationSeconds: number, unit: string): string {
   const durationMinutes = durationSeconds / 60;
-  const perMin = durationMinutes > 0 ? (goal / durationMinutes).toFixed(1) : null;
-  const goalStr = goal % 1 === 0 ? String(goal) : goal.toFixed(1);
+  const perMin = durationMinutes > 0 ? Math.round(goal / durationMinutes) : null;
+  const goalStr = Math.round(goal);
   return perMin ? `~${goalStr} ${unit} (${perMin} ${unit}/min)` : `~${goalStr} ${unit}`;
 }
 
@@ -1115,10 +1115,6 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                           </div>
                         )}
 
-                        {/* Target pace line */}
-                        {targetRpm && (
-                          <div className="engine-breakdown-pace">Pace: {targetRpm}</div>
-                        )}
 
                         {/* Block rest between blocks */}
                         {workout?.set_rest_seconds && blockArrayIdx < blocks.length - 1 && (
