@@ -13,6 +13,35 @@ interface ProgramWorkout {
   sort_order: number;
 }
 
+const SUMMARY_LABELS = ['skills', 'strength', 'metcon', 'accessory'] as const;
+
+/** Extract a one-line summary like "Muscle-ups · Back Squat · 5 RFT" from workout text. */
+function workoutSummary(text: string): string {
+  if (!text?.trim()) return '';
+  const lower = text.toLowerCase();
+  const allLabels = ['warm-up', 'skills', 'strength', 'metcon', 'cool down', 'accessory', 'mobility'];
+  const parts: string[] = [];
+
+  for (const label of SUMMARY_LABELS) {
+    const needle = label + ':';
+    const start = lower.indexOf(needle);
+    if (start < 0) continue;
+    const contentStart = start + needle.length;
+    // Find the next block label to know where this block ends
+    let end = text.length;
+    for (const other of allLabels) {
+      const otherNeedle = other + ':';
+      const idx = lower.indexOf(otherNeedle, contentStart);
+      if (idx >= 0 && idx < end) end = idx;
+    }
+    const content = text.slice(contentStart, end).trim();
+    const firstLine = content.split('\n')[0].trim();
+    if (firstLine) parts.push(firstLine.length > 30 ? firstLine.slice(0, 28) + '…' : firstLine);
+  }
+
+  return parts.join(' · ');
+}
+
 export default function ProgramDetailPage({ session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -212,6 +241,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                   <span className="program-day-label">Day {dayNum}</span>
                                   {done && <span className="program-completed-badge">Done</span>}
                                   {ip && <span className="program-in-progress-badge">{ip.savedCount}/{ip.totalBlocks} blocks</span>}
+                                  {!isExpanded && <span className="program-day-summary">{workoutSummary(w.workout_text)}</span>}
                                 </div>
                                 <svg
                                   className={`program-day-chevron${isExpanded ? ' expanded' : ''}`}
