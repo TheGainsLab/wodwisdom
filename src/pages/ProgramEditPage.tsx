@@ -51,8 +51,15 @@ function blocksToText(blocks: WorkoutBlock[]): string {
 }
 
 function blockSummary(blocks: WorkoutBlock[]): string {
-  const present = blocks.filter(b => b.content.trim()).map(b => b.label);
-  return present.length > 0 ? present.join(' · ') : 'Empty workout';
+  const skip = new Set<BlockLabel>(['Warm-up', 'Cool down']);
+  const parts = blocks
+    .filter(b => b.content.trim() && !skip.has(b.label))
+    .map(b => {
+      const firstLine = b.content.trim().split('\n')[0].trim();
+      return firstLine.length > 30 ? firstLine.slice(0, 28) + '…' : firstLine;
+    })
+    .filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : 'Empty workout';
 }
 
 /* ── Auto-resize textarea hook ───────────────────────────────── */
