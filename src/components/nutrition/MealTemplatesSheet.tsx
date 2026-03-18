@@ -116,6 +116,7 @@ export default function MealTemplatesSheet({
           .from('meal_templates')
           .update({ log_count: (template.log_count || 0) + 1, last_logged_at: new Date().toISOString() })
           .eq('id', template.id);
+        setLoggingId(null);
         onLogged();
       }
     } catch (e: any) {
