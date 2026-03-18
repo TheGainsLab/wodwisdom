@@ -311,8 +311,8 @@ body.landing-body{overflow:auto;height:auto}
 .program-save-btn{background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;padding:4px 10px;border-radius:4px;font-weight:600}
 .program-save-btn:hover{opacity:.85}
 .program-save-btn:disabled{opacity:.5;cursor:not-allowed}
-.program-remove-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:4px}
-.program-remove-btn:hover{text-decoration:underline}
+.program-remove-btn{background:none;border:1px solid var(--border);color:var(--accent);font-size:12px;cursor:pointer;padding:6px 12px;border-radius:6px;margin-top:8px;width:100%}
+.program-remove-btn:hover{border-color:var(--accent);background:rgba(255,59,48,.08)}
 /* Block-level edit */
 .block-edit-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
 .block-edit-row{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}

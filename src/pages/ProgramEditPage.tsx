@@ -410,13 +410,6 @@ export default function ProgramEditPage({ session }: { session: Session }) {
                               {saving ? 'Saving...' : 'Save'}
                             </button>
                           )}
-                          <button
-                            type="button"
-                            className="program-remove-btn"
-                            onClick={e => { e.stopPropagation(); removeWorkout(i); }}
-                          >
-                            Remove
-                          </button>
                           <svg
                             className={`block-edit-chevron${w.expanded ? ' block-edit-chevron--open' : ''}`}
                             width="16" height="16" viewBox="0 0 24 24"
@@ -537,6 +530,13 @@ export default function ProgramEditPage({ session }: { session: Session }) {
                               )}
                             </>
                           )}
+                          <button
+                            type="button"
+                            className="program-remove-btn"
+                            onClick={() => removeWorkout(i)}
+                          >
+                            Remove Day
+                          </button>
                         </div>
                       )}
                     </div>
