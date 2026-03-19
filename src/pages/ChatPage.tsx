@@ -259,8 +259,7 @@ export default function ChatPage({ session }: { session: Session }) {
         {messages.length === 0 && !isLoading ? (
           <div className="welcome">
             <GainsLogo className="welcome-gains-logo" />
-            <h2>What do you want to know?</h2>
-            <h2 className="welcome-subtitle">Get answers from the AI that speaks your language.</h2>
+            <h2>Get answers from the AI that speaks your language.</h2>
             {!isPaywalled && (
               <div style={{ marginTop: 8 }} />
             )}
