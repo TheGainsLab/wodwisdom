@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { CHAT_ENDPOINT, getAuthHeaders, supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
+import GainsLogo from '../components/GainsLogo';
 import { formatMarkdown } from '../lib/formatMarkdown';
 
 interface Message {
@@ -257,13 +258,9 @@ export default function ChatPage({ session }: { session: Session }) {
 
         {messages.length === 0 && !isLoading ? (
           <div className="welcome">
-            <div className="welcome-logo">W</div>
+            <GainsLogo className="welcome-gains-logo" />
             <h2>What do you want to know?</h2>
-            <p>{sourceFilter === 'science'
-              ? 'Get more technical, in-depth answers from physiology and biochemistry texts.'
-              : sourceFilter === 'strength-science'
-              ? 'Search strength training science, biomechanics and programming from world-class coaches.'
-              : 'Get answers from study guides, seminar content and journal articles on the methodology.'}</p>
+            <h2 className="welcome-subtitle">Get answers from the AI that speaks your language.</h2>
             {!isPaywalled && (
               <div style={{ marginTop: 8 }} />
             )}
