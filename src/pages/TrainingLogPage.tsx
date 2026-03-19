@@ -620,9 +620,6 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                       const logBlocks = blockFilter === 'all'
                         ? allBlocks
                         : allBlocks.filter(b => b.block_type === blockFilter);
-                      const hasScores = logBlocks.some(b => b.score);
-                      const hasRx = logBlocks.some(b => b.rx);
-
                       return (
                         <div
                           key={log.id}
@@ -630,41 +627,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                           style={{ cursor: 'pointer' }}
                           onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
-                            <div>
-                              <span style={{ fontWeight: 700, fontSize: 15 }}>{formatDate(log.workout_date)}</span>
-                              <span style={{ marginLeft: 10, fontSize: 12, color: 'var(--accent)', textTransform: 'uppercase' }}>
-                                {TYPE_LABELS[log.workout_type] || log.workout_type}
-                              </span>
-                              {hasRx && <span style={{ marginLeft: 8, fontSize: 11, background: 'var(--accent-glow)', color: 'var(--accent)', padding: '2px 8px', borderRadius: 4 }}>Rx</span>}
-                            </div>
-                            {hasScores && (
-                              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 14, color: 'var(--text-dim)' }}>
-                                {logBlocks.find(b => b.score)!.score}
-                                {logBlocks.filter(b => b.score).length > 1 && ` +${logBlocks.filter(b => b.score).length - 1}`}
-                              </span>
-                            )}
+                          <div>
+                            <span style={{ fontWeight: 700, fontSize: 15 }}>{formatDate(log.workout_date)}</span>
                           </div>
-
-                          {logBlocks.filter(b => b.score).length > 1 && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                              {logBlocks.filter(b => b.score).map((block, i) => (
-                                <span
-                                  key={i}
-                                  style={{
-                                    fontSize: 12,
-                                    color: 'var(--text-dim)',
-                                    background: 'var(--surface2)',
-                                    padding: '2px 8px',
-                                    borderRadius: 4,
-                                    fontFamily: 'JetBrains Mono',
-                                  }}
-                                >
-                                  {getBlockLabel(block)}: {block.score}{block.rx ? ' Rx' : ''}
-                                </span>
-                              ))}
-                            </div>
-                          )}
 
                           {expandedId === log.id && (() => {
                             const logEntries = entriesByLog[log.id] || [];
