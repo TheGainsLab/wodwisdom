@@ -15,16 +15,19 @@ function buildAthleteContext(
   skills: Record<string, string> | null | undefined,
   conditioning: Record<string, string | number> | null | undefined,
   bodyweight: number | null | undefined,
-  units: string | null | undefined
+  units: string | null | undefined,
+  gender: string | null | undefined
 ): string {
   const hasLifts = lifts && Object.keys(lifts).length > 0;
   const hasSkills = skills && Object.keys(skills).length > 0;
   const hasConditioning = conditioning && Object.keys(conditioning).length > 0 && Object.values(conditioning).some((v) => v !== "" && v != null);
   const hasBodyweight = bodyweight != null && bodyweight > 0;
-  if (!hasLifts && !hasSkills && !hasConditioning && !hasBodyweight) return "";
+  if (!hasLifts && !hasSkills && !hasConditioning && !hasBodyweight && !gender) return "";
 
   const parts: string[] = ["\n\nATHLETE PROFILE:"];
   const u = units === "kg" ? "kg" : "lbs";
+
+  if (gender) parts.push(`Gender: ${gender}`);
 
   if (hasBodyweight) {
     parts.push(`Bodyweight: ${bodyweight} ${u}`);
@@ -114,7 +117,7 @@ Deno.serve(async (req) => {
     // Fetch athlete profile for prompt personalization
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
-      .select("lifts, skills, conditioning, bodyweight, units")
+      .select("lifts, skills, conditioning, bodyweight, units, gender")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -232,7 +235,7 @@ Deno.serve(async (req) => {
         system:
           (source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : source_filter === "strength-science" ? STRENGTH_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT) +
           (include_profile
-            ? buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units) +
+            ? buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units, athleteProfile?.gender) +
               (recentTraining ? "\n\n" + recentTraining : "") +
               (programContext ? "\n\n" + programContext : "")
             : "") +

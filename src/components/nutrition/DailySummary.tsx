@@ -47,7 +47,7 @@ export default function DailySummary({ daily }: { daily: DailyNutrition | null }
             />
           </div>
           <div className="nutrition-surplus-labels">
-            <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: '#ffffff' }}>
               {Math.round(cals).toLocaleString()} / {Math.round(tdee).toLocaleString()} cal
             </span>
             {surplus != null && (

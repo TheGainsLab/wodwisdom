@@ -356,15 +356,9 @@
 /* Compact meal type chip row */
 .nutrition-meal-chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
   padding-bottom: 2px;
-}
-
-.nutrition-meal-chips::-webkit-scrollbar {
-  display: none;
 }
 
 .nutrition-meal-chip {
@@ -406,18 +400,20 @@
   align-items: center;
   gap: 4px;
   background: none;
-  border: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
   color: var(--text-muted);
   font-family: 'Outfit', sans-serif;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  padding: 0;
-  transition: color 0.15s;
+  padding: 5px 12px;
+  transition: all 0.15s;
 }
 
 .nutrition-quick-link:hover {
-  color: var(--accent);
+  border-color: var(--accent);
+  color: var(--text);
 }
 
 /* Nutrition page body layout */

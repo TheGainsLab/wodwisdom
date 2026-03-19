@@ -16,33 +16,6 @@ interface Message {
   streaming?: boolean;
 }
 
-const SUGGESTIONS: Record<string, string[]> = {
-  journal: [
-    'Paste a workout and ask for scaling and cues',
-    'What are the points of performance for the air squat?',
-    'How should I scale workouts for beginners?',
-    'What is the nutritional prescription?',
-    'Explain the three metabolic pathways',
-    'What does virtuosity mean in coaching?',
-    'How do I improve member retention?',
-  ],
-  science: [
-    'Explain the sliding filament theory of muscle contraction',
-    'How does the body regulate blood pressure?',
-    'What role does the hypothalamus play in homeostasis?',
-    'Describe the physiology of oxygen transport in blood',
-    'How do the kidneys regulate fluid balance?',
-    'Explain the cardiac cycle and its phases',
-  ],
-  'strength-science': [
-    'How does periodization improve strength gains?',
-    'What are the biomechanics of the deadlift?',
-    'How does progressive overload work for hypertrophy?',
-    'What role does the nervous system play in strength?',
-    'How should I program squats for intermediates?',
-    'What does the research say about training frequency?',
-  ],
-};
 
 
 export default function ChatPage({ session }: { session: Session }) {
@@ -258,7 +231,7 @@ export default function ChatPage({ session }: { session: Session }) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
-  const activeSuggestions = SUGGESTIONS[sourceFilter];
+
 
   const sourceButtons = (['journal', 'science', 'strength-science'] as const).map(s => (
     <button key={s} className={"source-btn " + (sourceFilter === s ? "active" : "")} onClick={() => setSourceFilter(s)}>
@@ -292,9 +265,7 @@ export default function ChatPage({ session }: { session: Session }) {
               ? 'Search strength training science, biomechanics and programming from world-class coaches.'
               : 'Get answers from study guides, seminar content and journal articles on the methodology.'}</p>
             {!isPaywalled && (
-              <div className="suggestions">
-                {activeSuggestions.slice(0, 4).map((s, i) => <button key={i} className="suggestion" onClick={() => sendMessage(s)}>{s}</button>)}
-              </div>
+              <div style={{ marginTop: 8 }} />
             )}
             {isPaywalled && (
               <div className="paywall-card">
