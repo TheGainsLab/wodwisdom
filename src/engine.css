@@ -73,8 +73,8 @@
 /* Exercise row */
 .engine-exercise{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:10px;transition:background .15s;background:transparent;border:none;width:100%;text-align:left;font-family:inherit;color:inherit}
 .engine-exercise:hover{background:var(--surface2)}
-.engine-exercise-name{font-size:15px;font-weight:600;color:var(--text);flex:1;min-width:0}
-.engine-exercise-detail{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim);min-width:48px;text-align:right;flex-shrink:0}
+.engine-exercise-name{font-size:15px;font-weight:600;color:var(--text);min-width:60px;flex-shrink:0}
+.engine-exercise-detail{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim);min-width:48px;text-align:right;flex:1}
 
 /* Set row */
 .engine-set{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;font-size:14px}
