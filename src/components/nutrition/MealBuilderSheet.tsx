@@ -67,7 +67,7 @@ export default function MealBuilderSheet({
   const [searching, setSearching] = useState(false);
 
   // Food detail
-  const [foodDetailTarget, setFoodDetailTarget] = useState<{ foodId: string; foodName: string } | null>(null);
+  const [foodDetailTarget, setFoodDetailTarget] = useState<{ foodId: string; foodName: string; brandName?: string } | null>(null);
 
   // Save template
   const [showSaveForm, setShowSaveForm] = useState(false);
@@ -133,7 +133,7 @@ export default function MealBuilderSheet({
 
   // Search result → open food detail
   const handleSelectSearchResult = (food: any) => {
-    setFoodDetailTarget({ foodId: food.food_id, foodName: food.food_name });
+    setFoodDetailTarget({ foodId: food.food_id, foodName: food.food_name, brandName: food.brand_name });
   };
 
   // From food detail → add to meal items
@@ -232,6 +232,7 @@ export default function MealBuilderSheet({
       <FoodDetailSheet
         foodId={foodDetailTarget.foodId}
         foodName={foodDetailTarget.foodName}
+        brandName={foodDetailTarget.brandName}
         mealType={mealType}
         dateStr={dateStr}
         onClose={() => setFoodDetailTarget(null)}
