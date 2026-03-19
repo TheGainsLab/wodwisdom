@@ -292,9 +292,7 @@ export default function ChatPage({ session }: { session: Session }) {
               ? 'Search strength training science, biomechanics and programming from world-class coaches.'
               : 'Get answers from study guides, seminar content and journal articles on the methodology.'}</p>
             {!isPaywalled && (
-              <div className="suggestions">
-                {activeSuggestions.slice(0, 4).map((s, i) => <button key={i} className="suggestion" onClick={() => sendMessage(s)}>{s}</button>)}
-              </div>
+              <div style={{ marginTop: 8 }} />
             )}
             {isPaywalled && (
               <div className="paywall-card">
