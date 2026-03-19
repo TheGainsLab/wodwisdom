@@ -77,7 +77,9 @@ body.landing-body{overflow:auto;height:auto}
 .usage-pill{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);background:var(--surface2);border:1px solid var(--border);padding:5px 10px;border-radius:20px;flex-shrink:0}
 .welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;animation:fadeUp .5s ease}
 .welcome-logo{width:64px;height:64px;background:var(--accent);border-radius:16px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:32px;color:white;margin-bottom:24px;box-shadow:0 0 40px var(--accent-glow)}
+.welcome-gains-logo{font-size:36px;margin-bottom:24px;color:var(--text)}
 .welcome h2{font-size:28px;font-weight:700;letter-spacing:-.5px;margin-bottom:8px}
+.welcome .welcome-subtitle{color:var(--text);margin-bottom:36px}
 .welcome p{color:var(--text-dim);font-size:15px;max-width:460px;line-height:1.6;margin-bottom:36px}
 .suggestions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:620px}
 .suggestion{background:var(--surface);border:1px solid var(--border);padding:10px 16px;border-radius:10px;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text-dim);cursor:pointer;transition:all .2s}
