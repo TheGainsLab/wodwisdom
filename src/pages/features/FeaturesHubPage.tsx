@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
 
 const FEATURES = [
@@ -68,8 +69,7 @@ export default function FeaturesHubPage() {
       <header className="feature-header">
         <div className="feature-header-inner">
           <Link to="/" className="feature-brand">
-            <span className="feature-logo">W</span>
-            <span className="feature-brand-name">WodWisdom</span>
+            <GainsLogo className="feature-brand-name" />
           </Link>
           <nav className="feature-nav">
             <a href="/#how-it-works">How It Works</a>
@@ -116,7 +116,7 @@ export default function FeaturesHubPage() {
         <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Try it Free</button>
       </section>
 
-      <footer className="feature-footer">WodWisdom</footer>
+      <footer className="feature-footer"><GainsLogo /></footer>
     </div>
   );
 }

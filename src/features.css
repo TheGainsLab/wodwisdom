@@ -10,9 +10,8 @@ body.feature-body{overflow:auto;height:auto}
 /* ===== Header ===== */
 .feature-header{position:sticky;top:0;z-index:100;background:rgba(9,9,11,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
 .feature-header-inner{max-width:1080px;margin:0 auto;padding:0 24px;height:64px;display:flex;align-items:center;gap:24px}
-.feature-brand{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none;color:var(--text)}
-.feature-logo{width:36px;height:36px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:white}
-.feature-brand-name{font-weight:700;font-size:17px;letter-spacing:-.3px}
+.feature-brand{display:flex;align-items:center;flex-shrink:0;text-decoration:none;color:var(--text)}
+.feature-brand-name{font-size:20px}
 .feature-nav{display:flex;gap:8px;margin-left:auto}
 .feature-nav a{color:var(--text-dim);text-decoration:none;font-size:14px;font-weight:500;padding:8px 14px;border-radius:8px;transition:color .15s,background .15s}
 .feature-nav a:hover{color:var(--text);background:var(--surface2)}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import GainsLogo from '../components/GainsLogo';
 import '../landing.css';
 
 const DEMO_EXAMPLES = [
@@ -99,8 +100,7 @@ export default function LandingPage() {
       <header className="landing-header">
         <div className="landing-header-inner">
           <div className="landing-brand">
-            <span className="landing-logo">W</span>
-            <span className="landing-brand-name">WodWisdom</span>
+            <GainsLogo className="landing-brand-name" />
           </div>
           <nav className="landing-nav">
             <a href="#how-it-works">How It Works</a>
@@ -295,7 +295,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="landing-footer">
-        WodWisdom
+        <GainsLogo />
       </footer>
     </div>
   );

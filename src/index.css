@@ -44,9 +44,8 @@ body.landing-body{overflow:auto;height:auto}
 .nav-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:90;animation:fadeIn .2s ease}
 .nav-sidebar{position:fixed;left:0;top:0;bottom:0;width:260px;background:var(--surface);border-right:1px solid var(--border);z-index:100;display:flex;flex-direction:column;transform:translateX(-100%);transition:transform .25s cubic-bezier(.4,0,.2,1)}
 .nav-sidebar.open{transform:translateX(0)}
-.nav-brand{padding:20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border)}
-.nav-logo{width:36px;height:36px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:white;flex-shrink:0}
-.nav-title{font-weight:700;font-size:17px;letter-spacing:-.3px}
+.nav-brand{padding:20px;display:flex;align-items:center;border-bottom:1px solid var(--border)}
+.nav-title{font-size:20px}
 .nav-links{flex:1;padding:12px 10px;display:flex;flex-direction:column;gap:2px}
 .nav-link{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:8px;border:none;background:none;color:var(--text-dim);font-family:'Outfit',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;width:100%;text-align:left}
 .nav-link:hover{background:var(--surface2);color:var(--text)}
