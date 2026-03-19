@@ -719,7 +719,7 @@ export default function AthletePage({ session }: { session: Session }) {
                     const isOverridden = tdeeOverride !== '';
 
                     return (
-                      <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                      <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border-light)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: editingTdee ? 10 : 0 }}>
                           <div>
                             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 2 }}>
