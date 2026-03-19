@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import GainsLogo from './GainsLogo';
 
 interface NavProps { isOpen: boolean; onClose: () => void; }
 
@@ -71,8 +72,7 @@ export default function Nav({ isOpen, onClose }: NavProps) {
       {isOpen && <div className="nav-overlay" onClick={onClose} />}
       <nav className={"nav-sidebar " + (isOpen ? "open" : "")}>
         <div className="nav-brand">
-          <span className="nav-logo">W</span>
-          <span className="nav-title">WodWisdom</span>
+          <GainsLogo className="nav-title" />
         </div>
         <div className="nav-links">
           <button className={"nav-link " + (location.pathname === "/profile" ? "active" : "")} onClick={() => goTo("/profile")}>

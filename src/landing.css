@@ -5,9 +5,8 @@
 /* ===== Header ===== */
 .landing-header{position:sticky;top:0;z-index:100;background:rgba(9,9,11,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
 .landing-header-inner{max-width:1080px;margin:0 auto;padding:0 24px;height:64px;display:flex;align-items:center;gap:24px}
-.landing-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.landing-logo{width:36px;height:36px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:white}
-.landing-brand-name{font-weight:700;font-size:17px;letter-spacing:-.3px}
+.landing-brand{display:flex;align-items:center;flex-shrink:0}
+.landing-brand-name{font-size:20px}
 .landing-nav{display:flex;gap:8px;margin-left:auto}
 .landing-nav a{color:var(--text-dim);text-decoration:none;font-size:14px;font-weight:500;padding:8px 14px;border-radius:8px;transition:color .15s,background .15s}
 .landing-nav a:hover{color:var(--text);background:var(--surface2)}
