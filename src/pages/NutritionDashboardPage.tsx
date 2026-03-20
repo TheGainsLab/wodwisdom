@@ -66,7 +66,7 @@ export default function NutritionDashboardPage({ session }: { session: Session }
   const [mealTemplates, setMealTemplates] = useState<any[]>([]);
 
   // Overlay sheets
-  const [foodDetailTarget, setFoodDetailTarget] = useState<{ foodId: string; foodName: string; prefill?: { servingId?: string; amount?: number } } | null>(null);
+  const [foodDetailTarget, setFoodDetailTarget] = useState<{ foodId: string; foodName: string; brandName?: string; prefill?: { servingId?: string; amount?: number } } | null>(null);
   const [showFavoritesSheet, setShowFavoritesSheet] = useState(false);
   const [showTemplatesSheet, setShowTemplatesSheet] = useState(false);
   const [showMealBuilder, setShowMealBuilder] = useState(false);
@@ -152,7 +152,7 @@ export default function NutritionDashboardPage({ session }: { session: Session }
 
   // Open food detail sheet for a search result
   const handleSelectFood = (food: SearchResult) => {
-    setFoodDetailTarget({ foodId: food.food_id, foodName: food.food_name });
+    setFoodDetailTarget({ foodId: food.food_id, foodName: food.food_name, brandName: food.brand_name });
   };
 
   // Open food detail sheet for a favorite (pre-filled)
@@ -316,6 +316,7 @@ export default function NutritionDashboardPage({ session }: { session: Session }
         <FoodDetailSheet
           foodId={foodDetailTarget.foodId}
           foodName={foodDetailTarget.foodName}
+          brandName={foodDetailTarget.brandName}
           prefillServingId={foodDetailTarget.prefill?.servingId}
           prefillAmount={foodDetailTarget.prefill?.amount}
           mealType={selectedMealType}

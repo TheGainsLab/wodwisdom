@@ -141,7 +141,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       if (data?.error) throw new Error(data.error);
 
       const updated = data.entry;
-      // Update local state so PR badges recalculate
+      // Update local state so top set badges recalculate
       setAllEntries(prev => prev.map(e => e.id === entryId ? { ...e, ...updated } : e));
       setEntriesByLog(prev => {
         const next = { ...prev };
@@ -440,7 +440,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                       <div key={movement} className="tl-movement-card">
                         <div className="tl-movement-header">
                           <span className="tl-movement-name">{formatMovementName(movement)}</span>
-                          <span className="tl-pr-badge">PR: {data.best}{data.bestUnit}</span>
+                          <span className="tl-pr-badge">TOP SET: {data.best}{data.bestUnit}</span>
                         </div>
                         <div className="tl-session-count">{data.entries.length} set{data.entries.length !== 1 ? 's' : ''} logged</div>
                         <div style={{ marginTop: 8 }}>

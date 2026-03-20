@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Loader2, Minus, Plus, Star } from 'lucide-react';
+import { X, Loader2, Minus, Plus, Star, Store, ShoppingBag, Check } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface Serving {
@@ -19,6 +19,7 @@ interface Serving {
 export default function FoodDetailSheet({
   foodId,
   foodName,
+  brandName,
   prefillServingId,
   prefillAmount,
   mealType,
@@ -29,6 +30,7 @@ export default function FoodDetailSheet({
 }: {
   foodId: string;
   foodName: string;
+  brandName?: string;
   prefillServingId?: string;
   prefillAmount?: number;
   mealType: string;
@@ -45,6 +47,101 @@ export default function FoodDetailSheet({
   const [error, setError] = useState('');
   const [savingFavorite, setSavingFavorite] = useState(false);
   const [savedFavorite, setSavedFavorite] = useState(false);
+
+  // Brand/source save prompt state
+  const [sourceStatus, setSourceStatus] = useState<'loading' | 'unknown' | 'known' | 'saved' | 'dismissed'>('loading');
+  const [sourceType, setSourceType] = useState<'restaurant' | 'brand' | null>(null);
+  const [savingSource, setSavingSource] = useState(false);
+
+  // Check if brand is already known
+  useEffect(() => {
+    if (!brandName || !brandName.trim()) {
+      setSourceStatus('dismissed');
+      return;
+    }
+    (async () => {
+      try {
+        const nameLower = brandName.toLowerCase();
+
+        // Check default lists
+        const [defRestaurants, defBrands] = await Promise.all([
+          supabase.from('default_restaurants').select('name, fatsecret_name').eq('is_active', true),
+          supabase.from('default_brands').select('name, fatsecret_name').eq('is_active', true),
+        ]);
+
+        const isDefaultRestaurant = (defRestaurants.data || []).some(
+          r => r.name.toLowerCase() === nameLower || r.fatsecret_name.toLowerCase() === nameLower
+        );
+        if (isDefaultRestaurant) {
+          setSourceType('restaurant');
+          setSourceStatus('known');
+          return;
+        }
+
+        const isDefaultBrand = (defBrands.data || []).some(
+          b => b.name.toLowerCase() === nameLower || b.fatsecret_name.toLowerCase() === nameLower
+        );
+        if (isDefaultBrand) {
+          setSourceType('brand');
+          setSourceStatus('known');
+          return;
+        }
+
+        // Check user favorites
+        const { data: favData } = await supabase.functions.invoke('favorites-manage', {
+          body: { action: 'get_all' },
+        });
+        if (favData?.success) {
+          const userRestaurants: any[] = favData.data.restaurants || [];
+          const userBrands: any[] = favData.data.brands || [];
+
+          const isUserRestaurant = userRestaurants.some(
+            r => r.restaurant_name?.toLowerCase() === nameLower
+          );
+          if (isUserRestaurant) {
+            setSourceType('restaurant');
+            setSourceStatus('known');
+            return;
+          }
+
+          const isUserBrand = userBrands.some(
+            b => b.brand_name?.toLowerCase() === nameLower
+          );
+          if (isUserBrand) {
+            setSourceType('brand');
+            setSourceStatus('known');
+            return;
+          }
+        }
+
+        setSourceStatus('unknown');
+      } catch {
+        setSourceStatus('dismissed');
+      }
+    })();
+  }, [brandName]);
+
+  const handleSaveSource = async (type: 'restaurant' | 'brand') => {
+    if (!brandName || savingSource) return;
+    setSavingSource(true);
+    try {
+      const action = type === 'restaurant' ? 'add_restaurant' : 'add_brand';
+      const nameKey = type === 'restaurant' ? 'restaurant_name' : 'brand_name';
+      await supabase.functions.invoke('favorites-manage', {
+        body: {
+          action,
+          [nameKey]: brandName,
+          fatsecret_brand_filter: brandName,
+        },
+      });
+      setSourceType(type);
+      setSourceStatus('saved');
+    } catch {
+      // Ignore — may already exist
+      setSourceStatus('saved');
+    }
+    setSavingSource(false);
+  };
 
   useEffect(() => {
     (async () => {
@@ -178,6 +275,117 @@ export default function FoodDetailSheet({
           </div>
         ) : (
           <>
+            {/* Brand/source save prompt */}
+            {brandName && sourceStatus === 'unknown' && (
+              <div style={{
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                padding: '12px 14px',
+                marginBottom: 20,
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>
+                  <span style={{ color: 'var(--text-dim)' }}>Save </span>
+                  <span style={{ fontWeight: 600 }}>{brandName}</span>
+                  <span style={{ color: 'var(--text-dim)' }}> to your favorites?</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => handleSaveSource('restaurant')}
+                    disabled={savingSource}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      padding: '8px 12px',
+                      background: 'var(--surface2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      color: 'var(--text)',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Store size={14} /> Restaurant
+                  </button>
+                  <button
+                    onClick={() => handleSaveSource('brand')}
+                    disabled={savingSource}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      padding: '8px 12px',
+                      background: 'var(--surface2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      color: 'var(--text)',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <ShoppingBag size={14} /> Brand
+                  </button>
+                  <button
+                    onClick={() => setSourceStatus('dismissed')}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'none',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      color: 'var(--text-dim)',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Brand saved confirmation */}
+            {brandName && sourceStatus === 'saved' && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 14px',
+                background: 'rgba(34, 197, 94, 0.08)',
+                border: '1px solid rgba(34, 197, 94, 0.3)',
+                borderRadius: 'var(--radius)',
+                marginBottom: 20,
+                fontSize: 13,
+                color: 'rgb(34, 197, 94)',
+                fontWeight: 500,
+              }}>
+                <Check size={14} />
+                {brandName} saved as {sourceType}
+              </div>
+            )}
+
+            {/* Known brand tag */}
+            {brandName && sourceStatus === 'known' && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 14px',
+                marginBottom: 20,
+                fontSize: 12,
+                color: 'var(--text-dim)',
+              }}>
+                {sourceType === 'restaurant' ? <Store size={12} /> : <ShoppingBag size={12} />}
+                {brandName} — {sourceType === 'restaurant' ? 'Restaurant' : 'Brand'}
+              </div>
+            )}
+
             {/* Serving size selector */}
             {servings.length > 0 && (
               <div style={{ marginBottom: 20 }}>
