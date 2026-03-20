@@ -102,7 +102,8 @@ OUTPUT RULES:
 - Each block header (Warm-up:, Mobility:, Skills:, Strength:, Metcon:, Cool down:) MUST appear on its own line starting at position 0. Never nest one block inside another.
 - Warm-up: and Mobility: are SEPARATE blocks. Do NOT put mobility content inside the Warm-up block. Warm-up is general preparation; Mobility is targeted drills on a separate line.
 - Do not add, remove, or reorder any headers.
-- Prescribe weights using the athlete's 1RMs where applicable. Use / for M/F Rx (e.g. 95/65).`;
+- Prescribe weights using the athlete's 1RMs where applicable. Use / for M/F Rx (e.g. 95/65).
+- Metcon examples in the REFERENCE section are real CrossFit workouts. Use them for structural inspiration only — adapt to the athlete's profile and eligibility rules, never copy verbatim.`;
 
 const METCON_GUIDANCE = `
 
@@ -188,6 +189,18 @@ async function retrieveRAGContext(
         0.25
       )
     );
+    // Real-world mainsite metcon examples for structural inspiration
+    const profSkills = profileData.skills
+      ? Object.entries(profileData.skills)
+          .filter(([, v]) => v === "advanced" || v === "intermediate")
+          .map(([k]) => k.replace(/_/g, " "))
+          .join(", ")
+      : "";
+    if (profSkills) {
+      queries.push(
+        searchChunks(supa, `CrossFit metcon workout ${profSkills}`, "mainsite", OPENAI_API_KEY, 5, 0.3)
+      );
+    }
     const results = await Promise.all(queries);
     const allChunks = results.flat();
     // Log individual counts in the same order as queries were pushed
@@ -196,6 +209,7 @@ async function retrieveRAGContext(
     if (skillNames) console.log(`[RAG] journal/skills: ${results[i++].length} chunks`);
     console.log(`[RAG] journal/conditioning: ${results[i++].length} chunks`);
     console.log(`[RAG] strength-science: ${results[i++].length} chunks`);
+    if (profSkills) console.log(`[RAG] mainsite/metcon: ${results[i++].length} chunks`);
     const unique = deduplicateChunks(allChunks);
     console.log(`[RAG] Total: ${allChunks.length} raw → ${unique.length} deduplicated`);
     if (unique.length === 0) return "";
