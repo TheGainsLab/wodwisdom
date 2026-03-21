@@ -88,6 +88,17 @@ body.feature-body{overflow:auto;height:auto}
 .feature-eval-sources-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted)}
 .feature-eval-chip{font-size:11px;color:var(--text-dim);background:var(--surface2);border:1px solid var(--border);padding:3px 9px;border-radius:4px}
 
+/* ===== Demo ===== */
+.feature-demo{padding:100px 0;border-top:1px solid var(--border)}
+.feature-demo-tabs{display:flex;justify-content:center;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:40px auto 24px;width:fit-content}
+.feature-demo-tab{padding:10px 20px;border:none;background:none;color:var(--text-muted);font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:color .15s,background .15s}
+.feature-demo-tab:not(:last-child){border-right:1px solid var(--border)}
+.feature-demo-tab.active{background:var(--accent);color:white}
+.feature-demo-tab:hover:not(.active){color:var(--text-dim)}
+.feature-demo-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:16px;max-width:680px;margin:0 auto}
+.feature-demo-q{align-self:flex-end;max-width:85%}
+.feature-demo-a{display:flex;flex-direction:column;gap:8px}
+
 /* ===== Footer CTA ===== */
 .feature-footer-cta{padding:100px 24px;text-align:center;background-image:radial-gradient(ellipse at 50% 50%,rgba(255,58,58,.06) 0%,transparent 60%)}
 .feature-footer-cta h2{font-size:clamp(24px,4vw,36px);font-weight:700;letter-spacing:-.5px;margin-bottom:24px}
@@ -104,6 +115,7 @@ body.feature-body{overflow:auto;height:auto}
 .feature-row.reverse{direction:ltr}
 .feature-hub-card{flex-direction:column;gap:16px}
 .feature-section{padding:60px 0}
+.feature-demo{padding:72px 0}
 .feature-app-frame-body{padding:16px}
 }
 
@@ -114,4 +126,5 @@ body.feature-body{overflow:auto;height:auto}
 .feature-section-title{font-size:26px}
 .feature-text h3{font-size:20px}
 .feature-hub-content h3{font-size:18px}
+.feature-demo-tab{padding:8px 14px;font-size:11px}
 }
