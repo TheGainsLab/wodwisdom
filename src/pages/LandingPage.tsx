@@ -56,11 +56,20 @@ export default function LandingPage() {
 
       {/* ===== Hero ===== */}
       <section className="landing-hero">
-        <h1 className="landing-hero-title">Fitness intelligence.</h1>
+        <GainsLogo className="landing-hero-logo" />
+        <h1 className="landing-hero-title">The program that follows you.</h1>
         <p className="landing-hero-sub">
-          Every journal article, seminar, and study guide — trained into one AI, available 24/7.
+          We trained an AI on the CrossFit methodology — every study guide, journal article, and seminar.
+          It knows your lifts, your skills, your engine, and your nutrition. It builds your program,
+          coaches every session, and gets smarter every time you train.
         </p>
-        <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
+        <p className="landing-hero-tagline">
+          This isn't a program you follow. It's a program that follows you.
+        </p>
+        <div className="landing-hero-ctas">
+          <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
+          <Link to="/features" className="landing-cta landing-cta-outline">See How It Works</Link>
+        </div>
       </section>
 
       {/* ===== Explainer ===== */}
