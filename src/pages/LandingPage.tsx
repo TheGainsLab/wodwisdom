@@ -72,20 +72,23 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== Explainer ===== */}
+      {/* ===== How to Work With Us ===== */}
       <section className="landing-explainer">
         <div className="landing-container">
-          <h2 className="landing-section-title">Bigger brains, bigger gains</h2>
-          <div className="landing-explainer-grid">
-            <p>
-              Every CrossFit journal article, seminar, and study guide, trained into one AI.{' '}
-              A coach who has learned everything and never forgets a word — and never sleeps.{' '}
-              The information you need all in one place. No need to dig around online or flip through social media reels for a cue or a hint. It's all here.
-            </p>
-            <p>
-              Flip on Science Mode and go deeper. We trained WodWisdom on graduate-level physiology
-              texts — so when you want to geek out and get technical, it's there.
-            </p>
+          <h2 className="landing-section-title">How to Work With Us</h2>
+          <div className="landing-offerings-grid">
+            <div className="landing-offering-card">
+              <h3>AI Coach</h3>
+              <p>Every journal article, seminar, and study guide — trained into one AI that never forgets and never sleeps. Ask anything about training, nutrition, movement, or programming and get a sourced, detailed answer instantly.</p>
+            </div>
+            <div className="landing-offering-card">
+              <h3>AI Programming</h3>
+              <p>Personalized programming that adapts to your athletes. Our AI builds sessions based on your goals, your capacity, and your progress — so every training day moves you forward.</p>
+            </div>
+            <div className="landing-offering-card">
+              <h3>Year of the Engine</h3>
+              <p>The gold standard in conditioning. A complete year-long engine-building program designed to systematically develop your aerobic capacity, stamina, and work capacity.</p>
+            </div>
           </div>
         </div>
       </section>
