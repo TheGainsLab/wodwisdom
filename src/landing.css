@@ -38,7 +38,9 @@
 .landing-offering-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px 28px;transition:border-color .2s}
 .landing-offering-card:hover{border-color:var(--accent)}
 .landing-offering-card h3{font-size:22px;font-weight:700;margin-bottom:12px;letter-spacing:-.3px}
-.landing-offering-card p{font-size:15px;line-height:1.7;color:var(--text-dim)}
+.landing-offering-card p{font-size:15px;line-height:1.7;color:var(--text-dim);margin-bottom:12px}
+.landing-offering-card p:last-child{margin-bottom:0}
+.landing-offering-tagline{font-size:17px;font-weight:600;color:var(--text);margin-bottom:16px}
 
 /* ===== Teaser ===== */
 .landing-teaser{padding:100px 0;border-top:1px solid var(--border)}
