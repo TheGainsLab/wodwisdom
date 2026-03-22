@@ -79,7 +79,10 @@ export default function LandingPage() {
           <div className="landing-offerings-grid">
             <div className="landing-offering-card">
               <h3>AI Coach</h3>
-              <p>Every journal article, seminar, and study guide — trained into one AI that never forgets and never sleeps. Ask anything about training, nutrition, movement, or programming and get a sourced, detailed answer instantly.</p>
+              <p className="landing-offering-tagline">The brain of a Level 4 coach, available any time</p>
+              <p>Ask anything about training, nutrition, movement, or recovery. Get answers from an AI that speaks your language — not generic fitness advice. Pacing strategy, movement cues, scaling options, competition prep, skills practice. Whatever you need, just ask.</p>
+              <p>Share your current training and get it optimized. Build a nutrition plan using your own data. The AI understands context — it doesn't just answer questions, it coaches.</p>
+              <p><strong>Science mode</strong> — Want a comprehensive overview of carbohydrate metabolism? How calcium ion concentration affects muscle contractions? Switch to science mode — a separate AI trained on biochemistry and physiology — and go as deep as you want.</p>
             </div>
             <div className="landing-offering-card">
               <h3>AI Programming</h3>
