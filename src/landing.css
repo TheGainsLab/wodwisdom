@@ -32,10 +32,13 @@
 .landing-cta-outline{background:transparent;border:2px solid var(--accent);color:var(--accent);text-decoration:none}
 .landing-cta-outline:hover{background:var(--accent);color:white}
 
-/* ===== Explainer ===== */
+/* ===== Offerings / How to Work With Us ===== */
 .landing-explainer{padding:100px 0;border-top:1px solid var(--border)}
-.landing-explainer-grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px}
-.landing-explainer-grid p{font-size:16px;line-height:1.75;color:var(--text-dim)}
+.landing-offerings-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:40px}
+.landing-offering-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px 28px;transition:border-color .2s}
+.landing-offering-card:hover{border-color:var(--accent)}
+.landing-offering-card h3{font-size:22px;font-weight:700;margin-bottom:12px;letter-spacing:-.3px}
+.landing-offering-card p{font-size:15px;line-height:1.7;color:var(--text-dim)}
 
 /* ===== Teaser ===== */
 .landing-teaser{padding:100px 0;border-top:1px solid var(--border)}
@@ -91,7 +94,7 @@
 @media(max-width:768px){
 .landing-nav{display:none}
 .landing-hero{min-height:auto;padding:60px 24px 80px}
-.landing-explainer-grid{grid-template-columns:1fr;gap:24px}
+.landing-offerings-grid{grid-template-columns:1fr;gap:16px}
 .landing-audience-grid{grid-template-columns:1fr;gap:16px}
 .landing-steps-grid{grid-template-columns:1fr;gap:40px}
 .landing-pricing-grid{grid-template-columns:1fr;max-width:400px}
