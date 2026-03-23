@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
+import ProfileMockup from '../../components/ProfileMockup';
 import '../../features.css';
 
 const Placeholder = ({ label }: { label: string }) => (
@@ -49,16 +50,15 @@ export default function ProgramsFeaturePage() {
         </p>
       </section>
 
-      {/* Step 1 — Evaluation */}
+      {/* Step 1 — Profile */}
       <section className="feature-section">
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Step 1 — Your evaluation</h3>
+              <h3>Step 1 — Your profile</h3>
               <p>
                 Tell The Gains Lab about your lifts, gymnastics skills, conditioning benchmarks, and goals.
-                The AI uses your complete profile to generate a detailed evaluation — not generic advice,
-                but analysis specific to your numbers and your movement capabilities.
+                Five minutes is all it takes to build the profile that powers everything.
               </p>
               <ul>
                 <li>Strength numbers and lift ratios</li>
@@ -66,6 +66,23 @@ export default function ProgramsFeaturePage() {
                 <li>Conditioning benchmarks across modalities</li>
                 <li>Training history and goals</li>
               </ul>
+              <ProfileMockup />
+            </div>
+            <Placeholder label="Screenshot: Athlete Profile" />
+          </div>
+        </div>
+      </section>
+
+      {/* Step 2 — Evaluation */}
+      <section className="feature-section">
+        <div className="feature-container">
+          <div className="feature-row reverse">
+            <div className="feature-text">
+              <h3>Step 2 — Your evaluation</h3>
+              <p>
+                The AI uses your complete profile to generate a detailed evaluation — not generic advice,
+                but analysis specific to your numbers and your movement capabilities.
+              </p>
               <div className="workout-review-section" style={{ maxWidth: 720, margin: '24px 0 16px' }}>
                 <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
                   Profile Evaluation
@@ -110,17 +127,17 @@ export default function ProgramsFeaturePage() {
                 and exercise physiology. You can trace any recommendation back to its source.
               </p>
             </div>
-            <Placeholder label="Screenshot: Athlete Profile" />
+            <Placeholder label="Screenshot: Profile Evaluation" />
           </div>
         </div>
       </section>
 
-      {/* Weekly View */}
+      {/* Step 3 — Program */}
       <section className="feature-section">
         <div className="feature-container">
-          <div className="feature-row reverse">
+          <div className="feature-row">
             <div className="feature-text">
-              <h3>Step 2 — Your program</h3>
+              <h3>Step 3 — Your program</h3>
               <p>
                 The evaluation doesn't sit in a folder. It becomes your program.
               </p>
@@ -146,12 +163,12 @@ export default function ProgramsFeaturePage() {
         </div>
       </section>
 
-      {/* Analysis */}
+      {/* Step 4 — Ongoing */}
       <section className="feature-section">
         <div className="feature-container">
-          <div className="feature-row">
+          <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>Step 3 — Ongoing</h3>
+              <h3>Step 4 — Ongoing</h3>
               <p>
                 The AI doesn't send you a program and wish you the best.
               </p>
