@@ -99,8 +99,14 @@ export default function LandingPage() {
               </ul>
             </div>
             <div className="landing-offering-card">
-              <h3>Year of the Engine</h3>
-              <p>The gold standard in conditioning. A complete year-long engine-building program designed to systematically develop your aerobic capacity, stamina, and work capacity.</p>
+              <h3>The Year of the Engine</h3>
+              <p>Engine isn't one parameter — it's many. Aerobic capacity. Anaerobic power. Threshold. Efficiency. Repeatability. These don't increase in lockstep, and your training history determines where each one starts. Treating them as a single system means dragging weak links along and holding strong ones back.</p>
+              <p>Forcing everyone into the same program doesn't make sense. So we don't.</p>
+              <p><strong>Year of the Engine AI</strong></p>
+              <p>The Year of the Engine is built on 20 distinct training frameworks, each independently targeting a specific adaptation. Machine learning calibrates every session precisely to you — not just the program, but every individual interval and every personal target within it.</p>
+              <p>High aerobic capacity? You'll get aggressive goals. Building anaerobic power? Each session ramps as you progress. You always know what you're trying to hit and why — before the clock starts.</p>
+              <p>Once it does, the app becomes your pacing coach. Goals, countdowns, and round context stay front and center through fatigue so you execute the plan and get exactly the stimulus you need.</p>
+              <p>No one-size-fits-all program can deliver this. Year of the Engine does.</p>
             </div>
           </div>
         </div>
