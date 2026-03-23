@@ -189,7 +189,7 @@ export default function FeaturesHubPage() {
             </div>
             <div className="feature-demo-a">
               <div className="msg-header">
-                <span className="msg-avatar">W</span>
+                <span className="msg-avatar">G</span>
               </div>
               <div className="msg-body assistant">
                 {DEMO_EXAMPLES[activeDemo].answer.map((p, i) => (

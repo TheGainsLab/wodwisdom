@@ -280,7 +280,7 @@ export default function ChatPage({ session }: { session: Session }) {
               <div key={i} className={"msg " + m.role}>
                 {m.role === 'assistant' && (
                   <div className="msg-header">
-                    <span className="msg-avatar">W</span>
+                    <span className="msg-avatar">G</span>
                     {m.message_id && <button className={"bookmark-btn " + (m.bookmarked ? "active" : "")} onClick={() => toggleBookmark(m.message_id!, i)}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill={m.bookmarked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
                     </button>}
@@ -317,7 +317,7 @@ export default function ChatPage({ session }: { session: Session }) {
                 )}
               </div>
             ))}
-            {isLoading && messages[messages.length - 1]?.role !== 'assistant' && <div className="msg assistant"><div className="msg-header"><span className="msg-avatar">W</span></div><div className="typing"><span /><span /><span /></div></div>}
+            {isLoading && messages[messages.length - 1]?.role !== 'assistant' && <div className="msg assistant"><div className="msg-header"><span className="msg-avatar">G</span></div><div className="typing"><span /><span /><span /></div></div>}
           </div>
         )}
 
