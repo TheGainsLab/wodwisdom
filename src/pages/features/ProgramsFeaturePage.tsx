@@ -43,29 +43,35 @@ export default function ProgramsFeaturePage() {
       {/* Hero */}
       <section className="feature-hero">
         <span className="feature-hero-badge">Programs</span>
-        <h1 className="feature-hero-title">Your program, analyzed</h1>
+        <h1 className="feature-hero-title">AI Programming</h1>
         <p className="feature-hero-sub">
-          Upload any training program. Get instant AI analysis of volume, movement patterns, energy systems, and smart suggestions for your athletes.
+          From evaluation to program to progress — AI handles all of it.
         </p>
       </section>
 
-      {/* Upload */}
+      {/* Step 1 — Evaluation */}
       <section className="feature-section">
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Upload and parse instantly</h3>
+              <h3>Step 1 — Your evaluation</h3>
               <p>
-                Drop in a program from any source — a Word doc, a copy-paste from your programming tool, or type it in directly.
-                WodWisdom parses the structure automatically: days, blocks, movements, loads, and time domains.
+                Tell The Gains Lab about your lifts, gymnastics skills, conditioning benchmarks, and goals.
+                The AI uses your complete profile to generate a detailed evaluation — not generic advice,
+                but analysis specific to your numbers and your movement capabilities.
               </p>
               <ul>
-                <li>Supports Word docs and direct text entry</li>
-                <li>Automatic structure detection</li>
-                <li>Parses movements, loads, and time domains</li>
+                <li>Strength numbers and lift ratios</li>
+                <li>Gymnastics skill levels</li>
+                <li>Conditioning benchmarks across modalities</li>
+                <li>Training history and goals</li>
               </ul>
+              <p>
+                Every insight is sourced from real methodology — CrossFit Journal articles, seminar content,
+                and exercise physiology. You can trace any recommendation back to its source.
+              </p>
             </div>
-            <Placeholder label="Screenshot: Program Upload" />
+            <Placeholder label="Screenshot: Athlete Profile" />
           </div>
         </div>
       </section>
@@ -94,7 +100,7 @@ export default function ProgramsFeaturePage() {
             <div className="feature-text">
               <h3>AI-powered program analysis</h3>
               <p>
-                Ask WodWisdom to analyze any program and get a detailed breakdown: volume distribution
+                Ask The Gains Lab to analyze any program and get a detailed breakdown: volume distribution
                 across movement categories, energy system balance, potential gaps, and suggestions for
                 complementary work. Understand your programming at a deeper level.
               </p>
