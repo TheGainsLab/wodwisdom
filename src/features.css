@@ -32,6 +32,7 @@ body.feature-body{overflow:auto;height:auto}
 .feature-hero-title{font-size:clamp(36px,6vw,56px);font-weight:800;letter-spacing:-1.5px;line-height:1.1;margin-bottom:16px;animation:featureFadeUp .6s ease}
 .feature-hero-sub{font-size:clamp(15px,2vw,18px);color:var(--text-dim);max-width:560px;line-height:1.6;margin-bottom:0;animation:featureFadeUp .6s ease .1s both}
 .feature-hero-badge{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);background:var(--accent-glow);padding:6px 14px;border-radius:20px;margin-bottom:20px;animation:featureFadeUp .6s ease}
+.feature-hero-body{font-size:clamp(15px,2vw,17px);color:var(--text-dim);max-width:600px;line-height:1.7;margin-top:16px;text-align:center;animation:featureFadeUp .6s ease .15s both}
 
 /* ===== Back Link ===== */
 .feature-back{display:inline-flex;align-items:center;gap:6px;color:var(--text-dim);text-decoration:none;font-size:14px;font-weight:500;padding:8px 0;transition:color .15s;margin-bottom:8px}
@@ -101,7 +102,12 @@ body.feature-body{overflow:auto;height:auto}
 
 /* ===== Footer CTA ===== */
 .feature-footer-cta{padding:100px 24px;text-align:center;background-image:radial-gradient(ellipse at 50% 50%,rgba(255,58,58,.06) 0%,transparent 60%)}
-.feature-footer-cta h2{font-size:clamp(24px,4vw,36px);font-weight:700;letter-spacing:-.5px;margin-bottom:24px}
+.feature-footer-cta h2{font-size:clamp(24px,4vw,36px);font-weight:700;letter-spacing:-.5px;margin-bottom:16px}
+.feature-footer-details{font-size:16px;color:var(--text-dim);line-height:1.6;margin-bottom:12px}
+.feature-footer-promo{font-size:15px;color:var(--accent);font-weight:600;margin-bottom:28px}
+.feature-footer-actions{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.feature-cta-secondary{display:inline-block;color:var(--text-dim);border:1px solid var(--border);border-radius:10px;padding:16px 36px;font-family:'Outfit',sans-serif;font-size:16px;font-weight:600;cursor:pointer;transition:all .2s;text-decoration:none}
+.feature-cta-secondary:hover{border-color:var(--text);color:var(--text)}
 .feature-footer{padding:24px;text-align:center;border-top:1px solid var(--border);color:var(--text-muted);font-size:13px}
 
 /* ===== Animations ===== */

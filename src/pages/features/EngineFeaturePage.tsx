@@ -43,55 +43,85 @@ export default function EngineFeaturePage() {
       {/* Hero */}
       <section className="feature-hero">
         <span className="feature-hero-badge">Engine</span>
-        <h1 className="feature-hero-title">Advanced conditioning analytics</h1>
-        <p className="feature-hero-sub">
-          Every training day classified, tracked, and analyzed. See how your conditioning breaks down across workout types, time domains, and modalities.
+        <h1 className="feature-hero-title">Year of the Engine</h1>
+        <p className="feature-hero-sub">The conditioning program that follows you.</p>
+        <p className="feature-hero-body">
+          Engine isn't one parameter — it's many. Aerobic capacity. Anaerobic power. Threshold.
+          Efficiency. Repeatability. These don't increase in lockstep. Treating them as a single
+          system means dragging weak links along and holding strong ones back.
+        </p>
+        <p className="feature-hero-body">
+          Forcing everyone into the same program doesn't make sense. So we don't.
         </p>
       </section>
 
-      {/* Training Day */}
+      {/* Machine learning calibration */}
       <section className="feature-section">
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Training day breakdown</h3>
+              <h3>Machine learning calibration</h3>
               <p>
-                Each training day is automatically classified by workout type — intervals, chippers,
-                AMRAPs, EMOMs, and more. See the full workout with movements, loads, time domains,
-                and the specific conditioning stimulus it targets.
+                20 distinct training frameworks, each independently targeting a specific adaptation.
+                Machine learning calibrates every session precisely to you — not just the program,
+                but every individual interval and every personal target within it.
               </p>
               <ul>
-                <li>Automatic workout type classification</li>
-                <li>Time domain and stimulus identification</li>
-                <li>Movement and load details</li>
+                <li>High aerobic capacity? You'll get aggressive goals.</li>
+                <li>Building anaerobic power? Each session ramps as you progress.</li>
+                <li>You always know what you're trying to hit and why — before the clock starts.</li>
               </ul>
             </div>
-            <Placeholder label="Screenshot: Engine Training Day" />
+            <Placeholder label="Screenshot: Session targets and interval goals" />
           </div>
         </div>
       </section>
 
-      {/* Analytics */}
+      {/* Pacing coach */}
       <section className="feature-section">
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>Conditioning analytics</h3>
+              <h3>Your pacing coach</h3>
               <p>
-                Visualize your training balance with heatmaps and charts. See how your programming
-                distributes across workout types, time domains, and modalities over weeks and months.
-                Identify gaps in your conditioning and areas of overemphasis.
+                Once the clock starts, the app becomes your pacing coach. Goals, countdowns, and
+                round context stay front and center through fatigue so you execute the plan and get
+                exactly the stimulus you need.
               </p>
+              <p>No guessing. No drifting. Just the work.</p>
             </div>
-            <Placeholder label="Screenshot: Engine Analytics & Heatmaps" />
+            <Placeholder label="Screenshot: Pacing coach mid-session" />
           </div>
         </div>
       </section>
 
-      {/* Taxonomy */}
+      {/* Conditioning analytics */}
       <section className="feature-section">
         <div className="feature-container">
           <div className="feature-row">
+            <div className="feature-text">
+              <h3>Conditioning analytics</h3>
+              <p>
+                Every training day classified, tracked, and analyzed. See how your conditioning
+                breaks down across workout types, time domains, and modalities over weeks and months.
+                Identify gaps and areas of overemphasis.
+              </p>
+              <ul>
+                <li>Automatic workout type classification</li>
+                <li>Time domain and stimulus identification</li>
+                <li>Heatmaps and charts across weeks and months</li>
+                <li>Energy system mapping</li>
+              </ul>
+            </div>
+            <Placeholder label="Screenshot: Engine analytics and heatmaps" />
+          </div>
+        </div>
+      </section>
+
+      {/* Workout taxonomy */}
+      <section className="feature-section">
+        <div className="feature-container">
+          <div className="feature-row reverse">
             <div className="feature-text">
               <h3>Workout taxonomy</h3>
               <p>
@@ -99,21 +129,25 @@ export default function EngineFeaturePage() {
                 defined with clear criteria so you know exactly how your training is being categorized
                 and why it matters for balanced conditioning development.
               </p>
-              <ul>
-                <li>Complete workout type definitions</li>
-                <li>Clear classification criteria</li>
-                <li>Energy system mapping</li>
-              </ul>
             </div>
-            <Placeholder label="Screenshot: Engine Taxonomy" />
+            <Placeholder label="Screenshot: Engine taxonomy" />
           </div>
         </div>
       </section>
 
       {/* Footer CTA */}
       <section className="feature-footer-cta">
-        <h2>Build a better engine.</h2>
-        <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Try it Free</button>
+        <h2>Year of the Engine — $29.99/mo</h2>
+        <p className="feature-footer-details">
+          AI Coach included. Machine learning calibration. Pacing coach. Full conditioning analytics.
+        </p>
+        <p className="feature-footer-promo">
+          Early access — lock in 20% off permanently before May 1, 2026.
+        </p>
+        <div className="feature-footer-actions">
+          <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Get Started</button>
+          <Link to="/#pricing" className="feature-cta-secondary">Back to Pricing</Link>
+        </div>
       </section>
 
       <footer className="feature-footer"><GainsLogo /></footer>
