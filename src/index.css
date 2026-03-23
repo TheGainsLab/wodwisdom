@@ -398,7 +398,7 @@ body.landing-body{overflow:auto;height:auto}
 .program-day-completed .program-day-header{background:color-mix(in srgb,var(--accent) 4%,transparent)}
 .program-day-completed .program-day-blocks{opacity:.7}
 .workout-blocks{display:flex;flex-direction:column;gap:10px}
-.workout-block{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow:hidden}
+.workout-block{background:var(--surface2);border:1px solid var(--border-light);border-radius:8px;padding:10px 12px;overflow:hidden}
 .workout-block-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);margin-bottom:4px}
 .workout-block-content{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text);line-height:1.5;white-space:pre-wrap}
 .workout-block-lines{list-style:none;margin:0;padding:0}
