@@ -46,7 +46,6 @@ export default function LandingPage() {
             <GainsLogo className="landing-brand-name" />
           </div>
           <nav className="landing-nav">
-            <a href="#how-it-works">How It Works</a>
             <a href="#pricing">Pricing</a>
             <a href="#faq">FAQ</a>
           </nav>
@@ -107,69 +106,6 @@ export default function LandingPage() {
               <p>High aerobic capacity? You'll get aggressive goals. Building anaerobic power? Each session ramps as you progress. You always know what you're trying to hit and why — before the clock starts.</p>
               <p>Once it does, the app becomes your pacing coach. Goals, countdowns, and round context stay front and center through fatigue so you execute the plan and get exactly the stimulus you need.</p>
               <p>No one-size-fits-all program can deliver this. Year of the Engine does.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ===== See It In Action Teaser ===== */}
-      <section className="landing-teaser">
-        <div className="landing-container" style={{ textAlign: 'center' }}>
-          <h2 className="landing-section-title">See it in action</h2>
-          <p className="landing-section-sub">Coaching, nutrition, movement cues, exercise science — ask anything and get a sourced, detailed answer.</p>
-          <Link to="/features" className="landing-cta" style={{ textDecoration: 'none' }}>Explore Features</Link>
-        </div>
-      </section>
-
-      {/* ===== Who It's For ===== */}
-      <section className="landing-audience">
-        <div className="landing-container">
-          <h2 className="landing-section-title">Built for the CrossFit community</h2>
-          <div className="landing-audience-grid">
-            <div className="landing-audience-card">
-              <div className="landing-audience-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" /></svg>
-              </div>
-              <h3>Coaches</h3>
-              <p>You're the intelligence layer between the workouts and the athletes. Coaches turn a program turn it into a personalized experience — pacing guidance, movement cues, scaling, warm-ups, the works. WodWisdom gives you instant access to the full methodology so you can deliver outstanding training every time. Walk into every class prepared.</p>
-            </div>
-            <div className="landing-audience-card">
-              <div className="landing-audience-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg>
-              </div>
-              <h3>Athletes</h3>
-              <p>Your program was built by a great coach. But it's built for everyone, not for you. WodWisdom turns a program into your program. Get personalized pacing guidance, warm-up and mobility work, and scaling options that match your level. Ask it to review your performance and suggest work you can do on your own. Same program, better results.</p>
-            </div>
-            <div className="landing-audience-card">
-              <div className="landing-audience-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
-              </div>
-              <h3>Gym Owners</h3>
-              <p>Fitness and helping others are your passion and your livelihood. WodWisdom handles the details that separate an average gym from a great one — and that keep members coming back. Review programming, generate class briefings, write warm-ups and cool-downs, surface movement cues your coaches can use on the spot. Add up to three coaches to your account so your entire team has full access to the knowledge base. Make every class excellent.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ===== How It Works ===== */}
-      <section id="how-it-works" className="landing-steps">
-        <div className="landing-container">
-          <h2 className="landing-section-title">How it works</h2>
-          <div className="landing-steps-grid">
-            <div className="landing-step">
-              <div className="landing-step-num">1</div>
-              <h3>You ask</h3>
-              <p>Ask anything related to fitness, training, nutrition, programming and more. General questions, specific questions, any questions. Review workouts. Nutrition planning. Anything and everything health and fitness.</p>
-            </div>
-            <div className="landing-step">
-              <div className="landing-step-num">2</div>
-              <h3>We search</h3>
-              <p>Our AI is trained to search thousands of journal articles, study guides, seminar content and more. Flip on science mode and gain access to graduate level anatomy, physiology and biochemistry.</p>
-            </div>
-            <div className="landing-step">
-              <div className="landing-step-num">3</div>
-              <h3>You get the answer</h3>
-              <p>Get a clear, sourced answer. WodWisdom thoroughly answers your question, and sources every article so you can dig in further. Need a quick answer? Click summarize and get a bulleted list. Bookmark it for easy reference, and fire away with follow up questions.</p>
             </div>
           </div>
         </div>
