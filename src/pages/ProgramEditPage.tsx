@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase, getAuthHeaders, ADJUST_WORKOUT_ENDPOINT } from '../lib/supabase';
 import Nav from '../components/Nav';
 
-const BLOCK_LABELS = ['Warm-up', 'Skills', 'Strength', 'Metcon', 'Cool down'] as const;
+const BLOCK_LABELS = ['Warm-up', 'Strength', 'Skills', 'Metcon', 'Cool down'] as const;
 type BlockLabel = typeof BLOCK_LABELS[number];
 
 interface WorkoutBlock {
