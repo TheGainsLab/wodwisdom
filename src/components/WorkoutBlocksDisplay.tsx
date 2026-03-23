@@ -1,9 +1,9 @@
 /**
- * Renders workout text split into delineated blocks (Warm-up, Skills, Strength, Metcon, Cool down).
+ * Renders workout text split into delineated blocks (Warm-up, Strength, Skills, Metcon, Cool down).
  * Falls back to raw text if parsing fails or format doesn't match.
  */
 
-const BLOCK_LABELS = ['Warm-up', 'Skills', 'Strength', 'Metcon', 'Cool down'] as const;
+const BLOCK_LABELS = ['Warm-up', 'Strength', 'Skills', 'Metcon', 'Cool down'] as const;
 
 interface ParsedBlock {
   label: string;
