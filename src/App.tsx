@@ -58,7 +58,7 @@ export default function App() {
     <Routes>
       <Route path="/auth" element={<AuthPage />} />
       <Route path="/features" element={<FeaturesHubPage />} />
-      <Route path="/features/ai-coaching" element={<AICoachingFeaturePage />} />
+      <Route path="/features/programming" element={<AICoachingFeaturePage />} />
       <Route path="/features/programs" element={<ProgramsFeaturePage />} />
       <Route path="/features/engine" element={<EngineFeaturePage />} />
       <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
@@ -95,7 +95,7 @@ export default function App() {
       <Route path="/engine/taxonomy" element={<EngineTaxonomyPage session={session} />} />
       <Route path="/nutrition" element={<NutritionDashboardPage session={session} />} />
       <Route path="/features" element={<FeaturesHubPage />} />
-      <Route path="/features/ai-coaching" element={<AICoachingFeaturePage />} />
+      <Route path="/features/programming" element={<AICoachingFeaturePage />} />
       <Route path="/features/programs" element={<ProgramsFeaturePage />} />
       <Route path="/features/engine" element={<EngineFeaturePage />} />
       <Route path="/features/nutrition" element={<NutritionFeaturePage />} />

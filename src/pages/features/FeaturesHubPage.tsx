@@ -63,7 +63,7 @@ const FEATURES = [
   {
     title: 'AI Coaching',
     description: 'Get a comprehensive AI evaluation of any athlete — strength ratios, skills assessment, conditioning analysis, and personalized priorities. Like having a head coach who has read every journal article and never forgets a detail.',
-    path: '/features/ai-coaching',
+    path: '/features/programming',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2a5 5 0 0 1 5 5v3a5 5 0 0 1-10 0V7a5 5 0 0 1 5-5z" />
