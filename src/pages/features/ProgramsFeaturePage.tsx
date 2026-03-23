@@ -120,14 +120,28 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>See the full picture</h3>
+              <h3>Step 2 — Your program</h3>
               <p>
-                View your entire program laid out by week. Each day shows the workout blocks with
-                movements, loads, and structure. Scroll through weeks to understand how the program
-                progresses and where the emphasis shifts.
+                The evaluation doesn't sit in a folder. It becomes your program.
+              </p>
+              <p>
+                The AI takes everything it learned about you — your strength ratios, your skill gaps,
+                your conditioning limiters, your priorities — and builds a personalized 20-day training
+                program around it. Every day is designed for you specifically.
+              </p>
+              <ul>
+                <li>Warm-ups targeted to that day's training</li>
+                <li>Mobility work matched to your limiters</li>
+                <li>Skills blocks addressing your gaps</li>
+                <li>Strength work prioritized by your hierarchy</li>
+                <li>Metcons built around movements you're proficient at</li>
+              </ul>
+              <p>
+                Every training day opens with the intent behind the session — the why behind every set
+                and rep. Every block comes with coaching cues, movement standards, and common faults to avoid.
               </p>
             </div>
-            <Placeholder label="Screenshot: Weekly Program View" />
+            <Placeholder label="Screenshot: Sample program day with coach's notes" />
           </div>
         </div>
       </section>
