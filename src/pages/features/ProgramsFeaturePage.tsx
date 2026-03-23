@@ -151,20 +151,27 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>AI-powered program analysis</h3>
+              <h3>Step 3 — Ongoing</h3>
               <p>
-                Ask The Gains Lab to analyze any program and get a detailed breakdown: volume distribution
-                across movement categories, energy system balance, potential gaps, and suggestions for
-                complementary work. Understand your programming at a deeper level.
+                The AI doesn't send you a program and wish you the best.
+              </p>
+              <p>
+                Log your results and the AI pays attention. Demonstrate proficiency and receive harder
+                progressions. Flag a weakness and the program adjusts. Tell it you're traveling and it
+                updates your workouts for the equipment you have.
+              </p>
+              <p>
+                Each month your profile is reviewed and your evaluation updated. Over time your assessments
+                tell the story of your development as an athlete.
               </p>
               <ul>
-                <li>Volume and movement pattern breakdown</li>
-                <li>Energy system analysis</li>
-                <li>Gap identification and suggestions</li>
-                <li>Comparison across training blocks</li>
+                <li>Adaptive adjustments — travel, competition prep, skill focus</li>
+                <li>Progressive overload — harder progressions as you improve</li>
+                <li>Monthly re-evaluation — your profile stays current</li>
+                <li>Longitudinal tracking — see your development over time</li>
               </ul>
             </div>
-            <Placeholder label="Screenshot: Program Analysis" />
+            <Placeholder label="Screenshot: Monthly evaluation update" />
           </div>
         </div>
       </section>
@@ -174,22 +181,24 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>Compare and modify</h3>
+              <h3>AI Programming — $34.99/mo</h3>
               <p>
-                Ask the AI to suggest modifications to any program — scale for a specific athlete,
-                adjust volume, or shift the energy system emphasis. Compare the original and modified
-                versions side by side to see exactly what changed and why.
+                AI Coach included. Personalized programming. Adaptive adjustments. Monthly reviews.
+              </p>
+              <p>
+                Early access — lock in 20% off permanently before May 1, 2026.
+              </p>
+              <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+                <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Get Started</button>
+                <Link to="/pricing" className="feature-cta-secondary">Back to Pricing</Link>
+              </div>
+              <p style={{ marginTop: 16, fontStyle: 'italic' }}>
+                The program that follows you.
               </p>
             </div>
             <Placeholder label="Screenshot: Program Comparison" />
           </div>
         </div>
-      </section>
-
-      {/* Footer CTA */}
-      <section className="feature-footer-cta">
-        <h2>Better programming starts here.</h2>
-        <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Try it Free</button>
       </section>
 
       <footer className="feature-footer"><GainsLogo /></footer>
