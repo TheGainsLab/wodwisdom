@@ -17,8 +17,8 @@ const FAQ_ITEMS = [
     a: 'Yes! Every new account gets 3 free questions so you can see the quality of answers before committing to a subscription.',
   },
   {
-    q: "What's the difference between the Coach and Gym plans?",
-    a: 'The Coach plan is for individuals. The Gym plan includes up to 3 coach seats so you can invite your coaching staff, plus a management dashboard to add and remove team members.',
+    q: "What's the difference between the plans?",
+    a: 'AI Coach gives you unlimited AI-powered coaching questions. Year of the Engine and AI Programming are full training programs that include AI Coach. All Access bundles everything together at a discount.',
   },
   {
     q: 'Can I cancel anytime?',
@@ -114,29 +114,46 @@ export default function LandingPage() {
       {/* ===== Pricing ===== */}
       <section id="pricing" className="landing-pricing">
         <div className="landing-container">
-          <h2 className="landing-section-title">Simple pricing</h2>
-          <p className="landing-section-sub">Start with 3 free questions. Upgrade when you're ready.</p>
+          <h2 className="landing-section-title">Service</h2>
+          <p className="landing-section-sub">Monthly</p>
           <div className="landing-pricing-grid">
             <div className="landing-pricing-card">
-              <h3>Coach</h3>
+              <h3>AI Coach</h3>
               <div className="landing-price">$7.99<span>/mo</span></div>
               <ul className="landing-pricing-features">
-                <li>Unlimited questions</li>
+                <li>Unlimited AI coaching questions</li>
                 <li>Full source library</li>
                 <li>Bookmarks & summaries</li>
                 <li>Search history</li>
               </ul>
               <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
             </div>
-            <div className="landing-pricing-card featured">
-              <div className="landing-pricing-badge">Best for teams</div>
-              <h3>Gym</h3>
-              <div className="landing-price">$24.99<span>/mo</span></div>
+            <div className="landing-pricing-card">
+              <h3>Year of the Engine</h3>
+              <div className="landing-price">$29.99<span>/mo</span></div>
               <ul className="landing-pricing-features">
-                <li>Everything in Coach</li>
-                <li>Up to 3 coach seats</li>
-                <li>Gym dashboard</li>
-                <li>Invite & manage coaches</li>
+                <li>AI Coach included</li>
+                <li>Full conditioning program</li>
+              </ul>
+              <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
+            </div>
+            <div className="landing-pricing-card">
+              <h3>AI Programming</h3>
+              <div className="landing-price">$34.99<span>/mo</span></div>
+              <ul className="landing-pricing-features">
+                <li>AI Coach included</li>
+                <li>Personalized programming</li>
+              </ul>
+              <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
+            </div>
+            <div className="landing-pricing-card featured">
+              <div className="landing-pricing-badge">Best value</div>
+              <h3>All Access</h3>
+              <div className="landing-price">$49.99<span>/mo</span></div>
+              <ul className="landing-pricing-features">
+                <li>AI Coach</li>
+                <li>Year of the Engine</li>
+                <li>AI Programming</li>
               </ul>
               <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
             </div>
