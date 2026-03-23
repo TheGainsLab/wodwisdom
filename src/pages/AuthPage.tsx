@@ -59,7 +59,7 @@ export default function AuthPage() {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <div className="auth-logo">W</div>
+        <div className="auth-logo">G</div>
         <h1>{forgotPassword ? 'Reset Password' : isSignUp && fromTryItFree ? 'Create Your Account' : isSignUp ? 'Create Account' : 'Sign In'}</h1>
         {!(isSignUp && fromTryItFree) && (
           <p className="auth-subtitle">{forgotPassword ? 'Enter your email and we\'ll send you a reset link' : isSignUp ? 'Start your coaching knowledge journey' : 'Access your coaching knowledge base'}</p>
