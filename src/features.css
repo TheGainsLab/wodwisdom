@@ -110,6 +110,29 @@ body.feature-body{overflow:auto;height:auto}
 .feature-cta-secondary:hover{border-color:var(--text);color:var(--text)}
 .feature-footer{padding:24px;text-align:center;border-top:1px solid var(--border);color:var(--text-muted);font-size:13px}
 
+/* ===== Chat Example Cards ===== */
+.feature-chat-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:24px;max-width:720px;margin-left:auto;margin-right:auto}
+.feature-chat-user{display:flex;justify-content:flex-end;margin-bottom:16px}
+.feature-chat-user-bubble{background:var(--accent);color:white;padding:12px 16px;border-radius:16px 16px 4px 16px;max-width:70%;font-size:15px;line-height:1.6}
+.feature-chat-assistant{display:flex;gap:10px;align-items:flex-start}
+.feature-chat-avatar{width:28px;height:28px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:white;flex-shrink:0;margin-top:2px}
+.feature-chat-response-wrap{flex:1;min-width:0}
+.feature-chat-mode-badge{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;padding:3px 10px;border-radius:4px;margin-bottom:8px}
+.feature-chat-mode-badge--science{background:rgba(110,168,254,.15);color:#6ea8fe}
+.feature-chat-response{position:relative;max-height:300px;overflow:hidden;transition:max-height .4s ease}
+.feature-chat-response.expanded{max-height:none}
+.feature-chat-response-inner{font-size:15px;line-height:1.75;color:var(--text-dim)}
+.feature-chat-response-inner p{margin-bottom:12px}
+.feature-chat-response-inner p:last-child{margin-bottom:0}
+.feature-chat-response-inner strong{color:var(--text);font-weight:600}
+.feature-chat-fade{position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(transparent,var(--surface));pointer-events:none}
+.feature-chat-expand{background:none;border:none;color:var(--accent);font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer;padding:8px 0 0;transition:opacity .15s}
+.feature-chat-expand:hover{opacity:.8}
+.feature-chat-sources{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.feature-chat-sources-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted)}
+.feature-chat-chip{font-size:11px;color:var(--text-dim);background:var(--surface2);border:1px solid var(--border);padding:3px 9px;border-radius:4px}
+.feature-chat-chip--science{color:#6ea8fe;background:rgba(110,168,254,.1);border-color:rgba(110,168,254,.25)}
+
 /* ===== Animations ===== */
 @keyframes featureFadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 
