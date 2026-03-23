@@ -86,7 +86,17 @@ export default function LandingPage() {
             </div>
             <div className="landing-offering-card">
               <h3>AI Programming</h3>
-              <p>Personalized programming that adapts to your athletes. Our AI builds sessions based on your goals, your capacity, and your progress — so every training day moves you forward.</p>
+              <p><strong>Stop following someone else's program. Get the program that follows you.</strong></p>
+              <p>Any AI can write a program. This is different. Our AI was trained on the CrossFit methodology and millions of historical workout data points — then it learns everything about you before writing a single rep.</p>
+              <p>Enter your 1RMs, skill levels, and conditioning data. The AI analyzes your fitness in depth, identifies your limiters, and builds a personalized 20-day program — warm-ups, mobility, skills work, strength blocks, and metcons assembled specifically for you.</p>
+              <p><strong>Coached every session</strong> — Every training day opens with the intent behind the session — the why behind every set and rep. Every block comes with coaching cues, movement standards, and common faults to avoid. It's like having a coach by your side every time you train. And if you have questions before you start, just ask — the AI is already there.</p>
+              <p><strong>Ongoing and adaptive</strong></p>
+              <ul>
+                <li>Traveling with only a hotel gym? Tell the AI. Your program updates for those days.</li>
+                <li>Prepping for a competition and need to drill specific skills? The AI tells you exactly where to insert them.</li>
+                <li>Log results and the AI adjusts. Demonstrate proficiency and receive harder progressions.</li>
+                <li>Each month, your profile is reviewed and your evaluation updated. Over time, your assessments tell the story of your development as an athlete.</li>
+              </ul>
             </div>
             <div className="landing-offering-card">
               <h3>Year of the Engine</h3>
