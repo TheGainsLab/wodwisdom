@@ -114,49 +114,31 @@ export default function LandingPage() {
       {/* ===== Pricing ===== */}
       <section id="pricing" className="landing-pricing">
         <div className="landing-container">
-          <h2 className="landing-section-title">Service</h2>
-          <p className="landing-section-sub">Monthly</p>
-          <div className="landing-pricing-grid">
-            <div className="landing-pricing-card">
-              <h3>AI Coach</h3>
-              <div className="landing-price">$7.99<span>/mo</span></div>
-              <ul className="landing-pricing-features">
-                <li>Unlimited AI coaching questions</li>
-                <li>Full source library</li>
-                <li>Bookmarks & summaries</li>
-                <li>Search history</li>
-              </ul>
-              <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
+          <div className="landing-pricing-table">
+            <div className="landing-pricing-header">
+              <span>Service</span>
+              <span>Monthly</span>
             </div>
-            <div className="landing-pricing-card">
-              <h3>Year of the Engine</h3>
-              <div className="landing-price">$29.99<span>/mo</span></div>
-              <ul className="landing-pricing-features">
-                <li>AI Coach included</li>
-                <li>Full conditioning program</li>
-              </ul>
-              <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
+            <div className="landing-pricing-row">
+              <span className="landing-pricing-name">AI Coach</span>
+              <span className="landing-pricing-amount">$7.99</span>
             </div>
-            <div className="landing-pricing-card">
-              <h3>AI Programming</h3>
-              <div className="landing-price">$34.99<span>/mo</span></div>
-              <ul className="landing-pricing-features">
-                <li>AI Coach included</li>
-                <li>Personalized programming</li>
-              </ul>
-              <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
+            <div className="landing-pricing-row">
+              <span className="landing-pricing-name">Year of the Engine</span>
+              <span className="landing-pricing-amount">$29.99</span>
             </div>
-            <div className="landing-pricing-card featured">
-              <div className="landing-pricing-badge">Best value</div>
-              <h3>All Access</h3>
-              <div className="landing-price">$49.99<span>/mo</span></div>
-              <ul className="landing-pricing-features">
-                <li>AI Coach</li>
-                <li>Year of the Engine</li>
-                <li>AI Programming</li>
-              </ul>
-              <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
+            <div className="landing-pricing-note">(AI Coach included)</div>
+            <div className="landing-pricing-row">
+              <span className="landing-pricing-name">AI Programming</span>
+              <span className="landing-pricing-amount">$34.99</span>
             </div>
+            <div className="landing-pricing-note">(AI Coach included)</div>
+            <div className="landing-pricing-row">
+              <span className="landing-pricing-name">All Access</span>
+              <span className="landing-pricing-amount">$49.99</span>
+            </div>
+            <div className="landing-pricing-note">(AI Coach, YoE and AI Programming)</div>
+            <button className="landing-cta" onClick={goToSignup} style={{marginTop: '28px', width: '100%'}}>Try it Free</button>
           </div>
         </div>
       </section>

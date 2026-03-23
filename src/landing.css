@@ -62,17 +62,13 @@
 
 /* ===== Pricing ===== */
 .landing-pricing{padding:100px 0;border-top:1px solid var(--border)}
-.landing-pricing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;max-width:1080px;margin:0 auto}
-.landing-pricing-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px 32px;display:flex;flex-direction:column;position:relative}
-.landing-pricing-card.featured{border-color:var(--accent);box-shadow:0 0 40px var(--accent-glow)}
-.landing-pricing-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--accent);color:white;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:5px 14px;border-radius:20px;white-space:nowrap}
-.landing-pricing-card h3{font-size:22px;font-weight:700;margin-bottom:8px;letter-spacing:-.3px}
-.landing-price{font-size:40px;font-weight:800;letter-spacing:-1px;margin-bottom:24px}
-.landing-price span{font-size:16px;font-weight:500;color:var(--text-dim)}
-.landing-pricing-features{list-style:none;display:flex;flex-direction:column;gap:12px;margin-bottom:32px;flex:1}
-.landing-pricing-features li{font-size:15px;color:var(--text-dim);padding-left:24px;position:relative}
-.landing-pricing-features li::before{content:'';position:absolute;left:0;top:6px;width:14px;height:14px;border-radius:50%;border:2px solid var(--accent);background:transparent}
-.landing-pricing-card .landing-cta{width:100%;text-align:center}
+.landing-pricing-table{max-width:480px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 24px}
+.landing-pricing-header{display:flex;justify-content:space-between;padding-bottom:14px;border-bottom:1px solid var(--border);margin-bottom:6px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)}
+.landing-pricing-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border)}
+.landing-pricing-row:last-of-type{border-bottom:none}
+.landing-pricing-name{font-size:16px;font-weight:600}
+.landing-pricing-amount{font-size:18px;font-weight:800;letter-spacing:-.3px}
+.landing-pricing-note{font-size:13px;color:var(--text-muted);padding:2px 0 0;margin-top:-4px}
 
 /* ===== FAQ ===== */
 .landing-faq{padding:100px 0;border-top:1px solid var(--border)}
@@ -99,7 +95,6 @@
 .landing-offerings-grid{grid-template-columns:1fr;gap:16px}
 .landing-audience-grid{grid-template-columns:1fr;gap:16px}
 .landing-steps-grid{grid-template-columns:1fr;gap:40px}
-.landing-pricing-grid{grid-template-columns:1fr 1fr;max-width:600px}
 .landing-explainer,.landing-teaser,.landing-audience,.landing-steps,.landing-pricing,.landing-faq{padding:72px 0}
 }
 
@@ -108,7 +103,6 @@
 .landing-container{padding:0 16px}
 .landing-hero{padding:40px 16px 60px}
 .landing-section-title{font-size:26px}
-.landing-pricing-grid{grid-template-columns:1fr;max-width:400px}
-.landing-pricing-card{padding:28px 22px}
+.landing-pricing-table{padding:20px 16px}
 .landing-audience-card{padding:24px 20px}
 }
