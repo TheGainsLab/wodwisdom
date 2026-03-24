@@ -240,7 +240,7 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
                     textTransform: 'uppercase',
                     letterSpacing: '.5px',
                     padding: '8px 12px',
-                    minWidth: 80,
+                    minWidth: 60,
                   }}>
                     {TD_LABELS[td]}
                   </th>
@@ -254,8 +254,9 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
                     fontSize: 14,
                     fontWeight: 600,
                     color: 'var(--text)',
-                    padding: '10px 12px',
-                    whiteSpace: 'nowrap',
+                    padding: '10px 8px',
+                    maxWidth: 140,
+                    wordBreak: 'break-word',
                   }}>
                     {movement}
                   </td>
@@ -265,7 +266,7 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
                       return (
                         <td key={td} style={{
                           textAlign: 'center',
-                          padding: '10px 12px',
+                          padding: '10px 8px',
                           borderRadius: 6,
                           background: 'var(--surface2)',
                         }}>
@@ -281,7 +282,7 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
                           onClick={() => cell.avg_percentile != null ? openDrillDown(movement, td) : undefined}
                           style={{
                             textAlign: 'center',
-                            padding: '10px 12px',
+                            padding: '10px 8px',
                             borderRadius: 6,
                             background: countColor(cell.workout_count),
                             cursor: cell.avg_percentile != null ? 'pointer' : 'default',
@@ -316,7 +317,7 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
                         onClick={() => openDrillDown(movement, td)}
                         style={{
                           textAlign: 'center',
-                          padding: '10px 12px',
+                          padding: '10px 8px',
                           borderRadius: 6,
                           background: cell.avg_percentile != null ? percentileColor(cell.avg_percentile) : 'var(--surface2)',
                           cursor: 'pointer',
