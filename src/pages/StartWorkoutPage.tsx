@@ -62,12 +62,6 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
   'cool-down': 'Cool Down',
 };
 
-function getMetconTypeLabel(text: string): string {
-  const t = text.toUpperCase();
-  if (/AMRAP|AS MANY ROUNDS/.test(t)) return 'AMRAP';
-  if (/EMOM|E\d+MOM/.test(t)) return 'EMOM';
-  return 'For Time';
-}
 
 function parseSetsReps(text: string): { sets?: number; reps?: number; perSetReps?: number[] } {
   // NxN format: "5x5", "3x10"
