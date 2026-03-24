@@ -5,6 +5,10 @@
 
 const BLOCK_LABELS = ['Warm-up', 'Skills', 'Strength', 'Metcon', 'Cool down'] as const;
 
+function blockDataAttr(label: string): string {
+  return label.toLowerCase().replace(/\s+/g, '-');
+}
+
 interface ParsedBlock {
   label: string;
   content: string;
@@ -154,7 +158,7 @@ export default function WorkoutBlocksDisplay({ text, className = '' }: WorkoutBl
           if (parsed) {
             return (
               <div key={i} className="workout-block">
-                <div className="workout-block-label">{b.label}</div>
+                <div className="workout-block-label" data-block={blockDataAttr(b.label)}>{b.label}</div>
                 <div className="workout-block-content">
                   {parsed.header && <div>{parsed.header}:</div>}
                   <ul className="workout-block-lines">
@@ -171,7 +175,7 @@ export default function WorkoutBlocksDisplay({ text, className = '' }: WorkoutBl
         const lines = b.content.split('\n').map(l => l.trim()).filter(Boolean);
         return (
           <div key={i} className="workout-block">
-            <div className="workout-block-label">{b.label}</div>
+            <div className="workout-block-label" data-block={blockDataAttr(b.label)}>{b.label}</div>
             <div className="workout-block-content">
               {lines.length > 1 ? (
                 <ul className="workout-block-lines">
