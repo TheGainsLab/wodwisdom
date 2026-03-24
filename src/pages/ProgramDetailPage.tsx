@@ -15,19 +15,27 @@ interface ProgramWorkout {
 
 const SUMMARY_LABELS = ['skills', 'strength', 'metcon', 'accessory'] as const;
 
-/** Extract a one-line summary like "Muscle-ups · Back Squat · 5 RFT" from workout text. */
-function workoutSummary(text: string): string {
-  if (!text?.trim()) return '';
+const DISPLAY_LABELS: Record<string, string> = {
+  skills: 'Skill',
+  strength: 'Strength',
+  metcon: 'Conditioning',
+  accessory: 'Accessory',
+};
+
+interface SummaryLine { label: string; text: string }
+
+/** Extract structured summary lines from workout text. */
+function workoutSummaryLines(text: string): SummaryLine[] {
+  if (!text?.trim()) return [];
   const lower = text.toLowerCase();
   const allLabels = ['warm-up', 'skills', 'strength', 'metcon', 'cool down', 'accessory', 'mobility'];
-  const parts: string[] = [];
+  const lines: SummaryLine[] = [];
 
   for (const label of SUMMARY_LABELS) {
     const needle = label + ':';
     const start = lower.indexOf(needle);
     if (start < 0) continue;
     const contentStart = start + needle.length;
-    // Find the next block label to know where this block ends
     let end = text.length;
     for (const other of allLabels) {
       const otherNeedle = other + ':';
@@ -36,10 +44,15 @@ function workoutSummary(text: string): string {
     }
     const content = text.slice(contentStart, end).trim();
     const firstLine = content.split('\n')[0].trim();
-    if (firstLine) parts.push(firstLine.length > 30 ? firstLine.slice(0, 28) + '…' : firstLine);
+    if (firstLine) {
+      lines.push({
+        label: DISPLAY_LABELS[label] || label,
+        text: firstLine.length > 40 ? firstLine.slice(0, 38) + '…' : firstLine,
+      });
+    }
   }
 
-  return parts.join(' · ');
+  return lines;
 }
 
 export default function ProgramDetailPage({ session }: { session: Session }) {
@@ -231,17 +244,28 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                 aria-expanded={isExpanded}
                               >
                                 <div className="program-day-left">
-                                  {done ? (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
-                                  ) : ip ? (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning, #f39c12)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                                  ) : (
-                                    <span className="program-day-dot" />
+                                  <div className="program-day-top-row">
+                                    {done ? (
+                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+                                    ) : ip ? (
+                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning, #f39c12)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                                    ) : (
+                                      <span className="program-day-dot" />
+                                    )}
+                                    <span className="program-day-label">Day {dayNum}</span>
+                                    {done && <span className="program-completed-badge">Done</span>}
+                                    {ip && <span className="program-in-progress-badge">{ip.savedCount}/{ip.totalBlocks} blocks</span>}
+                                  </div>
+                                  {!isExpanded && (
+                                    <div className="program-day-summary-lines">
+                                      {workoutSummaryLines(w.workout_text).map((line) => (
+                                        <div key={line.label} className="program-day-summary-line">
+                                          <span className="program-day-summary-label">{line.label}:</span>
+                                          <span className="program-day-summary-text">{line.text}</span>
+                                        </div>
+                                      ))}
+                                    </div>
                                   )}
-                                  <span className="program-day-label">Day {dayNum}</span>
-                                  {done && <span className="program-completed-badge">Done</span>}
-                                  {ip && <span className="program-in-progress-badge">{ip.savedCount}/{ip.totalBlocks} blocks</span>}
-                                  {!isExpanded && <span className="program-day-summary">{workoutSummary(w.workout_text)}</span>}
                                 </div>
                                 <svg
                                   className={`program-day-chevron${isExpanded ? ' expanded' : ''}`}
