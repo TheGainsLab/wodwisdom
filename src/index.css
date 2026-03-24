@@ -404,11 +404,11 @@ body.landing-body{overflow:auto;height:auto}
 .workout-blocks{display:flex;flex-direction:column;gap:10px}
 .workout-block{background:var(--surface2);border:1px solid #ffffff;border-radius:8px;padding:10px 12px;overflow:hidden}
 .workout-block-label{display:inline-block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);margin-bottom:4px;padding:4px 10px;border-radius:6px;background:var(--surface3)}
-.workout-block-label[data-block="warm-up"]{color:#f59e0b;background:rgba(245,158,11,.15)}
-.workout-block-label[data-block="skills"]{color:#a855f7;background:rgba(168,85,247,.15)}
-.workout-block-label[data-block="strength"]{color:#e86b8b;background:rgba(232,107,139,.15)}
-.workout-block-label[data-block="metcon"]{color:#34d399;background:rgba(52,211,153,.15)}
-.workout-block-label[data-block="cool-down"]{color:#2dd4bf;background:rgba(45,212,191,.15)}
+.workout-block-label[data-block="warm-up"]{color:#ff3a3a;background:rgba(255,58,58,.15)}
+.workout-block-label[data-block="skills"]{color:#ff3a3a;background:rgba(255,58,58,.15)}
+.workout-block-label[data-block="strength"]{color:#ff3a3a;background:rgba(255,58,58,.15)}
+.workout-block-label[data-block="metcon"]{color:#ff3a3a;background:rgba(255,58,58,.15)}
+.workout-block-label[data-block="cool-down"]{color:#ff3a3a;background:rgba(255,58,58,.15)}
 .workout-block-content{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text);line-height:1.5;white-space:pre-wrap}
 .workout-block-lines{list-style:none;margin:0;padding:0}
 .workout-blocks-fallback{font-family:'JetBrains Mono',monospace;font-size:12px;white-space:pre-wrap;line-height:1.5;color:var(--text)}
