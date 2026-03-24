@@ -218,7 +218,7 @@ body.landing-body{overflow:auto;height:auto}
 .workout-review-textarea::placeholder{color:var(--text-muted)}
 .workout-review-textarea:disabled{opacity:.6;cursor:not-allowed}
 .workout-review-result{animation:fadeUp .3s ease}
-.workout-review-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px}
+.workout-review-section{background:var(--surface);border:1px solid #ffffff;border-radius:var(--radius);padding:20px 24px;margin-bottom:16px}
 .workout-review-section h3{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);margin-bottom:12px}
 .workout-review-content{font-size:15px;line-height:1.7;color:var(--text-dim)}
 .workout-review-content p{margin-bottom:8px}
