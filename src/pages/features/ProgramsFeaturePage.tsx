@@ -68,7 +68,6 @@ export default function ProgramsFeaturePage() {
               </ul>
               <ProfileMockup />
             </div>
-            <Placeholder label="Screenshot: Athlete Profile" />
           </div>
         </div>
       </section>
