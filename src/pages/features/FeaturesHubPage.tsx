@@ -80,7 +80,7 @@ export default function FeaturesHubPage() {
 
       {/* Hero */}
       <section className="feature-hero">
-        <h1 className="feature-hero-title">See what WodWisdom can do</h1>
+        <h1 className="feature-hero-title">See what <GainsLogo /> can do</h1>
         <p className="feature-hero-sub">
           AI-powered coaching, programming, conditioning analytics, and nutrition tracking — built for the CrossFit community.
         </p>
