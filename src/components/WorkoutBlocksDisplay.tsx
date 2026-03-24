@@ -59,6 +59,46 @@ function splitTopLevelCommas(text: string): string[] {
 }
 
 /**
+ * Parse any single-line block content into a header and bullet items.
+ * Detects common workout formats (AMRAP, For Time, Rounds, Every X min, Tabata, etc.)
+ * and splits comma-separated movements onto separate lines.
+ * Returns null if content is already multi-line or cannot be meaningfully split.
+ */
+function parseBlockContent(content: string): { header: string | null; items: string[] } | null {
+  const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length > 1) return null; // already multi-line
+
+  // Detect format headers: "3 Rounds For Time:", "AMRAP 12 min:", "21-15-9:", "Every 3 min x 5:", "Tabata:", etc.
+  const headerPatterns = [
+    /^(\d+\s+rounds?\s+for\s+time\b[^,]*?)[:,]\s*/i,
+    /^(for\s+time\b[^,]*?)[:,]\s*/i,
+    /^(AMRAP\s+\d+\s*(?:min(?:utes?)?)?[^,]*?)[:,]\s*/i,
+    /^(E\d*MOM\s+\d+\s*(?:min(?:utes?)?)?[^,]*?)[:,]\s*/i,
+    /^(every\s+\d+\s*(?:min(?:utes?)?|sec(?:onds?)?)\s*(?:x\s*\d+)?[^,]*?)[:,]\s*/i,
+    /^(tabata\b[^,]*?)[:,]\s*/i,
+    /^(\d+(?:[–-]\d+)+\b[^,]*?)[:,]\s*/i,  // e.g. "21-15-9:"
+    /^(\d+\s*[×x]\s*\d+\b[^,]*?)[:,]\s*/i, // e.g. "5×3 Back Squat"
+  ];
+
+  let header: string | null = null;
+  let remainder = content;
+
+  for (const pat of headerPatterns) {
+    const m = content.match(pat);
+    if (m) {
+      header = m[1].trim();
+      remainder = content.slice(m[0].length).trim();
+      break;
+    }
+  }
+
+  const items = splitTopLevelCommas(remainder);
+  if (items.length < 2 && !header) return null; // nothing to restructure
+
+  return { header, items };
+}
+
+/**
  * Parse Skills block content into a header (e.g. "4 sets") and bullet items.
  * Returns null if the content already has newlines (let existing logic handle it).
  */
@@ -103,6 +143,7 @@ function parseSkillsContent(content: string): { header: string | null; items: st
  * Useful when blocks are already separated (e.g. on the Start Workout page).
  */
 export function BlockContent({ label, content }: { label: string; content: string }) {
+  // Skills blocks: specialised EMOM / sets parsing
   if (label === 'Skills') {
     const parsed = parseSkillsContent(content);
     if (parsed) {
@@ -117,6 +158,21 @@ export function BlockContent({ label, content }: { label: string; content: strin
         </>
       );
     }
+  }
+
+  // All blocks: split single-line content with detected format headers
+  const generalParsed = parseBlockContent(content);
+  if (generalParsed) {
+    return (
+      <>
+        {generalParsed.header && <div>{generalParsed.header}:</div>}
+        <ul className="workout-block-lines">
+          {generalParsed.items.map((item, j) => (
+            <li key={j}>{item}</li>
+          ))}
+        </ul>
+      </>
+    );
   }
 
   const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
@@ -170,6 +226,24 @@ export default function WorkoutBlocksDisplay({ text, className = '' }: WorkoutBl
               </div>
             );
           }
+        }
+
+        // All blocks: try general single-line parsing (format header + comma split)
+        const generalParsed = parseBlockContent(b.content);
+        if (generalParsed) {
+          return (
+            <div key={i} className="workout-block">
+              <div className="workout-block-label" data-block={blockDataAttr(b.label)}>{b.label}</div>
+              <div className="workout-block-content">
+                {generalParsed.header && <div>{generalParsed.header}:</div>}
+                <ul className="workout-block-lines">
+                  {generalParsed.items.map((item, j) => (
+                    <li key={j}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          );
         }
 
         const lines = b.content.split('\n').map(l => l.trim()).filter(Boolean);
