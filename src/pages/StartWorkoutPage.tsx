@@ -1087,7 +1087,6 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                   <div key={bi} className="workout-review-section" style={{ marginBottom: 16 }}>
                     <h3>
                       {block.label}
-                      {block.type === 'metcon' && ` — ${getMetconTypeLabel(block.text)}`}
                     </h3>
                     <div className="workout-review-content" style={{ marginBottom: 16 }}>
                       <BlockContent label={block.label} content={block.text} />
