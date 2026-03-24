@@ -21,6 +21,16 @@ type Layer = 'frequency' | 'performance';
 const TIME_DOMAINS = ['short', 'medium', 'long'] as const;
 const TD_LABELS: Record<string, string> = { short: 'Short', medium: 'Medium', long: 'Long' };
 
+function ordinal(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  const mod10 = n % 10;
+  if (mod10 === 1) return `${n}st`;
+  if (mod10 === 2) return `${n}nd`;
+  if (mod10 === 3) return `${n}rd`;
+  return `${n}th`;
+}
+
 function percentileColor(p: number): string {
   if (p >= 80) return 'rgba(34,197,94,.7)';
   if (p >= 60) return 'rgba(34,197,94,.35)';
@@ -303,7 +313,7 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
                               color: percentileTextColor(cell.avg_percentile),
                               marginTop: 2,
                             }}>
-                              {cell.avg_percentile}th %ile
+                              {ordinal(cell.avg_percentile!)} %ile
                             </div>
                           )}
                         </td>
