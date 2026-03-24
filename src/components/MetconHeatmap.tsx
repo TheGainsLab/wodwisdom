@@ -85,41 +85,22 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
   async function openDrillDown(movement: string, td: string) {
     setDrillDown({ movement, td });
     setDrillLoading(true);
-    const { data } = await supabase
-      .from('workout_log_entries')
-      .select(`
-        block_id,
-        workout_log_blocks!inner (
-          block_label,
-          score,
-          percentile,
-          performance_tier,
-          time_domain,
-          workout_logs!inner ( workout_date, user_id )
-        )
-      `)
-      .eq('movement', movement)
-      .eq('workout_log_blocks.block_type', 'metcon')
-      .eq('workout_log_blocks.time_domain', td)
-      .not('workout_log_blocks.percentile', 'is', null)
-      .eq('workout_log_blocks.workout_logs.user_id', userId)
-      .order('block_id', { ascending: false });
+    const { data, error } = await supabase.rpc('get_metcon_drilldown', {
+      p_user_id: userId,
+      p_movement: movement,
+      p_time_domain: td,
+    });
 
-    if (data) {
-      const seen = new Set<string>();
-      const items: DrillDownItem[] = [];
-      for (const row of data as any[]) {
-        const b = row.workout_log_blocks;
-        if (!b || seen.has(row.block_id)) continue;
-        seen.add(row.block_id);
-        items.push({
-          block_label: b.block_label,
-          score: b.score,
-          percentile: b.percentile,
-          performance_tier: b.performance_tier,
-          workout_date: b.workout_logs?.workout_date ?? '',
-        });
-      }
+    if (error) {
+      console.error('get_metcon_drilldown error:', error);
+    } else if (data) {
+      const items: DrillDownItem[] = (data as any[]).map((row) => ({
+        block_label: row.block_label,
+        score: row.score,
+        percentile: row.percentile,
+        performance_tier: row.performance_tier,
+        workout_date: row.workout_date ?? '',
+      }));
       items.sort((a, b) => b.workout_date.localeCompare(a.workout_date));
       setDrillItems(items);
     }

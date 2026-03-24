@@ -99,10 +99,31 @@ const GENERATE_PROMPT = `Generate a 4-week training program for the athlete desc
 Use the REFERENCE material and COACHING GUIDELINES below to guide all programming decisions — periodization approach, loading schemes, skill progressions, metcon design, and deload strategy.
 OUTPUT RULES:
 - Complete every block in the template provided.
-- Format each block as MULTI-LINE text:
-  • First line after the header: the format or scheme (e.g. "3 Rounds For Time:", "EMOM 12 min:", "5×3 @75%").
-  • Following lines: one movement or drill per line.
+- Format EVERY block as MULTI-LINE text — NEVER use commas to join movements on one line. This applies to ALL blocks: Warm-up, Mobility, Skills, Strength, Metcon, and Cool down.
+  • First line after the header: the format or scheme ONLY (e.g. "3 Rounds For Time:", "EMOM 12 min:", "5×3 @75%"). Do NOT put a movement on this line.
+  • Following lines: one movement or drill per line. Each movement gets its own line.
   • Last line (if applicable): notes, rest periods, target time, or scaling.
+
+FORMATTING EXAMPLES (follow these exactly):
+  BAD — never do this:
+    Warm-up: 400m row, 10 pass-throughs, 10 air squats, hip circles
+    Mobility: 90/90 switches, couch stretch 1 min/side
+    Metcon: 5 RFT: 10 Box Jump Overs 30/24, 8 HSPU
+  GOOD — always do this:
+    Warm-up:
+    400m row
+    10 pass-throughs
+    10 air squats
+    hip circles
+
+    Mobility:
+    90/90 switches
+    couch stretch 1 min/side
+
+    Metcon:
+    5 RFT:
+    10 Box Jump Overs 30/24
+    8 HSPU
 - Each block header (Warm-up:, Mobility:, Skills:, Strength:, Metcon:, Cool down:) MUST appear on its own line starting at position 0. Never nest one block inside another. Content lines for a block go on the lines BELOW its header.
 - Warm-up: and Mobility: are SEPARATE blocks. Do NOT put mobility content inside the Warm-up block. Warm-up is general preparation; Mobility is targeted drills on a separate line.
 - Do not add, remove, or reorder any headers.
