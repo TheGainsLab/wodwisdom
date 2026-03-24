@@ -126,7 +126,6 @@ export default function ProgramsFeaturePage() {
                 and exercise physiology. You can trace any recommendation back to its source.
               </p>
             </div>
-            <Placeholder label="Screenshot: Profile Evaluation" />
           </div>
         </div>
       </section>
