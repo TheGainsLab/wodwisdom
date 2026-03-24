@@ -1305,6 +1305,13 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                           {skKeys.length > 0 && (
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Skill movements (confirm or adjust)</div>
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>
+                                <span style={{ width: 48 }}>Sets</span>
+                                <span style={{ width: 48 }}>Reps</span>
+                                <span style={{ width: 60 }}>Hold (s)</span>
+                                <span style={{ width: 48 }}>Quality</span>
+                                <span style={{ width: 48 }}>RPE</span>
+                              </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                 {skKeys.map(key => {
                                   const sk = skillsEntries[key];
