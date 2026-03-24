@@ -98,8 +98,12 @@ async function fetchCoachingGuidelines(
 const GENERATE_PROMPT = `Generate a 4-week training program for the athlete described below.
 Use the REFERENCE material and COACHING GUIDELINES below to guide all programming decisions — periodization approach, loading schemes, skill progressions, metcon design, and deload strategy.
 OUTPUT RULES:
-- Complete every block in the template provided. One line per block.
-- Each block header (Warm-up:, Mobility:, Skills:, Strength:, Metcon:, Cool down:) MUST appear on its own line starting at position 0. Never nest one block inside another.
+- Complete every block in the template provided.
+- Format each block as MULTI-LINE text:
+  • First line after the header: the format or scheme (e.g. "3 Rounds For Time:", "EMOM 12 min:", "5×3 @75%").
+  • Following lines: one movement or drill per line.
+  • Last line (if applicable): notes, rest periods, target time, or scaling.
+- Each block header (Warm-up:, Mobility:, Skills:, Strength:, Metcon:, Cool down:) MUST appear on its own line starting at position 0. Never nest one block inside another. Content lines for a block go on the lines BELOW its header.
 - Warm-up: and Mobility: are SEPARATE blocks. Do NOT put mobility content inside the Warm-up block. Warm-up is general preparation; Mobility is targeted drills on a separate line.
 - Do not add, remove, or reorder any headers.
 - Prescribe weights using the athlete's 1RMs where applicable. Use / for M/F Rx (e.g. 95/65).
@@ -440,7 +444,7 @@ Use the SKILLS ANALYSIS above to decide what goes in each day's Skills: block. Y
 - Week 4 is deload — reduce skill volume, keep only the top 1-2 priority skills at 1x each.
 - Vary the drill, not just the movement. If L-sit appears 3x in a week, each session should have a different focus (e.g. tuck hold for time, single-leg extension, parallette L-sit).
 
-Complete the following program template. Fill in every block with one line of programming. Do not add or remove any headers.
+Complete the following program template. Fill in every block using multi-line formatting (scheme on the first line, one movement per line after that). Do not add or remove any headers.
 ${skeleton}`;
     // Inject developing skills into Rule 6 of METCON_GUIDANCE
     const developingList = developingSkills.length > 0 ? developingSkills.join(", ") : "none";
