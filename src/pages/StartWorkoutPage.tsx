@@ -1170,6 +1170,18 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                           {mvKeys.length > 0 && (
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Movements (confirm or adjust)</div>
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>
+                                <span style={{ width: 64 }}>Reps</span>
+                                <span style={{ width: 28 }}></span>
+                                {mvKeys.some(k => metconEntries[k] && (metconEntries[k].category || 'bodyweight') === 'weighted') && (
+                                  <>
+                                    <span style={{ width: 64 }}>Wt</span>
+                                    <span style={{ width: 28 }}></span>
+                                  </>
+                                )}
+                                <span style={{ width: 56 }}>Quality</span>
+                                <span style={{ width: 56 }}>RPE</span>
+                              </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                 {mvKeys.map(key => {
                                   const mv = metconEntries[key];
@@ -1179,6 +1191,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                   const isWeighted = cat === 'weighted';
                                   const hasDistance = isMonostructural && (mv.distance != null && mv.distance > 0);
                                   const hasCalories = isMonostructural && mv.distance_unit === 'cal';
+                                  const hasAnyWeighted = mvKeys.some(k => metconEntries[k] && (metconEntries[k].category || 'bodyweight') === 'weighted');
                                   return (
                                     <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                       <input
@@ -1187,7 +1200,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                         onChange={e => setMetconEntry(key, 'movement', e.target.value)}
                                         style={{ ...compactInputStyle, width: '100%' }}
                                       />
-                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                         {hasDistance && !hasCalories ? (
                                           <>
                                             <input
@@ -1197,28 +1210,38 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                               onChange={e => setMetconEntry(key, 'distance', e.target.value ? parseInt(e.target.value, 10) : undefined)}
                                               style={{ ...compactInputStyle, width: 64 }}
                                             />
-                                            <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 16 }}>{mv.distance_unit || 'm'}</span>
+                                            <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 28 }}>{mv.distance_unit || 'm'}</span>
                                           </>
                                         ) : (
-                                          <input
-                                            type="number"
-                                            placeholder={hasCalories ? 'Cal' : 'Reps'}
-                                            value={mv.reps ?? ''}
-                                            onChange={e => setMetconEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                            style={{ ...compactInputStyle, width: 56 }}
-                                          />
-                                        )}
-                                        {isWeighted && (
                                           <>
                                             <input
                                               type="number"
-                                              placeholder=""
-                                              value={mv.weight ?? ''}
-                                              onChange={e => setMetconEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
+                                              placeholder={hasCalories ? 'Cal' : ''}
+                                              value={mv.reps ?? ''}
+                                              onChange={e => setMetconEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)}
                                               style={{ ...compactInputStyle, width: 64 }}
                                             />
-                                            <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 24 }}>{mv.weight_unit || 'lbs'}</span>
+                                            <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 28 }}></span>
                                           </>
+                                        )}
+                                        {hasAnyWeighted && (
+                                          isWeighted ? (
+                                            <>
+                                              <input
+                                                type="number"
+                                                placeholder=""
+                                                value={mv.weight ?? ''}
+                                                onChange={e => setMetconEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
+                                                style={{ ...compactInputStyle, width: 64 }}
+                                              />
+                                              <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 28 }}>{mv.weight_unit || 'lbs'}</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <span style={{ width: 64 }}></span>
+                                              <span style={{ width: 28 }}></span>
+                                            </>
+                                          )
                                         )}
                                         <select
                                           value={mv.quality ?? ''}
