@@ -98,23 +98,23 @@ export default function EngineFeaturePage() {
         </div>
       </section>
 
-      {/* Conditioning analytics */}
+      {/* Engine fingerprint */}
       <section className="feature-section">
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Conditioning analytics</h3>
+              <h3>Your engine has a fingerprint. Here's yours.</h3>
               <p>
-                Every training day classified, tracked, and analyzed. See how your conditioning
-                breaks down across workout types, time domains, and modalities over weeks and months.
-                Identify gaps and areas of overemphasis.
+                1:3 work-to-rest: 31 cal/min. 1:1 work-to-rest: 16 cal/min. Your output nearly
+                doubles with the right rest ratio. Most athletes never know this about themselves.
+                Most coaches don't have this data either.
               </p>
-              <ul>
-                <li>Automatic workout type classification</li>
-                <li>Time domain and stimulus identification</li>
-                <li>Heatmaps and charts across weeks and months</li>
-                <li>Energy system mapping</li>
-              </ul>
+              <p>
+                Year of the Engine tracks your performance across every work:rest ratio so the AI
+                programs the intervals that actually produce results for you — not the ratios that
+                work for everyone else.
+              </p>
+              <p>No one else is showing you this data. Because no one else has it.</p>
             </div>
 
           </div>
