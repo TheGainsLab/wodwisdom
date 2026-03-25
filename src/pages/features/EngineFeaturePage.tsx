@@ -92,6 +92,7 @@ export default function EngineFeaturePage() {
                 and they go up. Fall short and the AI adjusts down. The program never stays static —
                 it follows your actual performance, not a predetermined schedule.
               </p>
+              <img src="/images/target-vs-actual.png" alt="Target vs Actual output comparison" className="feature-img" />
             </div>
 
           </div>
@@ -115,6 +116,7 @@ export default function EngineFeaturePage() {
                 work for everyone else.
               </p>
               <p>No one else is showing you this data. Because no one else has it.</p>
+              <img src="/images/work-rest-ratio.png" alt="Work to rest ratio analytics" className="feature-img" />
             </div>
 
           </div>
