@@ -234,7 +234,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                         {week.days.map((w) => {
                           const done = completedWorkoutIds.has(w.id);
                           const ip = inProgressWorkouts.get(w.id);
-                          const dayNum = w.sort_order + 1;
                           const isExpanded = expandedDays.has(w.id);
                           return (
                             <div key={w.id} className={`program-day-row${done ? ' program-day-completed' : ip ? ' program-day-in-progress' : ''}`}>
