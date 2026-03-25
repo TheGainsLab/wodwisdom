@@ -71,28 +71,6 @@ export default function AICoachingFeaturePage() {
         </p>
       </section>
 
-      {/* How It Works */}
-      <section className="feature-section">
-        <div className="feature-container">
-          <div className="feature-row">
-            <div className="feature-text">
-              <h3>Build your athlete profile</h3>
-              <p>
-                Tell WodWisdom about your lifts, gymnastics skills, conditioning benchmarks, and goals.
-                The AI uses your complete profile to generate a detailed evaluation — not generic advice,
-                but analysis specific to your numbers and your movement capabilities.
-              </p>
-              <ul>
-                <li>Strength numbers and lift ratios</li>
-                <li>Gymnastics skill levels</li>
-                <li>Conditioning benchmarks across modalities</li>
-                <li>Training history and goals</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Real Chat Examples */}
       <section className="feature-section">
         <div className="feature-container">
