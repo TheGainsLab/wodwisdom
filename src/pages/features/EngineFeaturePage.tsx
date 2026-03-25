@@ -174,6 +174,7 @@ export default function EngineFeaturePage() {
                 systems over weeks and months. Identify gaps. Spot overemphasis. Make sure every
                 component of your engine is getting the attention it needs.
               </p>
+              <img src="/images/sessions.png" alt="Sessions by day type analytics" className="feature-img" />
             </div>
 
           </div>
