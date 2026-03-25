@@ -77,18 +77,21 @@ export default function EngineFeaturePage() {
         </div>
       </section>
 
-      {/* Pacing coach */}
+      {/* AI adjusts */}
       <section className="feature-section">
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>Your pacing coach</h3>
+              <h3>The AI watches. The program adjusts.</h3>
               <p>
-                Once the clock starts, the app becomes your pacing coach. Goals, countdowns, and
-                round context stay front and center through fatigue so you execute the plan and get
-                exactly the stimulus you need.
+                Target: 14. Actual: 17. Three sessions in a row beating the target. The AI noticed.
+                Your next session will be harder.
               </p>
-              <p>No guessing. No drifting. Just the work.</p>
+              <p>
+                Log your results and the machine learning recalibrates. Beat your targets consistently
+                and they go up. Fall short and the AI adjusts down. The program never stays static —
+                it follows your actual performance, not a predetermined schedule.
+              </p>
             </div>
 
           </div>
