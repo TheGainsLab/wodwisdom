@@ -138,6 +138,28 @@ export default function EngineFeaturePage() {
         </div>
       </section>
 
+      {/* Heart rate analytics */}
+      <section className="feature-section">
+        <div className="feature-container">
+          <div className="feature-row">
+            <div className="feature-text">
+              <h3>Heart rate doesn't lie.</h3>
+              <p>
+                Anaerobic sessions peak at 165 bpm. Max Aerobic Power sessions at 134 bpm. That 31
+                bpm spread is your aerobic system working exactly as designed. If your Max Aerobic
+                Power sessions are running above 150 bpm, you're not training the system you think
+                you are.
+              </p>
+              <p>
+                HR analytics across all frameworks — Avg HR, Avg Peak HR, Max Peak HR, Efficiency,
+                Load — give you the physiological data to train smarter, not just harder.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
       {/* Footer CTA */}
       <section className="feature-footer-cta">
         <h2>Year of the Engine — $29.99/mo</h2>
