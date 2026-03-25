@@ -3,19 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
 
-const Placeholder = ({ label }: { label: string }) => (
-  <div className="feature-screenshot">
-    <div className="feature-screenshot-placeholder">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <circle cx="8.5" cy="8.5" r="1.5" />
-        <path d="M21 15l-5-5L5 21" />
-      </svg>
-      <span>{label}</span>
-    </div>
-  </div>
-);
-
 export default function EngineFeaturePage() {
   const navigate = useNavigate();
 
@@ -103,7 +90,7 @@ export default function EngineFeaturePage() {
               </p>
               <p>No guessing. No drifting. Just the work.</p>
             </div>
-            <Placeholder label="Screenshot: Pacing coach mid-session" />
+
           </div>
         </div>
       </section>
@@ -126,7 +113,7 @@ export default function EngineFeaturePage() {
                 <li>Energy system mapping</li>
               </ul>
             </div>
-            <Placeholder label="Screenshot: Engine analytics and heatmaps" />
+
           </div>
         </div>
       </section>
@@ -143,7 +130,7 @@ export default function EngineFeaturePage() {
                 and why it matters for balanced conditioning development.
               </p>
             </div>
-            <Placeholder label="Screenshot: Engine taxonomy" />
+
           </div>
         </div>
       </section>
