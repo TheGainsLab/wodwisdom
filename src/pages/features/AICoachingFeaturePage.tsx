@@ -74,9 +74,10 @@ export default function AICoachingFeaturePage() {
       {/* Real Chat Examples */}
       <section className="feature-section">
         <div className="feature-container">
-          <h2 className="feature-section-title">Real conversations, real coaching</h2>
+          <h2 className="feature-section-title">Ask anything</h2>
           <p className="feature-section-sub">
-            These are actual AI-generated responses from WodWisdom. Every answer is specific to the athlete's profile.
+            Pacing strategy. Movement cues. Scaling options. Competition prep. Skills practice. Nutrition planning.
+            Program review. Whatever you need — the AI speaks your language and coaches in real time.
           </p>
 
           <ChatExample question="When I snatch, I can pull high enough, but sometimes miss in the catch at weights I can make. What might be causing this and how can I correct it?">
