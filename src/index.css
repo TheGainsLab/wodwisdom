@@ -244,12 +244,12 @@ body.landing-body{overflow:auto;height:auto}
 .wr-prescription--metcon{border-left-color:#4ade80}
 .wr-prescription .workout-review-content{font-size:14px;line-height:1.6;font-weight:600;color:var(--text)}
 /* Time domain with clock icon */
-.wr-time-domain{display:flex;gap:10px;align-items:flex-start;margin-bottom:16px;padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px}
+.wr-time-domain{display:flex;gap:10px;align-items:flex-start;margin-bottom:16px;padding:12px 14px;background:var(--bg);border:1px solid #ffffff;border-radius:8px}
 .wr-time-domain svg{flex-shrink:0;margin-top:3px;color:var(--text-dim)}
 .wr-time-domain .workout-review-content{font-size:14px;line-height:1.6}
 /* Movement cards */
 .wr-movement-cards{display:flex;flex-direction:column;gap:10px}
-.wr-movement-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px}
+.wr-movement-card{background:var(--bg);border:1px solid #ffffff;border-radius:8px;padding:14px 16px}
 .wr-movement-name{font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px}
 .wr-cue-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
 .wr-cue-item{display:flex;align-items:flex-start;gap:8px;font-size:13px;line-height:1.5;color:var(--text-dim)}
