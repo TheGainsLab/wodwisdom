@@ -1343,21 +1343,21 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                         <input
                                           type="number"
-                                          placeholder="Sets"
+                                          placeholder=""
                                           value={sk.sets ?? ''}
                                           onChange={e => setSkillEntry(key, 'sets', e.target.value ? parseInt(e.target.value, 10) : undefined)}
                                           style={{ ...compactInputStyle, width: 48 }}
                                         />
                                         <input
                                           type="number"
-                                          placeholder="Reps"
+                                          placeholder=""
                                           value={sk.reps_completed ?? ''}
                                           onChange={e => setSkillEntry(key, 'reps_completed', e.target.value ? parseInt(e.target.value, 10) : undefined)}
                                           style={{ ...compactInputStyle, width: 48 }}
                                         />
                                         <input
                                           type="number"
-                                          placeholder="Hold (s)"
+                                          placeholder=""
                                           value={sk.hold_seconds ?? ''}
                                           onChange={e => setSkillEntry(key, 'hold_seconds', e.target.value ? parseInt(e.target.value, 10) : undefined)}
                                           style={{ ...compactInputStyle, width: 60 }}
