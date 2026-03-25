@@ -352,6 +352,45 @@ Deno.serve(async (req) => {
       });
     }
 
+    // -----------------------------------------------------------------------
+    // Cache check: return existing review before any heavy data fetching
+    // -----------------------------------------------------------------------
+    if (source_id) {
+      const { data: cached } = await supa
+        .from("workout_reviews")
+        .select("review")
+        .eq("user_id", user.id)
+        .eq("source_id", source_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (cached?.review) {
+        return new Response(JSON.stringify({ review: cached.review, cached: true }), {
+          status: 200,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      // Text-based cache: match on normalized workout text for manual submissions
+      const { data: cached } = await supa
+        .from("workout_reviews")
+        .select("review")
+        .eq("user_id", user.id)
+        .is("source_id", null)
+        .eq("workout_text", trimmed)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (cached?.review) {
+        return new Response(JSON.stringify({ review: cached.review, cached: true }), {
+          status: 200,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // Fetch entitlements, athlete profile, and recent training in parallel
     const [profileRes, entitlementRes, athleteRes, recentTraining] = await Promise.all([
       supa.from("profiles").select("role").eq("id", user.id).single(),
@@ -403,45 +442,6 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: "Daily limit reached" }),
           { status: 429, headers: { ...cors, "Content-Type": "application/json" } }
         );
-      }
-    }
-
-    // -----------------------------------------------------------------------
-    // Cache check: return existing review for this workout
-    // -----------------------------------------------------------------------
-    if (source_id) {
-      const { data: cached } = await supa
-        .from("workout_reviews")
-        .select("review")
-        .eq("user_id", user.id)
-        .eq("source_id", source_id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (cached?.review) {
-        return new Response(JSON.stringify({ review: cached.review, cached: true }), {
-          status: 200,
-          headers: { ...cors, "Content-Type": "application/json" },
-        });
-      }
-    } else {
-      // Text-based cache: match on normalized workout text for manual submissions
-      const { data: cached } = await supa
-        .from("workout_reviews")
-        .select("review")
-        .eq("user_id", user.id)
-        .is("source_id", null)
-        .eq("workout_text", trimmed)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (cached?.review) {
-        return new Response(JSON.stringify({ review: cached.review, cached: true }), {
-          status: 200,
-          headers: { ...cors, "Content-Type": "application/json" },
-        });
       }
     }
 
