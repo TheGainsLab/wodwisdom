@@ -138,10 +138,17 @@ export default function ProgramsFeaturePage() {
                 <li>Strength work prioritized by your hierarchy</li>
                 <li>Metcons built around movements you're proficient at</li>
               </ul>
+              <img src="/images/Program-Card.png" alt="Sample program day" className="feature-img" />
               <p>
-                Every training day opens with the intent behind the session — the why behind every set
-                and rep. Every block comes with coaching cues, movement standards, and common faults to avoid.
+                Every training day opens with the intent behind the session. Every block comes with coaching cues,
+                movement standards, and common faults to avoid. Tap Coach before you start — your AI coach is already prepared.
               </p>
+              <img src="/images/MetCon-Card.png" alt="MetCon coaching card" className="feature-img" />
+              <p style={{ fontStyle: 'italic', color: 'var(--text-dim)' }}>
+                "Bar muscle-ups will be your limiter today. Here's your race plan — and your coach already knows why."
+              </p>
+              <img src="/images/strength-card.png" alt="Strength coaching card" className="feature-img" />
+              <img src="/images/skills-card.png" alt="Skills coaching card" className="feature-img" />
             </div>
           </div>
         </div>
