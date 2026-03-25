@@ -53,6 +53,11 @@ export default function EngineFeaturePage() {
         <p className="feature-hero-body">
           Forcing everyone into the same program doesn't make sense. So we don't.
         </p>
+        <img
+          src="/images/pacing-coach.png"
+          alt="Pacing Coach — real-time interval targets and progress tracking"
+          className="feature-hero-img"
+        />
       </section>
 
       {/* Machine learning calibration */}
