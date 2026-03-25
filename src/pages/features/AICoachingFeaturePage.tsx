@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
 
@@ -34,8 +34,6 @@ function ChatExample({ question, children, scienceMode }: { question: string; ch
 }
 
 export default function AICoachingFeaturePage() {
-  const navigate = useNavigate();
-
   useEffect(() => {
     document.body.classList.add('feature-body');
     return () => document.body.classList.remove('feature-body');
@@ -62,48 +60,22 @@ export default function AICoachingFeaturePage() {
         <span className="feature-hero-badge">AI Coaching</span>
         <h1 className="feature-hero-title">AI that knows your athlete</h1>
         <p className="feature-hero-sub">
-          Enter your numbers, skills, and benchmarks. Get back a comprehensive evaluation that connects the dots across every domain of fitness.
+          We trained an AI on the CrossFit methodology — every study guide, journal article, and seminar.
+          Ask it anything about training, nutrition, movement, or recovery. Get answers grounded in real
+          methodology, not generic fitness advice.
         </p>
-      </section>
-
-      {/* How It Works */}
-      <section className="feature-section">
-        <div className="feature-container">
-          <div className="feature-row">
-            <div className="feature-text">
-              <h3>Build your athlete profile</h3>
-              <p>
-                Tell WodWisdom about your lifts, gymnastics skills, conditioning benchmarks, and goals.
-                The AI uses your complete profile to generate a detailed evaluation — not generic advice,
-                but analysis specific to your numbers and your movement capabilities.
-              </p>
-              <ul>
-                <li>Strength numbers and lift ratios</li>
-                <li>Gymnastics skill levels</li>
-                <li>Conditioning benchmarks across modalities</li>
-                <li>Training history and goals</li>
-              </ul>
-            </div>
-            <div className="feature-screenshot">
-              <div className="feature-screenshot-placeholder">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <path d="M21 15l-5-5L5 21" />
-                </svg>
-                <span>Screenshot: Athlete Profile</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <p className="feature-hero-sub">
+          No profile required.
+        </p>
       </section>
 
       {/* Real Chat Examples */}
       <section className="feature-section">
         <div className="feature-container">
-          <h2 className="feature-section-title">Real conversations, real coaching</h2>
+          <h2 className="feature-section-title">Ask anything</h2>
           <p className="feature-section-sub">
-            These are actual AI-generated responses from WodWisdom. Every answer is specific to the athlete's profile.
+            Pacing strategy. Movement cues. Scaling options. Competition prep. Skills practice. Nutrition planning.
+            Program review. Whatever you need — the AI speaks your language and coaches in real time.
           </p>
 
           <ChatExample question="When I snatch, I can pull high enough, but sometimes miss in the catch at weights I can make. What might be causing this and how can I correct it?">
@@ -120,6 +92,15 @@ export default function AICoachingFeaturePage() {
               <span className="feature-chat-chip">37 05 lifting shoulder</span>
             </div>
           </ChatExample>
+
+          <div className="feature-text" style={{ textAlign: 'center', margin: '48px 0' }}>
+            <h3>Science mode — go as deep as you want</h3>
+            <p>
+              Switch to science mode for a separate AI trained on biochemistry and physiology.
+              Carbohydrate metabolism, phosphocreatine resynthesis, heart rate variability,
+              calcium ion concentration and muscle contractions — go as deep as you want.
+            </p>
+          </div>
 
           <ChatExample question="I want to develop all the energy systems to support my fitness and do better in CrossFit. Can you help me understand phosphocreatine resynthesis and how my training can enhance it?" scienceMode>
             <p>The phosphocreatine (PCr) system is your most explosive energy pathway, providing immediate power for roughly 8-10 seconds of maximal effort. Looking at your profile, this system is what drives your heavy lifts like that 555lb deadlift and powers the first few reps of high-intensity movements.</p>
@@ -152,24 +133,18 @@ export default function AICoachingFeaturePage() {
                 You can trace any recommendation back to its source material.
               </p>
             </div>
-            <div className="feature-screenshot">
-              <div className="feature-screenshot-placeholder">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <path d="M21 15l-5-5L5 21" />
-                </svg>
-                <span>Screenshot: Sources & Citations</span>
-              </div>
-            </div>
           </div>
         </div>
       </section>
 
-      {/* Footer CTA */}
       <section className="feature-footer-cta">
-        <h2>Get your evaluation today.</h2>
-        <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Try it Free</button>
+        <h2>Want the AI to know your numbers?</h2>
+        <p style={{ maxWidth: 640, margin: '0 auto 24px', color: 'var(--text-dim)', fontSize: 15, lineHeight: 1.6 }}>
+          The AI Coach answers any question without a profile. But when you add AI Programming, the coach knows
+          your 1RMs, your skill levels, your conditioning benchmarks — and every coaching note in your program
+          is built around your specific data.
+        </p>
+        <Link to="/features/programs" className="feature-cta">Learn more about AI Programming &rarr;</Link>
       </section>
 
       <footer className="feature-footer"><GainsLogo /></footer>
