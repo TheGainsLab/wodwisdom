@@ -86,12 +86,6 @@ export default function EngineFeaturePage() {
                 that number specifically for you.
               </p>
             </div>
-            <div className="feature-screenshot">
-              <img
-                src="/images/pacing-coach.png"
-                alt="Pacing Coach — Day 24 Max Aerobic Power session with real-time targets"
-              />
-            </div>
           </div>
         </div>
       </section>
