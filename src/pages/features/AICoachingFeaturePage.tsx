@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
 
@@ -34,8 +34,6 @@ function ChatExample({ question, children, scienceMode }: { question: string; ch
 }
 
 export default function AICoachingFeaturePage() {
-  const navigate = useNavigate();
-
   useEffect(() => {
     document.body.classList.add('feature-body');
     return () => document.body.classList.remove('feature-body');
@@ -137,6 +135,16 @@ export default function AICoachingFeaturePage() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="feature-footer-cta">
+        <h2>Want the AI to know your numbers?</h2>
+        <p style={{ maxWidth: 640, margin: '0 auto 24px', color: 'var(--text-dim)', fontSize: 15, lineHeight: 1.6 }}>
+          The AI Coach answers any question without a profile. But when you add AI Programming, the coach knows
+          your 1RMs, your skill levels, your conditioning benchmarks — and every coaching note in your program
+          is built around your specific data.
+        </p>
+        <Link to="/features/programs" className="feature-cta">Learn more about AI Programming &rarr;</Link>
       </section>
 
       <footer className="feature-footer"><GainsLogo /></footer>
