@@ -98,23 +98,23 @@ export default function EngineFeaturePage() {
         </div>
       </section>
 
-      {/* Conditioning analytics */}
+      {/* Engine fingerprint */}
       <section className="feature-section">
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Conditioning analytics</h3>
+              <h3>Your engine has a fingerprint. Here's yours.</h3>
               <p>
-                Every training day classified, tracked, and analyzed. See how your conditioning
-                breaks down across workout types, time domains, and modalities over weeks and months.
-                Identify gaps and areas of overemphasis.
+                1:3 work-to-rest: 31 cal/min. 1:1 work-to-rest: 16 cal/min. Your output nearly
+                doubles with the right rest ratio. Most athletes never know this about themselves.
+                Most coaches don't have this data either.
               </p>
-              <ul>
-                <li>Automatic workout type classification</li>
-                <li>Time domain and stimulus identification</li>
-                <li>Heatmaps and charts across weeks and months</li>
-                <li>Energy system mapping</li>
-              </ul>
+              <p>
+                Year of the Engine tracks your performance across every work:rest ratio so the AI
+                programs the intervals that actually produce results for you — not the ratios that
+                work for everyone else.
+              </p>
+              <p>No one else is showing you this data. Because no one else has it.</p>
             </div>
 
           </div>
@@ -126,11 +126,50 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>Workout taxonomy</h3>
+              <h3>See how your output differs across training types.</h3>
               <p>
-                Understand the full classification system behind the analytics. Every workout type is
-                defined with clear criteria so you know exactly how your training is being categorized
-                and why it matters for balanced conditioning development.
+                Anaerobic: 31 cal/min. Max Aerobic Power: 15 cal/min. Endurance: 11 cal/min. Every
+                framework produces different output — and it should. Now you can see exactly how your
+                performance varies across energy systems and track improvement in each one independently.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* Heart rate analytics */}
+      <section className="feature-section">
+        <div className="feature-container">
+          <div className="feature-row">
+            <div className="feature-text">
+              <h3>Heart rate doesn't lie.</h3>
+              <p>
+                Anaerobic sessions peak at 165 bpm. Max Aerobic Power sessions at 134 bpm. That 31
+                bpm spread is your aerobic system working exactly as designed. If your Max Aerobic
+                Power sessions are running above 150 bpm, you're not training the system you think
+                you are.
+              </p>
+              <p>
+                HR analytics across all frameworks — Avg HR, Avg Peak HR, Max Peak HR, Efficiency,
+                Load — give you the physiological data to train smarter, not just harder.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* Framework balance */}
+      <section className="feature-section">
+        <div className="feature-container">
+          <div className="feature-row">
+            <div className="feature-text">
+              <h3>Balance across all 20 frameworks.</h3>
+              <p>
+                See how your training distributes across workout types, time domains, and energy
+                systems over weeks and months. Identify gaps. Spot overemphasis. Make sure every
+                component of your engine is getting the attention it needs.
               </p>
             </div>
 
