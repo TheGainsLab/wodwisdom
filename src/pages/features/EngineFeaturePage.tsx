@@ -76,8 +76,22 @@ export default function EngineFeaturePage() {
                 <li>Building anaerobic power? Each session ramps as you progress.</li>
                 <li>You always know what you're trying to hit and why — before the clock starts.</li>
               </ul>
+              <p>
+                Once it does, the app becomes your pacing coach. Goals, countdowns, and round context
+                stay front and center through fatigue so you execute the plan and get exactly the
+                stimulus you need.
+              </p>
+              <p>
+                Day 24. Max Aerobic Power. Goal: 68.4 calories. Not 65. Not 70. The AI calculated
+                that number specifically for you.
+              </p>
             </div>
-            <Placeholder label="Screenshot: Session targets and interval goals" />
+            <div className="feature-screenshot">
+              <img
+                src="/images/pacing-coach.png"
+                alt="Pacing Coach — Day 24 Max Aerobic Power session with real-time targets"
+              />
+            </div>
           </div>
         </div>
       </section>
