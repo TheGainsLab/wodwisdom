@@ -252,7 +252,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                     ) : (
                                       <span className="program-day-dot" />
                                     )}
-                                    <span className="program-day-label">Day {dayNum}</span>
+                                    <span className="program-day-label">Day {(w.sort_order % 5) + 1}</span>
                                     {done && <span className="program-completed-badge">Done</span>}
                                     {ip && <span className="program-in-progress-badge">{ip.savedCount}/{ip.totalBlocks} blocks</span>}
                                   </div>
