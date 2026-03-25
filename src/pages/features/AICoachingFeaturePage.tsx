@@ -95,6 +95,15 @@ export default function AICoachingFeaturePage() {
             </div>
           </ChatExample>
 
+          <div className="feature-text" style={{ textAlign: 'center', margin: '48px 0' }}>
+            <h3>Science mode — go as deep as you want</h3>
+            <p>
+              Switch to science mode for a separate AI trained on biochemistry and physiology.
+              Carbohydrate metabolism, phosphocreatine resynthesis, heart rate variability,
+              calcium ion concentration and muscle contractions — go as deep as you want.
+            </p>
+          </div>
+
           <ChatExample question="I want to develop all the energy systems to support my fitness and do better in CrossFit. Can you help me understand phosphocreatine resynthesis and how my training can enhance it?" scienceMode>
             <p>The phosphocreatine (PCr) system is your most explosive energy pathway, providing immediate power for roughly 8-10 seconds of maximal effort. Looking at your profile, this system is what drives your heavy lifts like that 555lb deadlift and powers the first few reps of high-intensity movements.</p>
             <p><strong>How PCr Works &amp; Recovers:</strong> PCr acts as an "ATP buffer" - when you fire up muscle contraction, ATP gets broken down to ADP, and PCr instantly donates its phosphate to regenerate ATP. This happens within fractions of a second, making it your fastest energy source. The key insight is that PCr resynthesis occurs through aerobic metabolism - your mitochondria use oxygen to rebuild those PCr stores.</p>
