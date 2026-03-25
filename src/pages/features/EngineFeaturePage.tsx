@@ -160,6 +160,23 @@ export default function EngineFeaturePage() {
         </div>
       </section>
 
+      {/* Framework balance */}
+      <section className="feature-section">
+        <div className="feature-container">
+          <div className="feature-row">
+            <div className="feature-text">
+              <h3>Balance across all 20 frameworks.</h3>
+              <p>
+                See how your training distributes across workout types, time domains, and energy
+                systems over weeks and months. Identify gaps. Spot overemphasis. Make sure every
+                component of your engine is getting the attention it needs.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
       {/* Footer CTA */}
       <section className="feature-footer-cta">
         <h2>Year of the Engine — $29.99/mo</h2>
