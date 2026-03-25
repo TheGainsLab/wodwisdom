@@ -102,25 +102,10 @@ function parseBlockContent(content: string): { header: string | null; items: str
  * Parse Skills block content into a header (e.g. "4 sets") and bullet items.
  * Returns null if the content already has newlines (let existing logic handle it).
  */
-function parseSkillsContent(content: string): { header: string | null; items: string[]; isEmom: boolean } | null {
+function parseSkillsContent(content: string): { header: string | null; items: string[] } | null {
   const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
 
-  // Detect EMOM header on the first line (e.g. "EMOM 8 …", "E2MOM 10 …")
-  const firstLine = lines[0] || '';
-  const emomMatch = firstLine.match(/^(E\d*MOM\s+\d+(?:\s*min(?:utes?)?)?)(?:\s+(.*))?$/i);
-  if (emomMatch) {
-    const header = emomMatch[1];
-    const remainderOfFirstLine = emomMatch[2] || '';
-    let items: string[];
-    if (lines.length > 1) {
-      items = [remainderOfFirstLine, ...lines.slice(1)].filter(Boolean);
-    } else {
-      items = splitTopLevelCommas(remainderOfFirstLine);
-    }
-    if (items.length > 0) return { header, items, isEmom: true };
-  }
-
-  if (lines.length > 1) return null; // already multi-line, existing rendering is fine
+  if (lines.length > 1) return null; // multi-line content — render as-is
 
   // Detect "N sets" prefix
   const setsMatch = content.match(/^(\d+\s+sets?)\b\s*/i);
@@ -135,7 +120,7 @@ function parseSkillsContent(content: string): { header: string | null; items: st
   const items = splitTopLevelCommas(remainder);
   if (items.length < 2 && !header) return null; // single item, no header — nothing to restructure
 
-  return { header, items, isEmom: false };
+  return { header, items };
 }
 
 /**
@@ -152,7 +137,7 @@ export function BlockContent({ label, content }: { label: string; content: strin
           {parsed.header && <div>{parsed.header}:</div>}
           <ul className="workout-block-lines">
             {parsed.items.map((item, j) => (
-              <li key={j}>{parsed.isEmom && parsed.items.length > 1 ? `Min ${j + 1} — ${item}` : item}</li>
+              <li key={j}>{item}</li>
             ))}
           </ul>
         </>
@@ -219,7 +204,7 @@ export default function WorkoutBlocksDisplay({ text, className = '' }: WorkoutBl
                   {parsed.header && <div>{parsed.header}:</div>}
                   <ul className="workout-block-lines">
                     {parsed.items.map((item, j) => (
-                      <li key={j}>{parsed.isEmom && parsed.items.length > 1 ? `Min ${j + 1} — ${item}` : item}</li>
+                      <li key={j}>{item}</li>
                     ))}
                   </ul>
                 </div>

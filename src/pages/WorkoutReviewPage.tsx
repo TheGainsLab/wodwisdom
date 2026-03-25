@@ -146,16 +146,21 @@ function CollapsibleBlock({ block, defaultOpen }: { block: ReviewBlock; defaultO
 export default function WorkoutReviewPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const location = useLocation();
-  // Restore last review from sessionStorage so a page refresh doesn't lose it
-  const savedSession = (() => {
+  // Restore cached review: check localStorage by source_id first, then sessionStorage
+  const savedReview = (() => {
     try {
+      const sid = (location.state as { source_id?: string } | null)?.source_id;
+      if (sid) {
+        const raw = localStorage.getItem(`wr_review_${sid}`);
+        if (raw) return JSON.parse(raw) as { workoutText: string; review: WorkoutReview };
+      }
       const raw = sessionStorage.getItem('wr_last_review');
       if (raw) return JSON.parse(raw) as { workoutText: string; review: WorkoutReview };
     } catch {}
     return null;
   })();
-  const [workoutText, setWorkoutText] = useState(savedSession?.workoutText ?? '');
-  const [review, setReview] = useState<WorkoutReview | null>(savedSession?.review ?? null);
+  const [workoutText, setWorkoutText] = useState(savedReview?.workoutText ?? '');
+  const [review, setReview] = useState<WorkoutReview | null>(savedReview?.review ?? null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [navOpen, setNavOpen] = useState(false);
@@ -230,9 +235,13 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
 
       const reviewData = data?.review as WorkoutReview;
       setReview(reviewData);
-      // Persist to sessionStorage so a page refresh restores the review
+      // Persist review: localStorage by source_id for cross-session cache, sessionStorage as fallback
       try {
-        sessionStorage.setItem('wr_last_review', JSON.stringify({ workoutText: trimmed, review: reviewData }));
+        const payload = JSON.stringify({ workoutText: trimmed, review: reviewData });
+        if (fromProgramState?.source_id) {
+          localStorage.setItem(`wr_review_${fromProgramState.source_id}`, payload);
+        }
+        sessionStorage.setItem('wr_last_review', payload);
       } catch {}
       // Only bump usage counter when it wasn't a cached response
       if (!data?.cached && (!tierLoaded || tier === 'free')) {
@@ -246,9 +255,11 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
   };
 
   // Auto-analyze when opened from program with workout pre-filled (runs once)
+  // Skip API call entirely if we already loaded a cached review from localStorage
   useEffect(() => {
     const text = fromProgramState?.workout_text?.trim();
     if (!text || !tierLoaded || hasAutoAnalyzed.current) return;
+    if (review) { hasAutoAnalyzed.current = true; return; }
     if (tier === 'free' && totalUsage >= freeLimit) return;
     hasAutoAnalyzed.current = true;
     setWorkoutText(text);
