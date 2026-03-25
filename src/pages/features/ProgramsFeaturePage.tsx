@@ -4,19 +4,6 @@ import GainsLogo from '../../components/GainsLogo';
 import ProfileMockup from '../../components/ProfileMockup';
 import '../../features.css';
 
-const Placeholder = ({ label }: { label: string }) => (
-  <div className="feature-screenshot">
-    <div className="feature-screenshot-placeholder">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <circle cx="8.5" cy="8.5" r="1.5" />
-        <path d="M21 15l-5-5L5 21" />
-      </svg>
-      <span>{label}</span>
-    </div>
-  </div>
-);
-
 export default function ProgramsFeaturePage() {
   const navigate = useNavigate();
 
@@ -151,12 +138,18 @@ export default function ProgramsFeaturePage() {
                 <li>Strength work prioritized by your hierarchy</li>
                 <li>Metcons built around movements you're proficient at</li>
               </ul>
+              <img src="/images/Program-Card.png" alt="Sample program day" className="feature-img" />
               <p>
-                Every training day opens with the intent behind the session — the why behind every set
-                and rep. Every block comes with coaching cues, movement standards, and common faults to avoid.
+                Every training day opens with the intent behind the session. Every block comes with coaching cues,
+                movement standards, and common faults to avoid. Tap Coach before you start — your AI coach is already prepared.
               </p>
+              <img src="/images/MetCon-Card.png" alt="MetCon coaching card" className="feature-img" />
+              <p style={{ fontStyle: 'italic', color: 'var(--text-dim)' }}>
+                "Bar muscle-ups will be your limiter today. Here's your race plan — and your coach already knows why."
+              </p>
+              <img src="/images/strength-card.png" alt="Strength coaching card" className="feature-img" />
+              <img src="/images/skills-card.png" alt="Skills coaching card" className="feature-img" />
             </div>
-            <Placeholder label="Screenshot: Sample program day with coach's notes" />
           </div>
         </div>
       </section>
@@ -186,7 +179,6 @@ export default function ProgramsFeaturePage() {
                 <li>Longitudinal tracking — see your development over time</li>
               </ul>
             </div>
-            <Placeholder label="Screenshot: Monthly evaluation update" />
           </div>
         </div>
       </section>
@@ -211,7 +203,6 @@ export default function ProgramsFeaturePage() {
                 The program that follows you.
               </p>
             </div>
-            <Placeholder label="Screenshot: Program Comparison" />
           </div>
         </div>
       </section>
