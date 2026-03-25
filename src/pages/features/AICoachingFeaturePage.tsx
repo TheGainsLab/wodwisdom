@@ -139,12 +139,6 @@ export default function AICoachingFeaturePage() {
         </div>
       </section>
 
-      {/* Footer CTA */}
-      <section className="feature-footer-cta">
-        <h2>Get your evaluation today.</h2>
-        <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Try it Free</button>
-      </section>
-
       <footer className="feature-footer"><GainsLogo /></footer>
     </div>
   );
