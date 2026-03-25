@@ -1106,7 +1106,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                               <div key={key} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                                 <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 28, textAlign: 'right' }}>S{ev.set_number}</span>
                                 <input type="number" placeholder="Reps" value={ev.reps ?? ''} onChange={e => setEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 60 }} />
-                                <input type="number" placeholder="Wt" value={ev.weight ?? ''} onChange={e => setEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)} style={{ ...compactInputStyle, width: 64, border: ev.weight == null ? '1px solid var(--accent)' : '1px solid var(--border)' }} />
+                                <input type="number" placeholder="" value={ev.weight ?? ''} onChange={e => setEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)} style={{ ...compactInputStyle, width: 64, border: ev.weight == null ? '1px solid var(--accent)' : '1px solid var(--border)' }} />
                                 <span style={{ color: 'var(--text-dim)', fontSize: 13, width: 28 }}>{ev.weight_unit || 'lbs'}</span>
                                 <select value={ev.rpe ?? ''} onChange={e => setEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 48, padding: '8px 4px', border: ev.rpe == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}>
                                   <option value=""></option>
@@ -1212,7 +1212,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                           <>
                                             <input
                                               type="number"
-                                              placeholder="Wt"
+                                              placeholder=""
                                               value={mv.weight ?? ''}
                                               onChange={e => setMetconEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
                                               style={{ ...compactInputStyle, width: 64 }}
