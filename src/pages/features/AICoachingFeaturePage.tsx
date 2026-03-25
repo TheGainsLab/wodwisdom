@@ -62,7 +62,12 @@ export default function AICoachingFeaturePage() {
         <span className="feature-hero-badge">AI Coaching</span>
         <h1 className="feature-hero-title">AI that knows your athlete</h1>
         <p className="feature-hero-sub">
-          Enter your numbers, skills, and benchmarks. Get back a comprehensive evaluation that connects the dots across every domain of fitness.
+          We trained an AI on the CrossFit methodology — every study guide, journal article, and seminar.
+          Ask it anything about training, nutrition, movement, or recovery. Get answers grounded in real
+          methodology, not generic fitness advice.
+        </p>
+        <p className="feature-hero-sub">
+          No profile required.
         </p>
       </section>
 
