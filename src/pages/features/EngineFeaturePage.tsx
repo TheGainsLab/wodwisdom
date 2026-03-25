@@ -134,6 +134,7 @@ export default function EngineFeaturePage() {
                 framework produces different output — and it should. Now you can see exactly how your
                 performance varies across energy systems and track improvement in each one independently.
               </p>
+              <img src="/images/comparison.png" alt="Output comparison across training types" className="feature-img" />
             </div>
 
           </div>
