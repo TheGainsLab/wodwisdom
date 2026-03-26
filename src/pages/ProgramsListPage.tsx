@@ -30,9 +30,8 @@ export default function ProgramsListPage({ session }: { session: Session }) {
     const [progData, profileRes, evalRes] = await Promise.all([
       supabase
         .from('programs')
-        .select('id, name, created_at, source')
+        .select('id, name, created_at')
         .eq('user_id', session.user.id)
-        .neq('source', 'external')
         .order('created_at', { ascending: false }),
       supabase
         .from('athlete_profiles')
