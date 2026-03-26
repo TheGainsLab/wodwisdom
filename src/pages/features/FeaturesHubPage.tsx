@@ -6,7 +6,7 @@ import '../../features.css';
 const FEATURES = [
   {
     title: 'AI Coaching',
-    description: 'Get a comprehensive AI evaluation of any athlete — strength ratios, skills assessment, conditioning analysis, and personalized priorities. Like having a head coach who has read every journal article and never forgets a detail.',
+    description: 'Ask anything about training, nutrition, movement, or recovery. Get answers grounded in real methodology — not generic fitness advice. Switch to Science mode to go deep on physiology and biochemistry.',
     path: '/features/coaching',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -19,7 +19,7 @@ const FEATURES = [
   },
   {
     title: 'Programs',
-    description: 'Upload any training program and get instant AI analysis — weekly volume breakdown, movement patterns, energy system balance, and smart modification suggestions tailored to your athletes.',
+    description: 'The AI learns your lifts, skills, and conditioning, evaluates your profile in depth, then builds a personalized program with coaching cues for every session. Log results and it adapts.',
     path: '/features/programs',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -30,7 +30,7 @@ const FEATURES = [
   },
   {
     title: 'Engine',
-    description: 'Advanced conditioning intelligence. See every training day classified by workout type, track your conditioning across time domains, and visualize your training balance with analytics and heatmaps.',
+    description: '20 distinct training frameworks, each targeting a specific adaptation. Machine learning calibrates every interval to your level and coaches you through each session in real time.',
     path: '/features/engine',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

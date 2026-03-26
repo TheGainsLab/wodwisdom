@@ -80,35 +80,19 @@ export default function LandingPage() {
             <div className="landing-offering-card">
               <h3>AI Coach</h3>
               <p className="landing-offering-tagline">The brain of a Level 4 coach, available any time</p>
-              <p>Ask anything about training, nutrition, movement, or recovery. Get answers from an AI that speaks your language — not generic fitness advice. Pacing strategy, movement cues, scaling options, competition prep, skills practice. Whatever you need, just ask.</p>
-              <p>Share your current training and get it optimized. Build a nutrition plan using your own data. The AI understands context — it doesn't just answer questions, it coaches.</p>
-              <p><strong>Science mode</strong> — Want a comprehensive overview of carbohydrate metabolism? How calcium ion concentration affects muscle contractions? Switch to science mode — a separate AI trained on biochemistry and physiology — and go as deep as you want.</p>
+              <p>Ask anything about training, nutrition, movement, or recovery. Get answers grounded in the CrossFit methodology — not generic fitness advice. Switch to Science mode to go deep on physiology and biochemistry.</p>
               <Link to="/features/coaching" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
             <div className="landing-offering-card">
               <h3>AI Programming</h3>
-              <p><strong>Stop following someone else's program. Get the program that follows you.</strong></p>
-              <p>Any AI can write a program. This is different. Our AI was trained on the CrossFit methodology and millions of historical workout data points — then it learns everything about you before writing a single rep.</p>
-              <p>Enter your 1RMs, skill levels, and conditioning data. The AI analyzes your fitness in depth, identifies your limiters, and builds a personalized 20-day program — warm-ups, mobility, skills work, strength blocks, and metcons assembled specifically for you.</p>
-              <p><strong>Coached every session</strong> — Every training day opens with the intent behind the session — the why behind every set and rep. Every block comes with coaching cues, movement standards, and common faults to avoid. It's like having a coach by your side every time you train. And if you have questions before you start, just ask — the AI is already there.</p>
-              <p><strong>Ongoing and adaptive</strong></p>
-              <ul>
-                <li>Traveling with only a hotel gym? Tell the AI. Your program updates for those days.</li>
-                <li>Prepping for a competition and need to drill specific skills? The AI tells you exactly where to insert them.</li>
-                <li>Log results and the AI adjusts. Demonstrate proficiency and receive harder progressions.</li>
-                <li>Each month, your profile is reviewed and your evaluation updated. Over time, your assessments tell the story of your development as an athlete.</li>
-              </ul>
+              <p className="landing-offering-tagline">Stop following someone else's program. Get the program that follows you.</p>
+              <p>The AI learns your lifts, skills, and conditioning, then builds a personalized program — warm-ups through metcons — with coaching cues for every session. Log results and it adapts.</p>
               <Link to="/features/programs" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
             <div className="landing-offering-card">
-              <h3>The Year of the Engine</h3>
-              <p>Engine isn't one parameter — it's many. Aerobic capacity. Anaerobic power. Threshold. Efficiency. Repeatability. These don't increase in lockstep, and your training history determines where each one starts. Treating them as a single system means dragging weak links along and holding strong ones back.</p>
-              <p>Forcing everyone into the same program doesn't make sense. So we don't.</p>
-              <p><strong>Year of the Engine AI</strong></p>
-              <p>The Year of the Engine is built on 20 distinct training frameworks, each independently targeting a specific adaptation. Machine learning calibrates every session precisely to you — not just the program, but every individual interval and every personal target within it.</p>
-              <p>High aerobic capacity? You'll get aggressive goals. Building anaerobic power? Each session ramps as you progress. You always know what you're trying to hit and why — before the clock starts.</p>
-              <p>Once it does, the app becomes your pacing coach. Goals, countdowns, and round context stay front and center through fatigue so you execute the plan and get exactly the stimulus you need.</p>
-              <p>No one-size-fits-all program can deliver this. Year of the Engine does.</p>
+              <h3>Year of the Engine</h3>
+              <p className="landing-offering-tagline">20 frameworks. One program. Calibrated to you.</p>
+              <p>Machine learning targets each energy system independently and calibrates every interval to your level. The app coaches you through each session in real time with pacing targets, countdowns, and round context.</p>
               <Link to="/features/engine" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
           </div>
