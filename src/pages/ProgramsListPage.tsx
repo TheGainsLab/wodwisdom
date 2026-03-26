@@ -16,21 +16,50 @@ export default function ProgramsListPage({ session }: { session: Session }) {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [navOpen, setNavOpen] = useState(false);
+  const [hasProfile, setHasProfile] = useState(false);
+  const [hasEvaluation, setHasEvaluation] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState('');
 
   useEffect(() => {
-    loadPrograms();
+    loadAll();
   }, [session.user.id]);
 
-  const loadPrograms = async () => {
+  const loadAll = async () => {
     setLoading(true);
-    const { data: progData } = await supabase
-      .from('programs')
-      .select('id, name, created_at')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false });
-    if (progData) {
+    const [progData, profileRes, evalRes] = await Promise.all([
+      supabase
+        .from('programs')
+        .select('id, name, created_at')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('athlete_profiles')
+        .select('lifts, skills, conditioning')
+        .eq('user_id', session.user.id)
+        .maybeSingle(),
+      supabase
+        .from('profile_evaluations')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(1),
+    ]);
+
+    // Check profile has meaningful data
+    if (profileRes.data) {
+      const d = profileRes.data;
+      const hasLifts = d.lifts && Object.values(d.lifts).some((v: any) => v > 0);
+      const hasSkills = d.skills && Object.values(d.skills).some((v: any) => v && v !== 'none');
+      const hasConditioning = d.conditioning && Object.values(d.conditioning).some((v: any) => v);
+      setHasProfile(!!(hasLifts || hasSkills || hasConditioning));
+    }
+
+    setHasEvaluation(!!(evalRes.data && evalRes.data.length > 0));
+
+    if (progData.data) {
       const withCount = await Promise.all(
-        progData.map(async p => {
+        progData.data.map(async p => {
           const { count } = await supabase
             .from('program_workouts')
             .select('id', { count: 'exact', head: true })
@@ -41,6 +70,49 @@ export default function ProgramsListPage({ session }: { session: Session }) {
       setPrograms(withCount);
     }
     setLoading(false);
+  };
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setGenerateError('');
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-program', {
+        body: {},
+      });
+      if (error) throw new Error(error.message || 'Failed to generate program');
+      if (data?.error) throw new Error(data.error || 'Failed to generate program');
+      const jobId = data?.job_id;
+      if (!jobId) throw new Error('No job ID returned');
+
+      let delay = 3000;
+      const maxDelay = 8000;
+      const maxAttempts = 80;
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise((r) => setTimeout(r, delay));
+        const { data: status, error: statusErr } = await supabase.functions.invoke('program-job-status', {
+          body: { job_id: jobId },
+        });
+        if (statusErr) throw new Error(statusErr.message || 'Failed to check job status');
+        if (status?.error && status?.status !== 'failed') throw new Error(status.error);
+
+        if (status?.status === 'complete') {
+          if (status.program_id) {
+            navigate(`/programs/${status.program_id}`);
+            return;
+          }
+          throw new Error('Program completed but no ID returned');
+        }
+        if (status?.status === 'failed') {
+          throw new Error(status.error || 'Program generation failed');
+        }
+        delay = Math.min(delay + 1000, maxDelay);
+      }
+      throw new Error('Program generation timed out');
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : 'Failed to generate program');
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleDelete = async (e: React.MouseEvent, programId: string) => {
@@ -71,9 +143,28 @@ export default function ProgramsListPage({ session }: { session: Session }) {
               <div className="page-loading"><div className="loading-pulse" /></div>
             ) : programs.length === 0 ? (
               <div className="empty-state">
-                <p>No programs yet.</p>
-                <p>Complete your profile to generate a personalized program.</p>
-                <button className="auth-btn" onClick={() => navigate('/profile')}>Go to Profile</button>
+                {!hasProfile ? (
+                  <>
+                    <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Set up your athlete profile</p>
+                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 16 }}>Add your lifts, skills, and benchmarks so the AI can build a program tailored to you.</p>
+                    <button className="auth-btn" onClick={() => navigate('/profile')}>Go to Profile</button>
+                  </>
+                ) : !hasEvaluation ? (
+                  <>
+                    <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Get your profile evaluated</p>
+                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 16 }}>Your profile is set up. Run an AI evaluation to unlock program generation.</p>
+                    <button className="auth-btn" onClick={() => navigate('/profile')}>Go to Evaluation</button>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Ready to generate your program</p>
+                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 16 }}>Your evaluation is complete. Generate a personalized program based on your profile and analysis.</p>
+                    {generateError && <div className="error-msg" style={{ marginBottom: 12 }}>{generateError}</div>}
+                    <button className="auth-btn" onClick={handleGenerate} disabled={generating}>
+                      {generating ? 'Generating...' : 'Generate Program'}
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <div className="history-list">
