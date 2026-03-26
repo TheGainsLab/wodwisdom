@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
@@ -9,6 +10,7 @@ interface Profile {
 }
 
 export default function SettingsPage({ session }: { session: Session }) {
+  const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
   const [profile, setProfile] = useState<Profile>({ full_name: '', role: 'user' });
   const [hasSubscription, setHasSubscription] = useState(false);
@@ -105,6 +107,20 @@ export default function SettingsPage({ session }: { session: Session }) {
                     </button>
                   </div>
                 )}
+                {/* Athlete Profile Link */}
+                <div className="settings-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/profile')}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 15 }}>Athlete Profile</div>
+                        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>1RMs, skills, equipment & benchmarks</div>
+                      </div>
+                    </div>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+                  </div>
+                </div>
+
                 {/* Profile Section */}
                 <div className="settings-card">
                   <h2 className="settings-card-title">Profile</h2>

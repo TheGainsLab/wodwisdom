@@ -75,10 +75,6 @@ export default function Nav({ isOpen, onClose }: NavProps) {
           <GainsLogo className="nav-title" />
         </div>
         <div className="nav-links">
-          <button className={"nav-link " + (location.pathname === "/profile" ? "active" : "")} onClick={() => goTo("/profile")}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-            Profile
-          </button>
           <div className="nav-group">
             <button className={"nav-group-header " + (isChatActive ? "active" : "")} onClick={() => setChatExpanded(!chatExpanded)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
