@@ -17,17 +17,20 @@ export default function Nav({ isOpen, onClose }: NavProps) {
   const isTrainingActive = location.pathname.startsWith('/programs') || location.pathname === '/training-log';
   const isNutritionActive = location.pathname.startsWith('/nutrition');
   const isEngineActive = location.pathname.startsWith('/engine');
+  const isAILogActive = location.pathname.startsWith('/ailog');
   const [chatExpanded, setChatExpanded] = useState(isChatActive);
   const [trainingExpanded, setTrainingExpanded] = useState(isTrainingActive);
   const [nutritionExpanded, setNutritionExpanded] = useState(isNutritionActive);
   const [engineExpanded, setEngineExpanded] = useState(isEngineActive);
+  const [ailogExpanded, setAilogExpanded] = useState(isAILogActive);
 
   useEffect(() => {
     if (isChatActive) setChatExpanded(true);
     if (isTrainingActive) setTrainingExpanded(true);
     if (isNutritionActive) setNutritionExpanded(true);
     if (isEngineActive) setEngineExpanded(true);
-  }, [isChatActive, isTrainingActive, isNutritionActive, isEngineActive]);
+    if (isAILogActive) setAilogExpanded(true);
+  }, [isChatActive, isTrainingActive, isNutritionActive, isEngineActive, isAILogActive]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -148,6 +151,20 @@ export default function Nav({ isOpen, onClose }: NavProps) {
                 </button>
                 <button className={"nav-link sub " + (location.pathname === "/engine/taxonomy" ? "active" : "")} onClick={() => goTo("/engine/taxonomy")}>
                   <span className="nav-sub-dot" />Day Types
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="nav-group">
+            <button className={"nav-group-header " + (isAILogActive ? "active" : "")} onClick={() => setAilogExpanded(!ailogExpanded)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.5V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-2.5c2.9-1.2 5-4.1 5-7.5a8 8 0 0 0-8-8z" /><line x1="10" y1="22" x2="14" y2="22" /></svg>
+              AI Log
+              <svg className={"nav-chevron " + (ailogExpanded ? "expanded" : "")} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+            </button>
+            {ailogExpanded && (
+              <div className="nav-group-items">
+                <button className={"nav-link sub " + (location.pathname === "/ailog" ? "active" : "")} onClick={() => goTo("/ailog")}>
+                  <span className="nav-sub-dot" />Dashboard
                 </button>
               </div>
             )}

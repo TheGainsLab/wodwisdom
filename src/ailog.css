@@ -1,0 +1,54 @@
+/* AI Log */
+
+.ailog-page{--border:#e0e0e8;--border-light:#f0f0f5}
+.ailog-page{padding:24px 20px;max-width:900px;margin:0 auto;width:100%;overflow-y:auto;flex:1;animation:fadeUp .4s ease}
+.ailog-card{background:var(--surface);border:1px solid var(--border-light);border-radius:12px;padding:24px}
+.ailog-section{display:flex;flex-direction:column;gap:16px}
+.ailog-header{font-size:20px;font-weight:700;letter-spacing:-.3px}
+.ailog-subheader{font-size:14px;color:var(--text-dim);line-height:1.6}
+.ailog-divider{border:none;border-top:1px solid var(--border-light);margin:0}
+.ailog-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.ailog-stat{background:var(--surface);border:1px solid var(--border-light);border-radius:12px;padding:18px 22px}
+.ailog-stat-value{font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:700;color:var(--text);margin-bottom:4px}
+.ailog-stat-label{font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px}
+.ailog-btn{border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-weight:600;cursor:pointer;transition:background .2s,transform .1s;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.ailog-btn:active{transform:scale(.98)}
+.ailog-btn:disabled{opacity:.5;cursor:not-allowed}
+.ailog-btn-primary{background:var(--accent);color:white;padding:14px 32px;font-size:15px}
+.ailog-btn-primary:hover:not(:disabled){background:var(--accent-hover)}
+.ailog-btn-secondary{background:none;border:1px solid var(--border);color:var(--text-dim);padding:11px 20px;font-size:14px}
+.ailog-btn-secondary:hover:not(:disabled){border-color:var(--accent);color:var(--text);background:var(--surface2)}
+
+/* Label */
+.ailog-label{display:block;font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+
+/* Input */
+.ailog-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:13px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:15px;outline:none;transition:border-color .2s,box-shadow .2s;box-sizing:border-box}
+.ailog-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.ailog-input::placeholder{color:var(--text-muted)}
+.ailog-input:disabled{opacity:.5;cursor:not-allowed}
+
+/* Empty state */
+.ailog-empty{display:flex;flex-direction:column;align-items:center;gap:16px;padding:48px 24px;text-align:center}
+.ailog-empty-icon{width:56;height:56;color:var(--text-muted);opacity:.5}
+
+/* Program card in list */
+.ailog-program{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:10px;border:1px solid var(--border-light);background:var(--surface);cursor:pointer;transition:border-color .15s,background .15s;width:100%;text-align:left;font-family:inherit;color:inherit}
+.ailog-program:hover{border-color:var(--accent);background:var(--surface2)}
+.ailog-program-name{font-size:15px;font-weight:600;color:var(--text)}
+.ailog-program-meta{font-size:13px;color:var(--text-dim)}
+.ailog-program-gym{font-size:12px;color:var(--text-muted);font-weight:500}
+
+/* Upload area */
+.ailog-upload{border:2px dashed var(--border);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
+.ailog-upload:hover,.ailog-upload.dragover{border-color:var(--accent);background:var(--accent-glow)}
+.ailog-upload-label{font-size:14px;color:var(--text-dim);margin-top:8px}
+
+/* Spin animation for loading */
+.spin{animation:ailog-spin 1s linear infinite}
+@keyframes ailog-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+/* Badge */
+.ailog-badge{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 10px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.ailog-badge--ongoing{background:rgba(34,197,94,.15);color:#4ade80}
+.ailog-badge--complete{background:var(--surface2);color:var(--text-dim)}

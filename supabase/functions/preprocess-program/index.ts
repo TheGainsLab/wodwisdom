@@ -552,6 +552,59 @@ async function parseBlock(
   return deduped;
 }
 
+const INFER_BLOCKS_PROMPT = `You classify CrossFit/fitness workout sections into block types.
+
+Given a workout text that may use labels like "Part A", "Part B", "A)", "B)", "1)", "2)", or no labels at all, identify each distinct section and classify it.
+
+Return ONLY a JSON array:
+[
+  {
+    "block_type": "warm-up" | "mobility" | "skills" | "strength" | "metcon" | "cool-down" | "accessory" | "other",
+    "block_order": <1-based integer>,
+    "block_text": "<the text content for this block>"
+  }
+]
+
+Classification rules:
+- strength: barbell or dumbbell work with sets×reps and percentages (5x5, 3x3 @80%, build to heavy single)
+- metcon: AMRAP, For Time, RFT, EMOM with multiple movements, timed workouts
+- skills: gymnastics practice, progression work, skill drills (handstand walks, muscle-up practice)
+- warm-up: general preparation, light cardio, movement prep
+- cool-down: stretching, foam rolling, recovery
+- mobility: targeted joint work, banded stretches
+- accessory: isolation work, core, supplemental exercises
+- other: anything that doesn't fit above
+
+If the entire text is a single workout (no sections), classify the whole thing as one block.
+Output valid JSON only, no markdown fences.`;
+
+async function inferBlocksAI(
+  workoutText: string,
+  apiKey: string,
+): Promise<{ block_type: string; block_order: number; block_text: string }[]> {
+  try {
+    const raw = await callClaude({
+      apiKey,
+      system: INFER_BLOCKS_PROMPT,
+      userContent: workoutText,
+      maxTokens: 1024,
+    });
+    const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+    const items = JSON.parse(cleaned);
+    if (!Array.isArray(items)) return [];
+    return items
+      .filter((b: Record<string, unknown>) => b.block_type && b.block_text)
+      .map((b: Record<string, unknown>, i: number) => ({
+        block_type: String(b.block_type),
+        block_order: typeof b.block_order === "number" ? b.block_order : i + 1,
+        block_text: String(b.block_text).trim(),
+      }));
+  } catch (e) {
+    console.error("[preprocess-program] inferBlocksAI error:", e);
+    return [];
+  }
+}
+
 console.log("[preprocess-program] v2 loaded");
 Deno.serve(async (req) => {
 if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -566,7 +619,7 @@ return new Response(JSON.stringify({ error: "Unauthorized" }), {
 }
 const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 const body = await req.json();
-const { name, text, file_base64, file_type, source, user_id: bodyUserId } = body;
+const { name, text, file_base64, file_type, source, user_id: bodyUserId, gym_name, is_ongoing, append_to_program_id } = body;
 const resolved = await resolveUserId(supa, authHeader, bodyUserId);
 if (resolved.error) {
 return new Response(JSON.stringify({ error: resolved.error }), {
@@ -613,20 +666,45 @@ return new Response(JSON.stringify({ error: `Expected exactly 20 workouts, got $
         headers: { ...cors, "Content-Type": "application/json" },
 });
 }
-const programName = (name && String(name).trim()) || "Untitled Program";
-const { data: prog, error: progErr } = await supa
-.from("programs")
-.insert({ user_id: userId, name: programName })
-.select("id")
-.single();
-if (progErr || !prog) {
-return new Response(JSON.stringify({ error: "Failed to create program" }), {
-        status: 500,
-        headers: { ...cors, "Content-Type": "application/json" },
-});
+// If appending to an existing program, verify ownership and use that program
+let progId: string;
+if (append_to_program_id) {
+  const { data: existing, error: existErr } = await supa
+    .from("programs")
+    .select("id")
+    .eq("id", append_to_program_id)
+    .eq("user_id", userId)
+    .single();
+  if (existErr || !existing) {
+    return new Response(JSON.stringify({ error: "Program not found" }), {
+      status: 404,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  progId = existing.id;
+} else {
+  const programName = (name && String(name).trim()) || "Untitled Program";
+  const insertObj: Record<string, unknown> = { user_id: userId, name: programName };
+  if (source === "external") {
+    insertObj.source = "external";
+    if (gym_name) insertObj.gym_name = String(gym_name).trim();
+    insertObj.is_ongoing = is_ongoing === true;
+  }
+  const { data: prog, error: progErr } = await supa
+    .from("programs")
+    .insert(insertObj)
+    .select("id")
+    .single();
+  if (progErr || !prog) {
+    return new Response(JSON.stringify({ error: "Failed to create program" }), {
+      status: 500,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  progId = prog.id;
 }
 const rows = workouts.map((w, i) => ({
-      program_id: prog.id,
+      program_id: progId,
       week_num: w.week_num,
       day_num: w.day_num,
       workout_text: w.workout_text,
@@ -637,18 +715,27 @@ const { data: insertedWorkouts, error: wkErr } = await supa
 .insert(rows)
 .select("id, workout_text");
 if (wkErr) {
-await supa.from("programs").delete().eq("id", prog.id);
+if (!append_to_program_id) await supa.from("programs").delete().eq("id", progId);
 return new Response(JSON.stringify({ error: "Failed to save workouts" }), {
         status: 500,
         headers: { ...cors, "Content-Type": "application/json" },
 });
 }
-console.log(`[preprocess-program] v2 inserted ${insertedWorkouts?.length ?? 0} workouts, prog=${prog.id}`);
+console.log(`[preprocess-program] v2 inserted ${insertedWorkouts?.length ?? 0} workouts, prog=${progId}`);
 if (insertedWorkouts?.length) {
 const blockRows: { program_workout_id: string; block_type: string; block_order: number; block_text: string }[] = [];
+const ANTHROPIC_KEY_FOR_INFER = Deno.env.get("ANTHROPIC_API_KEY");
 for (const w of insertedWorkouts) {
 console.log(`[preprocess-program] v2 extracting blocks for workout ${w.id}, has workout_text: ${typeof w.workout_text}, len=${w.workout_text?.length ?? 'null'}`);
-const blocks = extractBlocksFromWorkoutText(w.workout_text);
+let blocks = extractBlocksFromWorkoutText(w.workout_text);
+// If no labeled blocks found and AI is available, use AI to infer block types
+if (blocks.length === 0 && ANTHROPIC_KEY_FOR_INFER && w.workout_text?.length > 10) {
+  blocks = await inferBlocksAI(w.workout_text, ANTHROPIC_KEY_FOR_INFER);
+  if (blocks.length === 0) {
+    // Fallback: treat entire text as a single "other" block
+    blocks = [{ block_type: "other", block_order: 1, block_text: w.workout_text }];
+  }
+}
 for (const b of blocks) {
           blockRows.push({
             program_workout_id: w.id,
@@ -696,7 +783,7 @@ if (insertedBlocks?.length) {
 }
 return new Response(
 JSON.stringify({
-        program_id: prog.id,
+        program_id: progId,
         workout_count: workouts.length,
 }),
 {
