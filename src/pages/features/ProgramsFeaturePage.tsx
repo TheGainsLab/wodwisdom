@@ -188,7 +188,7 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>AI Programming — $34.99/mo</h3>
+              <h3>AI Programming — $29.99/mo</h3>
               <p>
                 AI Coach included. Personalized programming. Adaptive adjustments. Monthly reviews.
               </p>
