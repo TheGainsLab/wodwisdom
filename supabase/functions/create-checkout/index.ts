@@ -4,8 +4,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
-const PRICE_ATHLETE = Deno.env.get("STRIPE_PRICE_ATHLETE");
-const PRICE_GYM = Deno.env.get("STRIPE_PRICE_GYM");
+const PRICE_COACH = Deno.env.get("STRIPE_PRICE_ATHLETE");
+const PRICE_PROGRAMMING = Deno.env.get("STRIPE_PRICE_PROGRAMMING");
+const PRICE_ENGINE = Deno.env.get("STRIPE_PRICE_ENGINE");
+const PRICE_ALL_ACCESS = Deno.env.get("STRIPE_PRICE_ALL_ACCESS");
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -24,7 +26,16 @@ serve(async (req) => {
     if (!user) throw new Error("Not authenticated");
 
     const { plan } = await req.json();
-    const priceId = plan === "gym" ? PRICE_GYM : PRICE_ATHLETE;
+    const PRICES: Record<string, string | undefined> = {
+      coach: PRICE_COACH,
+      programming: PRICE_PROGRAMMING,
+      engine: PRICE_ENGINE,
+      all_access: PRICE_ALL_ACCESS,
+      // Legacy alias
+      athlete: PRICE_COACH,
+    };
+    const priceId = PRICES[plan];
+    if (!priceId) throw new Error("Invalid plan: " + plan);
 
     const origin = req.headers.get("Origin") || req.headers.get("Referer")?.replace(/\/$/, "") || "https://wodwisdom.com";
     const baseUrl = origin.startsWith("http") ? origin : `https://${origin}`;

@@ -145,7 +145,7 @@ export default function LandingPage() {
             <div className="landing-pricing-note">(AI Coach included)</div>
             <div className="landing-pricing-row">
               <span className="landing-pricing-name">AI Programming</span>
-              <span className="landing-pricing-amount">$34.99</span>
+              <span className="landing-pricing-amount">$29.99</span>
             </div>
             <div className="landing-pricing-note">(AI Coach included)</div>
             <div className="landing-pricing-row">
