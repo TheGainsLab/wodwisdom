@@ -11,12 +11,9 @@ ALTER TABLE programs
   ADD COLUMN gym_name text,
   ADD COLUMN is_ongoing boolean NOT NULL DEFAULT false;
 
--- 2. Add 'external' to workout_logs source_type
+-- 2. Re-add source_type to workout_logs (was dropped in 20260235 migration)
 ALTER TABLE workout_logs
-  DROP CONSTRAINT IF EXISTS workout_logs_source_type_check;
-
-ALTER TABLE workout_logs
-  ADD CONSTRAINT workout_logs_source_type_check
+  ADD COLUMN source_type text NOT NULL DEFAULT 'program'
     CHECK (source_type IN ('review', 'program', 'manual', 'external'));
 
 -- 3. Gating: AI Log access uses the existing user_entitlements table
