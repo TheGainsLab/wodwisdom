@@ -776,7 +776,7 @@ return new Response(JSON.stringify({ error: "Could not parse any workouts from t
 });
 }
 // AI-generated programs must produce exactly 20 workouts (5 days × 4 weeks)
-if (useAIParser && workouts.length !== 20) {
+if (isGenerated && workouts.length !== 20) {
 return new Response(JSON.stringify({ error: `Expected exactly 20 workouts, got ${workouts.length}` }), {
         status: 422,
         headers: { ...cors, "Content-Type": "application/json" },
