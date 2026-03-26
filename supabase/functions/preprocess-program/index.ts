@@ -652,16 +652,22 @@ async function splitDaysAI(
   apiKey: string,
 ): Promise<ParsedWorkout[]> {
   try {
+    console.log("[preprocess-program] splitDaysAI called, input length:", rawText.length);
     const raw = await callClaude({
       apiKey,
       system: SPLIT_DAYS_PROMPT,
       userContent: rawText,
       maxTokens: 4096,
     });
+    console.log("[preprocess-program] splitDaysAI raw response:", raw.substring(0, 500));
     const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
     const items = JSON.parse(cleaned);
-    if (!Array.isArray(items)) return [];
-    return items
+    if (!Array.isArray(items)) {
+      console.error("[preprocess-program] splitDaysAI: not an array");
+      return [];
+    }
+    console.log("[preprocess-program] splitDaysAI parsed", items.length, "days");
+    const results = items
       .filter((d: Record<string, unknown>) => d.workout_text && typeof d.workout_text === "string")
       .map((d: Record<string, unknown>, i: number) => ({
         week_num: typeof d.week_num === "number" ? d.week_num : 1,
@@ -669,6 +675,8 @@ async function splitDaysAI(
         workout_text: String(d.workout_text).trim(),
         sort_order: i,
       }));
+    console.log("[preprocess-program] splitDaysAI returning", results.length, "workouts, first:", results[0]?.workout_text?.substring(0, 100));
+    return results;
   } catch (e) {
     console.error("[preprocess-program] splitDaysAI error:", e);
     return [];
@@ -750,12 +758,15 @@ return new Response(JSON.stringify({ error: "Provide text or file_base64 with fi
 });
 }
 // For non-generated programs, use AI to split into days
+console.log("[preprocess-program] routing: source=", source, "isGenerated=", isGenerated, "rawText?=", !!rawText, "rawTextLen=", rawText?.length, "workouts.length=", workouts.length, "hasApiKey=", !!ANTHROPIC_API_KEY);
 if (rawText && workouts.length === 0 && ANTHROPIC_API_KEY) {
   console.log("[preprocess-program] using AI day splitting for non-generated program");
   workouts = await splitDaysAI(rawText, ANTHROPIC_API_KEY);
+  console.log("[preprocess-program] after AI split: workouts.length=", workouts.length);
 }
 // Fallback: if AI parsing failed or no API key, try regex as last resort
 if (rawText && workouts.length === 0) {
+  console.log("[preprocess-program] AI split returned 0, falling back to regex");
   workouts = parseProgramText(rawText);
 }
 if (workouts.length === 0) {
