@@ -104,7 +104,7 @@ export default function Nav({ isOpen, onClose }: NavProps) {
             {trainingExpanded && (
               <div className="nav-group-items">
                 <button className={"nav-link sub " + (location.pathname.startsWith("/programs") ? "active" : "")} onClick={() => goTo("/programs")}>
-                  <span className="nav-sub-dot" />Programs
+                  <span className="nav-sub-dot" />My Programs
                 </button>
                 <button className={"nav-link sub " + (location.pathname === "/training-log" ? "active" : "")} onClick={() => goTo("/training-log")}>
                   <span className="nav-sub-dot" />Training Log
