@@ -552,133 +552,96 @@ async function parseBlock(
   return deduped;
 }
 
-const INFER_BLOCKS_PROMPT = `You classify CrossFit/fitness workout sections into block types.
+// ─── Combined AI parser: splits into days AND classifies blocks in one call ───
 
-Given a workout text that may use labels like "Part A", "Part B", "A)", "B)", "1)", "2)", or no labels at all, identify each distinct section and classify it.
-
-Return ONLY a JSON array:
-[
-  {
-    "block_type": "warm-up" | "mobility" | "skills" | "strength" | "metcon" | "cool-down" | "accessory" | "other",
-    "block_order": <1-based integer>,
-    "block_text": "<the text content for this block>"
-  }
-]
-
-Classification rules:
-- strength: barbell or dumbbell work with sets×reps and percentages (5x5, 3x3 @80%, build to heavy single)
-- metcon: AMRAP, For Time, RFT, EMOM with multiple movements, timed workouts
-- skills: gymnastics practice, progression work, skill drills (handstand walks, muscle-up practice)
-- warm-up: general preparation, light cardio, movement prep
-- cool-down: stretching, foam rolling, recovery
-- mobility: targeted joint work, banded stretches
-- accessory: isolation work, core, supplemental exercises
-- other: anything that doesn't fit above
-
-If the entire text is a single workout (no sections), classify the whole thing as one block.
-Output valid JSON only, no markdown fences.`;
-
-async function inferBlocksAI(
-  workoutText: string,
-  apiKey: string,
-): Promise<{ block_type: string; block_order: number; block_text: string }[]> {
-  try {
-    const raw = await callClaude({
-      apiKey,
-      system: INFER_BLOCKS_PROMPT,
-      userContent: workoutText,
-      maxTokens: 1024,
-    });
-    const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
-    const items = JSON.parse(cleaned);
-    if (!Array.isArray(items)) return [];
-    return items
-      .filter((b: Record<string, unknown>) => b.block_type && b.block_text)
-      .map((b: Record<string, unknown>, i: number) => ({
-        block_type: String(b.block_type),
-        block_order: typeof b.block_order === "number" ? b.block_order : i + 1,
-        block_text: String(b.block_text).trim(),
-      }));
-  } catch (e) {
-    console.error("[preprocess-program] inferBlocksAI error:", e);
-    return [];
-  }
+interface ParsedDay {
+  week_num: number;
+  day_num: number;
+  blocks: { block_type: string; block_order: number; block_text: string }[];
 }
 
-const SPLIT_DAYS_PROMPT = `You split CrossFit/gym programming text into individual training days.
+const PARSE_PROGRAM_PROMPT = `You parse raw gym/CrossFit programming text into training days and their blocks in a SINGLE pass.
 
-CRITICAL: A "day" is an ENTIRE training session — it includes ALL parts, sections, movements, and details for that day. A typical gym day might have a strength portion AND a conditioning portion AND a warm-up. ALL of those belong to the SAME day entry. Do NOT split a single day's content into multiple entries.
-
-Day boundaries are identified by day headers like:
-- Day names: "Monday", "Tuesday", "Wed", etc.
-- Day labels: "Day 1", "Day 2", etc.
-- Week transitions: "Week 1", "Week 2", etc.
-
-Everything between one day header and the next day header is ONE day's workout.
-
-Example input:
-"""
-Monday
-A) Back Squat 5x5 @80%
-B) 3 Rounds For Time:
-15 Wall Balls
-12 Toes to Bar
-
-Tuesday
-Rest
-"""
-
-Example output:
+Return ONLY a JSON array where each element is a training day:
 [
-  {"week_num": 1, "day_num": 1, "workout_text": "A) Back Squat 5x5 @80%\\nB) 3 Rounds For Time:\\n15 Wall Balls\\n12 Toes to Bar"},
-  {"week_num": 1, "day_num": 2, "workout_text": "Rest"}
+  {
+    "week_num": 1,
+    "day_num": 1,
+    "blocks": [
+      {
+        "block_type": "strength",
+        "block_order": 1,
+        "block_text": "Back Squat 5x5 @80%"
+      },
+      {
+        "block_type": "metcon",
+        "block_order": 2,
+        "block_text": "3 Rounds For Time:\\n15 Wall Balls 20/14\\n12 Toes to Bar\\n9 Power Cleans 135/95"
+      }
+    ]
+  }
 ]
 
-Return ONLY a JSON array with objects containing:
-- "week_num": integer starting at 1
-- "day_num": 1=Monday through 7=Sunday, or sequential if no day names
-- "workout_text": ALL content for this day joined with \\n newlines
+DAY SPLITTING RULES:
+- A "day" is an ENTIRE training session. Everything between one day header and the next belongs to ONE day.
+- Day headers: "Monday", "Tuesday", "Day 1", "Day 2", etc.
+- INCLUDE rest days and active recovery days (single block with block_type "other").
+- day_num: 1=Monday through 7=Sunday, or sequential if no day names.
+- week_num: use week labels if present, otherwise default to 1.
+- A 7-day week should produce exactly 7 entries.
 
-Rules:
-- INCLUDE rest days and active recovery days.
-- Preserve the original text exactly. Do not rewrite, summarize, or omit any lines.
-- Strip only the day header itself (e.g. remove "Monday" but keep everything else).
-- If week labels exist, use them. Otherwise default to week 1.
-- A 5-day gym week should produce exactly 5 entries (or 7 if weekends are included).
-- Output valid JSON only, no markdown fences.`;
+BLOCK CLASSIFICATION RULES:
+- Split each day's content into blocks based on section markers: "A)" "B)" "A." "B." "Part A" "Part B" "Then:" or content shifts.
+- Classify each block by its CONTENT (not its label):
+  - strength: barbell/dumbbell work with sets×reps and percentages (5x5, 3x3 @80%, build to heavy single)
+  - metcon: AMRAP, For Time, RFT, EMOM with multiple movements, timed workouts
+  - skills: gymnastics practice, progression work, skill drills
+  - warm-up: general preparation, light cardio, movement prep
+  - cool-down: stretching, foam rolling, recovery
+  - mobility: targeted joint work, banded stretches
+  - accessory: isolation work, core, supplemental exercises
+  - other: rest days, active recovery, anything that doesn't fit above
+- Preserve the original text in block_text exactly. Do not rewrite or summarize.
+- Strip section labels (A), B), Part A, etc.) from block_text but keep the workout content.
+- If a day has no clear section divisions, treat the entire content as one block and classify it.
 
-async function splitDaysAI(
+Output valid JSON only, no markdown fences.`;
+
+async function parseProgramAI(
   rawText: string,
   apiKey: string,
-): Promise<ParsedWorkout[]> {
+): Promise<ParsedDay[]> {
   try {
-    console.log("[preprocess-program] splitDaysAI called, input length:", rawText.length);
+    console.log("[preprocess-program] parseProgramAI called, input length:", rawText.length);
     const raw = await callClaude({
       apiKey,
-      system: SPLIT_DAYS_PROMPT,
+      system: PARSE_PROGRAM_PROMPT,
       userContent: rawText,
-      maxTokens: 4096,
+      maxTokens: 8192,
     });
-    console.log("[preprocess-program] splitDaysAI raw response:", raw.substring(0, 500));
+    console.log("[preprocess-program] parseProgramAI raw response:", raw.substring(0, 500));
     const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
     const items = JSON.parse(cleaned);
     if (!Array.isArray(items)) {
-      console.error("[preprocess-program] splitDaysAI: not an array");
+      console.error("[preprocess-program] parseProgramAI: not an array");
       return [];
     }
-    console.log("[preprocess-program] splitDaysAI parsed", items.length, "days");
-    const results = items
-      .filter((d: Record<string, unknown>) => d.workout_text && typeof d.workout_text === "string")
-      .map((d: Record<string, unknown>, i: number) => ({
+    console.log("[preprocess-program] parseProgramAI parsed", items.length, "days");
+    return items
+      .filter((d: Record<string, unknown>) => d.blocks && Array.isArray(d.blocks))
+      .map((d: Record<string, unknown>) => ({
         week_num: typeof d.week_num === "number" ? d.week_num : 1,
-        day_num: typeof d.day_num === "number" ? d.day_num : i + 1,
-        workout_text: String(d.workout_text).trim(),
-        sort_order: i,
+        day_num: typeof d.day_num === "number" ? d.day_num : 1,
+        blocks: (d.blocks as Record<string, unknown>[])
+          .filter((b) => b.block_text && typeof b.block_text === "string")
+          .map((b, i) => ({
+            block_type: String(b.block_type || "other"),
+            block_order: typeof b.block_order === "number" ? b.block_order : i + 1,
+            block_text: String(b.block_text).trim(),
+          })),
       }));
-    console.log("[preprocess-program] splitDaysAI returning", results.length, "workouts, first:", results[0]?.workout_text?.substring(0, 100));
-    return results;
   } catch (e) {
-    console.error("[preprocess-program] splitDaysAI error:", e);
+    console.error("[preprocess-program] parseProgramAI error:", e);
     return [];
   }
 }
@@ -757,16 +720,23 @@ return new Response(JSON.stringify({ error: "Provide text or file_base64 with fi
         headers: { ...cors, "Content-Type": "application/json" },
 });
 }
-// For non-generated programs, use AI to split into days
-console.log("[preprocess-program] routing: source=", source, "isGenerated=", isGenerated, "rawText?=", !!rawText, "rawTextLen=", rawText?.length, "workouts.length=", workouts.length, "hasApiKey=", !!ANTHROPIC_API_KEY);
+// For non-generated programs, use combined AI parser (days + blocks in one call)
+let parsedDays: ParsedDay[] = [];
 if (rawText && workouts.length === 0 && ANTHROPIC_API_KEY) {
-  console.log("[preprocess-program] using AI day splitting for non-generated program");
-  workouts = await splitDaysAI(rawText, ANTHROPIC_API_KEY);
-  console.log("[preprocess-program] after AI split: workouts.length=", workouts.length);
+  console.log("[preprocess-program] using combined AI parser for non-generated program");
+  parsedDays = await parseProgramAI(rawText, ANTHROPIC_API_KEY);
+  // Convert to workouts format (workout_text = blocks joined)
+  workouts = parsedDays.map((d, i) => ({
+    week_num: d.week_num,
+    day_num: d.day_num,
+    workout_text: d.blocks.map((b) => b.block_text).join("\n\n"),
+    sort_order: i,
+  }));
+  console.log("[preprocess-program] AI parser returned", workouts.length, "days with blocks");
 }
 // Fallback: if AI parsing failed or no API key, try regex as last resort
 if (rawText && workouts.length === 0) {
-  console.log("[preprocess-program] AI split returned 0, falling back to regex");
+  console.log("[preprocess-program] AI parser returned 0, falling back to regex");
   workouts = parseProgramText(rawText);
 }
 if (workouts.length === 0) {
@@ -840,26 +810,35 @@ return new Response(JSON.stringify({ error: "Failed to save workouts" }), {
 console.log(`[preprocess-program] v2 inserted ${insertedWorkouts?.length ?? 0} workouts, prog=${progId}`);
 if (insertedWorkouts?.length) {
 const blockRows: { program_workout_id: string; block_type: string; block_order: number; block_text: string }[] = [];
-const ANTHROPIC_KEY_FOR_INFER = Deno.env.get("ANTHROPIC_API_KEY");
-for (const w of insertedWorkouts) {
-console.log(`[preprocess-program] v2 extracting blocks for workout ${w.id}, has workout_text: ${typeof w.workout_text}, len=${w.workout_text?.length ?? 'null'}`);
-let blocks = extractBlocksFromWorkoutText(w.workout_text);
-// If no labeled blocks found and AI is available, use AI to infer block types
-if (blocks.length === 0 && ANTHROPIC_KEY_FOR_INFER && w.workout_text?.length > 10) {
-  blocks = await inferBlocksAI(w.workout_text, ANTHROPIC_KEY_FOR_INFER);
-  if (blocks.length === 0) {
-    // Fallback: treat entire text as a single "other" block
-    blocks = [{ block_type: "other", block_order: 1, block_text: w.workout_text }];
+
+if (parsedDays.length > 0) {
+  // We have pre-parsed blocks from the combined AI parser — use them directly
+  for (let i = 0; i < insertedWorkouts.length && i < parsedDays.length; i++) {
+    const w = insertedWorkouts[i];
+    const day = parsedDays[i];
+    for (const b of day.blocks) {
+      blockRows.push({
+        program_workout_id: w.id,
+        block_type: b.block_type,
+        block_order: b.block_order,
+        block_text: b.block_text,
+      });
+    }
   }
-}
-for (const b of blocks) {
-          blockRows.push({
-            program_workout_id: w.id,
-            block_type: b.block_type,
-            block_order: b.block_order,
-            block_text: b.block_text,
-});
-}
+  console.log(`[preprocess-program] wrote ${blockRows.length} blocks from AI parser`);
+} else {
+  // Generated programs: use regex block extraction (labels are guaranteed)
+  for (const w of insertedWorkouts) {
+    const blocks = extractBlocksFromWorkoutText(w.workout_text);
+    for (const b of blocks) {
+      blockRows.push({
+        program_workout_id: w.id,
+        block_type: b.block_type,
+        block_order: b.block_order,
+        block_text: b.block_text,
+      });
+    }
+  }
 }
 if (blockRows.length > 0) {
 const { data: insertedBlocks } = await supa
