@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
@@ -41,12 +42,21 @@ type InputMode = 'search' | 'photo' | 'barcode' | 'mymeals';
 // ── Component ──
 
 export default function NutritionDashboardPage({ session }: { session: Session }) {
+  const [searchParams] = useSearchParams();
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const { hasFeature, loading: entLoading } = useEntitlements(session.user.id);
 
-  // Date navigation
-  const [currentDate, setCurrentDate] = useState(new Date());
+  // Date navigation — support ?date=YYYY-MM-DD from calendar
+  const initialDate = (() => {
+    const param = searchParams.get('date');
+    if (param && /^\d{4}-\d{2}-\d{2}$/.test(param)) {
+      const d = new Date(param + 'T12:00:00');
+      if (!isNaN(d.getTime())) return d;
+    }
+    return new Date();
+  })();
+  const [currentDate, setCurrentDate] = useState(initialDate);
   const dateStr = formatDate(currentDate);
 
   // Data

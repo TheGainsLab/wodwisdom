@@ -28,6 +28,7 @@ import EngineTrainingDayPage from './pages/EngineTrainingDayPage';
 import EngineAnalyticsPage from './pages/EngineAnalyticsPage';
 import EngineTaxonomyPage from './pages/EngineTaxonomyPage';
 import NutritionDashboardPage from './pages/NutritionDashboardPage';
+import NutritionCalendarPage from './pages/NutritionCalendarPage';
 import FeaturesHubPage from './pages/features/FeaturesHubPage';
 import AICoachingFeaturePage from './pages/features/AICoachingFeaturePage';
 import ProgramsFeaturePage from './pages/features/ProgramsFeaturePage';
@@ -92,6 +93,7 @@ export default function App() {
       <Route path="/engine/analytics" element={<EngineAnalyticsPage session={session} />} />
       <Route path="/engine/taxonomy" element={<EngineTaxonomyPage session={session} />} />
       <Route path="/nutrition" element={<NutritionDashboardPage session={session} />} />
+      <Route path="/nutrition/calendar" element={<NutritionCalendarPage session={session} />} />
       <Route path="/features" element={<FeaturesHubPage />} />
       <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
       <Route path="/features/programs" element={<ProgramsFeaturePage />} />
