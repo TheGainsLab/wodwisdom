@@ -605,6 +605,57 @@ async function inferBlocksAI(
   }
 }
 
+const SPLIT_DAYS_PROMPT = `You split CrossFit/fitness programming text into individual training days.
+
+Given raw programming text in any format, identify each training day and return structured data.
+
+Return ONLY a JSON array:
+[
+  {
+    "week_num": <integer, starting at 1>,
+    "day_num": <1=Monday through 7=Sunday, or sequential if no day names>,
+    "workout_text": "<all content for this day combined into one string, preserving line breaks>"
+  }
+]
+
+Rules:
+- Group everything under the same day together. If a day has Part A, Part B, etc., combine them all into one entry.
+- INCLUDE rest days. If a day says "Rest" or "Active Recovery", include it with workout_text = "Rest".
+- Preserve the original text for each day as closely as possible. Do not rewrite or summarize.
+- If week labels are present (Week 1, Week 2), use them for week_num. Otherwise default to week 1.
+- If day names are present (Monday, Tuesday), map to day_num (Monday=1, Tuesday=2, etc.).
+- If only "Day 1", "Day 2" style labels, use sequential numbering.
+- Strip the day header itself from workout_text (don't include "Monday:" in the text).
+- Output valid JSON only, no markdown fences.`;
+
+async function splitDaysAI(
+  rawText: string,
+  apiKey: string,
+): Promise<ParsedWorkout[]> {
+  try {
+    const raw = await callClaude({
+      apiKey,
+      system: SPLIT_DAYS_PROMPT,
+      userContent: rawText,
+      maxTokens: 4096,
+    });
+    const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+    const items = JSON.parse(cleaned);
+    if (!Array.isArray(items)) return [];
+    return items
+      .filter((d: Record<string, unknown>) => d.workout_text && typeof d.workout_text === "string")
+      .map((d: Record<string, unknown>, i: number) => ({
+        week_num: typeof d.week_num === "number" ? d.week_num : 1,
+        day_num: typeof d.day_num === "number" ? d.day_num : i + 1,
+        workout_text: String(d.workout_text).trim(),
+        sort_order: i,
+      }));
+  } catch (e) {
+    console.error("[preprocess-program] splitDaysAI error:", e);
+    return [];
+  }
+}
+
 console.log("[preprocess-program] v2 loaded");
 Deno.serve(async (req) => {
 if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -629,16 +680,38 @@ return new Response(JSON.stringify({ error: resolved.error }), {
 }
 const userId = resolved.userId;
 let workouts: ParsedWorkout[] = [];
-const useAIParser = source === "generate";
+const isGenerated = source === "generate";
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+
+// Extract raw text from input (file or direct text)
+let rawText: string | null = null;
 if (file_base64 && file_type) {
 const buf = Uint8Array.from(atob(file_base64), (c) => c.charCodeAt(0));
 const arrayBuffer = buf.buffer;
 if (file_type === "xlsx" || file_type === "xls") {
-        workouts = parseExcelToWorkouts(arrayBuffer);
+  if (isGenerated) {
+    workouts = parseExcelToWorkouts(arrayBuffer);
+  } else {
+    // For external Excel files, convert to text rows then use AI
+    const wb = XLSX.read(arrayBuffer, { type: "array" });
+    const textParts: string[] = [];
+    for (const name of wb.SheetNames) {
+      const sheet = wb.Sheets[name];
+      const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 }) as (string | number)[][];
+      for (const row of rows) {
+        const line = row.map((c) => String(c || "").trim()).filter(Boolean).join(" | ");
+        if (line) textParts.push(line);
+      }
+    }
+    rawText = textParts.join("\n");
+  }
 } else if (file_type === "txt" || file_type === "csv") {
 const decoder = new TextDecoder("utf-8");
-const str = decoder.decode(buf);
-        workouts = useAIParser ? parseProgramTextAI(str) : parseProgramText(str);
+rawText = decoder.decode(buf);
+if (isGenerated) {
+  workouts = parseProgramTextAI(rawText);
+  rawText = null; // skip AI path
+}
 } else {
 return new Response(JSON.stringify({ error: "Unsupported file type. Use xlsx, xls, txt, or csv." }), {
           status: 400,
@@ -646,12 +719,25 @@ return new Response(JSON.stringify({ error: "Unsupported file type. Use xlsx, xl
 });
 }
 } else if (text && typeof text === "string") {
-      workouts = useAIParser ? parseProgramTextAI(text.trim()) : parseProgramText(text.trim());
+rawText = text.trim();
+if (isGenerated) {
+  workouts = parseProgramTextAI(rawText);
+  rawText = null; // skip AI path
+}
 } else {
 return new Response(JSON.stringify({ error: "Provide text or file_base64 with file_type" }), {
         status: 400,
         headers: { ...cors, "Content-Type": "application/json" },
 });
+}
+// For non-generated programs, use AI to split into days
+if (rawText && workouts.length === 0 && ANTHROPIC_API_KEY) {
+  console.log("[preprocess-program] using AI day splitting for non-generated program");
+  workouts = await splitDaysAI(rawText, ANTHROPIC_API_KEY);
+}
+// Fallback: if AI parsing failed or no API key, try regex as last resort
+if (rawText && workouts.length === 0) {
+  workouts = parseProgramText(rawText);
 }
 if (workouts.length === 0) {
 return new Response(JSON.stringify({ error: "Could not parse any workouts from the input." }), {
