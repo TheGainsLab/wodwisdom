@@ -3,16 +3,69 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 
+type PlanKey = 'coach' | 'programming' | 'engine' | 'all_access';
+
+const PLANS: { key: PlanKey; name: string; price: string; features: string[]; badge?: string; featured?: boolean }[] = [
+  {
+    key: 'coach',
+    name: 'AI Coach',
+    price: '$7.99',
+    features: [
+      'Unlimited coaching questions',
+      'Full source library',
+      'Bookmarks & summaries',
+      'Workout reviews',
+    ],
+  },
+  {
+    key: 'programming',
+    name: 'AI Programming',
+    price: '$29.99',
+    badge: 'Includes AI Coach',
+    features: [
+      'Personalized program generation',
+      'AI profile evaluation',
+      'Program analysis & modifications',
+      'Session-by-session coaching cues',
+    ],
+  },
+  {
+    key: 'engine',
+    name: 'Year of the Engine',
+    price: '$29.99',
+    badge: 'Includes AI Coach',
+    features: [
+      '20 distinct training frameworks',
+      'Machine-learning calibrated targets',
+      'Real-time pacing coach',
+      'Conditioning analytics & heatmaps',
+    ],
+  },
+  {
+    key: 'all_access',
+    name: 'All Access',
+    price: '$49.99',
+    badge: 'Best value',
+    featured: true,
+    features: [
+      'Everything in AI Coach',
+      'AI Programming',
+      'Year of the Engine',
+      'All future features included',
+    ],
+  },
+];
+
 interface CheckoutPageProps { session: Session; }
 
 export default function CheckoutPage({ session: _session }: CheckoutPageProps) {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<PlanKey | null>(null);
   const [error, setError] = useState('');
   const [navOpen, setNavOpen] = useState(false);
 
-  const selectPlan = async (p: 'athlete' | 'gym') => {
+  const selectPlan = async (p: PlanKey) => {
     setError('');
-    setLoading(true);
+    setLoading(p);
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { plan: p },
@@ -27,7 +80,7 @@ export default function CheckoutPage({ session: _session }: CheckoutPageProps) {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   };
 
@@ -45,36 +98,35 @@ export default function CheckoutPage({ session: _session }: CheckoutPageProps) {
           <div style={{ maxWidth: 520, margin: '0 auto', padding: '24px 0' }}>
             <div className="checkout-plans">
               <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Choose your plan</h2>
-              <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 24 }}>Get unlimited access to the full coaching knowledge base. You'll complete payment on Stripe's secure page.</p>
+              <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 24 }}>All plans include a free trial. You'll complete payment on Stripe's secure page.</p>
 
-              <div className="checkout-plan-card" onClick={() => !loading && selectPlan('athlete')}>
-                <div>
-                  <h3 style={{ fontSize: 18, fontWeight: 700 }}>Coach</h3>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)' }}>$7.99<span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-dim)' }}>/mo</span></div>
-                  <ul style={{ marginTop: 12, paddingLeft: 18, color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.8 }}>
-                    <li>Unlimited questions</li>
-                    <li>Full source library</li>
-                    <li>Bookmarks & summaries</li>
-                    <li>Workout reviews</li>
-                  </ul>
+              {PLANS.map(plan => (
+                <div
+                  key={plan.key}
+                  className={'checkout-plan-card' + (plan.featured ? ' featured' : '')}
+                  onClick={() => !loading && selectPlan(plan.key)}
+                >
+                  {plan.badge && <div className="checkout-plan-badge">{plan.badge}</div>}
+                  <div>
+                    <h3 style={{ fontSize: 18, fontWeight: 700 }}>{plan.name}</h3>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)' }}>
+                      {plan.price}<span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-dim)' }}>/mo</span>
+                    </div>
+                    <ul style={{ marginTop: 12, paddingLeft: 18, color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.8 }}>
+                      {plan.features.map((f, i) => <li key={i}>{f}</li>)}
+                    </ul>
+                  </div>
+                  <button
+                    type="button"
+                    className="auth-btn"
+                    disabled={!!loading}
+                    style={{ marginTop: 16 }}
+                    onClick={(e) => { e.stopPropagation(); if (!loading) selectPlan(plan.key); }}
+                  >
+                    {loading === plan.key ? 'Redirecting...' : 'Subscribe'}
+                  </button>
                 </div>
-                <button type="button" className="auth-btn" disabled={loading} style={{ marginTop: 16 }} onClick={(e) => { e.stopPropagation(); if (!loading) selectPlan('athlete'); }}>{loading ? 'Redirecting...' : 'Subscribe'}</button>
-              </div>
-
-              <div className="checkout-plan-card featured" onClick={() => !loading && selectPlan('gym')}>
-                <div className="checkout-plan-badge">Best for teams</div>
-                <div>
-                  <h3 style={{ fontSize: 18, fontWeight: 700 }}>Gym</h3>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)' }}>$24.99<span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-dim)' }}>/mo</span></div>
-                  <ul style={{ marginTop: 12, paddingLeft: 18, color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.8 }}>
-                    <li>Everything in Coach</li>
-                    <li>Up to 3 coach seats</li>
-                    <li>Gym dashboard</li>
-                    <li>Invite & manage coaches</li>
-                  </ul>
-                </div>
-                <button type="button" className="auth-btn" disabled={loading} style={{ marginTop: 16 }} onClick={(e) => { e.stopPropagation(); if (!loading) selectPlan('gym'); }}>{loading ? 'Redirecting...' : 'Subscribe'}</button>
-              </div>
+              ))}
 
               {error && <div className="auth-error" style={{ display: 'block', marginTop: 16 }}>{error}</div>}
             </div>
