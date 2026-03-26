@@ -605,27 +605,46 @@ async function inferBlocksAI(
   }
 }
 
-const SPLIT_DAYS_PROMPT = `You split CrossFit/fitness programming text into individual training days.
+const SPLIT_DAYS_PROMPT = `You split CrossFit/gym programming text into individual training days.
 
-Given raw programming text in any format, identify each training day and return structured data.
+CRITICAL: A "day" is an ENTIRE training session — it includes ALL parts, sections, movements, and details for that day. A typical gym day might have a strength portion AND a conditioning portion AND a warm-up. ALL of those belong to the SAME day entry. Do NOT split a single day's content into multiple entries.
 
-Return ONLY a JSON array:
+Day boundaries are identified by day headers like:
+- Day names: "Monday", "Tuesday", "Wed", etc.
+- Day labels: "Day 1", "Day 2", etc.
+- Week transitions: "Week 1", "Week 2", etc.
+
+Everything between one day header and the next day header is ONE day's workout.
+
+Example input:
+"""
+Monday
+A) Back Squat 5x5 @80%
+B) 3 Rounds For Time:
+15 Wall Balls
+12 Toes to Bar
+
+Tuesday
+Rest
+"""
+
+Example output:
 [
-  {
-    "week_num": <integer, starting at 1>,
-    "day_num": <1=Monday through 7=Sunday, or sequential if no day names>,
-    "workout_text": "<all content for this day combined into one string, preserving line breaks>"
-  }
+  {"week_num": 1, "day_num": 1, "workout_text": "A) Back Squat 5x5 @80%\\nB) 3 Rounds For Time:\\n15 Wall Balls\\n12 Toes to Bar"},
+  {"week_num": 1, "day_num": 2, "workout_text": "Rest"}
 ]
 
+Return ONLY a JSON array with objects containing:
+- "week_num": integer starting at 1
+- "day_num": 1=Monday through 7=Sunday, or sequential if no day names
+- "workout_text": ALL content for this day joined with \\n newlines
+
 Rules:
-- Group everything under the same day together. If a day has Part A, Part B, etc., combine them all into one entry.
-- INCLUDE rest days. If a day says "Rest" or "Active Recovery", include it with workout_text = "Rest".
-- Preserve the original text for each day as closely as possible. Do not rewrite or summarize.
-- If week labels are present (Week 1, Week 2), use them for week_num. Otherwise default to week 1.
-- If day names are present (Monday, Tuesday), map to day_num (Monday=1, Tuesday=2, etc.).
-- If only "Day 1", "Day 2" style labels, use sequential numbering.
-- Strip the day header itself from workout_text (don't include "Monday:" in the text).
+- INCLUDE rest days and active recovery days.
+- Preserve the original text exactly. Do not rewrite, summarize, or omit any lines.
+- Strip only the day header itself (e.g. remove "Monday" but keep everything else).
+- If week labels exist, use them. Otherwise default to week 1.
+- A 5-day gym week should produce exactly 5 entries (or 7 if weekends are included).
 - Output valid JSON only, no markdown fences.`;
 
 async function splitDaysAI(
