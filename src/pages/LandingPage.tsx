@@ -78,10 +78,11 @@ export default function LandingPage() {
           <div className="landing-offerings-grid">
             <div className="landing-offering-card">
               <h3>AI Coach</h3>
-              <p className="landing-offering-tagline">The brain of a Level 4 coach, available any time</p>
-              <p>Ask anything about training, nutrition, movement, or recovery. Get answers from an AI that speaks your language — not generic fitness advice. Pacing strategy, movement cues, scaling options, competition prep, skills practice. Whatever you need, just ask.</p>
-              <p>Share your current training and get it optimized. Build a nutrition plan using your own data. The AI understands context — it doesn't just answer questions, it coaches.</p>
-              <p><strong>Science mode</strong> — Want a comprehensive overview of carbohydrate metabolism? How calcium ion concentration affects muscle contractions? Switch to science mode — a separate AI trained on biochemistry and physiology — and go as deep as you want.</p>
+              <p className="landing-offering-tagline">Get answers from an AI that speaks your language</p>
+              <p>Ask about anything: training, nutrition, recovery and more. Get actionable insights, not generic fitness advice. Build nutrition plans. It's like working with a personal coach who has taken every course and passed every test.</p>
+              <p>Need pacing strategy for a quarterfinals WOD? Need to hammer a few skills before a competition next month? The AI understands your situation, so you get coaching, not just answers.</p>
+              <p><strong>Science mode</strong></p>
+              <p>Want a comprehensive overview of carbohydrate metabolism? How calcium ion concentration affects muscle contractions? Want to nerd out on any training or nutrition topic? Toggle science mode and access a separate AI trained on biochemistry and physiology. Go as deep as you want.</p>
               <Link to="/features/coaching" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
             <div className="landing-offering-card">
