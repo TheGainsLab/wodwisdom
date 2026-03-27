@@ -80,19 +80,19 @@ export default function LandingPage() {
             <div className="landing-offering-card">
               <h3>AI Coach</h3>
               <p className="landing-offering-tagline">The brain of a Level 4 coach, available any time</p>
-              <p>Ask anything about training, nutrition, movement, or recovery. Get answers grounded in the CrossFit methodology — not generic fitness advice. Switch to Science mode to go deep on physiology and biochemistry.</p>
+              <p>Get answers you can trust, grounded in the methodology. Want to nerd out on something? Flip on science mode and talk with an AI trained on physiology and biochemistry.</p>
               <Link to="/features/coaching" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
             <div className="landing-offering-card">
               <h3>AI Programming</h3>
               <p className="landing-offering-tagline">Stop following someone else's program. Get the program that follows you.</p>
-              <p>The AI learns your lifts, skills, and conditioning, then builds a personalized program — warm-ups through metcons — with coaching cues for every session. Log results and it adapts.</p>
+              <p>The AI learns your lifts, skills, and conditioning, then builds a personalized program — warm-ups through metcons — with coaching cues for every session. Log results and it adapts. The program follows you.</p>
               <Link to="/features/programs" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
             <div className="landing-offering-card">
               <h3>Year of the Engine</h3>
-              <p className="landing-offering-tagline">20 frameworks. One program. Calibrated to you.</p>
-              <p>Machine learning targets each energy system independently and calibrates every interval to your level. The app coaches you through each session in real time with pacing targets, countdowns, and round context.</p>
+              <p className="landing-offering-tagline">The best conditioning program, calibrated to you</p>
+              <p>The app learns your Engine and sets a custom target for every training day. Machine learning targets each energy system independently. The app coaches you through each session in real time with pacing targets. Analytics show your Engine in unmatched detail.</p>
               <Link to="/features/engine" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
           </div>
