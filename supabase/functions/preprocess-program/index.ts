@@ -712,6 +712,7 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
 // Extract raw text from input (file or direct text)
 let rawText: string | null = null;
+let parsedDays: ParsedDay[] = [];
 if (file_base64 && file_type) {
 const buf = Uint8Array.from(atob(file_base64), (c) => c.charCodeAt(0));
 const arrayBuffer = buf.buffer;
@@ -808,7 +809,6 @@ return new Response(JSON.stringify({ error: "Provide text or file_base64 with fi
 });
 }
 // For non-generated programs, use combined AI parser (days + blocks in one call)
-let parsedDays: ParsedDay[] = [];
 if (rawText && workouts.length === 0 && ANTHROPIC_API_KEY) {
   console.log("[preprocess-program] using combined AI parser for non-generated program");
   parsedDays = await parseProgramAI(rawText, ANTHROPIC_API_KEY);
