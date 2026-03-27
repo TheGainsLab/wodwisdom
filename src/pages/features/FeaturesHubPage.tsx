@@ -30,7 +30,7 @@ const FEATURES = [
   },
   {
     title: 'Engine',
-    description: '20 distinct training frameworks, each targeting a specific adaptation. Machine learning calibrates every interval to your level and coaches you through each session in real time.',
+    description: 'The app learns your Engine and sets a custom target for every training day. Machine learning targets each energy system independently. The app coaches you through each session in real time with pacing targets. Analytics show your Engine in unmatched detail.',
     path: '/features/engine',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
