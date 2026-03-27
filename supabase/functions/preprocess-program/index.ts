@@ -720,81 +720,19 @@ if (file_type === "xlsx" || file_type === "xls") {
   if (isGenerated) {
     workouts = parseExcelToWorkouts(arrayBuffer);
   } else {
-    // For external Excel files, pivot into day-by-day text for AI
+    // For external Excel files, dump raw cell data and let AI parse it
     const wb = XLSX.read(arrayBuffer, { type: "array" });
-    const textParts: string[] = [];
+    const lines: string[] = [];
     for (const sheetName of wb.SheetNames) {
       const sheet = wb.Sheets[sheetName];
       const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 }) as (string | number)[][];
       if (rows.length === 0) continue;
-
-      // Find header row with day names
-      let headerIdx = -1;
-      let dayColumns: { col: number; name: string }[] = [];
-      const DAY_NAMES_LC = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
-                            "mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-      for (let r = 0; r < Math.min(rows.length, 10); r++) {
-        const row = rows[r] || [];
-        const matches: { col: number; name: string }[] = [];
-        for (let c = 0; c < row.length; c++) {
-          const val = String(row[c] || "").trim().toLowerCase();
-          if (DAY_NAMES_LC.includes(val)) {
-            matches.push({ col: c, name: String(row[c]).trim() });
-          }
-        }
-        if (matches.length >= 2) {
-          headerIdx = r;
-          dayColumns = matches;
-          break;
-        }
-      }
-
-      if (headerIdx >= 0 && dayColumns.length >= 2) {
-        // Pivot: group rows into week-blocks separated by blank rows, then read across columns
-        const dataRows = rows.slice(headerIdx + 1);
-        const weekBlocks: (string | number)[][][] = [];
-        let currentBlock: (string | number)[][] = [];
-
-        for (const row of dataRows) {
-          const isEmpty = dayColumns.every((dc) => {
-            const v = row[dc.col];
-            return v == null || String(v).trim() === "";
-          });
-          if (isEmpty) {
-            if (currentBlock.length > 0) {
-              weekBlocks.push(currentBlock);
-              currentBlock = [];
-            }
-          } else {
-            currentBlock.push(row);
-          }
-        }
-        if (currentBlock.length > 0) weekBlocks.push(currentBlock);
-
-        // Format each week-block as day-by-day text
-        for (let wi = 0; wi < weekBlocks.length; wi++) {
-          textParts.push(`Week ${wi + 1}`);
-          for (const dc of dayColumns) {
-            const lines = weekBlocks[wi]
-              .map((row) => String(row[dc.col] || "").trim())
-              .filter(Boolean);
-            if (lines.length > 0) {
-              textParts.push(`${dc.name}`);
-              textParts.push(lines.join("\n"));
-              textParts.push("");
-            }
-          }
-        }
-      } else {
-        // No day-name headers - format each row as a line
-        if (wb.SheetNames.length > 1) textParts.push(`--- Sheet: ${sheetName} ---`);
-        for (const row of rows) {
-          const line = row.map((c) => String(c || "").trim()).filter(Boolean).join(" | ");
-          if (line) textParts.push(line);
-        }
+      if (wb.SheetNames.length > 1) lines.push(`--- Sheet: ${sheetName} ---`);
+      for (const row of rows) {
+        lines.push(row.map((c) => String(c ?? "")).join("\t"));
       }
     }
-    rawText = textParts.join("\n");
+    rawText = lines.join("\n");
   }
 } else if (file_type === "txt" || file_type === "csv") {
 const decoder = new TextDecoder("utf-8");
