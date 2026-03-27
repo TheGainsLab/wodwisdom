@@ -154,12 +154,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== Footer CTA ===== */}
-      <section className="landing-footer-cta">
-        <h2>The best coaches never stop learning.</h2>
-        <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
-      </section>
-
       <footer className="landing-footer">
         <GainsLogo />
       </footer>
