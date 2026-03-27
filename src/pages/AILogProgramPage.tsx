@@ -82,6 +82,8 @@ export default function AILogProgramPage({ session }: { session: Session }) {
       }
       if (analysisRes.data) {
         setAnalysis(analysisRes.data as AnalysisData);
+        if (analysisRes.data.gaps) setGaps(analysisRes.data.gaps as GapFinding[]);
+        if (analysisRes.data.gap_summary) setSummary(analysisRes.data.gap_summary as string);
       }
       setLoading(false);
     })();

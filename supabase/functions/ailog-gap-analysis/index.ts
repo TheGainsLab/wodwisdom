@@ -344,7 +344,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Upsert analysis
+    // Upsert analysis with gaps and summary
     await supa
       .from("program_analyses")
       .upsert(
@@ -361,6 +361,8 @@ Deno.serve(async (req) => {
           loading_ratio: analysis.loading_ratio,
           distinct_loads: analysis.distinct_loads,
           load_bands: analysis.load_bands,
+          gaps,
+          gap_summary: summary,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "program_id" }
