@@ -1,3 +1,4 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 import { callClaude, callClaudeVision } from "../_shared/call-claude.ts";
@@ -911,37 +912,12 @@ const { data: insertedBlocks } = await supa
   .insert(blockRows)
   .select("id, block_type, block_text");
 
-// Parse blocks inline using callClaude (10 concurrent)
-if (insertedBlocks?.length) {
-  const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-  if (ANTHROPIC_API_KEY) {
-    const parseable = insertedBlocks.filter((b) =>
-      ["metcon", "skills", "strength"].includes(b.block_type)
-    );
+// Return immediately — parse movement details in background
+const insertedBlocksForParsing = insertedBlocks;
+}
+}
 
-    const CONCURRENCY = 3;
-    for (let i = 0; i < parseable.length; i += CONCURRENCY) {
-      const batch = parseable.slice(i, i + CONCURRENCY);
-      await Promise.all(batch.map(async (b) => {
-        try {
-          const parsed = await parseBlock(b.block_type, b.block_text, ANTHROPIC_API_KEY);
-          if (parsed) {
-            await supa
-              .from("program_workout_blocks")
-              .update({ parsed_tasks: parsed })
-              .eq("id", b.id);
-          }
-        } catch (e) {
-          console.error(`[preprocess-program] parse ${b.block_type} error for block ${b.id}:`, e);
-        }
-      }));
-    }
-    console.log(`[preprocess-program] parsed ${parseable.length} blocks`);
-  }
-}
-}
-}
-return new Response(
+const response = new Response(
 JSON.stringify({
         program_id: progId,
         workout_count: workouts.length,
@@ -951,6 +927,40 @@ JSON.stringify({
         headers: { ...cors, "Content-Type": "application/json" },
 }
 );
+
+// Parse blocks in background — don't block the response
+const parseInBackground = async () => {
+  if (!insertedBlocksForParsing?.length) return;
+  const ANTHROPIC_API_KEY_BG = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!ANTHROPIC_API_KEY_BG) return;
+  const parseable = insertedBlocksForParsing.filter((b) =>
+    ["metcon", "skills", "strength"].includes(b.block_type)
+  );
+  if (parseable.length === 0) return;
+  console.log(`[preprocess-program] background: parsing ${parseable.length} blocks`);
+  const CONCURRENCY = 3;
+  for (let i = 0; i < parseable.length; i += CONCURRENCY) {
+    const batch = parseable.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(async (b) => {
+      try {
+        const parsed = await parseBlock(b.block_type, b.block_text, ANTHROPIC_API_KEY_BG);
+        if (parsed) {
+          await supa
+            .from("program_workout_blocks")
+            .update({ parsed_tasks: parsed })
+            .eq("id", b.id);
+        }
+      } catch (e) {
+        console.error(`[preprocess-program] background parse error for block ${b.id}:`, e);
+      }
+    }));
+  }
+  console.log(`[preprocess-program] background: finished parsing ${parseable.length} blocks`);
+};
+
+EdgeRuntime.waitUntil(parseInBackground());
+
+return response;
 } catch (e) {
 return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500,
