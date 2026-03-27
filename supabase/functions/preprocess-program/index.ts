@@ -608,6 +608,29 @@ BLOCK CLASSIFICATION RULES:
 
 Output valid JSON only, no markdown fences.`;
 
+const PARSE_PROGRAM_VISION_PROMPT = `Parse this gym/CrossFit programming image into training days and their blocks.
+
+Return ONLY a JSON array where each element is a training day:
+[
+  {
+    "week_num": 1,
+    "day_num": 1,
+    "blocks": [
+      {
+        "block_type": "metcon",
+        "block_order": 1,
+        "block_text": "FOR TIME 21-15-9\\nPushups\\nKettlebell Swings\\nDouble Unders"
+      }
+    ]
+  }
+]
+
+- day_num: 1=Monday through 7=Sunday
+- block_type: strength, metcon, skills, warm-up, cool-down, mobility, accessory, or other
+- Include rest days (block_type "other")
+- Preserve all text exactly as shown
+- Output valid JSON only, no markdown fences.`;
+
 async function parseProgramVision(
   imageBase64: string,
   mediaType: string,
@@ -617,9 +640,8 @@ async function parseProgramVision(
     console.log("[preprocess-program] parseProgramVision called, mediaType:", mediaType);
     const raw = await callClaudeVision({
       apiKey,
-      system: PARSE_PROGRAM_PROMPT,
+      system: PARSE_PROGRAM_VISION_PROMPT,
       images: [{ base64: imageBase64, mediaType }],
-      textPrompt: "Parse this gym programming image into training days and blocks.",
       maxTokens: 8192,
     });
     console.log("[preprocess-program] parseProgramVision raw response:", raw.substring(0, 500));
