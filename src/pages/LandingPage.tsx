@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import GainsLogo from '../components/GainsLogo';
-import ProfileMockup from '../components/ProfileMockup';
 import '../landing.css';
 
 const FAQ_ITEMS = [
@@ -99,17 +98,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== Profile Preview ===== */}
-      <section className="landing-profile-preview">
-        <div className="landing-container">
-          <h2 className="landing-section-title">5 minutes. That's all we need.</h2>
-          <p className="landing-section-sub">
-            A quick profile powers everything — your program, your coaching, your nutrition plan. Here's a sample.
-          </p>
-          <ProfileMockup />
-        </div>
-      </section>
-
       {/* ===== Pricing ===== */}
       <section id="pricing" className="landing-pricing">
         <div className="landing-container">
@@ -164,12 +152,6 @@ export default function LandingPage() {
             ))}
           </div>
         </div>
-      </section>
-
-      {/* ===== Footer CTA ===== */}
-      <section className="landing-footer-cta">
-        <h2>The best coaches never stop learning.</h2>
-        <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
       </section>
 
       <footer className="landing-footer">
