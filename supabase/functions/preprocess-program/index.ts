@@ -874,6 +874,8 @@ return new Response(JSON.stringify({ error: "Failed to save workouts" }), {
 });
 }
 console.log(`[preprocess-program] v2 inserted ${insertedWorkouts?.length ?? 0} workouts, prog=${progId}`);
+let insertedBlocksForParsing: { id: string; block_type: string; block_text: string }[] | null = null;
+
 if (insertedWorkouts?.length) {
 const blockRows: { program_workout_id: string; block_type: string; block_order: number; block_text: string }[] = [];
 
@@ -907,13 +909,11 @@ if (parsedDays.length > 0) {
   }
 }
 if (blockRows.length > 0) {
-const { data: insertedBlocks } = await supa
-  .from("program_workout_blocks")
-  .insert(blockRows)
-  .select("id, block_type, block_text");
-
-// Return immediately — parse movement details in background
-const insertedBlocksForParsing = insertedBlocks;
+  const { data: insertedBlocks } = await supa
+    .from("program_workout_blocks")
+    .insert(blockRows)
+    .select("id, block_type, block_text");
+  insertedBlocksForParsing = insertedBlocks;
 }
 }
 
