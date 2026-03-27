@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import GainsLogo from '../components/GainsLogo';
-import ProfileMockup from '../components/ProfileMockup';
 import '../landing.css';
 
 const FAQ_ITEMS = [
@@ -96,17 +95,6 @@ export default function LandingPage() {
               <Link to="/features/engine" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* ===== Profile Preview ===== */}
-      <section className="landing-profile-preview">
-        <div className="landing-container">
-          <h2 className="landing-section-title">5 minutes. That's all we need.</h2>
-          <p className="landing-section-sub">
-            A quick profile powers everything — your program, your coaching, your nutrition plan. Here's a sample.
-          </p>
-          <ProfileMockup />
         </div>
       </section>
 
