@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import * as mammoth from 'mammoth';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
-import { ClipboardList, Upload } from 'lucide-react';
+import { Camera, ClipboardList, Upload } from 'lucide-react';
 import '../ailog.css';
 
 const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
@@ -197,6 +197,41 @@ export default function AILogUploadPage({ session: _session }: { session: Sessio
 
   const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); }, []);
   const handleDragLeave = useCallback(() => setIsDragOver(false), []);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = arrayBufferToBase64(reader.result as ArrayBuffer);
+          const ext = file.type === 'image/png' ? 'png' : 'jpg';
+          setPendingFile({ file, base64, fileType: ext });
+          setPasteText('');
+        };
+        reader.readAsArrayBuffer(file);
+        return;
+      }
+    }
+  }, []);
+
+  const handleCameraCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = arrayBufferToBase64(reader.result as ArrayBuffer);
+      const ext = file.type === 'image/png' ? 'png' : 'jpg';
+      setPendingFile({ file, base64, fileType: ext });
+      setPasteText('');
+    };
+    reader.readAsArrayBuffer(file);
+  }, []);
+
   const canUpload = pasteText.trim().length > 0 || pendingFile != null;
 
   return (
@@ -314,15 +349,30 @@ export default function AILogUploadPage({ session: _session }: { session: Sessio
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
+                onPaste={handlePaste}
+                tabIndex={0}
               >
                 <Upload size={24} style={{ color: 'var(--text-muted)' }} />
                 <div className="ailog-upload-label">
-                  Paste your programming below, or drop a file (.txt, .csv, .xlsx, .pdf, .png, .jpg)
+                  Drop a file, paste an image (Cmd+V), or use the options below
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <label className="ailog-btn ailog-btn-secondary" style={{ padding: '6px 12px', fontSize: 12, borderRadius: 6, cursor: 'pointer' }}>
+                    <Camera size={14} /> Take Photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleCameraCapture}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
                 </div>
               </div>
 
               <textarea
                 className="ailog-input"
+                onPaste={handlePaste}
                 placeholder={"Monday\nBack Squat 5x5 @275\nThen: 21-15-9 Thrusters (95/65) & Pull-ups — 7:42 Rx\n\nTuesday\nRest\n\nWednesday\n5 RFT: 400m Run, 15 OHS (95/65)\n..."}
                 value={pasteText}
                 onChange={e => setPasteText(e.target.value)}
