@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
-import { callClaude } from "../_shared/call-claude.ts";
+import { callClaude, callClaudeVision } from "../_shared/call-claude.ts";
 
 // Inlined from _shared/parse-workout-blocks.ts to avoid import resolution issues
 const BLOCK_LABELS = ["Warm-up", "Mobility", "Skills", "Strength", "Metcon", "Cool down"] as const;
@@ -607,6 +607,43 @@ BLOCK CLASSIFICATION RULES:
 
 Output valid JSON only, no markdown fences.`;
 
+async function parseProgramVision(
+  imageBase64: string,
+  mediaType: string,
+  apiKey: string,
+): Promise<ParsedDay[]> {
+  try {
+    console.log("[preprocess-program] parseProgramVision called, mediaType:", mediaType);
+    const raw = await callClaudeVision({
+      apiKey,
+      system: PARSE_PROGRAM_PROMPT,
+      images: [{ base64: imageBase64, mediaType }],
+      textPrompt: "Parse this gym programming image into training days and blocks.",
+      maxTokens: 8192,
+    });
+    console.log("[preprocess-program] parseProgramVision raw response:", raw.substring(0, 500));
+    const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+    const items = JSON.parse(cleaned);
+    if (!Array.isArray(items)) return [];
+    return items
+      .filter((d: Record<string, unknown>) => d.blocks && Array.isArray(d.blocks))
+      .map((d: Record<string, unknown>) => ({
+        week_num: typeof d.week_num === "number" ? d.week_num : 1,
+        day_num: typeof d.day_num === "number" ? d.day_num : 1,
+        blocks: (d.blocks as Record<string, unknown>[])
+          .filter((b) => b.block_text && typeof b.block_text === "string")
+          .map((b, i) => ({
+            block_type: String(b.block_type || "other"),
+            block_order: typeof b.block_order === "number" ? b.block_order : i + 1,
+            block_text: String(b.block_text).trim(),
+          })),
+      }));
+  } catch (e) {
+    console.error("[preprocess-program] parseProgramVision error:", e);
+    return [];
+  }
+}
+
 async function parseProgramAI(
   rawText: string,
   apiKey: string,
@@ -682,15 +719,38 @@ if (file_type === "xlsx" || file_type === "xls") {
   if (isGenerated) {
     workouts = parseExcelToWorkouts(arrayBuffer);
   } else {
-    // For external Excel files, convert to text rows then use AI
+    // For external Excel files, format as structured text for AI
     const wb = XLSX.read(arrayBuffer, { type: "array" });
     const textParts: string[] = [];
-    for (const name of wb.SheetNames) {
-      const sheet = wb.Sheets[name];
+    for (const sheetName of wb.SheetNames) {
+      const sheet = wb.Sheets[sheetName];
       const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 }) as (string | number)[][];
-      for (const row of rows) {
-        const line = row.map((c) => String(c || "").trim()).filter(Boolean).join(" | ");
-        if (line) textParts.push(line);
+      if (rows.length === 0) continue;
+      if (wb.SheetNames.length > 1) textParts.push(`--- Sheet: ${sheetName} ---`);
+      // Detect header row and format as markdown table
+      const headerRow = rows[0] || [];
+      const hasHeaders = headerRow.some((c) => {
+        const s = String(c || "").trim().toLowerCase();
+        return ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+                "mon", "tue", "wed", "thu", "fri", "sat", "sun",
+                "day", "week", "workout", "wod"].includes(s);
+      });
+      if (hasHeaders) {
+        // Format as markdown table for better AI comprehension
+        const headers = headerRow.map((c) => String(c || "").trim() || "-");
+        textParts.push("| " + headers.join(" | ") + " |");
+        textParts.push("| " + headers.map(() => "---").join(" | ") + " |");
+        for (let r = 1; r < rows.length; r++) {
+          const cells = (rows[r] || []).map((c) => String(c || "").trim().replace(/\n/g, " / "));
+          while (cells.length < headers.length) cells.push("");
+          textParts.push("| " + cells.join(" | ") + " |");
+        }
+      } else {
+        // No clear headers - format each row with line breaks
+        for (const row of rows) {
+          const line = row.map((c) => String(c || "").trim()).filter(Boolean).join(" | ");
+          if (line) textParts.push(line);
+        }
       }
     }
     rawText = textParts.join("\n");
@@ -702,8 +762,35 @@ if (isGenerated) {
   workouts = parseProgramTextAI(rawText);
   rawText = null; // skip AI path
 }
+} else if (["png", "jpg", "jpeg", "webp", "heic"].includes(file_type)) {
+  // Image: use Claude vision directly
+  if (ANTHROPIC_API_KEY) {
+    const mediaTypes: Record<string, string> = {
+      png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", heic: "image/heic",
+    };
+    parsedDays = await parseProgramVision(file_base64, mediaTypes[file_type] || "image/jpeg", ANTHROPIC_API_KEY);
+    workouts = parsedDays.map((d, i) => ({
+      week_num: d.week_num,
+      day_num: d.day_num,
+      workout_text: d.blocks.map((b) => b.block_text).join("\n\n"),
+      sort_order: i,
+    }));
+  }
+} else if (file_type === "pdf") {
+  // PDF: send each page as an image to Claude vision
+  // For now, treat the PDF as a single image (first page)
+  // Claude can read PDFs sent as images
+  if (ANTHROPIC_API_KEY) {
+    parsedDays = await parseProgramVision(file_base64, "application/pdf", ANTHROPIC_API_KEY);
+    workouts = parsedDays.map((d, i) => ({
+      week_num: d.week_num,
+      day_num: d.day_num,
+      workout_text: d.blocks.map((b) => b.block_text).join("\n\n"),
+      sort_order: i,
+    }));
+  }
 } else {
-return new Response(JSON.stringify({ error: "Unsupported file type. Use xlsx, xls, txt, or csv." }), {
+return new Response(JSON.stringify({ error: "Unsupported file type. Use xlsx, xls, txt, csv, pdf, or image files." }), {
           status: 400,
           headers: { ...cors, "Content-Type": "application/json" },
 });

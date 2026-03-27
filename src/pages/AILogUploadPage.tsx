@@ -130,9 +130,11 @@ export default function AILogUploadPage({ session: _session }: { session: Sessio
     const isTxt = ['text/plain', 'text/csv', 'application/csv'].includes(file.type) || ext === 'txt' || ext === 'csv';
     const isDocx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || ext === 'docx';
     const isExcel = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'].includes(file.type) || ext === 'xlsx' || ext === 'xls';
+    const isImage = ['image/png', 'image/jpeg', 'image/webp', 'image/heic'].includes(file.type) || ['png', 'jpg', 'jpeg', 'webp', 'heic'].includes(ext);
+    const isPdf = file.type === 'application/pdf' || ext === 'pdf';
 
-    if (!isTxt && !isDocx && !isExcel) {
-      setError('Use .txt, .csv, .docx, or .xlsx files.');
+    if (!isTxt && !isDocx && !isExcel && !isImage && !isPdf) {
+      setError('Use .txt, .csv, .docx, .xlsx, .pdf, or image files (.png, .jpg).');
       return;
     }
 
@@ -165,6 +167,28 @@ export default function AILogUploadPage({ session: _session }: { session: Sessio
       reader.onload = () => {
         const base64 = arrayBufferToBase64(reader.result as ArrayBuffer);
         setPendingFile({ file, base64, fileType: ext === 'xls' ? 'xls' : 'xlsx' });
+        setPasteText('');
+      };
+      reader.readAsArrayBuffer(file);
+      return;
+    }
+
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = arrayBufferToBase64(reader.result as ArrayBuffer);
+        setPendingFile({ file, base64, fileType: ext === 'heic' ? 'heic' : ext === 'webp' ? 'webp' : ext === 'png' ? 'png' : 'jpg' });
+        setPasteText('');
+      };
+      reader.readAsArrayBuffer(file);
+      return;
+    }
+
+    if (isPdf) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = arrayBufferToBase64(reader.result as ArrayBuffer);
+        setPendingFile({ file, base64, fileType: 'pdf' });
         setPasteText('');
       };
       reader.readAsArrayBuffer(file);
@@ -293,7 +317,7 @@ export default function AILogUploadPage({ session: _session }: { session: Sessio
               >
                 <Upload size={24} style={{ color: 'var(--text-muted)' }} />
                 <div className="ailog-upload-label">
-                  Paste your programming below, or drop a .txt, .csv, .docx, or .xlsx file
+                  Paste your programming below, or drop a file (.txt, .csv, .xlsx, .pdf, .png, .jpg)
                 </div>
               </div>
 

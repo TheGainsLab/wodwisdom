@@ -115,6 +115,77 @@ export async function callClaude(opts: {
 }
 
 // ---------------------------------------------------------------------------
+// Vision: sends image(s) + optional text to Claude and returns text response.
+// ---------------------------------------------------------------------------
+export async function callClaudeVision(opts: {
+  apiKey: string;
+  system: string;
+  images: { base64: string; mediaType: string }[];
+  textPrompt?: string;
+  maxTokens: number;
+}): Promise<string> {
+  const { apiKey, system, images, textPrompt, maxTokens } = opts;
+  const content: { type: string; source?: { type: string; media_type: string; data: string }; text?: string }[] = [];
+
+  for (const img of images) {
+    content.push({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: img.mediaType,
+        data: img.base64,
+      },
+    });
+  }
+
+  if (textPrompt) {
+    content.push({ type: "text", text: textPrompt });
+  }
+
+  const msgs = [{ role: "user", content }];
+
+  // Sonnet retries with exponential backoff
+  for (let i = 0; i < MAX_RETRIES; i++) {
+    if (RETRY_DELAYS[i] > 0) await new Promise((r) => setTimeout(r, RETRY_DELAYS[i]));
+
+    const resp = await attempt(SONNET_MODEL, apiKey, system, msgs as any, maxTokens, false);
+
+    if (resp.ok) {
+      const data = await resp.json();
+      return data.content?.[0]?.text?.trim() || "";
+    }
+
+    const err = await resp.json().catch(() => ({}));
+    if (!isRetryable(resp.status, err)) {
+      console.error("Claude Vision API error (non-retryable):", err);
+      throw new Error("Claude Vision API call failed");
+    }
+
+    if (i < MAX_RETRIES - 1) {
+      const serverDelay = getRetryAfterMs(resp, err);
+      const nextDelay = serverDelay ?? RETRY_DELAYS[i + 1];
+      console.warn(`Claude Vision retry ${i + 1}/${MAX_RETRIES} in ${nextDelay}ms`);
+      if (serverDelay && serverDelay > RETRY_DELAYS[i + 1]) {
+        await new Promise((r) => setTimeout(r, serverDelay - RETRY_DELAYS[i + 1]));
+      }
+    }
+  }
+
+  // Haiku fallback
+  console.warn("Sonnet vision retries exhausted, falling back to Haiku");
+  const resp = await attempt(HAIKU_MODEL, apiKey, system, msgs as any, maxTokens, false);
+
+  if (resp.ok) {
+    const data = await resp.json();
+    return data.content?.[0]?.text?.trim() || "";
+  }
+
+  const err = await resp.json().catch(() => ({}));
+  console.error("Haiku vision fallback also failed:", err);
+  throw new Error("Claude Vision API call failed (Sonnet + Haiku)");
+}
+
+// ---------------------------------------------------------------------------
 // Streaming: returns the raw Response so the caller can pipe the SSE body.
 // ---------------------------------------------------------------------------
 export async function callClaudeStreaming(opts: {
