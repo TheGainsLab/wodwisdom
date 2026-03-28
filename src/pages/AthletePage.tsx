@@ -340,8 +340,9 @@ export default function AthletePage({ session }: { session: Session }) {
     const [profileRes, trainingRes, nutritionRes] = await Promise.all([
       supabase
         .from('profile_evaluations')
-        .select('id, profile_snapshot, analysis, created_at')
+        .select('id, profile_snapshot, analysis, created_at, month_number, visible')
         .eq('user_id', session.user.id)
+        .eq('visible', true)
         .order('created_at', { ascending: false })
         .limit(20),
       supabase
@@ -371,8 +372,9 @@ export default function AthletePage({ session }: { session: Session }) {
         .maybeSingle(),
       supabase
         .from('profile_evaluations')
-        .select('id, profile_snapshot, analysis, created_at')
+        .select('id, profile_snapshot, analysis, created_at, month_number, visible')
         .eq('user_id', session.user.id)
+        .eq('visible', true)
         .order('created_at', { ascending: false })
         .limit(20),
       supabase
@@ -951,6 +953,7 @@ export default function AthletePage({ session }: { session: Session }) {
                           const isExpanded = expandedEvalId === ev.id;
                           const prevEval = evaluations[idx + 1] || null;
                           const diffs = prevEval ? buildProfileDiffs(prevEval.profile_snapshot, ev.profile_snapshot) : [];
+                          const monthLabel = (ev as any).month_number > 1 ? `Month ${(ev as any).month_number} — ` : '';
 
                           return (
                             <div key={ev.id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
@@ -971,7 +974,7 @@ export default function AthletePage({ session }: { session: Session }) {
                                   fontSize: 14,
                                 }}
                               >
-                                <span style={{ fontWeight: 600 }}>{formatDate(ev.created_at)}</span>
+                                <span style={{ fontWeight: 600 }}>{monthLabel}{formatDate(ev.created_at)}</span>
                                 <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
                               </button>
                               {isExpanded && (

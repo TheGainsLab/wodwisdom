@@ -66,7 +66,7 @@ function workoutSummaryLines(text: string): SummaryLine[] {
 export default function ProgramDetailPage({ session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [program, setProgram] = useState<{ id: string; name: string } | null>(null);
+  const [program, setProgram] = useState<{ id: string; name: string; source?: string; generated_months?: number } | null>(null);
   const [allWorkouts, setAllWorkouts] = useState<ProgramWorkout[]>([]);
   const [completedWorkoutIds, setCompletedWorkoutIds] = useState<Set<string>>(new Set());
   const [inProgressWorkouts, setInProgressWorkouts] = useState<Map<string, { logId: string; savedCount: number; totalBlocks: number }>>(new Map());
@@ -74,6 +74,8 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [loading, setLoading] = useState(true);
   const [navOpen, setNavOpen] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  const [generatingNextMonth, setGeneratingNextMonth] = useState(false);
+  const [nextMonthJobId, setNextMonthJobId] = useState<string | null>(null);
 
   const toggleDay = useCallback((workoutId: string) => {
     setExpandedDays(prev => {
@@ -94,7 +96,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     setLoading(true);
     const { data: prog, error: progErr } = await supabase
       .from('programs')
-      .select('id, name')
+      .select('id, name, source, generated_months')
       .eq('id', id)
       .eq('user_id', session.user.id)
       .single();
@@ -199,6 +201,41 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
 
   const workouts = allWorkouts;
   const completedCount = workouts.filter(w => completedWorkoutIds.has(w.id)).length;
+  const isGenerated = program?.source === 'generated' || program?.name?.startsWith('Month ');
+
+  const handleGenerateNextMonth = async () => {
+    if (!program || generatingNextMonth) return;
+    setGeneratingNextMonth(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-next-month', {
+        body: { program_id: program.id },
+      });
+      if (error) throw error;
+      setNextMonthJobId(data.job_id);
+      // Poll for completion
+      const pollInterval = setInterval(async () => {
+        const { data: jobData } = await supabase.functions.invoke('program-job-status', {
+          body: { job_id: data.job_id },
+        });
+        if (jobData?.status === 'complete') {
+          clearInterval(pollInterval);
+          setGeneratingNextMonth(false);
+          setNextMonthJobId(null);
+          // Reload program to show new workouts
+          loadProgram();
+        } else if (jobData?.status === 'failed') {
+          clearInterval(pollInterval);
+          setGeneratingNextMonth(false);
+          setNextMonthJobId(null);
+          alert('Failed to generate next month: ' + (jobData?.error || 'Unknown error'));
+        }
+      }, 5000);
+    } catch (err) {
+      console.error('Generate next month failed:', err);
+      setGeneratingNextMonth(false);
+      alert('Failed to start generation');
+    }
+  };
 
   if (!id) return null;
 
@@ -369,6 +406,28 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     ));
                   })()}
                 </div>
+                {isGenerated && (
+                  <div style={{ marginTop: 24, padding: '16px', background: 'var(--surface2)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
+                        Month {program.generated_months || 1} of training
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                        {generatingNextMonth
+                          ? 'Generating next month — evaluating profile and building workouts...'
+                          : 'Generate the next month to continue your program.'}
+                      </div>
+                    </div>
+                    <button
+                      className="auth-btn"
+                      disabled={generatingNextMonth}
+                      onClick={handleGenerateNextMonth}
+                      style={{ whiteSpace: 'nowrap', opacity: generatingNextMonth ? 0.6 : 1 }}
+                    >
+                      {generatingNextMonth ? 'Generating...' : `Generate Month ${(program.generated_months || 1) + 1}`}
+                    </button>
+                  </div>
+                )}
                 <div className="program-detail-actions" style={{ marginTop: 24 }}>
                   <button className="auth-btn" style={{ background: 'var(--surface2)', color: 'var(--text)' }} onClick={() => navigate('/programs')}>
                     Back
