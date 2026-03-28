@@ -100,7 +100,7 @@ async function computeGapsAI(
     profile.snatch_level && `snatch: ${profile.snatch_level}`,
     profile.clean_jerk_level && `clean & jerk: ${profile.clean_jerk_level}`,
   ].filter(Boolean);
-  if (liftLevels.length > 0) profileParts.push("Lift levels (A=strong, B=moderate, C=weak): " + liftLevels.join(', '));
+  if (liftLevels.length > 0) profileParts.push("Lift levels (A=needs development, B=moderate, C=advanced): " + liftLevels.join(', '));
   if (profile.skills && Object.keys(profile.skills).length > 0) {
     profileParts.push("Skills: " + Object.entries(profile.skills).filter(([, v]) => v && v !== 'none').map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(', '));
   }
