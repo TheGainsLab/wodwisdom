@@ -289,9 +289,21 @@ export default function ProgramAnalysisPage({ session }: { session: Session }) {
                     )}
                     {analysis.load_bands && Object.values(analysis.load_bands).some(v => v > 0) && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-                        {Object.entries(analysis.load_bands).filter(([, v]) => v > 0).map(([band, count]) => {
+                        {Object.entries(analysis.load_bands)
+                          .filter(([, v]) => v > 0)
+                          .sort((a, b) => {
+                            const numA = parseInt(a[0].replace(/[^\d]/g, '')) || 0;
+                            const numB = parseInt(b[0].replace(/[^\d]/g, '')) || 0;
+                            return numA - numB;
+                          })
+                          .map(([band, count], i, arr) => {
                           const maxBand = Math.max(...Object.values(analysis.load_bands!));
                           const pct = maxBand > 0 ? Math.round((count / maxBand) * 100) : 0;
+                          const t = arr.length > 1 ? i / (arr.length - 1) : 0;
+                          const r = Math.round(96 + t * (248 - 96));
+                          const g = Math.round(165 + t * (113 - 165));
+                          const b2 = Math.round(250 + t * (143 - 250));
+                          const barColor = `rgb(${r}, ${g}, ${b2})`;
                           return (
                             <div key={band}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
@@ -299,7 +311,7 @@ export default function ProgramAnalysisPage({ session }: { session: Session }) {
                                 <span style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}>{count}</span>
                               </div>
                               <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
-                                <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent)', borderRadius: 3, transition: 'width .3s' }} />
+                                <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: 3, transition: 'width .3s' }} />
                               </div>
                             </div>
                           );
