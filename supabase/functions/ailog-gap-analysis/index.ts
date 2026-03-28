@@ -17,10 +17,12 @@ import {
 } from "../_shared/build-movements-context.ts";
 import { checkEntitlement } from "../_shared/entitlements.ts";
 import { callClaude } from "../_shared/call-claude.ts";
+import { searchChunks, deduplicateChunks, formatChunksAsContext } from "../_shared/rag.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -83,6 +85,7 @@ async function computeGapsAI(
   analysis: ReturnType<typeof analyzeBlocks>,
   profile: AthleteProfile,
   apiKey: string,
+  ragContext?: string,
 ): Promise<{ gaps: GapFinding[]; summary: string | null }> {
   const profileParts: string[] = [];
   if (profile.gender) profileParts.push(`Gender: ${profile.gender}`);
@@ -117,9 +120,13 @@ ATHLETE PROFILE:
 ${profileParts.length > 0 ? profileParts.join('\n') : 'No profile data available.'}`;
 
   try {
+    const systemPrompt = ragContext
+      ? GAP_ANALYSIS_PROMPT + "\n\nREFERENCE MATERIAL (use to inform your analysis):\n" + ragContext
+      : GAP_ANALYSIS_PROMPT;
+
     const raw = await callClaude({
       apiKey,
-      system: GAP_ANALYSIS_PROMPT,
+      system: systemPrompt,
       userContent,
       maxTokens: 2048,
     });
@@ -239,11 +246,36 @@ Deno.serve(async (req) => {
       clean_jerk_level: profileRes.data?.clean_jerk_level as string | null,
     };
 
-    // AI-driven gap analysis: send program data + athlete profile to Claude
+    // RAG: search for relevant training science context
+    let ragContext = "";
+    if (OPENAI_API_KEY) {
+      try {
+        const profileSummary = [
+          profile.gender, profile.bodyweight ? `${profile.bodyweight}lbs` : null,
+          Object.keys(profile.lifts || {}).length > 0 ? "has lift data" : null,
+          Object.keys(profile.skills || {}).length > 0 ? "has skills" : null,
+        ].filter(Boolean).join(", ");
+        const searchQuery = `CrossFit programming gaps training analysis ${profileSummary}`;
+
+        const [journalChunks, strengthChunks] = await Promise.all([
+          searchChunks(supa, searchQuery, "journal", OPENAI_API_KEY, 3, 0.25),
+          searchChunks(supa, searchQuery, "strength-science", OPENAI_API_KEY, 3, 0.25),
+        ]);
+
+        const allChunks = deduplicateChunks([...journalChunks, ...strengthChunks]);
+        if (allChunks.length > 0) {
+          ragContext = formatChunksAsContext(allChunks, 4);
+        }
+      } catch (e) {
+        console.error("[ailog-gap-analysis] RAG search error:", e);
+      }
+    }
+
+    // AI-driven gap analysis: send program data + athlete profile + RAG context to Claude
     let gaps: GapFinding[] = [];
     let summary: string | null = null;
     if (ANTHROPIC_API_KEY) {
-      const result = await computeGapsAI(analysis, profile, ANTHROPIC_API_KEY);
+      const result = await computeGapsAI(analysis, profile, ANTHROPIC_API_KEY, ragContext || undefined);
       gaps = result.gaps;
       summary = result.summary;
     }
