@@ -55,180 +55,89 @@ interface GapFinding {
   detail: string;
 }
 
-function computeGaps(
+const GAP_ANALYSIS_PROMPT = `You are an expert CrossFit coach analyzing a training program for a specific athlete. Given the program analysis data and the athlete's profile, identify gaps in the programming that are relevant to THIS person.
+
+Return ONLY a JSON object:
+{
+  "gaps": [
+    {
+      "category": "modality" | "time_domain" | "skill" | "strength" | "movement" | "conditioning",
+      "severity": "high" | "medium" | "low",
+      "title": "Short gap title",
+      "detail": "1-2 sentence explanation of why this matters for this specific athlete"
+    }
+  ],
+  "summary": "2-3 sentence overall assessment of the biggest issues and what to prioritize"
+}
+
+Rules:
+- Personalize everything to the athlete. A weak squat matters more if the athlete's squat level is C. A missing skill matters more if it's listed as "developing" in their profile.
+- Consider the athlete's age, gender, and training history when assessing severity.
+- Don't flag something as a gap if it's appropriate for the athlete's level or goals.
+- Be specific and actionable. "No long workouts" is better than "time domain imbalance."
+- Limit to the most important 3-7 gaps. Don't list everything that could theoretically be better.
+- Sort by severity in the gaps array (high first).
+- Output valid JSON only, no markdown fences.`;
+
+async function computeGapsAI(
   analysis: ReturnType<typeof analyzeBlocks>,
   profile: AthleteProfile,
-): GapFinding[] {
-  const gaps: GapFinding[] = [];
-  const { modal_balance, time_domains, not_programmed, movement_frequency } = analysis;
-
-  // ── Modality balance gaps ──
-  const totalModal = (modal_balance.Weightlifting || 0) + (modal_balance.Gymnastics || 0) + (modal_balance.Monostructural || 0);
-  if (totalModal > 0) {
-    const wPct = (modal_balance.Weightlifting || 0) / totalModal;
-    const gPct = (modal_balance.Gymnastics || 0) / totalModal;
-    const mPct = (modal_balance.Monostructural || 0) / totalModal;
-
-    if (mPct < 0.1) {
-      gaps.push({
-        category: "modality",
-        severity: "high",
-        title: "No monostructural conditioning",
-        detail: `Only ${Math.round(mPct * 100)}% of movements are monostructural (running, rowing, biking). Your cardiovascular base is not being developed.`,
-      });
-    } else if (mPct < 0.2) {
-      gaps.push({
-        category: "modality",
-        severity: "medium",
-        title: "Low monostructural volume",
-        detail: `${Math.round(mPct * 100)}% monostructural is below the recommended 25-30%. Consider adding dedicated conditioning sessions.`,
-      });
-    }
-
-    if (gPct < 0.1) {
-      gaps.push({
-        category: "modality",
-        severity: "high",
-        title: "No gymnastics work",
-        detail: `Only ${Math.round(gPct * 100)}% gymnastics. Body control, pulling, and core work are missing.`,
-      });
-    } else if (gPct < 0.2) {
-      gaps.push({
-        category: "modality",
-        severity: "medium",
-        title: "Low gymnastics volume",
-        detail: `${Math.round(gPct * 100)}% gymnastics is below recommended levels. Bodyweight skills need more attention.`,
-      });
-    }
-
-    if (wPct > 0.6) {
-      gaps.push({
-        category: "modality",
-        severity: "medium",
-        title: "Weightlifting-heavy programming",
-        detail: `${Math.round(wPct * 100)}% of movements are weightlifting. The program is barbell-dominant at the expense of other modalities.`,
-      });
-    }
+  apiKey: string,
+): Promise<{ gaps: GapFinding[]; summary: string | null }> {
+  const profileParts: string[] = [];
+  if (profile.gender) profileParts.push(`Gender: ${profile.gender}`);
+  if (profile.bodyweight) profileParts.push(`Bodyweight: ${profile.bodyweight}`);
+  if (profile.lifts && Object.keys(profile.lifts).length > 0) {
+    profileParts.push("Lifts: " + Object.entries(profile.lifts).filter(([, v]) => v > 0).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(', '));
+  }
+  const liftLevels = [
+    profile.squat_level && `squat: ${profile.squat_level}`,
+    profile.bench_level && `bench: ${profile.bench_level}`,
+    profile.deadlift_level && `deadlift: ${profile.deadlift_level}`,
+    profile.snatch_level && `snatch: ${profile.snatch_level}`,
+    profile.clean_jerk_level && `clean & jerk: ${profile.clean_jerk_level}`,
+  ].filter(Boolean);
+  if (liftLevels.length > 0) profileParts.push("Lift levels (A=strong, B=moderate, C=weak): " + liftLevels.join(', '));
+  if (profile.skills && Object.keys(profile.skills).length > 0) {
+    profileParts.push("Skills: " + Object.entries(profile.skills).filter(([, v]) => v && v !== 'none').map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(', '));
+  }
+  if (profile.conditioning && Object.keys(profile.conditioning).length > 0) {
+    profileParts.push("Conditioning benchmarks: " + Object.entries(profile.conditioning).filter(([, v]) => v != null && v !== '').map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(', '));
   }
 
-  // ── Time domain gaps ──
-  const totalTD = (time_domains.short || 0) + (time_domains.medium || 0) + (time_domains.long || 0);
-  if (totalTD > 0) {
-    if ((time_domains.long || 0) === 0) {
-      gaps.push({
-        category: "time_domain",
-        severity: "high",
-        title: "No long-duration workouts",
-        detail: "All metcons are under 15 minutes. Long time domain work (15-30+ min) builds aerobic capacity and pacing ability.",
-      });
-    }
-    if ((time_domains.short || 0) / totalTD > 0.7) {
-      gaps.push({
-        category: "time_domain",
-        severity: "medium",
-        title: "Over-emphasis on short workouts",
-        detail: `${Math.round(((time_domains.short || 0) / totalTD) * 100)}% of metcons are short (<8 min). Add medium and long efforts for better balance.`,
-      });
-    }
-    if ((time_domains.medium || 0) === 0 && totalTD >= 3) {
-      gaps.push({
-        category: "time_domain",
-        severity: "medium",
-        title: "No medium-length workouts",
-        detail: "Missing the 8-15 minute time domain. This range trains the transition between anaerobic and aerobic systems.",
-      });
-    }
-  }
+  const userContent = `PROGRAM ANALYSIS:
+Modal balance: ${JSON.stringify(analysis.modal_balance)}
+Time domains: ${JSON.stringify(analysis.time_domains)}
+Workout formats: ${JSON.stringify(analysis.workout_formats)}
+Movement frequency (top 15): ${JSON.stringify(analysis.movement_frequency.slice(0, 15).map(m => ({ name: m.name, count: m.count, modality: m.modality })))}
+Not programmed: ${JSON.stringify(analysis.not_programmed)}
+Loading ratio: ${JSON.stringify(analysis.loading_ratio)}
 
-  // ── Skill progression gaps ──
-  const skills = profile.skills || {};
-  const programmedMovements = new Set(movement_frequency.map((m) => m.name));
+ATHLETE PROFILE:
+${profileParts.length > 0 ? profileParts.join('\n') : 'No profile data available.'}`;
 
-  const SKILL_MOVEMENT_MAP: Record<string, string[]> = {
-    ring_muscle_ups: ["ring muscle up", "muscle up"],
-    bar_muscle_ups: ["bar muscle up"],
-    hspu: ["handstand push up", "hspu", "strict handstand push up", "kipping handstand push up"],
-    handstand_walk: ["handstand walk"],
-    pistols: ["pistol", "pistol squat"],
-    double_unders: ["double under"],
-    rope_climb: ["rope climb", "legless rope climb"],
-    pull_ups: ["pull up", "strict pull up", "kipping pull up", "chest to bar pull up"],
-    toes_to_bar: ["toes to bar", "t2b"],
-  };
-
-  for (const [skill, level] of Object.entries(skills)) {
-    if (level === "developing" || level === "cannot") {
-      const relatedMovements = SKILL_MOVEMENT_MAP[skill] || [skill.replace(/_/g, " ")];
-      const isProgrammed = relatedMovements.some((m) => programmedMovements.has(m));
-      if (!isProgrammed) {
-        gaps.push({
-          category: "skill",
-          severity: level === "cannot" ? "high" : "medium",
-          title: `${skill.replace(/_/g, " ")} not being trained`,
-          detail: `Your profile shows ${skill.replace(/_/g, " ")} as "${level}" but your gym doesn't program progressions for it.`,
-        });
-      }
-    }
-  }
-
-  // ── Strength gaps ──
-  const LIFT_LEVEL_MAP: Record<string, string | null> = {
-    squat: profile.squat_level,
-    bench: profile.bench_level,
-    deadlift: profile.deadlift_level,
-    snatch: profile.snatch_level,
-    clean_jerk: profile.clean_jerk_level,
-  };
-
-  const LIFT_MOVEMENT_MAP: Record<string, string[]> = {
-    squat: ["back squat", "front squat", "squat"],
-    bench: ["bench press"],
-    deadlift: ["deadlift"],
-    snatch: ["snatch", "power snatch", "squat snatch", "hang snatch"],
-    clean_jerk: ["clean", "power clean", "squat clean", "clean and jerk", "jerk", "push jerk", "split jerk"],
-  };
-
-  for (const [lift, level] of Object.entries(LIFT_LEVEL_MAP)) {
-    if (level === "C") {
-      const relatedMovements = LIFT_MOVEMENT_MAP[lift] || [lift.replace(/_/g, " ")];
-      const liftFreq = movement_frequency
-        .filter((m) => relatedMovements.some((rm) => m.name.includes(rm)))
-        .reduce((sum, m) => sum + m.count, 0);
-
-      if (liftFreq === 0) {
-        gaps.push({
-          category: "strength",
-          severity: "high",
-          title: `${lift.replace(/_/g, " ")} needs work but isn't programmed`,
-          detail: `Your ${lift.replace(/_/g, " ")} is classified at level C but your gym doesn't include it in their programming.`,
-        });
-      } else if (liftFreq < 2) {
-        gaps.push({
-          category: "strength",
-          severity: "medium",
-          title: `${lift.replace(/_/g, " ")} under-programmed`,
-          detail: `Your ${lift.replace(/_/g, " ")} is level C but only appears ${liftFreq}x in the program. Needs more frequency to progress.`,
-        });
-      }
-    }
-  }
-
-  // ── Conditioning gaps (profile has benchmarks but no monostructural work) ──
-  const conditioning = profile.conditioning || {};
-  if (Object.keys(conditioning).length > 0 && (modal_balance.Monostructural || 0) < 2) {
-    gaps.push({
-      category: "conditioning",
-      severity: "medium",
-      title: "Conditioning benchmarks exist but no dedicated training",
-      detail: "You have conditioning benchmarks in your profile but your gym rarely programs monostructural work. Your engine will stagnate.",
+  try {
+    const raw = await callClaude({
+      apiKey,
+      system: GAP_ANALYSIS_PROMPT,
+      userContent,
+      maxTokens: 2048,
     });
+    const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+    const parsed = JSON.parse(cleaned);
+    const gaps: GapFinding[] = (parsed.gaps || [])
+      .filter((g: Record<string, unknown>) => g.title && g.detail && g.severity)
+      .map((g: Record<string, unknown>) => ({
+        category: String(g.category || "other"),
+        severity: ["high", "medium", "low"].includes(g.severity as string) ? g.severity as "high" | "medium" | "low" : "medium",
+        title: String(g.title),
+        detail: String(g.detail),
+      }));
+    return { gaps, summary: parsed.summary || null };
+  } catch (e) {
+    console.error("[ailog-gap-analysis] computeGapsAI error:", e);
+    return { gaps: [], summary: null };
   }
-
-  // Sort by severity
-  const severityOrder = { high: 0, medium: 1, low: 2 };
-  gaps.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
-
-  return gaps;
 }
 
 Deno.serve(async (req) => {
@@ -330,18 +239,13 @@ Deno.serve(async (req) => {
       clean_jerk_level: profileRes.data?.clean_jerk_level as string | null,
     };
 
-    const gaps = computeGaps(analysis, profile);
-
-    // Generate AI summary if we have gaps
+    // AI-driven gap analysis: send program data + athlete profile to Claude
+    let gaps: GapFinding[] = [];
     let summary: string | null = null;
-    if (gaps.length > 0 && ANTHROPIC_API_KEY) {
-      const gapSummary = gaps.map((g) => `[${g.severity.toUpperCase()}] ${g.title}: ${g.detail}`).join("\n");
-      summary = await callClaude({
-        apiKey: ANTHROPIC_API_KEY,
-        system: `You are a CrossFit coach analyzing a training program's gaps. Given a list of identified gaps, write a concise 2-3 sentence summary of the most important findings. Be direct and actionable. Do not use bullet points.`,
-        userContent: gapSummary,
-        maxTokens: 256,
-      });
+    if (ANTHROPIC_API_KEY) {
+      const result = await computeGapsAI(analysis, profile, ANTHROPIC_API_KEY);
+      gaps = result.gaps;
+      summary = result.summary;
     }
 
     // Upsert analysis with gaps and summary
