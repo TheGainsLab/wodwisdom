@@ -75,7 +75,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
   const [generatingNextMonth, setGeneratingNextMonth] = useState(false);
-  const [nextMonthJobId, setNextMonthJobId] = useState<string | null>(null);
 
   const toggleDay = useCallback((workoutId: string) => {
     setExpandedDays(prev => {
@@ -211,7 +210,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
         body: { program_id: program.id },
       });
       if (error) throw error;
-      setNextMonthJobId(data.job_id);
       // Poll for completion
       const pollInterval = setInterval(async () => {
         const { data: jobData } = await supabase.functions.invoke('program-job-status', {
@@ -220,13 +218,11 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
         if (jobData?.status === 'complete') {
           clearInterval(pollInterval);
           setGeneratingNextMonth(false);
-          setNextMonthJobId(null);
           // Reload program to show new workouts
           loadProgram();
         } else if (jobData?.status === 'failed') {
           clearInterval(pollInterval);
           setGeneratingNextMonth(false);
-          setNextMonthJobId(null);
           alert('Failed to generate next month: ' + (jobData?.error || 'Unknown error'));
         }
       }, 5000);
