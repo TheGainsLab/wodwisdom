@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { ANALYZE_PROGRAM_ENDPOINT, INCORPORATE_ENDPOINT } from '../lib/supabase';
 import Nav from '../components/Nav';
+import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 
 interface ProgramAnalysis {
   modal_balance: Record<string, number>;
@@ -19,30 +20,16 @@ interface ProgramAnalysis {
   load_bands?: Record<string, number>;
 }
 
-function formatLoadsDisplay(m: { loads?: string[]; load?: string }): string {
-  const loads = m.loads ?? (m.load ? [m.load] : []);
-  const nonBw = [...new Set(loads)].filter(l => l && l !== 'BW');
-  if (nonBw.length === 0) return 'BW';
-  return nonBw.join(', ');
-}
+const MODALITY_COLORS: Record<string, string> = {
+  Weightlifting: '#f87171',
+  Gymnastics: '#60a5fa',
+  Monostructural: '#4ade80',
+};
 
-function BarChart({ data, max }: { data: Record<string, number>; max?: number }) {
-  const entries = Object.entries(data).filter(([, v]) => v > 0);
-  const ceiling = max ?? Math.max(...entries.map(([, v]) => v), 1);
-  return (
-    <div className="analysis-bar-chart">
-      {entries.map(([label, value]) => (
-        <div key={label} className="analysis-bar-row">
-          <span className="analysis-bar-label">{label}</span>
-          <div className="analysis-bar-track">
-            <div className="analysis-bar-fill" style={{ width: `${(value / ceiling) * 100}%` }} />
-          </div>
-          <span className="analysis-bar-value">{value}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
+const MODALITY_SHORT: Record<string, string> = {
+  W: 'W', G: 'G', M: 'M',
+  Weightlifting: 'W', Gymnastics: 'G', Monostructural: 'M',
+};
 
 export default function ProgramAnalysisPage({ session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
@@ -56,6 +43,7 @@ export default function ProgramAnalysisPage({ session }: { session: Session }) {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
   const [navOpen, setNavOpen] = useState(false);
+  const [showAllMovements, setShowAllMovements] = useState(false);
 
   const getAuthHeaders = useCallback(async () => {
     const { data: { session: s } } = await supabase.auth.getSession();
@@ -164,6 +152,9 @@ export default function ProgramAnalysisPage({ session }: { session: Session }) {
 
   if (!id) return null;
 
+  const totalModal = analysis ? (analysis.modal_balance.Weightlifting || 0) + (analysis.modal_balance.Gymnastics || 0) + (analysis.modal_balance.Monostructural || 0) : 0;
+  const topMovements = analysis?.movement_frequency?.slice(0, showAllMovements ? 30 : 10) || [];
+
   return (
     <div className="app-layout">
       <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
@@ -174,136 +165,252 @@ export default function ProgramAnalysisPage({ session }: { session: Session }) {
           </button>
           <h1>{programName ? `${programName} – Analysis` : 'Program Analysis'}</h1>
         </header>
-        <div className="page-body">
-          <div className="program-detail-wrap">
-            {loading ? (
-              <div className="page-loading"><div className="loading-pulse" /></div>
-            ) : !analysis ? (
-              <div className="empty-state">
+        <div className="ailog-page">
+          {loading ? (
+            <div className="loading-pulse" />
+          ) : !analysis ? (
+            <div className="ailog-card">
+              <div className="ailog-empty">
                 <p>Could not load analysis.</p>
-                <button className="auth-btn" onClick={() => loadData()}>Retry</button>
+                <button className="ailog-btn ailog-btn-primary" onClick={() => loadData()}>Retry</button>
               </div>
-            ) : (
-              <>
-                <div className="analysis-toolbar">
+            </div>
+          ) : (
+            <>
+              <div className="ailog-card" style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <button
-                    type="button"
-                    className="link-btn"
+                    className="ailog-btn ailog-btn-secondary"
+                    style={{ padding: '8px 14px', fontSize: 13, borderRadius: 6 }}
                     onClick={handleRefresh}
                     disabled={refreshing}
                   >
-                    {refreshing ? 'Refreshing...' : 'Refresh analysis'}
+                    <RefreshCw size={14} className={refreshing ? 'spin' : ''} />
+                    {refreshing ? 'Refreshing...' : 'Refresh'}
                   </button>
-                  {refreshError && <span className="error-msg" style={{ marginLeft: 12 }}>{refreshError}</span>}
+                  {refreshError && <span style={{ color: 'var(--error, #ef4444)', fontSize: 13, marginLeft: 12 }}>{refreshError}</span>}
                 </div>
-                <div className="analysis-section">
-                  <h2 className="analysis-section-title">Modal balance</h2>
-                  <BarChart data={analysis.modal_balance} />
+              </div>
+
+              {/* Modality balance */}
+              <div className="ailog-card" style={{ marginBottom: 16 }}>
+                <div className="ailog-section">
+                  <h3 className="ailog-header">Modality Balance</h3>
+                  {totalModal > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {(['Weightlifting', 'Gymnastics', 'Monostructural'] as const).map((mod) => {
+                        const count = analysis.modal_balance[mod] || 0;
+                        const pct = totalModal > 0 ? Math.round((count / totalModal) * 100) : 0;
+                        const color = MODALITY_COLORS[mod];
+                        return (
+                          <div key={mod}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                              <span style={{ color: 'var(--text-dim)' }}>{mod}</span>
+                              <span style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}>{pct}%</span>
+                            </div>
+                            <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3, transition: 'width .3s' }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                <div className="analysis-section">
-                  <h2 className="analysis-section-title">Time domains</h2>
-                  <BarChart data={analysis.time_domains} />
+              </div>
+
+              {/* Time domains */}
+              <div className="ailog-card" style={{ marginBottom: 16 }}>
+                <div className="ailog-section">
+                  <h3 className="ailog-header">Time Domains</h3>
+                  <div className="ailog-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+                    {(['short', 'medium', 'long'] as const).map((td) => (
+                      <div key={td} className="ailog-stat" style={{ textAlign: 'center' }}>
+                        <div className="ailog-stat-value" style={{ fontSize: 22 }}>{analysis.time_domains[td] || 0}</div>
+                        <div className="ailog-stat-label">{td === 'short' ? '<8 min' : td === 'medium' ? '8-15 min' : '15+ min'}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="analysis-section">
-                  <h2 className="analysis-section-title">Workout structure</h2>
-                  <BarChart data={analysis.workout_structure} />
+              </div>
+
+              {/* Workout structure */}
+              <div className="ailog-card" style={{ marginBottom: 16 }}>
+                <div className="ailog-section">
+                  <h3 className="ailog-header">Workout Structure</h3>
+                  <div className="ailog-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                    {Object.entries(analysis.workout_structure).filter(([, v]) => v > 0).map(([label, value]) => (
+                      <div key={label} className="ailog-stat" style={{ textAlign: 'center' }}>
+                        <div className="ailog-stat-value" style={{ fontSize: 22 }}>{value}</div>
+                        <div className="ailog-stat-label">{label}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="analysis-section">
-                  <h2 className="analysis-section-title">Workout formats</h2>
-                  <BarChart data={analysis.workout_formats} />
+              </div>
+
+              {/* Workout formats */}
+              <div className="ailog-card" style={{ marginBottom: 16 }}>
+                <div className="ailog-section">
+                  <h3 className="ailog-header">Workout Formats</h3>
+                  <div className="ailog-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                    {Object.entries(analysis.workout_formats).filter(([, v]) => v > 0).map(([label, value]) => (
+                      <div key={label} className="ailog-stat" style={{ textAlign: 'center' }}>
+                        <div className="ailog-stat-value" style={{ fontSize: 22 }}>{value}</div>
+                        <div className="ailog-stat-label">{label}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                {(analysis.loading_ratio || analysis.load_bands) && (
-                  <div className="analysis-section">
-                    <h2 className="analysis-section-title">Loading analysis</h2>
+              </div>
+
+              {/* Loading analysis */}
+              {(analysis.loading_ratio || analysis.load_bands) && (
+                <div className="ailog-card" style={{ marginBottom: 16 }}>
+                  <div className="ailog-section">
+                    <h3 className="ailog-header">Loading Analysis</h3>
                     {analysis.loading_ratio && (
-                      <div className="analysis-loading-stats">
-                        <span>Loaded: {analysis.loading_ratio.loaded} · Bodyweight: {analysis.loading_ratio.bodyweight}</span>
+                      <div className="ailog-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+                        <div className="ailog-stat" style={{ textAlign: 'center' }}>
+                          <div className="ailog-stat-value" style={{ fontSize: 22 }}>{analysis.loading_ratio.loaded}</div>
+                          <div className="ailog-stat-label">Loaded</div>
+                        </div>
+                        <div className="ailog-stat" style={{ textAlign: 'center' }}>
+                          <div className="ailog-stat-value" style={{ fontSize: 22 }}>{analysis.loading_ratio.bodyweight}</div>
+                          <div className="ailog-stat-label">Bodyweight</div>
+                        </div>
                         {analysis.distinct_loads != null && (
-                          <span style={{ marginLeft: 16 }}>Distinct loads: {analysis.distinct_loads}</span>
+                          <div className="ailog-stat" style={{ textAlign: 'center' }}>
+                            <div className="ailog-stat-value" style={{ fontSize: 22 }}>{analysis.distinct_loads}</div>
+                            <div className="ailog-stat-label">Distinct Loads</div>
+                          </div>
                         )}
                       </div>
                     )}
                     {analysis.load_bands && Object.values(analysis.load_bands).some(v => v > 0) && (
-                      <BarChart data={analysis.load_bands} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+                        {Object.entries(analysis.load_bands).filter(([, v]) => v > 0).map(([band, count]) => {
+                          const maxBand = Math.max(...Object.values(analysis.load_bands!));
+                          const pct = maxBand > 0 ? Math.round((count / maxBand) * 100) : 0;
+                          return (
+                            <div key={band}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                                <span style={{ color: 'var(--text-dim)' }}>{band} lbs</span>
+                                <span style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}>{count}</span>
+                              </div>
+                              <div style={{ height: 6, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent)', borderRadius: 3, transition: 'width .3s' }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
-                )}
-                <div className="analysis-section">
-                  <h2 className="analysis-section-title">Movement frequency</h2>
-                  <div className="analysis-movement-table-wrap">
-                    <table className="program-workouts-table">
-                      <thead>
-                        <tr>
-                          <th>Movement</th>
-                          <th>Count</th>
-                          <th>Modality</th>
-                          <th>Load</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {analysis.movement_frequency.slice(0, 30).map((m, i) => (
-                          <tr key={i}>
-                            <td>{m.name}</td>
-                            <td>{m.count}</td>
-                            <td>{m.modality === 'W' ? 'Weightlifting' : m.modality === 'G' ? 'Gymnastics' : 'Monostructural'}</td>
-                            <td>{formatLoadsDisplay(m)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
                 </div>
-                {analysis.notices.length > 0 && (
-                  <div className="analysis-section">
-                    <h2 className="analysis-section-title">Notices</h2>
-                    <ul className="analysis-notices">
-                      {analysis.notices.map((n, i) => (
-                        <li key={i}>{n}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {analysis.consecutive_overlaps.length > 0 && (
-                  <div className="analysis-section">
-                    <h2 className="analysis-section-title">Consecutive day overlaps</h2>
-                    <ul className="analysis-overlaps">
-                      {analysis.consecutive_overlaps.map((o, i) => (
-                        <li key={i}>{o.days}: {o.movements.join(', ')}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <div className="analysis-section analysis-incorporate">
-                  <h2 className="analysis-section-title">Incorporate movements</h2>
-                  <p className="analysis-incorporate-desc">Select movements from the CrossFit canon that are not yet programmed. AI will suggest placements.</p>
-                  <div className="analysis-not-programmed">
-                    {(['Weightlifting', 'Gymnastics', 'Monostructural'] as const).map(cat => {
-                      const items = analysis.not_programmed[cat] || [];
-                      if (items.length === 0) return null;
+              )}
+
+              {/* Movement frequency */}
+              {topMovements.length > 0 && (
+                <div className="ailog-card" style={{ marginBottom: 16 }}>
+                  <div className="ailog-section">
+                    <h3 className="ailog-header">Movement Frequency</h3>
+                    {topMovements.map((m, i) => {
+                      const modShort = MODALITY_SHORT[m.modality] || m.modality;
+                      const color = modShort === 'W' ? '#f87171' : modShort === 'G' ? '#60a5fa' : '#4ade80';
+                      const bgColor = modShort === 'W' ? 'rgba(239,68,68,.15)' : modShort === 'G' ? 'rgba(59,130,246,.15)' : 'rgba(34,197,94,.15)';
                       return (
-                        <div key={cat} className="analysis-category">
-                          <div className="analysis-category-label">{cat}</div>
-                          <div className="analysis-movement-chips">
-                            {items.map(m => (
-                              <button
-                                key={m}
-                                type="button"
-                                className={'analysis-movement-chip' + (selectedMovements.has(m) ? ' selected' : '')}
-                                onClick={() => toggleMovement(m)}
-                              >
-                                {m}
-                              </button>
-                            ))}
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border-light)' }}>
+                          <span style={{ fontSize: 14, textTransform: 'capitalize' }}>{m.name}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{
+                              fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px',
+                              padding: '3px 10px', borderRadius: 4, display: 'inline-flex', alignItems: 'center',
+                              background: bgColor, color,
+                            }}>{modShort}</span>
+                            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, minWidth: 24, textAlign: 'right' }}>{m.count}</span>
                           </div>
                         </div>
                       );
                     })}
-                  </div>
-                  {selectedMovements.size > 0 && (
-                    <div className="analysis-incorporate-actions">
-                      <span className="analysis-selected-count">{selectedMovements.size} selected</span>
+                    {(analysis.movement_frequency?.length || 0) > 10 && (
                       <button
-                        className="auth-btn"
+                        style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', padding: '8px 0', display: 'flex', alignItems: 'center', gap: 4 }}
+                        onClick={() => setShowAllMovements(!showAllMovements)}
+                      >
+                        {showAllMovements ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        {showAllMovements ? 'Show less' : `Show all ${analysis.movement_frequency.length}`}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Notices */}
+              {analysis.notices.length > 0 && (
+                <div className="ailog-card" style={{ marginBottom: 16 }}>
+                  <div className="ailog-section">
+                    <h3 className="ailog-header">Notices</h3>
+                    {analysis.notices.map((n, i) => (
+                      <div key={i} style={{ fontSize: 14, color: 'var(--text-dim)', padding: '6px 0', borderBottom: '1px solid var(--border-light)' }}>{n}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Consecutive overlaps */}
+              {analysis.consecutive_overlaps.length > 0 && (
+                <div className="ailog-card" style={{ marginBottom: 16 }}>
+                  <div className="ailog-section">
+                    <h3 className="ailog-header">Consecutive Day Overlaps</h3>
+                    {analysis.consecutive_overlaps.map((o, i) => (
+                      <div key={i} style={{ fontSize: 14, color: 'var(--text-dim)', padding: '6px 0', borderBottom: '1px solid var(--border-light)' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text)' }}>{o.days}:</span> {o.movements.join(', ')}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Not programmed / incorporate */}
+              <div className="ailog-card" style={{ marginBottom: 16 }}>
+                <div className="ailog-section">
+                  <h3 className="ailog-header">Not Programmed</h3>
+                  <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: '0 0 12px' }}>Select movements to incorporate into your program.</p>
+                  {(['Weightlifting', 'Gymnastics', 'Monostructural'] as const).map(cat => {
+                    const items = analysis.not_programmed[cat] || [];
+                    if (items.length === 0) return null;
+                    return (
+                      <div key={cat} style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: MODALITY_COLORS[cat], textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>{cat}</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {items.map(m => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => toggleMovement(m)}
+                              style={{
+                                fontSize: 12, padding: '4px 10px', borderRadius: 4, cursor: 'pointer',
+                                fontFamily: 'inherit', textTransform: 'capitalize',
+                                background: selectedMovements.has(m) ? 'var(--accent)' : 'var(--surface2)',
+                                color: selectedMovements.has(m) ? 'white' : 'var(--text-dim)',
+                                border: selectedMovements.has(m) ? '1px solid var(--accent)' : '1px solid var(--border-light)',
+                                transition: 'all .15s',
+                              }}
+                            >
+                              {m}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {selectedMovements.size > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>{selectedMovements.size} selected</span>
+                      <button
+                        className="ailog-btn ailog-btn-primary"
+                        style={{ padding: '8px 14px', fontSize: 13, borderRadius: 6 }}
                         onClick={handleIncorporate}
                         disabled={incorporating}
                       >
@@ -311,16 +418,21 @@ export default function ProgramAnalysisPage({ session }: { session: Session }) {
                       </button>
                     </div>
                   )}
-                  {incorporateError && <div className="error-msg" style={{ marginTop: 8 }}>{incorporateError}</div>}
+                  {incorporateError && <div style={{ color: 'var(--error, #ef4444)', fontSize: 13, marginTop: 8 }}>{incorporateError}</div>}
                 </div>
-                <div className="program-detail-actions" style={{ marginTop: 24 }}>
-                  <button className="auth-btn" style={{ background: 'var(--surface2)', color: 'var(--text)' }} onClick={() => navigate(`/programs/${id}`)}>
-                    Back to program
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                <button
+                  className="ailog-btn ailog-btn-secondary"
+                  style={{ flex: 1 }}
+                  onClick={() => navigate(`/programs/${id}`)}
+                >
+                  Back to program
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
