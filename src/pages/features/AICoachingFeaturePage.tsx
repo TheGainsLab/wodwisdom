@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
 
@@ -34,6 +34,7 @@ function ChatExample({ question, children, scienceMode }: { question: string; ch
 }
 
 export default function AICoachingFeaturePage() {
+  const navigate = useNavigate();
   useEffect(() => {
     document.body.classList.add('feature-body');
     return () => document.body.classList.remove('feature-body');
@@ -63,11 +64,13 @@ export default function AICoachingFeaturePage() {
           Pacing strategy. Movement cues. Scaling options. Competition prep. Skills practice. Nutrition planning.
           Program review. Whatever you need — the AI speaks your language and coaches in real time.
         </p>
+        <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Try it Free</button>
       </section>
 
       {/* Real Chat Examples */}
       <section className="feature-section">
         <div className="feature-container">
+          <h2 className="feature-section-title">Real examples from real athletes</h2>
 
           <ChatExample question="When I snatch, I can pull high enough, but sometimes miss in the catch at weights I can make. What might be causing this and how can I correct it?">
             <p>Your issue sounds like a classic overhead position problem rather than a pulling deficit. If you're pulling high enough but missing catches on weights you can make, the fault is likely in your receiving position and stability.</p>
