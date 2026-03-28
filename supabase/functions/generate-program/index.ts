@@ -153,12 +153,14 @@ METCON DESIGN RULES (apply to every Metcon: block):
 /* ------------------------------------------------------------------ */
 /*  SKELETON BUILDER — full 20-day template                           */
 /* ------------------------------------------------------------------ */
-function buildProgramSkeleton(): string {
+function buildProgramSkeleton(monthNumber: number = 1): string {
+  const dayOffset = (monthNumber - 1) * 20;
+  const weekOffset = (monthNumber - 1) * 4;
   const lines: string[] = [];
   for (let week = 1; week <= 4; week++) {
-    lines.push(`Week ${week}`);
+    lines.push(`Week ${weekOffset + week}`);
     for (let day = 1; day <= 5; day++) {
-      const dayNum = (week - 1) * 5 + day;
+      const dayNum = dayOffset + (week - 1) * 5 + day;
       lines.push(`Day ${dayNum}:`);
       lines.push(`Warm-up: `);
       lines.push(`Mobility: `);
@@ -171,6 +173,105 @@ function buildProgramSkeleton(): string {
   }
   return lines.join("\n");
 }
+
+/* ------------------------------------------------------------------ */
+/*  MONTH 2+ CONTEXT — fetch previous program & evaluation history    */
+/* ------------------------------------------------------------------ */
+async function fetchPreviousProgramContext(
+  supa: ReturnType<typeof createClient>,
+  programId: string,
+  monthNumber: number
+): Promise<string> {
+  // Fetch last month's workouts (previous 20 days)
+  const prevMonth = monthNumber - 1;
+  const { data: prevWorkouts } = await supa
+    .from("program_workouts")
+    .select("week_num, day_num, workout_text, sort_order")
+    .eq("program_id", programId)
+    .eq("month_number", prevMonth)
+    .order("sort_order");
+
+  if (!prevWorkouts || prevWorkouts.length === 0) return "";
+
+  // Summarize the previous month's programming (not full text — too long)
+  const strengthDays: string[] = [];
+  const metconSummaries: string[] = [];
+  const skillDays: string[] = [];
+
+  for (const w of prevWorkouts) {
+    const text = w.workout_text || "";
+    const dayNum = w.sort_order + 1;
+
+    // Extract strength block
+    const strengthMatch = text.match(/Strength:\s*([\s\S]*?)(?=(?:Metcon:|Cool\s*down:|$))/i);
+    if (strengthMatch) {
+      const firstLine = strengthMatch[1].trim().split("\n")[0];
+      if (firstLine) strengthDays.push(`Day ${dayNum}: ${firstLine}`);
+    }
+
+    // Extract metcon block (first 2 lines)
+    const metconMatch = text.match(/Metcon:\s*([\s\S]*?)(?=(?:Cool\s*down:|$))/i);
+    if (metconMatch) {
+      const lines = metconMatch[1].trim().split("\n").slice(0, 2).join(" | ");
+      if (lines) metconSummaries.push(`Day ${dayNum}: ${lines}`);
+    }
+
+    // Extract skills block
+    const skillsMatch = text.match(/Skills:\s*([\s\S]*?)(?=(?:Strength:|$))/i);
+    if (skillsMatch) {
+      const firstLine = skillsMatch[1].trim().split("\n")[0];
+      if (firstLine) skillDays.push(`Day ${dayNum}: ${firstLine}`);
+    }
+  }
+
+  const parts: string[] = [`PREVIOUS MONTH (Month ${prevMonth}) PROGRAMMING SUMMARY:`];
+  if (strengthDays.length > 0) parts.push("Strength:\n" + strengthDays.join("\n"));
+  if (skillDays.length > 0) parts.push("Skills:\n" + skillDays.join("\n"));
+  if (metconSummaries.length > 0) parts.push("Metcons:\n" + metconSummaries.join("\n"));
+
+  return parts.join("\n\n");
+}
+
+async function fetchEvaluationHistory(
+  supa: ReturnType<typeof createClient>,
+  userId: string
+): Promise<string> {
+  const { data: evals } = await supa
+    .from("profile_evaluations")
+    .select("month_number, analysis, created_at")
+    .eq("user_id", userId)
+    .eq("visible", true)
+    .order("created_at", { ascending: true });
+
+  if (!evals || evals.length === 0) return "";
+
+  const parts = evals.map((e: { month_number: number; analysis: string; created_at: string }) => {
+    const date = new Date(e.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+    return `Month ${e.month_number} (${date}):\n${e.analysis}`;
+  });
+
+  return "EVALUATION HISTORY (longitudinal progression):\n\n" + parts.join("\n\n---\n\n");
+}
+
+/* ------------------------------------------------------------------ */
+/*  MONTH 2+ PROGRESSION PROMPT                                       */
+/* ------------------------------------------------------------------ */
+const PROGRESSION_PROMPT = `You are continuing a multi-month training program. This is Month {monthNumber} for this athlete.
+
+PROGRESSION PRINCIPLES:
+- Review the previous month's programming and the athlete's training log to determine what worked and what needs adjustment.
+- LOADING PROGRESSION: If the athlete consistently hit prescribed weights, increase by 2-5% for main lifts. If they missed reps or RPE was very high, maintain or slightly reduce.
+- SKILL PROGRESSION: If skills improved (reflected in evaluation or log), advance the drill complexity. If stalled, change the approach — different drills, different rep scheme.
+- CONDITIONING: Vary time domains and modality balance month-to-month. If last month was heavy on short metcons, shift toward more medium/long. Rotate monostructural emphases.
+- PERIODIZATION: Month {monthNumber} should build on Month {prevMonth}. Consider accumulation → intensification → peaking → deload cycles across months.
+- DELOAD: Week 4 of each month remains a deload week — reduce volume but maintain movement patterns.
+- VARIETY: Do not repeat the same metcon structures from last month. Rotate barbell movements, vary gymnastics pairings, introduce new combinations.
+- Use the TRAINING LOG to see what the athlete ACTUALLY did — loads hit, scores posted, completion rates. Program based on demonstrated capability, not just what was prescribed.
+
+{evaluationHistory}
+
+{previousProgramContext}
+`;
 async function retrieveRAGContext(
   supa: ReturnType<typeof createClient>,
   profileData: ProfileData
@@ -364,9 +465,14 @@ async function processJob(
   jobId: string,
   userId: string,
   evalRow: {
+    id?: string;
     profile_snapshot: ProfileData;
     analysis: string | null;
-  }
+  },
+  options: {
+    monthNumber?: number;
+    programId?: string;  // existing program to append to
+  } = {}
 ): Promise<void> {
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   console.log(`=== Job ${jobId} start ===`);
@@ -374,14 +480,32 @@ async function processJob(
   try {
     // Mark processing
     await supa.from("program_jobs").update({ status: "processing", updated_at: new Date().toISOString() }).eq("id", jobId);
+    const monthNumber = options.monthNumber || 1;
+    const existingProgramId = options.programId || null;
+    const isContinuation = monthNumber > 1 && existingProgramId != null;
+    console.log(`[${jobId}] Month ${monthNumber}, continuation=${isContinuation}, existingProgram=${existingProgramId}`);
     const profile = evalRow.profile_snapshot || {};
     const profileStr = formatProfile(profile);
     console.log(`[${jobId}] Profile: ${profileStr.length} chars, lifts=${Object.keys(profile.lifts || {}).length}, skills=${Object.keys(profile.skills || {}).length}`);
     const analysisStr = evalRow.analysis || "No detailed analysis.";
     console.log(`[${jobId}] Analysis: ${analysisStr.length} chars`);
-    const recentTraining = await fetchAndFormatRecentHistory(supa, userId, { maxLines: 25 });
+    // For Month 2+, fetch extended training history (full month) and previous program context
+    const trainingDays = isContinuation ? 35 : 14;
+    const trainingMaxLines = isContinuation ? 60 : 25;
+    const recentTraining = await fetchAndFormatRecentHistory(supa, userId, { days: trainingDays, maxLines: trainingMaxLines });
     const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
-    console.log(`[${jobId}] Training history: ${recentTraining ? recentTraining.length + ' chars' : 'none'}`);
+    console.log(`[${jobId}] Training history: ${recentTraining ? recentTraining.length + ' chars' : 'none'} (${trainingDays} days)`);
+    // Fetch previous program context and evaluation history for Month 2+
+    let previousProgramContext = "";
+    let evaluationHistory = "";
+    if (isContinuation) {
+      [previousProgramContext, evaluationHistory] = await Promise.all([
+        fetchPreviousProgramContext(supa, existingProgramId, monthNumber),
+        fetchEvaluationHistory(supa, userId),
+      ]);
+      console.log(`[${jobId}] Previous program context: ${previousProgramContext.length} chars`);
+      console.log(`[${jobId}] Evaluation history: ${evaluationHistory.length} chars`);
+    }
     const ragContext = await retrieveRAGContext(supa, profile);
     console.log(`[${jobId}] RAG context: ${ragContext ? ragContext.length + ' chars' : 'none'}`);
     // Determine athlete scope for guideline filtering
@@ -397,7 +521,7 @@ async function processJob(
     // Fetch strength guidelines from coaching_guidelines table
     const guidelinesBlock = await fetchCoachingGuidelines(supa, scopes);
     console.log(`[${jobId}] Guidelines: ${guidelinesBlock ? guidelinesBlock.length + ' chars' : 'none'}`);
-    const skeleton = buildProgramSkeleton();
+    const skeleton = buildProgramSkeleton(monthNumber);
     console.log(`[${jobId}] Skeleton: ${skeleton.length} chars, ${(skeleton.match(/^Day \d+:/gm) || []).length} day headers`);
     // Derive metcon-eligible vs skill-block-only movements
     const proficientSkills: string[] = [];
@@ -470,14 +594,23 @@ ${skeleton}`;
     // Inject developing skills into Rule 6 of METCON_GUIDANCE
     const developingList = developingSkills.length > 0 ? developingSkills.join(", ") : "none";
     const metconGuidance = METCON_GUIDANCE.replace("{developingSkills}", developingList);
-    const systemPrompt = GENERATE_PROMPT + metconGuidance + guidelinesBlock + ragContext;
+    // Build system prompt — add progression context for Month 2+
+    let progressionBlock = "";
+    if (isContinuation) {
+      progressionBlock = "\n\n" + PROGRESSION_PROMPT
+        .replace(/\{monthNumber\}/g, String(monthNumber))
+        .replace(/\{prevMonth\}/g, String(monthNumber - 1))
+        .replace("{evaluationHistory}", evaluationHistory)
+        .replace("{previousProgramContext}", previousProgramContext);
+    }
+    const systemPrompt = GENERATE_PROMPT + metconGuidance + progressionBlock + guidelinesBlock + ragContext;
     console.log(`[${jobId}] Prompt sizes: system=${systemPrompt.length} chars, user=${userPrompt.length} chars`);
     if (!ANTHROPIC_API_KEY) {
       throw new Error("Program generation is not configured");
     }
     const MAX_ATTEMPTS = 3;
     const monthYear = new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" });
-    const programName = `Month 1 — ${monthYear}`;
+    const programName = `Month ${monthNumber} — ${monthYear}`;
     let program_id: string | undefined;
     let workout_count: number | undefined;
     const messages: Array<{ role: string; content: string }> = [
@@ -540,12 +673,15 @@ ${skeleton}`;
         }
         throw new Error("Generated program was empty or too short");
       }
-      // FIX 4: Wrong day count retry message updated
+      // Day count validation — Month N expects days offset by (monthNumber-1)*20
+      const dayOffset = (monthNumber - 1) * 20;
+      const expectedFirstDay = dayOffset + 1;
+      const expectedLastDay = dayOffset + 20;
       if (dayHeaders.length < 20) {
         if (attempt < MAX_ATTEMPTS) {
           console.warn(`[${jobId}] Attempt ${attempt}: only ${dayHeaders.length}/20 days, retrying with correction...`);
           messages.push({ role: "assistant", content: programText });
-          messages.push({ role: "user", content: `That program only contained ${dayHeaders.length} days. It must have exactly 20 days (Day 1 through Day 20). Please output the complete program with all 20 days.` });
+          messages.push({ role: "user", content: `That program only contained ${dayHeaders.length} days. It must have exactly 20 days (Day ${expectedFirstDay} through Day ${expectedLastDay}). Please output the complete program with all 20 days.` });
           continue;
         }
         throw new Error(`Program contained ${dayHeaders.length}/20 days after ${MAX_ATTEMPTS} attempts`);
@@ -565,7 +701,7 @@ ${skeleton}`;
         if (attempt < MAX_ATTEMPTS) {
           console.warn(`[${jobId}] Attempt ${attempt}: parsed ${parsedWorkouts.length}/20 workouts, retrying...`);
           messages.push({ role: "assistant", content: programText });
-          messages.push({ role: "user", content: `That program failed validation: Expected exactly 20 workouts, got ${parsedWorkouts.length}. Please output the complete program with exactly 20 days (Day 1 through Day 20), filling in every block of the template.` });
+          messages.push({ role: "user", content: `That program failed validation: Expected exactly 20 workouts, got ${parsedWorkouts.length}. Please output the complete program with exactly 20 days (Day ${expectedFirstDay} through Day ${expectedLastDay}), filling in every block of the template.` });
           continue;
         }
         throw new Error(`Expected 20 workouts, got ${parsedWorkouts.length}`);
@@ -586,27 +722,39 @@ ${skeleton}`;
         // On final attempt, log but proceed — partial compliance is better than failure
         console.warn(`[${jobId}] Final attempt still has ${metconViolations.length} violations — saving anyway`);
       }
-      // Insert program
-      const { data: prog, error: progErr } = await supa
-        .from("programs")
-        .insert({ user_id: userId, name: programName })
-        .select("id")
-        .single();
-      if (progErr || !prog) throw new Error("Failed to create program");
-      // Insert workouts
+      // For Month 1: create new program. For Month 2+: append to existing program.
+      let progId: string;
+      if (isContinuation && existingProgramId) {
+        progId = existingProgramId;
+        console.log(`[${jobId}] Appending month ${monthNumber} to existing program ${progId}`);
+      } else {
+        const { data: prog, error: progErr } = await supa
+          .from("programs")
+          .insert({ user_id: userId, name: programName, source: "generated" })
+          .select("id")
+          .single();
+        if (progErr || !prog) throw new Error("Failed to create program");
+        progId = prog.id;
+        console.log(`[${jobId}] Created new program ${progId}`);
+      }
+      // Insert workouts with month_number
       const wkRows = parsedWorkouts.map((pw, idx) => ({
-        program_id: prog.id,
+        program_id: progId,
         week_num: pw.week_num,
         day_num: pw.day_num,
         workout_text: pw.workout_text,
-        sort_order: idx,
+        sort_order: pw.sort_order,
+        month_number: monthNumber,
       }));
       const { data: insertedWks, error: wkErr } = await supa
         .from("program_workouts")
         .insert(wkRows)
         .select("id, workout_text");
       if (wkErr) {
-        await supa.from("programs").delete().eq("id", prog.id);
+        // Only delete program if we just created it (Month 1)
+        if (!isContinuation) {
+          await supa.from("programs").delete().eq("id", progId);
+        }
         throw new Error("Failed to save workouts");
       }
       // Extract and insert blocks
@@ -633,16 +781,28 @@ ${skeleton}`;
         }
         console.log(`[${jobId}] Inserted ${blockRows.length} blocks for ${insertedWks.length} workouts`);
       }
+      // Update generated_months on the program
+      await supa
+        .from("programs")
+        .update({ generated_months: monthNumber })
+        .eq("id", progId);
+      // Mark evaluation as visible now that program is ready (atomic delivery)
+      if (evalRow.id) {
+        await supa
+          .from("profile_evaluations")
+          .update({ visible: true, program_id: progId })
+          .eq("id", evalRow.id);
+      }
       // Trigger analysis in background (fire and forget)
       const analyzeUrl = `${SUPABASE_URL}/functions/v1/analyze-program`;
       fetch(analyzeUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
-        body: JSON.stringify({ program_id: prog.id, user_id: userId }),
+        body: JSON.stringify({ program_id: progId, user_id: userId }),
       }).catch((err) => console.error("Analyze-program fire-and-forget failed:", err));
-      program_id = prog.id;
+      program_id = progId;
       workout_count = parsedWorkouts.length;
-      console.log(`[${jobId}] Save success: program_id=${program_id}, workout_count=${workout_count}`);
+      console.log(`[${jobId}] Save success: program_id=${program_id}, workout_count=${workout_count}, month=${monthNumber}`);
       break;
     }
     if (!program_id) {
@@ -686,21 +846,33 @@ Deno.serve(async (req) => {
       });
     }
     let evaluationId: string | null = null;
+    let monthNumber: number = 1;
+    let programId: string | null = null;
     try {
       const body = await req.json().catch(() => ({}));
       evaluationId = body?.evaluation_id ?? null;
+      monthNumber = body?.month_number ?? 1;
+      programId = body?.program_id ?? null;
     } catch {
       // no body
     }
+    // For Month 2+, validate that program_id is provided
+    if (monthNumber > 1 && !programId) {
+      return new Response(
+        JSON.stringify({ error: "program_id is required for Month 2+ generation" }),
+        { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
+      );
+    }
     // Fetch evaluation: use provided id, or most recent
     let evalRow: {
+      id?: string;
       profile_snapshot: ProfileData;
       analysis: string | null;
     } | null = null;
     if (evaluationId) {
       const { data } = await supa
         .from("profile_evaluations")
-        .select("profile_snapshot, analysis")
+        .select("id, profile_snapshot, analysis")
         .eq("id", evaluationId)
         .eq("user_id", user.id)
         .maybeSingle();
@@ -709,7 +881,7 @@ Deno.serve(async (req) => {
     if (!evalRow) {
       const { data } = await supa
         .from("profile_evaluations")
-        .select("profile_snapshot, analysis")
+        .select("id, profile_snapshot, analysis")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -742,7 +914,10 @@ Deno.serve(async (req) => {
       );
     }
     // Fire background task — no user token needed, uses service-role key
-    EdgeRuntime.waitUntil(processJob(job.id, user.id, evalRow));
+    EdgeRuntime.waitUntil(processJob(job.id, user.id, evalRow, {
+      monthNumber,
+      programId: programId || undefined,
+    }));
     // Return immediately with job_id
     return new Response(
       JSON.stringify({ job_id: job.id }),
