@@ -292,8 +292,8 @@ export default function ProgramAnalysisPage({ session }: { session: Session }) {
                         {Object.entries(analysis.load_bands)
                           .filter(([, v]) => v > 0)
                           .sort((a, b) => {
-                            const numA = parseInt(a[0].replace(/[^\d]/g, '')) || 0;
-                            const numB = parseInt(b[0].replace(/[^\d]/g, '')) || 0;
+                            const numA = parseInt(a[0].match(/\d+/)?.[0] || '0');
+                            const numB = parseInt(b[0].match(/\d+/)?.[0] || '0');
                             return numA - numB;
                           })
                           .map(([band, count], i, arr) => {
