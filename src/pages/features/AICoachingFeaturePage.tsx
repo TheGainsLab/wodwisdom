@@ -58,25 +58,16 @@ export default function AICoachingFeaturePage() {
       {/* Hero */}
       <section className="feature-hero">
         <span className="feature-hero-badge">AI Coaching</span>
-        <h1 className="feature-hero-title">AI that knows your athlete</h1>
+        <h1 className="feature-hero-title">Ask anything</h1>
         <p className="feature-hero-sub">
-          We trained an AI on the CrossFit methodology — every study guide, journal article, and seminar.
-          Ask it anything about training, nutrition, movement, or recovery. Get answers grounded in real
-          methodology, not generic fitness advice.
-        </p>
-        <p className="feature-hero-sub">
-          No profile required.
+          Pacing strategy. Movement cues. Scaling options. Competition prep. Skills practice. Nutrition planning.
+          Program review. Whatever you need — the AI speaks your language and coaches in real time.
         </p>
       </section>
 
       {/* Real Chat Examples */}
       <section className="feature-section">
         <div className="feature-container">
-          <h2 className="feature-section-title">Ask anything</h2>
-          <p className="feature-section-sub">
-            Pacing strategy. Movement cues. Scaling options. Competition prep. Skills practice. Nutrition planning.
-            Program review. Whatever you need — the AI speaks your language and coaches in real time.
-          </p>
 
           <ChatExample question="When I snatch, I can pull high enough, but sometimes miss in the catch at weights I can make. What might be causing this and how can I correct it?">
             <p>Your issue sounds like a classic overhead position problem rather than a pulling deficit. If you're pulling high enough but missing catches on weights you can make, the fault is likely in your receiving position and stability.</p>
