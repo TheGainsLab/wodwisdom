@@ -3,7 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
-import WorkoutBlocksDisplay from '../components/WorkoutBlocksDisplay';
+import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksDisplay';
+
+interface ProgramBlock {
+  id: string;
+  program_workout_id: string;
+  block_type: string;
+  block_order: number;
+  block_text: string;
+}
 
 interface ProgramWorkout {
   id: string;
@@ -62,6 +70,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [allWorkouts, setAllWorkouts] = useState<ProgramWorkout[]>([]);
   const [completedWorkoutIds, setCompletedWorkoutIds] = useState<Set<string>>(new Set());
   const [inProgressWorkouts, setInProgressWorkouts] = useState<Map<string, { logId: string; savedCount: number; totalBlocks: number }>>(new Map());
+  const [workoutBlocks, setWorkoutBlocks] = useState<Map<string, ProgramBlock[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [navOpen, setNavOpen] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
@@ -102,6 +111,26 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       .eq('program_id', id)
       .order('sort_order');
     setAllWorkouts(wk || []);
+
+    // Fetch blocks for all workouts
+    if (wk?.length) {
+      const ids = wk.map((w) => w.id);
+      const blockMap = new Map<string, ProgramBlock[]>();
+      for (let i = 0; i < ids.length; i += 100) {
+        const batch = ids.slice(i, i + 100);
+        const { data: blocks } = await supabase
+          .from('program_workout_blocks')
+          .select('id, program_workout_id, block_type, block_order, block_text')
+          .in('program_workout_id', batch)
+          .order('block_order');
+        for (const b of blocks || []) {
+          const existing = blockMap.get(b.program_workout_id) || [];
+          existing.push(b as ProgramBlock);
+          blockMap.set(b.program_workout_id, existing);
+        }
+      }
+      setWorkoutBlocks(blockMap);
+    }
 
     if (wk?.length) {
       const ids = wk.map((w) => w.id);
@@ -257,12 +286,28 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                   </div>
                                   {!isExpanded && (
                                     <div className="program-day-summary-lines">
-                                      {workoutSummaryLines(w.workout_text).map((line) => (
-                                        <div key={line.label} className="program-day-summary-line">
-                                          <span className="program-day-summary-label">{line.label}:</span>
-                                          <span className="program-day-summary-text">{line.text}</span>
-                                        </div>
-                                      ))}
+                                      {workoutBlocks.has(w.id) && workoutBlocks.get(w.id)!.length > 0 ? (
+                                        workoutBlocks.get(w.id)!
+                                          .filter((b) => ['skills', 'strength', 'metcon', 'accessory'].includes(b.block_type))
+                                          .map((b) => {
+                                            const label = b.block_type === 'metcon' ? 'Conditioning' : b.block_type.charAt(0).toUpperCase() + b.block_type.slice(1);
+                                            const firstLine = b.block_text.split('\n')[0].trim();
+                                            const text = firstLine.length > 40 ? firstLine.slice(0, 38) + '…' : firstLine;
+                                            return (
+                                              <div key={b.id} className="program-day-summary-line">
+                                                <span className="program-day-summary-label">{label}:</span>
+                                                <span className="program-day-summary-text">{text}</span>
+                                              </div>
+                                            );
+                                          })
+                                      ) : (
+                                        workoutSummaryLines(w.workout_text).map((line) => (
+                                          <div key={line.label} className="program-day-summary-line">
+                                            <span className="program-day-summary-label">{line.label}:</span>
+                                            <span className="program-day-summary-text">{line.text}</span>
+                                          </div>
+                                        ))
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -278,7 +323,24 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                               {isExpanded && (
                                 <div className="program-day-body">
                                   <div className="program-day-blocks">
-                                    <WorkoutBlocksDisplay text={w.workout_text} />
+                                    {workoutBlocks.has(w.id) && workoutBlocks.get(w.id)!.length > 0 ? (
+                                      <div className="workout-blocks">
+                                        {workoutBlocks.get(w.id)!.map((b, bi) => (
+                                          <div key={bi} className="workout-block">
+                                            <div className="workout-block-label" data-block={b.block_type}>{
+                                              b.block_type === 'warm-up' ? 'Warm-up' :
+                                              b.block_type === 'cool-down' ? 'Cool down' :
+                                              b.block_type.charAt(0).toUpperCase() + b.block_type.slice(1)
+                                            }</div>
+                                            <div className="workout-block-content">
+                                              <BlockContent label={b.block_type === 'skills' ? 'Skills' : ''} content={b.block_text} />
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <WorkoutBlocksDisplay text={w.workout_text} />
+                                    )}
                                   </div>
                                   <div className="program-day-actions">
                                     <button

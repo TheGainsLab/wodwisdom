@@ -146,13 +146,14 @@ function CollapsibleBlock({ block, defaultOpen }: { block: ReviewBlock; defaultO
 export default function WorkoutReviewPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const location = useLocation();
-  // Restore cached review: check localStorage by source_id first, then sessionStorage
+  // Restore cached review: check localStorage by source_id first, then sessionStorage (only for freestyle)
   const savedReview = (() => {
     try {
       const sid = (location.state as { source_id?: string } | null)?.source_id;
       if (sid) {
         const raw = localStorage.getItem(`wr_review_${sid}`);
         if (raw) return JSON.parse(raw) as { workoutText: string; review: WorkoutReview };
+        return null; // has source_id but no cached review — don't fall back to sessionStorage
       }
       const raw = sessionStorage.getItem('wr_last_review');
       if (raw) return JSON.parse(raw) as { workoutText: string; review: WorkoutReview };

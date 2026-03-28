@@ -5,6 +5,7 @@ import App from './App';
 import './index.css';
 import './engine.css';
 import './nutrition.css';
+import './ailog.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
