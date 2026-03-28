@@ -11,10 +11,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callClaude } from "../_shared/call-claude.ts";
 import { checkEntitlement } from "../_shared/entitlements.ts";
+import { searchChunks, deduplicateChunks, formatChunksAsContext } from "../_shared/rag.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -105,6 +107,31 @@ Deno.serve(async (req) => {
       )
       .join("\n");
 
+    // RAG: search for relevant training science
+    let ragContext = "";
+    if (OPENAI_API_KEY) {
+      try {
+        const gapTopics = gaps.map((g: { title: string }) => g.title).join(", ");
+        const searchQuery = `CrossFit supplemental training programming ${gapTopics}`;
+
+        const [journalChunks, strengthChunks] = await Promise.all([
+          searchChunks(supa, searchQuery, "journal", OPENAI_API_KEY, 3, 0.25),
+          searchChunks(supa, searchQuery, "strength-science", OPENAI_API_KEY, 3, 0.25),
+        ]);
+
+        const allChunks = deduplicateChunks([...journalChunks, ...strengthChunks]);
+        if (allChunks.length > 0) {
+          ragContext = formatChunksAsContext(allChunks, 4);
+        }
+      } catch (e) {
+        console.error("[ailog-generate-supplement] RAG search error:", e);
+      }
+    }
+
+    const systemPrompt = ragContext
+      ? SUPPLEMENT_PROMPT + "\n\nREFERENCE MATERIAL (use to inform session design):\n" + ragContext
+      : SUPPLEMENT_PROMPT;
+
     const userContent = `ATHLETE PROFILE:
 ${profile_summary || "No profile data available."}
 
@@ -115,7 +142,7 @@ Generate supplemental sessions to address these gaps.`;
 
     const raw = await callClaude({
       apiKey: ANTHROPIC_API_KEY,
-      system: SUPPLEMENT_PROMPT,
+      system: systemPrompt,
       userContent,
       maxTokens: 4096,
     });
