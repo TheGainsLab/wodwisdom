@@ -69,44 +69,67 @@ export default function AICoachingFeaturePage() {
             Imagine having a personal Level 4 Coach who never forgets a thing. Ask anything about fitness: pacing, movement cues, nutrition planning, program review, and more. Need a deep dive on a technical topic? Flip on science mode and talk with an AI trained on biochemistry and physiology.
           </p>
 
-          <ChatExample question="When I snatch, I can pull high enough, but sometimes miss in the catch at weights I can make. What might be causing this and how can I correct it?">
-            <p>Your issue sounds like a classic overhead position problem rather than a pulling deficit. If you're pulling high enough but missing catches on weights you can make, the fault is likely in your receiving position and stability.</p>
-            <p>The most common culprit is inactive shoulders in the catch. As the Level 1 guide emphasizes, you need "active shoulders" - shoulders pulled up tight to your ears by the traps, not yielding to the load. When you catch with passive shoulders, the bar crashes down and you lose the lift despite having the strength to hold it.</p>
-            <p>Given your overhead squat max of 265 lbs and snatch of 245 lbs, you clearly have the strength. The issue is likely positional. Check if you're catching with your shoulders properly engaged - they should be "tucked up next to the ear" as gymnasts say. A passive shoulder yields to the load and kills the lift.</p>
-            <p>Your beginner-level deficit HSPU rating suggests overhead positioning might be a weak link. Work overhead squat holds at lighter weights, focusing on active shoulder engagement throughout the entire range of motion. Practice snatching from blocks or hang positions to isolate the receiving position without the fatigue of the full lift.</p>
-            <p>Also examine your footwork in the catch. Are you landing in your optimal squat stance? Poor foot positioning can compromise your receiving position even if your pull is perfect.</p>
-            <p>Drill pause overhead squats at 185-205 lbs, holding the bottom for 3 seconds with active shoulders. This will build the stability and positioning awareness you need to stick those catches consistently.</p>
+          <ChatExample question="When I snatch, I sometimes miss in the catch. What are some drills I can do to correct this?">
+            <p>Missing catches in the snatch typically stems from poor positioning, timing, or confidence in the receiving position. The key is developing comfort and strength in that bottom position through targeted skill-transfer exercises.</p>
+            <p>Start with the overhead squat - this is the foundation of your catch position. Practice holding the bottom position with perfect posture, working on flexibility and stability. As Glassman notes, this movement is "the heart of the snatch" and essential for developing effective athletic movement.</p>
+            <p>The snatch balance progressions are your best friends here. Begin with the pressing snatch balance: bar on your back with snatch grip, slowly squat down while pressing the bar overhead simultaneously. This teaches you to find and hold that catch position with control.</p>
+            <p>Progress to the heaving snatch balance, adding a short dip and drive to initiate the movement before settling into the bottom position. This builds the timing and confidence to get under the bar quickly.</p>
+            <p>Finally, work the full snatch balance - start in your pulling stance, dip and drive explosively, then dive under while moving your feet to the wider catching stance. This most closely mimics the actual catch dynamics.</p>
+            <p>Practice these progressions consistently with PVC or light weight first. The catch position must become automatic and strong before you can trust it under a heavy snatch. Most athletes need far more overhead squat and snatch balance work than they think - these positions don't develop overnight but require dedicated practice to master.</p>
             <div className="feature-chat-sources">
               <span className="feature-chat-sources-label">Sources</span>
-              <span className="feature-chat-chip">Errors, Cues and Exaggerations</span>
               <span className="feature-chat-chip">CFJ English Level1 TrainingGuide</span>
-              <span className="feature-chat-chip">37 05 lifting shoulder</span>
+              <span className="feature-chat-chip">Skill Transfer Exercises for the Snatch English</span>
+              <span className="feature-chat-chip">Next-Level Coaching: The Snatch</span>
             </div>
           </ChatExample>
 
-          <div className="feature-text" style={{ textAlign: 'center', margin: '48px 0' }}>
-            <h3>Science mode — go as deep as you want</h3>
-            <p>
-              Switch to science mode for a separate AI trained on biochemistry and physiology.
-              Carbohydrate metabolism, phosphocreatine resynthesis, heart rate variability,
-              calcium ion concentration and muscle contractions — go as deep as you want.
-            </p>
-          </div>
-
-          <ChatExample question="I want to develop all the energy systems to support my fitness and do better in CrossFit. Can you help me understand phosphocreatine resynthesis and how my training can enhance it?" scienceMode>
-            <p>The phosphocreatine (PCr) system is your most explosive energy pathway, providing immediate power for roughly 8-10 seconds of maximal effort. Looking at your profile, this system is what drives your heavy lifts like that 555lb deadlift and powers the first few reps of high-intensity movements.</p>
-            <p><strong>How PCr Works &amp; Recovers:</strong> PCr acts as an "ATP buffer" - when you fire up muscle contraction, ATP gets broken down to ADP, and PCr instantly donates its phosphate to regenerate ATP. This happens within fractions of a second, making it your fastest energy source. The key insight is that PCr resynthesis occurs through aerobic metabolism - your mitochondria use oxygen to rebuild those PCr stores.</p>
-            <p>Recovery follows a specific timeline: you'll restore about 50% of PCr within 30 seconds, 75% by 1 minute, and 95% by 2-3 minutes. This is why you can hit multiple heavy singles with adequate rest but struggle to maintain power in rapid-fire MetCons.</p>
-            <p><strong>Training Applications for You:</strong> Given your strength levels, focus on these PCr development strategies:</p>
-            <p><strong>1. Alactic Power Intervals:</strong> 10-15 second all-out efforts with 45-90 seconds rest. Try 8x15s bike sprints or 6x30m sprints with full recovery.</p>
-            <p><strong>2. Cluster Training:</strong> Break your strength work into clusters - instead of 5 straight reps, do 5x1 with 10-15 seconds between reps. This maintains PCr availability for each rep.</p>
-            <p><strong>3. Aerobic Base Development:</strong> Since oxidative metabolism refuels PCr, your steady-state work (like that 16:54 5k row) directly supports power recovery between efforts.</p>
-            <p><strong>CrossFit-Specific Considerations:</strong> Most MetCons don't allow full PCr recovery, which is why you see power drop-off after round 1-2. Train this reality with incomplete rest protocols, but also develop maximum capacity with full recovery work. Your wall-facing HSPU and kipping pull-up practice already targets this system well - just ensure adequate rest between sets to maximize quality and PCr development.</p>
+          <ChatExample question="I don't have a ring muscle up yet. I can do 7 strict pullups, but can't get the timing right. Give me some drills and cues to get ring muscle ups.">
+            <p>You've got the pulling strength, so let's work on the specific skills and timing. The muscle-up isn't just about strength - it's about coordination, false grip mastery, and understanding the transition.</p>
+            <p>Start with the foundation movements from the CrossFit progression:</p>
+            <p><strong>Ring Support Hold</strong> - Master this first. Get comfortable supporting your bodyweight with straight arms, rings turned out. Hold for 30+ seconds consistently.</p>
+            <p><strong>Ring Dips</strong> - You need strength through the full range. Work toward getting your hands to your armpits at the bottom, then pressing to full lockout.</p>
+            <p><strong>False Grip Development</strong> - This is crucial. Practice hanging from the rings with the false grip (wrist over the ring, not fingers). Your pulling strength means nothing if you lose this grip during the transition. Start with short holds and build up.</p>
+            <p><strong>Kneeling Muscle-ups</strong> - Set rings low, kneel underneath, and practice the movement pattern. Focus on the transition from pull to press. This teaches the timing without the full load.</p>
+            <p>The key timing cue: "Pull high, roll over, press out." You need to pull your chest well above the rings before initiating the transition. Many athletes try to transition too early.</p>
+            <p>As Tucker notes in the spotting article, the muscle-up requires "kinesthetic and spatial awareness" beyond just strength. The transition happens quickly, and you need to trust the movement.</p>
+            <p>Practice the elevator spot with a coach if possible - it helps you feel the proper rhythm under load while staying safe. Don't rush the progression. Master each step before moving to the next.</p>
             <div className="feature-chat-sources">
               <span className="feature-chat-sources-label">Sources</span>
-              <span className="feature-chat-chip feature-chat-chip--science">84 Sports Physiology</span>
-              <span className="feature-chat-chip feature-chat-chip--science">72 Energetics And Metabolic Rate</span>
-              <span className="feature-chat-chip feature-chat-chip--science">Lehninger's Principles of Biochemistry - 13.2</span>
+              <span className="feature-chat-chip">Spotting the Muscle-Up</span>
+              <span className="feature-chat-chip">CFJ English Level1 TrainingGuide</span>
+              <span className="feature-chat-chip">Applications of the Support on Rings</span>
+            </div>
+          </ChatExample>
+
+          <ChatExample question="I do CrossFit at 9am. I wake up at 6am. Give me some guidance about pre and post workout nutrition.">
+            <p>With that 3-hour window, you've got good timing to fuel properly without feeling heavy during your workout.</p>
+            <p><strong>Pre-workout (6-7am):</strong> Start with something easily digestible about 2 hours before - around 7am works well. Think moderate carbs with minimal fat and fiber that could slow digestion. A banana with a small amount of nut butter, some berries with a bit of yogurt, or even just a piece of toast. You want fuel in the tank but not a heavy meal sitting in your stomach.</p>
+            <p>About 30-60 minutes before (8-8:30am), consider something lighter if needed - maybe just a few dates or a small piece of fruit. Some athletes do great fasted after that initial fuel, others need that little top-off.</p>
+            <p>Hydration is critical - start drinking water when you wake up. You're dehydrated from sleep and need to be well-hydrated before that 9am session.</p>
+            <p><strong>Post-workout:</strong> This is your golden window. Within 30 minutes, prioritize protein and carbs to kickstart recovery. The CrossFit prescription emphasizes quality - think real food over supplements when possible. Greek yogurt with berries, eggs with some fruit, or a quality protein shake with banana if you're rushed.</p>
+            <p>Don't overthink it. The biggest mistake is either training completely fasted or eating too much too close to workout time. Your 3-hour window is actually ideal - use it to fuel appropriately without compromising performance. Pay attention to how different foods make you feel and adjust accordingly.</p>
+            <div className="feature-chat-sources">
+              <span className="feature-chat-sources-label">Sources</span>
+              <span className="feature-chat-chip">CFJ English L2 TrainingGuide</span>
+              <span className="feature-chat-chip">Scaling CrossFit Workouts</span>
+              <span className="feature-chat-chip">CFJ English Level1 TrainingGuide</span>
+            </div>
+          </ChatExample>
+
+          <ChatExample question="I will be traveling next week and have 3 days in a hotel gym. I'll have dumbbells, a jump rope, and exercise bikes. Can you give me 3 metcons with this equipment to help me stay sharp on the road?">
+            <p>Here are three solid metcons that'll keep you sharp with dumbbells, jump rope, and bikes:</p>
+            <p><strong>Day 1: "Hotel Helen"</strong> 3 rounds for time: 1000m bike (or 90 seconds moderate pace) / 21 dumbbell swings (Russian style, eye level) / 12 burpees</p>
+            <p>The bike replaces the traditional 400m run but maintains that longer aerobic component. Scale the dumbbell weight so you can move continuously with good form.</p>
+            <p><strong>Day 2: "Road Intervals"</strong> 5 rounds for time: 15 dumbbell thrusters / 20 double-unders (or 40 singles) / 500m bike (moderate-hard effort)</p>
+            <p>This hits that mid-range time domain with mixed modal demands. The bike intervals will spike your heart rate between the upper body work and jump rope.</p>
+            <p><strong>Day 3: "Travel Grind"</strong> 20 minutes AMRAP: 250m easy bike / 15 dumbbell deadlifts / 10 dumbbell push press (5 each arm) / 30 double-unders (or 60 singles)</p>
+            <p>The easy bike serves as active recovery between the more intense dumbbell and jump rope work, letting you maintain a steady pace for the full 20 minutes.</p>
+            <p>As the sources note about dumbbell work, these will challenge your stability and unilateral strength differently than barbells. Keep weights moderate - you want to maintain that CrossFit intensity and movement quality while staying sharp on the road.</p>
+            <div className="feature-chat-sources">
+              <span className="feature-chat-sources-label">Sources</span>
+              <span className="feature-chat-chip">13 03 Benchmark Workouts</span>
+              <span className="feature-chat-chip">Dumbbells: Did You Get the Message?</span>
             </div>
           </ChatExample>
         </div>
