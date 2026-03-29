@@ -60,11 +60,6 @@ export default function AICoachingFeaturePage() {
       <section className="feature-hero">
         <span className="feature-hero-badge">AI Coaching</span>
         <h1 className="feature-hero-title">Ask anything</h1>
-        <p className="feature-hero-sub">
-          Pacing strategy. Movement cues. Scaling options. Competition prep. Skills practice. Nutrition planning.
-          Program review. Whatever you need — the AI speaks your language and coaches in real time.
-        </p>
-        <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Try it Free</button>
       </section>
 
       {/* Real Chat Examples */}
