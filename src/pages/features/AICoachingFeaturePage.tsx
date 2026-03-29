@@ -74,8 +74,7 @@ export default function AICoachingFeaturePage() {
         <div className="feature-container">
           <h2 className="feature-section-title">Ask anything</h2>
           <p className="feature-section-sub">
-            Pacing strategy. Movement cues. Scaling options. Competition prep. Skills practice. Nutrition planning.
-            Program review. Whatever you need — the AI speaks your language and coaches in real time.
+            Imagine having a personal Level 4 Coach who never forgets a thing. Ask anything about fitness: pacing, movement cues, nutrition planning, program review, and more. Need a deep dive on a technical topic? Flip on science mode and talk with an AI trained on biochemistry and physiology.
           </p>
 
           <ChatExample question="When I snatch, I can pull high enough, but sometimes miss in the catch at weights I can make. What might be causing this and how can I correct it?">
