@@ -142,9 +142,7 @@ export default function AICoachingFeaturePage() {
             <div className="feature-text">
               <h3>Every recommendation is sourced</h3>
               <p>
-                WodWisdom doesn't make things up. Every evaluation pulls from real training methodology —
-                CrossFit Journal articles, seminar content, exercise physiology textbooks, and more.
-                You can trace any recommendation back to its source material.
+                GAINS doesn't answer with generic information. Every answer pulls from real sources: Journal articles, study guides, seminars and more. Technical answers come straight from the texts and every answer can be traced back to source material.
               </p>
             </div>
           </div>
