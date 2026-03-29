@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
+import { Plus, Zap } from 'lucide-react';
 
 interface Program {
   id: string;
@@ -20,6 +22,8 @@ export default function ProgramsListPage({ session }: { session: Session }) {
   const [hasEvaluation, setHasEvaluation] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState('');
+  const { hasFeature } = useEntitlements(session.user.id);
+  const hasEngine = hasFeature('engine');
 
   useEffect(() => {
     loadAll();
@@ -139,6 +143,32 @@ export default function ProgramsListPage({ session }: { session: Session }) {
         </header>
         <div className="page-body">
           <div className="programs-list-wrap">
+            {/* Engine card */}
+            {hasEngine && (
+              <div
+                className="history-item"
+                style={{ marginBottom: 16, cursor: 'pointer', borderLeft: '3px solid var(--accent)' }}
+                onClick={() => navigate('/engine')}
+              >
+                <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Zap size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <span className="history-question">Year of the Engine</span>
+                  <span className="history-time" style={{ marginLeft: 'auto' }}>720-day conditioning program</span>
+                </div>
+              </div>
+            )}
+
+            {/* Add Program button */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+              <button
+                className="auth-btn"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', fontSize: 14 }}
+                onClick={() => navigate('/ailog/upload')}
+              >
+                <Plus size={16} /> Add Program
+              </button>
+            </div>
+
             {loading ? (
               <div className="page-loading"><div className="loading-pulse" /></div>
             ) : programs.length === 0 ? (
