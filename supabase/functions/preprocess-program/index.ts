@@ -1,6 +1,7 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
-import { callClaude } from "../_shared/call-claude.ts";
+import { callClaude, callClaudeVision } from "../_shared/call-claude.ts";
 
 // Inlined from _shared/parse-workout-blocks.ts to avoid import resolution issues
 const BLOCK_LABELS = ["Warm-up", "Mobility", "Skills", "Strength", "Metcon", "Cool down"] as const;
@@ -552,6 +553,159 @@ async function parseBlock(
   return deduped;
 }
 
+// ─── Combined AI parser: splits into days AND classifies blocks in one call ───
+
+interface ParsedDay {
+  week_num: number;
+  day_num: number;
+  blocks: { block_type: string; block_order: number; block_text: string }[];
+}
+
+const PARSE_PROGRAM_PROMPT = `You parse raw gym/CrossFit programming text into training days and their blocks in a SINGLE pass.
+
+Return ONLY a JSON array where each element is a training day:
+[
+  {
+    "week_num": 1,
+    "day_num": 1,
+    "blocks": [
+      {
+        "block_type": "strength",
+        "block_order": 1,
+        "block_text": "Back Squat 5x5 @80%"
+      },
+      {
+        "block_type": "metcon",
+        "block_order": 2,
+        "block_text": "3 Rounds For Time:\\n15 Wall Balls 20/14\\n12 Toes to Bar\\n9 Power Cleans 135/95"
+      }
+    ]
+  }
+]
+
+DAY SPLITTING RULES:
+- A "day" is an ENTIRE training session. Everything between one day header and the next belongs to ONE day.
+- Day headers: "Monday", "Tuesday", "Day 1", "Day 2", etc.
+- INCLUDE rest days and active recovery days (single block with block_type "other").
+- day_num: 1=Monday through 7=Sunday, or sequential if no day names.
+- week_num: use week labels if present, otherwise default to 1.
+- A 7-day week should produce exactly 7 entries.
+
+BLOCK CLASSIFICATION RULES:
+- Split each day's content into blocks based on section markers: "A)" "B)" "A." "B." "Part A" "Part B" "Then:" or content shifts.
+- Classify each block by its CONTENT (not its label):
+  - strength: barbell/dumbbell work with sets×reps and percentages (5x5, 3x3 @80%, build to heavy single)
+  - metcon: AMRAP, For Time, RFT, EMOM with multiple movements, timed workouts
+  - skills: gymnastics practice, progression work, skill drills
+  - warm-up: general preparation, light cardio, movement prep
+  - cool-down: stretching, foam rolling, recovery
+  - mobility: targeted joint work, banded stretches
+  - accessory: isolation work, core, supplemental exercises
+  - other: rest days, active recovery, anything that doesn't fit above
+- Preserve the original text in block_text exactly. Do not rewrite or summarize.
+- Strip section labels (A), B), Part A, etc.) from block_text but keep the workout content.
+- If a day has no clear section divisions, treat the entire content as one block and classify it.
+
+Output valid JSON only, no markdown fences.`;
+
+const PARSE_PROGRAM_VISION_PROMPT = `Parse this gym/CrossFit programming image into training days and their blocks.
+
+Return ONLY a JSON array where each element is a training day:
+[
+  {
+    "week_num": 1,
+    "day_num": 1,
+    "blocks": [
+      {
+        "block_type": "metcon",
+        "block_order": 1,
+        "block_text": "FOR TIME 21-15-9\\nPushups\\nKettlebell Swings\\nDouble Unders"
+      }
+    ]
+  }
+]
+
+- day_num: 1=Monday through 7=Sunday
+- block_type: strength, metcon, skills, warm-up, cool-down, mobility, accessory, or other
+- Include rest days (block_type "other")
+- Preserve all text exactly as shown
+- Output valid JSON only, no markdown fences.`;
+
+async function parseProgramVision(
+  imageBase64: string,
+  mediaType: string,
+  apiKey: string,
+): Promise<ParsedDay[]> {
+  try {
+    console.log("[preprocess-program] parseProgramVision called, mediaType:", mediaType);
+    const raw = await callClaudeVision({
+      apiKey,
+      system: PARSE_PROGRAM_VISION_PROMPT,
+      images: [{ base64: imageBase64, mediaType }],
+      maxTokens: 8192,
+    });
+    console.log("[preprocess-program] parseProgramVision raw response:", raw.substring(0, 500));
+    const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+    const items = JSON.parse(cleaned);
+    if (!Array.isArray(items)) return [];
+    return items
+      .filter((d: Record<string, unknown>) => d.blocks && Array.isArray(d.blocks))
+      .map((d: Record<string, unknown>) => ({
+        week_num: typeof d.week_num === "number" ? d.week_num : 1,
+        day_num: typeof d.day_num === "number" ? d.day_num : 1,
+        blocks: (d.blocks as Record<string, unknown>[])
+          .filter((b) => b.block_text && typeof b.block_text === "string")
+          .map((b, i) => ({
+            block_type: String(b.block_type || "other"),
+            block_order: typeof b.block_order === "number" ? b.block_order : i + 1,
+            block_text: String(b.block_text).trim(),
+          })),
+      }));
+  } catch (e) {
+    console.error("[preprocess-program] parseProgramVision error:", e);
+    return [];
+  }
+}
+
+async function parseProgramAI(
+  rawText: string,
+  apiKey: string,
+): Promise<ParsedDay[]> {
+  try {
+    console.log("[preprocess-program] parseProgramAI called, input length:", rawText.length);
+    const raw = await callClaude({
+      apiKey,
+      system: PARSE_PROGRAM_PROMPT,
+      userContent: rawText,
+      maxTokens: 8192,
+    });
+    console.log("[preprocess-program] parseProgramAI raw response:", raw.substring(0, 500));
+    const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+    const items = JSON.parse(cleaned);
+    if (!Array.isArray(items)) {
+      console.error("[preprocess-program] parseProgramAI: not an array");
+      return [];
+    }
+    console.log("[preprocess-program] parseProgramAI parsed", items.length, "days");
+    return items
+      .filter((d: Record<string, unknown>) => d.blocks && Array.isArray(d.blocks))
+      .map((d: Record<string, unknown>) => ({
+        week_num: typeof d.week_num === "number" ? d.week_num : 1,
+        day_num: typeof d.day_num === "number" ? d.day_num : 1,
+        blocks: (d.blocks as Record<string, unknown>[])
+          .filter((b) => b.block_text && typeof b.block_text === "string")
+          .map((b, i) => ({
+            block_type: String(b.block_type || "other"),
+            block_order: typeof b.block_order === "number" ? b.block_order : i + 1,
+            block_text: String(b.block_text).trim(),
+          })),
+      }));
+  } catch (e) {
+    console.error("[preprocess-program] parseProgramAI error:", e);
+    return [];
+  }
+}
+
 console.log("[preprocess-program] v2 loaded");
 Deno.serve(async (req) => {
 if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -566,7 +720,7 @@ return new Response(JSON.stringify({ error: "Unauthorized" }), {
 }
 const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 const body = await req.json();
-const { name, text, file_base64, file_type, source, user_id: bodyUserId } = body;
+const { name, text, file_base64, file_type, source, user_id: bodyUserId, gym_name, is_ongoing, append_to_program_id } = body;
 const resolved = await resolveUserId(supa, authHeader, bodyUserId);
 if (resolved.error) {
 return new Response(JSON.stringify({ error: resolved.error }), {
@@ -576,29 +730,102 @@ return new Response(JSON.stringify({ error: resolved.error }), {
 }
 const userId = resolved.userId;
 let workouts: ParsedWorkout[] = [];
-const useAIParser = source === "generate";
+const isGenerated = source === "generate";
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+
+// Extract raw text from input (file or direct text)
+let rawText: string | null = null;
+let parsedDays: ParsedDay[] = [];
 if (file_base64 && file_type) {
 const buf = Uint8Array.from(atob(file_base64), (c) => c.charCodeAt(0));
 const arrayBuffer = buf.buffer;
 if (file_type === "xlsx" || file_type === "xls") {
-        workouts = parseExcelToWorkouts(arrayBuffer);
+  if (isGenerated) {
+    workouts = parseExcelToWorkouts(arrayBuffer);
+  } else {
+    // For external Excel files, dump raw cell data and let AI parse it
+    const wb = XLSX.read(arrayBuffer, { type: "array" });
+    const lines: string[] = [];
+    for (const sheetName of wb.SheetNames) {
+      const sheet = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 }) as (string | number)[][];
+      if (rows.length === 0) continue;
+      if (wb.SheetNames.length > 1) lines.push(`--- Sheet: ${sheetName} ---`);
+      for (const row of rows) {
+        lines.push(row.map((c) => String(c ?? "")).join("\t"));
+      }
+    }
+    rawText = lines.join("\n");
+  }
 } else if (file_type === "txt" || file_type === "csv") {
 const decoder = new TextDecoder("utf-8");
-const str = decoder.decode(buf);
-        workouts = useAIParser ? parseProgramTextAI(str) : parseProgramText(str);
+rawText = decoder.decode(buf);
+if (isGenerated) {
+  workouts = parseProgramTextAI(rawText);
+  rawText = null; // skip AI path
+}
+} else if (["png", "jpg", "jpeg", "webp", "heic"].includes(file_type)) {
+  // Image: use Claude vision directly
+  if (ANTHROPIC_API_KEY) {
+    const mediaTypes: Record<string, string> = {
+      png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", heic: "image/heic",
+    };
+    parsedDays = await parseProgramVision(file_base64, mediaTypes[file_type] || "image/jpeg", ANTHROPIC_API_KEY);
+    workouts = parsedDays.map((d, i) => ({
+      week_num: d.week_num,
+      day_num: d.day_num,
+      workout_text: d.blocks.map((b) => b.block_text).join("\n\n"),
+      sort_order: i,
+    }));
+  }
+} else if (file_type === "pdf") {
+  // PDF: send each page as an image to Claude vision
+  // For now, treat the PDF as a single image (first page)
+  // Claude can read PDFs sent as images
+  if (ANTHROPIC_API_KEY) {
+    parsedDays = await parseProgramVision(file_base64, "application/pdf", ANTHROPIC_API_KEY);
+    workouts = parsedDays.map((d, i) => ({
+      week_num: d.week_num,
+      day_num: d.day_num,
+      workout_text: d.blocks.map((b) => b.block_text).join("\n\n"),
+      sort_order: i,
+    }));
+  }
 } else {
-return new Response(JSON.stringify({ error: "Unsupported file type. Use xlsx, xls, txt, or csv." }), {
+return new Response(JSON.stringify({ error: "Unsupported file type. Use xlsx, xls, txt, csv, pdf, or image files." }), {
           status: 400,
           headers: { ...cors, "Content-Type": "application/json" },
 });
 }
 } else if (text && typeof text === "string") {
-      workouts = useAIParser ? parseProgramTextAI(text.trim()) : parseProgramText(text.trim());
+rawText = text.trim();
+if (isGenerated) {
+  workouts = parseProgramTextAI(rawText);
+  rawText = null; // skip AI path
+}
 } else {
 return new Response(JSON.stringify({ error: "Provide text or file_base64 with file_type" }), {
         status: 400,
         headers: { ...cors, "Content-Type": "application/json" },
 });
+}
+// For non-generated programs, use combined AI parser (days + blocks in one call)
+if (rawText && workouts.length === 0 && ANTHROPIC_API_KEY) {
+  console.log("[preprocess-program] using combined AI parser for non-generated program");
+  parsedDays = await parseProgramAI(rawText, ANTHROPIC_API_KEY);
+  // Convert to workouts format (workout_text = blocks joined)
+  workouts = parsedDays.map((d, i) => ({
+    week_num: d.week_num,
+    day_num: d.day_num,
+    workout_text: d.blocks.map((b) => b.block_text).join("\n\n"),
+    sort_order: i,
+  }));
+  console.log("[preprocess-program] AI parser returned", workouts.length, "days with blocks");
+}
+// Fallback: if AI parsing failed or no API key, try regex as last resort
+if (rawText && workouts.length === 0) {
+  console.log("[preprocess-program] AI parser returned 0, falling back to regex");
+  workouts = parseProgramText(rawText);
 }
 if (workouts.length === 0) {
 return new Response(JSON.stringify({ error: "Could not parse any workouts from the input." }), {
@@ -607,26 +834,51 @@ return new Response(JSON.stringify({ error: "Could not parse any workouts from t
 });
 }
 // AI-generated programs must produce exactly 20 workouts (5 days × 4 weeks)
-if (useAIParser && workouts.length !== 20) {
+if (isGenerated && workouts.length !== 20) {
 return new Response(JSON.stringify({ error: `Expected exactly 20 workouts, got ${workouts.length}` }), {
         status: 422,
         headers: { ...cors, "Content-Type": "application/json" },
 });
 }
-const programName = (name && String(name).trim()) || "Untitled Program";
-const { data: prog, error: progErr } = await supa
-.from("programs")
-.insert({ user_id: userId, name: programName })
-.select("id")
-.single();
-if (progErr || !prog) {
-return new Response(JSON.stringify({ error: "Failed to create program" }), {
-        status: 500,
-        headers: { ...cors, "Content-Type": "application/json" },
-});
+// If appending to an existing program, verify ownership and use that program
+let progId: string;
+if (append_to_program_id) {
+  const { data: existing, error: existErr } = await supa
+    .from("programs")
+    .select("id")
+    .eq("id", append_to_program_id)
+    .eq("user_id", userId)
+    .single();
+  if (existErr || !existing) {
+    return new Response(JSON.stringify({ error: "Program not found" }), {
+      status: 404,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  progId = existing.id;
+} else {
+  const programName = (name && String(name).trim()) || "Untitled Program";
+  const insertObj: Record<string, unknown> = { user_id: userId, name: programName };
+  if (source === "external") {
+    insertObj.source = "external";
+    if (gym_name) insertObj.gym_name = String(gym_name).trim();
+    insertObj.is_ongoing = is_ongoing === true;
+  }
+  const { data: prog, error: progErr } = await supa
+    .from("programs")
+    .insert(insertObj)
+    .select("id")
+    .single();
+  if (progErr || !prog) {
+    return new Response(JSON.stringify({ error: "Failed to create program" }), {
+      status: 500,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  progId = prog.id;
 }
 const rows = workouts.map((w, i) => ({
-      program_id: prog.id,
+      program_id: progId,
       week_num: w.week_num,
       day_num: w.day_num,
       workout_text: w.workout_text,
@@ -637,66 +889,59 @@ const { data: insertedWorkouts, error: wkErr } = await supa
 .insert(rows)
 .select("id, workout_text");
 if (wkErr) {
-await supa.from("programs").delete().eq("id", prog.id);
+if (!append_to_program_id) await supa.from("programs").delete().eq("id", progId);
 return new Response(JSON.stringify({ error: "Failed to save workouts" }), {
         status: 500,
         headers: { ...cors, "Content-Type": "application/json" },
 });
 }
-console.log(`[preprocess-program] v2 inserted ${insertedWorkouts?.length ?? 0} workouts, prog=${prog.id}`);
+console.log(`[preprocess-program] v2 inserted ${insertedWorkouts?.length ?? 0} workouts, prog=${progId}`);
+let insertedBlocksForParsing: { id: string; block_type: string; block_text: string }[] | null = null;
+
 if (insertedWorkouts?.length) {
 const blockRows: { program_workout_id: string; block_type: string; block_order: number; block_text: string }[] = [];
-for (const w of insertedWorkouts) {
-console.log(`[preprocess-program] v2 extracting blocks for workout ${w.id}, has workout_text: ${typeof w.workout_text}, len=${w.workout_text?.length ?? 'null'}`);
-const blocks = extractBlocksFromWorkoutText(w.workout_text);
-for (const b of blocks) {
-          blockRows.push({
-            program_workout_id: w.id,
-            block_type: b.block_type,
-            block_order: b.block_order,
-            block_text: b.block_text,
-});
-}
-}
-if (blockRows.length > 0) {
-const { data: insertedBlocks } = await supa
-  .from("program_workout_blocks")
-  .insert(blockRows)
-  .select("id, block_type, block_text");
 
-// Parse blocks inline using callClaude (10 concurrent)
-if (insertedBlocks?.length) {
-  const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-  if (ANTHROPIC_API_KEY) {
-    const parseable = insertedBlocks.filter((b) =>
-      ["metcon", "skills", "strength"].includes(b.block_type)
-    );
-
-    const CONCURRENCY = 3;
-    for (let i = 0; i < parseable.length; i += CONCURRENCY) {
-      const batch = parseable.slice(i, i + CONCURRENCY);
-      await Promise.all(batch.map(async (b) => {
-        try {
-          const parsed = await parseBlock(b.block_type, b.block_text, ANTHROPIC_API_KEY);
-          if (parsed) {
-            await supa
-              .from("program_workout_blocks")
-              .update({ parsed_tasks: parsed })
-              .eq("id", b.id);
-          }
-        } catch (e) {
-          console.error(`[preprocess-program] parse ${b.block_type} error for block ${b.id}:`, e);
-        }
-      }));
+if (parsedDays.length > 0) {
+  // We have pre-parsed blocks from the combined AI parser — use them directly
+  for (let i = 0; i < insertedWorkouts.length && i < parsedDays.length; i++) {
+    const w = insertedWorkouts[i];
+    const day = parsedDays[i];
+    for (const b of day.blocks) {
+      blockRows.push({
+        program_workout_id: w.id,
+        block_type: b.block_type,
+        block_order: b.block_order,
+        block_text: b.block_text,
+      });
     }
-    console.log(`[preprocess-program] parsed ${parseable.length} blocks`);
+  }
+  console.log(`[preprocess-program] wrote ${blockRows.length} blocks from AI parser`);
+} else {
+  // Generated programs: use regex block extraction (labels are guaranteed)
+  for (const w of insertedWorkouts) {
+    const blocks = extractBlocksFromWorkoutText(w.workout_text);
+    for (const b of blocks) {
+      blockRows.push({
+        program_workout_id: w.id,
+        block_type: b.block_type,
+        block_order: b.block_order,
+        block_text: b.block_text,
+      });
+    }
   }
 }
+if (blockRows.length > 0) {
+  const { data: insertedBlocks } = await supa
+    .from("program_workout_blocks")
+    .insert(blockRows)
+    .select("id, block_type, block_text");
+  insertedBlocksForParsing = insertedBlocks;
 }
 }
-return new Response(
+
+const response = new Response(
 JSON.stringify({
-        program_id: prog.id,
+        program_id: progId,
         workout_count: workouts.length,
 }),
 {
@@ -704,6 +949,40 @@ JSON.stringify({
         headers: { ...cors, "Content-Type": "application/json" },
 }
 );
+
+// Parse blocks in background — don't block the response
+const parseInBackground = async () => {
+  if (!insertedBlocksForParsing?.length) return;
+  const ANTHROPIC_API_KEY_BG = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!ANTHROPIC_API_KEY_BG) return;
+  const parseable = insertedBlocksForParsing.filter((b) =>
+    ["metcon", "skills", "strength"].includes(b.block_type)
+  );
+  if (parseable.length === 0) return;
+  console.log(`[preprocess-program] background: parsing ${parseable.length} blocks`);
+  const CONCURRENCY = 3;
+  for (let i = 0; i < parseable.length; i += CONCURRENCY) {
+    const batch = parseable.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(async (b) => {
+      try {
+        const parsed = await parseBlock(b.block_type, b.block_text, ANTHROPIC_API_KEY_BG);
+        if (parsed) {
+          await supa
+            .from("program_workout_blocks")
+            .update({ parsed_tasks: parsed })
+            .eq("id", b.id);
+        }
+      } catch (e) {
+        console.error(`[preprocess-program] background parse error for block ${b.id}:`, e);
+      }
+    }));
+  }
+  console.log(`[preprocess-program] background: finished parsing ${parseable.length} blocks`);
+};
+
+EdgeRuntime.waitUntil(parseInBackground());
+
+return response;
 } catch (e) {
 return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500,

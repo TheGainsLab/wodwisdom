@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
 
@@ -34,6 +34,7 @@ function ChatExample({ question, children, scienceMode }: { question: string; ch
 }
 
 export default function AICoachingFeaturePage() {
+  const navigate = useNavigate();
   useEffect(() => {
     document.body.classList.add('feature-body');
     return () => document.body.classList.remove('feature-body');
@@ -58,15 +59,12 @@ export default function AICoachingFeaturePage() {
       {/* Hero */}
       <section className="feature-hero">
         <span className="feature-hero-badge">AI Coaching</span>
-        <h1 className="feature-hero-title">AI that knows your athlete</h1>
+        <h1 className="feature-hero-title">Ask anything</h1>
         <p className="feature-hero-sub">
-          We trained an AI on the CrossFit methodology — every study guide, journal article, and seminar.
-          Ask it anything about training, nutrition, movement, or recovery. Get answers grounded in real
-          methodology, not generic fitness advice.
+          Pacing strategy. Movement cues. Scaling options. Competition prep. Skills practice. Nutrition planning.
+          Program review. Whatever you need — the AI speaks your language and coaches in real time.
         </p>
-        <p className="feature-hero-sub">
-          No profile required.
-        </p>
+        <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Try it Free</button>
       </section>
 
       {/* Real Chat Examples */}

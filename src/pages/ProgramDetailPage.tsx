@@ -3,7 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
-import WorkoutBlocksDisplay from '../components/WorkoutBlocksDisplay';
+import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksDisplay';
+
+interface ProgramBlock {
+  id: string;
+  program_workout_id: string;
+  block_type: string;
+  block_order: number;
+  block_text: string;
+}
 
 interface ProgramWorkout {
   id: string;
@@ -58,13 +66,15 @@ function workoutSummaryLines(text: string): SummaryLine[] {
 export default function ProgramDetailPage({ session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [program, setProgram] = useState<{ id: string; name: string } | null>(null);
+  const [program, setProgram] = useState<{ id: string; name: string; source?: string; generated_months?: number } | null>(null);
   const [allWorkouts, setAllWorkouts] = useState<ProgramWorkout[]>([]);
   const [completedWorkoutIds, setCompletedWorkoutIds] = useState<Set<string>>(new Set());
   const [inProgressWorkouts, setInProgressWorkouts] = useState<Map<string, { logId: string; savedCount: number; totalBlocks: number }>>(new Map());
+  const [workoutBlocks, setWorkoutBlocks] = useState<Map<string, ProgramBlock[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [navOpen, setNavOpen] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  const [generatingNextMonth, setGeneratingNextMonth] = useState(false);
 
   const toggleDay = useCallback((workoutId: string) => {
     setExpandedDays(prev => {
@@ -85,7 +95,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     setLoading(true);
     const { data: prog, error: progErr } = await supabase
       .from('programs')
-      .select('id, name')
+      .select('id, name, source, generated_months')
       .eq('id', id)
       .eq('user_id', session.user.id)
       .single();
@@ -102,6 +112,26 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       .eq('program_id', id)
       .order('sort_order');
     setAllWorkouts(wk || []);
+
+    // Fetch blocks for all workouts
+    if (wk?.length) {
+      const ids = wk.map((w) => w.id);
+      const blockMap = new Map<string, ProgramBlock[]>();
+      for (let i = 0; i < ids.length; i += 100) {
+        const batch = ids.slice(i, i + 100);
+        const { data: blocks } = await supabase
+          .from('program_workout_blocks')
+          .select('id, program_workout_id, block_type, block_order, block_text')
+          .in('program_workout_id', batch)
+          .order('block_order');
+        for (const b of blocks || []) {
+          const existing = blockMap.get(b.program_workout_id) || [];
+          existing.push(b as ProgramBlock);
+          blockMap.set(b.program_workout_id, existing);
+        }
+      }
+      setWorkoutBlocks(blockMap);
+    }
 
     if (wk?.length) {
       const ids = wk.map((w) => w.id);
@@ -170,6 +200,38 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
 
   const workouts = allWorkouts;
   const completedCount = workouts.filter(w => completedWorkoutIds.has(w.id)).length;
+  const isGenerated = program?.source === 'generated' || program?.name?.startsWith('Month ');
+
+  const handleGenerateNextMonth = async () => {
+    if (!program || generatingNextMonth) return;
+    setGeneratingNextMonth(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-next-month', {
+        body: { program_id: program.id },
+      });
+      if (error) throw error;
+      // Poll for completion
+      const pollInterval = setInterval(async () => {
+        const { data: jobData } = await supabase.functions.invoke('program-job-status', {
+          body: { job_id: data.job_id },
+        });
+        if (jobData?.status === 'complete') {
+          clearInterval(pollInterval);
+          setGeneratingNextMonth(false);
+          // Reload program to show new workouts
+          loadProgram();
+        } else if (jobData?.status === 'failed') {
+          clearInterval(pollInterval);
+          setGeneratingNextMonth(false);
+          alert('Failed to generate next month: ' + (jobData?.error || 'Unknown error'));
+        }
+      }, 5000);
+    } catch (err) {
+      console.error('Generate next month failed:', err);
+      setGeneratingNextMonth(false);
+      alert('Failed to start generation');
+    }
+  };
 
   if (!id) return null;
 
@@ -257,12 +319,28 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                   </div>
                                   {!isExpanded && (
                                     <div className="program-day-summary-lines">
-                                      {workoutSummaryLines(w.workout_text).map((line) => (
-                                        <div key={line.label} className="program-day-summary-line">
-                                          <span className="program-day-summary-label">{line.label}:</span>
-                                          <span className="program-day-summary-text">{line.text}</span>
-                                        </div>
-                                      ))}
+                                      {workoutBlocks.has(w.id) && workoutBlocks.get(w.id)!.length > 0 ? (
+                                        workoutBlocks.get(w.id)!
+                                          .filter((b) => ['skills', 'strength', 'metcon', 'accessory'].includes(b.block_type))
+                                          .map((b) => {
+                                            const label = b.block_type === 'metcon' ? 'Conditioning' : b.block_type.charAt(0).toUpperCase() + b.block_type.slice(1);
+                                            const firstLine = b.block_text.split('\n')[0].trim();
+                                            const text = firstLine.length > 40 ? firstLine.slice(0, 38) + '…' : firstLine;
+                                            return (
+                                              <div key={b.id} className="program-day-summary-line">
+                                                <span className="program-day-summary-label">{label}:</span>
+                                                <span className="program-day-summary-text">{text}</span>
+                                              </div>
+                                            );
+                                          })
+                                      ) : (
+                                        workoutSummaryLines(w.workout_text).map((line) => (
+                                          <div key={line.label} className="program-day-summary-line">
+                                            <span className="program-day-summary-label">{line.label}:</span>
+                                            <span className="program-day-summary-text">{line.text}</span>
+                                          </div>
+                                        ))
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -278,7 +356,24 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                               {isExpanded && (
                                 <div className="program-day-body">
                                   <div className="program-day-blocks">
-                                    <WorkoutBlocksDisplay text={w.workout_text} />
+                                    {workoutBlocks.has(w.id) && workoutBlocks.get(w.id)!.length > 0 ? (
+                                      <div className="workout-blocks">
+                                        {workoutBlocks.get(w.id)!.map((b, bi) => (
+                                          <div key={bi} className="workout-block">
+                                            <div className="workout-block-label" data-block={b.block_type}>{
+                                              b.block_type === 'warm-up' ? 'Warm-up' :
+                                              b.block_type === 'cool-down' ? 'Cool down' :
+                                              b.block_type.charAt(0).toUpperCase() + b.block_type.slice(1)
+                                            }</div>
+                                            <div className="workout-block-content">
+                                              <BlockContent label={b.block_type === 'skills' ? 'Skills' : ''} content={b.block_text} />
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <WorkoutBlocksDisplay text={w.workout_text} />
+                                    )}
                                   </div>
                                   <div className="program-day-actions">
                                     <button
@@ -307,6 +402,28 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     ));
                   })()}
                 </div>
+                {isGenerated && (
+                  <div style={{ marginTop: 24, padding: '16px', background: 'var(--surface2)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
+                        Month {program.generated_months || 1} of training
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                        {generatingNextMonth
+                          ? 'Generating next month — evaluating profile and building workouts...'
+                          : 'Generate the next month to continue your program.'}
+                      </div>
+                    </div>
+                    <button
+                      className="auth-btn"
+                      disabled={generatingNextMonth}
+                      onClick={handleGenerateNextMonth}
+                      style={{ whiteSpace: 'nowrap', opacity: generatingNextMonth ? 0.6 : 1 }}
+                    >
+                      {generatingNextMonth ? 'Generating...' : `Generate Month ${(program.generated_months || 1) + 1}`}
+                    </button>
+                  </div>
+                )}
                 <div className="program-detail-actions" style={{ marginTop: 24 }}>
                   <button className="auth-btn" style={{ background: 'var(--surface2)', color: 'var(--text)' }} onClick={() => navigate('/programs')}>
                     Back

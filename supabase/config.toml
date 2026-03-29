@@ -99,3 +99,12 @@ verify_jwt = false
 
 [functions.nutrition-analysis]
 verify_jwt = false
+
+[functions.ailog-gap-analysis]
+verify_jwt = false
+
+[functions.ailog-generate-supplement]
+verify_jwt = false
+
+[functions.ailog-bulk-import]
+verify_jwt = false

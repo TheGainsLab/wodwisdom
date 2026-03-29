@@ -212,6 +212,18 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Parse optional month_number and program_id from request body
+    let monthNumber = 1;
+    let programId: string | null = null;
+    try {
+      const body = await req.json().catch(() => ({}));
+      monthNumber = body?.month_number ?? 1;
+      programId = body?.program_id ?? null;
+    } catch {
+      // no body — defaults are fine
+    }
+    const isContinuation = monthNumber > 1;
+
     // Fetch previous evaluation for comparison
     const { data: prevEval } = await supa
       .from("profile_evaluations")
@@ -222,11 +234,15 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
+    // For Month 2+, use extended training history (full month) to capture more data
+    const trainingDays = isContinuation ? 35 : 14;
+    const trainingMaxLines = isContinuation ? 60 : 30;
+
     // Build RAG context, comparison, and recent training in parallel
     const [ragContext, comparisonContext, recentTraining] = await Promise.all([
       retrieveRAGContext(supa, profileData),
       Promise.resolve(buildComparisonContext(prevEval, profileData)),
-      fetchAndFormatRecentHistory(supa, user.id),
+      fetchAndFormatRecentHistory(supa, user.id, { days: trainingDays, maxLines: trainingMaxLines }),
     ]);
     const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
 
@@ -260,9 +276,13 @@ Deno.serve(async (req) => {
     const analysis = data.content?.[0]?.text?.trim() || "Unable to generate analysis.";
 
     // Save evaluation
-    const evalRow = {
+    // For Month 2+ triggered by generate-next-month, set visible=false
+    // (will be made visible when the program generation completes)
+    const evalRow: Record<string, unknown> = {
       user_id: user.id,
       analysis,
+      month_number: monthNumber,
+      visible: isContinuation ? false : true,
       profile_snapshot: {
         lifts: profileData.lifts || {},
         skills: profileData.skills || {},
@@ -275,6 +295,7 @@ Deno.serve(async (req) => {
         gender: profileData.gender ?? null,
       },
     };
+    if (programId) evalRow.program_id = programId;
 
     const { data: savedEval, error: insertErr } = await supa
       .from("profile_evaluations")
