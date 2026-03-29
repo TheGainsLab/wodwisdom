@@ -158,17 +158,6 @@ export default function ProgramsListPage({ session }: { session: Session }) {
               </div>
             )}
 
-            {/* Add Program button */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-              <button
-                className="auth-btn"
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', fontSize: 14 }}
-                onClick={() => navigate('/ailog/upload')}
-              >
-                <Plus size={16} /> Add Program
-              </button>
-            </div>
-
             {loading ? (
               <div className="page-loading"><div className="loading-pulse" /></div>
             ) : programs.length === 0 ? (
@@ -202,6 +191,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                   <div
                     key={p.id}
                     className="history-item"
+                    style={{ borderLeft: '3px solid var(--accent)' }}
                     onClick={() => navigate(`/programs/${p.id}`)}
                   >
                     <div className="history-item-header">
@@ -223,6 +213,15 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                     </div>
                   </div>
                 ))}
+
+                {/* Add Program button */}
+                <button
+                  className="auth-btn"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '14px 16px', fontSize: 14, width: '100%', marginTop: 16 }}
+                  onClick={() => navigate('/ailog/upload')}
+                >
+                  <Plus size={16} /> Add Program
+                </button>
               </div>
             )}
           </div>
