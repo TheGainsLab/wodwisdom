@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import Nav from '../components/Nav';
 import { supabase } from '../lib/supabase';
-import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Dumbbell, Play, Plus, RefreshCw, Sparkles, TrendingUp } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Dumbbell, Play, RefreshCw, Sparkles, TrendingUp } from 'lucide-react';
 import '../ailog.css';
 
 const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
