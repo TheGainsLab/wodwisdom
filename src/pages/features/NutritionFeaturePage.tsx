@@ -56,9 +56,7 @@ export default function NutritionFeaturePage() {
             <div className="feature-text">
               <h3>Nutrition dashboard</h3>
               <p>
-                See your daily intake at a glance — calories, protein, carbs, and fat tracked against
-                your targets. Log meals throughout the day and watch your macros update in real time.
-                Simple, fast, built for athletes who train hard.
+                Daily intake at a glance - know instantly if you're in a surplus or deficit. Updates in real time so you can plan your days and weeks easily.
               </p>
               <ul>
                 <li>Daily macro tracking</li>
@@ -78,9 +76,7 @@ export default function NutritionFeaturePage() {
             <div className="feature-text">
               <h3>Scan and search</h3>
               <p>
-                Point your camera at any barcode to instantly look up nutrition info. Or search our
-                food database by name. Either way, logging a meal takes seconds, not minutes.
-                No more guessing or manual entry.
+                Easy to use: take a photo and AI does the rest. Shopping? Snap the barcode at the store and save the ingredients for use later. Logging takes seconds.
               </p>
             </div>
             <Placeholder label="Screenshot: Barcode Scanner & Food Search" />
@@ -95,9 +91,7 @@ export default function NutritionFeaturePage() {
             <div className="feature-text">
               <h3>Meal builder & templates</h3>
               <p>
-                Build meals from individual foods, adjust portions, and save them as templates. Eat the
-                same pre-workout meal every day? Save it once, log it with one tap. Build a library of
-                your go-to meals for fast, consistent tracking.
+                Quickly save your favorites and log them with a single tap. Favorite meals at home? Select the ingredients and save the meal. Usual lunch place during work? Save it, and log your meal before you order next time! It's that easy.
               </p>
               <ul>
                 <li>Combine foods into complete meals</li>
