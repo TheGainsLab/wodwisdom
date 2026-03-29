@@ -1,0 +1,35 @@
+-- Add a multi-category variant of match_chunks for "all sources" mode
+-- Searches across multiple categories, excluding mainsite
+CREATE OR REPLACE FUNCTION match_chunks_multi(
+  query_embedding vector(1536),
+  match_threshold float,
+  match_count int,
+  filter_categories text[]
+)
+RETURNS TABLE (
+  id text,
+  title text,
+  author text,
+  source text,
+  content text,
+  similarity float
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    c.id,
+    c.title,
+    c.author,
+    c.source,
+    c.content,
+    1 - (c.embedding <=> query_embedding) AS similarity
+  FROM chunks c
+  WHERE
+    c.category = ANY(filter_categories)
+    AND 1 - (c.embedding <=> query_embedding) > match_threshold
+  ORDER BY c.embedding <=> query_embedding
+  LIMIT match_count;
+END;
+$$;

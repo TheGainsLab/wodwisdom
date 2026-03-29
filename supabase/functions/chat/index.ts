@@ -72,6 +72,9 @@ const SCIENCE_SYSTEM_PROMPT =
 const STRENGTH_SYSTEM_PROMPT =
   "You are a strength and conditioning expert grounded in strength-science literature. Focus on programming, periodization, biomechanics, and the physiology of strength. Coach-to-coach voice, practical and evidence-based. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Ground answers in the provided context when available. Cite sources naturally. Emphasize application to training—how to program, progress, and avoid common errors. If context does not cover the question, supplement with general knowledge but be transparent. Avoid excessive formatting. Do not list sources at the end, weave them in naturally.";
 
+const ALL_SYSTEM_PROMPT =
+  "You are an expert coach and knowledge base assistant grounded in CrossFit methodology, strength-science literature, and exercise physiology. Coach-to-coach voice, direct, practical, evidence-based. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Ground answers in the provided context when available. When referencing physiological mechanisms, be accurate but accessible — explain the science in terms an experienced coach would understand. Cite sources naturally. If context does not cover the question, supplement with general knowledge but be transparent. Avoid excessive formatting. Do not list sources at the end, weave them in naturally.";
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -174,13 +177,20 @@ Deno.serve(async (req) => {
     ]);
     const queryEmb = embData.data[0].embedding;
 
-    // Retrieve matching chunks from vector store, always filtered by category
-    const { data: chunks } = await supa.rpc("match_chunks_filtered", {
-      query_embedding: queryEmb,
-      match_threshold: 0.25,
-      match_count: 6,
-      filter_category: source_filter || "journal",
-    });
+    // Retrieve matching chunks from vector store, filtered by category
+    const { data: chunks } = source_filter === "all"
+      ? await supa.rpc("match_chunks_multi", {
+          query_embedding: queryEmb,
+          match_threshold: 0.25,
+          match_count: 6,
+          filter_categories: ["journal", "science", "strength-science"],
+        })
+      : await supa.rpc("match_chunks_filtered", {
+          query_embedding: queryEmb,
+          match_threshold: 0.25,
+          match_count: 6,
+          filter_category: source_filter || "journal",
+        });
 
     const sources: { title: string; author: string; source: string; similarity: number }[] = [];
     let context = "";
@@ -233,7 +243,7 @@ Deno.serve(async (req) => {
         max_tokens: 1024,
         stream: true,
         system:
-          (source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : source_filter === "strength-science" ? STRENGTH_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT) +
+          (source_filter === "all" ? ALL_SYSTEM_PROMPT : source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : source_filter === "strength-science" ? STRENGTH_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT) +
           (include_profile
             ? buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units, athleteProfile?.gender) +
               (recentTraining ? "\n\n" + recentTraining : "") +

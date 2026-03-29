@@ -24,7 +24,7 @@ export default function ChatPage({ session }: { session: Session }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState<'journal' | 'science' | 'strength-science'>('journal');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'journal' | 'science' | 'strength-science'>('all');
   const [includeProfile, setIncludeProfile] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [dailyUsage, setDailyUsage] = useState(0);
@@ -234,9 +234,9 @@ export default function ChatPage({ session }: { session: Session }) {
 
 
 
-  const sourceButtons = (['journal', 'science', 'strength-science'] as const).map(s => (
+  const sourceButtons = (['all', 'journal', 'science', 'strength-science'] as const).map(s => (
     <button key={s} className={"source-btn " + (sourceFilter === s ? "active" : "")} onClick={() => setSourceFilter(s)}>
-      {s === 'journal' ? 'Journal' : s === 'science' ? 'Science' : 'Strength'}
+      {s === 'all' ? 'All' : s === 'journal' ? 'Journal' : s === 'science' ? 'Science' : 'Strength'}
     </button>
   ));
 
