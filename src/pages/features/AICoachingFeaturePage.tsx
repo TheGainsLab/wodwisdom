@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
 
@@ -34,7 +34,6 @@ function ChatExample({ question, children, scienceMode }: { question: string; ch
 }
 
 export default function AICoachingFeaturePage() {
-  const navigate = useNavigate();
   useEffect(() => {
     document.body.classList.add('feature-body');
     return () => document.body.classList.remove('feature-body');
