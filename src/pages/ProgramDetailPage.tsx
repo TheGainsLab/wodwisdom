@@ -434,9 +434,11 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                   <button className="auth-btn" style={{ background: 'transparent', border: '1px solid var(--accent)', color: 'var(--accent)' }} onClick={handleDelete}>
                     Delete
                   </button>
-                  <button className="auth-btn" onClick={() => navigate(`/programs/${id}/analyze`)}>
-                    Analyze program
-                  </button>
+                  {!isGenerated && (
+                    <button className="auth-btn" onClick={() => navigate(`/programs/${id}/analyze`)}>
+                      Analyze program
+                    </button>
+                  )}
                 </div>
               </>
             )}

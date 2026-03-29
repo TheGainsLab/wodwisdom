@@ -32,6 +32,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
         .from('programs')
         .select('id, name, created_at')
         .eq('user_id', session.user.id)
+        .neq('committed', false)
         .order('created_at', { ascending: false }),
       supabase
         .from('athlete_profiles')
