@@ -10,6 +10,7 @@ interface Program {
   id: string;
   name: string;
   created_at: string;
+  source?: string;
   workout_count?: number;
 }
 
@@ -34,7 +35,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
     const [progData, profileRes, evalRes] = await Promise.all([
       supabase
         .from('programs')
-        .select('id, name, created_at')
+        .select('id, name, created_at, source')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false }),
       supabase
@@ -187,14 +188,22 @@ export default function ProgramsListPage({ session }: { session: Session }) {
               </div>
             ) : (
               <div className="history-list">
-                {programs.map(p => (
+                {[...programs].sort((a, b) => {
+                  const aIsOwn = a.source !== 'external' ? 0 : 1;
+                  const bIsOwn = b.source !== 'external' ? 0 : 1;
+                  if (aIsOwn !== bIsOwn) return aIsOwn - bIsOwn;
+                  return 0;
+                }).map(p => {
+                  const isOwn = p.source !== 'external';
+                  return (
                   <div
                     key={p.id}
                     className="history-item"
                     style={{ borderLeft: '3px solid var(--accent)' }}
                     onClick={() => navigate(`/programs/${p.id}`)}
                   >
-                    <div className="history-item-header">
+                    <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {isOwn && <Zap size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
                       <span className="history-question">{p.name}</span>
                       <span className="history-time">
                         {p.workout_count} workout{p.workout_count !== 1 ? 's' : ''}
@@ -212,7 +221,8 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                       Created {formatDate(p.created_at)}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
 
                 {/* Add Program button */}
                 <button
