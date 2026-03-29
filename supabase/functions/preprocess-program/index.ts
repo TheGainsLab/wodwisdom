@@ -720,7 +720,7 @@ return new Response(JSON.stringify({ error: "Unauthorized" }), {
 }
 const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 const body = await req.json();
-const { name, text, file_base64, file_type, source, user_id: bodyUserId, gym_name, is_ongoing, append_to_program_id } = body;
+const { name, text, file_base64, file_type, source, user_id: bodyUserId, gym_name, is_ongoing, committed, append_to_program_id } = body;
 const resolved = await resolveUserId(supa, authHeader, bodyUserId);
 if (resolved.error) {
 return new Response(JSON.stringify({ error: resolved.error }), {
@@ -863,6 +863,7 @@ if (append_to_program_id) {
     insertObj.source = "external";
     if (gym_name) insertObj.gym_name = String(gym_name).trim();
     insertObj.is_ongoing = is_ongoing === true;
+    insertObj.committed = committed === true ? true : false;
   }
   const { data: prog, error: progErr } = await supa
     .from("programs")
