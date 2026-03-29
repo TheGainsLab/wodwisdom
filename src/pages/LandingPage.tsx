@@ -94,6 +94,12 @@ export default function LandingPage() {
               <p>The app learns your Engine and sets a custom target for every training day. Machine learning targets each energy system independently. The app coaches you through each session in real time with pacing targets. Analytics show your Engine in unmatched detail.</p>
               <Link to="/features/engine" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
+            <div className="landing-offering-card">
+              <h3>Nutrition</h3>
+              <p className="landing-offering-tagline">Track your fuel as easily as you track your training</p>
+              <p>Log meals with photos, barcodes, or by searching a database of millions of foods and restaurant menus. Build templates for your go-to meals and track macros against your targets.</p>
+              <Link to="/features/nutrition" className="landing-offering-learn-more">Learn more &rarr;</Link>
+            </div>
           </div>
         </div>
       </section>
