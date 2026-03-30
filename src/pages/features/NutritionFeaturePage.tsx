@@ -45,7 +45,7 @@ export default function NutritionFeaturePage() {
         <span className="feature-hero-badge">Nutrition</span>
         <h1 className="feature-hero-title">Track fuel, not just reps</h1>
         <p className="feature-hero-sub">
-          Nutrition data with a snap - just take a photo of whatever you eat and AI measures everything and logs it for you. You can also scan barcodes, search a database and build your favorite meals, whether you're cooking at home or going out to eat.
+          Nutrition data with a snap - just take a photo of whatever you eat and AI handles the rest. You can also scan barcodes, search a database and build your favorite meals, whether you're cooking at home or going out to eat.
         </p>
       </section>
 
