@@ -126,17 +126,8 @@ export default function ProgramsFeaturePage() {
                 The evaluation doesn't sit in a folder. It becomes your program.
               </p>
               <p>
-                The AI takes everything it learned about you — your strength ratios, your skill gaps,
-                your conditioning limiters, your priorities — and builds a personalized 20-day training
-                program around it. Every day is designed for you specifically.
+                The AI takes everything it learned—your strengths, your gaps, your priorities—and builds a personalized 20-day training program around you. Every day designed for your numbers, your equipment, your goals.
               </p>
-              <ul>
-                <li>Warm-ups targeted to that day's training</li>
-                <li>Mobility work matched to your limiters</li>
-                <li>Skills blocks addressing your gaps</li>
-                <li>Strength work prioritized by your hierarchy</li>
-                <li>Metcons built around movements you're proficient at</li>
-              </ul>
               <img src="/images/Program-Card.png" alt="Sample program day" className="feature-img" />
               <p>
                 Every training day opens with the intent behind the session. Every block comes with coaching cues,
