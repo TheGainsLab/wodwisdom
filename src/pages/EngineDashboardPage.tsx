@@ -13,7 +13,7 @@ import {
   calculateWorkDurationMinutes,
 } from '../lib/engineService';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, Lock, Check, Play, Settings } from 'lucide-react';
+import { ChevronLeft, Lock, Check, Play, Settings, BarChart3 } from 'lucide-react';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -332,9 +332,9 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
               <button
                 className="engine-btn"
                 onClick={() => navigate('/engine/analytics')}
-                style={{ width: '100%', border: '1px solid var(--border)', color: 'var(--text-dim)' }}
+                style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-light)', color: 'var(--text)', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
               >
-                Analytics
+                <BarChart3 size={18} /> Analytics
               </button>
 
               <hr className="engine-divider" />
