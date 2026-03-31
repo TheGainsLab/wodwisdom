@@ -130,8 +130,7 @@ export default function ProgramsFeaturePage() {
               </p>
               <img src="/images/Program-Card.png" alt="Sample program day" className="feature-img" />
               <p>
-                Every training day opens with the intent behind the session. Every block comes with coaching cues,
-                movement standards, and common faults to avoid. Tap Coach before you start — your AI coach is already prepared.
+                Every session opens with intent. Every block comes with coaching cues, movement standards, and common faults. Tap Coach before you start—your AI coach is already prepared.
               </p>
               <img src="/images/MetCon-Card.png" alt="MetCon coaching card" className="feature-img" />
               <p style={{ fontStyle: 'italic', color: 'var(--text-dim)' }}>
