@@ -187,9 +187,6 @@ export default function EngineFeaturePage() {
         <p className="feature-footer-details">
           AI Coach included. Machine learning calibration. Pacing coach. Full conditioning analytics.
         </p>
-        <p className="feature-footer-promo">
-          Early access — lock in 20% off permanently before May 1, 2026.
-        </p>
         <div className="feature-footer-actions">
           <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Get Started</button>
           <Link to="/#pricing" className="feature-cta-secondary">Back to Pricing</Link>
