@@ -192,9 +192,6 @@ export default function ProgramsFeaturePage() {
               <p>
                 AI Coach included. Personalized programming. Adaptive adjustments. Monthly reviews.
               </p>
-              <p>
-                Early access — lock in 20% off permanently before May 1, 2026.
-              </p>
               <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
                 <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Get Started</button>
                 <Link to="/pricing" className="feature-cta-secondary">Back to Pricing</Link>
