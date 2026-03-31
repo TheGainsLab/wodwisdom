@@ -94,7 +94,7 @@ export default function LandingPage() {
               <Link to="/features/engine" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
             <div className="landing-offering-card">
-              <h3>Nutrition</h3>
+              <h3>AI Nutrition</h3>
               <p className="landing-offering-tagline">Track your fuel as easily as you track your training</p>
               <p>Log meals with photos, barcodes, or by searching millions of foods and restaurant menus. Build templates for your go-to meals. Track macros against your targets. Because what you put in is half the equation.</p>
               <Link to="/features/nutrition" className="landing-offering-learn-more">Learn more &rarr;</Link>
@@ -116,27 +116,31 @@ export default function LandingPage() {
               <span className="landing-pricing-amount">$7.99</span>
             </div>
             <div className="landing-pricing-row">
+              <span className="landing-pricing-name">AI Nutrition</span>
+              <span className="landing-pricing-amount">$7.99</span>
+            </div>
+            <div className="landing-pricing-row">
+              <span className="landing-pricing-name">AI Coach + AI Nutrition</span>
+              <span className="landing-pricing-amount">$11.99</span>
+            </div>
+            <div className="landing-pricing-row">
               <div>
                 <span className="landing-pricing-name">Year of the Engine</span>
-                <div className="landing-pricing-note">(AI Coach included)</div>
+                <div className="landing-pricing-note">(AI Coach and AI Nutrition included)</div>
               </div>
               <span className="landing-pricing-amount">$29.99</span>
             </div>
             <div className="landing-pricing-row">
               <div>
                 <span className="landing-pricing-name">AI Programming</span>
-                <div className="landing-pricing-note">(AI Coach included)</div>
+                <div className="landing-pricing-note">(AI Coach and AI Nutrition included)</div>
               </div>
               <span className="landing-pricing-amount">$29.99</span>
             </div>
             <div className="landing-pricing-row">
-              <span className="landing-pricing-name">AI Nutrition</span>
-              <span className="landing-pricing-amount">$7.99</span>
-            </div>
-            <div className="landing-pricing-row">
               <div>
                 <span className="landing-pricing-name">All Access</span>
-                <div className="landing-pricing-note">(AI Coach, YoE and AI Programming)</div>
+                <div className="landing-pricing-note">(AI Coach, AI Programming, YoE and AI Nutrition)</div>
               </div>
               <span className="landing-pricing-amount">$49.99</span>
             </div>
