@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import * as mammoth from 'mammoth';
 import { supabase } from '../lib/supabase';
+import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 import { Camera, ClipboardList, Upload } from 'lucide-react';
 import '../ailog.css';
@@ -20,9 +21,15 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-export default function AILogUploadPage({ session: _session }: { session: Session }) {
+export default function AILogUploadPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { isAdmin, loading: entLoading } = useEntitlements(session.user.id);
+
+  if (!entLoading && !isAdmin) {
+    navigate('/programs');
+    return null;
+  }
   const appendTo = searchParams.get('append'); // existing program id for "Add This Week"
 
   const [mode, setMode] = useState<'programming' | 'results'>(appendTo ? 'programming' : 'programming');
