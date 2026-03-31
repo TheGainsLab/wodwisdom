@@ -24,6 +24,10 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
     q: 'If I sign up for Year of the Engine, do I get AI Coach and Nutrition for free?',
     a: <>Yes. All <strong>Year of the Engine</strong> subscribers also get access to the <strong>AI Coach</strong> feature with 10 questions a day and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
   },
+  {
+    q: 'If I sign up for AI Programming, do I get access to AI Coach and Nutrition for free?',
+    a: <>Yes. All <strong>AI Programming</strong> subscribers also get access to the <strong>AI Coach</strong> feature with 20 questions a day and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
+  },
 ];
 
 export default function LandingPage() {
