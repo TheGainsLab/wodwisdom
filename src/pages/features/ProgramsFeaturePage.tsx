@@ -109,8 +109,7 @@ export default function ProgramsFeaturePage() {
                 </div>
               </div>
               <p>
-                Every insight is sourced from real methodology — CrossFit Journal articles, seminar content,
-                and exercise physiology. You can trace any recommendation back to its source.
+                Every insight is sourced. Trace any recommendation back to the methodology.
               </p>
             </div>
           </div>
