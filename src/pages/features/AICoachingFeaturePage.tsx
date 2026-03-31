@@ -66,7 +66,7 @@ export default function AICoachingFeaturePage() {
         <div className="feature-container">
           <h2 className="feature-section-title">Real examples from real athletes</h2>
           <p className="feature-section-sub">
-            Imagine having a personal Level 4 Coach who never forgets a thing. Ask anything about fitness: pacing, movement cues, nutrition planning, program review, and more. Need a deep dive on a technical topic? Flip on science mode and talk with an AI trained on biochemistry and physiology.
+            Imagine a Level 4 coach who never forgets a thing. Ask about pacing, movement cues, nutrition planning, program review—or flip on science mode for a deep dive into biochemistry and physiology.
           </p>
 
           <ChatExample question="When I snatch, I sometimes miss in the catch. What are some drills I can do to correct this?">
