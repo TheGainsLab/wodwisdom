@@ -3,19 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
 
-const Placeholder = ({ label }: { label: string }) => (
-  <div className="feature-screenshot">
-    <div className="feature-screenshot-placeholder">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <circle cx="8.5" cy="8.5" r="1.5" />
-        <path d="M21 15l-5-5L5 21" />
-      </svg>
-      <span>{label}</span>
-    </div>
-  </div>
-);
-
 export default function NutritionFeaturePage() {
   const navigate = useNavigate();
 
@@ -64,7 +51,9 @@ export default function NutritionFeaturePage() {
                 <li>Real-time progress updates</li>
               </ul>
             </div>
-            <Placeholder label="Screenshot: Nutrition Dashboard" />
+            <div className="feature-screenshot">
+              <img src="/images/nutrition-1.png" alt="Nutrition Dashboard" style={{ width: '100%', borderRadius: 12 }} />
+            </div>
           </div>
         </div>
       </section>
@@ -79,7 +68,9 @@ export default function NutritionFeaturePage() {
                 Easy to use: take a photo and AI does the rest. Shopping? Snap the barcode at the store and save the ingredients for use later. Logging takes seconds.
               </p>
             </div>
-            <Placeholder label="Screenshot: Barcode Scanner & Food Search" />
+            <div className="feature-screenshot">
+              <img src="/images/nutrition-2.png" alt="Barcode Scanner & Food Search" style={{ width: '100%', borderRadius: 12 }} />
+            </div>
           </div>
         </div>
       </section>
@@ -99,7 +90,9 @@ export default function NutritionFeaturePage() {
                 <li>Save and reuse meal templates</li>
               </ul>
             </div>
-            <Placeholder label="Screenshot: Meal Builder" />
+            <div className="feature-screenshot">
+              <img src="/images/nutrition-3.png" alt="Meal Builder & Templates" style={{ width: '100%', borderRadius: 12 }} />
+            </div>
           </div>
         </div>
       </section>
