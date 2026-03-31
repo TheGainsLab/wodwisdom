@@ -5,10 +5,6 @@ import '../landing.css';
 
 const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   {
-    q: 'What sources does WodWisdom use?',
-    a: 'WodWisdom is built on hundreds of articles from the CrossFit Journal, exercise physiology textbooks, and the CrossFit Kids Training Guide. Every answer includes source citations so you can verify the information.',
-  },
-  {
     q: 'Can I try it before paying?',
     a: 'Yes! Every new account gets 3 free questions so you can see the quality of answers before committing to a subscription.',
   },
@@ -66,12 +62,7 @@ export default function LandingPage() {
         <GainsLogo className="landing-hero-logo" />
         <h1 className="landing-hero-title">The program that follows you.</h1>
         <p className="landing-hero-sub">
-          We trained an AI on the CrossFit methodology — every study guide, journal article, and seminar.
-          It knows your lifts, your skills, your engine, and your nutrition. It builds your program,
-          coaches every session, and gets smarter every time you train.
-        </p>
-        <p className="landing-hero-tagline">
-          This isn't a program you follow. It's a program that follows you.
+          We trained an AI on the CrossFit methodology. It learns your lifts, your skills, your conditioning, your nutrition. Then it builds your training, coaches every session, and gets smarter every time you train.
         </p>
         <div className="landing-hero-ctas">
           <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
@@ -87,25 +78,25 @@ export default function LandingPage() {
             <div className="landing-offering-card">
               <h3>AI Coach</h3>
               <p className="landing-offering-tagline">The brain of a Level 4 coach, available any time</p>
-              <p>Get answers you can trust, grounded in the methodology. Want to nerd out on something? Flip on science mode and talk with an AI trained on physiology and biochemistry.</p>
+              <p>Get answers you can trust, grounded in the methodology. Or go deeper—switch to science mode and talk with an AI trained on physiology and biochemistry.</p>
               <Link to="/features/coaching" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
             <div className="landing-offering-card">
               <h3>AI Programming</h3>
-              <p className="landing-offering-tagline">Stop following someone else's program. Get the program that follows you.</p>
-              <p>The AI learns your lifts, skills, and conditioning, then builds a personalized program — warm-ups through metcons — with coaching cues for every session. Log results and it adapts. The program follows you.</p>
+              <p className="landing-offering-tagline">Stop following someone else's program.</p>
+              <p>The AI learns your lifts, skills, and conditioning. Then it builds a personalized program—warm-ups, skill work, strength, metcons—with coaching cues for every session. Log your results and it adapts. The program follows you.</p>
               <Link to="/features/programs" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
             <div className="landing-offering-card">
               <h3>Year of the Engine</h3>
               <p className="landing-offering-tagline">The best conditioning program, calibrated to you</p>
-              <p>The app learns your Engine and sets a custom target for every training day. Machine learning targets each energy system independently. The app coaches you through each session in real time with pacing targets. Analytics show your Engine in unmatched detail.</p>
+              <p>The app learns your Engine and sets a custom target for every training day—pacing each interval to your fitness, not a generic template. Machine learning targets each energy system independently. Real-time coaching guides you through every session. And the analytics show your Engine in unmatched detail.</p>
               <Link to="/features/engine" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
             <div className="landing-offering-card">
               <h3>Nutrition</h3>
               <p className="landing-offering-tagline">Track your fuel as easily as you track your training</p>
-              <p>Log meals with photos, barcodes, or by searching a database of millions of foods and restaurant menus. Build templates for your go-to meals and track macros against your targets.</p>
+              <p>Log meals with photos, barcodes, or by searching millions of foods and restaurant menus. Build templates for your go-to meals. Track macros against your targets. Because what you put in is half the equation.</p>
               <Link to="/features/nutrition" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
           </div>

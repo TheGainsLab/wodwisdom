@@ -6,7 +6,7 @@ import '../../features.css';
 const FEATURES = [
   {
     title: 'AI Coaching',
-    description: 'Get answers you can trust, grounded in the methodology. Want to nerd out on something? Flip on science mode and talk with an AI trained on physiology and biochemistry.',
+    description: 'Get answers you can trust, grounded in the methodology. Or go deeper—switch to science mode and talk with an AI trained on physiology and biochemistry.',
     path: '/features/coaching',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -19,7 +19,7 @@ const FEATURES = [
   },
   {
     title: 'Programs',
-    description: 'The AI learns your lifts, skills, and conditioning, then builds a personalized program — warm-ups through metcons — with coaching cues for every session. Log results and it adapts. The program follows you.',
+    description: 'The AI learns your lifts, skills, and conditioning. Then it builds a personalized program—warm-ups, skill work, strength, metcons—with coaching cues for every session. Log your results and it adapts. The program follows you.',
     path: '/features/programs',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -30,7 +30,7 @@ const FEATURES = [
   },
   {
     title: 'Engine',
-    description: 'The app learns your Engine and sets a custom target for every training day. Machine learning targets each energy system independently. The app coaches you through each session in real time with pacing targets. Analytics show your Engine in unmatched detail.',
+    description: 'The app learns your Engine and sets a custom target for every training day—pacing each interval to your fitness, not a generic template. Machine learning targets each energy system independently. Real-time coaching guides you through every session. And the analytics show your Engine in unmatched detail.',
     path: '/features/engine',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
