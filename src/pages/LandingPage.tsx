@@ -28,6 +28,10 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
     q: 'If I sign up for AI Programming, do I get access to AI Coach and Nutrition for free?',
     a: <>Yes. All <strong>AI Programming</strong> subscribers also get access to the <strong>AI Coach</strong> feature with 20 questions a day and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
   },
+  {
+    q: 'What is included in the All Access membership?',
+    a: <>All Access members get access to <strong>AI Programming</strong>, <strong>Year of the Engine</strong>, <strong>AI Coach</strong>, and <strong>Nutrition</strong>. All of this for under $50 a month.</>,
+  },
 ];
 
 export default function LandingPage() {
