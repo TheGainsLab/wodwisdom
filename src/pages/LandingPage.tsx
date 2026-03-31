@@ -116,20 +116,30 @@ export default function LandingPage() {
               <span className="landing-pricing-amount">$7.99</span>
             </div>
             <div className="landing-pricing-row">
-              <span className="landing-pricing-name">Year of the Engine</span>
+              <div>
+                <span className="landing-pricing-name">Year of the Engine</span>
+                <div className="landing-pricing-note">(AI Coach included)</div>
+              </div>
               <span className="landing-pricing-amount">$29.99</span>
             </div>
-            <div className="landing-pricing-note">(AI Coach included)</div>
             <div className="landing-pricing-row">
-              <span className="landing-pricing-name">AI Programming</span>
+              <div>
+                <span className="landing-pricing-name">AI Programming</span>
+                <div className="landing-pricing-note">(AI Coach included)</div>
+              </div>
               <span className="landing-pricing-amount">$29.99</span>
             </div>
-            <div className="landing-pricing-note">(AI Coach included)</div>
             <div className="landing-pricing-row">
-              <span className="landing-pricing-name">All Access</span>
+              <span className="landing-pricing-name">AI Nutrition</span>
+              <span className="landing-pricing-amount">$7.99</span>
+            </div>
+            <div className="landing-pricing-row">
+              <div>
+                <span className="landing-pricing-name">All Access</span>
+                <div className="landing-pricing-note">(AI Coach, YoE and AI Programming)</div>
+              </div>
               <span className="landing-pricing-amount">$49.99</span>
             </div>
-            <div className="landing-pricing-note">(AI Coach, YoE and AI Programming)</div>
             <button className="landing-cta" onClick={goToSignup} style={{marginTop: '28px', width: '100%'}}>Try it Free</button>
           </div>
         </div>
