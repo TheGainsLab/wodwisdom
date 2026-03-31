@@ -23,7 +23,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
   const [hasEvaluation, setHasEvaluation] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState('');
-  const { hasFeature } = useEntitlements(session.user.id);
+  const { hasFeature, isAdmin } = useEntitlements(session.user.id);
   const hasEngine = hasFeature('engine');
 
   useEffect(() => {
@@ -225,14 +225,16 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                   );
                 })}
 
-                {/* Add Program button */}
-                <button
-                  className="auth-btn"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '14px 16px', fontSize: 14, width: '100%', marginTop: 16 }}
-                  onClick={() => navigate('/ailog/upload')}
-                >
-                  <Plus size={16} /> Add Program
-                </button>
+                {/* Add Program button — admin only */}
+                {isAdmin && (
+                  <button
+                    className="auth-btn"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '14px 16px', fontSize: 14, width: '100%', marginTop: 16 }}
+                    onClick={() => navigate('/ailog/upload')}
+                  >
+                    <Plus size={16} /> Add Program
+                  </button>
+                )}
               </div>
             )}
           </div>

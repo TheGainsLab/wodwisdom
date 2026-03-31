@@ -328,6 +328,15 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                 <Play size={18} /> Start Day {currentDay}
               </button>
 
+              {/* Analytics button */}
+              <button
+                className="engine-btn"
+                onClick={() => navigate('/engine/analytics')}
+                style={{ width: '100%', border: '1px solid var(--border)', color: 'var(--text-dim)' }}
+              >
+                Analytics
+              </button>
+
               <hr className="engine-divider" />
 
               {/* Month grid */}
