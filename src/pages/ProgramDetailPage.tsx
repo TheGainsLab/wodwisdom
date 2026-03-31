@@ -180,17 +180,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     setLoading(false);
   };
 
-  const handleDelete = async () => {
-    if (!id || !program) return;
-    if (!window.confirm('Delete this program? This cannot be undone.')) return;
-    const { error } = await supabase.from('programs').delete().eq('id', id).eq('user_id', session.user.id);
-    if (error) {
-      console.error('Delete failed:', error);
-      return;
-    }
-    navigate('/programs');
-  };
-
   const handleNameChange = async (newName: string) => {
     const trimmed = newName.trim() || 'Untitled Program';
     if (!id || !program || trimmed === program.name) return;
@@ -427,15 +416,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                 <div className="program-detail-actions" style={{ marginTop: 24 }}>
                   <button className="auth-btn" style={{ background: 'var(--surface2)', color: 'var(--text)' }} onClick={() => navigate('/programs')}>
                     Back
-                  </button>
-                  <button className="auth-btn" style={{ background: 'var(--surface2)', color: 'var(--text)' }} onClick={() => navigate(`/programs/${id}/edit`)}>
-                    Edit
-                  </button>
-                  <button className="auth-btn" style={{ background: 'transparent', border: '1px solid var(--accent)', color: 'var(--accent)' }} onClick={handleDelete}>
-                    Delete
-                  </button>
-                  <button className="auth-btn" onClick={() => navigate(`/programs/${id}/analyze`)}>
-                    Analyze program
                   </button>
                 </div>
               </>

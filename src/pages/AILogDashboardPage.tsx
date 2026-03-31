@@ -12,7 +12,7 @@ interface ExternalProgram {
   id: string;
   name: string;
   gym_name: string | null;
-  is_ongoing: boolean;
+  committed: boolean;
   created_at: string;
   workout_count: number;
 }
@@ -29,9 +29,10 @@ export default function AILogDashboardPage({ session }: { session: Session }) {
       setLoading(true);
       const { data } = await supabase
         .from('programs')
-        .select('id, name, gym_name, is_ongoing, created_at, program_workouts(count)')
+        .select('id, name, gym_name, committed, created_at, program_workouts(count)')
         .eq('user_id', session.user.id)
         .eq('source', 'external')
+        .eq('committed', false)
         .order('created_at', { ascending: false });
 
       if (data) {
@@ -39,7 +40,7 @@ export default function AILogDashboardPage({ session }: { session: Session }) {
           id: p.id,
           name: p.name,
           gym_name: p.gym_name,
-          is_ongoing: p.is_ongoing,
+          committed: p.committed ?? false,
           created_at: p.created_at,
           workout_count: p.program_workouts?.[0]?.count ?? 0,
         })));
@@ -85,10 +86,10 @@ export default function AILogDashboardPage({ session }: { session: Session }) {
             <div className="ailog-card">
               <div className="ailog-empty">
                 <Brain size={48} className="ailog-empty-icon" />
-                <h2 className="ailog-header">No programs yet</h2>
+                <h2 className="ailog-header">No drafts</h2>
                 <p className="ailog-subheader">
-                  Upload your gym's programming to get AI-powered gap analysis
-                  and personalized supplemental recommendations.
+                  Upload your gym's programming to analyze it and fill gaps
+                  before committing to My Programs.
                 </p>
                 <button
                   className="ailog-btn ailog-btn-primary"
@@ -125,9 +126,7 @@ export default function AILogDashboardPage({ session }: { session: Session }) {
                       {p.workout_count} workout{p.workout_count !== 1 ? 's' : ''}
                     </div>
                   </div>
-                  <span className={`ailog-badge ${p.is_ongoing ? 'ailog-badge--ongoing' : 'ailog-badge--complete'}`}>
-                    {p.is_ongoing ? 'Ongoing' : 'Complete'}
-                  </span>
+                  <span className="ailog-badge ailog-badge--ongoing">Draft</span>
                 </button>
               ))}
             </div>

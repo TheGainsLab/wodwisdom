@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import Nav from '../components/Nav';
 import { supabase } from '../lib/supabase';
-import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Dumbbell, Play, Plus, RefreshCw, Sparkles, TrendingUp } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Dumbbell, Play, RefreshCw, Sparkles, TrendingUp } from 'lucide-react';
 import '../ailog.css';
 
 const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
@@ -39,6 +39,7 @@ interface ProgramData {
   is_ongoing: boolean;
   source: string;
   created_at: string;
+  committed: boolean;
 }
 
 interface AnalysisData {
@@ -65,13 +66,34 @@ export default function AILogProgramPage({ session }: { session: Session }) {
   const [supplements, setSupplements] = useState<SupplementSession[]>([]);
   const [generatingSupplements, setGeneratingSupplements] = useState(false);
   const [showAllMovements, setShowAllMovements] = useState(false);
+  const [committing, setCommitting] = useState(false);
+
+  const isDraft = program ? !program.committed : true;
+
+  const commitProgram = async () => {
+    if (!id || !program || committing) return;
+    setCommitting(true);
+    try {
+      const { error } = await supabase
+        .from('programs')
+        .update({ committed: true })
+        .eq('id', id)
+        .eq('user_id', session.user.id);
+      if (error) throw error;
+      setProgram({ ...program, committed: true });
+      navigate('/programs');
+    } catch (err) {
+      console.error('Commit failed:', err);
+      setCommitting(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
     (async () => {
       setLoading(true);
       const [progRes, workoutsRes, analysisRes] = await Promise.all([
-        supabase.from('programs').select('id, name, gym_name, is_ongoing, source, created_at').eq('id', id).single(),
+        supabase.from('programs').select('id, name, gym_name, is_ongoing, source, created_at, committed').eq('id', id).single(),
         supabase.from('program_workouts').select('id, week_num, day_num, workout_text, sort_order').eq('program_id', id).order('sort_order'),
         supabase.from('program_analyses').select('*').eq('program_id', id).maybeSingle(),
       ]);
@@ -213,27 +235,36 @@ export default function AILogProgramPage({ session }: { session: Session }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   {program.gym_name && <div className="ailog-program-gym">{program.gym_name}</div>}
-                  <div className="ailog-program-meta">{workoutCount} workout{workoutCount !== 1 ? 's' : ''} uploaded</div>
+                  <div className="ailog-program-meta">
+                    {workoutCount} workout{workoutCount !== 1 ? 's' : ''} uploaded
+                    {isDraft && <span style={{ marginLeft: 8, fontSize: 11, color: '#fbbf24', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px' }}>Draft</span>}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {program.is_ongoing && (
-                    <button
-                      className="ailog-btn ailog-btn-secondary"
-                      style={{ padding: '8px 14px', fontSize: 13, borderRadius: 6 }}
-                      onClick={() => navigate(`/ailog/upload?append=${id}`)}
-                    >
-                      <Plus size={14} /> Add Week
-                    </button>
+                  {isDraft && (
+                    <>
+                      <button
+                        className="ailog-btn ailog-btn-secondary"
+                        style={{ padding: '8px 14px', fontSize: 13, borderRadius: 6 }}
+                        onClick={runAnalysis}
+                        disabled={analyzing}
+                      >
+                        <RefreshCw size={14} className={analyzing ? 'spin' : ''} />
+                        {analyzing ? 'Analyzing...' : analysis ? 'Re-analyze' : 'Run Analysis'}
+                      </button>
+                      <button
+                        className="ailog-btn ailog-btn-primary"
+                        style={{ padding: '8px 14px', fontSize: 13, borderRadius: 6 }}
+                        onClick={commitProgram}
+                        disabled={committing}
+                      >
+                        {committing ? 'Saving...' : 'Commit to My Programs'}
+                      </button>
+                    </>
                   )}
-                  <button
-                    className="ailog-btn ailog-btn-primary"
-                    style={{ padding: '8px 14px', fontSize: 13, borderRadius: 6 }}
-                    onClick={runAnalysis}
-                    disabled={analyzing}
-                  >
-                    <RefreshCw size={14} className={analyzing ? 'spin' : ''} />
-                    {analyzing ? 'Analyzing...' : analysis ? 'Re-analyze' : 'Run Analysis'}
-                  </button>
+                  {!isDraft && (
+                    <span style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 0' }}>Committed</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -274,6 +305,8 @@ export default function AILogProgramPage({ session }: { session: Session }) {
             </div>
           )}
 
+          {/* Analysis tools — only available for drafts (pre-commit) */}
+          {isDraft && <>
           {/* AI Summary */}
           {summary && (
             <div className="ailog-card" style={{ marginBottom: 16, borderLeft: '3px solid var(--accent)' }}>
@@ -480,6 +513,7 @@ export default function AILogProgramPage({ session }: { session: Session }) {
               </div>
             </div>
           )}
+          </>}{/* end isDraft analysis tools */}
         </div>
       </div>
     </div>

@@ -29,7 +29,7 @@ export default function AILogUploadPage({ session: _session }: { session: Sessio
   const [pasteText, setPasteText] = useState('');
   const [programName, setProgramName] = useState('');
   const [gymName, setGymName] = useState('');
-  const [isOngoing, setIsOngoing] = useState(true);
+  const isOngoing = false; // ongoing concept removed — each upload is a separate program
   const [importResult, setImportResult] = useState<{ imported: number } | null>(null);
   const [pendingFile, setPendingFile] = useState<{ file: File; base64: string; fileType: string } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -89,6 +89,7 @@ export default function AILogUploadPage({ session: _session }: { session: Sessio
         source: 'external',
         gym_name: gymName.trim() || undefined,
         is_ongoing: isOngoing,
+        committed: false, // starts as draft in AI Log workspace
       };
 
       if (appendTo) {
@@ -118,7 +119,7 @@ export default function AILogUploadPage({ session: _session }: { session: Sessio
     } finally {
       setSaving(false);
     }
-  }, [pasteText, programName, gymName, isOngoing, pendingFile, appendTo, getAuthHeaders, navigate]);
+  }, [pasteText, programName, gymName, pendingFile, appendTo, getAuthHeaders, navigate]);
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
@@ -328,17 +329,6 @@ export default function AILogUploadPage({ session: _session }: { session: Sessio
                       value={programName}
                       onChange={e => setProgramName(e.target.value)}
                     />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--text-dim)', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={isOngoing}
-                        onChange={e => setIsOngoing(e.target.checked)}
-                        style={{ accentColor: 'var(--accent)' }}
-                      />
-                      Ongoing program (I'll add weeks as they come)
-                    </label>
                   </div>
                   <hr className="ailog-divider" />
                 </>
