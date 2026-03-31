@@ -11,6 +11,7 @@ export default function Nav({ isOpen, onClose }: NavProps) {
   const goTo = (path: string) => { navigate(path); onClose(); };
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasSubscription, setHasSubscription] = useState(false);
+  const [hasEngine, setHasEngine] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
 
   const isChatActive = location.pathname === '/' || location.pathname === '/history' || location.pathname === '/bookmarks';
@@ -35,12 +36,14 @@ export default function Nav({ isOpen, onClose }: NavProps) {
             if (data?.role === 'admin') setIsAdmin(true);
           });
         // Check if user has any entitlements (i.e. is a subscriber)
-        supabase.from('user_entitlements').select('id')
+        supabase.from('user_entitlements').select('id, feature')
           .eq('user_id', user.id)
           .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
-          .limit(1)
           .then(({ data }) => {
-            if (data && data.length > 0) setHasSubscription(true);
+            if (data && data.length > 0) {
+              setHasSubscription(true);
+              if (data.some(e => e.feature === 'engine')) setHasEngine(true);
+            }
           });
       }
     });
@@ -109,6 +112,11 @@ export default function Nav({ isOpen, onClose }: NavProps) {
                 <button className={"nav-link sub " + (location.pathname === "/training-log" ? "active" : "")} onClick={() => goTo("/training-log")}>
                   <span className="nav-sub-dot" />Training Log
                 </button>
+                {(hasEngine || isAdmin) && (
+                  <button className={"nav-link sub " + (location.pathname === "/engine/analytics" ? "active" : "")} onClick={() => goTo("/engine/analytics")}>
+                    <span className="nav-sub-dot" />Analytics
+                  </button>
+                )}
               </div>
             )}
           </div>
