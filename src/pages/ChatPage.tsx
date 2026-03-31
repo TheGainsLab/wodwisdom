@@ -28,7 +28,7 @@ export default function ChatPage({ session }: { session: Session }) {
   const [includeProfile, setIncludeProfile] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [dailyUsage, setDailyUsage] = useState(0);
-  const [dailyLimit, setDailyLimit] = useState(75);
+  const [dailyLimit, setDailyLimit] = useState(20);
   const [tier, setTier] = useState<'free' | 'paid'>('free');
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [freeLimit, setFreeLimit] = useState(3);

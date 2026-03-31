@@ -3,14 +3,10 @@ import { useNavigate, Link } from 'react-router-dom';
 import GainsLogo from '../components/GainsLogo';
 import '../landing.css';
 
-const FAQ_ITEMS = [
+const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   {
     q: 'What sources does WodWisdom use?',
     a: 'WodWisdom is built on hundreds of articles from the CrossFit Journal, exercise physiology textbooks, and the CrossFit Kids Training Guide. Every answer includes source citations so you can verify the information.',
-  },
-  {
-    q: 'Is this an official CrossFit product?',
-    a: 'No. WodWisdom is an independent tool built by coaches, for coaches. It uses publicly available CrossFit educational materials as its knowledge base.',
   },
   {
     q: 'Can I try it before paying?',
@@ -23,6 +19,18 @@ const FAQ_ITEMS = [
   {
     q: 'Can I cancel anytime?',
     a: 'Yes. There are no contracts or commitments. You can cancel your subscription at any time and retain access through the end of your billing period.',
+  },
+  {
+    q: 'If I sign up for Year of the Engine, do I get AI Coach and Nutrition for free?',
+    a: <>Yes. All <strong>Year of the Engine</strong> subscribers also get access to the <strong>AI Coach</strong> feature with 10 questions a day and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
+  },
+  {
+    q: 'If I sign up for AI Programming, do I get access to AI Coach and Nutrition for free?',
+    a: <>Yes. All <strong>AI Programming</strong> subscribers also get access to the <strong>AI Coach</strong> feature with 20 questions a day and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
+  },
+  {
+    q: 'What is included in the All Access membership?',
+    a: <>All Access members get access to <strong>AI Programming</strong>, <strong>Year of the Engine</strong>, <strong>AI Coach</strong>, and <strong>Nutrition</strong>. All of this for under $50 a month.</>,
   },
 ];
 
