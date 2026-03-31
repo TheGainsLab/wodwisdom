@@ -59,6 +59,7 @@ export default function AICoachingFeaturePage() {
       <section className="feature-hero">
         <span className="feature-hero-badge">AI Coaching</span>
         <h1 className="feature-hero-title">Ask anything</h1>
+        <p className="feature-hero-sub">Get answers you can use in your next training session.</p>
       </section>
 
       {/* Real Chat Examples */}
