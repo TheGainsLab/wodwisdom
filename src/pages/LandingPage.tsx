@@ -83,8 +83,8 @@ export default function LandingPage() {
             </div>
             <div className="landing-offering-card">
               <h3>AI Programming</h3>
-              <p className="landing-offering-tagline">Stop following someone else's program. Get the program that follows you.</p>
-              <p>The AI learns your lifts, skills, and conditioning, then builds a personalized program — warm-ups through metcons — with coaching cues for every session. Log results and it adapts. The program follows you.</p>
+              <p className="landing-offering-tagline">Stop following someone else's program.</p>
+              <p>The AI learns your lifts, skills, and conditioning. Then it builds a personalized program—warm-ups, skill work, strength, metcons—with coaching cues for every session. Log your results and it adapts. The program follows you.</p>
               <Link to="/features/programs" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
             <div className="landing-offering-card">
