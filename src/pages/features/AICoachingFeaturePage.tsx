@@ -150,7 +150,7 @@ export default function AICoachingFeaturePage() {
       </section>
 
       <section className="feature-footer-cta">
-        <h2>Want the AI to know your numbers?</h2>
+        <h2>Get the program that follows you.</h2>
         <p style={{ maxWidth: 640, margin: '0 auto 24px', color: 'var(--text-dim)', fontSize: 15, lineHeight: 1.6 }}>
           The AI Coach answers any question without a profile. But when you add AI Programming, the coach knows
           your 1RMs, your skill levels, your conditioning benchmarks — and every coaching note in your program
