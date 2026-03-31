@@ -140,9 +140,9 @@ export default function AICoachingFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>Every recommendation is sourced</h3>
+              <h3>Every answer is sourced</h3>
               <p>
-                GAINS doesn't answer with generic information. Every answer pulls from real sources: Journal articles, study guides, seminars and more. Technical answers come straight from the texts and every answer can be traced back to source material.
+                No generic information. Every response pulls from CrossFit Journal articles, study guides, seminars, and more. Technical answers come straight from the source material—and every one can be traced back.
               </p>
             </div>
           </div>
