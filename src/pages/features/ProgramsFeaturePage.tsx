@@ -109,8 +109,7 @@ export default function ProgramsFeaturePage() {
                 </div>
               </div>
               <p>
-                Every insight is sourced from real methodology — CrossFit Journal articles, seminar content,
-                and exercise physiology. You can trace any recommendation back to its source.
+                Every insight is sourced. Trace any recommendation back to the methodology.
               </p>
             </div>
           </div>
@@ -127,21 +126,11 @@ export default function ProgramsFeaturePage() {
                 The evaluation doesn't sit in a folder. It becomes your program.
               </p>
               <p>
-                The AI takes everything it learned about you — your strength ratios, your skill gaps,
-                your conditioning limiters, your priorities — and builds a personalized 20-day training
-                program around it. Every day is designed for you specifically.
+                The AI takes everything it learned—your strengths, your gaps, your priorities—and builds a personalized 20-day training program around you. Every day designed for your numbers, your equipment, your goals.
               </p>
-              <ul>
-                <li>Warm-ups targeted to that day's training</li>
-                <li>Mobility work matched to your limiters</li>
-                <li>Skills blocks addressing your gaps</li>
-                <li>Strength work prioritized by your hierarchy</li>
-                <li>Metcons built around movements you're proficient at</li>
-              </ul>
               <img src="/images/Program-Card.png" alt="Sample program day" className="feature-img" />
               <p>
-                Every training day opens with the intent behind the session. Every block comes with coaching cues,
-                movement standards, and common faults to avoid. Tap Coach before you start — your AI coach is already prepared.
+                Every session opens with intent. Every block comes with coaching cues, movement standards, and common faults. Tap Coach before you start—your AI coach is already prepared.
               </p>
               <img src="/images/MetCon-Card.png" alt="MetCon coaching card" className="feature-img" />
               <p style={{ fontStyle: 'italic', color: 'var(--text-dim)' }}>
@@ -191,9 +180,6 @@ export default function ProgramsFeaturePage() {
               <h3>AI Programming — $29.99/mo</h3>
               <p>
                 AI Coach included. Personalized programming. Adaptive adjustments. Monthly reviews.
-              </p>
-              <p>
-                Early access — lock in 20% off permanently before May 1, 2026.
               </p>
               <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
                 <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Get Started</button>

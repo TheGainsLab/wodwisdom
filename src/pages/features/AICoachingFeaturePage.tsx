@@ -59,6 +59,7 @@ export default function AICoachingFeaturePage() {
       <section className="feature-hero">
         <span className="feature-hero-badge">AI Coaching</span>
         <h1 className="feature-hero-title">Ask anything</h1>
+        <p className="feature-hero-sub">Get answers you can use in your next training session.</p>
       </section>
 
       {/* Real Chat Examples */}
@@ -66,7 +67,7 @@ export default function AICoachingFeaturePage() {
         <div className="feature-container">
           <h2 className="feature-section-title">Real examples from real athletes</h2>
           <p className="feature-section-sub">
-            Imagine having a personal Level 4 Coach who never forgets a thing. Ask anything about fitness: pacing, movement cues, nutrition planning, program review, and more. Need a deep dive on a technical topic? Flip on science mode and talk with an AI trained on biochemistry and physiology.
+            Imagine a Level 4 coach who never forgets a thing. Ask about pacing, movement cues, nutrition planning, program review—or flip on science mode for a deep dive into biochemistry and physiology.
           </p>
 
           <ChatExample question="When I snatch, I sometimes miss in the catch. What are some drills I can do to correct this?">
@@ -140,9 +141,9 @@ export default function AICoachingFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>Every recommendation is sourced</h3>
+              <h3>Every answer is sourced</h3>
               <p>
-                GAINS doesn't answer with generic information. Every answer pulls from real sources: Journal articles, study guides, seminars and more. Technical answers come straight from the texts and every answer can be traced back to source material.
+                No generic information. Every response pulls from CrossFit Journal articles, study guides, seminars, and more. Technical answers come straight from the source material—and every one can be traced back.
               </p>
             </div>
           </div>
@@ -150,11 +151,9 @@ export default function AICoachingFeaturePage() {
       </section>
 
       <section className="feature-footer-cta">
-        <h2>Want the AI to know your numbers?</h2>
+        <h2>Get the program that follows you.</h2>
         <p style={{ maxWidth: 640, margin: '0 auto 24px', color: 'var(--text-dim)', fontSize: 15, lineHeight: 1.6 }}>
-          The AI Coach answers any question without a profile. But when you add AI Programming, the coach knows
-          your 1RMs, your skill levels, your conditioning benchmarks — and every coaching note in your program
-          is built around your specific data.
+          AI Coach answers any question. AI Programming builds your training. It learns your lifts, skills, and conditioning—then builds a personalized program that adapts every time you log a result. Coaching cues. Training intent. A program that follows you.
         </p>
         <Link to="/features/programs" className="feature-cta">Learn more about AI Programming &rarr;</Link>
       </section>
