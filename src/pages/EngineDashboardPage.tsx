@@ -330,9 +330,9 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
 
               {/* Analytics button */}
               <button
-                className="engine-btn"
+                className="engine-btn engine-btn-primary"
                 onClick={() => navigate('/engine/analytics')}
-                style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border-light)', color: 'var(--text)', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                style={{ width: '100%' }}
               >
                 <BarChart3 size={18} /> Analytics
               </button>
