@@ -8,7 +8,7 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 const FREE_LIMIT = 3;
-const DAILY_LIMIT = 75;
+const DAILY_LIMIT = 20;
 
 function buildAthleteContext(
   lifts: Record<string, number> | null | undefined,
@@ -143,17 +143,20 @@ Deno.serve(async (req) => {
         );
       }
     } else {
-      // Paid tier: 75 questions per day
-      const { data: dc } = await supa.rpc("get_daily_usage", {
-        check_user_id: user.id,
-      });
-      dailyCount = dc || 0;
+      // Paid tier: 20 questions per day (admins unlimited)
+      const isAdmin = profile?.role === "admin";
+      if (!isAdmin) {
+        const { data: dc } = await supa.rpc("get_daily_usage", {
+          check_user_id: user.id,
+        });
+        dailyCount = dc || 0;
 
-      if (dailyCount >= DAILY_LIMIT) {
-        return new Response(
-          JSON.stringify({ error: "Daily limit reached" }),
-          { status: 429, headers: { ...cors, "Content-Type": "application/json" } }
-        );
+        if (dailyCount >= DAILY_LIMIT) {
+          return new Response(
+            JSON.stringify({ error: "Daily limit reached" }),
+            { status: 429, headers: { ...cors, "Content-Type": "application/json" } }
+          );
+        }
       }
     }
 
