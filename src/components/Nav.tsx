@@ -10,9 +10,7 @@ export default function Nav({ isOpen, onClose }: NavProps) {
   const location = useLocation();
   const goTo = (path: string) => { navigate(path); onClose(); };
   const [isAdmin, setIsAdmin] = useState(false);
-  const [hasSubscription, setHasSubscription] = useState(false);
   const [hasEngine, setHasEngine] = useState(false);
-  const [portalLoading, setPortalLoading] = useState(false);
 
   const isChatActive = location.pathname === '/' || location.pathname === '/history' || location.pathname === '/bookmarks';
   const isTrainingActive = location.pathname.startsWith('/programs') || location.pathname === '/training-log' || location.pathname.startsWith('/engine') || location.pathname.startsWith('/ailog');
@@ -40,35 +38,12 @@ export default function Nav({ isOpen, onClose }: NavProps) {
           .eq('user_id', user.id)
           .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
           .then(({ data }) => {
-            if (data && data.length > 0) {
-              setHasSubscription(true);
-              if (data.some(e => e.feature === 'engine')) setHasEngine(true);
-            }
+            if (data && data.some(e => e.feature === 'engine')) setHasEngine(true);
           });
       }
     });
   }, []);
 
-  const openBillingPortal = async () => {
-    setPortalLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('create-portal-session', {
-        body: {},
-      });
-      if (error) {
-        alert(error.message || 'Failed to open billing portal');
-        return;
-      }
-      if (data?.error) {
-        alert(data.error);
-        return;
-      }
-      if (data?.url) window.location.href = data.url;
-    } finally {
-      setPortalLoading(false);
-      onClose();
-    }
-  };
 
   return (
     <>
@@ -145,17 +120,6 @@ export default function Nav({ isOpen, onClose }: NavProps) {
           )}
         </div>
         <div className="nav-footer">
-          {hasSubscription ? (
-            <button className="nav-link" onClick={openBillingPortal} disabled={portalLoading}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
-              {portalLoading ? 'Opening...' : 'Billing'}
-            </button>
-          ) : (
-            <button className={"nav-link " + (location.pathname === "/checkout" ? "active" : "")} onClick={() => goTo("/checkout")}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-              Upgrade
-            </button>
-          )}
           <button className={"nav-link " + (location.pathname === "/settings" ? "active" : "")} onClick={() => goTo("/settings")}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
             Settings
