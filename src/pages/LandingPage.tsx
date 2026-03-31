@@ -122,21 +122,21 @@ export default function LandingPage() {
             <div className="landing-pricing-row">
               <div>
                 <span className="landing-pricing-name">Year of the Engine</span>
-                <div className="landing-pricing-note">(AI Coach included)</div>
+                <div className="landing-pricing-note">(AI Coach and AI Nutrition included)</div>
               </div>
               <span className="landing-pricing-amount">$29.99</span>
             </div>
             <div className="landing-pricing-row">
               <div>
                 <span className="landing-pricing-name">AI Programming</span>
-                <div className="landing-pricing-note">(AI Coach included)</div>
+                <div className="landing-pricing-note">(AI Coach and AI Nutrition included)</div>
               </div>
               <span className="landing-pricing-amount">$29.99</span>
             </div>
             <div className="landing-pricing-row">
               <div>
                 <span className="landing-pricing-name">All Access</span>
-                <div className="landing-pricing-note">(AI Coach, YoE and AI Programming)</div>
+                <div className="landing-pricing-note">(AI Coach, AI Programming, YoE and AI Nutrition)</div>
               </div>
               <span className="landing-pricing-amount">$49.99</span>
             </div>
