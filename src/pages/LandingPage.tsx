@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import GainsLogo from '../components/GainsLogo';
 import '../landing.css';
 
-const FAQ_ITEMS = [
+const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   {
     q: 'What sources does WodWisdom use?',
     a: 'WodWisdom is built on hundreds of articles from the CrossFit Journal, exercise physiology textbooks, and the CrossFit Kids Training Guide. Every answer includes source citations so you can verify the information.',
@@ -19,6 +19,10 @@ const FAQ_ITEMS = [
   {
     q: 'Can I cancel anytime?',
     a: 'Yes. There are no contracts or commitments. You can cancel your subscription at any time and retain access through the end of your billing period.',
+  },
+  {
+    q: 'If I sign up for Year of the Engine, do I get AI Coach and Nutrition for free?',
+    a: <>Yes. All <strong>Year of the Engine</strong> subscribers also get access to the <strong>AI Coach</strong> feature with 10 questions a day and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
   },
 ];
 
