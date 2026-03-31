@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import Nav from '../components/Nav';
 import { supabase } from '../lib/supabase';
+import { useEntitlements } from '../hooks/useEntitlements';
 import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Dumbbell, Play, RefreshCw, Sparkles, TrendingUp } from 'lucide-react';
 import '../ailog.css';
 
@@ -53,6 +54,7 @@ interface AnalysisData {
 export default function AILogProgramPage({ session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAdmin, loading: entLoading } = useEntitlements(session.user.id);
   const [navOpen, setNavOpen] = useState(false);
   const [program, setProgram] = useState<ProgramData | null>(null);
   const [workouts, setWorkouts] = useState<WorkoutItem[]>([]);
@@ -69,6 +71,11 @@ export default function AILogProgramPage({ session }: { session: Session }) {
   const [committing, setCommitting] = useState(false);
 
   const isDraft = program ? !program.committed : true;
+
+  if (!entLoading && !isAdmin) {
+    navigate('/programs');
+    return null;
+  }
 
   const commitProgram = async () => {
     if (!id || !program || committing) return;
