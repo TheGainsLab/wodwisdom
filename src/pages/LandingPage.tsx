@@ -78,7 +78,7 @@ export default function LandingPage() {
             <div className="landing-offering-card">
               <h3>AI Coach</h3>
               <p className="landing-offering-tagline">The brain of a Level 4 coach, available any time</p>
-              <p>Get answers you can trust, grounded in the methodology. Want to nerd out on something? Flip on science mode and talk with an AI trained on physiology and biochemistry.</p>
+              <p>Get answers you can trust, grounded in the methodology. Or go deeper—switch to science mode and talk with an AI trained on physiology and biochemistry.</p>
               <Link to="/features/coaching" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
             <div className="landing-offering-card">

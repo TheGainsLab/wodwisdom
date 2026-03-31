@@ -6,7 +6,7 @@ import '../../features.css';
 const FEATURES = [
   {
     title: 'AI Coaching',
-    description: 'Get answers you can trust, grounded in the methodology. Want to nerd out on something? Flip on science mode and talk with an AI trained on physiology and biochemistry.',
+    description: 'Get answers you can trust, grounded in the methodology. Or go deeper—switch to science mode and talk with an AI trained on physiology and biochemistry.',
     path: '/features/coaching',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
