@@ -33,12 +33,12 @@ export default function EngineFeaturePage() {
         <h1 className="feature-hero-title">Year of the Engine</h1>
         <p className="feature-hero-sub">The conditioning program that follows you.</p>
         <p className="feature-hero-body">
-          Engine isn't one parameter — it's many. Aerobic capacity. Anaerobic power. Threshold.
-          Efficiency. Repeatability. These don't increase in lockstep. Treating them as a single
-          system means dragging weak links along and holding strong ones back.
+          Forcing everyone into the same conditioning program doesn't make sense. So we don't.
         </p>
         <p className="feature-hero-body">
-          Forcing everyone into the same program doesn't make sense. So we don't.
+          Engine isn't one thing. Aerobic capacity. Anaerobic power. Threshold.
+          Efficiency. Repeatability. These don't increase in lockstep. Treat them as one
+          and you drag weak links along while holding strong ones back.
         </p>
         <img
           src="/images/pacing-coach.png"
@@ -52,25 +52,24 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Machine learning calibration</h3>
+              <h3>20 frameworks. One AI.</h3>
               <p>
-                20 distinct training frameworks, each independently targeting a specific adaptation.
-                Machine learning calibrates every session precisely to you — not just the program,
-                but every individual interval and every personal target within it.
-              </p>
-              <ul>
-                <li>High aerobic capacity? You'll get aggressive goals.</li>
-                <li>Building anaerobic power? Each session ramps as you progress.</li>
-                <li>You always know what you're trying to hit and why — before the clock starts.</li>
-              </ul>
-              <p>
-                Once it does, the app becomes your pacing coach. Goals, countdowns, and round context
-                stay front and center through fatigue so you execute the plan and get exactly the
-                stimulus you need.
+                Year of the Engine uses 20 distinct training frameworks, each targeting a specific adaptation.
+                Machine learning calibrates every session precisely to you—not just the program, but every
+                individual interval and every personal target within it.
               </p>
               <p>
-                Day 24. Max Aerobic Power. Goal: 68.4 calories. Not 65. Not 70. The AI calculated
-                that number specifically for you.
+                High aerobic capacity? You'll get aggressive goals. Building anaerobic power? Each session
+                ramps as you progress.
+              </p>
+              <h3>Know the number. Hit the number.</h3>
+              <p>
+                Day 24. Max Aerobic Power. Goal: 68.4 calories.
+                Not 65. Not 70. That number was calculated for you, specifically.
+              </p>
+              <p>
+                Once the clock starts, the app becomes your pacing coach. Goals, countdowns, and round
+                context stay front and center through fatigue—so you execute the plan and get the stimulus you need.
               </p>
             </div>
           </div>
@@ -88,9 +87,8 @@ export default function EngineFeaturePage() {
                 Your next session will be harder.
               </p>
               <p>
-                Log your results and the machine learning recalibrates. Beat your targets consistently
-                and they go up. Fall short and the AI adjusts down. The program never stays static —
-                it follows your actual performance, not a predetermined schedule.
+                Log your results and it recalibrates. Beat your targets and they go up. Fall short and
+                it adjusts down. The program never stays static—it follows your actual performance, not a schedule.
               </p>
               <img src="/images/target-vs-actual.png" alt="Target vs Actual output comparison" className="feature-img" />
             </div>
@@ -105,15 +103,14 @@ export default function EngineFeaturePage() {
           <div className="feature-row">
             <div className="feature-text">
               <h3>Your engine has a fingerprint. Here's yours.</h3>
+              <p><em>1:3 work-to-rest: 31 cal/min. 1:1 work-to-rest: 16 cal/min.</em></p>
               <p>
-                1:3 work-to-rest: 31 cal/min. 1:1 work-to-rest: 16 cal/min. Your output nearly
-                doubles with the right rest ratio. Most athletes never know this about themselves.
-                Most coaches don't have this data either.
+                Your output nearly doubles with the right rest ratio. Most athletes never know this
+                about themselves. Most coaches don't have this data either.
               </p>
               <p>
                 Year of the Engine tracks your performance across every work:rest ratio so the AI
-                programs the intervals that actually produce results for you — not the ratios that
-                work for everyone else.
+                programs the intervals that actually work for you—not the ratios that work for everyone else.
               </p>
               <p>No one else is showing you this data. Because no one else has it.</p>
               <img src="/images/work-rest-ratio.png" alt="Work to rest ratio analytics" className="feature-img" />
@@ -149,13 +146,14 @@ export default function EngineFeaturePage() {
               <h3>Heart rate doesn't lie.</h3>
               <p>
                 Anaerobic sessions peak at 165 bpm. Max Aerobic Power sessions at 134 bpm. That 31
-                bpm spread is your aerobic system working exactly as designed. If your Max Aerobic
-                Power sessions are running above 150 bpm, you're not training the system you think
-                you are.
+                bpm spread is your aerobic system working exactly as designed.
               </p>
               <p>
-                HR analytics across all frameworks — Avg HR, Avg Peak HR, Max Peak HR, Efficiency,
-                Load — give you the physiological data to train smarter, not just harder.
+                If your Max Aerobic Power sessions are running above 150 bpm, you're not training
+                the system you think you are.
+              </p>
+              <p>
+                HR analytics—avg HR, peak HR, efficiency, load—give you the data to train smarter, not just harder.
               </p>
             </div>
 
@@ -171,8 +169,7 @@ export default function EngineFeaturePage() {
               <h3>Balance across all 20 frameworks.</h3>
               <p>
                 See how your training distributes across workout types, time domains, and energy
-                systems over weeks and months. Identify gaps. Spot overemphasis. Make sure every
-                component of your engine is getting the attention it needs.
+                systems. Spot gaps. Fix overemphasis. Keep every component of your engine in check.
               </p>
               <img src="/images/sessions.png" alt="Sessions by day type analytics" className="feature-img" />
             </div>
