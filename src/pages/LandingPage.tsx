@@ -94,7 +94,7 @@ export default function LandingPage() {
               <Link to="/features/engine" className="landing-offering-learn-more">Learn more &rarr;</Link>
             </div>
             <div className="landing-offering-card">
-              <h3>Nutrition</h3>
+              <h3>AI Nutrition</h3>
               <p className="landing-offering-tagline">Track your fuel as easily as you track your training</p>
               <p>Log meals with photos, barcodes, or by searching millions of foods and restaurant menus. Build templates for your go-to meals. Track macros against your targets. Because what you put in is half the equation.</p>
               <Link to="/features/nutrition" className="landing-offering-learn-more">Learn more &rarr;</Link>
