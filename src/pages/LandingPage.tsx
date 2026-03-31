@@ -5,10 +5,6 @@ import '../landing.css';
 
 const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   {
-    q: 'What sources does WodWisdom use?',
-    a: 'WodWisdom is built on hundreds of articles from the CrossFit Journal, exercise physiology textbooks, and the CrossFit Kids Training Guide. Every answer includes source citations so you can verify the information.',
-  },
-  {
     q: 'Can I try it before paying?',
     a: 'Yes! Every new account gets 3 free questions so you can see the quality of answers before committing to a subscription.',
   },
