@@ -81,7 +81,7 @@
 .landing-pricing-row:last-of-type{border-bottom:none}
 .landing-pricing-name{font-size:16px;font-weight:600}
 .landing-pricing-amount{font-size:18px;font-weight:800;letter-spacing:-.3px}
-.landing-pricing-note{font-size:13px;color:var(--text-muted);padding:2px 0 0;margin-top:-4px}
+.landing-pricing-note{font-size:13px;color:var(--text-muted);padding:2px 0 0;margin-top:2px}
 
 /* ===== FAQ ===== */
 .landing-faq{padding:100px 0;border-top:1px solid var(--border)}
