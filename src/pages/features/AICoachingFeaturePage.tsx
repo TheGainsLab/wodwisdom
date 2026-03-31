@@ -152,9 +152,7 @@ export default function AICoachingFeaturePage() {
       <section className="feature-footer-cta">
         <h2>Get the program that follows you.</h2>
         <p style={{ maxWidth: 640, margin: '0 auto 24px', color: 'var(--text-dim)', fontSize: 15, lineHeight: 1.6 }}>
-          The AI Coach answers any question without a profile. But when you add AI Programming, the coach knows
-          your 1RMs, your skill levels, your conditioning benchmarks — and every coaching note in your program
-          is built around your specific data.
+          AI Coach answers any question. AI Programming builds your training. It learns your lifts, skills, and conditioning—then builds a personalized program that adapts every time you log a result. Coaching cues. Training intent. A program that follows you.
         </p>
         <Link to="/features/programs" className="feature-cta">Learn more about AI Programming &rarr;</Link>
       </section>
