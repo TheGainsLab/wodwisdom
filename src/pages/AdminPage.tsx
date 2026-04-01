@@ -11,7 +11,7 @@ type Tab = 'overview' | 'engagement' | 'users';
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
     <div className="admin-stat-card">
-      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 8 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text)', marginBottom: 8 }}>
         {label}
       </div>
       <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
@@ -24,7 +24,7 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
-    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', marginTop: 32, marginBottom: 12 }}>
+    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--accent)', marginTop: 32, marginBottom: 12 }}>
       {children}
     </h3>
   );
