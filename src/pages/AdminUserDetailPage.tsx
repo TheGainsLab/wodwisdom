@@ -54,7 +54,7 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export default function AdminUserDetailPage({ session }: { session: Session }) {
+export default function AdminUserDetailPage({ session: _session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
