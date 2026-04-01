@@ -5,6 +5,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
 const PRICE_COACH = Deno.env.get("STRIPE_PRICE_ATHLETE");
+const PRICE_NUTRITION = Deno.env.get("STRIPE_PRICE_NUTRITION");
+const PRICE_COACH_NUTRITION = Deno.env.get("STRIPE_PRICE_COACH_NUTRITION");
 const PRICE_PROGRAMMING = Deno.env.get("STRIPE_PRICE_PROGRAMMING");
 const PRICE_ENGINE = Deno.env.get("STRIPE_PRICE_ENGINE");
 const PRICE_ALL_ACCESS = Deno.env.get("STRIPE_PRICE_ALL_ACCESS");
@@ -28,6 +30,8 @@ serve(async (req) => {
     const { plan } = await req.json();
     const PRICES: Record<string, string | undefined> = {
       coach: PRICE_COACH,
+      nutrition: PRICE_NUTRITION,
+      coach_nutrition: PRICE_COACH_NUTRITION,
       programming: PRICE_PROGRAMMING,
       engine: PRICE_ENGINE,
       all_access: PRICE_ALL_ACCESS,

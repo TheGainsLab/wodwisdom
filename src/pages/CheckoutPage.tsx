@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 
-type PlanKey = 'coach' | 'programming' | 'engine' | 'all_access';
+type PlanKey = 'coach' | 'nutrition' | 'coach_nutrition' | 'programming' | 'engine' | 'all_access';
 
 const PLANS: { key: PlanKey; name: string; price: string; features: string[]; badge?: string; featured?: boolean }[] = [
   {
@@ -18,10 +18,31 @@ const PLANS: { key: PlanKey; name: string; price: string; features: string[]; ba
     ],
   },
   {
+    key: 'nutrition',
+    name: 'AI Nutrition',
+    price: '$7.99',
+    features: [
+      'Photo-based meal logging',
+      'Barcode scanner',
+      'Millions of foods & restaurant menus',
+      'Meal templates & favorites',
+    ],
+  },
+  {
+    key: 'coach_nutrition',
+    name: 'AI Coach + AI Nutrition',
+    price: '$11.99',
+    features: [
+      'Everything in AI Coach',
+      'Everything in AI Nutrition',
+      'Save vs buying separately',
+    ],
+  },
+  {
     key: 'programming',
     name: 'AI Programming',
     price: '$29.99',
-    badge: 'Includes AI Coach',
+    badge: 'Includes AI Coach & Nutrition',
     features: [
       'Personalized program generation',
       'AI profile evaluation',
@@ -33,7 +54,7 @@ const PLANS: { key: PlanKey; name: string; price: string; features: string[]; ba
     key: 'engine',
     name: 'Year of the Engine',
     price: '$29.99',
-    badge: 'Includes AI Coach',
+    badge: 'Includes AI Coach & Nutrition',
     features: [
       '20 distinct training frameworks',
       'Machine-learning calibrated targets',
