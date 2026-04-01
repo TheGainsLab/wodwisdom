@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    const fromEmail = Deno.env.get('FROM_EMAIL') || 'noreply@wodwisdom.app'
+    const fromEmail = Deno.env.get('FROM_EMAIL') || 'noreply@thegainslab.com'
 
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',

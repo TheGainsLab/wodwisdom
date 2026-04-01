@@ -25,7 +25,7 @@ serve(async (req) => {
     const { data: profile } = await supa.from("profiles").select("stripe_customer_id").eq("id", user.id).single();
     if (!profile?.stripe_customer_id) throw new Error("No subscription to manage");
 
-    const origin = req.headers.get("Origin") || req.headers.get("Referer")?.replace(/\/$/, "") || "https://wodwisdom.com";
+    const origin = req.headers.get("Origin") || req.headers.get("Referer")?.replace(/\/$/, "") || "https://www.thegainslab.com";
     const baseUrl = origin.startsWith("http") ? origin : `https://${origin}`;
     const returnUrl = `${baseUrl}/settings`;
 

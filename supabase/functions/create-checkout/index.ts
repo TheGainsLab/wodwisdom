@@ -37,7 +37,7 @@ serve(async (req) => {
     const priceId = PRICES[plan];
     if (!priceId) throw new Error("Invalid plan: " + plan);
 
-    const origin = req.headers.get("Origin") || req.headers.get("Referer")?.replace(/\/$/, "") || "https://wodwisdom.com";
+    const origin = req.headers.get("Origin") || req.headers.get("Referer")?.replace(/\/$/, "") || "https://www.thegainslab.com";
     const baseUrl = origin.startsWith("http") ? origin : `https://${origin}`;
     const successUrl = `${baseUrl}/checkout/complete`;
     const cancelUrl = `${baseUrl}/checkout`;
