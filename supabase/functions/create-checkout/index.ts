@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
-const PRICE_COACH = Deno.env.get("STRIPE_PRICE_ATHLETE");
+const PRICE_COACH = Deno.env.get("STRIPE_PRICE_COACH");
 const PRICE_COACH_QUARTERLY = Deno.env.get("STRIPE_PRICE_COACH_QUARTERLY");
 const PRICE_NUTRITION = Deno.env.get("STRIPE_PRICE_NUTRITION");
 const PRICE_NUTRITION_QUARTERLY = Deno.env.get("STRIPE_PRICE_NUTRITION_QUARTERLY");
@@ -43,9 +43,7 @@ serve(async (req) => {
       programming: { monthly: PRICE_PROGRAMMING, quarterly: PRICE_PROGRAMMING_QUARTERLY },
       engine: { monthly: PRICE_ENGINE, quarterly: PRICE_ENGINE_QUARTERLY },
       all_access: { monthly: PRICE_ALL_ACCESS, quarterly: PRICE_ALL_ACCESS_QUARTERLY },
-      // Legacy alias
-      athlete: { monthly: PRICE_COACH, quarterly: PRICE_COACH_QUARTERLY },
-    };
+};
     const planPrices = PRICES[plan];
     if (!planPrices) throw new Error("Invalid plan: " + plan);
     const priceId = isQuarterly ? planPrices.quarterly : planPrices.monthly;
