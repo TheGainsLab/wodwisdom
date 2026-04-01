@@ -9,6 +9,7 @@ import HistoryPage from './pages/HistoryPage';
 import BookmarksPage from './pages/BookmarksPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminPage from './pages/AdminPage';
+import AdminUserDetailPage from './pages/AdminUserDetailPage';
 import AthletePage from './pages/AthletePage';
 import WorkoutReviewPage from './pages/WorkoutReviewPage';
 import StartWorkoutPage from './pages/StartWorkoutPage';
@@ -90,6 +91,7 @@ export default function App() {
       <Route path="/settings" element={<SettingsPage session={session} />} />
       <Route path="/profile" element={<AthletePage session={session} />} />
       <Route path="/admin" element={<AdminPage session={session} />} />
+      <Route path="/admin/users/:id" element={<AdminUserDetailPage session={session} />} />
       <Route path="/engine" element={<EngineDashboardPage session={session} />} />
       <Route path="/engine/dashboard" element={<EngineDashboardPage session={session} />} />
       <Route path="/engine/training/:dayNumber" element={<EngineTrainingDayPage session={session} />} />
