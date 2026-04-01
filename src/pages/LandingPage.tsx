@@ -33,6 +33,7 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
 export default function LandingPage() {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [pricingInterval, setPricingInterval] = useState<'monthly' | 'quarterly'>('monthly');
   const goToAuth = () => navigate('/auth');
   const goToSignup = () => navigate('/auth?signup=1');
 
@@ -107,42 +108,56 @@ export default function LandingPage() {
       <section id="pricing" className="landing-pricing">
         <div className="landing-container">
           <div className="landing-pricing-table">
+            <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
+              <button
+                style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: pricingInterval === 'monthly' ? 'var(--accent)' : 'transparent', color: pricingInterval === 'monthly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
+                onClick={() => setPricingInterval('monthly')}
+              >
+                Monthly
+              </button>
+              <button
+                style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: pricingInterval === 'quarterly' ? 'var(--accent)' : 'transparent', color: pricingInterval === 'quarterly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
+                onClick={() => setPricingInterval('quarterly')}
+              >
+                Quarterly
+              </button>
+            </div>
             <div className="landing-pricing-header">
               <span>Service</span>
-              <span>Monthly</span>
+              <span>{pricingInterval === 'monthly' ? 'Monthly' : 'Quarterly'}</span>
             </div>
             <div className="landing-pricing-row">
               <span className="landing-pricing-name">AI Coach</span>
-              <span className="landing-pricing-amount">$7.99</span>
+              <span className="landing-pricing-amount">{pricingInterval === 'monthly' ? '$7.99' : '$17.99'}</span>
             </div>
             <div className="landing-pricing-row">
               <span className="landing-pricing-name">AI Nutrition</span>
-              <span className="landing-pricing-amount">$7.99</span>
+              <span className="landing-pricing-amount">{pricingInterval === 'monthly' ? '$7.99' : '$17.99'}</span>
             </div>
             <div className="landing-pricing-row">
               <span className="landing-pricing-name">AI Coach + AI Nutrition</span>
-              <span className="landing-pricing-amount">$11.99</span>
+              <span className="landing-pricing-amount">{pricingInterval === 'monthly' ? '$11.99' : '$29.99'}</span>
             </div>
             <div className="landing-pricing-row">
               <div>
                 <span className="landing-pricing-name">Year of the Engine</span>
                 <div className="landing-pricing-note">(AI Coach and AI Nutrition included)</div>
               </div>
-              <span className="landing-pricing-amount">$29.99</span>
+              <span className="landing-pricing-amount">{pricingInterval === 'monthly' ? '$29.99' : '$74.99'}</span>
             </div>
             <div className="landing-pricing-row">
               <div>
                 <span className="landing-pricing-name">AI Programming</span>
                 <div className="landing-pricing-note">(AI Coach and AI Nutrition included)</div>
               </div>
-              <span className="landing-pricing-amount">$29.99</span>
+              <span className="landing-pricing-amount">{pricingInterval === 'monthly' ? '$29.99' : '$74.99'}</span>
             </div>
             <div className="landing-pricing-row">
               <div>
                 <span className="landing-pricing-name">All Access</span>
                 <div className="landing-pricing-note">(AI Coach, AI Programming, YoE and AI Nutrition)</div>
               </div>
-              <span className="landing-pricing-amount">$49.99</span>
+              <span className="landing-pricing-amount">{pricingInterval === 'monthly' ? '$49.99' : '$119.00'}</span>
             </div>
             <button className="landing-cta" onClick={goToSignup} style={{marginTop: '28px', width: '100%'}}>Try it Free</button>
           </div>

@@ -5,9 +5,17 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
 const PRICE_COACH = Deno.env.get("STRIPE_PRICE_ATHLETE");
+const PRICE_COACH_QUARTERLY = Deno.env.get("STRIPE_PRICE_COACH_QUARTERLY");
+const PRICE_NUTRITION = Deno.env.get("STRIPE_PRICE_NUTRITION");
+const PRICE_NUTRITION_QUARTERLY = Deno.env.get("STRIPE_PRICE_NUTRITION_QUARTERLY");
+const PRICE_COACH_NUTRITION = Deno.env.get("STRIPE_PRICE_COACH_NUTRITION");
+const PRICE_COACH_NUTRITION_QUARTERLY = Deno.env.get("STRIPE_PRICE_COACH_NUTRITION_QUARTERLY");
 const PRICE_PROGRAMMING = Deno.env.get("STRIPE_PRICE_PROGRAMMING");
+const PRICE_PROGRAMMING_QUARTERLY = Deno.env.get("STRIPE_PRICE_PROGRAMMING_QUARTERLY");
 const PRICE_ENGINE = Deno.env.get("STRIPE_PRICE_ENGINE");
+const PRICE_ENGINE_QUARTERLY = Deno.env.get("STRIPE_PRICE_ENGINE_QUARTERLY");
 const PRICE_ALL_ACCESS = Deno.env.get("STRIPE_PRICE_ALL_ACCESS");
+const PRICE_ALL_ACCESS_QUARTERLY = Deno.env.get("STRIPE_PRICE_ALL_ACCESS_QUARTERLY");
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -25,19 +33,25 @@ serve(async (req) => {
     const { data: { user } } = await supa.auth.getUser(token);
     if (!user) throw new Error("Not authenticated");
 
-    const { plan } = await req.json();
-    const PRICES: Record<string, string | undefined> = {
-      coach: PRICE_COACH,
-      programming: PRICE_PROGRAMMING,
-      engine: PRICE_ENGINE,
-      all_access: PRICE_ALL_ACCESS,
-      // Legacy alias
-      athlete: PRICE_COACH,
-    };
-    const priceId = PRICES[plan];
-    if (!priceId) throw new Error("Invalid plan: " + plan);
+    const { plan, interval = "monthly" } = await req.json();
+    const isQuarterly = interval === "quarterly";
 
-    const origin = req.headers.get("Origin") || req.headers.get("Referer")?.replace(/\/$/, "") || "https://wodwisdom.com";
+    const PRICES: Record<string, { monthly: string | undefined; quarterly: string | undefined }> = {
+      coach: { monthly: PRICE_COACH, quarterly: PRICE_COACH_QUARTERLY },
+      nutrition: { monthly: PRICE_NUTRITION, quarterly: PRICE_NUTRITION_QUARTERLY },
+      coach_nutrition: { monthly: PRICE_COACH_NUTRITION, quarterly: PRICE_COACH_NUTRITION_QUARTERLY },
+      programming: { monthly: PRICE_PROGRAMMING, quarterly: PRICE_PROGRAMMING_QUARTERLY },
+      engine: { monthly: PRICE_ENGINE, quarterly: PRICE_ENGINE_QUARTERLY },
+      all_access: { monthly: PRICE_ALL_ACCESS, quarterly: PRICE_ALL_ACCESS_QUARTERLY },
+      // Legacy alias
+      athlete: { monthly: PRICE_COACH, quarterly: PRICE_COACH_QUARTERLY },
+    };
+    const planPrices = PRICES[plan];
+    if (!planPrices) throw new Error("Invalid plan: " + plan);
+    const priceId = isQuarterly ? planPrices.quarterly : planPrices.monthly;
+    if (!priceId) throw new Error("Price not configured for " + plan + " " + interval);
+
+    const origin = req.headers.get("Origin") || req.headers.get("Referer")?.replace(/\/$/, "") || "https://www.thegainslab.com";
     const baseUrl = origin.startsWith("http") ? origin : `https://${origin}`;
     const successUrl = `${baseUrl}/checkout/complete`;
     const cancelUrl = `${baseUrl}/checkout`;

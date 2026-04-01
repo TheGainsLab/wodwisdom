@@ -3,13 +3,15 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 
-type PlanKey = 'coach' | 'programming' | 'engine' | 'all_access';
+type PlanKey = 'coach' | 'nutrition' | 'coach_nutrition' | 'programming' | 'engine' | 'all_access';
+type Interval = 'monthly' | 'quarterly';
 
-const PLANS: { key: PlanKey; name: string; price: string; features: string[]; badge?: string; featured?: boolean }[] = [
+const PLANS: { key: PlanKey; name: string; monthly: string; quarterly: string; features: string[]; badge?: string; featured?: boolean }[] = [
   {
     key: 'coach',
     name: 'AI Coach',
-    price: '$7.99',
+    monthly: '$7.99',
+    quarterly: '$17.99',
     features: [
       'Unlimited coaching questions',
       'Full source library',
@@ -18,10 +20,34 @@ const PLANS: { key: PlanKey; name: string; price: string; features: string[]; ba
     ],
   },
   {
+    key: 'nutrition',
+    name: 'AI Nutrition',
+    monthly: '$7.99',
+    quarterly: '$17.99',
+    features: [
+      'Photo-based meal logging',
+      'Barcode scanner',
+      'Millions of foods & restaurant menus',
+      'Meal templates & favorites',
+    ],
+  },
+  {
+    key: 'coach_nutrition',
+    name: 'AI Coach + AI Nutrition',
+    monthly: '$11.99',
+    quarterly: '$29.99',
+    features: [
+      'Everything in AI Coach',
+      'Everything in AI Nutrition',
+      'Save vs buying separately',
+    ],
+  },
+  {
     key: 'programming',
     name: 'AI Programming',
-    price: '$29.99',
-    badge: 'Includes AI Coach',
+    monthly: '$29.99',
+    quarterly: '$74.99',
+    badge: 'Includes AI Coach & Nutrition',
     features: [
       'Personalized program generation',
       'AI profile evaluation',
@@ -32,8 +58,9 @@ const PLANS: { key: PlanKey; name: string; price: string; features: string[]; ba
   {
     key: 'engine',
     name: 'Year of the Engine',
-    price: '$29.99',
-    badge: 'Includes AI Coach',
+    monthly: '$29.99',
+    quarterly: '$74.99',
+    badge: 'Includes AI Coach & Nutrition',
     features: [
       '20 distinct training frameworks',
       'Machine-learning calibrated targets',
@@ -44,7 +71,8 @@ const PLANS: { key: PlanKey; name: string; price: string; features: string[]; ba
   {
     key: 'all_access',
     name: 'All Access',
-    price: '$49.99',
+    monthly: '$49.99',
+    quarterly: '$119.00',
     badge: 'Best value',
     featured: true,
     features: [
@@ -62,13 +90,14 @@ export default function CheckoutPage({ session: _session }: CheckoutPageProps) {
   const [loading, setLoading] = useState<PlanKey | null>(null);
   const [error, setError] = useState('');
   const [navOpen, setNavOpen] = useState(false);
+  const [interval, setInterval] = useState<Interval>('monthly');
 
   const selectPlan = async (p: PlanKey) => {
     setError('');
     setLoading(p);
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { plan: p },
+        body: { plan: p, interval },
       });
       if (error) throw new Error(error.message || 'Failed to create checkout');
       if (data?.error) throw new Error(data.error || 'Failed to create checkout');
@@ -98,7 +127,23 @@ export default function CheckoutPage({ session: _session }: CheckoutPageProps) {
           <div style={{ maxWidth: 520, margin: '0 auto', padding: '24px 0' }}>
             <div className="checkout-plans">
               <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Choose your plan</h2>
-              <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 24 }}>All plans include a free trial. You'll complete payment on Stripe's secure page.</p>
+              <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 20 }}>All plans include a free trial. You'll complete payment on Stripe's secure page.</p>
+
+              {/* Monthly / Quarterly toggle */}
+              <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+                <button
+                  style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'monthly' ? 'var(--accent)' : 'transparent', color: interval === 'monthly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
+                  onClick={() => setInterval('monthly')}
+                >
+                  Monthly
+                </button>
+                <button
+                  style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'quarterly' ? 'var(--accent)' : 'transparent', color: interval === 'quarterly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
+                  onClick={() => setInterval('quarterly')}
+                >
+                  Quarterly
+                </button>
+              </div>
 
               {PLANS.map(plan => (
                 <div
@@ -110,7 +155,10 @@ export default function CheckoutPage({ session: _session }: CheckoutPageProps) {
                   <div>
                     <h3 style={{ fontSize: 18, fontWeight: 700 }}>{plan.name}</h3>
                     <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--accent)' }}>
-                      {plan.price}<span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-dim)' }}>/mo</span>
+                      {interval === 'monthly' ? plan.monthly : plan.quarterly}
+                      <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-dim)' }}>
+                        {interval === 'monthly' ? '/mo' : '/qtr'}
+                      </span>
                     </div>
                     <ul style={{ marginTop: 12, paddingLeft: 18, color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.8 }}>
                       {plan.features.map((f, i) => <li key={i}>{f}</li>)}
