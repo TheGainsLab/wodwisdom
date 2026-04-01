@@ -1,65 +1,14 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 
-type Tab = 'overview' | 'users' | 'knowledge' | 'gyms';
+type Tab = 'overview' | 'engagement' | 'users';
 
-interface OverviewData {
-  stats: any;
-  trend: { day: string; question_count: number; unique_users: number }[];
-  topUsers: { user_id: string; full_name: string; email: string; question_count: number; total_tokens: number }[];
-  chunks: { journal: number; science: number };
-}
+// ── Shared Components ──
 
-interface UserRow {
-  id: string;
-  email: string;
-  full_name: string;
-  role: string;
-  has_ai_suite: boolean;
-  has_engine: boolean;
-  engine_months_unlocked: number;
-  question_count: number;
-  total_tokens: number;
-  last_active: string | null;
-}
-
-interface KBData {
-  journal_chunks: number;
-  science_chunks: number;
-  sources: { title: string; category: string; chunks: number }[];
-}
-
-interface GymRow {
-  id: string;
-  name: string;
-  max_seats: number;
-  created_at: string;
-  owner_name: string;
-  owner_email: string;
-  member_count: number;
-}
-
-interface GymMember {
-  id: string;
-  invited_email: string;
-  user_id: string | null;
-  status: string;
-  full_name: string;
-  created_at: string;
-}
-
-async function adminFetch(supabase: import('@supabase/supabase-js').SupabaseClient, action: string, params: Record<string, any> = {}) {
-  const { data, error } = await supabase.functions.invoke('admin-data', {
-    body: { action, ...params },
-  });
-  if (error) throw new Error(error.message || 'Admin request failed');
-  if (data?.error) throw new Error(data.error || 'Admin request failed');
-  return data;
-}
-
-function StatCard({ label, value }: { label: string; value: string | number }) {
+function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
     <div className="admin-stat-card">
       <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 8 }}>
@@ -68,27 +17,58 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
       <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
         {typeof value === 'number' ? value.toLocaleString() : value}
       </div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{sub}</div>}
     </div>
   );
 }
 
-const statusColor = (s: string) => s === 'active' ? '#2ec486' : s === 'invited' ? '#f0a050' : '#666';
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', marginTop: 32, marginBottom: 12 }}>
+      {children}
+    </h3>
+  );
+}
+
+function FeatureBadge({ feature }: { feature: string }) {
+  const colors: Record<string, string> = {
+    ai_chat: '#2ec486',
+    nutrition: '#6ea8fe',
+    programming: 'var(--accent)',
+    engine: '#f0a050',
+  };
+  const color = colors[feature] || '#666';
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
+      color, background: color + '20',
+      padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap',
+    }}>
+      {feature.replace(/_/g, ' ')}
+    </span>
+  );
+}
+
+// ── Main Component ──
 
 export default function AdminPage({ session }: { session: Session }) {
+  const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
-  // Tab data
-  const [overview, setOverview] = useState<OverviewData | null>(null);
-  const [users, setUsers] = useState<UserRow[]>([]);
-  const [kb, setKb] = useState<KBData | null>(null);
-  const [gyms, setGyms] = useState<GymRow[]>([]);
-  const [expandedGym, setExpandedGym] = useState<string | null>(null);
-  const [gymMembers, setGymMembers] = useState<Record<string, GymMember[]>>({});
+  // Overview data
+  const [overviewStats, setOverviewStats] = useState<any>(null);
+
+  // Engagement data
+  const [featureUsage, setFeatureUsage] = useState<any>(null);
+  const [engagementPeriod, setEngagementPeriod] = useState(30);
+
+  // Users data
+  const [users, setUsers] = useState<any[]>([]);
+  const [userSearch, setUserSearch] = useState('');
 
   useEffect(() => {
     supabase.from('profiles').select('role').eq('id', session.user.id).single()
@@ -101,26 +81,25 @@ export default function AdminPage({ session }: { session: Session }) {
 
   const loadTab = async (tab: Tab) => {
     setError('');
+    setLoading(true);
     try {
       switch (tab) {
         case 'overview': {
-          const data = await adminFetch(supabase, 'get_overview');
-          setOverview(data);
+          const { data, error } = await supabase.rpc('admin_overview_stats');
+          if (error) throw new Error(error.message);
+          setOverviewStats(data);
+          break;
+        }
+        case 'engagement': {
+          const { data, error } = await supabase.rpc('admin_feature_usage', { days_back: engagementPeriod });
+          if (error) throw new Error(error.message);
+          setFeatureUsage(data);
           break;
         }
         case 'users': {
-          const data = await adminFetch(supabase, 'get_users');
-          setUsers(data.users || []);
-          break;
-        }
-        case 'knowledge': {
-          const data = await adminFetch(supabase, 'get_knowledge_base');
-          setKb(data);
-          break;
-        }
-        case 'gyms': {
-          const data = await adminFetch(supabase, 'get_gyms');
-          setGyms(data.gyms || []);
+          const { data, error } = await supabase.rpc('admin_user_list_v2');
+          if (error) throw new Error(error.message);
+          setUsers(data || []);
           break;
         }
       }
@@ -132,39 +111,7 @@ export default function AdminPage({ session }: { session: Session }) {
 
   const switchTab = (tab: Tab) => {
     setActiveTab(tab);
-    setLoading(true);
     loadTab(tab);
-  };
-
-  const updateUser = async (userId: string, field: string, value: string) => {
-    setError(''); setSuccess('');
-    try {
-      await adminFetch(supabase, 'update_user', { user_id: userId, field, value });
-      setUsers(prev => prev.map(u => {
-        if (u.id !== userId) return u;
-        if (field === 'ai_suite') return { ...u, has_ai_suite: value === 'grant' };
-        if (field === 'engine') return { ...u, has_engine: value === 'grant' };
-        if (field === 'engine_months') return { ...u, engine_months_unlocked: parseInt(value, 10) };
-        return { ...u, [field]: value };
-      }));
-      setSuccess('Updated');
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (e: any) {
-      setError(e.message);
-    }
-  };
-
-  const toggleGym = async (gymId: string) => {
-    if (expandedGym === gymId) { setExpandedGym(null); return; }
-    setExpandedGym(gymId);
-    if (!gymMembers[gymId]) {
-      try {
-        const data = await adminFetch(supabase, 'get_gym_members', { gym_id: gymId });
-        setGymMembers(prev => ({ ...prev, [gymId]: data.members || [] }));
-      } catch (e: any) {
-        setError(e.message);
-      }
-    }
   };
 
   // Access denied
@@ -187,7 +134,17 @@ export default function AdminPage({ session }: { session: Session }) {
     );
   }
 
-  const maxTrend = overview?.trend ? Math.max(...overview.trend.map(d => d.question_count), 1) : 1;
+  // Filtered users
+  const filteredUsers = userSearch
+    ? users.filter(u =>
+        (u.full_name || '').toLowerCase().includes(userSearch.toLowerCase()) ||
+        (u.email || '').toLowerCase().includes(userSearch.toLowerCase())
+      )
+    : users;
+
+  const maxTrend = featureUsage?.chat_by_day
+    ? Math.max(...featureUsage.chat_by_day.map((d: any) => d.questions), 1)
+    : 1;
 
   return (
     <div className="app-layout">
@@ -199,13 +156,13 @@ export default function AdminPage({ session }: { session: Session }) {
           </button>
           <h1>Admin</h1>
           <div className="source-toggle" style={{ marginLeft: 'auto' }}>
-            {(['overview', 'users', 'knowledge', 'gyms'] as const).map(tab => (
+            {(['overview', 'engagement', 'users'] as const).map(tab => (
               <button
                 key={tab}
                 className={'source-btn ' + (activeTab === tab ? 'active' : '')}
                 onClick={() => switchTab(tab)}
               >
-                {tab === 'knowledge' ? 'KB' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
@@ -213,224 +170,178 @@ export default function AdminPage({ session }: { session: Session }) {
         <div className="page-body">
           <div style={{ maxWidth: 900, margin: '0 auto' }}>
             {error && <div className="auth-error" style={{ display: 'block', marginBottom: 16 }}>{error}</div>}
-            {success && <div style={{ background: 'rgba(46,196,134,0.1)', border: '1px solid rgba(46,196,134,0.25)', color: '#2ec486', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 16 }}>{success}</div>}
 
             {loading ? <div className="page-loading"><div className="loading-pulse" /></div> :
 
             /* ===== Overview Tab ===== */
-            activeTab === 'overview' && overview ? (
+            activeTab === 'overview' && overviewStats ? (
               <>
+                <SectionHeader>Active Users</SectionHeader>
                 <div className="admin-stats-grid">
-                  <StatCard label="Total Questions" value={overview.stats.total_questions} />
-                  <StatCard label="Today" value={overview.stats.today_questions} />
-                  <StatCard label="This Week" value={overview.stats.week_questions} />
-                  <StatCard label="This Month" value={overview.stats.month_questions} />
-                  <StatCard label="Active Today" value={overview.stats.active_users_today} />
-                  <StatCard label="Active (Week)" value={overview.stats.active_users_week} />
-                  <StatCard label="Total Users" value={overview.stats.total_users} />
-                  <StatCard label="Bookmarks" value={overview.stats.total_bookmarks} />
-                  <StatCard label="Tokens (Total)" value={(overview.stats.total_input_tokens + overview.stats.total_output_tokens).toLocaleString()} />
-                  <StatCard label="Tokens (Today)" value={(overview.stats.today_input_tokens + overview.stats.today_output_tokens).toLocaleString()} />
-                  <StatCard label="Journal Chunks" value={overview.chunks.journal} />
-                  <StatCard label="Science Chunks" value={overview.chunks.science} />
+                  <StatCard label="Today" value={overviewStats.active_today} />
+                  <StatCard label="7 Days" value={overviewStats.active_7d} />
+                  <StatCard label="30 Days" value={overviewStats.active_30d} />
+                  <StatCard label="Total Users" value={overviewStats.total_users} />
                 </div>
 
-                <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', marginTop: 32, marginBottom: 12 }}>
-                  Top Users
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {overview.topUsers.map((u, i) => (
-                    <div key={u.user_id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: 'var(--text-muted)', width: 28, textAlign: 'right' }}>#{i + 1}</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 500 }}>{u.full_name || u.email}</div>
-                        {u.full_name && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{u.email}</div>}
-                      </div>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>{u.question_count}</span>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--text-muted)' }}>{u.total_tokens.toLocaleString()} tok</span>
-                    </div>
+                <SectionHeader>Signups</SectionHeader>
+                <div className="admin-stats-grid">
+                  <StatCard label="Last 7 Days" value={overviewStats.new_signups_7d} />
+                  <StatCard label="Last 30 Days" value={overviewStats.new_signups_30d} />
+                </div>
+
+                <SectionHeader>Entitlements</SectionHeader>
+                <div className="admin-stats-grid">
+                  <StatCard label="Users with Access" value={overviewStats.users_with_entitlements} sub={`of ${overviewStats.total_users} total`} />
+                  {overviewStats.entitled_users && overviewStats.entitled_users.map((e: any) => (
+                    <StatCard key={e.feature} label={e.feature.replace(/_/g, ' ')} value={e.count} />
                   ))}
                 </div>
 
-                <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', marginTop: 32, marginBottom: 12 }}>
-                  Daily Trend (30 days)
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {overview.trend.map(d => (
-                    <div key={d.day} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--text-muted)', width: 52, flexShrink: 0 }}>
-                        {new Date(d.day).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
-                      </span>
-                      <div className="admin-trend-bar" style={{ width: Math.max(2, (d.question_count / maxTrend) * 200) }} />
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--text-dim)', width: 24 }}>{d.question_count}</span>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: 'var(--text-muted)' }}>{d.unique_users}u</span>
-                    </div>
+                <SectionHeader>Profile → Program Funnel</SectionHeader>
+                <div className="admin-stats-grid">
+                  <StatCard label="Profiles with Lifts" value={overviewStats.profiles_with_lifts} />
+                  <StatCard label="With Evaluation" value={overviewStats.profiles_with_evaluation} />
+                  <StatCard label="With Program" value={overviewStats.profiles_with_program} />
+                </div>
+              </>
+            ) :
+
+            /* ===== Engagement Tab ===== */
+            activeTab === 'engagement' && featureUsage ? (
+              <>
+                {/* Period selector */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+                  {[7, 30, 90].map(d => (
+                    <button
+                      key={d}
+                      className={'source-btn ' + (engagementPeriod === d ? 'active' : '')}
+                      onClick={() => { setEngagementPeriod(d); loadTab('engagement'); }}
+                    >
+                      {d}d
+                    </button>
                   ))}
+                </div>
+
+                <SectionHeader>Chat</SectionHeader>
+                <div className="admin-stats-grid">
+                  <StatCard label="Questions" value={featureUsage.chat_questions} />
+                  <StatCard label="Users" value={featureUsage.chat_users} />
+                  <StatCard label="Input Tokens" value={Number(featureUsage.total_input_tokens).toLocaleString()} />
+                  <StatCard label="Output Tokens" value={Number(featureUsage.total_output_tokens).toLocaleString()} />
+                </div>
+
+                {/* Daily trend */}
+                {featureUsage.chat_by_day && featureUsage.chat_by_day.length > 0 && (
+                  <>
+                    <SectionHeader>Daily Questions</SectionHeader>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {featureUsage.chat_by_day.map((d: any) => (
+                        <div key={d.day} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--text-muted)', width: 52, flexShrink: 0 }}>
+                            {new Date(d.day).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
+                          </span>
+                          <div className="admin-trend-bar" style={{ width: Math.max(2, (d.questions / maxTrend) * 200) }} />
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--text-dim)', width: 24 }}>{d.questions}</span>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: 'var(--text-muted)' }}>{d.users}u</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <SectionHeader>Engine</SectionHeader>
+                <div className="admin-stats-grid">
+                  <StatCard label="Sessions" value={featureUsage.engine_sessions} />
+                  <StatCard label="Users" value={featureUsage.engine_users} />
+                </div>
+
+                <SectionHeader>Nutrition</SectionHeader>
+                <div className="admin-stats-grid">
+                  <StatCard label="Entries" value={featureUsage.nutrition_entries} />
+                  <StatCard label="Users" value={featureUsage.nutrition_users} />
+                  <StatCard label="Days Logged" value={featureUsage.nutrition_days_logged} />
+                </div>
+
+                <SectionHeader>Programs & Workouts</SectionHeader>
+                <div className="admin-stats-grid">
+                  <StatCard label="Programs Generated" value={featureUsage.programs_generated} />
+                  <StatCard label="Evaluations Run" value={featureUsage.evaluations_run} />
+                  <StatCard label="Workouts Logged" value={featureUsage.workouts_logged} />
+                  <StatCard label="Workout Users" value={featureUsage.workout_users} />
                 </div>
               </>
             ) :
 
             /* ===== Users Tab ===== */
             activeTab === 'users' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {users.map(u => (
-                  <div key={u.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1, minWidth: 180 }}>
-                      <div style={{ fontSize: 14, fontWeight: 500 }}>{u.full_name || 'No name'}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{u.email}</div>
-                    </div>
-                    <select
-                      value={u.role}
-                      onChange={e => updateUser(u.id, 'role', e.target.value)}
-                      style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 8px', color: 'var(--text)', fontFamily: "'Outfit', sans-serif", fontSize: 12 }}
-                    >
-                      <option value="user">User</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                    <button
-                      onClick={() => updateUser(u.id, 'ai_suite', u.has_ai_suite ? 'revoke' : 'grant')}
-                      style={{
-                        fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
-                        color: u.has_ai_suite ? '#2ec486' : '#666',
-                        background: (u.has_ai_suite ? '#2ec486' : '#666') + '20',
-                        padding: '3px 10px', borderRadius: 4,
-                        border: 'none', cursor: 'pointer', fontFamily: "'Outfit', sans-serif",
-                      }}
-                    >
-                      AI Suite
-                    </button>
-                    <button
-                      onClick={() => updateUser(u.id, 'engine', u.has_engine ? 'revoke' : 'grant')}
-                      style={{
-                        fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
-                        color: u.has_engine ? '#f0a050' : '#666',
-                        background: (u.has_engine ? '#f0a050' : '#666') + '20',
-                        padding: '3px 10px', borderRadius: 4,
-                        border: 'none', cursor: 'pointer', fontFamily: "'Outfit', sans-serif",
-                      }}
-                    >
-                      Engine
-                    </button>
-                    {u.has_engine && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <button
-                          onClick={() => u.engine_months_unlocked > 1 && updateUser(u.id, 'engine_months', String(u.engine_months_unlocked - 1))}
-                          style={{
-                            width: 20, height: 20, fontSize: 14, lineHeight: '18px',
-                            border: '1px solid var(--border)', borderRadius: 4,
-                            background: 'var(--bg)', color: 'var(--text-muted)',
-                            cursor: u.engine_months_unlocked > 1 ? 'pointer' : 'default',
-                            opacity: u.engine_months_unlocked > 1 ? 1 : 0.3,
-                            fontFamily: "'JetBrains Mono', monospace", padding: 0,
-                          }}
-                        >
-                          -
-                        </button>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: '#f0a050', minWidth: 40, textAlign: 'center' }}>
-                          {u.engine_months_unlocked}mo
-                        </span>
-                        <button
-                          onClick={() => updateUser(u.id, 'engine_months', String(u.engine_months_unlocked + 1))}
-                          style={{
-                            width: 20, height: 20, fontSize: 14, lineHeight: '18px',
-                            border: '1px solid var(--border)', borderRadius: 4,
-                            background: 'var(--bg)', color: 'var(--text-muted)',
-                            cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace", padding: 0,
-                          }}
-                        >
-                          +
-                        </button>
-                      </div>
-                    )}
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--text-muted)' }}>
-                      {u.question_count} Q
-                    </span>
-                    {u.last_active && (
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        {new Date(u.last_active).toLocaleDateString()}
-                      </span>
-                    )}
-                  </div>
-                ))}
-                {users.length === 0 && <div className="empty-state"><p>No users found.</p></div>}
-              </div>
-            ) :
-
-            /* ===== Knowledge Base Tab ===== */
-            activeTab === 'knowledge' && kb ? (
               <>
-                <div className="admin-stats-grid" style={{ maxWidth: 400, marginBottom: 24 }}>
-                  <StatCard label="Journal Chunks" value={kb.journal_chunks} />
-                  <StatCard label="Science Chunks" value={kb.science_chunks} />
+                {/* Search */}
+                <div style={{ marginBottom: 16 }}>
+                  <input
+                    type="text"
+                    placeholder="Search by name or email..."
+                    value={userSearch}
+                    onChange={e => setUserSearch(e.target.value)}
+                    style={{
+                      width: '100%', padding: '10px 14px', fontSize: 14,
+                      background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+                      color: 'var(--text)', fontFamily: "'Outfit', sans-serif",
+                    }}
+                  />
                 </div>
-                <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', marginBottom: 12 }}>
-                  Sources ({kb.sources.length} titles)
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {kb.sources.map((s, i) => (
-                    <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 500 }}>{s.title}</span>
-                        <span style={{
-                          fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
-                          color: s.category === 'science' ? '#6ea8fe' : 'var(--accent)',
-                          background: (s.category === 'science' ? '#6ea8fe' : 'var(--accent)') + '15',
-                          padding: '2px 6px', borderRadius: 3,
-                        }}>
-                          {s.category}
-                        </span>
+
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+                  {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {filteredUsers.map(u => (
+                    <div
+                      key={u.id}
+                      onClick={() => navigate(`/admin/users/${u.id}`)}
+                      style={{
+                        background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
+                        padding: '14px 18px', cursor: 'pointer', transition: 'border-color .15s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-light)')}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600 }}>{u.full_name || 'No name'}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{u.email}</div>
+                        </div>
+                        {u.role === 'admin' && (
+                          <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: 'var(--accent)', background: 'var(--accent-glow)', padding: '2px 8px', borderRadius: 4 }}>Admin</span>
+                        )}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
                       </div>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>
-                        {s.chunks}
-                      </span>
+
+                      {/* Entitlements */}
+                      {u.entitlements && u.entitlements.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                          {u.entitlements.map((f: string) => <FeatureBadge key={f} feature={f} />)}
+                        </div>
+                      )}
+
+                      {/* Activity summary */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 11, color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
+                        {u.question_count > 0 && <span>{u.question_count} questions</span>}
+                        {u.engine_sessions_count > 0 && <span>{u.engine_sessions_count} engine</span>}
+                        {u.nutrition_days_logged > 0 && <span>{u.nutrition_days_logged}d nutrition</span>}
+                        {u.workouts_logged > 0 && <span>{u.workouts_logged} workouts</span>}
+                        {u.programs_count > 0 && <span>{u.programs_count} program{u.programs_count > 1 ? 's' : ''}</span>}
+                        {u.last_active && (
+                          <span>last active {new Date(u.last_active).toLocaleDateString()}</span>
+                        )}
+                        {!u.last_active && <span>never active</span>}
+                      </div>
                     </div>
                   ))}
+                  {filteredUsers.length === 0 && <div className="empty-state"><p>No users found.</p></div>}
                 </div>
               </>
-            ) :
-
-            /* ===== Gyms Tab ===== */
-            activeTab === 'gyms' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {gyms.map(g => (
-                  <div key={g.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
-                    <div
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                      onClick={() => toggleGym(g.id)}
-                    >
-                      <div>
-                        <div style={{ fontSize: 16, fontWeight: 700 }}>{g.name}</div>
-                        <div style={{ color: 'var(--text-dim)', fontSize: 13, marginTop: 4 }}>
-                          Owner: {g.owner_name} &middot; {g.member_count}/{g.max_seats} seats &middot; {new Date(g.created_at).toLocaleDateString()}
-                        </div>
-                      </div>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transition: 'transform .2s', transform: expandedGym === g.id ? 'rotate(180deg)' : 'none', flexShrink: 0, color: 'var(--text-muted)' }}>
-                        <polyline points="6 9 12 15 18 9" />
-                      </svg>
-                    </div>
-                    {expandedGym === g.id && (
-                      <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {!gymMembers[g.id] ? (
-                          <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading...</div>
-                        ) : gymMembers[g.id].length === 0 ? (
-                          <div style={{ padding: 12, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No members</div>
-                        ) : gymMembers[g.id].map(m => (
-                          <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 13, fontWeight: 500 }}>{m.full_name}</div>
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.invited_email}</div>
-                            </div>
-                            <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: statusColor(m.status), background: statusColor(m.status) + '20', padding: '2px 8px', borderRadius: 4 }}>
-                              {m.status}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {gyms.length === 0 && <div className="empty-state"><p>No gyms found.</p></div>}
-              </div>
             ) : null}
           </div>
         </div>
