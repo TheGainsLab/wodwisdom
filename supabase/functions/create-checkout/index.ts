@@ -23,50 +23,67 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const PRICES: Record<string, { monthly: string | undefined; quarterly: string | undefined }> = {
+  coach: { monthly: PRICE_COACH, quarterly: PRICE_COACH_QUARTERLY },
+  nutrition: { monthly: PRICE_NUTRITION, quarterly: PRICE_NUTRITION_QUARTERLY },
+  coach_nutrition: { monthly: PRICE_COACH_NUTRITION, quarterly: PRICE_COACH_NUTRITION_QUARTERLY },
+  programming: { monthly: PRICE_PROGRAMMING, quarterly: PRICE_PROGRAMMING_QUARTERLY },
+  engine: { monthly: PRICE_ENGINE, quarterly: PRICE_ENGINE_QUARTERLY },
+  all_access: { monthly: PRICE_ALL_ACCESS, quarterly: PRICE_ALL_ACCESS_QUARTERLY },
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    const supa = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
-    const token = authHeader!.replace("Bearer ", "");
-    const { data: { user } } = await supa.auth.getUser(token);
-    if (!user) throw new Error("Not authenticated");
-
     const { plan, interval = "monthly" } = await req.json();
     const isQuarterly = interval === "quarterly";
 
-    const PRICES: Record<string, { monthly: string | undefined; quarterly: string | undefined }> = {
-      coach: { monthly: PRICE_COACH, quarterly: PRICE_COACH_QUARTERLY },
-      nutrition: { monthly: PRICE_NUTRITION, quarterly: PRICE_NUTRITION_QUARTERLY },
-      coach_nutrition: { monthly: PRICE_COACH_NUTRITION, quarterly: PRICE_COACH_NUTRITION_QUARTERLY },
-      programming: { monthly: PRICE_PROGRAMMING, quarterly: PRICE_PROGRAMMING_QUARTERLY },
-      engine: { monthly: PRICE_ENGINE, quarterly: PRICE_ENGINE_QUARTERLY },
-      all_access: { monthly: PRICE_ALL_ACCESS, quarterly: PRICE_ALL_ACCESS_QUARTERLY },
-};
     const planPrices = PRICES[plan];
     if (!planPrices) throw new Error("Invalid plan: " + plan);
     const priceId = isQuarterly ? planPrices.quarterly : planPrices.monthly;
     if (!priceId) throw new Error("Price not configured for " + plan + " " + interval);
 
+    // Check if user is authenticated (optional)
+    const authHeader = req.headers.get("Authorization");
+    let userEmail: string | undefined;
+    let userId: string | undefined;
+
+    if (authHeader) {
+      const supa = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user } } = await supa.auth.getUser(token);
+      if (user) {
+        userEmail = user.email;
+        userId = user.id;
+      }
+    }
+
     const origin = req.headers.get("Origin") || req.headers.get("Referer")?.replace(/\/$/, "") || "https://www.thegainslab.com";
     const baseUrl = origin.startsWith("http") ? origin : `https://${origin}`;
-    const successUrl = `${baseUrl}/checkout/complete`;
+    // Include session_id in success URL so CheckoutCompletePage can look up the email
+    const successUrl = `${baseUrl}/checkout/complete?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${baseUrl}/checkout`;
 
     const params: Record<string, string> = {
       "mode": "subscription",
       "payment_method_types[0]": "card",
-      "line_items[0][price]": priceId!,
+      "line_items[0][price]": priceId,
       "line_items[0][quantity]": "1",
-      "customer_email": user.email!,
       "success_url": successUrl,
       "cancel_url": cancelUrl,
-      "metadata[user_id]": user.id,
       "metadata[plan]": plan,
-      "subscription_data[metadata][user_id]": user.id,
       "subscription_data[metadata][plan]": plan,
     };
+
+    // If authenticated, pre-fill email and attach user ID
+    if (userEmail) {
+      params["customer_email"] = userEmail;
+    }
+    if (userId) {
+      params["metadata[user_id]"] = userId;
+      params["subscription_data[metadata][user_id]"] = userId;
+    }
 
     const resp = await fetch("https://api.stripe.com/v1/checkout/sessions", {
       method: "POST",

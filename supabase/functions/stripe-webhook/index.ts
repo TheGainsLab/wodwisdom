@@ -140,7 +140,15 @@ serve(async (req) => {
 
           console.log(`Granted ${features.length} entitlements to user ${userId}`);
         } else {
-          console.error("No user found for email:", email);
+          // No account yet — write to pending_subscriptions
+          console.log(`No user found for ${email} — writing to pending_subscriptions`);
+          await supa.from("pending_subscriptions").upsert({
+            email,
+            stripe_customer_id: customerId,
+            stripe_subscription_id: subscriptionId,
+            plan,
+            entitlements: features,
+          }, { onConflict: "stripe_subscription_id" });
         }
         break;
       }
