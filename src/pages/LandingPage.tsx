@@ -116,7 +116,7 @@ export default function LandingPage() {
             <div className="landing-offering-card">
               <h3>Year of the Engine</h3>
               <p className="landing-offering-tagline">The best conditioning program, calibrated to you</p>
-              <p>The app learns your Engine and sets a custom target for every training day—pacing each interval to your fitness, not a generic template. Machine learning targets each energy system independently. Real-time coaching guides you through every session. And the analytics show your Engine in unmatched detail.</p>
+              <p>Custom targets for every training day, pacing each interval to your fitness. Machine learning targets each energy system independently. Real-time coaching guides you through every session. Analytics give you a window into your progress — share results with AI for even deeper insights.</p>
               <Link to="/features/engine" className="landing-offering-learn-more">See how it works &rarr;</Link>
             </div>
             <div className="landing-offering-card">
