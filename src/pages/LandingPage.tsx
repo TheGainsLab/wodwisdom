@@ -90,16 +90,11 @@ export default function LandingPage() {
         <p className="landing-hero-sub">
           We trained an AI on the CrossFit methodology: study guides, journal articles, seminars and more. This is the AI that speaks your language. Share some basic info and the AI builds a program tailored exactly to you, coaches every session and learns as you log your results, maximizing the impact of every training session.
         </p>
-        <div className="landing-hero-ctas">
-          <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
-          <Link to="/features" className="landing-cta landing-cta-outline">See How It Works</Link>
-        </div>
       </section>
 
       {/* ===== How to Work With Us ===== */}
       <section className="landing-explainer">
         <div className="landing-container">
-          <h2 className="landing-section-title">How to Work With Us</h2>
           <div className="landing-offerings-grid">
             <div className="landing-offering-card">
               <h3>AI Coach</h3>
