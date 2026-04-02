@@ -88,7 +88,7 @@ export default function LandingPage() {
         <GainsLogo className="landing-hero-logo" />
         <h1 className="landing-hero-title">The program that follows you.</h1>
         <p className="landing-hero-sub">
-          We trained an AI on the CrossFit methodology. It learns your lifts, your skills, your conditioning, your nutrition. Then it builds your training, coaches every session, and gets smarter every time you train.
+          We trained an AI on the CrossFit methodology: study guides, journal articles, seminars and more. This is the AI that speaks your language. Share some basic info and the AI builds a program tailored exactly to you, coaches every session and learns as you log your results, maximizing the impact of every training session.
         </p>
         <div className="landing-hero-ctas">
           <button className="landing-cta" onClick={goToSignup}>Try it Free</button>
