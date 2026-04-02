@@ -121,7 +121,7 @@ export default function LandingPage() {
             </div>
             <div className="landing-offering-card">
               <h3>AI Nutrition</h3>
-              <p className="landing-offering-tagline">Track your fuel as easily as you track your training</p>
+              <p className="landing-offering-tagline">Tracking your training? Track your fuel.</p>
               <p>Log meals with photos, barcodes, or by searching millions of foods and restaurant menus. Build templates for your go-to meals. Track macros against your targets. Because what you put in is half the equation.</p>
               <Link to="/features/nutrition" className="landing-offering-learn-more">See how it works &rarr;</Link>
             </div>
