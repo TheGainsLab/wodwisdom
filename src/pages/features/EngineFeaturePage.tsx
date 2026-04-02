@@ -1,10 +1,28 @@
-import { useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
 
+const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
+const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
+
 export default function EngineFeaturePage() {
-  const navigate = useNavigate();
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  const buyEngine = async () => {
+    setCheckoutLoading(true);
+    try {
+      const resp = await fetch(CHECKOUT_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'engine', interval: 'monthly' }),
+      });
+      const data = await resp.json();
+      if (data.url) { window.location.href = data.url; return; }
+      if (data.error) alert(data.error);
+    } catch { alert('Failed to start checkout'); }
+    finally { setCheckoutLoading(false); }
+  };
 
   useEffect(() => {
     document.body.classList.add('feature-body');
@@ -185,7 +203,7 @@ export default function EngineFeaturePage() {
           AI Coach included. Machine learning calibration. Pacing coach. Full conditioning analytics.
         </p>
         <div className="feature-footer-actions">
-          <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Get Started</button>
+          <button className="feature-cta" onClick={buyEngine} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
           <Link to="/#pricing" className="feature-cta-secondary">Back to Pricing</Link>
         </div>
       </section>

@@ -30,12 +30,37 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   },
 ];
 
+const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
+const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [pricingInterval, setPricingInterval] = useState<'monthly' | 'quarterly'>('monthly');
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const goToAuth = () => navigate('/auth');
   const goToSignup = () => navigate('/auth?signup=1');
+
+  const buyPlan = async (plan: string) => {
+    setCheckoutLoading(plan);
+    try {
+      const resp = await fetch(CHECKOUT_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan, interval: pricingInterval }),
+      });
+      const data = await resp.json();
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      if (data.error) alert(data.error);
+    } catch {
+      alert('Failed to start checkout');
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
 
   useEffect(() => {
     document.body.classList.add('landing-body');
@@ -126,39 +151,29 @@ export default function LandingPage() {
               <span>Service</span>
               <span>{pricingInterval === 'monthly' ? 'Monthly' : 'Quarterly'}</span>
             </div>
-            <div className="landing-pricing-row">
-              <span className="landing-pricing-name">AI Coach</span>
-              <span className="landing-pricing-amount">{pricingInterval === 'monthly' ? '$7.99' : '$17.99'}</span>
-            </div>
-            <div className="landing-pricing-row">
-              <span className="landing-pricing-name">AI Nutrition</span>
-              <span className="landing-pricing-amount">{pricingInterval === 'monthly' ? '$7.99' : '$17.99'}</span>
-            </div>
-            <div className="landing-pricing-row">
-              <span className="landing-pricing-name">AI Coach + AI Nutrition</span>
-              <span className="landing-pricing-amount">{pricingInterval === 'monthly' ? '$11.99' : '$29.99'}</span>
-            </div>
-            <div className="landing-pricing-row">
-              <div>
-                <span className="landing-pricing-name">Year of the Engine</span>
-                <div className="landing-pricing-note">(AI Coach and AI Nutrition included)</div>
+            {[
+              { plan: 'coach', name: 'AI Coach', monthly: '$7.99', quarterly: '$17.99' },
+              { plan: 'nutrition', name: 'AI Nutrition', monthly: '$7.99', quarterly: '$17.99' },
+              { plan: 'coach_nutrition', name: 'AI Coach + AI Nutrition', monthly: '$11.99', quarterly: '$29.99' },
+              { plan: 'engine', name: 'AI Year of the Engine', monthly: '$29.99', quarterly: '$74.99', note: '(AI Coach and AI Nutrition included)' },
+              { plan: 'programming', name: 'AI Programming', monthly: '$29.99', quarterly: '$74.99', note: '(AI Coach and AI Nutrition included)' },
+              { plan: 'all_access', name: 'All Access', monthly: '$49.99', quarterly: '$119.99', note: '(AI Coach, AI Programming, YoE and AI Nutrition)' },
+            ].map(p => (
+              <div
+                key={p.plan}
+                className="landing-pricing-row"
+                style={{ cursor: 'pointer', transition: 'background .15s' }}
+                onClick={() => !checkoutLoading && buyPlan(p.plan)}
+              >
+                <div>
+                  <span className="landing-pricing-name">{p.name}</span>
+                  {p.note && <div className="landing-pricing-note">{p.note}</div>}
+                </div>
+                <span className="landing-pricing-amount">
+                  {checkoutLoading === p.plan ? '...' : pricingInterval === 'monthly' ? p.monthly : p.quarterly}
+                </span>
               </div>
-              <span className="landing-pricing-amount">{pricingInterval === 'monthly' ? '$29.99' : '$74.99'}</span>
-            </div>
-            <div className="landing-pricing-row">
-              <div>
-                <span className="landing-pricing-name">AI Programming</span>
-                <div className="landing-pricing-note">(AI Coach and AI Nutrition included)</div>
-              </div>
-              <span className="landing-pricing-amount">{pricingInterval === 'monthly' ? '$29.99' : '$74.99'}</span>
-            </div>
-            <div className="landing-pricing-row">
-              <div>
-                <span className="landing-pricing-name">All Access</span>
-                <div className="landing-pricing-note">(AI Coach, AI Programming, YoE and AI Nutrition)</div>
-              </div>
-              <span className="landing-pricing-amount">{pricingInterval === 'monthly' ? '$49.99' : '$119.00'}</span>
-            </div>
+            ))}
             <button className="landing-cta" onClick={goToSignup} style={{marginTop: '28px', width: '100%'}}>Try it Free</button>
           </div>
         </div>

@@ -14,6 +14,7 @@ export default function SettingsPage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [profile, setProfile] = useState<Profile>({ full_name: '', role: 'user' });
   const [hasSubscription, setHasSubscription] = useState(false);
+  const [userFeatures, setUserFeatures] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -27,13 +28,15 @@ export default function SettingsPage({ session }: { session: Session }) {
   useEffect(() => {
     Promise.all([
       supabase.from('profiles').select('full_name, role').eq('id', session.user.id).single(),
-      supabase.from('user_entitlements').select('id')
+      supabase.from('user_entitlements').select('feature')
         .eq('user_id', session.user.id)
-        .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
-        .limit(1),
+        .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString()),
     ]).then(([{ data: profileData }, { data: entitlements }]) => {
       if (profileData) setProfile(profileData);
-      setHasSubscription((entitlements && entitlements.length > 0) || false);
+      if (entitlements && entitlements.length > 0) {
+        setHasSubscription(true);
+        setUserFeatures(entitlements.map(e => e.feature));
+      }
       setLoading(false);
     });
   }, [session.user.id]);
@@ -98,15 +101,37 @@ export default function SettingsPage({ session }: { session: Session }) {
 
             {loading ? <div className="page-loading"><div className="loading-pulse" /></div> : (
               <>
-                {hasSubscription && (
-                  <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
-                    <h2 className="settings-card-title">Subscription</h2>
-                    <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 16 }}>Update payment method, change plan, or cancel anytime.</p>
-                    <button className="auth-btn" onClick={openBillingPortal} disabled={portalLoading}>
-                      {portalLoading ? 'Opening...' : 'Manage subscription'}
-                    </button>
-                  </div>
-                )}
+                {/* Subscription Section */}
+                <div className="settings-card" style={hasSubscription ? { borderColor: 'var(--accent)', background: 'var(--accent-glow)' } : {}}>
+                  <h2 className="settings-card-title">Subscription</h2>
+                  {hasSubscription ? (
+                    <>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                        {userFeatures.map(f => (
+                          <span key={f} style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--accent)', background: 'rgba(255,58,58,0.1)', padding: '3px 10px', borderRadius: 4 }}>
+                            {f.replace(/_/g, ' ')}
+                          </span>
+                        ))}
+                      </div>
+                      <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 16 }}>Update payment method, change plan, or cancel anytime.</p>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button className="auth-btn" onClick={openBillingPortal} disabled={portalLoading}>
+                          {portalLoading ? 'Opening...' : 'Manage subscription'}
+                        </button>
+                        <button className="auth-btn" onClick={() => navigate('/checkout')} style={{ background: 'var(--surface2)', color: 'var(--text)' }}>
+                          Change plan
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 16 }}>You're on the free plan. Upgrade to unlock all features.</p>
+                      <button className="auth-btn" onClick={() => navigate('/checkout')}>
+                        Upgrade
+                      </button>
+                    </>
+                  )}
+                </div>
                 {/* Athlete Profile Link */}
                 <div className="settings-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/profile')}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

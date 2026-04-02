@@ -3,20 +3,17 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
 const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET");
 
-// Product → feature mapping
-// When you add new Stripe products, map them here
-const PRODUCT_FEATURES: Record<string, string[]> = {
-  ai_suite: ["ai_chat", "program_gen", "workout_review", "workout_log"],
-  // engine: ["engine"],
-  // engine_premium: ["engine", "ai_chat"],
-};
-
-// Map Stripe price IDs to product keys above
-const PRICE_TO_PRODUCT: Record<string, string> = {
-  [Deno.env.get("STRIPE_PRICE_ATHLETE") || ""]: "ai_suite",
-  // [Deno.env.get("STRIPE_PRICE_ENGINE") || ""]: "engine",
+// Fallback plan → entitlements mapping (used if price metadata is missing)
+const PLAN_ENTITLEMENTS: Record<string, string[]> = {
+  coach: ["ai_chat"],
+  nutrition: ["nutrition"],
+  coach_nutrition: ["ai_chat", "nutrition"],
+  engine: ["engine", "ai_chat", "nutrition"],
+  programming: ["programming", "ai_chat", "nutrition"],
+  all_access: ["ai_chat", "programming", "engine", "nutrition"],
 };
 
 const cryptoKey = await crypto.subtle.importKey(
@@ -36,6 +33,48 @@ async function verifyStripeSignature(payload: string, header: string): Promise<b
   const mac = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(signedPayload));
   const expected = Array.from(new Uint8Array(mac)).map(b => b.toString(16).padStart(2, "0")).join("");
   return expected === sig;
+}
+
+// Fetch subscription details from Stripe to get price metadata
+async function getSubscriptionEntitlements(subscriptionId: string): Promise<{ plan: string; features: string[] }> {
+  // Fetch the subscription to get the price ID
+  const subResp = await fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
+    headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+  });
+  const sub = await subResp.json();
+
+  // Get the price ID from the first subscription item
+  const priceId = sub.items?.data?.[0]?.price?.id;
+  if (!priceId) {
+    // Fall back to subscription metadata
+    const plan = sub.metadata?.plan;
+    if (plan && PLAN_ENTITLEMENTS[plan]) {
+      return { plan, features: PLAN_ENTITLEMENTS[plan] };
+    }
+    return { plan: "unknown", features: [] };
+  }
+
+  // Fetch the price to get its metadata
+  const priceResp = await fetch(`https://api.stripe.com/v1/prices/${priceId}`, {
+    headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+  });
+  const price = await priceResp.json();
+
+  // Read entitlements from price metadata
+  const plan = price.metadata?.plan || sub.metadata?.plan || "unknown";
+  const entitlementsStr = price.metadata?.entitlements;
+
+  if (entitlementsStr) {
+    // Use metadata from the price
+    return { plan, features: entitlementsStr.split(",").map((s: string) => s.trim()) };
+  }
+
+  // Fall back to plan → entitlements mapping
+  if (plan && PLAN_ENTITLEMENTS[plan]) {
+    return { plan, features: PLAN_ENTITLEMENTS[plan] };
+  }
+
+  return { plan, features: [] };
 }
 
 serve(async (req) => {
@@ -58,29 +97,93 @@ serve(async (req) => {
         const customerId = session.customer;
         const subscriptionId = session.subscription;
 
-        // Look up which product was purchased
-        const priceId = session.line_items?.data?.[0]?.price?.id || "";
-        const productKey = PRICE_TO_PRODUCT[priceId] || "ai_suite";
-        const features = PRODUCT_FEATURES[productKey] || [];
+        if (!subscriptionId) {
+          console.log("No subscription ID in checkout session — skipping");
+          break;
+        }
+
+        // Get entitlements from the subscription's price metadata
+        const { plan, features } = await getSubscriptionEntitlements(subscriptionId);
+        console.log(`Checkout completed: plan=${plan}, features=${features.join(",")}, email=${email}`);
+
+        if (features.length === 0) {
+          console.error("No features resolved for plan:", plan);
+          break;
+        }
 
         // Find user by email
         const { data: profiles } = await supa.from("profiles").select("id").eq("email", email).limit(1);
         if (profiles && profiles.length > 0) {
           const userId = profiles[0].id;
-          const source = subscriptionId || `stripe_${customerId}`;
+          const source = subscriptionId;
 
           // Store stripe_customer_id on profiles
           await supa.from("profiles").update({
             stripe_customer_id: customerId,
           }).eq("id", userId);
 
-          // Grant entitlements for this product
+          // Remove any existing entitlements from previous subscriptions
+          // (handles plan changes — old entitlements cleared, new ones granted)
+          await supa.from("user_entitlements")
+            .delete()
+            .eq("user_id", userId)
+            .like("source", "sub_%");
+
+          // Grant entitlements for this plan
           for (const feature of features) {
             await supa.from("user_entitlements").upsert({
               user_id: userId,
               feature,
               source,
             }, { onConflict: "user_id,feature,source" });
+          }
+
+          console.log(`Granted ${features.length} entitlements to user ${userId}`);
+        } else {
+          // No account yet — write to pending_subscriptions
+          console.log(`No user found for ${email} — writing to pending_subscriptions`);
+          await supa.from("pending_subscriptions").upsert({
+            email,
+            stripe_customer_id: customerId,
+            stripe_subscription_id: subscriptionId,
+            plan,
+            entitlements: features,
+          }, { onConflict: "stripe_subscription_id" });
+        }
+        break;
+      }
+
+      case "customer.subscription.updated": {
+        const sub = event.data.object;
+        const customerId = sub.customer;
+        const subscriptionId = sub.id;
+        const status = sub.status;
+
+        // Handle plan changes (upgrade/downgrade)
+        if (status === "active") {
+          const { plan, features } = await getSubscriptionEntitlements(subscriptionId);
+          console.log(`Subscription updated: plan=${plan}, features=${features.join(",")}`);
+
+          const { data: profiles } = await supa.from("profiles").select("id").eq("stripe_customer_id", customerId).limit(1);
+          if (profiles && profiles.length > 0) {
+            const userId = profiles[0].id;
+
+            // Clear old entitlements from this subscription
+            await supa.from("user_entitlements")
+              .delete()
+              .eq("user_id", userId)
+              .eq("source", subscriptionId);
+
+            // Grant new entitlements
+            for (const feature of features) {
+              await supa.from("user_entitlements").upsert({
+                user_id: userId,
+                feature,
+                source: subscriptionId,
+              }, { onConflict: "user_id,feature,source" });
+            }
+
+            console.log(`Updated entitlements for user ${userId}: ${features.join(",")}`);
           }
         }
         break;
@@ -91,6 +194,8 @@ serve(async (req) => {
         const customerId = sub.customer;
         const subscriptionId = sub.id;
 
+        console.log(`Subscription deleted: ${subscriptionId}`);
+
         // Find user by stripe_customer_id
         const { data: profiles } = await supa.from("profiles").select("id").eq("stripe_customer_id", customerId).limit(1);
         if (profiles && profiles.length > 0) {
@@ -99,13 +204,11 @@ serve(async (req) => {
             .delete()
             .eq("user_id", profiles[0].id)
             .eq("source", subscriptionId);
+
+          console.log(`Removed entitlements for user ${profiles[0].id}`);
         }
         break;
       }
-
-      // subscription.updated, invoice.paid, invoice.payment_failed:
-      // Entitlements persist as long as they exist — no action needed.
-      // When you want grace periods or past_due handling, add logic here.
 
       default:
         console.log("Unhandled event:", event.type);

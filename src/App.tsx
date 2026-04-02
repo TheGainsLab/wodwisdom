@@ -66,6 +66,7 @@ export default function App() {
       <Route path="/features/programs" element={<ProgramsFeaturePage />} />
       <Route path="/features/engine" element={<EngineFeaturePage />} />
       <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
+      <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
       <Route path="*" element={<LandingPage />} />
     </Routes>
   );

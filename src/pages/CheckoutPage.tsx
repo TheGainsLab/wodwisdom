@@ -72,7 +72,7 @@ const PLANS: { key: PlanKey; name: string; monthly: string; quarterly: string; f
     key: 'all_access',
     name: 'All Access',
     monthly: '$49.99',
-    quarterly: '$119.00',
+    quarterly: '$119.99',
     badge: 'Best value',
     featured: true,
     features: [

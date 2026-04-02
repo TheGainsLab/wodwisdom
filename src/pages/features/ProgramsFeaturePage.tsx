@@ -1,11 +1,29 @@
-import { useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import ProfileMockup from '../../components/ProfileMockup';
 import '../../features.css';
 
+const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
+const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
+
 export default function ProgramsFeaturePage() {
-  const navigate = useNavigate();
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  const buyProgramming = async () => {
+    setCheckoutLoading(true);
+    try {
+      const resp = await fetch(CHECKOUT_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'programming', interval: 'monthly' }),
+      });
+      const data = await resp.json();
+      if (data.url) { window.location.href = data.url; return; }
+      if (data.error) alert(data.error);
+    } catch { alert('Failed to start checkout'); }
+    finally { setCheckoutLoading(false); }
+  };
 
   useEffect(() => {
     document.body.classList.add('feature-body');
@@ -182,7 +200,7 @@ export default function ProgramsFeaturePage() {
                 AI Coach included. Personalized programming. Adaptive adjustments. Monthly reviews.
               </p>
               <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-                <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Get Started</button>
+                <button className="feature-cta" onClick={buyProgramming} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
                 <Link to="/pricing" className="feature-cta-secondary">Back to Pricing</Link>
               </div>
               <p style={{ marginTop: 16, fontStyle: 'italic' }}>

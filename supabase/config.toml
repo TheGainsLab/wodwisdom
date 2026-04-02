@@ -108,3 +108,9 @@ verify_jwt = false
 
 [functions.ailog-bulk-import]
 verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.checkout-session-info]
+verify_jwt = false
