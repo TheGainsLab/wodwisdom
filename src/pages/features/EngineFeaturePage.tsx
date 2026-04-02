@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
 
@@ -7,7 +7,6 @@ const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmf
 const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
 
 export default function EngineFeaturePage() {
-  const navigate = useNavigate();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const buyEngine = async () => {
