@@ -61,16 +61,13 @@ export default function AICoachingFeaturePage() {
       <section className="feature-hero">
         <span className="feature-hero-badge">AI Coaching</span>
         <h1 className="feature-hero-title">Ask anything</h1>
-        <p className="feature-hero-sub">Get answers you can use in your next training session.</p>
+        <p className="feature-hero-sub">Imagine getting answers you can use in your next training session from a Level 4 Coach who never forgets a thing. Ask about pacing, movement cues, nutrition planning, program review—or flip on science mode for a deep dive into biochemistry and physiology.</p>
       </section>
 
       {/* Real Chat Examples */}
       <section className="feature-section">
         <div className="feature-container">
           <h2 className="feature-section-title">Real examples from real athletes</h2>
-          <p className="feature-section-sub">
-            Imagine a Level 4 coach who never forgets a thing. Ask about pacing, movement cues, nutrition planning, program review—or flip on science mode for a deep dive into biochemistry and physiology.
-          </p>
 
           <ChatExample question="When I snatch, I sometimes miss in the catch. What are some drills I can do to correct this?">
             <p>Missing catches in the snatch typically stems from poor positioning, timing, or confidence in the receiving position. The key is developing comfort and strength in that bottom position through targeted skill-transfer exercises.</p>
