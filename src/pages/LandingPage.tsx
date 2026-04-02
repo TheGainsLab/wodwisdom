@@ -95,6 +95,7 @@ export default function LandingPage() {
       {/* ===== How to Work With Us ===== */}
       <section className="landing-explainer">
         <div className="landing-container">
+          <h2 className="landing-section-title">What we offer</h2>
           <div className="landing-offerings-grid">
             <div className="landing-offering-card">
               <h3>AI Coach</h3>
