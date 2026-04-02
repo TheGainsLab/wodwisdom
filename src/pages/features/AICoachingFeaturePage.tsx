@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
 
@@ -34,6 +34,8 @@ function ChatExample({ question, children, scienceMode }: { question: string; ch
 }
 
 export default function AICoachingFeaturePage() {
+  const navigate = useNavigate();
+
   useEffect(() => {
     document.body.classList.add('feature-body');
     return () => document.body.classList.remove('feature-body');
@@ -151,11 +153,19 @@ export default function AICoachingFeaturePage() {
       </section>
 
       <section className="feature-footer-cta">
-        <h2>Get the program that follows you.</h2>
-        <p style={{ maxWidth: 640, margin: '0 auto 24px', color: 'var(--text-dim)', fontSize: 15, lineHeight: 1.6 }}>
-          AI Coach answers any question. AI Programming builds your training. It learns your lifts, skills, and conditioning—then builds a personalized program that adapts every time you log a result. Coaching cues. Training intent. A program that follows you.
+        <h2>AI Coach — $7.99/mo</h2>
+        <p className="feature-footer-details">
+          Unlimited coaching questions. Full source library. Bookmarks & summaries. Workout reviews.
         </p>
-        <Link to="/features/programs" className="feature-cta">Learn more about AI Programming &rarr;</Link>
+        <div className="feature-footer-actions">
+          <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Try it Free</button>
+        </div>
+        <p style={{ maxWidth: 540, margin: '24px auto 0', color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.6 }}>
+          AI Coach is included with{' '}
+          <Link to="/features/programs" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>AI Programming</Link>,{' '}
+          <Link to="/features/engine" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>AI Year of the Engine</Link>, and{' '}
+          <Link to="/#pricing" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>All Access</Link>.
+        </p>
       </section>
 
       <footer className="feature-footer"><GainsLogo /></footer>

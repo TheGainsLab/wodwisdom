@@ -1,10 +1,29 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
 
+const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
+const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
+
 export default function NutritionFeaturePage() {
   const navigate = useNavigate();
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  const buyNutrition = async () => {
+    setCheckoutLoading(true);
+    try {
+      const resp = await fetch(CHECKOUT_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'nutrition', interval: 'monthly' }),
+      });
+      const data = await resp.json();
+      if (data.url) { window.location.href = data.url; return; }
+      if (data.error) alert(data.error);
+    } catch { alert('Failed to start checkout'); }
+    finally { setCheckoutLoading(false); }
+  };
 
   useEffect(() => {
     document.body.classList.add('feature-body');
@@ -99,8 +118,20 @@ export default function NutritionFeaturePage() {
 
       {/* Footer CTA */}
       <section className="feature-footer-cta">
-        <h2>Fuel your training.</h2>
-        <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Try it Free</button>
+        <h2>AI Nutrition — $7.99/mo</h2>
+        <p className="feature-footer-details">
+          Photo logging. Barcode scanner. Millions of foods. Meal templates. Macro tracking.
+        </p>
+        <div className="feature-footer-actions">
+          <button className="feature-cta" onClick={buyNutrition} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
+          <button className="feature-cta-secondary" onClick={() => navigate('/auth?signup=1')}>Try it Free</button>
+        </div>
+        <p style={{ maxWidth: 540, margin: '24px auto 0', color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.6 }}>
+          AI Nutrition is included with{' '}
+          <Link to="/features/programs" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>AI Programming</Link>,{' '}
+          <Link to="/features/engine" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>AI Year of the Engine</Link>, and{' '}
+          <Link to="/#pricing" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>All Access</Link>.
+        </p>
       </section>
 
       <footer className="feature-footer"><GainsLogo /></footer>
