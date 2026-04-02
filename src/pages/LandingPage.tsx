@@ -105,25 +105,25 @@ export default function LandingPage() {
               <h3>AI Coach</h3>
               <p className="landing-offering-tagline">The brain of a Level 4 coach, available any time</p>
               <p>Get answers you can trust, grounded in the methodology. Or go deeper—switch to science mode and talk with an AI trained on physiology and biochemistry.</p>
-              <Link to="/features/coaching" className="landing-offering-learn-more">Learn more &rarr;</Link>
+              <Link to="/features/coaching" className="landing-offering-learn-more">See how it works &rarr;</Link>
             </div>
             <div className="landing-offering-card">
               <h3>AI Programming</h3>
               <p className="landing-offering-tagline">Stop following someone else's program.</p>
               <p>The AI learns your lifts, skills, and conditioning. Then it builds a personalized program—warm-ups, skill work, strength, metcons—with coaching cues for every session. Log your results and it adapts. The program follows you.</p>
-              <Link to="/features/programs" className="landing-offering-learn-more">Learn more &rarr;</Link>
+              <Link to="/features/programs" className="landing-offering-learn-more">See how it works &rarr;</Link>
             </div>
             <div className="landing-offering-card">
               <h3>Year of the Engine</h3>
               <p className="landing-offering-tagline">The best conditioning program, calibrated to you</p>
               <p>The app learns your Engine and sets a custom target for every training day—pacing each interval to your fitness, not a generic template. Machine learning targets each energy system independently. Real-time coaching guides you through every session. And the analytics show your Engine in unmatched detail.</p>
-              <Link to="/features/engine" className="landing-offering-learn-more">Learn more &rarr;</Link>
+              <Link to="/features/engine" className="landing-offering-learn-more">See how it works &rarr;</Link>
             </div>
             <div className="landing-offering-card">
               <h3>AI Nutrition</h3>
               <p className="landing-offering-tagline">Track your fuel as easily as you track your training</p>
               <p>Log meals with photos, barcodes, or by searching millions of foods and restaurant menus. Build templates for your go-to meals. Track macros against your targets. Because what you put in is half the equation.</p>
-              <Link to="/features/nutrition" className="landing-offering-learn-more">Learn more &rarr;</Link>
+              <Link to="/features/nutrition" className="landing-offering-learn-more">See how it works &rarr;</Link>
             </div>
           </div>
         </div>
