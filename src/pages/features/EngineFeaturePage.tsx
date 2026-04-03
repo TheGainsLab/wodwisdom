@@ -122,11 +122,9 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>See how your output differs across training types.</h3>
+              <h3>Track output across frameworks</h3>
               <p>
-                Anaerobic: 31 cal/min. Max Aerobic Power: 15 cal/min. Endurance: 11 cal/min. Every
-                framework produces different output — and it should. Now you can see exactly how your
-                performance varies across energy systems and track improvement in each one independently.
+                Anaerobic: 31 cal/min. Max Aerobic Power: 15 cal/min. Endurance: 11 cal/min. See exactly how your performance varies across energy systems and track improvement in each one independently.
               </p>
               <img src="/images/comparison.png" alt="Output comparison across training types" className="feature-img" />
             </div>
