@@ -134,7 +134,7 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Heart rate doesn't lie.</h3>
+              <h3 style={{ textAlign: 'center' }}>Heart rate doesn't lie.</h3>
               <p>
                 Anaerobic sessions peak at 165 bpm. Max Aerobic Power sessions at 134 bpm. That 31
                 bpm spread is your aerobic system working exactly as designed.
@@ -153,7 +153,7 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>See what the AI sees</h3>
+              <h3 style={{ textAlign: 'center' }}>See what the AI sees</h3>
               <p>
                 Track your training distribution across energy systems — the same data the AI uses to update your training.
               </p>
