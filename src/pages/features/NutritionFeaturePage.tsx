@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
 
@@ -7,7 +7,6 @@ const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmf
 const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
 
 export default function NutritionFeaturePage() {
-  const navigate = useNavigate();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const buyNutrition = async () => {
@@ -60,7 +59,7 @@ export default function NutritionFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Nutrition dashboard</h3>
+              <h3 style={{ textAlign: 'center' }}>Nutrition dashboard</h3>
               <p>
                 Daily intake at a glance - know instantly if you're in a surplus or deficit. Updates in real time so you can plan your days and weeks easily.
               </p>
@@ -82,7 +81,7 @@ export default function NutritionFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>Scan and search</h3>
+              <h3 style={{ textAlign: 'center' }}>Scan and search</h3>
               <p>
                 Easy to use: take a photo and AI does the rest. Shopping? Snap the barcode at the store and save the ingredients for use later. Logging takes seconds.
               </p>
@@ -99,7 +98,7 @@ export default function NutritionFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Meal builder & templates</h3>
+              <h3 style={{ textAlign: 'center' }}>Meal builder & templates</h3>
               <p>
                 Quickly save your favorites and log them with a single tap. Favorite meals at home? Select the ingredients and save the meal. Usual lunch place during work? Save it, and log your meal before you order next time! It's that easy.
               </p>
@@ -124,7 +123,6 @@ export default function NutritionFeaturePage() {
         </p>
         <div className="feature-footer-actions">
           <button className="feature-cta" onClick={buyNutrition} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
-          <button className="feature-cta-secondary" onClick={() => navigate('/auth?signup=1')}>Try it Free</button>
         </div>
         <p style={{ maxWidth: 540, margin: '24px auto 0', color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.6 }}>
           AI Nutrition is included with{' '}

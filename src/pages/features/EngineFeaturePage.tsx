@@ -56,11 +56,6 @@ export default function EngineFeaturePage() {
         <p className="feature-hero-body">
           Year of the Engine uses 20 distinct training frameworks, each targeting a specific adaptation. Machine learning calibrates every session precisely to you - every single interval is personalized to you.
         </p>
-        <img
-          src="/images/pacing-coach.png"
-          alt="Pacing Coach — real-time interval targets and progress tracking"
-          className="feature-hero-img"
-        />
       </section>
 
       {/* Know the number */}
@@ -76,6 +71,7 @@ export default function EngineFeaturePage() {
                 Once the clock starts, the app becomes your pacing coach. Goals, countdowns, and round
                 context stay front and center through fatigue—so you execute the plan and get the stimulus you need.
               </p>
+              <img src="/images/pacing-coach.png" alt="Pacing Coach — real-time interval targets and progress tracking" className="feature-img" />
             </div>
           </div>
         </div>
@@ -138,7 +134,7 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Heart rate doesn't lie.</h3>
+              <h3 style={{ textAlign: 'center' }}>Heart rate doesn't lie.</h3>
               <p>
                 Anaerobic sessions peak at 165 bpm. Max Aerobic Power sessions at 134 bpm. That 31
                 bpm spread is your aerobic system working exactly as designed.
@@ -157,7 +153,7 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>See what the AI sees</h3>
+              <h3 style={{ textAlign: 'center' }}>See what the AI sees</h3>
               <p>
                 Track your training distribution across energy systems — the same data the AI uses to update your training.
               </p>
