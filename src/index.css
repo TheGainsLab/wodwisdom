@@ -235,7 +235,7 @@ body.landing-body{overflow:auto;height:auto}
 /* Week/Day header */
 .wr-week-day-header{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:12px}
 /* Intent card */
-.wr-intent-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px}
+.wr-intent-card{background:var(--surface);border:1px solid #ffffff;border-radius:var(--radius);padding:20px 24px;margin-bottom:16px}
 .wr-intent-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);margin-bottom:10px}
 /* Prescription (the workout itself) */
 .wr-prescription{margin-bottom:12px;padding:12px 14px;background:var(--bg);border-radius:8px;border-left:3px solid var(--accent)}

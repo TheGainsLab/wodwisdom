@@ -60,7 +60,7 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Step 1 — Your profile</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 1 — Your profile</h3>
               <p>
                 Five minutes to build the profile that powers your program.
               </p>
@@ -81,7 +81,7 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>Step 2 — Your evaluation</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 2 — Your evaluation</h3>
               <p>
                 The AI uses your complete profile to generate a detailed evaluation, specific to your fitness level and abilities.
               </p>
@@ -134,7 +134,7 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Step 3 — Your program</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 3 — Your program</h3>
               <p>
                 The AI combines your evaluation with your profile and builds a training program around you. Every training block is designed for your numbers, your equipment, your goals.
               </p>
@@ -153,7 +153,7 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>Step 4 — Ongoing</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 4 — Ongoing</h3>
               <p>
                 We don't send you a program and wish you the best.
               </p>
