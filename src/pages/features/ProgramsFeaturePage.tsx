@@ -51,7 +51,7 @@ export default function ProgramsFeaturePage() {
         <span className="feature-hero-badge">Programs</span>
         <h1 className="feature-hero-title">AI Programming</h1>
         <p className="feature-hero-sub">
-          From evaluation to program to progress — AI handles all of it.
+          The program that follows you.
         </p>
       </section>
 

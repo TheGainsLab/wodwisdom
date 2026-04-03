@@ -64,14 +64,14 @@
 
 /* ===== Profile Preview ===== */
 .landing-profile-preview{padding:100px 0;border-top:1px solid var(--border)}
-.landing-profile-card{max-width:600px;margin:40px auto 0;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 28px 20px;display:flex;flex-direction:column;gap:24px}
-.landing-profile-group-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:10px}
+.landing-profile-card{max-width:600px;margin:40px auto 0;background:var(--surface);border:1px solid #ffffff;border-radius:16px;padding:28px 28px 20px;display:flex;flex-direction:column;gap:24px}
+.landing-profile-group-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:10px}
 .landing-profile-fields{display:flex;flex-wrap:wrap;gap:8px 20px}
 .landing-profile-field{display:flex;align-items:center;gap:8px;min-width:140px}
 .landing-profile-field-label{font-size:14px;color:var(--text-dim)}
 .landing-profile-field-value{font-size:15px;font-weight:700;color:var(--text);margin-left:auto}
 .landing-profile-skill-tag{font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);letter-spacing:.2px}
-.landing-profile-more{text-align:center;font-size:13px;color:var(--text-muted);padding-top:4px;border-top:1px solid var(--border);font-weight:500}
+.landing-profile-more{text-align:center;font-size:13px;color:var(--accent);padding-top:4px;border-top:1px solid var(--border);font-weight:500}
 
 /* ===== Pricing ===== */
 .landing-pricing{padding:100px 0;border-top:1px solid var(--border)}

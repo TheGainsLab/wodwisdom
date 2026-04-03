@@ -138,13 +138,11 @@ export default function AICoachingFeaturePage() {
       {/* Sourced */}
       <section className="feature-section">
         <div className="feature-container">
-          <div className="feature-row reverse">
-            <div className="feature-text">
-              <h3>Every answer is sourced</h3>
-              <p>
-                No generic information. Every response pulls from CrossFit Journal articles, study guides, seminars, and more. Technical answers come straight from the source material—and every one can be traced back.
-              </p>
-            </div>
+          <div style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto' }}>
+            <h3 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.3px', marginBottom: 12 }}>Every answer is sourced</h3>
+            <p style={{ fontSize: 15, lineHeight: 1.75, color: 'var(--text-dim)' }}>
+              Responses come from journal articles, study guides, seminars, and more. Technical answers come straight from the source material—and every one can be traced back.
+            </p>
           </div>
         </div>
       </section>
