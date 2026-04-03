@@ -62,8 +62,7 @@ export default function ProgramsFeaturePage() {
             <div className="feature-text">
               <h3>Step 1 — Your profile</h3>
               <p>
-                Tell The Gains Lab about your lifts, gymnastics skills, conditioning benchmarks, and goals.
-                Five minutes is all it takes to build the profile that powers everything.
+                Five minutes to build the profile that powers your program.
               </p>
               <ul>
                 <li>Strength numbers and lift ratios</li>
@@ -84,8 +83,7 @@ export default function ProgramsFeaturePage() {
             <div className="feature-text">
               <h3>Step 2 — Your evaluation</h3>
               <p>
-                The AI uses your complete profile to generate a detailed evaluation — not generic advice,
-                but analysis specific to your numbers and your movement capabilities.
+                The AI uses your complete profile to generate a detailed evaluation, specific to your fitness level and abilities.
               </p>
               <div className="workout-review-section" style={{ maxWidth: 720, margin: '24px 0 16px' }}>
                 <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
@@ -126,9 +124,6 @@ export default function ProgramsFeaturePage() {
                   </p>
                 </div>
               </div>
-              <p>
-                Every insight is sourced. Trace any recommendation back to the methodology.
-              </p>
             </div>
           </div>
         </div>
@@ -141,21 +136,13 @@ export default function ProgramsFeaturePage() {
             <div className="feature-text">
               <h3>Step 3 — Your program</h3>
               <p>
-                The evaluation doesn't sit in a folder. It becomes your program.
-              </p>
-              <p>
-                The AI takes everything it learned—your strengths, your gaps, your priorities—and builds a personalized 20-day training program around you. Every day designed for your numbers, your equipment, your goals.
+                The AI combines your evaluation with your profile and builds a training program around you. Every training block is designed for your numbers, your equipment, your goals.
               </p>
               <img src="/images/Program-Card.png" alt="Sample program day" className="feature-img" />
               <p>
                 Every session opens with intent. Every block comes with coaching cues, movement standards, and common faults. Tap Coach before you start—your AI coach is already prepared.
               </p>
               <img src="/images/MetCon-Card.png" alt="MetCon coaching card" className="feature-img" />
-              <p style={{ fontStyle: 'italic', color: 'var(--text-dim)' }}>
-                "Bar muscle-ups will be your limiter today. Here's your race plan — and your coach already knows why."
-              </p>
-              <img src="/images/strength-card.png" alt="Strength coaching card" className="feature-img" />
-              <img src="/images/skills-card.png" alt="Skills coaching card" className="feature-img" />
             </div>
           </div>
         </div>
