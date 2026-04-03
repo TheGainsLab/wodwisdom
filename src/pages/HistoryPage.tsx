@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useDebounce } from '../hooks/useDebounce';
 import Nav from '../components/Nav';
 
-interface ChatMessage { id: string; question: string; answer: string; sources: any[]; created_at: string; summary?: string; }
+interface ChatMessage { id: string; question: string; answer: string; sources: any[]; context_type?: string | null; created_at: string; summary?: string; }
 
 function formatMd(t: string): string {
   return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/\n\n/g,'</p><p>').replace(/\n- /g,'<br>\u2022 ').replace(/\n/g,'<br>').replace(/^/,'<p>').replace(/$/,'</p>');
@@ -131,6 +131,9 @@ export default function HistoryPage({ session }: { session: Session }) {
              {displayMessages.map(msg => (
                <div key={msg.id} className={"history-item " + (expanded === msg.id ? "expanded" : "")} onClick={() => setExpanded(expanded === msg.id ? null : msg.id)}>
                  <div className="history-item-header">
+                   {msg.context_type === 'workout' && (
+                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ flexShrink: 0 }}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /></svg>
+                   )}
                    <span className="history-question">{msg.question}</span>
                    {debouncedSearch.trim() && (() => {
                      const match = getMatchType(msg, debouncedSearch);

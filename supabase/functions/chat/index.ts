@@ -160,7 +160,24 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { question, history = [], source_filter, include_profile = false } = await req.json();
+    const { question, history = [], source_filter, include_profile = false, workout_id } = await req.json();
+
+    // Fetch workout context if this is a coaching conversation
+    let workoutContext = "";
+    let contextType: string | null = null;
+    let contextId: string | null = null;
+    if (workout_id) {
+      const { data: workout } = await supa
+        .from("program_workouts")
+        .select("id, week_num, day_num, workout_text, program_id")
+        .eq("id", workout_id)
+        .single();
+      if (workout) {
+        contextType = "workout";
+        contextId = workout.id;
+        workoutContext = `\n\nTODAY'S TRAINING (Week ${workout.week_num}, Day ${workout.day_num}):\n${workout.workout_text}`;
+      }
+    }
 
     // Generate embedding and (optionally) recent training + program in parallel
     const [embData, recentTraining, programContext] = await Promise.all([
@@ -246,12 +263,16 @@ Deno.serve(async (req) => {
         max_tokens: 1024,
         stream: true,
         system:
-          (source_filter === "all" ? ALL_SYSTEM_PROMPT : source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : source_filter === "strength-science" ? STRENGTH_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT) +
-          (include_profile
+          (workoutContext
+            ? "You are coaching an athlete through a specific training session. Answer questions about today's workout using the provided context. Be specific to the movements, loads, and time domains in the session. Coach-to-coach voice, direct, practical. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Cite sources naturally when relevant."
+            : (source_filter === "all" ? ALL_SYSTEM_PROMPT : source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : source_filter === "strength-science" ? STRENGTH_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT)
+          ) +
+          (include_profile || workoutContext
             ? buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units, athleteProfile?.gender) +
               (recentTraining ? "\n\n" + recentTraining : "") +
               (programContext ? "\n\n" + programContext : "")
             : "") +
+          workoutContext +
           context,
         messages,
       }),
@@ -339,6 +360,8 @@ Deno.serve(async (req) => {
               sources: clientSources,
               input_tokens: inputTokens,
               output_tokens: outputTokens,
+              context_type: contextType,
+              context_id: contextId,
             })
             .select("id")
             .single();
