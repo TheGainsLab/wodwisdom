@@ -88,12 +88,10 @@ export default function EngineFeaturePage() {
             <div className="feature-text">
               <h3>The AI watches. The program adjusts.</h3>
               <p>
-                Target: 14. Actual: 17. Three sessions in a row beating the target. The AI noticed.
-                Your next session will be harder.
+                Log your results and it recalibrates. Target: 14. Actual: 17. The AI notices, and your next session will be harder.
               </p>
               <p>
-                Log your results and it recalibrates. Beat your targets and they go up. Fall short and
-                it adjusts down. The program never stays static—it follows your actual performance, not a schedule.
+                The program follows your actual performance, not a schedule.
               </p>
               <img src="/images/target-vs-actual.png" alt="Target vs Actual output comparison" className="feature-img" />
             </div>
