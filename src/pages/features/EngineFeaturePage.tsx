@@ -51,10 +51,10 @@ export default function EngineFeaturePage() {
         <h1 className="feature-hero-title">Year of the Engine</h1>
         <p className="feature-hero-sub">The conditioning program that follows you.</p>
         <p className="feature-hero-body">
-          Your engine isn't one thing. It's many things: Aerobic capacity. Anaerobic power. Efficiency. Repeatability. Treat them as one and you drag weak links along while holding strong ones back.
+          Your engine isn't one thing. It's aerobic capacity. Anaerobic power. Efficiency. Repeatability. Treat them as one and you drag weak links along while holding strong ones back.
         </p>
         <p className="feature-hero-body">
-          Year of the Engine uses 20 distinct training frameworks, each targeting a specific adaptation. Machine learning calibrates every session precisely to you - every single interval is personalized to you. High aerobic capacity? You'll get aggressive goals. Building anaerobic power? Each session ramps as you progress.
+          Year of the Engine uses 20 distinct training frameworks, each targeting a specific adaptation. Machine learning calibrates every session precisely to you - every single interval is personalized to you.
         </p>
         <img
           src="/images/pacing-coach.png"
