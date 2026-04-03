@@ -140,7 +140,7 @@ export default function ProgramsFeaturePage() {
               </p>
               <img src="/images/Program-Card.png" alt="Sample program day" className="feature-img" />
               <p>
-                Every session opens with intent. Every block comes with coaching cues, movement standards, and common faults. Tap Coach before you start—your AI coach is already prepared.
+                Before you start, tap coach to get Level 4 insights.
               </p>
               <img src="/images/MetCon-Card.png" alt="MetCon coaching card" className="feature-img" />
             </div>
