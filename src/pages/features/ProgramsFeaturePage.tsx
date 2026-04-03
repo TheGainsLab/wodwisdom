@@ -62,8 +62,7 @@ export default function ProgramsFeaturePage() {
             <div className="feature-text">
               <h3>Step 1 — Your profile</h3>
               <p>
-                Tell The Gains Lab about your lifts, gymnastics skills, conditioning benchmarks, and goals.
-                Five minutes is all it takes to build the profile that powers everything.
+                Five minutes to build the profile that powers your program.
               </p>
               <ul>
                 <li>Strength numbers and lift ratios</li>
