@@ -144,10 +144,6 @@ export default function EngineFeaturePage() {
                 bpm spread is your aerobic system working exactly as designed.
               </p>
               <p>
-                If your Max Aerobic Power sessions are running above 150 bpm, you're not training
-                the system you think you are.
-              </p>
-              <p>
                 HR analytics—avg HR, peak HR, efficiency, load—give you the data to train smarter, not just harder.
               </p>
             </div>
