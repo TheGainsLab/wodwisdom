@@ -136,10 +136,7 @@ export default function ProgramsFeaturePage() {
             <div className="feature-text">
               <h3>Step 3 — Your program</h3>
               <p>
-                The evaluation doesn't sit in a folder. It becomes your program.
-              </p>
-              <p>
-                The AI takes everything it learned—your strengths, your gaps, your priorities—and builds a personalized 20-day training program around you. Every day designed for your numbers, your equipment, your goals.
+                The AI combines your evaluation with your profile and builds a training program around you. Every training block is designed for your numbers, your equipment, your goals.
               </p>
               <img src="/images/Program-Card.png" alt="Sample program day" className="feature-img" />
               <p>
