@@ -124,9 +124,6 @@ export default function ProgramsFeaturePage() {
                   </p>
                 </div>
               </div>
-              <p>
-                Every insight is sourced. Trace any recommendation back to the methodology.
-              </p>
             </div>
           </div>
         </div>
