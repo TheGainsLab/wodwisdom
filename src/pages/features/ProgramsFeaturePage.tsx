@@ -60,7 +60,7 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Step 1 — Your profile</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 1 — Your profile</h3>
               <p>
                 Five minutes to build the profile that powers your program.
               </p>
@@ -81,7 +81,7 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>Step 2 — Your evaluation</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 2 — Your evaluation</h3>
               <p>
                 The AI uses your complete profile to generate a detailed evaluation, specific to your fitness level and abilities.
               </p>
@@ -134,15 +134,20 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Step 3 — Your program</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 3 — Your program</h3>
               <p>
                 The AI combines your evaluation with your profile and builds a training program around you. Every training block is designed for your numbers, your equipment, your goals.
               </p>
               <img src="/images/Program-Card.png" alt="Sample program day" className="feature-img" />
               <p>
-                Before you start, tap coach to get Level 4 insights.
+                Tap Coach to get personalized assistance — review the training intent to understand the goals for the day, with links to sources at the bottom.
               </p>
-              <img src="/images/MetCon-Card.png" alt="MetCon coaching card" className="feature-img" />
+              <img src="/images/coach-overview.png" alt="Coach view with training intent and expandable sections" className="feature-img" />
+              <p>
+                Click on a specific section for more detailed information.
+              </p>
+              <img src="/images/coach-skills.png" alt="Skills coaching with movement cues and common faults" className="feature-img" />
+              <img src="/images/coach-metcon.png" alt="MetCon coaching with pacing strategy and movement cues" className="feature-img" />
             </div>
           </div>
         </div>
@@ -153,7 +158,7 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>Step 4 — Ongoing</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 4 — Ongoing</h3>
               <p>
                 We don't send you a program and wish you the best.
               </p>

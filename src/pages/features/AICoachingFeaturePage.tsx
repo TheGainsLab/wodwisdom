@@ -150,7 +150,7 @@ export default function AICoachingFeaturePage() {
       <section className="feature-footer-cta">
         <h2>AI Coach — $7.99/mo</h2>
         <p className="feature-footer-details">
-          Unlimited coaching questions. Full source library. Bookmarks & summaries. Workout reviews.
+          Unlimited coaching questions. Full source library. Bookmarks & summaries.
         </p>
         <div className="feature-footer-actions">
           <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Try it Free</button>
