@@ -157,10 +157,9 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Balance across all 20 frameworks.</h3>
+              <h3>See what the AI sees</h3>
               <p>
-                See how your training distributes across workout types, time domains, and energy
-                systems. Spot gaps. Fix overemphasis. Keep every component of your engine in check.
+                Track your training distribution across energy systems — the same data the AI uses to update your training.
               </p>
               <img src="/images/sessions.png" alt="Sessions by day type analytics" className="feature-img" />
             </div>
