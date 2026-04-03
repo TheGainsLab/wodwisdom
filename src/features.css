@@ -33,7 +33,7 @@ body.feature-body{overflow:auto;height:auto}
 .feature-hero-sub{font-size:clamp(15px,2vw,18px);color:var(--text-dim);max-width:560px;line-height:1.6;margin-bottom:0;animation:featureFadeUp .6s ease .1s both}
 .feature-hero-badge{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);background:var(--accent-glow);padding:6px 14px;border-radius:20px;margin-bottom:20px;animation:featureFadeUp .6s ease}
 .feature-hero-body{font-size:clamp(15px,2vw,17px);color:var(--text-dim);max-width:600px;line-height:1.7;margin-top:16px;text-align:center;animation:featureFadeUp .6s ease .15s both}
-.feature-hero-img{margin-top:40px;width:280px;max-width:100%;border-radius:20px;box-shadow:0 8px 40px rgba(0,0,0,.5);background:var(--bg);animation:featureFadeUp .6s ease .25s both}
+.feature-hero-img{margin-top:40px;width:280px;max-width:100%;border-radius:20px;border:1px solid #ffffff;box-shadow:0 8px 40px rgba(0,0,0,.5);background:var(--bg);animation:featureFadeUp .6s ease .25s both}
 
 /* ===== Back Link ===== */
 .feature-back{display:inline-flex;align-items:center;gap:6px;color:var(--text-dim);text-decoration:none;font-size:14px;font-weight:500;padding:8px 0;transition:color .15s;margin-bottom:8px}
@@ -66,8 +66,8 @@ body.feature-body{overflow:auto;height:auto}
 .feature-text li::before{content:'';position:absolute;left:0;top:8px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
 
 /* ===== Screenshot Placeholder ===== */
-img.feature-img{width:100%;max-width:360px;margin:24px auto 0;display:block;border-radius:16px;border:1px solid var(--border);background:var(--bg)}
-.feature-screenshot{background:var(--bg);border:1px solid var(--border);border-radius:16px;overflow:hidden;position:relative}
+img.feature-img{width:100%;max-width:360px;margin:24px auto 0;display:block;border-radius:16px;border:1px solid #ffffff;background:var(--bg)}
+.feature-screenshot{background:var(--bg);border:1px solid #ffffff;border-radius:16px;overflow:hidden;position:relative}
 .feature-screenshot img{width:100%;display:block;border-radius:16px;background:var(--bg)}
 .feature-screenshot-placeholder{width:100%;aspect-ratio:16/10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-muted);font-size:13px;font-weight:500;background:linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%)}
 .feature-screenshot-placeholder svg{width:40px;height:40px;opacity:.4}

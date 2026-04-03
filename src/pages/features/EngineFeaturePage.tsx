@@ -51,16 +51,11 @@ export default function EngineFeaturePage() {
         <h1 className="feature-hero-title">Year of the Engine</h1>
         <p className="feature-hero-sub">The conditioning program that follows you.</p>
         <p className="feature-hero-body">
-          Your engine isn't one thing. It's many things: Aerobic capacity. Anaerobic power. Efficiency. Repeatability. Treat them as one and you drag weak links along while holding strong ones back.
+          Your engine isn't one thing. It's aerobic capacity. Anaerobic power. Efficiency. Repeatability. Treat them as one and you drag weak links along while holding strong ones back.
         </p>
         <p className="feature-hero-body">
-          Year of the Engine uses 20 distinct training frameworks, each targeting a specific adaptation. Machine learning calibrates every session precisely to you - every single interval is personalized to you. High aerobic capacity? You'll get aggressive goals. Building anaerobic power? Each session ramps as you progress.
+          Year of the Engine uses 20 distinct training frameworks, each targeting a specific adaptation. Machine learning calibrates every session precisely to you - every single interval is personalized to you.
         </p>
-        <img
-          src="/images/pacing-coach.png"
-          alt="Pacing Coach — real-time interval targets and progress tracking"
-          className="feature-hero-img"
-        />
       </section>
 
       {/* Know the number */}
@@ -68,7 +63,7 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Know the number. Hit the number.</h3>
+              <h3 style={{ textAlign: 'center' }}>Know the number. Hit the number.</h3>
               <p>
                 Day 24. Max Aerobic Power. Goal: 68.4 calories.
               </p>
@@ -76,6 +71,7 @@ export default function EngineFeaturePage() {
                 Once the clock starts, the app becomes your pacing coach. Goals, countdowns, and round
                 context stay front and center through fatigue—so you execute the plan and get the stimulus you need.
               </p>
+              <img src="/images/pacing-coach.png" alt="Pacing Coach — real-time interval targets and progress tracking" className="feature-img" />
             </div>
           </div>
         </div>
@@ -86,7 +82,7 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>The AI watches. The program adjusts.</h3>
+              <h3 style={{ textAlign: 'center' }}>The AI watches. The program adjusts.</h3>
               <p>
                 Log your results and it recalibrates. Target: 14. Actual: 17. The AI notices, and your next session will be harder.
               </p>
@@ -105,7 +101,7 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Your engine has a fingerprint.</h3>
+              <h3 style={{ textAlign: 'center' }}>Your engine has a fingerprint.</h3>
               <p><em>1:3 work-to-rest: 31 cal/min. 1:1 work-to-rest: 16 cal/min.</em></p>
               <p>
                 Year of the Engine tracks your performance across every work:rest ratio so the AI programs the intervals that actually work for you. Year of the Engine includes AI Coaching, so share this data with your AI Coach to get pacing guidance for MetCons.
@@ -122,7 +118,7 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>Track output across frameworks</h3>
+              <h3 style={{ textAlign: 'center' }}>Track output across frameworks</h3>
               <p>
                 Anaerobic: 31 cal/min. Max Aerobic Power: 15 cal/min. Endurance: 11 cal/min. See exactly how your performance varies across energy systems and track improvement in each one independently.
               </p>
@@ -138,7 +134,7 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Heart rate doesn't lie.</h3>
+              <h3 style={{ textAlign: 'center' }}>Heart rate doesn't lie.</h3>
               <p>
                 Anaerobic sessions peak at 165 bpm. Max Aerobic Power sessions at 134 bpm. That 31
                 bpm spread is your aerobic system working exactly as designed.
@@ -157,7 +153,7 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>See what the AI sees</h3>
+              <h3 style={{ textAlign: 'center' }}>See what the AI sees</h3>
               <p>
                 Track your training distribution across energy systems — the same data the AI uses to update your training.
               </p>
