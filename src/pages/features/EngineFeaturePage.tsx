@@ -68,7 +68,7 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Know the number. Hit the number.</h3>
+              <h3 style={{ textAlign: 'center' }}>Know the number. Hit the number.</h3>
               <p>
                 Day 24. Max Aerobic Power. Goal: 68.4 calories.
               </p>
@@ -86,7 +86,7 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>The AI watches. The program adjusts.</h3>
+              <h3 style={{ textAlign: 'center' }}>The AI watches. The program adjusts.</h3>
               <p>
                 Log your results and it recalibrates. Target: 14. Actual: 17. The AI notices, and your next session will be harder.
               </p>
@@ -105,7 +105,7 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Your engine has a fingerprint.</h3>
+              <h3 style={{ textAlign: 'center' }}>Your engine has a fingerprint.</h3>
               <p><em>1:3 work-to-rest: 31 cal/min. 1:1 work-to-rest: 16 cal/min.</em></p>
               <p>
                 Year of the Engine tracks your performance across every work:rest ratio so the AI programs the intervals that actually work for you. Year of the Engine includes AI Coaching, so share this data with your AI Coach to get pacing guidance for MetCons.
@@ -122,7 +122,7 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>Track output across frameworks</h3>
+              <h3 style={{ textAlign: 'center' }}>Track output across frameworks</h3>
               <p>
                 Anaerobic: 31 cal/min. Max Aerobic Power: 15 cal/min. Endurance: 11 cal/min. See exactly how your performance varies across energy systems and track improvement in each one independently.
               </p>
