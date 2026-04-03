@@ -140,7 +140,7 @@ export default function ProgramsFeaturePage() {
               </p>
               <img src="/images/Program-Card.png" alt="Sample program day" className="feature-img" />
               <p>
-                Every session opens with intent. Every block comes with coaching cues, movement standards, and common faults. Tap Coach before you start—your AI coach is already prepared.
+                Before you start, tap coach to get Level 4 insights.
               </p>
               <img src="/images/MetCon-Card.png" alt="MetCon coaching card" className="feature-img" />
             </div>
@@ -155,23 +155,14 @@ export default function ProgramsFeaturePage() {
             <div className="feature-text">
               <h3>Step 4 — Ongoing</h3>
               <p>
-                The AI doesn't send you a program and wish you the best.
+                We don't send you a program and wish you the best.
               </p>
               <p>
-                Log your results and the AI pays attention. Demonstrate proficiency and receive harder
-                progressions. Flag a weakness and the program adjusts. Tell it you're traveling and it
-                updates your workouts for the equipment you have.
+                Log your results and the program adapts. Flag weaknesses and the AI adjusts. Demonstrate proficiency and the challenges increase. Update your profile anytime.
               </p>
               <p>
-                Each month your profile is reviewed and your evaluation updated. Over time your assessments
-                tell the story of your development as an athlete.
+                Every month, AI reviews your profile and training, updates your evaluation, and generates the next month of training.
               </p>
-              <ul>
-                <li>Adaptive adjustments — travel, competition prep, skill focus</li>
-                <li>Progressive overload — harder progressions as you improve</li>
-                <li>Monthly re-evaluation — your profile stays current</li>
-                <li>Longitudinal tracking — see your development over time</li>
-              </ul>
             </div>
           </div>
         </div>
@@ -184,7 +175,7 @@ export default function ProgramsFeaturePage() {
             <div className="feature-text">
               <h3>AI Programming — $29.99/mo</h3>
               <p>
-                AI Coach included. Personalized programming. Adaptive adjustments. Monthly reviews.
+                Includes AI Coach and Nutrition.
               </p>
               <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
                 <button className="feature-cta" onClick={buyProgramming} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
