@@ -51,12 +51,7 @@ export default function EngineFeaturePage() {
         <h1 className="feature-hero-title">Year of the Engine</h1>
         <p className="feature-hero-sub">The conditioning program that follows you.</p>
         <p className="feature-hero-body">
-          Forcing everyone into the same conditioning program doesn't make sense. So we don't.
-        </p>
-        <p className="feature-hero-body">
-          Engine isn't one thing. Aerobic capacity. Anaerobic power. Threshold.
-          Efficiency. Repeatability. These don't increase in lockstep. Treat them as one
-          and you drag weak links along while holding strong ones back.
+          Your engine isn't one thing. It's many things: Aerobic capacity. Anaerobic power. Efficiency. Repeatability. Treat them as one and you drag weak links along while holding strong ones back. Year of the Engine builds them all with personalized conditioning workouts and the industry's best data.
         </p>
         <img
           src="/images/pacing-coach.png"
