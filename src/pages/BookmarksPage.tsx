@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 
-interface Bookmark { id: string; message_id: string; question: string; answer: string; sources: any[]; created_at: string; }
+interface Bookmark { id: string; message_id: string; question: string; answer: string; sources: any[]; context_type: string | null; created_at: string; }
 
 function formatMd(t: string): string {
   return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/\n\n/g,'</p><p>').replace(/\n- /g,'<br>\u2022 ').replace(/\n/g,'<br>').replace(/^/,'<p>').replace(/$/,'</p>');

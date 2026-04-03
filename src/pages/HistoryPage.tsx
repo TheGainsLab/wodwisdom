@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useDebounce } from '../hooks/useDebounce';
 import Nav from '../components/Nav';
 
-interface ChatMessage { id: string; question: string; answer: string; sources: any[]; created_at: string; summary?: string; }
+interface ChatMessage { id: string; question: string; answer: string; sources: any[]; context_type?: string | null; created_at: string; summary?: string; }
 
 function formatMd(t: string): string {
   return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/\n\n/g,'</p><p>').replace(/\n- /g,'<br>\u2022 ').replace(/\n/g,'<br>').replace(/^/,'<p>').replace(/$/,'</p>');

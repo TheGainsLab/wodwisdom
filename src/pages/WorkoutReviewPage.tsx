@@ -153,7 +153,7 @@ interface CoachMessage {
   streaming?: boolean;
 }
 
-function CoachChat({ session, workoutId, workoutText }: { session: Session; workoutId: string | null; workoutText: string }) {
+function CoachChat({ workoutId }: { session: Session; workoutId: string | null; workoutText: string }) {
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
