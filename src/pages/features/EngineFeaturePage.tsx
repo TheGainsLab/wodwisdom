@@ -71,7 +71,6 @@ export default function EngineFeaturePage() {
               <h3>Know the number. Hit the number.</h3>
               <p>
                 Day 24. Max Aerobic Power. Goal: 68.4 calories.
-                Not 65. Not 70. That number was calculated for you, specifically.
               </p>
               <p>
                 Once the clock starts, the app becomes your pacing coach. Goals, countdowns, and round
