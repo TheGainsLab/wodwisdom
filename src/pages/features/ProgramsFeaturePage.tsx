@@ -139,6 +139,17 @@ export default function ProgramsFeaturePage() {
                 The AI combines your evaluation with your profile and builds a training program around you. Every training block is designed for your numbers, your equipment, your goals.
               </p>
               <img src="/images/Program-Card.png" alt="Sample program day" className="feature-img" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Step 4 — Coaching */}
+      <section className="feature-section">
+        <div className="feature-container">
+          <div className="feature-row">
+            <div className="feature-text">
+              <h3 style={{ textAlign: 'center' }}>Step 4 — Coaching</h3>
               <p>
                 Tap Coach to get personalized assistance — review the training intent to understand the goals for the day, with links to sources at the bottom.
               </p>
@@ -153,12 +164,12 @@ export default function ProgramsFeaturePage() {
         </div>
       </section>
 
-      {/* Step 4 — Ongoing */}
+      {/* Step 5 — Ongoing */}
       <section className="feature-section">
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Step 4 — Ongoing</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 5 — Ongoing</h3>
               <p>
                 We don't send you a program and wish you the best.
               </p>
