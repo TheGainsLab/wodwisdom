@@ -105,17 +105,11 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3>Your engine has a fingerprint. Here's yours.</h3>
+              <h3>Your engine has a fingerprint.</h3>
               <p><em>1:3 work-to-rest: 31 cal/min. 1:1 work-to-rest: 16 cal/min.</em></p>
               <p>
-                Your output nearly doubles with the right rest ratio. Most athletes never know this
-                about themselves. Most coaches don't have this data either.
+                Year of the Engine tracks your performance across every work:rest ratio so the AI programs the intervals that actually work for you. Year of the Engine includes AI Coaching, so share this data with your AI Coach to get pacing guidance for MetCons.
               </p>
-              <p>
-                Year of the Engine tracks your performance across every work:rest ratio so the AI
-                programs the intervals that actually work for you—not the ratios that work for everyone else.
-              </p>
-              <p>No one else is showing you this data. Because no one else has it.</p>
               <img src="/images/work-rest-ratio.png" alt="Work to rest ratio analytics" className="feature-img" />
             </div>
 
