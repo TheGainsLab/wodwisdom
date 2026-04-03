@@ -16,9 +16,9 @@ export default function BookmarksPage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
-    supabase.from('bookmarks').select('id, message_id, created_at, chat_messages(question, answer, sources)').eq('user_id', session.user.id).order('created_at', { ascending: false })
+    supabase.from('bookmarks').select('id, message_id, created_at, chat_messages(question, answer, sources, context_type)').eq('user_id', session.user.id).order('created_at', { ascending: false })
       .then(({ data }) => {
-        if (data) setBookmarks(data.map((b: any) => ({ id: b.id, message_id: b.message_id, question: b.chat_messages?.question || '', answer: b.chat_messages?.answer || '', sources: b.chat_messages?.sources || [], created_at: b.created_at })));
+        if (data) setBookmarks(data.map((b: any) => ({ id: b.id, message_id: b.message_id, question: b.chat_messages?.question || '', answer: b.chat_messages?.answer || '', sources: b.chat_messages?.sources || [], context_type: b.chat_messages?.context_type || null, created_at: b.created_at })));
         setLoading(false);
       });
   }, []);
@@ -45,6 +45,9 @@ export default function BookmarksPage({ session }: { session: Session }) {
              {bookmarks.map(bm => (
                <div key={bm.id} className={"history-item " + (expanded === bm.id ? "expanded" : "")}>
                  <div className="history-item-header" onClick={() => setExpanded(expanded === bm.id ? null : bm.id)}>
+                   {bm.context_type === 'workout' && (
+                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ flexShrink: 0 }}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /></svg>
+                   )}
                    <span className="history-question">{bm.question}</span>
                    <button className="bookmark-remove" onClick={e => { e.stopPropagation(); removeBookmark(bm.id); }}>
                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>

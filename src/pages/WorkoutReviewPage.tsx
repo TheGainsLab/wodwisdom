@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, FunctionsHttpError } from '../lib/supabase';
+import { CHAT_ENDPOINT, getAuthHeaders } from '../lib/supabase';
 import Nav from '../components/Nav';
 
 // ---------------------------------------------------------------------------
@@ -143,6 +144,157 @@ function CollapsibleBlock({ block, defaultOpen }: { block: ReviewBlock; defaultO
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Coach Chat component — inline chat on the Coach view
+// ---------------------------------------------------------------------------
+interface CoachMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  streaming?: boolean;
+}
+
+function CoachChat({ session, workoutId, workoutText }: { session: Session; workoutId: string | null; workoutText: string }) {
+  const [messages, setMessages] = useState<CoachMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => { scrollToBottom(); }, [messages]);
+
+  const sendMessage = useCallback(async () => {
+    const question = input.trim();
+    if (!question || isLoading) return;
+
+    const userMsg: CoachMessage = { role: 'user', content: question };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      const resp = await fetch(CHAT_ENDPOINT, {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({
+          question,
+          history: [...messages, userMsg].slice(-10),
+          source_filter: 'all',
+          include_profile: true,
+          workout_id: workoutId,
+        }),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json();
+        setMessages(prev => [...prev, { role: 'assistant', content: err.error || 'Failed to get response' }]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Stream the response
+      setMessages(prev => [...prev, { role: 'assistant', content: '', streaming: true }]);
+      const reader = resp.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === 'delta' && event.text) {
+              fullText += event.text;
+              setMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = { role: 'assistant', content: fullText, streaming: true };
+                return updated;
+              });
+            }
+            if (event.type === 'done') {
+              setMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = { role: 'assistant', content: fullText };
+                return updated;
+              });
+            }
+          } catch {}
+        }
+      }
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Failed to connect.' }]);
+    }
+    setIsLoading(false);
+  }, [input, isLoading, messages, workoutId]);
+
+  return (
+    <div style={{ marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 20 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--accent)', marginBottom: 12 }}>
+        Ask about this workout
+      </div>
+
+      {/* Messages */}
+      {messages.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16, maxHeight: 400, overflowY: 'auto' }}>
+          {messages.map((m, i) => (
+            <div key={i} style={{
+              alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+              maxWidth: '85%',
+              background: m.role === 'user' ? 'var(--accent)' : 'var(--surface2)',
+              color: m.role === 'user' ? 'white' : 'var(--text-dim)',
+              padding: '10px 14px',
+              borderRadius: m.role === 'user' ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
+              fontSize: 14,
+              lineHeight: 1.6,
+            }}>
+              <div dangerouslySetInnerHTML={{ __html: formatMarkdown(m.content || '...') }} />
+            </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+      )}
+
+      {/* Input */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          type="text"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+          placeholder="Ask about pacing, scaling, substitutions..."
+          style={{
+            flex: 1, padding: '12px 14px', fontSize: 14,
+            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+            color: 'var(--text)', fontFamily: "'Outfit', sans-serif",
+          }}
+          disabled={isLoading}
+        />
+        <button
+          onClick={sendMessage}
+          disabled={isLoading || !input.trim()}
+          style={{
+            width: 44, height: 44, borderRadius: 8, border: 'none',
+            background: 'var(--accent)', color: 'white', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: isLoading || !input.trim() ? 0.5 : 1,
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function WorkoutReviewPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -355,6 +507,13 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
                 {review.sources && review.sources.length > 0 && (
                   <SourcesSection sources={review.sources} />
                 )}
+
+                {/* Coach Chat */}
+                <CoachChat
+                  session={session}
+                  workoutId={fromProgramState?.source_id || null}
+                  workoutText={workoutText}
+                />
 
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
