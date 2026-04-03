@@ -143,11 +143,6 @@ export default function ProgramsFeaturePage() {
                 Every session opens with intent. Every block comes with coaching cues, movement standards, and common faults. Tap Coach before you start—your AI coach is already prepared.
               </p>
               <img src="/images/MetCon-Card.png" alt="MetCon coaching card" className="feature-img" />
-              <p style={{ fontStyle: 'italic', color: 'var(--text-dim)' }}>
-                "Bar muscle-ups will be your limiter today. Here's your race plan — and your coach already knows why."
-              </p>
-              <img src="/images/strength-card.png" alt="Strength coaching card" className="feature-img" />
-              <img src="/images/skills-card.png" alt="Skills coaching card" className="feature-img" />
             </div>
           </div>
         </div>
