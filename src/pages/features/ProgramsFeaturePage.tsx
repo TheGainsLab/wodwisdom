@@ -140,9 +140,14 @@ export default function ProgramsFeaturePage() {
               </p>
               <img src="/images/Program-Card.png" alt="Sample program day" className="feature-img" />
               <p>
-                Before you start, tap coach to get Level 4 insights.
+                Tap Coach to get personalized assistance — review the training intent to understand the goals for the day, with links to sources at the bottom.
               </p>
-              <img src="/images/MetCon-Card.png" alt="MetCon coaching card" className="feature-img" />
+              <img src="/images/coach-overview.png" alt="Coach view with training intent and expandable sections" className="feature-img" />
+              <p>
+                Click on a specific section for more detailed information.
+              </p>
+              <img src="/images/coach-skills.png" alt="Skills coaching with movement cues and common faults" className="feature-img" />
+              <img src="/images/coach-metcon.png" alt="MetCon coaching with pacing strategy and movement cues" className="feature-img" />
             </div>
           </div>
         </div>
