@@ -184,7 +184,7 @@ export default function ProgramsFeaturePage() {
             <div className="feature-text">
               <h3>AI Programming — $29.99/mo</h3>
               <p>
-                AI Coach included. Personalized programming. Adaptive adjustments. Monthly reviews.
+                Includes AI Coach and Nutrition.
               </p>
               <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
                 <button className="feature-cta" onClick={buyProgramming} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
