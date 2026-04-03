@@ -83,8 +83,7 @@ export default function ProgramsFeaturePage() {
             <div className="feature-text">
               <h3>Step 2 — Your evaluation</h3>
               <p>
-                The AI uses your complete profile to generate a detailed evaluation — not generic advice,
-                but analysis specific to your numbers and your movement capabilities.
+                The AI uses your complete profile to generate a detailed evaluation, specific to your fitness level and abilities.
               </p>
               <div className="workout-review-section" style={{ maxWidth: 720, margin: '24px 0 16px' }}>
                 <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
