@@ -15,6 +15,11 @@
   --text-muted: #505068;
   --radius: 10px;
 }
+/* PWA update banner */
+.pwa-update-banner{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 20px;display:flex;align-items:center;gap:14px;z-index:10000;box-shadow:0 8px 32px rgba(0,0,0,.5);font-size:14px;animation:fadeUp .3s ease}
+.pwa-update-banner button{background:var(--accent);color:white;border:none;border-radius:6px;padding:8px 16px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.pwa-update-banner button:hover{background:var(--accent-hover)}
+
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;overflow:hidden;height:100vh;height:100dvh}
 body.landing-body{overflow:auto;height:auto}
