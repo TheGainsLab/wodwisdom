@@ -126,12 +126,16 @@ export default function SettingsPage({ session }: { session: Session }) {
             {loading ? <div className="page-loading"><div className="loading-pulse" /></div> : (
               <>
                 {/* Subscription Section */}
-                <div className="settings-card" style={hasSubscription ? { borderColor: 'var(--accent)', background: 'var(--accent-glow)' } : {}}>
+                <div className="settings-card" style={hasSubscription || profile.role === 'admin' ? { borderColor: 'var(--accent)', background: 'var(--accent-glow)' } : {}}>
                   <h2 className="settings-card-title">Subscription</h2>
-                  {hasSubscription ? (
+                  {hasSubscription || profile.role === 'admin' ? (
                     <>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                        {userFeatures.map(f => (
+                        {profile.role === 'admin' ? (
+                          <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--accent)', background: 'rgba(255,58,58,0.1)', padding: '3px 10px', borderRadius: 4 }}>
+                            All Access (Admin)
+                          </span>
+                        ) : userFeatures.map(f => (
                           <span key={f} style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--accent)', background: 'rgba(255,58,58,0.1)', padding: '3px 10px', borderRadius: 4 }}>
                             {f.replace(/_/g, ' ')}
                           </span>
