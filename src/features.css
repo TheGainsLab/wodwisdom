@@ -159,3 +159,7 @@ img.feature-img{width:100%;max-width:360px;margin:24px auto 0;display:block;bord
 .feature-hub-content h3{font-size:18px}
 .feature-demo-tab{padding:8px 14px;font-size:11px}
 }
+
+@media(display-mode:standalone){
+  .feature-header-inner{padding-top:env(safe-area-inset-top)}
+}

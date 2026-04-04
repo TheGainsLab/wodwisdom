@@ -508,6 +508,7 @@ body.landing-body{overflow:auto;height:auto}
 /* Standalone PWA: safe area for status bar */
 @media(display-mode:standalone){
   .chat-header,.page-header{padding-top:calc(12px + env(safe-area-inset-top))}
+  .auth-screen{padding-top:calc(20px + env(safe-area-inset-top))}
 }
 
 /* ── Workout Calendar Heatmap ────────────────────────────── */
