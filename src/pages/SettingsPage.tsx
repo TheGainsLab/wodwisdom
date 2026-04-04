@@ -222,6 +222,27 @@ export default function SettingsPage({ session }: { session: Session }) {
                     <span className="settings-value">{new Date(session.user.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
+
+                {/* Install App — only show when not already installed as PWA */}
+                {!window.matchMedia('(display-mode: standalone)').matches && (
+                  <div className="settings-card">
+                    <h2 className="settings-card-title">Install App</h2>
+                    <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12, lineHeight: 1.5 }}>
+                      Install GAINS on your phone for a fullscreen app experience with offline support.
+                    </p>
+                    {/iPad|iPhone|iPod/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent) ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--text)' }}>
+                        <span>Tap</span>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" /></svg>
+                        <span>in Safari, then <strong>&quot;Add to Home Screen&quot;</strong></span>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 14, color: 'var(--text)' }}>
+                        Use your browser menu to <strong>&quot;Install app&quot;</strong> or <strong>&quot;Add to Home Screen&quot;</strong>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
