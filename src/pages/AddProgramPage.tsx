@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import * as mammoth from 'mammoth';
 import { supabase } from '../lib/supabase';
+import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 
 const PREPROCESS_ENDPOINT = (import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co') + '/functions/v1/preprocess-program';
@@ -16,8 +17,14 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-export default function AddProgramPage({ session: _session }: { session: Session }) {
+export default function AddProgramPage({ session }: { session: Session }) {
   const navigate = useNavigate();
+  const { isAdmin, loading: entLoading } = useEntitlements(session.user.id);
+
+  if (!entLoading && !isAdmin) {
+    navigate('/programs', { replace: true });
+    return null;
+  }
   const [pasteText, setPasteText] = useState('');
   const [programName, setProgramName] = useState('');
   const [pendingFile, setPendingFile] = useState<{ file: File; base64: string; fileType: string } | null>(null);

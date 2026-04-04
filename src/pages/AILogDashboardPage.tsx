@@ -22,7 +22,7 @@ export default function AILogDashboardPage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [programs, setPrograms] = useState<ExternalProgram[]>([]);
-  const { hasFeature, loading: entLoading } = useEntitlements(session.user.id);
+  const { isAdmin, loading: entLoading } = useEntitlements(session.user.id);
 
   useEffect(() => {
     (async () => {
@@ -49,9 +49,7 @@ export default function AILogDashboardPage({ session }: { session: Session }) {
     })();
   }, [session.user.id]);
 
-  const hasAccess = hasFeature('ailog');
-
-  if (!loading && !entLoading && !hasAccess) {
+  if (!loading && !entLoading && !isAdmin) {
     return (
       <div className="app-layout">
         <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
