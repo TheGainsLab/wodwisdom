@@ -7,15 +7,10 @@
   .page-body{padding:16px 12px}
 
   /* ── StartWorkoutPage ──────────────────────────────────── */
-  /* Hide RPE + Quality columns on small screens to fit strength form */
-  .sw-optional-col{display:none !important}
-  .sw-strength-header{padding-left:28px !important}
   .sw-strength-row{flex-wrap:wrap;gap:8px !important}
   .sw-strength-row input,.sw-strength-row select{min-height:44px}
-  .sw-metcon-header{display:none !important}
   .sw-metcon-row{flex-wrap:wrap;gap:6px !important}
   .sw-metcon-row input,.sw-metcon-row select{min-height:44px;min-width:56px}
-  .sw-skills-header{display:none !important}
   .sw-skills-row{flex-wrap:wrap;gap:6px !important}
   .sw-skills-row input,.sw-skills-row select{flex:1;min-width:44px;min-height:44px}
   .sw-bottom-actions{flex-direction:column !important}
