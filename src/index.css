@@ -600,8 +600,7 @@ body.landing-body{overflow:auto;height:auto}
     background:var(--surface);
     border-top:1px solid var(--border);
     z-index:100;
-    padding:6px 0 0;
-    padding-bottom:env(safe-area-inset-bottom);
+    padding:6px 0 4px;
   }
   .tab-item{
     flex:1;
