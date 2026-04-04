@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import NutritionPaywall from '../components/nutrition/NutritionPaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
+import { cacheGet, cacheSet, nutritionKey, nutritionSummaryKey } from '../lib/offlineCache';
 import { ChevronLeft, ChevronRight, Plus, X, Star, UtensilsCrossed, BookOpen } from 'lucide-react';
 import DailySummary from '../components/nutrition/DailySummary';
 import type { DailyNutrition } from '../components/nutrition/DailySummary';
@@ -84,9 +85,20 @@ export default function NutritionDashboardPage({ session }: { session: Session }
   // Error
   const [logError, setLogError] = useState('');
 
-  // Load entries for current date
+  // Load entries for current date (with offline cache fallback)
   const loadDay = async () => {
     setLoading(true);
+    const uid = session.user.id;
+
+    if (!navigator.onLine) {
+      const cachedEntries = await cacheGet<FoodEntry[]>(nutritionKey(uid, dateStr));
+      const cachedDaily = await cacheGet<DailyNutrition>(nutritionSummaryKey(uid, dateStr));
+      if (cachedEntries) setEntries(cachedEntries);
+      if (cachedDaily) setDaily(cachedDaily);
+      setLoading(false);
+      return;
+    }
+
     const startOfDay = `${dateStr}T00:00:00.000Z`;
     const endOfDay = `${dateStr}T23:59:59.999Z`;
 
@@ -94,20 +106,27 @@ export default function NutritionDashboardPage({ session }: { session: Session }
       supabase
         .from('food_entries')
         .select('id, food_name, calories, protein, carbohydrate, fat, meal_type, number_of_units, serving_description, logged_at')
-        .eq('user_id', session.user.id)
+        .eq('user_id', uid)
         .gte('logged_at', startOfDay)
         .lte('logged_at', endOfDay)
         .order('logged_at', { ascending: true }),
       supabase
         .from('daily_nutrition')
         .select('total_calories, total_protein, total_carbohydrate, total_fat, tdee_estimate, surplus_deficit')
-        .eq('user_id', session.user.id)
+        .eq('user_id', uid)
         .eq('date', dateStr)
         .single(),
     ]);
 
-    setEntries(entriesRes.data || []);
-    setDaily(dailyRes.data || null);
+    const entries = entriesRes.data || [];
+    const daily = dailyRes.data || null;
+    setEntries(entries);
+    setDaily(daily);
+
+    // Cache for offline use
+    cacheSet(nutritionKey(uid, dateStr), entries);
+    if (daily) cacheSet(nutritionSummaryKey(uid, dateStr), daily);
+
     setLoading(false);
   };
 

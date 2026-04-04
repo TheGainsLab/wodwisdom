@@ -5,6 +5,9 @@ import { CHAT_ENDPOINT, getAuthHeaders, supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import GainsLogo from '../components/GainsLogo';
 import { formatMarkdown } from '../lib/formatMarkdown';
+import { OfflineMessage } from '../components/OfflineBanner';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { cacheGet, cacheSet, chatHistoryKey } from '../lib/offlineCache';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -35,6 +38,24 @@ export default function ChatPage({ session }: { session: Session }) {
   const [tierLoaded, setTierLoaded] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const online = useOnlineStatus();
+
+  // Load cached messages when offline
+  useEffect(() => {
+    if (!online && messages.length === 0) {
+      cacheGet<Message[]>(chatHistoryKey(session.user.id)).then(cached => {
+        if (cached) setMessages(cached);
+      });
+    }
+  }, [online]);
+
+  // Cache messages whenever they change (skip empty/streaming)
+  useEffect(() => {
+    const settled = messages.filter(m => !m.streaming);
+    if (settled.length > 0) {
+      cacheSet(chatHistoryKey(session.user.id), settled.slice(-20));
+    }
+  }, [messages]);
 
   // Load subscription tier and usage on mount
   useEffect(() => {
@@ -321,7 +342,11 @@ export default function ChatPage({ session }: { session: Session }) {
           </div>
         )}
 
-        {isPaywalled && messages.length > 0 ? (
+        {!online ? (
+          <div className="input-area">
+            <OfflineMessage feature="AI Coach" />
+          </div>
+        ) : isPaywalled && messages.length > 0 ? (
           <div className="paywall-bar">
             <div className="paywall-bar-inner">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>

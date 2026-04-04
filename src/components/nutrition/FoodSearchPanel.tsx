@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { OfflineMessage } from '../OfflineBanner';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
 export interface SearchResult {
   food_id: string;
@@ -46,9 +48,10 @@ export default function FoodSearchPanel({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const online = useOnlineStatus();
 
   const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim() || !online) return;
     setSearching(true);
     setSearchError('');
     try {
@@ -70,6 +73,7 @@ export default function FoodSearchPanel({
 
   return (
     <>
+      {!online && <OfflineMessage feature="Food search" />}
       {/* Search input — first thing the user sees */}
       <div style={{ display: 'flex', gap: 8 }}>
         <input

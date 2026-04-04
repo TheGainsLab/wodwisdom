@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import BottomTabBar from './components/BottomTabBar';
+import InstallPrompt from './components/InstallPrompt';
 import AuthPage from './pages/AuthPage';
 import LandingPage from './pages/LandingPage';
 import ChatPage from './pages/ChatPage';
@@ -125,6 +126,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {!hideTabBar && <BottomTabBar />}
+      <InstallPrompt />
     </>
   );
 }
