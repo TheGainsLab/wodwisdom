@@ -13,17 +13,20 @@ export default function Nav({ isOpen, onClose }: NavProps) {
   const [hasEngine, setHasEngine] = useState(false);
 
   const isChatActive = location.pathname === '/' || location.pathname === '/history' || location.pathname === '/bookmarks';
-  const isTrainingActive = location.pathname.startsWith('/programs') || location.pathname === '/training-log' || location.pathname.startsWith('/engine') || location.pathname.startsWith('/ailog');
+  const isEngineActive = location.pathname.startsWith('/engine');
+  const isTrainingActive = location.pathname.startsWith('/programs') || location.pathname === '/training-log' || location.pathname.startsWith('/ailog') || location.pathname === '/workout-review' || location.pathname.startsWith('/workout');
   const isNutritionActive = location.pathname.startsWith('/nutrition');
   const [chatExpanded, setChatExpanded] = useState(isChatActive);
+  const [engineExpanded, setEngineExpanded] = useState(isEngineActive);
   const [trainingExpanded, setTrainingExpanded] = useState(isTrainingActive);
   const [nutritionExpanded, setNutritionExpanded] = useState(isNutritionActive);
 
   useEffect(() => {
     if (isChatActive) setChatExpanded(true);
+    if (isEngineActive) setEngineExpanded(true);
     if (isTrainingActive) setTrainingExpanded(true);
     if (isNutritionActive) setNutritionExpanded(true);
-  }, [isChatActive, isTrainingActive, isNutritionActive]);
+  }, [isChatActive, isEngineActive, isTrainingActive, isNutritionActive]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -74,6 +77,25 @@ export default function Nav({ isOpen, onClose }: NavProps) {
             )}
           </div>
           <div className="nav-group">
+            <button className={"nav-group-header " + (isEngineActive ? "active" : "")} onClick={() => setEngineExpanded(!engineExpanded)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2c1 3 2.5 3.5 3.5 4.5A5 5 0 0 1 17 10c0 2.76-2.24 5-5 5s-5-2.24-5-5c0-1.33.52-2.54 1.37-3.44C9.37 5.56 11 5 12 2z" /><path d="M12 15v7" /><path d="M8 22h8" /></svg>
+              Engine
+              <svg className={"nav-chevron " + (engineExpanded ? "expanded" : "")} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+            </button>
+            {engineExpanded && (
+              <div className="nav-group-items">
+                <button className={"nav-link sub " + (location.pathname === "/engine" || location.pathname === "/engine/dashboard" ? "active" : "")} onClick={() => goTo("/engine")}>
+                  <span className="nav-sub-dot" />Dashboard
+                </button>
+                {(hasEngine || isAdmin) && (
+                  <button className={"nav-link sub " + (location.pathname === "/engine/analytics" ? "active" : "")} onClick={() => goTo("/engine/analytics")}>
+                    <span className="nav-sub-dot" />Analytics
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="nav-group">
             <button className={"nav-group-header " + (isTrainingActive ? "active" : "")} onClick={() => setTrainingExpanded(!trainingExpanded)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
               Training
@@ -87,11 +109,6 @@ export default function Nav({ isOpen, onClose }: NavProps) {
                 <button className={"nav-link sub " + (location.pathname === "/training-log" ? "active" : "")} onClick={() => goTo("/training-log")}>
                   <span className="nav-sub-dot" />Training Log
                 </button>
-                {(hasEngine || isAdmin) && (
-                  <button className={"nav-link sub " + (location.pathname === "/engine/analytics" ? "active" : "")} onClick={() => goTo("/engine/analytics")}>
-                    <span className="nav-sub-dot" />Analytics
-                  </button>
-                )}
               </div>
             )}
           </div>
