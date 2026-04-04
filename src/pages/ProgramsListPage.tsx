@@ -25,6 +25,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
   const [generateError, setGenerateError] = useState('');
   const { hasFeature, isAdmin } = useEntitlements(session.user.id);
   const hasEngine = hasFeature('engine');
+  const hasProgramming = hasFeature('programming');
 
   useEffect(() => {
     loadAll();
@@ -164,7 +165,13 @@ export default function ProgramsListPage({ session }: { session: Session }) {
               <div className="page-loading"><div className="loading-pulse" /></div>
             ) : programs.length === 0 ? (
               <div className="empty-state">
-                {!hasProfile ? (
+                {!hasProgramming ? (
+                  <>
+                    <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>AI Programming</p>
+                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 16 }}>Get a personalized training program built by AI, tailored to your lifts, skills, and goals.</p>
+                    <button className="auth-btn" onClick={() => navigate('/checkout')}>Upgrade to unlock</button>
+                  </>
+                ) : !hasProfile ? (
                   <>
                     <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Set up your athlete profile</p>
                     <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 16 }}>Add your lifts, skills, and benchmarks so the AI can build a program tailored to you.</p>
