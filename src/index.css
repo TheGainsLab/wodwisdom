@@ -20,6 +20,25 @@
 .pwa-update-banner button{background:var(--accent);color:white;border:none;border-radius:6px;padding:8px 16px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
 .pwa-update-banner button:hover{background:var(--accent-hover)}
 
+/* Install prompt */
+.install-prompt{position:fixed;bottom:72px;left:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.6);animation:fadeUp .3s ease}
+.install-prompt-content{display:flex;align-items:center;gap:12px;min-width:0}
+.install-prompt-icon{width:40px;height:40px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:white;flex-shrink:0}
+.install-prompt-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.install-prompt-text strong{font-size:14px;font-weight:700}
+.install-prompt-text span{font-size:12px;color:var(--text-dim);line-height:1.4}
+.install-prompt-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.install-prompt-btn{background:var(--accent);color:white;border:none;border-radius:8px;padding:8px 16px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.install-prompt-btn:hover{background:var(--accent-hover)}
+.install-prompt-dismiss{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px;display:flex}
+.install-prompt-dismiss:hover{color:var(--text-dim)}
+@media(min-width:641px){.install-prompt{max-width:400px;left:auto;right:24px;bottom:24px}}
+
+/* Offline banner */
+.offline-banner{position:fixed;top:0;left:0;right:0;background:#b45309;color:white;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;font-size:13px;font-weight:600;z-index:10001;animation:fadeIn .2s ease}
+.offline-message{background:rgba(180,83,9,.12);border:1px solid rgba(180,83,9,.3);color:#fbbf24;padding:14px 16px;border-radius:10px;display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.5;margin:12px 0}
+.offline-message svg{flex-shrink:0;margin-top:1px}
+
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;overflow:hidden;height:100vh;height:100dvh}
 body.landing-body{overflow:auto;height:auto}

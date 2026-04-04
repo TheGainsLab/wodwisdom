@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
+import { cacheGet, cacheSet, profileKey, entitlementsKey } from '../lib/offlineCache';
 
 interface Profile {
   full_name: string;
@@ -26,16 +27,39 @@ export default function SettingsPage({ session }: { session: Session }) {
   const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
+    const uid = session.user.id;
+
+    if (!navigator.onLine) {
+      // Load from cache when offline
+      Promise.all([
+        cacheGet<Profile>(profileKey(uid)),
+        cacheGet<string[]>(entitlementsKey(uid)),
+      ]).then(([cachedProfile, cachedFeatures]) => {
+        if (cachedProfile) setProfile(cachedProfile);
+        if (cachedFeatures && cachedFeatures.length > 0) {
+          setHasSubscription(true);
+          setUserFeatures(cachedFeatures);
+        }
+        setLoading(false);
+      });
+      return;
+    }
+
     Promise.all([
-      supabase.from('profiles').select('full_name, role').eq('id', session.user.id).single(),
+      supabase.from('profiles').select('full_name, role').eq('id', uid).single(),
       supabase.from('user_entitlements').select('feature')
-        .eq('user_id', session.user.id)
+        .eq('user_id', uid)
         .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString()),
     ]).then(([{ data: profileData }, { data: entitlements }]) => {
-      if (profileData) setProfile(profileData);
+      if (profileData) {
+        setProfile(profileData);
+        cacheSet(profileKey(uid), profileData);
+      }
       if (entitlements && entitlements.length > 0) {
         setHasSubscription(true);
-        setUserFeatures(entitlements.map(e => e.feature));
+        const features = entitlements.map(e => e.feature);
+        setUserFeatures(features);
+        cacheSet(entitlementsKey(uid), features);
       }
       setLoading(false);
     });
