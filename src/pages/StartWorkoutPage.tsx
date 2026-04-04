@@ -1092,27 +1092,27 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                         .sort((a, b) => parseInt(a.split('-s')[1], 10) - parseInt(b.split('-s')[1], 10));
 
                       return (
-                        <div className="sw-strength-form" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          <div className="sw-strength-header" style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)', paddingLeft: 40 }}>
-                            <span style={{ flex: '1 1 60px' }}>Reps</span>
-                            <span style={{ flex: '1 1 64px' }}>Wt</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)', paddingLeft: 40 }}>
+                            <span style={{ width: 60 }}>Reps</span>
+                            <span style={{ width: 64 }}>Wt</span>
                             <span style={{ width: 28 }}></span>
-                            <span className="sw-optional-col" style={{ flex: '1 1 48px' }}>RPE</span>
-                            <span className="sw-optional-col" style={{ flex: '1 1 48px' }}>Quality</span>
+                            <span style={{ width: 48 }}>RPE</span>
+                            <span style={{ width: 48 }}>Quality</span>
                           </div>
                           {setKeys.map(key => {
                             const ev = entryValues[key] || {};
                             return (
-                              <div key={key} className="sw-strength-row" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                              <div key={key} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                                 <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 28, textAlign: 'right' }}>S{ev.set_number}</span>
-                                <input type="number" placeholder="Reps" value={ev.reps ?? ''} onChange={e => setEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, flex: '1 1 60px', minWidth: 0 }} />
-                                <input type="number" placeholder="" value={ev.weight ?? ''} onChange={e => setEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)} style={{ ...compactInputStyle, flex: '1 1 64px', minWidth: 0, border: ev.weight == null ? '1px solid var(--accent)' : '1px solid var(--border)' }} />
+                                <input type="number" placeholder="Reps" value={ev.reps ?? ''} onChange={e => setEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 60 }} />
+                                <input type="number" placeholder="" value={ev.weight ?? ''} onChange={e => setEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)} style={{ ...compactInputStyle, width: 64, border: ev.weight == null ? '1px solid var(--accent)' : '1px solid var(--border)' }} />
                                 <span style={{ color: 'var(--text-dim)', fontSize: 13, width: 28 }}>{ev.weight_unit || 'lbs'}</span>
-                                <select className="sw-optional-col" value={ev.rpe ?? ''} onChange={e => setEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, flex: '1 1 48px', minWidth: 0, padding: '8px 4px', border: ev.rpe == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}>
+                                <select value={ev.rpe ?? ''} onChange={e => setEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 48, padding: '8px 4px', border: ev.rpe == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}>
                                   <option value=""></option>
                                   {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
                                 </select>
-                                <select className="sw-optional-col" value={ev.quality ?? ''} onChange={e => setEntry(key, 'quality', e.target.value || undefined)} style={{ ...compactInputStyle, flex: '1 1 48px', minWidth: 0, padding: '8px 4px', border: ev.quality == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}>
+                                <select value={ev.quality ?? ''} onChange={e => setEntry(key, 'quality', e.target.value || undefined)} style={{ ...compactInputStyle, width: 48, padding: '8px 4px', border: ev.quality == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}>
                                   <option value=""></option>
                                   <option value="A">A</option>
                                   <option value="B">B</option>
@@ -1170,17 +1170,17 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                           {mvKeys.length > 0 && (
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Movements (confirm or adjust)</div>
-                              <div className="sw-metcon-header" style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>
-                                <span style={{ flex: '1 1 64px' }}>Reps</span>
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>
+                                <span style={{ width: 64 }}>Reps</span>
                                 <span style={{ width: 28 }}></span>
                                 {mvKeys.some(k => metconEntries[k] && (metconEntries[k].category || 'bodyweight') === 'weighted') && (
                                   <>
-                                    <span style={{ flex: '1 1 64px' }}>Wt</span>
+                                    <span style={{ width: 64 }}>Wt</span>
                                     <span style={{ width: 28 }}></span>
                                   </>
                                 )}
-                                <span style={{ flex: '1 1 56px' }}>Quality</span>
-                                <span style={{ flex: '1 1 56px' }}>RPE</span>
+                                <span style={{ width: 56 }}>Quality</span>
+                                <span style={{ width: 56 }}>RPE</span>
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                 {mvKeys.map(key => {
@@ -1200,7 +1200,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                         onChange={e => setMetconEntry(key, 'movement', e.target.value)}
                                         style={{ ...compactInputStyle, width: '100%' }}
                                       />
-                                      <div className="sw-metcon-row" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                         {hasDistance && !hasCalories ? (
                                           <>
                                             <input
@@ -1208,7 +1208,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                               placeholder="Dist"
                                               value={mv.distance ?? ''}
                                               onChange={e => setMetconEntry(key, 'distance', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                              style={{ ...compactInputStyle, flex: '1 1 64px', minWidth: 0 }}
+                                              style={{ ...compactInputStyle, width: 64 }}
                                             />
                                             <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 28 }}>{mv.distance_unit || 'm'}</span>
                                           </>
@@ -1219,7 +1219,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                               placeholder={hasCalories ? 'Cal' : ''}
                                               value={mv.reps ?? ''}
                                               onChange={e => setMetconEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                              style={{ ...compactInputStyle, flex: '1 1 64px', minWidth: 0 }}
+                                              style={{ ...compactInputStyle, width: 64 }}
                                             />
                                             <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 28 }}></span>
                                           </>
@@ -1232,13 +1232,13 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                                 placeholder=""
                                                 value={mv.weight ?? ''}
                                                 onChange={e => setMetconEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
-                                                style={{ ...compactInputStyle, flex: '1 1 64px', minWidth: 0 }}
+                                                style={{ ...compactInputStyle, width: 64 }}
                                               />
                                               <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 28 }}>{mv.weight_unit || 'lbs'}</span>
                                             </>
                                           ) : (
                                             <>
-                                              <span style={{ flex: '1 1 64px' }}></span>
+                                              <span style={{ width: 64 }}></span>
                                               <span style={{ width: 28 }}></span>
                                             </>
                                           )
@@ -1246,7 +1246,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                         <select
                                           value={mv.quality ?? ''}
                                           onChange={e => setMetconEntry(key, 'quality', e.target.value || undefined)}
-                                          style={{ ...compactInputStyle, flex: '1 1 56px', minWidth: 0, padding: '8px 4px', border: mv.quality == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
+                                          style={{ ...compactInputStyle, width: 56, padding: '8px 4px', border: mv.quality == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
                                         >
                                           <option value=""></option>
                                           <option value="A">A</option>
@@ -1257,7 +1257,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                         <select
                                           value={mv.rpe ?? ''}
                                           onChange={e => setMetconEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, flex: '1 1 56px', minWidth: 0, padding: '8px 4px', border: mv.rpe == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
+                                          style={{ ...compactInputStyle, width: 56, padding: '8px 4px', border: mv.rpe == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
                                         >
                                           <option value=""></option>
                                           {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
@@ -1333,39 +1333,39 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                         onChange={e => setSkillEntry(key, 'movement', e.target.value)}
                                         style={{ ...compactInputStyle, width: '100%' }}
                                       />
-                                      <div className="sw-skills-header" style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)' }}>
-                                        <span style={{ flex: 1 }}>Sets</span>
-                                        <span style={{ flex: 1 }}>Reps</span>
-                                        <span style={{ flex: 1 }}>Hold (s)</span>
-                                        <span className="sw-optional-col" style={{ flex: 1 }}>Quality</span>
-                                        <span className="sw-optional-col" style={{ flex: 1 }}>RPE</span>
+                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)' }}>
+                                        <span style={{ width: 48 }}>Sets</span>
+                                        <span style={{ width: 48 }}>Reps</span>
+                                        <span style={{ width: 60 }}>Hold (s)</span>
+                                        <span style={{ width: 48 }}>Quality</span>
+                                        <span style={{ width: 48 }}>RPE</span>
                                       </div>
-                                      <div className="sw-skills-row" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                         <input
                                           type="number"
                                           placeholder=""
                                           value={sk.sets ?? ''}
                                           onChange={e => setSkillEntry(key, 'sets', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, flex: 1, minWidth: 0 }}
+                                          style={{ ...compactInputStyle, width: 48 }}
                                         />
                                         <input
                                           type="number"
                                           placeholder=""
                                           value={sk.reps_completed ?? ''}
                                           onChange={e => setSkillEntry(key, 'reps_completed', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, flex: 1, minWidth: 0 }}
+                                          style={{ ...compactInputStyle, width: 48 }}
                                         />
                                         <input
                                           type="number"
                                           placeholder=""
                                           value={sk.hold_seconds ?? ''}
                                           onChange={e => setSkillEntry(key, 'hold_seconds', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, flex: 1, minWidth: 0 }}
+                                          style={{ ...compactInputStyle, width: 60 }}
                                         />
                                         <select
                                           value={sk.quality ?? ''}
                                           onChange={e => setSkillEntry(key, 'quality', e.target.value || undefined)}
-                                          style={{ ...compactInputStyle, flex: 1, minWidth: 0, padding: '8px 4px', border: sk.quality == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
+                                          style={{ ...compactInputStyle, width: 48, padding: '8px 4px', border: sk.quality == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
                                         >
                                           <option value=""></option>
                                           <option value="A">A</option>
@@ -1376,7 +1376,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                         <select
                                           value={sk.rpe ?? ''}
                                           onChange={e => setSkillEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, flex: 1, minWidth: 0, padding: '8px 4px', border: sk.rpe == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
+                                          style={{ ...compactInputStyle, width: 48, padding: '8px 4px', border: sk.rpe == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}
                                         >
                                           <option value=""></option>
                                           {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
