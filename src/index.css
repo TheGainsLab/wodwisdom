@@ -600,8 +600,8 @@ body.landing-body{overflow:auto;height:auto}
     background:var(--surface);
     border-top:1px solid var(--border);
     z-index:100;
-    padding:6px 0;
-    padding-bottom:calc(6px + env(safe-area-inset-bottom));
+    padding:6px 0 0;
+    padding-bottom:env(safe-area-inset-bottom);
   }
   .tab-item{
     flex:1;
@@ -628,6 +628,6 @@ body.landing-body{overflow:auto;height:auto}
   .nav-overlay,.nav-sidebar{display:none}
 
   /* Add bottom padding to main content so it doesn't sit behind the tab bar */
-  .main-content{padding-bottom:calc(60px + env(safe-area-inset-bottom))}
+  .main-content{padding-bottom:56px}
   .tab-label{letter-spacing:.2px}
 }
