@@ -119,3 +119,7 @@
 .landing-pricing-table{padding:20px 16px}
 .landing-audience-card{padding:24px 20px}
 }
+
+@media(display-mode:standalone){
+  .landing-header-inner{padding-top:env(safe-area-inset-top)}
+}
