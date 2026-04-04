@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
+import BottomTabBar from './components/BottomTabBar';
 import AuthPage from './pages/AuthPage';
 import LandingPage from './pages/LandingPage';
 import ChatPage from './pages/ChatPage';
@@ -72,43 +73,58 @@ export default function App() {
   );
 
   return (
-    <Routes>
-      <Route path="/" element={<ChatPage session={session} />} />
-      <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
-      <Route path="/workout/start" element={<StartWorkoutPage session={session} />} />
-      <Route path="/workout-analysis" element={<WorkoutAnalysisPage session={session} />} />
-      <Route path="/training-log" element={<TrainingLogPage session={session} />} />
-      <Route path="/programs" element={<ProgramsListPage session={session} />} />
-      <Route path="/programs/new" element={<AddProgramPage session={session} />} />
-      <Route path="/programs/:id/edit" element={<ProgramEditPage session={session} />} />
-      <Route path="/programs/:id/analyze" element={<ProgramAnalysisPage session={session} />} />
-      <Route path="/programs/:id/modify/:modificationId/compare" element={<ProgramComparePage session={session} />} />
-      <Route path="/programs/:id/modify/:modificationId/review" element={<ProgramReviewPage session={session} />} />
-      <Route path="/programs/:id" element={<ProgramDetailPage session={session} />} />
-      <Route path="/checkout" element={<CheckoutPage session={session} />} />
-      <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
-      <Route path="/history" element={<HistoryPage session={session} />} />
-      <Route path="/bookmarks" element={<BookmarksPage session={session} />} />
-      <Route path="/settings" element={<SettingsPage session={session} />} />
-      <Route path="/profile" element={<AthletePage session={session} />} />
-      <Route path="/admin" element={<AdminPage session={session} />} />
-      <Route path="/admin/users/:id" element={<AdminUserDetailPage session={session} />} />
-      <Route path="/engine" element={<EngineDashboardPage session={session} />} />
-      <Route path="/engine/dashboard" element={<EngineDashboardPage session={session} />} />
-      <Route path="/engine/training/:dayNumber" element={<EngineTrainingDayPage session={session} />} />
-      <Route path="/engine/analytics" element={<EngineAnalyticsPage session={session} />} />
-      <Route path="/engine/taxonomy" element={<EngineTaxonomyPage session={session} />} />
-      <Route path="/nutrition" element={<NutritionDashboardPage session={session} />} />
-      <Route path="/nutrition/calendar" element={<NutritionCalendarPage session={session} />} />
-      <Route path="/ailog" element={<AILogDashboardPage session={session} />} />
-      <Route path="/ailog/upload" element={<AILogUploadPage session={session} />} />
-      <Route path="/ailog/:id" element={<AILogProgramPage session={session} />} />
-      <Route path="/features" element={<FeaturesHubPage />} />
-      <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
-      <Route path="/features/programs" element={<ProgramsFeaturePage />} />
-      <Route path="/features/engine" element={<EngineFeaturePage />} />
-      <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <AuthenticatedApp session={session} />
+  );
+}
+
+const HIDE_TAB_BAR_ROUTES = ['/workout/start', '/checkout', '/checkout/complete'];
+
+function AuthenticatedApp({ session }: { session: Session }) {
+  const location = useLocation();
+  const hideTabBar = HIDE_TAB_BAR_ROUTES.some(r => location.pathname === r) ||
+    location.pathname.startsWith('/features');
+
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<ChatPage session={session} />} />
+        <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
+        <Route path="/workout/start" element={<StartWorkoutPage session={session} />} />
+        <Route path="/workout-analysis" element={<WorkoutAnalysisPage session={session} />} />
+        <Route path="/training-log" element={<TrainingLogPage session={session} />} />
+        <Route path="/programs" element={<ProgramsListPage session={session} />} />
+        <Route path="/programs/new" element={<AddProgramPage session={session} />} />
+        <Route path="/programs/:id/edit" element={<ProgramEditPage session={session} />} />
+        <Route path="/programs/:id/analyze" element={<ProgramAnalysisPage session={session} />} />
+        <Route path="/programs/:id/modify/:modificationId/compare" element={<ProgramComparePage session={session} />} />
+        <Route path="/programs/:id/modify/:modificationId/review" element={<ProgramReviewPage session={session} />} />
+        <Route path="/programs/:id" element={<ProgramDetailPage session={session} />} />
+        <Route path="/checkout" element={<CheckoutPage session={session} />} />
+        <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
+        <Route path="/history" element={<HistoryPage session={session} />} />
+        <Route path="/bookmarks" element={<BookmarksPage session={session} />} />
+        <Route path="/settings" element={<SettingsPage session={session} />} />
+        <Route path="/profile" element={<AthletePage session={session} />} />
+        <Route path="/admin" element={<AdminPage session={session} />} />
+        <Route path="/admin/users/:id" element={<AdminUserDetailPage session={session} />} />
+        <Route path="/engine" element={<EngineDashboardPage session={session} />} />
+        <Route path="/engine/dashboard" element={<EngineDashboardPage session={session} />} />
+        <Route path="/engine/training/:dayNumber" element={<EngineTrainingDayPage session={session} />} />
+        <Route path="/engine/analytics" element={<EngineAnalyticsPage session={session} />} />
+        <Route path="/engine/taxonomy" element={<EngineTaxonomyPage session={session} />} />
+        <Route path="/nutrition" element={<NutritionDashboardPage session={session} />} />
+        <Route path="/nutrition/calendar" element={<NutritionCalendarPage session={session} />} />
+        <Route path="/ailog" element={<AILogDashboardPage session={session} />} />
+        <Route path="/ailog/upload" element={<AILogUploadPage session={session} />} />
+        <Route path="/ailog/:id" element={<AILogProgramPage session={session} />} />
+        <Route path="/features" element={<FeaturesHubPage />} />
+        <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
+        <Route path="/features/programs" element={<ProgramsFeaturePage />} />
+        <Route path="/features/engine" element={<EngineFeaturePage />} />
+        <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      {!hideTabBar && <BottomTabBar />}
+    </>
   );
 }

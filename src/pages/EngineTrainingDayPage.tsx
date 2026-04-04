@@ -1391,7 +1391,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         </div>
 
         {/* Controls */}
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+        <div className="engine-workout-controls" style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
           <button
             className="engine-btn engine-btn-secondary"
             onClick={() => setIsPaused(!isPaused)}
@@ -1474,7 +1474,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
             {/* RPE */}
             <div>
               <span className="engine-label">RPE (1–10)</span>
-              <div style={{ display: 'flex', gap: 4 }}>
+              <div className="engine-rpe-grid" style={{ display: 'flex', gap: 4 }}>
                 {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
                   <button
                     key={n}
