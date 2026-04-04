@@ -239,7 +239,7 @@ function CoachChat({ workoutId }: { session: Session; workoutId: string | null; 
   return (
     <div style={{ marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 20 }}>
       <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--accent)', marginBottom: 12 }}>
-        Ask about this workout
+        AI Coach
       </div>
 
       {/* Messages */}
