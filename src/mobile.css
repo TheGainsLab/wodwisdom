@@ -1,0 +1,85 @@
+/* ── Mobile Responsive Overrides (≤640px) ───────────────── */
+/* Applied on top of page-specific CSS for mobile viewports */
+
+@media(max-width:640px){
+
+  /* ── Global page containers ─────────────────────────────── */
+  .page-body{padding:16px 12px}
+
+  /* ── StartWorkoutPage ──────────────────────────────────── */
+  /* Hide RPE + Quality columns on small screens to fit strength form */
+  .sw-optional-col{display:none !important}
+  .sw-strength-header{padding-left:28px !important}
+  .sw-strength-row{flex-wrap:wrap;gap:8px !important}
+  .sw-strength-row input,.sw-strength-row select{min-height:44px}
+  .sw-metcon-header{display:none !important}
+  .sw-metcon-row{flex-wrap:wrap;gap:6px !important}
+  .sw-metcon-row input,.sw-metcon-row select{min-height:44px;min-width:56px}
+  .sw-skills-header{display:none !important}
+  .sw-skills-row{flex-wrap:wrap;gap:6px !important}
+  .sw-skills-row input,.sw-skills-row select{flex:1;min-width:44px;min-height:44px}
+  .sw-bottom-actions{flex-direction:column !important}
+  .sw-bottom-actions button{width:100%;flex:none !important}
+
+  /* ── EngineTrainingDayPage ──────────────────────────────── */
+  .engine-category-row{flex-wrap:wrap}
+  .engine-unit-row{flex-wrap:wrap}
+  .engine-exercise-header{flex-wrap:wrap;gap:6px}
+  .engine-exercise-label{font-size:13px}
+  .engine-rpe-grid{flex-wrap:wrap !important;gap:6px !important}
+  .engine-rpe-grid .engine-card{flex:0 0 calc(20% - 6px) !important;min-height:44px}
+  .engine-workout-controls{flex-direction:column !important}
+  .engine-workout-controls button{max-width:none !important;width:100%}
+
+  /* ── TrainingLogPage ───────────────────────────────────── */
+  .workout-form-row{flex-wrap:wrap;gap:6px}
+  .workout-form-row input{min-width:0}
+  .workout-actions{flex-direction:column;gap:8px}
+  .workout-actions button{width:100%}
+
+  /* ── ProgramDetailPage ─────────────────────────────────── */
+  .program-header-actions{flex-wrap:wrap;gap:8px}
+  .program-header-actions button{flex:1;min-width:120px}
+  .program-week-grid{grid-template-columns:1fr}
+  .program-day-card{padding:12px}
+
+  /* ── SettingsPage ──────────────────────────────────────── */
+  .settings-row{flex-direction:column;align-items:flex-start;gap:4px}
+  .settings-row label{font-size:12px}
+  .settings-value{font-size:14px}
+
+  /* ── BookmarksPage / HistoryPage ────────────────────────── */
+  .msg-actions{gap:4px}
+  .msg-actions button{min-width:44px;min-height:44px}
+
+  /* ── AdminPage ─────────────────────────────────────────── */
+  .admin-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+  /* ── MetconHeatmap ─────────────────────────────────────── */
+  .heatmap-container{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+  /* ── Program Analysis / Compare ────────────────────────── */
+  .analysis-grid{grid-template-columns:1fr}
+  .compare-columns{flex-direction:column}
+
+  /* ── Engine Analytics ──────────────────────────────────── */
+  .ea-menu-grid{grid-template-columns:1fr}
+  .ea-ratio-bars{gap:12px;height:auto}
+  .ea-ratio-col{max-width:none}
+  .ea-chart-container{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+  /* ── Workout Review ────────────────────────────────────── */
+  .review-sources{flex-wrap:wrap}
+
+  /* ── Generic utility classes for mobile ─────────────────── */
+  .mobile-stack{flex-direction:column !important;align-items:stretch !important}
+  .mobile-full{width:100% !important;max-width:100% !important}
+  .mobile-hide{display:none !important}
+}
+
+@media(max-width:480px){
+  /* Extra small screens */
+  .engine-grid{grid-template-columns:1fr !important}
+  .engine-stat-value{font-size:20px}
+  .engine-timer{font-size:32px}
+}

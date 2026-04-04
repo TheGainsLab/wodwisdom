@@ -92,7 +92,7 @@ export default function CheckoutCompletePage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
         <div className="loading-pulse" />
       </div>
     );
@@ -101,7 +101,7 @@ export default function CheckoutCompletePage() {
   // Logged-in user — show upgrade success
   if (isLoggedIn) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 40, textAlign: 'center' }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 40, textAlign: 'center' }}>
         <div style={{ width: 64, height: 64, background: 'rgba(46,196,134,0.2)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2ec486" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
         </div>
@@ -115,7 +115,7 @@ export default function CheckoutCompletePage() {
   // Signup success — check email
   if (signupSuccess) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 40, textAlign: 'center' }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 40, textAlign: 'center' }}>
         <div style={{ width: 64, height: 64, background: 'rgba(46,196,134,0.2)', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2ec486" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
         </div>
@@ -128,7 +128,7 @@ export default function CheckoutCompletePage() {
 
   // Not logged in — show account creation form
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 24 }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 24 }}>
       <div style={{ maxWidth: 400, width: '100%' }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <GainsLogo className="landing-hero-logo" />
