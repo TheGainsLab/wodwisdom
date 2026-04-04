@@ -13,13 +13,25 @@ const tabs = [
     ),
   },
   {
+    key: 'engine',
+    label: 'Engine',
+    path: '/engine',
+    match: (p: string) => p.startsWith('/engine'),
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M12 2c1 3 2.5 3.5 3.5 4.5A5 5 0 0 1 17 10c0 2.76-2.24 5-5 5s-5-2.24-5-5c0-1.33.52-2.54 1.37-3.44C9.37 5.56 11 5 12 2z" />
+        <path d="M12 15v7" />
+        <path d="M8 22h8" />
+      </svg>
+    ),
+  },
+  {
     key: 'training',
     label: 'Training',
     path: '/programs',
     match: (p: string) =>
       p.startsWith('/programs') ||
       p === '/training-log' ||
-      p.startsWith('/engine') ||
       p.startsWith('/ailog') ||
       p === '/workout-review' ||
       p.startsWith('/workout'),
