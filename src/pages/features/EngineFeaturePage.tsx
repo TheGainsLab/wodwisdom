@@ -143,7 +143,7 @@ export default function EngineFeaturePage() {
                 HR analytics—avg HR, peak HR, efficiency, load—give you the data to train smarter, not just harder.
               </p>
             </div>
-
+            <img src="/images/HR-analytics.png" alt="HR Analytics — average heart rate by day type" className="feature-img" />
           </div>
         </div>
       </section>
