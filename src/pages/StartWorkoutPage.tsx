@@ -1077,11 +1077,23 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                   </div>
                 </div>
 
-                {blocks.map((block, bi) => (
-                  <div key={bi} className="workout-review-section" style={{ marginBottom: 16 }}>
-                    <h3>
-                      {block.label}
-                    </h3>
+                {blocks.map((block, bi) => {
+                  const locked = savedBlocks.has(bi);
+                  return (
+                  <div key={bi} className={'workout-review-section' + (locked ? ' block-locked' : '')} style={{ marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <h3>
+                        {block.label}
+                      </h3>
+                      {locked && (
+                        <button
+                          style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}
+                          onClick={() => setSavedBlocks(prev => { const next = new Set(prev); next.delete(bi); return next; })}
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
                     <div className="workout-review-content" style={{ marginBottom: 16 }}>
                       <BlockContent label={block.label} content={block.text} />
                     </div>
@@ -1447,7 +1459,8 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                     </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
 
                 {error && <div className="auth-error" style={{ display: 'block', marginBottom: 16 }}>{error}</div>}
 
