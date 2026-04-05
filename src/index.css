@@ -34,6 +34,11 @@
 .install-prompt-dismiss:hover{color:var(--text-dim)}
 @media(min-width:641px){.install-prompt{max-width:400px;left:auto;right:24px;bottom:24px}}
 
+/* Locked block (saved workout block) */
+.block-locked{opacity:.6;transition:opacity .2s}
+.block-locked input,.block-locked select,.block-locked textarea{pointer-events:none;opacity:.7}
+.block-locked .auth-btn{pointer-events:none}
+
 /* Offline banner */
 .offline-banner{position:fixed;top:0;left:0;right:0;background:#b45309;color:white;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;font-size:13px;font-weight:600;z-index:10001;animation:fadeIn .2s ease}
 .offline-message{background:rgba(180,83,9,.12);border:1px solid rgba(180,83,9,.3);color:#fbbf24;padding:14px 16px;border-radius:10px;display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.5;margin:12px 0}
