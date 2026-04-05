@@ -65,7 +65,7 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
   }
 
   return (
-    <div className="engine-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div className="engine-page" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
       <div className="engine-card" style={{ maxWidth: 560, width: '100%' }}>
         <div className="engine-section">
           <h2 className="engine-header">
