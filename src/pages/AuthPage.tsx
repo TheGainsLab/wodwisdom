@@ -82,7 +82,7 @@ export default function AuthPage() {
           )
         ) : confirmSent ? (
           <>
-            <div className="success-msg">Check your email to confirm your account. Click the link we sent to complete signup.</div>
+            <div className="success-msg">Check your email to confirm your account. Click the link we sent to complete signup. If you don't see it, check your spam or junk folder.</div>
             <div className="auth-toggle"><a onClick={() => { setConfirmSent(false); setError(''); }}>Back to sign in</a></div>
           </>
         ) : (
