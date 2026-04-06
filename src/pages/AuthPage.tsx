@@ -16,6 +16,7 @@ export default function AuthPage() {
   const [forgotPassword, setForgotPassword] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [confirmSent, setConfirmSent] = useState(false);
+  const [showResend, setShowResend] = useState(false);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +53,12 @@ export default function AuthPage() {
         if (error) throw error;
         window.location.href = nextUrl;
       }
-    } catch (err: any) { setError(err.message); }
+    } catch (err: any) {
+      setError(err.message);
+      if (err.message?.toLowerCase().includes('email not confirmed')) {
+        setShowResend(true);
+      }
+    }
     setLoading(false);
   };
 
@@ -65,6 +71,23 @@ export default function AuthPage() {
           <p className="auth-subtitle">{forgotPassword ? 'Enter your email and we\'ll send you a reset link' : isSignUp ? 'Start your coaching knowledge journey' : 'Access your coaching knowledge base'}</p>
         )}
         {error && <div className="auth-error">{error}</div>}
+        {showResend && (
+          <button
+            className="auth-btn"
+            style={{ width: '100%', background: 'var(--surface2)', color: 'var(--text)', marginBottom: 12 }}
+            disabled={loading}
+            onClick={async () => {
+              setLoading(true);
+              setError('');
+              const { error: resendErr } = await supabase.auth.resend({ type: 'signup', email });
+              if (resendErr) setError(resendErr.message);
+              else { setError('Confirmation email resent. Check your inbox and spam folder.'); setShowResend(false); }
+              setLoading(false);
+            }}
+          >
+            {loading ? 'Sending...' : 'Resend confirmation email'}
+          </button>
+        )}
         {forgotPassword ? (
           resetSent ? (
             <>
@@ -83,6 +106,21 @@ export default function AuthPage() {
         ) : confirmSent ? (
           <>
             <div className="success-msg">Check your email to confirm your account. Click the link we sent to complete signup. If you don't see it, check your spam or junk folder.</div>
+            <button
+              className="auth-btn"
+              style={{ width: '100%', background: 'var(--surface2)', color: 'var(--text)', marginTop: 16 }}
+              disabled={loading}
+              onClick={async () => {
+                setLoading(true);
+                setError('');
+                const { error } = await supabase.auth.resend({ type: 'signup', email });
+                if (error) setError(error.message);
+                else setError('Confirmation email resent. Check your inbox and spam folder.');
+                setLoading(false);
+              }}
+            >
+              {loading ? 'Sending...' : 'Resend confirmation email'}
+            </button>
             <div className="auth-toggle"><a onClick={() => { setConfirmSent(false); setError(''); }}>Back to sign in</a></div>
           </>
         ) : (
