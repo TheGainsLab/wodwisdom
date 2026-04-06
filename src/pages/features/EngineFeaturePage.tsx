@@ -110,8 +110,8 @@ function ProgramsLibrary() {
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: expanded ? 10 : 0 }}>
                   <div>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>{prog.name}</span>
-                    <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 10 }}>{prog.freq} · {prog.months} months</span>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>{prog.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>{prog.freq} · {prog.months} months</div>
                   </div>
                   <svg
                     width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" strokeWidth="2"
