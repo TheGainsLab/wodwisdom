@@ -17,12 +17,12 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
     a: 'Yes. There are no contracts or commitments. You can cancel your subscription at any time and retain access through the end of your billing period.',
   },
   {
-    q: 'If I sign up for Year of the Engine, do I get AI Coach and Nutrition for free?',
-    a: <>Yes. All <strong>Year of the Engine</strong> subscribers also get access to the <strong>AI Coach</strong> feature with 10 questions a day and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
+    q: 'What else is included with my Year of the Engine subscription?',
+    a: <>All <strong>Year of the Engine</strong> subscribers also get access to the <strong>AI Coach</strong> feature and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
   },
   {
-    q: 'If I sign up for AI Programming, do I get access to AI Coach and Nutrition for free?',
-    a: <>Yes. All <strong>AI Programming</strong> subscribers also get access to the <strong>AI Coach</strong> feature with 20 questions a day and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
+    q: 'What else is included with my AI Programming subscription?',
+    a: <>All <strong>AI Programming</strong> subscribers also get access to the <strong>AI Coach</strong> feature with 20 questions a day and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
   },
   {
     q: 'What is included in the All Access membership?',
