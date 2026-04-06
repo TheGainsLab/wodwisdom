@@ -322,7 +322,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [isDirty, setIsDirty] = useState(true);
   const [isNewUser, setIsNewUser] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<{ kind: 'profile' | 'training' | 'nutrition'; text: string; evaluationId?: string | null } | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState<'profile' | 'training' | 'nutrition' | null>(null);
@@ -418,6 +418,7 @@ export default function AthletePage({ session }: { session: Session }) {
         setUnits((d.units as 'lbs' | 'kg') || 'lbs');
         setGender((d.gender as 'male' | 'female') || '');
         setTdeeOverride(d.tdee_override != null ? String(d.tdee_override) : '');
+        setIsDirty(false);
       }
       if (evalRes.data) {
         setEvaluations(evalRes.data);
@@ -431,14 +432,18 @@ export default function AthletePage({ session }: { session: Session }) {
     });
   }, [session.user.id]);
 
+  const markDirty = () => setIsDirty(true);
+
   const setLift = (key: string, value: string) => {
     const num = value === '' ? 0 : parseInt(value, 10);
     if (isNaN(num)) return;
     setLifts(prev => ({ ...prev, [key]: num }));
+    markDirty();
   };
 
   const setSkill = (key: string, level: SkillLevel) => {
     setSkills(prev => ({ ...prev, [key]: level }));
+    markDirty();
   };
 
   const setConditioningVal = (key: string, value: string | number) => {
@@ -451,6 +456,7 @@ export default function AthletePage({ session }: { session: Session }) {
     } else {
       setConditioning(prev => ({ ...prev, [key]: value }));
     }
+    markDirty();
   };
 
   const fetchProfileAnalysis = async () => {
@@ -571,7 +577,6 @@ export default function AthletePage({ session }: { session: Session }) {
   const saveProfile = async () => {
     setSaving(true);
     setError('');
-    setSuccess('');
 
     // Only store non-zero lifts
     const cleanLifts: Record<string, number> = {};
@@ -628,8 +633,7 @@ export default function AthletePage({ session }: { session: Session }) {
       setIsNewUser(false);
       navigate('/');
     } else {
-      setSuccess('Athlete profile saved');
-      setTimeout(() => setSuccess(''), 3000);
+      setIsDirty(false);
     }
     setSaving(false);
   };
@@ -667,7 +671,6 @@ export default function AthletePage({ session }: { session: Session }) {
               </div>
             )}
             {error && <div className="auth-error" style={{ display: 'block' }}>{error}</div>}
-            {success && <div className="success-msg">{success}</div>}
 
             {loading ? (
               <div className="page-loading"><div className="loading-pulse" /></div>
@@ -686,7 +689,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         max="120"
                         placeholder="—"
                         value={age}
-                        onChange={e => setAge(e.target.value)}
+                        onChange={e => { setAge(e.target.value); markDirty(); }}
                       />
                     </div>
                     <div className="lift-item">
@@ -698,7 +701,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         step={units === 'lbs' ? 1 : 0.1}
                         placeholder="—"
                         value={height}
-                        onChange={e => setHeight(e.target.value)}
+                        onChange={e => { setHeight(e.target.value); markDirty(); }}
                       />
                     </div>
                     <div className="lift-item">
@@ -710,7 +713,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         step={units === 'lbs' ? 5 : 2}
                         placeholder="0"
                         value={bodyweight}
-                        onChange={e => setBodyweight(e.target.value)}
+                        onChange={e => { setBodyweight(e.target.value); markDirty(); }}
                       />
                     </div>
                   </div>
@@ -720,14 +723,14 @@ export default function AthletePage({ session }: { session: Session }) {
                       <button
                         type="button"
                         className={'skill-level-btn' + (units === 'lbs' ? ' active' : '')}
-                        onClick={() => setUnits('lbs')}
+                        onClick={() => { setUnits('lbs'); markDirty(); }}
                       >
                         lbs
                       </button>
                       <button
                         type="button"
                         className={'skill-level-btn' + (units === 'kg' ? ' active' : '')}
-                        onClick={() => setUnits('kg')}
+                        onClick={() => { setUnits('kg'); markDirty(); }}
                       >
                         kg
                       </button>
@@ -737,14 +740,14 @@ export default function AthletePage({ session }: { session: Session }) {
                       <button
                         type="button"
                         className={'skill-level-btn' + (gender === 'male' ? ' active' : '')}
-                        onClick={() => setGender('male')}
+                        onClick={() => { setGender('male'); markDirty(); }}
                       >
                         Male
                       </button>
                       <button
                         type="button"
                         className={'skill-level-btn' + (gender === 'female' ? ' active' : '')}
-                        onClick={() => setGender('female')}
+                        onClick={() => { setGender('female'); markDirty(); }}
                       >
                         Female
                       </button>
@@ -789,7 +792,7 @@ export default function AthletePage({ session }: { session: Session }) {
                               step="50"
                               placeholder={calc?.tdee ? String(calc.tdee) : 'e.g. 2500'}
                               value={tdeeOverride}
-                              onChange={e => setTdeeOverride(e.target.value)}
+                              onChange={e => { setTdeeOverride(e.target.value); markDirty(); }}
                               style={{ flex: 1 }}
                             />
                             {isOverridden && (
@@ -826,7 +829,7 @@ export default function AthletePage({ session }: { session: Session }) {
                             <input
                               type="checkbox"
                               checked={equipment[item.key] ?? true}
-                              onChange={e => setEquipment(prev => ({ ...prev, [item.key]: e.target.checked }))}
+                              onChange={e => { setEquipment(prev => ({ ...prev, [item.key]: e.target.checked })); markDirty(); }}
                               style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer' }}
                             />
                           </label>
@@ -1026,10 +1029,10 @@ export default function AthletePage({ session }: { session: Session }) {
                 <button
                   className="auth-btn"
                   onClick={saveProfile}
-                  disabled={saving}
-                  style={success ? { background: '#2ec486', color: 'white' } : undefined}
+                  disabled={saving || !isDirty}
+                  style={!isDirty ? { background: '#2ec486', color: 'white' } : undefined}
                 >
-                  {saving ? 'Saving...' : success ? 'Saved ✓' : 'Save Athlete Profile'}
+                  {saving ? 'Saving...' : !isDirty ? 'Saved ✓' : 'Save Athlete Profile'}
                 </button>
 
                 {/* Evaluation History */}
