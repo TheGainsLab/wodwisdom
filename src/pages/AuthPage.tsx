@@ -83,6 +83,21 @@ export default function AuthPage() {
         ) : confirmSent ? (
           <>
             <div className="success-msg">Check your email to confirm your account. Click the link we sent to complete signup. If you don't see it, check your spam or junk folder.</div>
+            <button
+              className="auth-btn"
+              style={{ width: '100%', background: 'var(--surface2)', color: 'var(--text)', marginTop: 16 }}
+              disabled={loading}
+              onClick={async () => {
+                setLoading(true);
+                setError('');
+                const { error } = await supabase.auth.resend({ type: 'signup', email });
+                if (error) setError(error.message);
+                else setError('Confirmation email resent. Check your inbox and spam folder.');
+                setLoading(false);
+              }}
+            >
+              {loading ? 'Sending...' : 'Resend confirmation email'}
+            </button>
             <div className="auth-toggle"><a onClick={() => { setConfirmSent(false); setError(''); }}>Back to sign in</a></div>
           </>
         ) : (
