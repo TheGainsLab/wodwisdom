@@ -174,9 +174,9 @@ export default function SettingsPage({ session }: { session: Session }) {
                   </div>
                 </div>
 
-                {/* Profile Section */}
+                {/* User Profile Section */}
                 <div className="settings-card">
-                  <h2 className="settings-card-title">Profile</h2>
+                  <h2 className="settings-card-title">User Profile</h2>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
                     <div className="settings-avatar">{profile.full_name?.[0]?.toUpperCase() || session.user.email?.[0]?.toUpperCase() || '?'}</div>
                     <div>
@@ -247,6 +247,14 @@ export default function SettingsPage({ session }: { session: Session }) {
                     )}
                   </div>
                 )}
+                {/* Sign Out */}
+                <button
+                  className="auth-btn"
+                  style={{ width: '100%', background: 'var(--surface2)', color: 'var(--text)', marginTop: 8 }}
+                  onClick={() => supabase.auth.signOut()}
+                >
+                  Sign Out
+                </button>
               </>
             )}
           </div>
