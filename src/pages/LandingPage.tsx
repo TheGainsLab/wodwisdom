@@ -106,6 +106,9 @@ export default function LandingPage() {
               <Link to="/features/nutrition" className="landing-offering-learn-more">See how it works &rarr;</Link>
             </div>
           </div>
+          <div style={{ textAlign: 'center', marginTop: 32 }}>
+            <Link to="/auth?signup=1" className="landing-cta">Try it Free</Link>
+          </div>
         </div>
       </section>
 
