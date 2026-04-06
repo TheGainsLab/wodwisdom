@@ -286,8 +286,105 @@ export function formatRecentHistory(
   return "RECENT TRAINING (last 14 days):\n" + lines.join("\n");
 }
 
+// ─── Engine session formatting ─────────────────────────────────────────
+
+export interface EngineSessionRow {
+  id: string;
+  date: string;
+  day_type: string;
+  modality: string;
+  units: string;
+  target_pace: string | null;
+  actual_pace: string | null;
+  total_output: string | null;
+  performance_ratio: string | null;
+  average_heart_rate: number | null;
+  peak_heart_rate: number | null;
+  perceived_exertion: number | null;
+  workout_data: {
+    total_intervals: number;
+    total_rest_time: number;
+    total_work_time: number;
+    avg_work_rest_ratio: number | null;
+    intervals_completed: number;
+  } | null;
+}
+
+function formatModality(modality: string): string {
+  return modality
+    .replace(/_/g, " ")
+    .replace(/\bc2\b/gi, "C2")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatDayType(dayType: string): string {
+  return dayType
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatEngineSession(session: EngineSessionRow): string {
+  const dateLabel = formatDate(session.date);
+  const dayType = formatDayType(session.day_type);
+  const modality = formatModality(session.modality);
+
+  const parts: string[] = [];
+
+  // Duration
+  const wd = session.workout_data;
+  if (wd && wd.total_work_time > 0) {
+    const totalMin = Math.round((wd.total_work_time + wd.total_rest_time) / 60);
+    parts.push(`${totalMin}min`);
+  }
+
+  // Interval structure for non-continuous sessions
+  if (wd && wd.total_intervals > 1) {
+    const workSec = Math.round(wd.total_work_time / wd.total_intervals);
+    const restSec = wd.total_rest_time > 0 ? Math.round(wd.total_rest_time / wd.total_intervals) : 0;
+    parts.push(`${wd.intervals_completed}x${workSec}s/${restSec}s`);
+  }
+
+  // Output
+  if (session.total_output) {
+    parts.push(`${session.total_output} ${session.units}`);
+  }
+
+  // Pace
+  if (session.actual_pace) {
+    const pace = parseFloat(session.actual_pace);
+    if (!isNaN(pace)) {
+      parts.push(`@${Math.round(pace * 10) / 10} ${session.units}/min`);
+    }
+  }
+
+  // Target comparison
+  if (session.target_pace && session.performance_ratio) {
+    const ratio = parseFloat(session.performance_ratio);
+    if (!isNaN(ratio)) {
+      const pct = Math.round(ratio * 100);
+      parts.push(`target ${session.target_pace}, ${pct}% of target`);
+    }
+  }
+
+  // Heart rate
+  if (session.average_heart_rate || session.peak_heart_rate) {
+    const hrParts: string[] = [];
+    if (session.average_heart_rate) hrParts.push(`avg ${session.average_heart_rate}`);
+    if (session.peak_heart_rate) hrParts.push(`peak ${session.peak_heart_rate}`);
+    parts.push(`HR ${hrParts.join("/")}`);
+  }
+
+  // RPE
+  if (session.perceived_exertion) {
+    parts.push(`RPE ${session.perceived_exertion}`);
+  }
+
+  return `${dateLabel} — Engine ${dayType}: ${modality} ${parts.join(", ")}`;
+}
+
 /**
  * Fetches last N days of workout logs, blocks, and entries for a user.
+ * Includes Engine conditioning sessions alongside regular workout logs.
  * Formats them for AI context with per-block detail.
  */
 export async function fetchAndFormatRecentHistory(
@@ -300,33 +397,104 @@ export async function fetchAndFormatRecentHistory(
   cutoff.setDate(cutoff.getDate() - days);
   const cutoffStr = cutoff.toISOString().slice(0, 10);
 
-  const { data: logs } = await supa
-    .from("workout_logs")
-    .select("id, workout_date, workout_text, workout_type")
-    .eq("user_id", userId)
-    .gte("workout_date", cutoffStr)
-    .order("workout_date", { ascending: false });
-
-  if (!logs || (logs as WorkoutLogRow[]).length === 0) return "";
-
-  const logIds = (logs as WorkoutLogRow[]).map((l) => l.id);
-
-  // Fetch blocks and entries in parallel
-  const [{ data: blocks }, { data: entries }] = await Promise.all([
+  // Fetch regular workout logs and Engine sessions in parallel
+  const [{ data: logs }, { data: engineSessions }] = await Promise.all([
     supa
-      .from("workout_log_blocks")
-      .select("id, log_id, block_type, block_label, block_text, score, rx, sort_order")
-      .in("log_id", logIds),
+      .from("workout_logs")
+      .select("id, workout_date, workout_text, workout_type")
+      .eq("user_id", userId)
+      .gte("workout_date", cutoffStr)
+      .order("workout_date", { ascending: false }),
     supa
-      .from("workout_log_entries")
-      .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, faults_observed")
-      .in("log_id", logIds),
+      .from("engine_workout_sessions")
+      .select("id, date, day_type, modality, units, target_pace, actual_pace, total_output, performance_ratio, average_heart_rate, peak_heart_rate, perceived_exertion, workout_data")
+      .eq("user_id", userId)
+      .eq("completed", true)
+      .gte("date", cutoffStr)
+      .order("date", { ascending: false }),
   ]);
 
-  return formatRecentHistory(
-    logs as WorkoutLogRow[],
-    (blocks || []) as WorkoutLogBlockRow[],
-    (entries || []) as WorkoutLogEntryRow[],
-    { maxLines: options?.maxLines }
-  );
+  const hasLogs = logs && (logs as WorkoutLogRow[]).length > 0;
+  const hasEngine = engineSessions && (engineSessions as EngineSessionRow[]).length > 0;
+
+  if (!hasLogs && !hasEngine) return "";
+
+  const maxLines = options?.maxLines ?? 30;
+
+  // Format Engine sessions into date-keyed lines
+  const engineLines: { date: string; line: string }[] = [];
+  if (hasEngine) {
+    for (const session of engineSessions as EngineSessionRow[]) {
+      engineLines.push({ date: session.date, line: formatEngineSession(session) });
+    }
+  }
+
+  // Format regular workout logs
+  let workoutLines: { date: string; line: string }[] = [];
+  if (hasLogs) {
+    const logRows = logs as WorkoutLogRow[];
+    const logIds = logRows.map((l) => l.id);
+
+    const [{ data: blocks }, { data: entries }] = await Promise.all([
+      supa
+        .from("workout_log_blocks")
+        .select("id, log_id, block_type, block_label, block_text, score, rx, sort_order")
+        .in("log_id", logIds),
+      supa
+        .from("workout_log_entries")
+        .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, faults_observed")
+        .in("log_id", logIds),
+    ]);
+
+    const blocksByLog = new Map<string, WorkoutLogBlockRow[]>();
+    for (const b of (blocks || []) as WorkoutLogBlockRow[]) {
+      const list = blocksByLog.get(b.log_id) || [];
+      list.push(b);
+      blocksByLog.set(b.log_id, list);
+    }
+
+    const entriesByBlock = new Map<string, WorkoutLogEntryRow[]>();
+    for (const e of (entries || []) as WorkoutLogEntryRow[]) {
+      const key = e.block_id
+        ? `id::${e.block_id}`
+        : `${e.log_id}::${e.block_label ?? ""}`;
+      const list = entriesByBlock.get(key) || [];
+      list.push(e);
+      entriesByBlock.set(key, list);
+    }
+
+    for (const log of logRows) {
+      const dateLabel = formatDate(log.workout_date);
+      const logBlocks = (blocksByLog.get(log.id) || []).sort(
+        (a, b) => a.sort_order - b.sort_order
+      );
+
+      if (logBlocks.length === 0) {
+        workoutLines.push({
+          date: log.workout_date,
+          line: `${dateLabel} — ${log.workout_text.slice(0, 80).replace(/\n/g, " ")}`,
+        });
+        continue;
+      }
+
+      for (const block of logBlocks) {
+        const byId = entriesByBlock.get(`id::${block.id}`) || [];
+        const byLabel = entriesByBlock.get(`${log.id}::${block.block_label ?? ""}`) || [];
+        const blockEntries = byId.length > 0 ? byId : byLabel;
+        const summary = formatBlock(block, blockEntries);
+        workoutLines.push({
+          date: log.workout_date,
+          line: `${dateLabel} — ${summary}`,
+        });
+      }
+    }
+  }
+
+  // Merge and sort by date descending
+  const allLines = [...workoutLines, ...engineLines]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, maxLines)
+    .map((l) => l.line);
+
+  return "RECENT TRAINING (last 14 days):\n" + allLines.join("\n");
 }
