@@ -98,7 +98,7 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                     {programIcon(prog.id)}
-                    <span style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>{prog.name}</span>
+                    <span style={{ fontSize: 16, fontWeight: 700, flex: 1, color: '#ffffff' }}>{prog.name}</span>
                     <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                       {prog.days_per_week}x/week
                     </span>
