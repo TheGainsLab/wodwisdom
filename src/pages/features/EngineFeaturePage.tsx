@@ -51,10 +51,10 @@ export default function EngineFeaturePage() {
         <h1 className="feature-hero-title">Year of the Engine</h1>
         <p className="feature-hero-sub">The conditioning program that follows you.</p>
         <p className="feature-hero-body">
-          Your engine isn't one thing. It's aerobic capacity. Anaerobic power. Efficiency. Repeatability. Treat them as one and you drag weak links along while holding strong ones back.
+          Your engine isn't one thing. It's aerobic capacity. Anaerobic power. Efficiency. Repeatability.
         </p>
         <p className="feature-hero-body">
-          Year of the Engine uses 20 distinct training frameworks, each targeting a specific adaptation. Machine learning calibrates every session precisely to you - every single interval is personalized to you.
+          Year of the Engine uses 20 distinct training frameworks, each targeting a specific adaptation. Machine learning calibrates every session precisely, so every single interval is personalized to you.
         </p>
       </section>
 
@@ -84,10 +84,10 @@ export default function EngineFeaturePage() {
             <div className="feature-text">
               <h3 style={{ textAlign: 'center' }}>The AI watches. The program adjusts.</h3>
               <p>
-                Log your results and it recalibrates. Target: 14. Actual: 17. The AI notices, and your next session will be harder.
+                Target: 14. Actual: 17. The AI recalibrates, and your next session will be harder.
               </p>
               <p>
-                The program follows your actual performance, not a schedule.
+                The program follows your performance, not a schedule.
               </p>
               <img src="/images/target-vs-actual.png" alt="Target vs Actual output comparison" className="feature-img" />
             </div>
@@ -102,9 +102,8 @@ export default function EngineFeaturePage() {
           <div className="feature-row">
             <div className="feature-text">
               <h3 style={{ textAlign: 'center' }}>Your engine has a fingerprint.</h3>
-              <p><em>1:3 work-to-rest: 31 cal/min. 1:1 work-to-rest: 16 cal/min.</em></p>
               <p>
-                Year of the Engine tracks your performance across every work:rest ratio so the AI programs the intervals that actually work for you. Year of the Engine includes AI Coaching, so share this data with your AI Coach to get pacing guidance for MetCons.
+                Unmatched detail into how your Engine works, and how it recovers. Ask your coach (or your AI Coach — it's included for Engine athletes) how to use this data in metcons.
               </p>
               <img src="/images/work-rest-ratio.png" alt="Work to rest ratio analytics" className="feature-img" />
             </div>
@@ -120,7 +119,7 @@ export default function EngineFeaturePage() {
             <div className="feature-text">
               <h3 style={{ textAlign: 'center' }}>Track output across frameworks</h3>
               <p>
-                Anaerobic: 31 cal/min. Max Aerobic Power: 15 cal/min. Endurance: 11 cal/min. See exactly how your performance varies across energy systems and track improvement in each one independently.
+                See exactly how your performance varies across energy systems and track improvement in each one independently.
               </p>
               <img src="/images/comparison.png" alt="Output comparison across training types" className="feature-img" />
             </div>
@@ -135,10 +134,6 @@ export default function EngineFeaturePage() {
           <div className="feature-row">
             <div className="feature-text">
               <h3 style={{ textAlign: 'center' }}>Heart rate doesn't lie.</h3>
-              <p>
-                Anaerobic sessions peak at 165 bpm. Max Aerobic Power sessions at 134 bpm. That 31
-                bpm spread is your aerobic system working exactly as designed.
-              </p>
               <p>
                 HR analytics—avg HR, peak HR, efficiency, load—give you the data to train smarter, not just harder.
               </p>
