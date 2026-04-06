@@ -200,7 +200,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
           </button>
           <h1 style={{ flex: 1, textAlign: 'center' }}>Engine</h1>
           <button
-            className="menu-btn"
+            className="menu-btn engine-settings-btn"
             onClick={() => setShowSwitcher(true)}
             title="Program settings"
           >

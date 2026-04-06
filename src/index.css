@@ -629,6 +629,7 @@ body.landing-body{overflow:auto;height:auto}
 
   /* Hide sidebar hamburger button on mobile — tab bar replaces it */
   .menu-btn{display:none}
+  .engine-settings-btn.menu-btn{display:flex}
   .nav-overlay,.nav-sidebar{display:none}
 
   /* Add bottom padding to main content so it doesn't sit behind the tab bar */
