@@ -6,6 +6,147 @@ import '../../features.css';
 const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
 const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
 
+const ENGINE_PROGRAMS = [
+  {
+    name: 'Year of the Engine',
+    freq: '5x/week',
+    days: 720,
+    months: 36,
+    description: 'The full 720-day program — 5 sessions per week across 36 months.',
+    who: 'Athletes committed to long-term conditioning development.',
+    emphasis: 'All 20 training frameworks in a structured progression. Builds every energy system systematically over 36 months.',
+  },
+  {
+    name: 'Year of the Engine (3-Day)',
+    freq: '3x/week',
+    days: 432,
+    months: 36,
+    description: 'Same program quality at 3 sessions per week — 432 training days.',
+    who: 'Athletes who train conditioning 3 days and use the other days for strength, sport, or recovery.',
+    emphasis: 'Same frameworks as the 5-day, fewer sessions per week. Every session still fully calibrated to you.',
+  },
+  {
+    name: 'Engine: Varied Order',
+    freq: '5x/week',
+    days: 720,
+    months: 36,
+    description: 'All 720 days in a shuffled sequence for returning athletes.',
+    who: 'Athletes who completed Year of the Engine (or part of it) and want fresh stimulus without repeating the same order.',
+    emphasis: 'Same workouts, different sequence. Your ML performance data carries over — the AI already knows your engine.',
+  },
+  {
+    name: 'Engine: Varied Order (3-Day)',
+    freq: '3x/week',
+    days: 432,
+    months: 36,
+    description: '432 days in a shuffled sequence at 3 sessions per week.',
+    who: 'Returning 3-day athletes who want variety.',
+    emphasis: 'Shuffled 3-day variant. All calibration data carries over.',
+  },
+  {
+    name: 'VO2 Max (3-Day)',
+    freq: '3x/week',
+    days: 144,
+    months: 12,
+    description: 'A 12-month VO2 Max emphasis program.',
+    who: 'Athletes focused on raising their aerobic ceiling — max aerobic power, oxygen uptake, and high-output interval capacity.',
+    emphasis: 'Heavy on max aerobic power intervals, devour (accumulating work), and infinity (multi-block supra-threshold). Polarized base work for recovery.',
+  },
+  {
+    name: 'VO2 Max (4-Day)',
+    freq: '4x/week',
+    days: 192,
+    months: 12,
+    description: 'A 12-month VO2 Max emphasis program at 4 sessions per week.',
+    who: 'Athletes who want aggressive VO2 Max development with an extra session per week.',
+    emphasis: 'Same VO2 Max focus as the 3-day with more volume — additional MAP and polarized sessions each week.',
+  },
+  {
+    name: 'Hyrox Race Prep (3-Day)',
+    freq: '3x/week',
+    days: 144,
+    months: 12,
+    description: 'A 12-month Hyrox race preparation program.',
+    who: 'Athletes training for Hyrox or similar functional fitness races.',
+    emphasis: 'Towers, synthesis, afterburner, and flux — frameworks that build sustained output, pace changes, and race-specific conditioning.',
+  },
+  {
+    name: 'Hyrox Race Prep (5-Day)',
+    freq: '5x/week',
+    days: 240,
+    months: 12,
+    description: 'A 12-month Hyrox race preparation program at 5 sessions per week.',
+    who: 'Dedicated Hyrox competitors who want maximum preparation volume.',
+    emphasis: 'Full 5-day race prep with towers, synthesis, afterburner, flux, and polarized recovery sessions.',
+  },
+];
+
+function ProgramsLibrary() {
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+
+  return (
+    <section className="feature-section">
+      <div className="feature-container">
+        <h2 className="feature-section-title" style={{ textAlign: 'center', marginBottom: 8 }}>8 programs. One subscription.</h2>
+        <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 15, marginBottom: 32, maxWidth: 540, margin: '0 auto 32px' }}>
+          Every Engine subscription includes access to all programs. Switch anytime — your performance data carries over.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 600, margin: '0 auto' }}>
+          {ENGINE_PROGRAMS.map((prog, i) => {
+            const expanded = expandedIdx === i;
+            return (
+              <div
+                key={i}
+                onClick={() => setExpandedIdx(expanded ? null : i)}
+                style={{
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 12,
+                  padding: '16px 20px',
+                  cursor: 'pointer',
+                  transition: 'border-color .15s',
+                  borderColor: expanded ? 'var(--accent)' : 'var(--border)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: expanded ? 10 : 0 }}>
+                  <div>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>{prog.name}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 10 }}>{prog.freq} · {prog.months} months</span>
+                  </div>
+                  <svg
+                    width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" strokeWidth="2"
+                    style={{ transition: 'transform .2s', transform: expanded ? 'rotate(180deg)' : 'none', flexShrink: 0 }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </div>
+                {expanded && (
+                  <div style={{ animation: 'fadeUp .2s ease' }}>
+                    <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 12 }}>
+                      {prog.description}
+                    </p>
+                    <div style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 8 }}>
+                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Who it's for: </span>
+                      <span style={{ color: 'var(--text)' }}>{prog.who}</span>
+                    </div>
+                    <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Training emphasis: </span>
+                      <span style={{ color: 'var(--text)' }}>{prog.emphasis}</span>
+                    </div>
+                    <div style={{ marginTop: 10 }}>
+                      <span className="engine-badge engine-badge--default">{prog.days} days</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function EngineFeaturePage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
@@ -158,6 +299,9 @@ export default function EngineFeaturePage() {
           </div>
         </div>
       </section>
+
+      {/* Programs library */}
+      <ProgramsLibrary />
 
       {/* Footer CTA */}
       <section className="feature-footer-cta">
