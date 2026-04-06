@@ -28,6 +28,10 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
     q: 'What is included in the All Access membership?',
     a: <>All Access members get access to <strong>AI Programming</strong>, <strong>Year of the Engine</strong>, <strong>AI Coach</strong>, and <strong>Nutrition</strong>. All of this for under $50 a month.</>,
   },
+  {
+    q: 'I have additional questions. How can I contact you?',
+    a: <>You can send us an email anytime to <a href="mailto:coach@thegainslab.com" style={{ color: 'var(--accent)' }}>coach@thegainslab.com</a></>,
+  },
 ];
 
 export default function LandingPage() {
