@@ -10,7 +10,13 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "What's the difference between the plans?",
-    a: 'AI Coach gives you unlimited AI-powered coaching questions. Year of the Engine and AI Programming are full training programs that include AI Coach. All Access bundles everything together at a discount.',
+    a: <>
+      <strong>AI Coach</strong> is an AI trained on the methodology. Get advice about anything related to fitness. It's like having access to a high-level coach 24/7.
+      <br /><br />
+      <strong>Year of the Engine</strong> is a personalized conditioning program for athletes at any level.
+      <br /><br />
+      <strong>AI Programming</strong> is customized programming written by an AI trained on methodology. Complete a user profile and the AI writes a program tailored precisely to you. Log your results and the AI learns, updating your training so you always get exactly what you need.
+    </>,
   },
   {
     q: 'Can I cancel anytime?',
