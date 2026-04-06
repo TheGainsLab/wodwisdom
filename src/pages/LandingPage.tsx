@@ -151,7 +151,7 @@ export default function LandingPage() {
       {/* ===== FAQ ===== */}
       <section id="faq" className="landing-faq">
         <div className="landing-container">
-          <h2 className="landing-section-title">Frequently asked questions</h2>
+          <h2 className="landing-section-title">Frequently Asked Questions</h2>
           <div className="landing-faq-list">
             {FAQ_ITEMS.map((item, i) => (
               <div
