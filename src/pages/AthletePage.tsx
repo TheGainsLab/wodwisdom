@@ -666,7 +666,7 @@ export default function AthletePage({ session }: { session: Session }) {
               <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
                 <h2 className="settings-card-title" style={{ marginBottom: 8 }}>Welcome to GAINS</h2>
                 <p style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-                  Complete your athlete profile to get the most out of your experience. AI Coach uses your 1RMs, skills, and benchmarks to tailor every response to your level — the more you fill out, the more personalized your coaching becomes.
+                  Complete your athlete profile. After completing your profile, save it and click AI Analysis. You'll receive a detailed breakdown of all aspects of your fitness, and priorities for improvement based on the methodology. After that, click on Coach to ask the AI Coach anything you want about fitness. AI Coach uses your 1RMs, skills, and benchmarks to tailor every response to your level, so every response is actionable and tailored to you.
                 </p>
               </div>
             )}
