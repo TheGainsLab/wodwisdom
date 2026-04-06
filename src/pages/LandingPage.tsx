@@ -30,37 +30,11 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   },
 ];
 
-const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
-const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
-
 export default function LandingPage() {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [pricingInterval, setPricingInterval] = useState<'monthly' | 'quarterly'>('monthly');
-  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const goToAuth = () => navigate('/auth');
-  const goToSignup = () => navigate('/auth?signup=1');
-
-  const buyPlan = async (plan: string) => {
-    setCheckoutLoading(plan);
-    try {
-      const resp = await fetch(CHECKOUT_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, interval: pricingInterval }),
-      });
-      const data = await resp.json();
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      if (data.error) alert(data.error);
-    } catch {
-      alert('Failed to start checkout');
-    } finally {
-      setCheckoutLoading(null);
-    }
-  };
 
   useEffect(() => {
     document.body.classList.add('landing-body');
@@ -158,19 +132,18 @@ export default function LandingPage() {
               <div
                 key={p.plan}
                 className="landing-pricing-row"
-                style={{ cursor: 'pointer', transition: 'background .15s' }}
-                onClick={() => !checkoutLoading && buyPlan(p.plan)}
               >
                 <div>
                   <span className="landing-pricing-name">{p.name}</span>
                   {p.note && <div className="landing-pricing-note">{p.note}</div>}
                 </div>
                 <span className="landing-pricing-amount">
-                  {checkoutLoading === p.plan ? '...' : pricingInterval === 'monthly' ? p.monthly : p.quarterly}
+                  {pricingInterval === 'monthly' ? p.monthly : p.quarterly}
                 </span>
               </div>
             ))}
-            <button className="landing-cta" onClick={goToSignup} style={{marginTop: '28px', width: '100%'}}>Try it Free</button>
+
+
           </div>
         </div>
       </section>
