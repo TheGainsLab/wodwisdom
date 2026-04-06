@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { classifyAthlete } from '../utils/classify-athlete';
 import { calculateTDEE } from '../utils/tdee';
+import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 import { formatMarkdown } from '../lib/formatMarkdown';
 
@@ -328,8 +329,14 @@ export default function AthletePage({ session }: { session: Session }) {
   const [generateLoading, setGenerateLoading] = useState(false);
   const [tdeeOverride, setTdeeOverride] = useState<string>('');
   const [editingTdee, setEditingTdee] = useState(false);
+  const [lastProfileAnalysis, setLastProfileAnalysis] = useState<string | null>(null);
+  const [lastTrainingAnalysis, setLastTrainingAnalysis] = useState<string | null>(null);
+  const [lastNutritionAnalysis, setLastNutritionAnalysis] = useState<string | null>(null);
 
   const navigate = useNavigate();
+  const { hasFeature, isAdmin } = useEntitlements(session.user.id);
+  const canTrainingAnalysis = isAdmin || hasFeature('engine') || hasFeature('programming');
+  const canNutritionAnalysis = isAdmin || hasFeature('nutrition');
 
   // Evaluation history
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
@@ -359,9 +366,18 @@ export default function AthletePage({ session }: { session: Session }) {
         .order('created_at', { ascending: false })
         .limit(20),
     ]);
-    if (profileRes.data) setEvaluations(profileRes.data);
-    if (trainingRes.data) setTrainingEvaluations(trainingRes.data);
-    if (nutritionRes.data) setNutritionEvaluations(nutritionRes.data);
+    if (profileRes.data) {
+      setEvaluations(profileRes.data);
+      if (profileRes.data.length > 0) setLastProfileAnalysis(profileRes.data[0].created_at);
+    }
+    if (trainingRes.data) {
+      setTrainingEvaluations(trainingRes.data);
+      if (trainingRes.data.length > 0) setLastTrainingAnalysis(trainingRes.data[0].created_at);
+    }
+    if (nutritionRes.data) {
+      setNutritionEvaluations(nutritionRes.data);
+      if (nutritionRes.data.length > 0) setLastNutritionAnalysis(nutritionRes.data[0].created_at);
+    }
   };
 
   useEffect(() => {
@@ -403,8 +419,14 @@ export default function AthletePage({ session }: { session: Session }) {
         setGender((d.gender as 'male' | 'female') || '');
         setTdeeOverride(d.tdee_override != null ? String(d.tdee_override) : '');
       }
-      if (evalRes.data) setEvaluations(evalRes.data);
-      if (trainingEvalRes.data) setTrainingEvaluations(trainingEvalRes.data);
+      if (evalRes.data) {
+        setEvaluations(evalRes.data);
+        if (evalRes.data.length > 0) setLastProfileAnalysis(evalRes.data[0].created_at);
+      }
+      if (trainingEvalRes.data) {
+        setTrainingEvaluations(trainingEvalRes.data);
+        if (trainingEvalRes.data.length > 0) setLastTrainingAnalysis(trainingEvalRes.data[0].created_at);
+      }
       setLoading(false);
     });
   }, [session.user.id]);
@@ -898,34 +920,86 @@ export default function AthletePage({ session }: { session: Session }) {
                 <CollapsibleSection title="AI Analysis">
                   <div style={{ borderColor: 'rgba(255,58,58,.2)', background: 'var(--accent-glow)', padding: 16, borderRadius: 8, marginBottom: 16 }}>
                   <p className="athlete-card-subtitle">Save your profile first, then analyze. Results are saved for comparison over time.</p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ background: 'var(--surface2)', color: 'var(--text)' }}
-                      onClick={fetchProfileAnalysis}
-                      disabled={!!analysisLoading}
-                    >
-                      {analysisLoading === 'profile' ? 'Analyzing...' : 'Profile Analysis'}
-                    </button>
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ background: 'var(--surface2)', color: 'var(--text)' }}
-                      onClick={fetchTrainingAnalysis}
-                      disabled={!!analysisLoading}
-                    >
-                      {analysisLoading === 'training' ? 'Analyzing...' : 'Training Analysis'}
-                    </button>
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ background: 'var(--surface2)', color: 'var(--text)' }}
-                      onClick={fetchNutritionAnalysis}
-                      disabled={!!analysisLoading}
-                    >
-                      {analysisLoading === 'nutrition' ? 'Analyzing...' : 'Nutrition Analysis'}
-                    </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                    {(() => {
+                      // Profile Analysis: available to all, rate limited
+                      const isFreeUser = !hasFeature('ai_chat') && !hasFeature('engine') && !hasFeature('programming') && !hasFeature('nutrition') && !isAdmin;
+                      const profileCooldown = lastProfileAnalysis ? Math.ceil((new Date(lastProfileAnalysis).getTime() + 30 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000)) : 0;
+                      const profileLocked = isFreeUser && lastProfileAnalysis != null;
+                      const profileOnCooldown = !isAdmin && profileCooldown > 0;
+
+                      const trainingCooldown = lastTrainingAnalysis ? Math.ceil((new Date(lastTrainingAnalysis).getTime() + 14 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000)) : 0;
+                      const trainingOnCooldown = !isAdmin && trainingCooldown > 0;
+
+                      const nutritionCooldown = lastNutritionAnalysis ? Math.ceil((new Date(lastNutritionAnalysis).getTime() + 14 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000)) : 0;
+                      const nutritionOnCooldown = !isAdmin && nutritionCooldown > 0;
+
+                      return (
+                        <>
+                          {/* Profile Analysis — available to all */}
+                          <button
+                            type="button"
+                            className="auth-btn"
+                            style={{ background: 'var(--surface2)', color: 'var(--text)' }}
+                            onClick={fetchProfileAnalysis}
+                            disabled={!!analysisLoading || profileLocked || profileOnCooldown}
+                          >
+                            {analysisLoading === 'profile' ? 'Analyzing...'
+                              : profileLocked ? 'Upgrade for more analyses'
+                              : profileOnCooldown ? `Available in ${profileCooldown} days`
+                              : 'Profile Analysis'}
+                          </button>
+
+                          {/* Training Analysis — Engine or Programming required */}
+                          <button
+                            type="button"
+                            className="auth-btn"
+                            style={canTrainingAnalysis
+                              ? { background: 'var(--surface2)', color: 'var(--text)' }
+                              : { background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: 0.6 }
+                            }
+                            onClick={canTrainingAnalysis ? fetchTrainingAnalysis : undefined}
+                            disabled={!!analysisLoading || !canTrainingAnalysis || trainingOnCooldown}
+                          >
+                            {!canTrainingAnalysis ? (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                                Training Analysis
+                              </span>
+                            ) : analysisLoading === 'training' ? 'Analyzing...'
+                              : trainingOnCooldown ? `Available in ${trainingCooldown} days`
+                              : 'Training Analysis'}
+                          </button>
+                          {!canTrainingAnalysis && (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Requires Engine or Programming subscription</span>
+                          )}
+
+                          {/* Nutrition Analysis — Nutrition required */}
+                          <button
+                            type="button"
+                            className="auth-btn"
+                            style={canNutritionAnalysis
+                              ? { background: 'var(--surface2)', color: 'var(--text)' }
+                              : { background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: 0.6 }
+                            }
+                            onClick={canNutritionAnalysis ? fetchNutritionAnalysis : undefined}
+                            disabled={!!analysisLoading || !canNutritionAnalysis || nutritionOnCooldown}
+                          >
+                            {!canNutritionAnalysis ? (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                                Nutrition Analysis
+                              </span>
+                            ) : analysisLoading === 'nutrition' ? 'Analyzing...'
+                              : nutritionOnCooldown ? `Available in ${nutritionCooldown} days`
+                              : 'Nutrition Analysis'}
+                          </button>
+                          {!canNutritionAnalysis && (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Requires Nutrition subscription</span>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                   {analysisResult && (
                     <div className="workout-review-section" style={{ marginTop: 0 }}>
