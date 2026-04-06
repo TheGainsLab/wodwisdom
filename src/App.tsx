@@ -82,8 +82,28 @@ const HIDE_TAB_BAR_ROUTES = ['/workout/start', '/checkout', '/checkout/complete'
 
 function AuthenticatedApp({ session }: { session: Session }) {
   const location = useLocation();
+  const [profileChecked, setProfileChecked] = useState(false);
+  const [hasProfile, setHasProfile] = useState(true);
   const hideTabBar = HIDE_TAB_BAR_ROUTES.some(r => location.pathname === r) ||
     location.pathname.startsWith('/features');
+
+  useEffect(() => {
+    supabase
+      .from('athlete_profiles')
+      .select('user_id')
+      .eq('user_id', session.user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setHasProfile(!!data);
+        setProfileChecked(true);
+      });
+  }, [session.user.id]);
+
+  // Redirect new users to profile page (except if already there or on settings/checkout)
+  const skipRedirect = ['/profile', '/settings', '/checkout', '/checkout/complete'];
+  if (profileChecked && !hasProfile && !skipRedirect.includes(location.pathname)) {
+    return <Navigate to="/profile" replace />;
+  }
 
   return (
     <>

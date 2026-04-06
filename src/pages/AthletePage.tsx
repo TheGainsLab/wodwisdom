@@ -322,6 +322,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isNewUser, setIsNewUser] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<{ kind: 'profile' | 'training' | 'nutrition'; text: string; evaluationId?: string | null } | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState<'profile' | 'training' | 'nutrition' | null>(null);
   const [generateLoading, setGenerateLoading] = useState(false);
@@ -384,6 +385,9 @@ export default function AthletePage({ session }: { session: Session }) {
         .order('created_at', { ascending: false })
         .limit(20),
     ]).then(([profileRes, evalRes, trainingEvalRes]) => {
+      if (!profileRes.data) {
+        setIsNewUser(true);
+      }
       if (profileRes.data) {
         const d = profileRes.data;
         setLifts(d.lifts || {});
@@ -596,10 +600,16 @@ export default function AthletePage({ session }: { session: Session }) {
         { onConflict: 'user_id' }
       );
 
-    if (err) setError(err.message);
-    else setSuccess('Athlete profile saved');
+    if (err) {
+      setError(err.message);
+    } else if (isNewUser) {
+      setIsNewUser(false);
+      navigate('/');
+    } else {
+      setSuccess('Athlete profile saved');
+      setTimeout(() => setSuccess(''), 3000);
+    }
     setSaving(false);
-    setTimeout(() => setSuccess(''), 3000);
   };
 
   // Build current profile snapshot for diff comparison
@@ -626,6 +636,14 @@ export default function AthletePage({ session }: { session: Session }) {
         </header>
         <div className="page-body">
           <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {isNewUser && (
+              <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
+                <h2 className="settings-card-title" style={{ marginBottom: 8 }}>Welcome to GAINS</h2>
+                <p style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+                  Complete your athlete profile to get the most out of your experience. AI Coach uses your 1RMs, skills, and benchmarks to tailor every response to your level — the more you fill out, the more personalized your coaching becomes.
+                </p>
+              </div>
+            )}
             {error && <div className="auth-error" style={{ display: 'block' }}>{error}</div>}
             {success && <div className="success-msg">{success}</div>}
 
