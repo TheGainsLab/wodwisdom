@@ -27,7 +27,7 @@ export default function ChatPage({ session }: { session: Session }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'journal' | 'science' | 'strength-science'>('all');
+  const [sourceFilter, setSourceFilter] = useState<'journal' | 'all'>('journal');
   const [includeProfile, setIncludeProfile] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [dailyUsage, setDailyUsage] = useState(0);
@@ -255,11 +255,16 @@ export default function ChatPage({ session }: { session: Session }) {
 
 
 
-  const sourceButtons = (['all', 'journal', 'science', 'strength-science'] as const).map(s => (
-    <button key={s} className={"source-btn " + (sourceFilter === s ? "active" : "")} onClick={() => setSourceFilter(s)}>
-      {s === 'all' ? 'All' : s === 'journal' ? 'Journal' : s === 'science' ? 'Science' : 'Strength'}
+  const scienceToggle = (
+    <button
+      className={"source-btn " + (sourceFilter === 'all' ? "active" : "")}
+      onClick={() => setSourceFilter(sourceFilter === 'all' ? 'journal' : 'all')}
+      style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 3h6l-1 7h4l-7 11 2-7H9l1-4z" /></svg>
+      Science Mode
     </button>
-  ));
+  );
 
   const usagePill = tier === 'free'
     ? <div className="usage-pill">{totalQuestions}/{freeLimit} free</div>
@@ -273,7 +278,7 @@ export default function ChatPage({ session }: { session: Session }) {
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <div className="source-toggle">{sourceButtons}</div>
+          <div className="source-toggle">{scienceToggle}</div>
           {tierLoaded && usagePill}
         </header>
 
