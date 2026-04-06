@@ -5,8 +5,8 @@ import '../landing.css';
 
 const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   {
-    q: 'Can I try it before paying?',
-    a: 'Yes! Every new account gets 3 free questions so you can see the quality of answers before committing to a subscription.',
+    q: 'How can I try it before paying?',
+    a: <><a href="/auth?signup=1" style={{ color: 'var(--accent)', fontWeight: 600 }}>Create a free account</a> to get access to AI Coach, the AI trained on the methodology, physiology and biochemistry. AI Coach is also included with AI Programming, Year of the Engine and All Access Programs.</>,
   },
   {
     q: "What's the difference between the plans?",
