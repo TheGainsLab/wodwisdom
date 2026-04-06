@@ -10,19 +10,25 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "What's the difference between the plans?",
-    a: 'AI Coach gives you unlimited AI-powered coaching questions. Year of the Engine and AI Programming are full training programs that include AI Coach. All Access bundles everything together at a discount.',
+    a: <>
+      <strong>AI Coach</strong> is an AI trained on the methodology. Get advice about anything related to fitness. It's like having access to a high-level coach 24/7.
+      <br /><br />
+      <strong>Year of the Engine</strong> is a personalized conditioning program for athletes at any level.
+      <br /><br />
+      <strong>AI Programming</strong> is customized programming written by an AI trained on methodology. Complete a user profile and the AI writes a program tailored precisely to you. Log your results and the AI learns, updating your training so you always get exactly what you need.
+    </>,
   },
   {
     q: 'Can I cancel anytime?',
     a: 'Yes. There are no contracts or commitments. You can cancel your subscription at any time and retain access through the end of your billing period.',
   },
   {
-    q: 'If I sign up for Year of the Engine, do I get AI Coach and Nutrition for free?',
-    a: <>Yes. All <strong>Year of the Engine</strong> subscribers also get access to the <strong>AI Coach</strong> feature with 10 questions a day and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
+    q: 'What else is included with my Year of the Engine subscription?',
+    a: <>All <strong>Year of the Engine</strong> subscribers also get access to the <strong>AI Coach</strong> feature and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
   },
   {
-    q: 'If I sign up for AI Programming, do I get access to AI Coach and Nutrition for free?',
-    a: <>Yes. All <strong>AI Programming</strong> subscribers also get access to the <strong>AI Coach</strong> feature with 20 questions a day and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
+    q: 'What else is included with my AI Programming subscription?',
+    a: <>All <strong>AI Programming</strong> subscribers also get access to the <strong>AI Coach</strong> feature with 20 questions a day and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
   },
   {
     q: 'What is included in the All Access membership?',
