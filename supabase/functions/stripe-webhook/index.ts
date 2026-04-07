@@ -42,6 +42,10 @@ async function getSubscriptionEntitlements(subscriptionId: string): Promise<{ pl
   const subResp = await fetchWithTimeout(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
     headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
   }, 15_000);
+  if (!subResp.ok) {
+    console.error("Failed to fetch subscription from Stripe:", subResp.status);
+    return { plan: "unknown", features: [] };
+  }
   const sub = await subResp.json();
 
   // Get the price ID from the first subscription item
@@ -59,6 +63,12 @@ async function getSubscriptionEntitlements(subscriptionId: string): Promise<{ pl
   const priceResp = await fetchWithTimeout(`https://api.stripe.com/v1/prices/${priceId}`, {
     headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
   }, 15_000);
+  if (!priceResp.ok) {
+    console.error("Failed to fetch price from Stripe:", priceResp.status);
+    // Fall back to subscription metadata
+    const plan = sub.metadata?.plan;
+    return { plan: plan || "unknown", features: plan && PLAN_ENTITLEMENTS[plan] ? PLAN_ENTITLEMENTS[plan] : [] };
+  }
   const price = await priceResp.json();
 
   // Read entitlements from price metadata
