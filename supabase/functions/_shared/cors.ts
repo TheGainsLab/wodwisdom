@@ -1,4 +1,4 @@
-const ALLOWED_ORIGINS = [
+export const ALLOWED_ORIGINS = [
   "https://www.wodwisdom.com",
   "https://wodwisdom.com",
   "https://www.thegainslab.com",
