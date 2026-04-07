@@ -14,17 +14,20 @@ export default function BookmarksPage({ session }: { session: Session }) {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [navOpen, setNavOpen] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     supabase.from('bookmarks').select('id, message_id, created_at, chat_messages(question, answer, sources, context_type)').eq('user_id', session.user.id).order('created_at', { ascending: false })
-      .then(({ data }) => {
-        if (data) setBookmarks(data.map((b: any) => ({ id: b.id, message_id: b.message_id, question: b.chat_messages?.question || '', answer: b.chat_messages?.answer || '', sources: b.chat_messages?.sources || [], context_type: b.chat_messages?.context_type || null, created_at: b.created_at })));
+      .then(({ data, error: err }) => {
+        if (err) { setError('Failed to load bookmarks'); }
+        else if (data) setBookmarks(data.map((b: any) => ({ id: b.id, message_id: b.message_id, question: b.chat_messages?.question || '', answer: b.chat_messages?.answer || '', sources: b.chat_messages?.sources || [], context_type: b.chat_messages?.context_type || null, created_at: b.created_at })));
         setLoading(false);
       });
   }, []);
 
   const removeBookmark = async (id: string) => {
-    await supabase.from('bookmarks').delete().eq('id', id);
+    const { error: err } = await supabase.from('bookmarks').delete().eq('id', id);
+    if (err) { setError('Failed to delete bookmark'); return; }
     setBookmarks(prev => prev.filter(b => b.id !== id));
   };
 
@@ -39,6 +42,7 @@ export default function BookmarksPage({ session }: { session: Session }) {
           <h1>Bookmarks</h1>
         </header>
         <div className="page-body">
+          {error && <div style={{ padding: '8px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12, color: 'var(--text-muted)', fontSize: 13 }}>{error}</div>}
           {loading ? <div className="page-loading"><div className="loading-pulse" /></div> :
            bookmarks.length === 0 ? <div className="empty-state"><p>No bookmarks yet. Save answers you want to reference later.</p></div> :
            <div className="history-list">
