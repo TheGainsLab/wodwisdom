@@ -1,6 +1,8 @@
+import DOMPurify from 'dompurify';
+
 /** Lightweight markdown-to-HTML converter for AI-generated analysis text. */
 export function formatMarkdown(text: string): string {
-  return text
+  const html = text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/\n\n/g, '</p><p>')
@@ -10,4 +12,5 @@ export function formatMarkdown(text: string): string {
     .replace(/^/, '<p>')
     .replace(/$/, '</p>')
     .replace(/<p><\/p>/g, '');
+  return DOMPurify.sanitize(html);
 }

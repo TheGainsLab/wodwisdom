@@ -18,17 +18,12 @@ import {
   buildLibraryEntries,
   type MovementsRow,
 } from "../_shared/build-movements-context.ts";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
 
 const SYSTEM_PROMPT = `You are an expert CrossFit programming consultant. A coach has uploaded their training program and wants to incorporate specific movements that are currently missing.
 
@@ -183,6 +178,7 @@ Generate modifications to incorporate the requested movements into this program.
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

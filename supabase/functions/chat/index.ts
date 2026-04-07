@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { fetchAndFormatProgramContext } from "../_shared/training-program.ts";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -75,14 +76,8 @@ const STRENGTH_SYSTEM_PROMPT =
 const ALL_SYSTEM_PROMPT =
   "You are an expert coach and knowledge base assistant grounded in CrossFit methodology, strength-science literature, and exercise physiology. Coach-to-coach voice, direct, practical, evidence-based. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Ground answers in the provided context when available. When referencing physiological mechanisms, be accurate but accessible — explain the science in terms an experienced coach would understand. Cite sources naturally. If context does not cover the question, supplement with general knowledge but be transparent. Avoid excessive formatting. Do not list sources at the end, weave them in naturally.";
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
 Deno.serve(async (req) => {
+  const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {

@@ -12,16 +12,11 @@ import {
   type MovementsRow,
 } from "../_shared/build-movements-context.ts";
 import type { ParsedBlock, ParsedBlockMovement } from "../_shared/workout-parser.ts";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
 
 interface MovementWithSuggestion extends ParsedBlockMovement {
   suggested_weight?: number | null;
@@ -32,6 +27,7 @@ interface BlockWithSuggestions extends Omit<ParsedBlock, "movements"> {
 }
 
 Deno.serve(async (req) => {
+  const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {

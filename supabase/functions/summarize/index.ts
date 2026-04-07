@@ -1,14 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 const SUMMARY_PROMPT = `You are a concise fitness and coaching assistant. Summarize the following answer into 2-3 bullet points that capture the most important takeaways. Use plain language a coach can scan in seconds. Return ONLY the bullet points, nothing else. Format each bullet starting with "• ".`
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
