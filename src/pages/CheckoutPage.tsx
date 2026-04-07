@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 
 type PlanKey = 'coach' | 'nutrition' | 'coach_nutrition' | 'programming' | 'engine' | 'all_access';
@@ -86,11 +88,14 @@ const PLANS: { key: PlanKey; name: string; monthly: string; quarterly: string; f
 
 interface CheckoutPageProps { session: Session; }
 
-export default function CheckoutPage({ session: _session }: CheckoutPageProps) {
+export default function CheckoutPage({ session }: CheckoutPageProps) {
   const [loading, setLoading] = useState<PlanKey | null>(null);
   const [error, setError] = useState('');
   const [navOpen, setNavOpen] = useState(false);
   const [interval, setInterval] = useState<Interval>('monthly');
+  const navigate = useNavigate();
+  const { hasFeature, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
+  const hasSubscription = !entLoading && (isAdmin || hasFeature('ai_chat') || hasFeature('engine') || hasFeature('programming') || hasFeature('nutrition'));
 
   const selectPlan = async (p: PlanKey) => {
     setError('');
@@ -126,8 +131,18 @@ export default function CheckoutPage({ session: _session }: CheckoutPageProps) {
         <div className="page-body">
           <div style={{ maxWidth: 520, margin: '0 auto', padding: '24px 0' }}>
             <div className="checkout-plans">
-              <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Choose your plan</h2>
-              <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 20 }}>All plans include a free trial. You'll complete payment on Stripe's secure page.</p>
+              {hasSubscription ? (
+                <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)', marginBottom: 20 }}>
+                  <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>You already have an active subscription</h2>
+                  <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 16 }}>To upgrade, downgrade, or change your plan, use Manage subscription in Settings.</p>
+                  <button className="auth-btn" onClick={() => navigate('/settings')}>Go to Settings</button>
+                </div>
+              ) : (
+                <>
+                  <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Choose your plan</h2>
+                  <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 20 }}>All plans include a free trial. You'll complete payment on Stripe's secure page.</p>
+                </>
+              )}
 
               {/* Monthly / Quarterly toggle */}
               <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>

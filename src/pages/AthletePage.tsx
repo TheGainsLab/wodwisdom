@@ -936,6 +936,7 @@ export default function AthletePage({ session }: { session: Session }) {
                     {(() => {
                       // Profile Analysis: available to all, rate limited
                       const isFreeUser = !hasFeature('ai_chat') && !hasFeature('engine') && !hasFeature('programming') && !hasFeature('nutrition') && !isAdmin;
+                      const upgradeRoute = isFreeUser ? '/checkout' : '/settings';
                       const profileCooldown = lastProfileAnalysis ? Math.ceil((new Date(lastProfileAnalysis).getTime() + 30 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000)) : 0;
                       const profileLocked = isFreeUser && lastProfileAnalysis != null;
                       const profileOnCooldown = !isAdmin && profileCooldown > 0;
@@ -953,7 +954,7 @@ export default function AthletePage({ session }: { session: Session }) {
                             type="button"
                             className="auth-btn"
                             style={{ background: 'var(--surface2)', color: 'var(--text)' }}
-                            onClick={profileLocked ? () => navigate('/checkout') : fetchProfileAnalysis}
+                            onClick={profileLocked ? () => navigate(upgradeRoute) : fetchProfileAnalysis}
                             disabled={!!analysisLoading || profileOnCooldown}
                           >
                             {analysisLoading === 'profile' ? 'Analyzing...'
@@ -970,7 +971,7 @@ export default function AthletePage({ session }: { session: Session }) {
                               ? { background: 'var(--surface2)', color: 'var(--text)' }
                               : { background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: 0.6 }
                             }
-                            onClick={canTrainingAnalysis ? fetchTrainingAnalysis : () => navigate('/checkout')}
+                            onClick={canTrainingAnalysis ? fetchTrainingAnalysis : () => navigate(upgradeRoute)}
                             disabled={!!analysisLoading || trainingOnCooldown}
                           >
                             {!canTrainingAnalysis ? (
@@ -994,7 +995,7 @@ export default function AthletePage({ session }: { session: Session }) {
                               ? { background: 'var(--surface2)', color: 'var(--text)' }
                               : { background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: 0.6 }
                             }
-                            onClick={canNutritionAnalysis ? fetchNutritionAnalysis : () => navigate('/checkout')}
+                            onClick={canNutritionAnalysis ? fetchNutritionAnalysis : () => navigate(upgradeRoute)}
                             disabled={!!analysisLoading || nutritionOnCooldown}
                           >
                             {!canNutritionAnalysis ? (
@@ -1034,7 +1035,7 @@ export default function AthletePage({ session }: { session: Session }) {
                           <button
                             type="button"
                             className="auth-btn"
-                            onClick={() => navigate('/checkout')}
+                            onClick={() => navigate((!hasFeature('ai_chat') && !hasFeature('engine') && !hasFeature('programming') && !hasFeature('nutrition') && !isAdmin) ? '/checkout' : '/settings')}
                             style={{ marginTop: 14, background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: 0.6, cursor: 'pointer' }}
                           >
                             <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
