@@ -953,8 +953,8 @@ export default function AthletePage({ session }: { session: Session }) {
                             type="button"
                             className="auth-btn"
                             style={{ background: 'var(--surface2)', color: 'var(--text)' }}
-                            onClick={fetchProfileAnalysis}
-                            disabled={!!analysisLoading || profileLocked || profileOnCooldown}
+                            onClick={profileLocked ? () => navigate('/checkout') : fetchProfileAnalysis}
+                            disabled={!!analysisLoading || profileOnCooldown}
                           >
                             {analysisLoading === 'profile' ? 'Analyzing...'
                               : profileLocked ? 'Upgrade for more analyses'
@@ -970,8 +970,8 @@ export default function AthletePage({ session }: { session: Session }) {
                               ? { background: 'var(--surface2)', color: 'var(--text)' }
                               : { background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: 0.6 }
                             }
-                            onClick={canTrainingAnalysis ? fetchTrainingAnalysis : undefined}
-                            disabled={!!analysisLoading || !canTrainingAnalysis || trainingOnCooldown}
+                            onClick={canTrainingAnalysis ? fetchTrainingAnalysis : () => navigate('/checkout')}
+                            disabled={!!analysisLoading || trainingOnCooldown}
                           >
                             {!canTrainingAnalysis ? (
                               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -994,8 +994,8 @@ export default function AthletePage({ session }: { session: Session }) {
                               ? { background: 'var(--surface2)', color: 'var(--text)' }
                               : { background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: 0.6 }
                             }
-                            onClick={canNutritionAnalysis ? fetchNutritionAnalysis : undefined}
-                            disabled={!!analysisLoading || !canNutritionAnalysis || nutritionOnCooldown}
+                            onClick={canNutritionAnalysis ? fetchNutritionAnalysis : () => navigate('/checkout')}
+                            disabled={!!analysisLoading || nutritionOnCooldown}
                           >
                             {!canNutritionAnalysis ? (
                               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1034,8 +1034,8 @@ export default function AthletePage({ session }: { session: Session }) {
                           <button
                             type="button"
                             className="auth-btn"
-                            disabled
-                            style={{ marginTop: 14, background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: 0.6 }}
+                            onClick={() => navigate('/checkout')}
+                            style={{ marginTop: 14, background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: 0.6, cursor: 'pointer' }}
                           >
                             <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
