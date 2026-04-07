@@ -967,10 +967,7 @@ export default function AthletePage({ session }: { session: Session }) {
                           <button
                             type="button"
                             className="auth-btn"
-                            style={canTrainingAnalysis
-                              ? { background: 'var(--surface2)', color: 'var(--text)' }
-                              : { background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: 0.6 }
-                            }
+                            style={{ background: 'var(--surface2)', color: 'var(--text)' }}
                             onClick={canTrainingAnalysis ? fetchTrainingAnalysis : () => navigate(upgradeRoute)}
                             disabled={!!analysisLoading || trainingOnCooldown}
                           >
@@ -991,10 +988,7 @@ export default function AthletePage({ session }: { session: Session }) {
                           <button
                             type="button"
                             className="auth-btn"
-                            style={canNutritionAnalysis
-                              ? { background: 'var(--surface2)', color: 'var(--text)' }
-                              : { background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: 0.6 }
-                            }
+                            style={{ background: 'var(--surface2)', color: 'var(--text)' }}
                             onClick={canNutritionAnalysis ? fetchNutritionAnalysis : () => navigate(upgradeRoute)}
                             disabled={!!analysisLoading || nutritionOnCooldown}
                           >
