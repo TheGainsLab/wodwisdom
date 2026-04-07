@@ -6,16 +6,10 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferTimeDomain } from "../_shared/time-domain.ts";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
 
 const BLOCK_TYPES = [
   "warm-up",
@@ -81,6 +75,7 @@ interface SaveBlockBody {
 }
 
 Deno.serve(async (req) => {
+  const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {

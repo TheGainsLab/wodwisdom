@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 import { callClaude, callClaudeVision } from "../_shared/call-claude.ts";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 // Inlined from _shared/parse-workout-blocks.ts to avoid import resolution issues
 const BLOCK_LABELS = ["Warm-up", "Mobility", "Skills", "Strength", "Metcon", "Cool down"] as const;
@@ -35,11 +36,6 @@ function extractBlocksFromWorkoutText(
 }
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const cors = {
-"Access-Control-Allow-Origin": "*",
-"Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-"Access-Control-Allow-Methods": "POST, OPTIONS",
-};
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const DAY_ABBREV = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const WEEK_REGEX = /week\s*(\d+)/i;
@@ -708,6 +704,7 @@ async function parseProgramAI(
 
 console.log("[preprocess-program] v2 loaded");
 Deno.serve(async (req) => {
+const cors = getCorsHeaders(req);
 if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 try {
 console.log("[preprocess-program] v2 handling request");
