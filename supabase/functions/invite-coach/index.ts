@@ -1,6 +1,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from "../_shared/cors.ts";
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
@@ -62,7 +70,7 @@ Deno.serve(async (req) => {
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
             <h2>You're invited!</h2>
-            <p><strong>${gym_name}</strong> wants you as a coach on WOD Wisdom.</p>
+            <p><strong>${escapeHtml(gym_name)}</strong> wants you as a coach on WOD Wisdom.</p>
             <p>Sign up or log in to accept:</p>
             <a href="${siteUrl}?invite=${encodeURIComponent(email)}" style="display: inline-block; background: #ff3a3a; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">Open WOD Wisdom</a>
           </div>
