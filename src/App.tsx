@@ -1,46 +1,64 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import BottomTabBar from './components/BottomTabBar';
 import InstallPrompt from './components/InstallPrompt';
 import ErrorBoundary from './components/ErrorBoundary';
+
+// Eagerly loaded — core pages users hit immediately
 import AuthPage from './pages/AuthPage';
 import LandingPage from './pages/LandingPage';
 import ChatPage from './pages/ChatPage';
-import HistoryPage from './pages/HistoryPage';
-import BookmarksPage from './pages/BookmarksPage';
-import SettingsPage from './pages/SettingsPage';
-import AdminPage from './pages/AdminPage';
-import AdminUserDetailPage from './pages/AdminUserDetailPage';
-import AthletePage from './pages/AthletePage';
-import WorkoutReviewPage from './pages/WorkoutReviewPage';
-import StartWorkoutPage from './pages/StartWorkoutPage';
-import TrainingLogPage from './pages/TrainingLogPage';
-import ProgramsListPage from './pages/ProgramsListPage';
-import AddProgramPage from './pages/AddProgramPage';
-import ProgramDetailPage from './pages/ProgramDetailPage';
-import ProgramEditPage from './pages/ProgramEditPage';
-import ProgramAnalysisPage from './pages/ProgramAnalysisPage';
-import ProgramComparePage from './pages/ProgramComparePage';
-import ProgramReviewPage from './pages/ProgramReviewPage';
-import WorkoutAnalysisPage from './pages/WorkoutAnalysisPage';
-import CheckoutPage from './pages/CheckoutPage';
-import CheckoutCompletePage from './pages/CheckoutCompletePage';
-import EngineDashboardPage from './pages/EngineDashboardPage';
-import EngineTrainingDayPage from './pages/EngineTrainingDayPage';
-import EngineAnalyticsPage from './pages/EngineAnalyticsPage';
-import EngineTaxonomyPage from './pages/EngineTaxonomyPage';
-import NutritionDashboardPage from './pages/NutritionDashboardPage';
-import NutritionCalendarPage from './pages/NutritionCalendarPage';
-import AILogDashboardPage from './pages/AILogDashboardPage';
-import AILogUploadPage from './pages/AILogUploadPage';
-import AILogProgramPage from './pages/AILogProgramPage';
-import FeaturesHubPage from './pages/features/FeaturesHubPage';
-import AICoachingFeaturePage from './pages/features/AICoachingFeaturePage';
-import ProgramsFeaturePage from './pages/features/ProgramsFeaturePage';
-import EngineFeaturePage from './pages/features/EngineFeaturePage';
-import NutritionFeaturePage from './pages/features/NutritionFeaturePage';
+
+// Lazy-loaded — feature modules loaded on demand
+const HistoryPage = lazy(() => import('./pages/HistoryPage'));
+const BookmarksPage = lazy(() => import('./pages/BookmarksPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
+const AdminUserDetailPage = lazy(() => import('./pages/AdminUserDetailPage'));
+const AthletePage = lazy(() => import('./pages/AthletePage'));
+const WorkoutReviewPage = lazy(() => import('./pages/WorkoutReviewPage'));
+const StartWorkoutPage = lazy(() => import('./pages/StartWorkoutPage'));
+const TrainingLogPage = lazy(() => import('./pages/TrainingLogPage'));
+const WorkoutAnalysisPage = lazy(() => import('./pages/WorkoutAnalysisPage'));
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
+const CheckoutCompletePage = lazy(() => import('./pages/CheckoutCompletePage'));
+
+// Programs
+const ProgramsListPage = lazy(() => import('./pages/ProgramsListPage'));
+const AddProgramPage = lazy(() => import('./pages/AddProgramPage'));
+const ProgramDetailPage = lazy(() => import('./pages/ProgramDetailPage'));
+const ProgramEditPage = lazy(() => import('./pages/ProgramEditPage'));
+const ProgramAnalysisPage = lazy(() => import('./pages/ProgramAnalysisPage'));
+const ProgramComparePage = lazy(() => import('./pages/ProgramComparePage'));
+const ProgramReviewPage = lazy(() => import('./pages/ProgramReviewPage'));
+
+// Engine
+const EngineDashboardPage = lazy(() => import('./pages/EngineDashboardPage'));
+const EngineTrainingDayPage = lazy(() => import('./pages/EngineTrainingDayPage'));
+const EngineAnalyticsPage = lazy(() => import('./pages/EngineAnalyticsPage'));
+const EngineTaxonomyPage = lazy(() => import('./pages/EngineTaxonomyPage'));
+
+// Nutrition
+const NutritionDashboardPage = lazy(() => import('./pages/NutritionDashboardPage'));
+const NutritionCalendarPage = lazy(() => import('./pages/NutritionCalendarPage'));
+
+// AI Log
+const AILogDashboardPage = lazy(() => import('./pages/AILogDashboardPage'));
+const AILogUploadPage = lazy(() => import('./pages/AILogUploadPage'));
+const AILogProgramPage = lazy(() => import('./pages/AILogProgramPage'));
+
+// Feature landing pages
+const FeaturesHubPage = lazy(() => import('./pages/features/FeaturesHubPage'));
+const AICoachingFeaturePage = lazy(() => import('./pages/features/AICoachingFeaturePage'));
+const ProgramsFeaturePage = lazy(() => import('./pages/features/ProgramsFeaturePage'));
+const EngineFeaturePage = lazy(() => import('./pages/features/EngineFeaturePage'));
+const NutritionFeaturePage = lazy(() => import('./pages/features/NutritionFeaturePage'));
+
+function PageLoader() {
+  return <div className="loading-screen"><div className="loading-pulse" /></div>;
+}
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -60,19 +78,21 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading) return <div className="loading-screen"><div className="loading-pulse" /></div>;
+  if (loading) return <PageLoader />;
   if (!session) return (
     <ErrorBoundary>
-      <Routes>
-        <Route path="/auth" element={<AuthPage />} />
-        <Route path="/features" element={<FeaturesHubPage />} />
-        <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
-        <Route path="/features/programs" element={<ProgramsFeaturePage />} />
-        <Route path="/features/engine" element={<EngineFeaturePage />} />
-        <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
-        <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
-        <Route path="*" element={<LandingPage />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/features" element={<FeaturesHubPage />} />
+          <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
+          <Route path="/features/programs" element={<ProgramsFeaturePage />} />
+          <Route path="/features/engine" element={<EngineFeaturePage />} />
+          <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
+          <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
+          <Route path="*" element={<LandingPage />} />
+        </Routes>
+      </Suspense>
     </ErrorBoundary>
   );
 
@@ -111,44 +131,46 @@ function AuthenticatedApp({ session }: { session: Session }) {
   return (
     <>
       <ErrorBoundary>
-        <Routes>
-          <Route path="/" element={<ChatPage session={session} />} />
-          <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
-          <Route path="/workout/start" element={<StartWorkoutPage session={session} />} />
-          <Route path="/workout-analysis" element={<WorkoutAnalysisPage session={session} />} />
-          <Route path="/training-log" element={<TrainingLogPage session={session} />} />
-          <Route path="/programs" element={<ProgramsListPage session={session} />} />
-          <Route path="/programs/new" element={<AddProgramPage session={session} />} />
-          <Route path="/programs/:id/edit" element={<ProgramEditPage session={session} />} />
-          <Route path="/programs/:id/analyze" element={<ProgramAnalysisPage session={session} />} />
-          <Route path="/programs/:id/modify/:modificationId/compare" element={<ProgramComparePage session={session} />} />
-          <Route path="/programs/:id/modify/:modificationId/review" element={<ProgramReviewPage session={session} />} />
-          <Route path="/programs/:id" element={<ProgramDetailPage session={session} />} />
-          <Route path="/checkout" element={<CheckoutPage session={session} />} />
-          <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
-          <Route path="/history" element={<HistoryPage session={session} />} />
-          <Route path="/bookmarks" element={<BookmarksPage session={session} />} />
-          <Route path="/settings" element={<SettingsPage session={session} />} />
-          <Route path="/profile" element={<AthletePage session={session} />} />
-          <Route path="/admin" element={<AdminPage session={session} />} />
-          <Route path="/admin/users/:id" element={<AdminUserDetailPage session={session} />} />
-          <Route path="/engine" element={<EngineDashboardPage session={session} />} />
-          <Route path="/engine/dashboard" element={<EngineDashboardPage session={session} />} />
-          <Route path="/engine/training/:dayNumber" element={<EngineTrainingDayPage session={session} />} />
-          <Route path="/engine/analytics" element={<EngineAnalyticsPage session={session} />} />
-          <Route path="/engine/taxonomy" element={<EngineTaxonomyPage session={session} />} />
-          <Route path="/nutrition" element={<NutritionDashboardPage session={session} />} />
-          <Route path="/nutrition/calendar" element={<NutritionCalendarPage session={session} />} />
-          <Route path="/ailog" element={<AILogDashboardPage session={session} />} />
-          <Route path="/ailog/upload" element={<AILogUploadPage session={session} />} />
-          <Route path="/ailog/:id" element={<AILogProgramPage session={session} />} />
-          <Route path="/features" element={<FeaturesHubPage />} />
-          <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
-          <Route path="/features/programs" element={<ProgramsFeaturePage />} />
-          <Route path="/features/engine" element={<EngineFeaturePage />} />
-          <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<ChatPage session={session} />} />
+            <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
+            <Route path="/workout/start" element={<StartWorkoutPage session={session} />} />
+            <Route path="/workout-analysis" element={<WorkoutAnalysisPage session={session} />} />
+            <Route path="/training-log" element={<TrainingLogPage session={session} />} />
+            <Route path="/programs" element={<ProgramsListPage session={session} />} />
+            <Route path="/programs/new" element={<AddProgramPage session={session} />} />
+            <Route path="/programs/:id/edit" element={<ProgramEditPage session={session} />} />
+            <Route path="/programs/:id/analyze" element={<ProgramAnalysisPage session={session} />} />
+            <Route path="/programs/:id/modify/:modificationId/compare" element={<ProgramComparePage session={session} />} />
+            <Route path="/programs/:id/modify/:modificationId/review" element={<ProgramReviewPage session={session} />} />
+            <Route path="/programs/:id" element={<ProgramDetailPage session={session} />} />
+            <Route path="/checkout" element={<CheckoutPage session={session} />} />
+            <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
+            <Route path="/history" element={<HistoryPage session={session} />} />
+            <Route path="/bookmarks" element={<BookmarksPage session={session} />} />
+            <Route path="/settings" element={<SettingsPage session={session} />} />
+            <Route path="/profile" element={<AthletePage session={session} />} />
+            <Route path="/admin" element={<AdminPage session={session} />} />
+            <Route path="/admin/users/:id" element={<AdminUserDetailPage session={session} />} />
+            <Route path="/engine" element={<EngineDashboardPage session={session} />} />
+            <Route path="/engine/dashboard" element={<EngineDashboardPage session={session} />} />
+            <Route path="/engine/training/:dayNumber" element={<EngineTrainingDayPage session={session} />} />
+            <Route path="/engine/analytics" element={<EngineAnalyticsPage session={session} />} />
+            <Route path="/engine/taxonomy" element={<EngineTaxonomyPage session={session} />} />
+            <Route path="/nutrition" element={<NutritionDashboardPage session={session} />} />
+            <Route path="/nutrition/calendar" element={<NutritionCalendarPage session={session} />} />
+            <Route path="/ailog" element={<AILogDashboardPage session={session} />} />
+            <Route path="/ailog/upload" element={<AILogUploadPage session={session} />} />
+            <Route path="/ailog/:id" element={<AILogProgramPage session={session} />} />
+            <Route path="/features" element={<FeaturesHubPage />} />
+            <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
+            <Route path="/features/programs" element={<ProgramsFeaturePage />} />
+            <Route path="/features/engine" element={<EngineFeaturePage />} />
+            <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </ErrorBoundary>
       {!hideTabBar && <BottomTabBar />}
       <InstallPrompt />
