@@ -35,6 +35,10 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
     a: <>All Access members get access to <strong>AI Programming</strong>, <strong>Year of the Engine</strong>, <strong>AI Coach</strong>, and <strong>Nutrition</strong>. All of this for under $50 a month.</>,
   },
   {
+    q: "Why aren't the questions free? I'm just trying to learn a few things.",
+    a: <>We use a current AI model, so each question has a meaningful token cost. All of your questions are stored in your searchable history and there is no limit to how many questions you can ask. There is a small cost for the database storage and AI token costs. <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Coach</span> is free with <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Engine</span>, <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Programming</span> and <span style={{ color: 'var(--accent)', fontWeight: 600 }}>All Access</span> subscriptions.</>,
+  },
+  {
     q: 'I have additional questions. How can I contact you?',
     a: <>You can send us an email anytime to <a href="mailto:coach@thegainslab.com" style={{ color: 'var(--accent)' }}>coach@thegainslab.com</a></>,
   },
