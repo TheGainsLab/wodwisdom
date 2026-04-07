@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
     }
 
     const nextMonth = (program.generated_months || 1) + 1;
-    console.log(`[generate-next-month] Program ${programId}: current months=${program.generated_months}, generating month ${nextMonth}`);
+    console.log(`[generate-next-month] current months=${program.generated_months}, generating month ${nextMonth}`);
 
     // 2. Check rate limit — one evaluation per month
     const thirtyDaysAgo = new Date();
@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
 
     const evalData = await evalResp.json();
     const evaluationId = evalData.evaluation_id;
-    console.log(`[generate-next-month] Evaluation created: ${evaluationId} (month ${nextMonth}, visible=false)`);
+    console.log(`[generate-next-month] Evaluation created (month ${nextMonth}, visible=false)`);
 
     // 4. Trigger program generation with month context
     //    This will append 20 workouts and make the evaluation visible on completion
@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
     }
 
     const genData = await genResp.json();
-    console.log(`[generate-next-month] Generation started: job_id=${genData.job_id}, month=${nextMonth}`);
+    console.log(`[generate-next-month] Generation started, month=${nextMonth}`);
 
     return new Response(
       JSON.stringify({

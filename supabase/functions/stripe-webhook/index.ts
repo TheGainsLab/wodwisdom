@@ -99,13 +99,11 @@ serve(async (req) => {
         const subscriptionId = session.subscription;
 
         if (!subscriptionId) {
-          console.log("No subscription ID in checkout session — skipping");
           break;
         }
 
         // Get entitlements from the subscription's price metadata
         const { plan, features } = await getSubscriptionEntitlements(subscriptionId);
-        console.log(`Checkout completed: plan=${plan}, features=${features.join(",")}, email=${email}`);
 
         if (features.length === 0) {
           console.error("No features resolved for plan:", plan);
@@ -139,10 +137,8 @@ serve(async (req) => {
             }, { onConflict: "user_id,feature,source" });
           }
 
-          console.log(`Granted ${features.length} entitlements to user ${userId}`);
         } else {
           // No account yet — write to pending_subscriptions
-          console.log(`No user found for ${email} — writing to pending_subscriptions`);
           await supa.from("pending_subscriptions").upsert({
             email,
             stripe_customer_id: customerId,
@@ -184,7 +180,6 @@ serve(async (req) => {
               }, { onConflict: "user_id,feature,source" });
             }
 
-            console.log(`Updated entitlements for user ${userId}: ${features.join(",")}`);
           }
         }
         break;
@@ -195,7 +190,7 @@ serve(async (req) => {
         const customerId = sub.customer;
         const subscriptionId = sub.id;
 
-        console.log(`Subscription deleted: ${subscriptionId}`);
+        // Subscription cancelled — remove entitlements
 
         // Find user by stripe_customer_id
         const { data: profiles } = await supa.from("profiles").select("id").eq("stripe_customer_id", customerId).limit(1);
@@ -206,7 +201,6 @@ serve(async (req) => {
             .eq("user_id", profiles[0].id)
             .eq("source", subscriptionId);
 
-          console.log(`Removed entitlements for user ${profiles[0].id}`);
         }
         break;
       }

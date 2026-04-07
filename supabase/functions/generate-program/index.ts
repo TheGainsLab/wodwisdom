@@ -471,7 +471,7 @@ async function processJob(
   } = {}
 ): Promise<void> {
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-  console.log(`=== Job ${jobId} start ===`);
+  console.log("[generate-program] Job start");
   const jobStart = Date.now();
   try {
     // Mark processing
@@ -479,18 +479,18 @@ async function processJob(
     const monthNumber = options.monthNumber || 1;
     const existingProgramId = options.programId || null;
     const isContinuation = monthNumber > 1 && existingProgramId != null;
-    console.log(`[${jobId}] Month ${monthNumber}, continuation=${isContinuation}, existingProgram=${existingProgramId}`);
+    console.log(`[generate-program] Month ${monthNumber}, continuation=${isContinuation}`);
     const profile = evalRow.profile_snapshot || {};
     const profileStr = formatProfile(profile);
-    console.log(`[${jobId}] Profile: ${profileStr.length} chars, lifts=${Object.keys(profile.lifts || {}).length}, skills=${Object.keys(profile.skills || {}).length}`);
+    console.log(`[generate-program] Profile: ${profileStr.length} chars, lifts=${Object.keys(profile.lifts || {}).length}, skills=${Object.keys(profile.skills || {}).length}`);
     const analysisStr = evalRow.analysis || "No detailed analysis.";
-    console.log(`[${jobId}] Analysis: ${analysisStr.length} chars`);
+    console.log(`[generate-program] Analysis: ${analysisStr.length} chars`);
     // For Month 2+, fetch extended training history (full month) and previous program context
     const trainingDays = isContinuation ? 35 : 14;
     const trainingMaxLines = isContinuation ? 60 : 25;
     const recentTraining = await fetchAndFormatRecentHistory(supa, userId, { days: trainingDays, maxLines: trainingMaxLines });
     const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
-    console.log(`[${jobId}] Training history: ${recentTraining ? recentTraining.length + ' chars' : 'none'} (${trainingDays} days)`);
+    console.log(`[generate-program] Training history: ${recentTraining ? recentTraining.length + ' chars' : 'none'} (${trainingDays} days)`);
     // Fetch previous program context and evaluation history for Month 2+
     let previousProgramContext = "";
     let evaluationHistory = "";
@@ -499,11 +499,11 @@ async function processJob(
         fetchPreviousProgramContext(supa, existingProgramId, monthNumber),
         fetchEvaluationHistory(supa, userId),
       ]);
-      console.log(`[${jobId}] Previous program context: ${previousProgramContext.length} chars`);
-      console.log(`[${jobId}] Evaluation history: ${evaluationHistory.length} chars`);
+      console.log(`[generate-program] Previous program context: ${previousProgramContext.length} chars`);
+      console.log(`[generate-program] Evaluation history: ${evaluationHistory.length} chars`);
     }
     const ragContext = await retrieveRAGContext(supa, profile);
-    console.log(`[${jobId}] RAG context: ${ragContext ? ragContext.length + ' chars' : 'none'}`);
+    console.log(`[generate-program] RAG context: ${ragContext ? ragContext.length + ' chars' : 'none'}`);
     // Determine athlete scope for guideline filtering
     const scopes = ["all"];
     if (profile.skills) {
@@ -513,12 +513,12 @@ async function processJob(
       if (developing > advanced) scopes.push("beginner");
       else if (advanced > 0) scopes.push("competition");
     }
-    console.log(`[${jobId}] Guideline scopes: [${scopes.join(", ")}]`);
+    console.log(`[generate-program] Guideline scopes: [${scopes.join(", ")}]`);
     // Fetch strength guidelines from coaching_guidelines table
     const guidelinesBlock = await fetchCoachingGuidelines(supa, scopes);
-    console.log(`[${jobId}] Guidelines: ${guidelinesBlock ? guidelinesBlock.length + ' chars' : 'none'}`);
+    console.log(`[generate-program] Guidelines: ${guidelinesBlock ? guidelinesBlock.length + ' chars' : 'none'}`);
     const skeleton = buildProgramSkeleton(monthNumber);
-    console.log(`[${jobId}] Skeleton: ${skeleton.length} chars, ${(skeleton.match(/^Day \d+:/gm) || []).length} day headers`);
+    console.log(`[generate-program] Skeleton: ${skeleton.length} chars, ${(skeleton.match(/^Day \d+:/gm) || []).length} day headers`);
     // Derive metcon-eligible vs skill-block-only movements
     const proficientSkills: string[] = [];
     const developingSkills: string[] = [];
@@ -603,7 +603,7 @@ ${skeleton}`;
         .replace("{previousProgramContext}", previousProgramContext);
     }
     const systemPrompt = GENERATE_PROMPT + metconGuidance + progressionBlock + guidelinesBlock + ragContext;
-    console.log(`[${jobId}] Prompt sizes: system=${systemPrompt.length} chars, user=${userPrompt.length} chars`);
+    console.log(`[generate-program] Prompt sizes: system=${systemPrompt.length} chars, user=${userPrompt.length} chars`);
     if (!ANTHROPIC_API_KEY) {
       throw new Error("Program generation is not configured");
     }
@@ -616,7 +616,7 @@ ${skeleton}`;
       { role: "user", content: userPrompt },
     ];
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      console.log(`[${jobId}] Attempt ${attempt}/${MAX_ATTEMPTS}: sending ${messages.length} messages to Claude...`);
+      console.log(`[generate-program] Attempt ${attempt}/${MAX_ATTEMPTS}: sending ${messages.length} messages to Claude...`);
       const apiStart = Date.now();
       const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -637,7 +637,7 @@ ${skeleton}`;
       const apiElapsed = ((Date.now() - apiStart) / 1000).toFixed(1);
       if (!claudeResp.ok) {
         const err = await claudeResp.json().catch(() => ({}));
-        console.error(`[${jobId}] Attempt ${attempt}: Claude API error after ${apiElapsed}s, status=${claudeResp.status}:`, JSON.stringify(err));
+        console.error(`[generate-program] Attempt ${attempt}: Claude API error after ${apiElapsed}s, status=${claudeResp.status}:`, JSON.stringify(err));
         throw new Error("Failed to generate program");
       }
       const claudeData = await claudeResp.json();
@@ -657,15 +657,11 @@ ${skeleton}`;
       const strengthCount = (programText.match(/^Strength:/gmi) || []).length;
       const metconCount = (programText.match(/^Metcon:/gmi) || []).length;
       const cooldownCount = (programText.match(/^Cool\s*down:/gmi) || []).length;
-      console.log(`[${jobId}] Attempt ${attempt}: ${apiElapsed}s, stop=${stopReason}, tokens=${inputTokens}in/${outputTokens}out, chars=${programText.length}, days=${dayHeaders.length}, blocks=[warmup=${warmupCount},skills=${skillsCount},strength=${strengthCount},metcon=${metconCount},cooldown=${cooldownCount}]`);
-      if (dayHeaders.length > 0) {
-        console.log(`[${jobId}] Attempt ${attempt} head: ${programText.slice(0, 200)}`);
-        console.log(`[${jobId}] Attempt ${attempt} tail: ${programText.slice(-200)}`);
-      }
+      console.log(`[generate-program] Attempt ${attempt}: ${apiElapsed}s, stop=${stopReason}, tokens=${inputTokens}in/${outputTokens}out, chars=${programText.length}, days=${dayHeaders.length}, blocks=[warmup=${warmupCount},skills=${skillsCount},strength=${strengthCount},metcon=${metconCount},cooldown=${cooldownCount}]`);
       // Too short — retry with context
       if (!programText || programText.length < 100) {
         if (attempt < MAX_ATTEMPTS) {
-          console.warn(`[${jobId}] Attempt ${attempt}: program too short (${programText.length} chars), retrying with correction...`);
+          console.warn(`[generate-program] Attempt ${attempt}: program too short (${programText.length} chars), retrying with correction...`);
           messages.push({ role: "assistant", content: programText || "(empty)" });
           messages.push({ role: "user", content: "That output was too short or empty. Please generate the complete program filling in every block of the template." });
           continue;
@@ -678,7 +674,7 @@ ${skeleton}`;
       const expectedLastDay = dayOffset + 20;
       if (dayHeaders.length < 20) {
         if (attempt < MAX_ATTEMPTS) {
-          console.warn(`[${jobId}] Attempt ${attempt}: only ${dayHeaders.length}/20 days, retrying with correction...`);
+          console.warn(`[generate-program] Attempt ${attempt}: only ${dayHeaders.length}/20 days, retrying with correction...`);
           messages.push({ role: "assistant", content: programText });
           messages.push({ role: "user", content: `That program only contained ${dayHeaders.length} days. It must have exactly 20 days (Day ${expectedFirstDay} through Day ${expectedLastDay}). Please output the complete program with all 20 days.` });
           continue;
@@ -686,7 +682,7 @@ ${skeleton}`;
         throw new Error(`Program contained ${dayHeaders.length}/20 days after ${MAX_ATTEMPTS} attempts`);
       }
       // Save program directly (bypasses preprocess-program HTTP call)
-      console.log(`[${jobId}] Saving program inline: ${programText.length} chars, name="${programName}"`);
+      console.log(`[generate-program] Saving program inline: ${programText.length} chars, name="${programName}"`);
       // Parse AI output into workouts using Day N: markers
       const dayParts = programText.replace(/\r\n/g, "\n").split(/^Day (\d+):/mi);
       const parsedWorkouts: { week_num: number; day_num: number; workout_text: string; sort_order: number }[] = [];
@@ -698,7 +694,7 @@ ${skeleton}`;
       }
       if (parsedWorkouts.length !== 20) {
         if (attempt < MAX_ATTEMPTS) {
-          console.warn(`[${jobId}] Attempt ${attempt}: parsed ${parsedWorkouts.length}/20 workouts, retrying...`);
+          console.warn(`[generate-program] Attempt ${attempt}: parsed ${parsedWorkouts.length}/20 workouts, retrying...`);
           messages.push({ role: "assistant", content: programText });
           messages.push({ role: "user", content: `That program failed validation: Expected exactly 20 workouts, got ${parsedWorkouts.length}. Please output the complete program with exactly 20 days (Day ${expectedFirstDay} through Day ${expectedLastDay}), filling in every block of the template.` });
           continue;
@@ -708,7 +704,7 @@ ${skeleton}`;
       // Validate metcon blocks against rules
       const metconViolations = validateMetcons(parsedWorkouts, developingSkills);
       if (metconViolations.length > 0) {
-        console.warn(`[${jobId}] Attempt ${attempt}: ${metconViolations.length} metcon violations found`);
+        console.warn(`[generate-program] Attempt ${attempt}: ${metconViolations.length} metcon violations found`);
         for (const v of metconViolations) {
           console.warn(`  [${v.rule}] ${v.detail}`);
         }
@@ -719,13 +715,13 @@ ${skeleton}`;
           continue;
         }
         // On final attempt, log but proceed — partial compliance is better than failure
-        console.warn(`[${jobId}] Final attempt still has ${metconViolations.length} violations — saving anyway`);
+        console.warn(`[generate-program] Final attempt still has ${metconViolations.length} violations — saving anyway`);
       }
       // For Month 1: create new program. For Month 2+: append to existing program.
       let progId: string;
       if (isContinuation && existingProgramId) {
         progId = existingProgramId;
-        console.log(`[${jobId}] Appending month ${monthNumber} to existing program ${progId}`);
+        console.log(`[generate-program] Appending month ${monthNumber} to existing program`);
       } else {
         const { data: prog, error: progErr } = await supa
           .from("programs")
@@ -734,7 +730,7 @@ ${skeleton}`;
           .single();
         if (progErr || !prog) throw new Error("Failed to create program");
         progId = prog.id;
-        console.log(`[${jobId}] Created new program ${progId}`);
+        console.log("[generate-program] Created new program");
       }
       // Insert workouts with month_number
       const wkRows = parsedWorkouts.map((pw, idx) => ({
@@ -778,7 +774,7 @@ ${skeleton}`;
         if (blockRows.length > 0) {
           await supa.from("program_workout_blocks").insert(blockRows);
         }
-        console.log(`[${jobId}] Inserted ${blockRows.length} blocks for ${insertedWks.length} workouts`);
+        console.log(`[generate-program] Inserted ${blockRows.length} blocks for ${insertedWks.length} workouts`);
       }
       // Update generated_months on the program
       await supa
@@ -801,7 +797,7 @@ ${skeleton}`;
       }).catch((err) => console.error("Analyze-program fire-and-forget failed:", err));
       program_id = progId;
       workout_count = parsedWorkouts.length;
-      console.log(`[${jobId}] Save success: program_id=${program_id}, workout_count=${workout_count}, month=${monthNumber}`);
+      console.log(`[generate-program] Save success: workout_count=${workout_count}, month=${monthNumber}`);
       break;
     }
     if (!program_id) {
@@ -813,9 +809,9 @@ ${skeleton}`;
       program_id,
       updated_at: new Date().toISOString(),
     }).eq("id", jobId);
-    console.log(`[${jobId}] Complete: program_id=${program_id}, workouts=${workout_count}, elapsed=${((Date.now() - jobStart) / 1000).toFixed(1)}s`);
+    console.log(`[generate-program] Complete: workouts=${workout_count}, elapsed=${((Date.now() - jobStart) / 1000).toFixed(1)}s`);
   } catch (e) {
-    console.error(`[${jobId}] FAILED after ${((Date.now() - jobStart) / 1000).toFixed(1)}s:`, e);
+    console.error(`[generate-program] FAILED after ${((Date.now() - jobStart) / 1000).toFixed(1)}s:`, e);
     try {
       await supa.from("program_jobs").update({
         status: "failed",
