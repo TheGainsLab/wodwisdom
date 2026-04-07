@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -83,7 +84,7 @@ function chunkText(text: string): string[] {
 async function generateEmbeddings(
   texts: string[]
 ): Promise<number[][]> {
-  const resp = await fetch("https://api.openai.com/v1/embeddings", {
+  const resp = await fetchWithTimeout("https://api.openai.com/v1/embeddings", {
     method: "POST",
     headers: {
       Authorization: "Bearer " + OPENAI_API_KEY,
@@ -93,7 +94,7 @@ async function generateEmbeddings(
       model: "text-embedding-3-small",
       input: texts,
     }),
-  });
+  }, 10_000);
 
   if (!resp.ok) {
     const err = await resp.text();

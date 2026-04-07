@@ -3,17 +3,20 @@
  * All FatSecret calls go through a proxy server with a static IP whitelisted by FatSecret.
  */
 
+import { fetchWithTimeout } from "./fetch-with-timeout.ts";
+
 const FATSECRET_PROXY_URL = "http://104.236.49.96:3000";
+const FATSECRET_TIMEOUT_MS = 10_000;
 
 export async function callFatSecretAPI(
   method: string,
   params: Record<string, string | number>
 ): Promise<any> {
-  const response = await fetch(FATSECRET_PROXY_URL, {
+  const response = await fetchWithTimeout(FATSECRET_PROXY_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ method, params }),
-  });
+  }, FATSECRET_TIMEOUT_MS);
 
   if (!response.ok) {
     const errorText = await response.text();

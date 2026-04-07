@@ -4,6 +4,7 @@
  */
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { fetchWithTimeout } from "./fetch-with-timeout.ts";
 
 export interface RAGChunk {
   id: string;
@@ -14,6 +15,8 @@ export interface RAGChunk {
   similarity: number;
 }
 
+const OPENAI_TIMEOUT_MS = 10_000;
+
 /**
  * Embed a query string using OpenAI text-embedding-3-small.
  * Throws on failure — callers should catch or let searchChunks handle it.
@@ -22,7 +25,7 @@ export async function embedQuery(
   query: string,
   openaiApiKey: string
 ): Promise<number[]> {
-  const resp = await fetch("https://api.openai.com/v1/embeddings", {
+  const resp = await fetchWithTimeout("https://api.openai.com/v1/embeddings", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${openaiApiKey}`,
@@ -32,7 +35,7 @@ export async function embedQuery(
       model: "text-embedding-3-small",
       input: query.substring(0, 2000),
     }),
-  });
+  }, OPENAI_TIMEOUT_MS);
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
