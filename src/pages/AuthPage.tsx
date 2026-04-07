@@ -45,6 +45,7 @@ export default function AuthPage() {
         if (error) throw error;
         if (!data.session) {
           setConfirmSent(true);
+          setLoading(false);
           return;
         }
         window.location.href = nextUrl;
