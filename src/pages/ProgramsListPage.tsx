@@ -33,50 +33,55 @@ export default function ProgramsListPage({ session }: { session: Session }) {
 
   const loadAll = async () => {
     setLoading(true);
-    const [progData, profileRes, evalRes] = await Promise.all([
-      supabase
-        .from('programs')
-        .select('id, name, created_at, source')
-        .eq('user_id', session.user.id)
-        .neq('committed', false)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('athlete_profiles')
-        .select('lifts, skills, conditioning')
-        .eq('user_id', session.user.id)
-        .maybeSingle(),
-      supabase
-        .from('profile_evaluations')
-        .select('id')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false })
-        .limit(1),
-    ]);
+    try {
+      const [progData, profileRes, evalRes] = await Promise.all([
+        supabase
+          .from('programs')
+          .select('id, name, created_at, source')
+          .eq('user_id', session.user.id)
+          .neq('committed', false)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('athlete_profiles')
+          .select('lifts, skills, conditioning')
+          .eq('user_id', session.user.id)
+          .maybeSingle(),
+        supabase
+          .from('profile_evaluations')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: false })
+          .limit(1),
+      ]);
 
-    // Check profile has meaningful data
-    if (profileRes.data) {
-      const d = profileRes.data;
-      const hasLifts = d.lifts && Object.values(d.lifts).some((v: any) => v > 0);
-      const hasSkills = d.skills && Object.values(d.skills).some((v: any) => v && v !== 'none');
-      const hasConditioning = d.conditioning && Object.values(d.conditioning).some((v: any) => v);
-      setHasProfile(!!(hasLifts || hasSkills || hasConditioning));
+      // Check profile has meaningful data
+      if (profileRes.data) {
+        const d = profileRes.data;
+        const hasLifts = d.lifts && Object.values(d.lifts).some((v: any) => v > 0);
+        const hasSkills = d.skills && Object.values(d.skills).some((v: any) => v && v !== 'none');
+        const hasConditioning = d.conditioning && Object.values(d.conditioning).some((v: any) => v);
+        setHasProfile(!!(hasLifts || hasSkills || hasConditioning));
+      }
+
+      setHasEvaluation(!!(evalRes.data && evalRes.data.length > 0));
+
+      if (progData.data) {
+        const withCount = await Promise.all(
+          progData.data.map(async p => {
+            const { count } = await supabase
+              .from('program_workouts')
+              .select('id', { count: 'exact', head: true })
+              .eq('program_id', p.id);
+            return { ...p, workout_count: count || 0 };
+          })
+        );
+        setPrograms(withCount);
+      }
+    } catch (err) {
+      console.error('[ProgramsListPage] Failed to load:', err);
+    } finally {
+      setLoading(false);
     }
-
-    setHasEvaluation(!!(evalRes.data && evalRes.data.length > 0));
-
-    if (progData.data) {
-      const withCount = await Promise.all(
-        progData.data.map(async p => {
-          const { count } = await supabase
-            .from('program_workouts')
-            .select('id', { count: 'exact', head: true })
-            .eq('program_id', p.id);
-          return { ...p, workout_count: count || 0 };
-        })
-      );
-      setPrograms(withCount);
-    }
-    setLoading(false);
   };
 
   const handleGenerate = async () => {
