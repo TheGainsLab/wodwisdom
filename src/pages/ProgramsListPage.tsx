@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
-import { Plus, Zap } from 'lucide-react';
+import { Plus, Zap, User, Brain, Dumbbell, MessageSquare, RefreshCw, BarChart3 } from 'lucide-react';
 
 interface Program {
   id: string;
@@ -165,11 +165,121 @@ export default function ProgramsListPage({ session }: { session: Session }) {
             ) : programs.length === 0 ? (
               <div className="empty-state">
                 {!hasProgramming ? (
-                  <>
-                    <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>AI Programming</p>
-                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 16 }}>Get a personalized training program built by AI, tailored to your lifts, skills, and goals.</p>
-                    <button className="auth-btn" onClick={() => navigate('/checkout')}>Upgrade to unlock</button>
-                  </>
+                  <div style={{ textAlign: 'center', maxWidth: 480, margin: '0 auto' }}>
+                    {/* Hero */}
+                    <div style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 14,
+                      background: 'var(--accent-glow)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--accent)',
+                      margin: '0 auto 16px',
+                    }}>
+                      <Brain size={28} />
+                    </div>
+                    <p style={{ fontWeight: 700, fontSize: 20, marginBottom: 6 }}>AI Programming</p>
+                    <p style={{ color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
+                      The program that follows you. AI builds a fully personalized training
+                      program from your profile, adapts it as you train, and coaches you
+                      through every session.
+                    </p>
+
+                    {/* Top CTA */}
+                    <button
+                      className="auth-btn"
+                      onClick={() => navigate('/checkout')}
+                      style={{ width: '100%', marginBottom: 24 }}
+                    >
+                      Upgrade to Unlock AI Programming
+                    </button>
+
+                    <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 20px' }} />
+
+                    {/* How It Works */}
+                    <p style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 16 }}>
+                      How It Works
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'left', marginBottom: 24 }}>
+                      {[
+                        { step: '1', title: 'Build Your Profile', desc: 'Enter your lifts, skills, conditioning benchmarks, and goals' },
+                        { step: '2', title: 'Get Your Evaluation', desc: 'AI analyzes your strengths, weaknesses, and priorities' },
+                        { step: '3', title: 'Receive Your Program', desc: 'A custom training program built around your numbers and goals' },
+                        { step: '4', title: 'Train & Adapt', desc: 'Log results, get coaching, and watch your program evolve' },
+                      ].map(({ step, title, desc }) => (
+                        <div key={step} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                          <div style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            background: 'var(--accent)',
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            flexShrink: 0,
+                          }}>
+                            {step}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{title}</div>
+                            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>{desc}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 20px' }} />
+
+                    {/* Features */}
+                    <p style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 16 }}>
+                      What You Get
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'left', marginBottom: 24 }}>
+                      {([
+                        [User, 'Personalized to You', 'Every workout built from your lifts, skills, and conditioning level'],
+                        [Brain, 'AI Evaluation', 'Detailed analysis of your strengths, weaknesses, and priorities'],
+                        [Dumbbell, 'Custom Programming', 'Training blocks designed for your numbers, equipment, and goals'],
+                        [MessageSquare, 'Built-in Coaching', 'Training intent, movement cues, pacing strategy for every session'],
+                        [RefreshCw, 'Adaptive Programs', 'Log results and the AI adjusts — flag weaknesses, increase challenges'],
+                        [BarChart3, 'Training Analysis', 'Track progress over time with AI-powered training reviews'],
+                      ] as const).map(([Icon, title, desc]) => (
+                        <div key={title} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                          <div style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            background: 'var(--surface2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}>
+                            <Icon size={16} style={{ color: 'var(--accent)' }} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{title}</div>
+                            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>{desc}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 20px' }} />
+
+                    {/* Bottom CTA */}
+                    <button
+                      className="auth-btn"
+                      onClick={() => navigate('/checkout')}
+                      style={{ width: '100%' }}
+                    >
+                      Upgrade to Unlock AI Programming
+                    </button>
+                  </div>
                 ) : !hasProfile ? (
                   <>
                     <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Set up your athlete profile</p>
