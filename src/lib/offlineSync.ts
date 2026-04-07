@@ -83,12 +83,16 @@ export async function syncOfflineQueue(): Promise<{ synced: number; failed: numb
  */
 export function setupAutoSync() {
   window.addEventListener('online', async () => {
-    const result = await syncOfflineQueue();
-    if (result.synced > 0) {
-      console.log(`[offline-sync] Synced ${result.synced} queued mutations`);
-    }
-    if (result.failed > 0) {
-      console.warn(`[offline-sync] ${result.failed} mutations failed to sync`);
+    try {
+      const result = await syncOfflineQueue();
+      if (result.synced > 0) {
+        console.log(`[offline-sync] Synced ${result.synced} queued mutations`);
+      }
+      if (result.failed > 0) {
+        console.warn(`[offline-sync] ${result.failed} mutations failed to sync`);
+      }
+    } catch (err) {
+      console.error('[offline-sync] Sync failed:', err);
     }
   });
 }
