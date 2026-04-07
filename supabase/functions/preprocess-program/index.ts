@@ -633,14 +633,12 @@ async function parseProgramVision(
   apiKey: string,
 ): Promise<ParsedDay[]> {
   try {
-    console.log("[preprocess-program] parseProgramVision called, mediaType:", mediaType);
     const raw = await callClaudeVision({
       apiKey,
       system: PARSE_PROGRAM_VISION_PROMPT,
       images: [{ base64: imageBase64, mediaType }],
       maxTokens: 8192,
     });
-    console.log("[preprocess-program] parseProgramVision raw response:", raw.substring(0, 500));
     const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
     const items = JSON.parse(cleaned);
     if (!Array.isArray(items)) return [];
@@ -668,14 +666,12 @@ async function parseProgramAI(
   apiKey: string,
 ): Promise<ParsedDay[]> {
   try {
-    console.log("[preprocess-program] parseProgramAI called, input length:", rawText.length);
     const raw = await callClaude({
       apiKey,
       system: PARSE_PROGRAM_PROMPT,
       userContent: rawText,
       maxTokens: 8192,
     });
-    console.log("[preprocess-program] parseProgramAI raw response:", raw.substring(0, 500));
     const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
     const items = JSON.parse(cleaned);
     if (!Array.isArray(items)) {
@@ -702,12 +698,10 @@ async function parseProgramAI(
   }
 }
 
-console.log("[preprocess-program] v2 loaded");
 Deno.serve(async (req) => {
 const cors = getCorsHeaders(req);
 if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 try {
-console.log("[preprocess-program] v2 handling request");
 const authHeader = req.headers.get("Authorization");
 if (!authHeader) {
 return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -893,7 +887,7 @@ return new Response(JSON.stringify({ error: "Failed to save workouts" }), {
         headers: { ...cors, "Content-Type": "application/json" },
 });
 }
-console.log(`[preprocess-program] v2 inserted ${insertedWorkouts?.length ?? 0} workouts, prog=${progId}`);
+console.log(`[preprocess-program] inserted ${insertedWorkouts?.length ?? 0} workouts`);
 let insertedBlocksForParsing: { id: string; block_type: string; block_text: string }[] | null = null;
 
 if (insertedWorkouts?.length) {
