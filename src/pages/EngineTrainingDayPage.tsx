@@ -372,6 +372,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const [logPeakHR, setLogPeakHR] = useState('');
   const [logRPE, setLogRPE] = useState(5);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   // ── Load data ──
   useEffect(() => {
@@ -391,12 +392,12 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         if (wk?.day_type) {
           getSessionsByDayType(wk.day_type)
             .then(sessions => setDayTypeHistory(sessions))
-            .catch(() => setDayTypeHistory([]));
+            .catch(() => { setDayTypeHistory([]); setLoadError('Failed to load workout history'); });
         }
 
         // Load preceding Rocket Races A data for Rocket Races B days
         if (wk?.day_type === 'rocket_races_b') {
-          const result = await findPrecedingRocketRacesA(dayNumber, progress?.engine_program_version ?? 'main_5day').catch(() => null);
+          const result = await findPrecedingRocketRacesA(dayNumber, progress?.engine_program_version ?? 'main_5day').catch(() => { setLoadError('Failed to load Rocket Races data'); return null; });
           if (result) {
             setRocketADay(result.partADay);
             setRocketASession(result.session);
@@ -404,7 +405,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         }
 
         // Try to load saved modality + unit preference
-        const pref = await loadModalityPreference('last_selected').catch(() => null);
+        const pref = await loadModalityPreference('last_selected').catch(() => { setLoadError('Failed to load preferences'); return null; });
         if (pref) {
           // secondary_unit stores the actual modality value
           if (pref.secondary_unit) setModality(pref.secondary_unit);
@@ -700,6 +701,13 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
     return (
       <div className="engine-page">
+        {loadError && (
+          <div style={{ padding: '8px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, margin: '0 0 12px', color: 'var(--text-muted)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AlertTriangle size={14} />
+            {loadError}
+            <button onClick={() => setLoadError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>&times;</button>
+          </div>
+        )}
         <div className="engine-section">
           <button
             className="engine-btn engine-btn-secondary engine-btn-sm"

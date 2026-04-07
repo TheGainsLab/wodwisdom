@@ -37,7 +37,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
       const [progData, profileRes, evalRes] = await Promise.all([
         supabase
           .from('programs')
-          .select('id, name, created_at, source')
+          .select('id, name, created_at, source, program_workouts(count)')
           .eq('user_id', session.user.id)
           .neq('committed', false)
           .order('created_at', { ascending: false }),
@@ -66,16 +66,10 @@ export default function ProgramsListPage({ session }: { session: Session }) {
       setHasEvaluation(!!(evalRes.data && evalRes.data.length > 0));
 
       if (progData.data) {
-        const withCount = await Promise.all(
-          progData.data.map(async p => {
-            const { count } = await supabase
-              .from('program_workouts')
-              .select('id', { count: 'exact', head: true })
-              .eq('program_id', p.id);
-            return { ...p, workout_count: count || 0 };
-          })
-        );
-        setPrograms(withCount);
+        setPrograms(progData.data.map((p: any) => ({
+          ...p,
+          workout_count: p.program_workouts?.[0]?.count ?? 0,
+        })));
       }
     } catch (err) {
       console.error('[ProgramsListPage] Failed to load:', err);
