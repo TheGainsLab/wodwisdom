@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
 
@@ -12,11 +13,11 @@ serve(async (req) => {
     if (!session_id) throw new Error("Missing session_id");
 
     // Fetch checkout session from Stripe
-    const resp = await fetch(`https://api.stripe.com/v1/checkout/sessions/${session_id}`, {
+    const resp = await fetchWithTimeout(`https://api.stripe.com/v1/checkout/sessions/${session_id}`, {
       headers: {
         "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":"),
       },
-    });
+    }, 15_000);
 
     const session = await resp.json();
     if (session.error) throw new Error(session.error.message);

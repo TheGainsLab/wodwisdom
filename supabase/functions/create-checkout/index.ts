@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -82,14 +83,14 @@ serve(async (req) => {
       params["subscription_data[metadata][user_id]"] = userId;
     }
 
-    const resp = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    const resp = await fetchWithTimeout("https://api.stripe.com/v1/checkout/sessions", {
       method: "POST",
       headers: {
         "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":"),
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams(params).toString(),
-    });
+    }, 15_000);
 
     const session = await resp.json();
     if (session.error) throw new Error(session.error.message);

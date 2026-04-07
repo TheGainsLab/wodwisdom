@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -38,9 +39,9 @@ async function verifyStripeSignature(payload: string, header: string): Promise<b
 // Fetch subscription details from Stripe to get price metadata
 async function getSubscriptionEntitlements(subscriptionId: string): Promise<{ plan: string; features: string[] }> {
   // Fetch the subscription to get the price ID
-  const subResp = await fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
+  const subResp = await fetchWithTimeout(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
     headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
-  });
+  }, 15_000);
   const sub = await subResp.json();
 
   // Get the price ID from the first subscription item
@@ -55,9 +56,9 @@ async function getSubscriptionEntitlements(subscriptionId: string): Promise<{ pl
   }
 
   // Fetch the price to get its metadata
-  const priceResp = await fetch(`https://api.stripe.com/v1/prices/${priceId}`, {
+  const priceResp = await fetchWithTimeout(`https://api.stripe.com/v1/prices/${priceId}`, {
     headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
-  });
+  }, 15_000);
   const price = await priceResp.json();
 
   // Read entitlements from price metadata
