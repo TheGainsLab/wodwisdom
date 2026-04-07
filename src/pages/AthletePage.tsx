@@ -919,10 +919,19 @@ export default function AthletePage({ session }: { session: Session }) {
                   ))}
                 </CollapsibleSection>
 
+                <button
+                  className="auth-btn"
+                  onClick={saveProfile}
+                  disabled={saving || !isDirty}
+                  style={!isDirty ? { background: '#2ec486', color: 'white' } : undefined}
+                >
+                  {saving ? 'Saving...' : !isDirty ? 'Saved ✓' : 'Save Athlete Profile'}
+                </button>
+
                 {/* AI Analysis */}
                 <CollapsibleSection title="AI Analysis">
                   <div style={{ borderColor: 'rgba(255,58,58,.2)', background: 'var(--accent-glow)', padding: 16, borderRadius: 8, marginBottom: 16 }}>
-                  <p className="athlete-card-subtitle">Save your profile first, then analyze. Results are saved for comparison over time.</p>
+                  <p className="athlete-card-subtitle">Results are saved for comparison over time.</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
                     {(() => {
                       // Profile Analysis: available to all, rate limited
@@ -1039,15 +1048,6 @@ export default function AthletePage({ session }: { session: Session }) {
                   )}
                   </div>
                 </CollapsibleSection>
-
-                <button
-                  className="auth-btn"
-                  onClick={saveProfile}
-                  disabled={saving || !isDirty}
-                  style={!isDirty ? { background: '#2ec486', color: 'white' } : undefined}
-                >
-                  {saving ? 'Saving...' : !isDirty ? 'Saved ✓' : 'Save Athlete Profile'}
-                </button>
 
                 {/* Evaluation History */}
                 {(evaluations.length > 0 || trainingEvaluations.length > 0 || nutritionEvaluations.length > 0) && (
