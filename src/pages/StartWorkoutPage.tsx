@@ -256,7 +256,7 @@ const compactInputStyle = {
   fontSize: 14,
 };
 
-export default function StartWorkoutPage({ session: _session }: { session: Session }) {
+export default function StartWorkoutPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [navOpen, setNavOpen] = useState(false);
@@ -284,6 +284,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
   const [inProgressLogId, setInProgressLogId] = useState<string | null>(null);
   const [savedBlocks, setSavedBlocks] = useState<Set<number>>(new Set());
   const [savingBlock, setSavingBlock] = useState<number | null>(null);
+  const [userUnits, setUserUnits] = useState<'lbs' | 'kg'>('lbs');
 
   const sourceState = location.state as {
     workout_text?: string;
@@ -301,8 +302,8 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
     (async () => {
       setLoading(true);
 
-      // Fetch blocks and work rates in parallel
-      const [blocksRes, ratesRes] = await Promise.all([
+      // Fetch blocks, work rates, and user units in parallel
+      const [blocksRes, ratesRes, unitsRes] = await Promise.all([
         supabase
           .from('program_workout_blocks')
           .select('id, block_type, block_text, block_order, parsed_tasks')
@@ -312,10 +313,18 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
           .from('movements')
           .select('canonical_name, display_name, work_rate, weight_degradation_rate, modality')
           .not('work_rate', 'is', null),
+        supabase
+          .from('athlete_profiles')
+          .select('units')
+          .eq('user_id', session.user.id)
+          .maybeSingle(),
       ]);
 
       if (ratesRes.data) {
         setWorkRates(ratesRes.data as MovementWorkRate[]);
+      }
+      if (unitsRes.data?.units === 'kg') {
+        setUserUnits('kg');
       }
 
       const { data, error: fetchErr } = blocksRes;
@@ -688,7 +697,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
           sets: 1,
           reps: ev.reps ?? null,
           weight: ev.weight ?? null,
-          weight_unit: ev.weight_unit || 'lbs',
+          weight_unit: ev.weight_unit || userUnits,
           rpe: ev.rpe ?? null,
           scaling_note: null,
           set_number: ev.set_number ?? null,
@@ -715,7 +724,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
             sets: null,
             reps: mv.reps ?? null,
             weight: mv.weight ?? null,
-            weight_unit: mv.weight_unit || 'lbs',
+            weight_unit: mv.weight_unit || userUnits,
             rpe: mv.rpe ?? null,
             scaling_note: mv.scaling_note?.trim() || null,
             set_number: null,
@@ -887,7 +896,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
               sets: 1,
               reps: ev.reps ?? null,
               weight: ev.weight ?? null,
-              weight_unit: ev.weight_unit || 'lbs',
+              weight_unit: ev.weight_unit || userUnits,
               rpe: ev.rpe ?? null,
               scaling_note: null,
               set_number: ev.set_number ?? null,
@@ -925,7 +934,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                 sets: null,
                 reps: mv.reps ?? null,
                 weight: mv.weight ?? null,
-                weight_unit: mv.weight_unit || 'lbs',
+                weight_unit: mv.weight_unit || userUnits,
                 rpe: mv.rpe ?? null,
                 scaling_note: mv.scaling_note?.trim() || null,
                 set_number: null,
@@ -1119,7 +1128,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                 <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 28, textAlign: 'right' }}>S{ev.set_number}</span>
                                 <input type="number" placeholder="Reps" value={ev.reps ?? ''} onChange={e => setEntry(key, 'reps', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 60 }} />
                                 <input type="number" placeholder="" value={ev.weight ?? ''} onChange={e => setEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)} style={{ ...compactInputStyle, width: 64, border: ev.weight == null ? '1px solid var(--accent)' : '1px solid var(--border)' }} />
-                                <span style={{ color: 'var(--text-dim)', fontSize: 13, width: 28 }}>{ev.weight_unit || 'lbs'}</span>
+                                <span style={{ color: 'var(--text-dim)', fontSize: 13, width: 28 }}>{ev.weight_unit || userUnits}</span>
                                 <select value={ev.rpe ?? ''} onChange={e => setEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)} style={{ ...compactInputStyle, width: 48, padding: '8px 4px', border: ev.rpe == null ? '1px solid var(--accent)' : '1px solid var(--border)' }}>
                                   <option value=""></option>
                                   {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
@@ -1246,7 +1255,7 @@ export default function StartWorkoutPage({ session: _session }: { session: Sessi
                                                 onChange={e => setMetconEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
                                                 style={{ ...compactInputStyle, width: 64 }}
                                               />
-                                              <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 28 }}>{mv.weight_unit || 'lbs'}</span>
+                                              <span style={{ fontSize: 13, color: 'var(--text-dim)', width: 28 }}>{mv.weight_unit || userUnits}</span>
                                             </>
                                           ) : (
                                             <>

@@ -679,6 +679,25 @@ export default function AthletePage({ session }: { session: Session }) {
                 {/* Basics */}
                 <div className="settings-card">
                   <h2 className="settings-card-title">Basics</h2>
+
+                  {/* Units toggle — prominent, first choice */}
+                  <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
+                    <button
+                      type="button"
+                      style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: units === 'lbs' ? 'var(--accent)' : 'transparent', color: units === 'lbs' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
+                      onClick={() => { setUnits('lbs'); markDirty(); }}
+                    >
+                      Imperial (lbs / in)
+                    </button>
+                    <button
+                      type="button"
+                      style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: units === 'kg' ? 'var(--accent)' : 'transparent', color: units === 'kg' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
+                      onClick={() => { setUnits('kg'); markDirty(); }}
+                    >
+                      Metric (kg / cm)
+                    </button>
+                  </div>
+
                   <div className="lift-grid" style={{ marginBottom: 16 }}>
                     <div className="lift-item">
                       <span className="lift-label">Age</span>
@@ -693,7 +712,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       />
                     </div>
                     <div className="lift-item">
-                      <span className="lift-label">Height ({units === 'lbs' ? 'in' : 'cm'})</span>
+                      <span className="lift-label">Height ({units === 'kg' ? 'cm' : 'in'})</span>
                       <input
                         className="lift-input"
                         type="number"
@@ -705,7 +724,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       />
                     </div>
                     <div className="lift-item">
-                      <span className="lift-label">Weight</span>
+                      <span className="lift-label">Weight ({units === 'kg' ? 'kg' : 'lbs'})</span>
                       <input
                         className="lift-input"
                         type="number"
@@ -717,41 +736,22 @@ export default function AthletePage({ session }: { session: Session }) {
                       />
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Units</span>
-                      <button
-                        type="button"
-                        className={'skill-level-btn' + (units === 'lbs' ? ' active' : '')}
-                        onClick={() => { setUnits('lbs'); markDirty(); }}
-                      >
-                        lbs
-                      </button>
-                      <button
-                        type="button"
-                        className={'skill-level-btn' + (units === 'kg' ? ' active' : '')}
-                        onClick={() => { setUnits('kg'); markDirty(); }}
-                      >
-                        kg
-                      </button>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Gender</span>
-                      <button
-                        type="button"
-                        className={'skill-level-btn' + (gender === 'male' ? ' active' : '')}
-                        onClick={() => { setGender('male'); markDirty(); }}
-                      >
-                        Male
-                      </button>
-                      <button
-                        type="button"
-                        className={'skill-level-btn' + (gender === 'female' ? ' active' : '')}
-                        onClick={() => { setGender('female'); markDirty(); }}
-                      >
-                        Female
-                      </button>
-                    </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Gender</span>
+                    <button
+                      type="button"
+                      className={'skill-level-btn' + (gender === 'male' ? ' active' : '')}
+                      onClick={() => { setGender('male'); markDirty(); }}
+                    >
+                      Male
+                    </button>
+                    <button
+                      type="button"
+                      className={'skill-level-btn' + (gender === 'female' ? ' active' : '')}
+                      onClick={() => { setGender('female'); markDirty(); }}
+                    >
+                      Female
+                    </button>
                   </div>
 
                   {/* TDEE estimate */}
@@ -840,8 +840,8 @@ export default function AthletePage({ session }: { session: Session }) {
                 </CollapsibleSection>
 
                 {/* 1RM Lifts */}
-                <CollapsibleSection title="1RM Lifts">
-                  <p className="athlete-card-subtitle">Enter your one-rep max weights</p>
+                <CollapsibleSection title={`1RM Lifts (${units})`}>
+                  <p className="athlete-card-subtitle">Enter your one-rep max weights in {units}</p>
                   {LIFT_GROUPS.map(group => (
                     <div key={group.title} style={{ marginBottom: 20 }}>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
@@ -853,7 +853,7 @@ export default function AthletePage({ session }: { session: Session }) {
                               className="lift-input"
                               type="number"
                               min="0"
-                              step="5"
+                              step={units === 'kg' ? 2.5 : 5}
                               placeholder="0"
                               value={lifts[lift.key] || ''}
                               onChange={e => setLift(lift.key, e.target.value)}

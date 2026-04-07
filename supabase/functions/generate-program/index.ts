@@ -549,8 +549,11 @@ async function processJob(
         equipmentConstraint = `\nEQUIPMENT CONSTRAINTS:\nThe athlete does NOT have the following equipment. NEVER program movements that require them: ${unavailable.join(", ")}.\nSubstitute with movements using available equipment (e.g. if no rower, use bike or run; if no rope, use extra pull-up volume; if no rings, use bar movements).\n`;
       }
     }
+    const unitLabel = profileData.units === "kg" ? "kg" : "lbs";
     const userPrompt = `ATHLETE PROFILE:
 ${profileStr}
+
+UNIT SYSTEM: This athlete uses ${unitLabel}. All weights in the program (strength percentages, barbell loads, dumbbell weights, wall ball weights, etc.) MUST be written in ${unitLabel}. Do not mix units.
 
 ${analysisStr}
 ${trainingBlock}${metconEligibility}${equipmentConstraint}
