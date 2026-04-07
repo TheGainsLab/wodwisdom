@@ -146,9 +146,6 @@ export default function SettingsPage({ session }: { session: Session }) {
                         <button className="auth-btn" onClick={openBillingPortal} disabled={portalLoading}>
                           {portalLoading ? 'Opening...' : 'Manage subscription'}
                         </button>
-                        <button className="auth-btn" onClick={() => navigate('/checkout')} style={{ background: 'var(--surface2)', color: 'var(--text)' }}>
-                          Change plan
-                        </button>
                       </div>
                     </>
                   ) : (
