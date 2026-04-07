@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getCorsHeaders } from "../_shared/cors.ts";
+import { getCorsHeaders, ALLOWED_ORIGINS } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -22,8 +22,8 @@ serve(async (req) => {
     const { data: profile } = await supa.from("profiles").select("stripe_customer_id").eq("id", user.id).single();
     if (!profile?.stripe_customer_id) throw new Error("No subscription to manage");
 
-    const origin = req.headers.get("Origin") || req.headers.get("Referer")?.replace(/\/$/, "") || "https://www.thegainslab.com";
-    const baseUrl = origin.startsWith("http") ? origin : `https://${origin}`;
+    const origin = req.headers.get("Origin") ?? "";
+    const baseUrl = ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.wodwisdom.com";
     const returnUrl = `${baseUrl}/settings`;
 
     const params = new URLSearchParams({

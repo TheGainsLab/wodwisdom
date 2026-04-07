@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getCorsHeaders } from "../_shared/cors.ts";
+import { getCorsHeaders, ALLOWED_ORIGINS } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -56,8 +56,8 @@ serve(async (req) => {
       }
     }
 
-    const origin = req.headers.get("Origin") || req.headers.get("Referer")?.replace(/\/$/, "") || "https://www.thegainslab.com";
-    const baseUrl = origin.startsWith("http") ? origin : `https://${origin}`;
+    const origin = req.headers.get("Origin") ?? "";
+    const baseUrl = ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.wodwisdom.com";
     // Include session_id in success URL so CheckoutCompletePage can look up the email
     const successUrl = `${baseUrl}/checkout/complete?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${baseUrl}/checkout`;
