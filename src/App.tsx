@@ -97,7 +97,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
         setHasProfile(!!data);
         setProfileChecked(true);
       });
-  }, [session.user.id]);
+  }, [session.user.id, location.pathname]);
 
   // Redirect new users to profile page (except if already there or on settings/checkout)
   const skipRedirect = ['/profile', '/settings', '/checkout', '/checkout/complete'];
