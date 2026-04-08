@@ -206,7 +206,10 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                       includes: ['AI Coach', 'Nutrition', 'AI Programming', 'Year of the Engine'],
                       features: ['ai_chat', 'programming', 'engine', 'nutrition'],
                       featured: true },
-                  ].filter(opt => opt.features.some(f => !has(f)));
+                  ].filter(opt => {
+                    const curr = ['ai_chat', 'programming', 'engine', 'nutrition'].filter(f => has(f));
+                    return curr.every(f => opt.features.includes(f)) && opt.features.some(f => !has(f));
+                  });
 
                   const fMap: Record<string, string> = {
                     'AI Coach': 'ai_chat', 'Nutrition': 'nutrition',
@@ -327,7 +330,10 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                       includes: ['AI Coach', 'Nutrition', 'AI Programming', 'Year of the Engine'],
                       features: ['ai_chat', 'programming', 'engine', 'nutrition'],
                       featured: true },
-                  ].filter(opt => opt.features.some(f => !has(f)));
+                  ].filter(opt => {
+                    const curr = ['ai_chat', 'programming', 'engine', 'nutrition'].filter(f => has(f));
+                    return curr.every(f => opt.features.includes(f)) && opt.features.some(f => !has(f));
+                  });
 
                   const fMap: Record<string, string> = {
                     'AI Coach': 'ai_chat', 'Nutrition': 'nutrition',

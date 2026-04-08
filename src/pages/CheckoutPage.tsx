@@ -118,8 +118,12 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
   const userFeatures = ['ai_chat', 'programming', 'engine', 'nutrition'].filter(f => hasFeature(f));
   const hasSubscription = !entLoading && !isAdmin && userFeatures.length > 0;
 
+  /** Check if a plan is a valid upgrade: keeps all current features AND adds at least one new one */
   const isUpgrade = (planKey: PlanKey): boolean => {
-    return PLAN_FEATURES[planKey].some(f => !hasFeature(f));
+    const planFeats = PLAN_FEATURES[planKey];
+    const keepsAll = userFeatures.every(f => planFeats.includes(f));
+    const addsNew = planFeats.some(f => !hasFeature(f));
+    return keepsAll && addsNew;
   };
 
   const alreadyHas = (planKey: PlanKey): boolean => {
