@@ -99,6 +99,13 @@ export default function NutritionPaywall({ hasFeature }: Props) {
 
           {/* Bottom CTA */}
           {ctaButton}
+
+          <button
+            onClick={() => navigate(-1 as any)}
+            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', marginTop: 4, fontFamily: 'inherit' }}
+          >
+            Go Back
+          </button>
         </div>
       </div>
     </div>
