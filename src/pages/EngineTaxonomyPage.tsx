@@ -122,7 +122,7 @@ export default function EngineTaxonomyPage({ session }: { session: Session }) {
         {loading ? (
           <div className="page-loading"><div className="loading-pulse" /></div>
         ) : !hasAccess ? (
-          <EnginePaywall />
+          <EnginePaywall hasFeature={hasFeature} />
         ) : (
           <div className="engine-page">
             <div className="engine-section">

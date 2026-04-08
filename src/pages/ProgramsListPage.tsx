@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -26,6 +26,20 @@ export default function ProgramsListPage({ session }: { session: Session }) {
   const { hasFeature, isAdmin } = useEntitlements(session.user.id);
   const hasEngine = hasFeature('engine');
   const hasProgramming = hasFeature('programming');
+  const hasOtherSub = !hasProgramming && (hasFeature('ai_chat') || hasFeature('engine') || hasFeature('nutrition'));
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const openBillingPortal = useCallback(async () => {
+    setPortalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-portal-session', { body: {} });
+      if (error || data?.error) { navigate('/checkout'); return; }
+      if (data?.url) { window.location.href = data.url; return; }
+      navigate('/checkout');
+    } finally {
+      setPortalLoading(false);
+    }
+  }, [navigate]);
 
   useEffect(() => {
     loadAll();
@@ -193,13 +207,20 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                   through every session.
                 </p>
 
+                {hasOtherSub && (
+                  <p style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600, marginBottom: 16 }}>
+                    You have an active subscription — upgrade to All Access to add AI Programming.
+                  </p>
+                )}
+
                 {/* Top CTA */}
                 <button
                   className="auth-btn"
-                  onClick={() => navigate('/checkout')}
+                  onClick={hasOtherSub ? openBillingPortal : () => navigate('/checkout')}
+                  disabled={portalLoading}
                   style={{ width: '100%', marginBottom: 24 }}
                 >
-                  Upgrade to Unlock AI Programming
+                  {portalLoading ? 'Opening...' : hasOtherSub ? 'Upgrade to All Access' : 'Upgrade to Unlock AI Programming'}
                 </button>
 
                 <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 20px' }} />
@@ -280,10 +301,11 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                 {/* Bottom CTA */}
                 <button
                   className="auth-btn"
-                  onClick={() => navigate('/checkout')}
+                  onClick={hasOtherSub ? openBillingPortal : () => navigate('/checkout')}
+                  disabled={portalLoading}
                   style={{ width: '100%' }}
                 >
-                  Upgrade to Unlock AI Programming
+                  {portalLoading ? 'Opening...' : hasOtherSub ? 'Upgrade to All Access' : 'Upgrade to Unlock AI Programming'}
                 </button>
               </div>
             ) : programs.length === 0 ? (

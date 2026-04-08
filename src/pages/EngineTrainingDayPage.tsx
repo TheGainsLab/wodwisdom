@@ -1618,7 +1618,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           )}
         </header>
 
-        {!hasAccess && stage !== 'loading' && <EnginePaywall />}
+        {!hasAccess && stage !== 'loading' && <EnginePaywall hasFeature={hasFeature} />}
         {hasAccess && stage === 'loading' && !workout && (
           <div className="engine-page">
             <div className="engine-empty">

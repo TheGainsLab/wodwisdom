@@ -1,5 +1,11 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zap, Calendar, Dumbbell, Clock, BarChart3, Timer, TrendingUp } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+
+interface Props {
+  hasFeature?: (feature: string) => boolean;
+}
 
 const PROGRAM_GROUPS = [
   {
@@ -48,17 +54,41 @@ const FEATURES = [
 /**
  * Shown when a user visits Engine pages without an active or trial subscription.
  * Displays program details, features, and upgrade CTAs.
+ * Context-aware: if user has another subscription, offers upgrade to All Access via Stripe portal.
  */
-export default function EnginePaywall() {
+export default function EnginePaywall({ hasFeature }: Props) {
   const navigate = useNavigate();
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  // Determine if user has an existing subscription (but not engine)
+  const hasOtherSub = hasFeature
+    ? hasFeature('ai_chat') || hasFeature('programming') || hasFeature('nutrition')
+    : false;
+
+  const openBillingPortal = async () => {
+    setPortalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-portal-session', { body: {} });
+      if (error || data?.error) { navigate('/checkout'); return; }
+      if (data?.url) { window.location.href = data.url; return; }
+      navigate('/checkout');
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
+  const handleUpgrade = hasOtherSub ? openBillingPortal : () => navigate('/checkout');
+  const ctaLabel = hasOtherSub ? 'Upgrade to All Access' : 'Upgrade to Access Engine';
+  const ctaLoading = portalLoading;
 
   const ctaButton = (
     <button
       className="engine-btn engine-btn-primary"
-      onClick={() => navigate('/checkout')}
+      onClick={handleUpgrade}
+      disabled={ctaLoading}
       style={{ width: '100%' }}
     >
-      <Zap size={18} /> Upgrade to Access Engine
+      <Zap size={18} /> {ctaLoading ? 'Opening...' : ctaLabel}
     </button>
   );
 
@@ -85,6 +115,12 @@ export default function EnginePaywall() {
             The world's most comprehensive conditioning program. 8 programs, 20+ workout
             frameworks, personalized pacing, and built-in analytics — from 3 to 5 days per week.
           </p>
+
+          {hasOtherSub && (
+            <p style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>
+              You have an active subscription — upgrade to All Access to add Engine.
+            </p>
+          )}
 
           {/* Top CTA */}
           {ctaButton}
