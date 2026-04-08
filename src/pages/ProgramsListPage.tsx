@@ -227,7 +227,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                         <button
                           key={opt.key}
                           className="auth-btn"
-                          onClick={() => navigate('/checkout')}
+                          onClick={() => navigate(`/checkout?plan=${opt.key}&interval=monthly`)}
                           style={{ width: '100%', display: 'flex', flexDirection: 'column', padding: '16px 20px', gap: 4,
                             border: opt.featured ? '2px solid var(--accent)' : undefined }}
                         >
@@ -348,7 +348,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                         <button
                           key={opt.key}
                           className="auth-btn"
-                          onClick={() => navigate('/checkout')}
+                          onClick={() => navigate(`/checkout?plan=${opt.key}&interval=monthly`)}
                           style={{ width: '100%', display: 'flex', flexDirection: 'column', padding: '16px 20px', gap: 4,
                             border: opt.featured ? '2px solid var(--accent)' : undefined }}
                         >

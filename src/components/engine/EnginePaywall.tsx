@@ -127,7 +127,7 @@ export default function EnginePaywall({ hasFeature }: Props) {
               <button
                 key={opt.key}
                 className="engine-btn engine-btn-primary"
-                onClick={() => navigate('/checkout')}
+                onClick={() => navigate(`/checkout?plan=${opt.key}&interval=monthly`)}
                 style={{
                   width: '100%',
                   flexDirection: 'column',
@@ -218,7 +218,7 @@ export default function EnginePaywall({ hasFeature }: Props) {
               <button
                 key={opt.key}
                 className="engine-btn engine-btn-primary"
-                onClick={() => navigate('/checkout')}
+                onClick={() => navigate(`/checkout?plan=${opt.key}&interval=monthly`)}
                 style={{
                   width: '100%',
                   flexDirection: 'column',
