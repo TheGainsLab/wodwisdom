@@ -8,7 +8,7 @@ import { CheckCircle } from 'lucide-react';
 
 type PlanKey = 'coach' | 'nutrition' | 'coach_nutrition' | 'programming' | 'engine' | 'all_access';
 type Interval = 'monthly' | 'quarterly';
-type Stage = 'browse' | 'confirm' | 'success';
+type Stage = 'browse' | 'loading' | 'confirm' | 'success';
 
 /** Features granted by each plan */
 const PLAN_FEATURES: Record<PlanKey, string[]> = {
@@ -103,7 +103,8 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
   const [error, setError] = useState('');
   const [navOpen, setNavOpen] = useState(false);
   const [interval, setInterval] = useState<Interval>('monthly');
-  const [stage, setStage] = useState<Stage>('browse');
+  const hasPlanParam = new URLSearchParams(window.location.search).has('plan');
+  const [stage, setStage] = useState<Stage>(hasPlanParam ? 'loading' as Stage : 'browse');
   const [selectedPlan, setSelectedPlan] = useState<PlanKey | null>(null);
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -160,6 +161,7 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
         throw new Error('No checkout URL returned');
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Something went wrong');
+        setStage('browse');
       } finally {
         setLoading(null);
       }
@@ -180,6 +182,7 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
       setStage('confirm');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong');
+      setStage('browse');
     } finally {
       setPreviewLoading(false);
     }
@@ -226,6 +229,13 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
         </header>
         <div className="page-body">
           <div style={{ maxWidth: 520, margin: '0 auto', padding: '24px 0' }}>
+
+            {/* ── LOADING (URL param auto-trigger) ── */}
+            {stage === 'loading' && (
+              <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                <div className="loading-pulse" />
+              </div>
+            )}
 
             {/* ── STAGE 3: SUCCESS ── */}
             {stage === 'success' && upgradedPlan && (
@@ -338,7 +348,7 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
 
                 <button
                   className="auth-btn"
-                  onClick={() => { setStage('browse'); setSelectedPlan(null); setPreview(null); setError(''); }}
+                  onClick={() => navigate(-1 as any)}
                   style={{ width: '100%', background: 'var(--surface2)', color: 'var(--text)' }}
                 >
                   Go Back
