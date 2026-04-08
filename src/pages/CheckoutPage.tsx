@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
@@ -110,7 +110,9 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
   const [upgrading, setUpgrading] = useState(false);
   const [upgradedPlan, setUpgradedPlan] = useState<PlanKey | null>(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { hasFeature, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
+  const autoTriggered = useRef(false);
 
   const userFeatures = ['ai_chat', 'programming', 'engine', 'nutrition'].filter(f => hasFeature(f));
   const hasSubscription = !entLoading && !isAdmin && userFeatures.length > 0;
@@ -129,6 +131,18 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
   };
 
   const featureLabels: Record<string, string> = { ai_chat: 'AI Coach', nutrition: 'Nutrition', programming: 'AI Programming', engine: 'Engine' };
+
+  // Auto-trigger plan selection from URL params (e.g. /checkout?plan=engine&interval=monthly)
+  useEffect(() => {
+    if (entLoading || autoTriggered.current) return;
+    const planParam = searchParams.get('plan') as PlanKey | null;
+    const intervalParam = searchParams.get('interval') as Interval | null;
+    if (planParam && PLAN_NAMES[planParam]) {
+      autoTriggered.current = true;
+      if (intervalParam === 'quarterly') setInterval('quarterly');
+      selectPlan(planParam);
+    }
+  }, [entLoading, searchParams]);
 
   // Stage 1: User clicks a plan → fetch preview for existing subscribers
   const selectPlan = async (p: PlanKey) => {
