@@ -545,7 +545,7 @@ async function processJob(
         equipmentConstraint = `\nEQUIPMENT CONSTRAINTS:\nThe athlete does NOT have the following equipment. NEVER program movements that require them: ${unavailable.join(", ")}.\nSubstitute with movements using available equipment (e.g. if no rower, use bike or run; if no rope, use extra pull-up volume; if no rings, use bar movements).\n`;
       }
     }
-    const unitLabel = profileData.units === "kg" ? "kg" : "lbs";
+    const unitLabel = profile.units === "kg" ? "kg" : "lbs";
     const userPrompt = `ATHLETE PROFILE:
 ${profileStr}
 
