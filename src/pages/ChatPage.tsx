@@ -7,6 +7,7 @@ import GainsLogo from '../components/GainsLogo';
 import { formatMarkdown } from '../lib/formatMarkdown';
 import { OfflineMessage } from '../components/OfflineBanner';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { Clock, Bookmark } from 'lucide-react';
 import { cacheGet, cacheSet, chatHistoryKey } from '../lib/offlineCache';
 
 interface Message {
@@ -280,6 +281,14 @@ export default function ChatPage({ session }: { session: Session }) {
           </button>
           <div className="source-toggle">{scienceToggle}</div>
           {tierLoaded && usagePill}
+          <div style={{ display: 'flex', gap: 12, marginLeft: 'auto' }}>
+            <button onClick={() => navigate('/history')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text-dim)' }} title="History">
+              <Clock size={20} />
+            </button>
+            <button onClick={() => navigate('/bookmarks')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text-dim)' }} title="Bookmarks">
+              <Bookmark size={20} />
+            </button>
+          </div>
         </header>
 
         {messages.length === 0 && !isLoading ? (
