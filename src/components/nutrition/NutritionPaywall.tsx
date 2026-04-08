@@ -1,7 +1,5 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Apple, Camera, Search, BookOpen, BarChart3, Utensils, ScanBarcode } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
 
 interface Props {
   hasFeature?: (feature: string) => boolean;
@@ -18,38 +16,22 @@ const FEATURES = [
 
 export default function NutritionPaywall({ hasFeature }: Props) {
   const navigate = useNavigate();
-  const [portalLoading, setPortalLoading] = useState(false);
 
-  // Determine if user has an existing subscription (but not nutrition)
+  // Users with programming or engine already include nutrition — they shouldn't see this.
+  // This handles users with just ai_chat (Coach only) who need to upgrade.
   const hasOtherSub = hasFeature
     ? hasFeature('ai_chat') || hasFeature('programming') || hasFeature('engine')
     : false;
 
-  const openBillingPortal = async () => {
-    setPortalLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('create-portal-session', { body: {} });
-      if (error || data?.error) { navigate('/checkout'); return; }
-      if (data?.url) { window.location.href = data.url; return; }
-      navigate('/checkout');
-    } finally {
-      setPortalLoading(false);
-    }
-  };
-
-  // Users with programming or engine already include nutrition — they shouldn't see this.
-  // This handles users with just ai_chat (Coach only) who need to upgrade.
-  const handleUpgrade = hasOtherSub ? openBillingPortal : () => navigate('/checkout');
-  const ctaLabel = hasOtherSub ? 'Upgrade to Add Nutrition' : 'Upgrade to Access Nutrition';
+  const ctaLabel = hasOtherSub ? 'Upgrade to Add Nutrition' : 'Upgrade to Access Nutrition — $7.99/mo';
 
   const ctaButton = (
     <button
       className="engine-btn engine-btn-primary"
-      onClick={handleUpgrade}
-      disabled={portalLoading}
+      onClick={() => navigate('/checkout')}
       style={{ width: '100%' }}
     >
-      <Apple size={18} /> {portalLoading ? 'Opening...' : ctaLabel}
+      <Apple size={18} /> {ctaLabel}
     </button>
   );
 
