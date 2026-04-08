@@ -63,8 +63,6 @@ serve(async (req) => {
       "items[0][price]": newPriceId,
       "proration_behavior": "create_prorations",
       "billing_cycle_anchor": "now",
-      "payment_behavior": "pending_if_incomplete",
-      "metadata[plan]": plan,
     });
 
     const updateResp = await fetchWithTimeout(
