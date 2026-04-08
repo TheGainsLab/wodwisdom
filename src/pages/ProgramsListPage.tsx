@@ -26,7 +26,6 @@ export default function ProgramsListPage({ session }: { session: Session }) {
   const { hasFeature, isAdmin } = useEntitlements(session.user.id);
   const hasEngine = hasFeature('engine');
   const hasProgramming = hasFeature('programming');
-  const hasOtherSub = !hasProgramming && (hasFeature('ai_chat') || hasFeature('engine') || hasFeature('nutrition'));
 
   useEffect(() => {
     loadAll();
