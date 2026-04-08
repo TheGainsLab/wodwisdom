@@ -97,7 +97,7 @@ export interface EnginePerformanceMetrics {
 }
 
 export interface EngineUserProgress {
-  engine_program_version: string;
+  engine_program_version: string | null;
   engine_current_day: number;
   engine_months_unlocked: number;
 }
