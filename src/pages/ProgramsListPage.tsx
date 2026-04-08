@@ -26,7 +26,6 @@ export default function ProgramsListPage({ session }: { session: Session }) {
   const { hasFeature, isAdmin } = useEntitlements(session.user.id);
   const hasEngine = hasFeature('engine');
   const hasProgramming = hasFeature('programming');
-  const hasOtherSub = !hasProgramming && (hasFeature('ai_chat') || hasFeature('engine') || hasFeature('nutrition'));
 
   useEffect(() => {
     loadAll();
@@ -194,20 +193,51 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                   through every session.
                 </p>
 
-                {hasOtherSub && (
-                  <p style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600, marginBottom: 16 }}>
-                    You have an active subscription — upgrade to All Access to add AI Programming.
-                  </p>
-                )}
+                {/* Upgrade options */}
+                {(() => {
+                  const has = (f: string) => hasFeature(f);
+                  const hasAnySub = has('ai_chat') || has('engine') || has('nutrition');
 
-                {/* Top CTA */}
-                <button
-                  className="auth-btn"
-                  onClick={() => navigate('/checkout')}
-                  style={{ width: '100%', marginBottom: 24 }}
-                >
-                  {hasOtherSub ? 'Upgrade to All Access — $49.99/mo' : 'Upgrade to AI Programming — $29.99/mo'}
-                </button>
+                  const options = [
+                    { key: 'programming', name: 'AI Programming', price: '$29.99/mo',
+                      includes: ['AI Coach', 'Nutrition', 'AI Programming'],
+                      features: ['programming', 'ai_chat', 'nutrition'] },
+                    { key: 'all_access', name: 'All Access', price: '$49.99/mo',
+                      includes: ['AI Coach', 'Nutrition', 'AI Programming', 'Year of the Engine'],
+                      features: ['ai_chat', 'programming', 'engine', 'nutrition'],
+                      featured: true },
+                  ].filter(opt => opt.features.some(f => !has(f)));
+
+                  const fMap: Record<string, string> = {
+                    'AI Coach': 'ai_chat', 'Nutrition': 'nutrition',
+                    'Year of the Engine': 'engine', 'AI Programming': 'programming',
+                  };
+                  const desc = (opt: typeof options[0]) => {
+                    const kept = opt.includes.filter(l => fMap[l] && has(fMap[l]));
+                    const gained = opt.includes.filter(l => !fMap[l] || !has(fMap[l]));
+                    const parts: string[] = [];
+                    if (kept.length > 0) parts.push('Keep ' + kept.join(', '));
+                    if (gained.length > 0) parts.push('Add ' + gained.join(', '));
+                    return parts.join(' · ');
+                  };
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
+                      {options.map(opt => (
+                        <button
+                          key={opt.key}
+                          className="auth-btn"
+                          onClick={() => navigate('/checkout')}
+                          style={{ width: '100%', display: 'flex', flexDirection: 'column', padding: '16px 20px', gap: 4,
+                            border: opt.featured ? '2px solid var(--accent)' : undefined }}
+                        >
+                          <span style={{ fontWeight: 700 }}>{opt.name} — {opt.price}</span>
+                          {hasAnySub && <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>{desc(opt)}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 20px' }} />
 
@@ -284,18 +314,55 @@ export default function ProgramsListPage({ session }: { session: Session }) {
 
                 <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 20px' }} />
 
-                {/* Bottom CTA */}
-                <button
-                  className="auth-btn"
-                  onClick={() => navigate('/checkout')}
-                  style={{ width: '100%' }}
-                >
-                  {hasOtherSub ? 'Upgrade to All Access — $49.99/mo' : 'Upgrade to AI Programming — $29.99/mo'}
-                </button>
+                {/* Bottom upgrade options */}
+                {(() => {
+                  const has = (f: string) => hasFeature(f);
+                  const hasAnySub = has('ai_chat') || has('engine') || has('nutrition');
+
+                  const options = [
+                    { key: 'programming', name: 'AI Programming', price: '$29.99/mo',
+                      includes: ['AI Coach', 'Nutrition', 'AI Programming'],
+                      features: ['programming', 'ai_chat', 'nutrition'] },
+                    { key: 'all_access', name: 'All Access', price: '$49.99/mo',
+                      includes: ['AI Coach', 'Nutrition', 'AI Programming', 'Year of the Engine'],
+                      features: ['ai_chat', 'programming', 'engine', 'nutrition'],
+                      featured: true },
+                  ].filter(opt => opt.features.some(f => !has(f)));
+
+                  const fMap: Record<string, string> = {
+                    'AI Coach': 'ai_chat', 'Nutrition': 'nutrition',
+                    'Year of the Engine': 'engine', 'AI Programming': 'programming',
+                  };
+                  const desc = (opt: typeof options[0]) => {
+                    const kept = opt.includes.filter(l => fMap[l] && has(fMap[l]));
+                    const gained = opt.includes.filter(l => !fMap[l] || !has(fMap[l]));
+                    const parts: string[] = [];
+                    if (kept.length > 0) parts.push('Keep ' + kept.join(', '));
+                    if (gained.length > 0) parts.push('Add ' + gained.join(', '));
+                    return parts.join(' · ');
+                  };
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {options.map(opt => (
+                        <button
+                          key={opt.key}
+                          className="auth-btn"
+                          onClick={() => navigate('/checkout')}
+                          style={{ width: '100%', display: 'flex', flexDirection: 'column', padding: '16px 20px', gap: 4,
+                            border: opt.featured ? '2px solid var(--accent)' : undefined }}
+                        >
+                          <span style={{ fontWeight: 700 }}>{opt.name} — {opt.price}</span>
+                          {hasAnySub && <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>{desc(opt)}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 <button
                   onClick={() => navigate(-1 as any)}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', marginTop: 8, fontFamily: 'inherit' }}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', marginTop: 12, fontFamily: 'inherit' }}
                 >
                   Go Back
                 </button>

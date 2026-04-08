@@ -5,6 +5,28 @@ interface Props {
   hasFeature?: (feature: string) => boolean;
 }
 
+/** Plans that include engine, with what they offer */
+const ENGINE_UPGRADE_OPTIONS = [
+  {
+    key: 'engine',
+    name: 'Year of the Engine',
+    price: '$29.99/mo',
+    includes: ['AI Coach', 'Nutrition', 'Year of the Engine'],
+  },
+  {
+    key: 'all_access',
+    name: 'All Access',
+    price: '$49.99/mo',
+    includes: ['AI Coach', 'Nutrition', 'Year of the Engine', 'AI Programming'],
+    featured: true,
+  },
+];
+
+const PLAN_FEATURES: Record<string, string[]> = {
+  engine: ['engine', 'ai_chat', 'nutrition'],
+  all_access: ['ai_chat', 'programming', 'engine', 'nutrition'],
+};
+
 const PROGRAM_GROUPS = [
   {
     category: 'Year of the Engine',
@@ -40,7 +62,7 @@ const PROGRAM_GROUPS = [
   },
 ];
 
-const FEATURES = [
+const FEATURE_LIST = [
   { icon: TrendingUp, text: 'Personalized pace targets from time trial baselines' },
   { icon: Timer, text: 'Built-in interval timer with work/rest tracking' },
   { icon: Calendar, text: 'Progressive month-by-month unlock system' },
@@ -49,28 +71,35 @@ const FEATURES = [
   { icon: Clock, text: 'Workouts scaled to your current fitness level' },
 ];
 
-/**
- * Shown when a user visits Engine pages without an active or trial subscription.
- * Context-aware: if user has another subscription, offers upgrade to All Access.
- */
 export default function EnginePaywall({ hasFeature }: Props) {
   const navigate = useNavigate();
 
-  const hasOtherSub = hasFeature
-    ? hasFeature('ai_chat') || hasFeature('programming') || hasFeature('nutrition')
-    : false;
+  const has = (f: string) => hasFeature ? hasFeature(f) : false;
+  const hasAnySub = has('ai_chat') || has('programming') || has('nutrition');
 
-  const ctaLabel = hasOtherSub ? 'Upgrade to All Access — $49.99/mo' : 'Upgrade to Access Engine — $29.99/mo';
+  // Filter to only show plans that are an upgrade (grant at least one new feature)
+  const upgradeOptions = hasAnySub
+    ? ENGINE_UPGRADE_OPTIONS.filter(opt => PLAN_FEATURES[opt.key].some(f => !has(f)))
+    : ENGINE_UPGRADE_OPTIONS;
 
-  const ctaButton = (
-    <button
-      className="engine-btn engine-btn-primary"
-      onClick={() => navigate('/checkout')}
-      style={{ width: '100%' }}
-    >
-      <Zap size={18} /> {ctaLabel}
-    </button>
-  );
+  // Build description for each option based on what user currently has
+  const describeOption = (opt: typeof ENGINE_UPGRADE_OPTIONS[0]) => {
+    const kept: string[] = [];
+    const gained: string[] = [];
+    for (const label of opt.includes) {
+      const featureMap: Record<string, string> = {
+        'AI Coach': 'ai_chat', 'Nutrition': 'nutrition',
+        'Year of the Engine': 'engine', 'AI Programming': 'programming',
+      };
+      const feat = featureMap[label];
+      if (feat && has(feat)) kept.push(label);
+      else gained.push(label);
+    }
+    const parts: string[] = [];
+    if (kept.length > 0) parts.push('Keep ' + kept.join(', '));
+    if (gained.length > 0) parts.push('Add ' + gained.join(', '));
+    return parts.join(' · ');
+  };
 
   return (
     <div className="engine-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -78,13 +107,9 @@ export default function EnginePaywall({ hasFeature }: Props) {
         <div className="engine-section" style={{ alignItems: 'center' }}>
           {/* Hero */}
           <div style={{
-            width: 56,
-            height: 56,
-            borderRadius: 14,
+            width: 56, height: 56, borderRadius: 14,
             background: 'var(--accent-glow)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: 'var(--accent)',
           }}>
             <Zap size={28} />
@@ -96,14 +121,32 @@ export default function EnginePaywall({ hasFeature }: Props) {
             frameworks, personalized pacing, and built-in analytics — from 3 to 5 days per week.
           </p>
 
-          {hasOtherSub && (
-            <p style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>
-              You have an active subscription — upgrade to All Access to add Engine.
-            </p>
-          )}
-
-          {/* Top CTA */}
-          {ctaButton}
+          {/* Upgrade options */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
+            {upgradeOptions.map(opt => (
+              <button
+                key={opt.key}
+                className="engine-btn engine-btn-primary"
+                onClick={() => navigate('/checkout')}
+                style={{
+                  width: '100%',
+                  flexDirection: 'column',
+                  padding: '16px 20px',
+                  gap: 4,
+                  border: opt.featured ? '2px solid var(--accent)' : undefined,
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Zap size={16} /> {opt.name} — {opt.price}
+                </span>
+                {hasAnySub && (
+                  <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>
+                    {describeOption(opt)}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
 
           <hr className="engine-divider" style={{ width: '100%' }} />
 
@@ -112,7 +155,6 @@ export default function EnginePaywall({ hasFeature }: Props) {
             <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 16, textAlign: 'center' }}>
               Choose Your Program
             </h3>
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {PROGRAM_GROUPS.map((group) => (
                 <div key={group.category}>
@@ -122,32 +164,19 @@ export default function EnginePaywall({ hasFeature }: Props) {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {group.programs.map((prog) => (
-                      <div
-                        key={prog.name}
-                        style={{
-                          background: 'var(--surface2)',
-                          border: '1px solid var(--border-light)',
-                          borderRadius: 8,
-                          padding: '12px 14px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          gap: 12,
-                        }}
-                      >
+                      <div key={prog.name} style={{
+                        background: 'var(--surface2)', border: '1px solid var(--border-light)',
+                        borderRadius: 8, padding: '12px 14px',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+                      }}>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{prog.name}</div>
                           <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{prog.duration}</div>
                         </div>
                         <div style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: 'var(--accent)',
-                          background: 'var(--accent-glow)',
-                          padding: '4px 10px',
-                          borderRadius: 20,
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0,
+                          fontSize: 11, fontWeight: 600, color: 'var(--accent)',
+                          background: 'var(--accent-glow)', padding: '4px 10px',
+                          borderRadius: 20, whiteSpace: 'nowrap', flexShrink: 0,
                         }}>
                           {prog.detail}
                         </div>
@@ -167,17 +196,11 @@ export default function EnginePaywall({ hasFeature }: Props) {
               Every Program Includes
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {FEATURES.map(({ icon: Icon, text }) => (
+              {FEATURE_LIST.map(({ icon: Icon, text }) => (
                 <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, color: 'var(--text-dim)' }}>
                   <div style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    background: 'var(--surface2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
+                    width: 32, height: 32, borderRadius: 8, background: 'var(--surface2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                   }}>
                     <Icon size={16} style={{ color: 'var(--accent)' }} />
                   </div>
@@ -189,8 +212,32 @@ export default function EnginePaywall({ hasFeature }: Props) {
 
           <hr className="engine-divider" style={{ width: '100%' }} />
 
-          {/* Bottom CTA */}
-          {ctaButton}
+          {/* Bottom upgrade options */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
+            {upgradeOptions.map(opt => (
+              <button
+                key={opt.key}
+                className="engine-btn engine-btn-primary"
+                onClick={() => navigate('/checkout')}
+                style={{
+                  width: '100%',
+                  flexDirection: 'column',
+                  padding: '16px 20px',
+                  gap: 4,
+                  border: opt.featured ? '2px solid var(--accent)' : undefined,
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Zap size={16} /> {opt.name} — {opt.price}
+                </span>
+                {hasAnySub && (
+                  <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>
+                    {describeOption(opt)}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
 
           <button
             onClick={() => navigate(-1 as any)}
