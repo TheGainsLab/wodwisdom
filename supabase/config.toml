@@ -22,6 +22,9 @@ verify_jwt = false
 [functions.create-portal-session]
 verify_jwt = false
 
+[functions.update-subscription]
+verify_jwt = false
+
 [functions.profile-analysis]
 verify_jwt = false
 

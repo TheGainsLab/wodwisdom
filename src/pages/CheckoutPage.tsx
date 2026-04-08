@@ -101,9 +101,9 @@ interface CheckoutPageProps { session: Session; }
 export default function CheckoutPage({ session }: CheckoutPageProps) {
   const [loading, setLoading] = useState<PlanKey | null>(null);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [navOpen, setNavOpen] = useState(false);
   const [interval, setInterval] = useState<Interval>('monthly');
-  const [portalLoading, setPortalLoading] = useState(false);
   const navigate = useNavigate();
   const { hasFeature, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
 
@@ -123,30 +123,24 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
     return planFeats.every(f => hasFeature(f));
   };
 
-  const openBillingPortal = async () => {
-    setPortalLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('create-portal-session', { body: {} });
-      if (error || data?.error) {
-        setError('Failed to open billing portal. Please try again.');
-        return;
-      }
-      if (data?.url) { window.location.href = data.url; return; }
-    } finally {
-      setPortalLoading(false);
-    }
-  };
-
   const selectPlan = async (p: PlanKey) => {
-    // Existing subscribers go to Stripe portal to upgrade
-    if (hasSubscription) {
-      await openBillingPortal();
-      return;
-    }
-
     setError('');
+    setSuccess('');
     setLoading(p);
     try {
+      if (hasSubscription) {
+        // Existing subscriber: update subscription with proration
+        const { data, error } = await supabase.functions.invoke('update-subscription', {
+          body: { plan: p, interval },
+        });
+        if (error) throw new Error(error.message || 'Failed to update subscription');
+        if (data?.error) throw new Error(data.error || 'Failed to update subscription');
+        setSuccess('Subscription updated! Your new plan is active.');
+        setTimeout(() => navigate('/'), 2000);
+        return;
+      }
+
+      // New subscriber: create checkout session
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { plan: p, interval },
       });
@@ -169,6 +163,8 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
     ? PLANS.filter(p => isUpgrade(p.key))
     : PLANS;
 
+  const featureLabels: Record<string, string> = { ai_chat: 'AI Coach', nutrition: 'Nutrition', programming: 'AI Programming', engine: 'Engine' };
+
   return (
     <div className="app-layout">
       <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
@@ -186,13 +182,10 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
                 <>
                   <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Upgrade your subscription</h2>
                   <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 4 }}>
-                    You currently have: <strong style={{ color: 'var(--text)' }}>{userFeatures.map(f => {
-                      const labels: Record<string, string> = { ai_chat: 'AI Coach', nutrition: 'Nutrition', programming: 'AI Programming', engine: 'Engine' };
-                      return labels[f] || f;
-                    }).join(', ')}</strong>
+                    You currently have: <strong style={{ color: 'var(--text)' }}>{userFeatures.map(f => featureLabels[f] || f).join(', ')}</strong>
                   </p>
                   <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 20 }}>
-                    Select a plan below to upgrade. Stripe will prorate your billing automatically.
+                    Select a plan below to upgrade. You'll receive a pro-rated credit for unused time on your current plan.
                   </p>
                 </>
               ) : (
@@ -203,20 +196,24 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
               )}
 
               {/* Monthly / Quarterly toggle */}
-              {!hasSubscription && (
-                <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
-                  <button
-                    style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'monthly' ? 'var(--accent)' : 'transparent', color: interval === 'monthly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
-                    onClick={() => setInterval('monthly')}
-                  >
-                    Monthly
-                  </button>
-                  <button
-                    style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'quarterly' ? 'var(--accent)' : 'transparent', color: interval === 'quarterly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
-                    onClick={() => setInterval('quarterly')}
-                  >
-                    Quarterly
-                  </button>
+              <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+                <button
+                  style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'monthly' ? 'var(--accent)' : 'transparent', color: interval === 'monthly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
+                  onClick={() => setInterval('monthly')}
+                >
+                  Monthly
+                </button>
+                <button
+                  style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'quarterly' ? 'var(--accent)' : 'transparent', color: interval === 'quarterly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
+                  onClick={() => setInterval('quarterly')}
+                >
+                  Quarterly
+                </button>
+              </div>
+
+              {success && (
+                <div style={{ background: 'rgba(46, 196, 134, 0.1)', border: '1px solid rgba(46, 196, 134, 0.3)', borderRadius: 8, padding: 16, marginBottom: 16, color: '#2ec486', fontSize: 14, fontWeight: 600, textAlign: 'center' }}>
+                  {success}
                 </div>
               )}
 
@@ -226,7 +223,7 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
                   <div
                     key={plan.key}
                     className={'checkout-plan-card' + (plan.featured ? ' featured' : '')}
-                    onClick={() => !loading && !portalLoading && !owned && selectPlan(plan.key)}
+                    onClick={() => !loading && !owned && selectPlan(plan.key)}
                     style={owned ? { opacity: 0.5, cursor: 'default' } : undefined}
                   >
                     {plan.badge && <div className="checkout-plan-badge">{plan.badge}</div>}
@@ -248,12 +245,12 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
                     <button
                       type="button"
                       className="auth-btn"
-                      disabled={!!loading || portalLoading || owned}
+                      disabled={!!loading || owned}
                       style={{ marginTop: 16 }}
-                      onClick={(e) => { e.stopPropagation(); if (!loading && !portalLoading && !owned) selectPlan(plan.key); }}
+                      onClick={(e) => { e.stopPropagation(); if (!loading && !owned) selectPlan(plan.key); }}
                     >
                       {owned ? 'Current Plan'
-                        : (loading === plan.key || portalLoading) ? 'Redirecting...'
+                        : loading === plan.key ? 'Upgrading...'
                         : hasSubscription ? 'Upgrade'
                         : 'Subscribe'}
                     </button>

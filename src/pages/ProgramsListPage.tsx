@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -27,19 +27,6 @@ export default function ProgramsListPage({ session }: { session: Session }) {
   const hasEngine = hasFeature('engine');
   const hasProgramming = hasFeature('programming');
   const hasOtherSub = !hasProgramming && (hasFeature('ai_chat') || hasFeature('engine') || hasFeature('nutrition'));
-  const [portalLoading, setPortalLoading] = useState(false);
-
-  const openBillingPortal = useCallback(async () => {
-    setPortalLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('create-portal-session', { body: {} });
-      if (error || data?.error) { navigate('/checkout'); return; }
-      if (data?.url) { window.location.href = data.url; return; }
-      navigate('/checkout');
-    } finally {
-      setPortalLoading(false);
-    }
-  }, [navigate]);
 
   useEffect(() => {
     loadAll();
@@ -216,11 +203,10 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                 {/* Top CTA */}
                 <button
                   className="auth-btn"
-                  onClick={hasOtherSub ? openBillingPortal : () => navigate('/checkout')}
-                  disabled={portalLoading}
+                  onClick={() => navigate('/checkout')}
                   style={{ width: '100%', marginBottom: 24 }}
                 >
-                  {portalLoading ? 'Opening...' : hasOtherSub ? 'Upgrade to All Access' : 'Upgrade to Unlock AI Programming'}
+                  {hasOtherSub ? 'Upgrade to All Access — $49.99/mo' : 'Upgrade to AI Programming — $29.99/mo'}
                 </button>
 
                 <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 20px' }} />
@@ -301,11 +287,10 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                 {/* Bottom CTA */}
                 <button
                   className="auth-btn"
-                  onClick={hasOtherSub ? openBillingPortal : () => navigate('/checkout')}
-                  disabled={portalLoading}
+                  onClick={() => navigate('/checkout')}
                   style={{ width: '100%' }}
                 >
-                  {portalLoading ? 'Opening...' : hasOtherSub ? 'Upgrade to All Access' : 'Upgrade to Unlock AI Programming'}
+                  {hasOtherSub ? 'Upgrade to All Access — $49.99/mo' : 'Upgrade to AI Programming — $29.99/mo'}
                 </button>
               </div>
             ) : programs.length === 0 ? (

@@ -1,7 +1,5 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zap, Calendar, Dumbbell, Clock, BarChart3, Timer, TrendingUp } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
 
 interface Props {
   hasFeature?: (feature: string) => boolean;
@@ -53,42 +51,24 @@ const FEATURES = [
 
 /**
  * Shown when a user visits Engine pages without an active or trial subscription.
- * Displays program details, features, and upgrade CTAs.
- * Context-aware: if user has another subscription, offers upgrade to All Access via Stripe portal.
+ * Context-aware: if user has another subscription, offers upgrade to All Access.
  */
 export default function EnginePaywall({ hasFeature }: Props) {
   const navigate = useNavigate();
-  const [portalLoading, setPortalLoading] = useState(false);
 
-  // Determine if user has an existing subscription (but not engine)
   const hasOtherSub = hasFeature
     ? hasFeature('ai_chat') || hasFeature('programming') || hasFeature('nutrition')
     : false;
 
-  const openBillingPortal = async () => {
-    setPortalLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('create-portal-session', { body: {} });
-      if (error || data?.error) { navigate('/checkout'); return; }
-      if (data?.url) { window.location.href = data.url; return; }
-      navigate('/checkout');
-    } finally {
-      setPortalLoading(false);
-    }
-  };
-
-  const handleUpgrade = hasOtherSub ? openBillingPortal : () => navigate('/checkout');
-  const ctaLabel = hasOtherSub ? 'Upgrade to All Access' : 'Upgrade to Access Engine';
-  const ctaLoading = portalLoading;
+  const ctaLabel = hasOtherSub ? 'Upgrade to All Access — $49.99/mo' : 'Upgrade to Access Engine — $29.99/mo';
 
   const ctaButton = (
     <button
       className="engine-btn engine-btn-primary"
-      onClick={handleUpgrade}
-      disabled={ctaLoading}
+      onClick={() => navigate('/checkout')}
       style={{ width: '100%' }}
     >
-      <Zap size={18} /> {ctaLoading ? 'Opening...' : ctaLabel}
+      <Zap size={18} /> {ctaLabel}
     </button>
   );
 
