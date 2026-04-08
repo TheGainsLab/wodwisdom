@@ -12,7 +12,6 @@ const NUTRITION_UPGRADE_OPTIONS = [
     name: 'AI Nutrition',
     price: '$7.99/mo',
     includes: ['Nutrition'],
-    onlyForFree: true, // hide if user already has any sub (they'd need a combo plan)
   },
   {
     key: 'coach_nutrition',
@@ -64,12 +63,13 @@ export default function NutritionPaywall({ hasFeature }: Props) {
   const has = (f: string) => hasFeature ? hasFeature(f) : false;
   const hasAnySub = has('ai_chat') || has('programming') || has('engine');
 
-  // Filter to plans that are an upgrade and make sense for the user
+  // Filter to plans that keep all current features AND add at least one new one
+  const currentFeatures = ['ai_chat', 'programming', 'engine', 'nutrition'].filter(f => has(f));
   const upgradeOptions = NUTRITION_UPGRADE_OPTIONS.filter(opt => {
-    // Hide nutrition-only plan if user already has another sub
-    if (opt.onlyForFree && hasAnySub) return false;
-    // Must grant at least one new feature
-    return PLAN_FEATURES[opt.key].some(f => !has(f));
+    const planFeats = PLAN_FEATURES[opt.key];
+    const keepsAll = currentFeatures.every(f => planFeats.includes(f));
+    const addsNew = planFeats.some(f => !has(f));
+    return keepsAll && addsNew;
   });
 
   const featureMap: Record<string, string> = {

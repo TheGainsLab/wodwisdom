@@ -77,9 +77,15 @@ export default function EnginePaywall({ hasFeature }: Props) {
   const has = (f: string) => hasFeature ? hasFeature(f) : false;
   const hasAnySub = has('ai_chat') || has('programming') || has('nutrition');
 
-  // Filter to only show plans that are an upgrade (grant at least one new feature)
+  // Filter to plans that keep all current features AND add at least one new one
+  const currentFeatures = ['ai_chat', 'programming', 'engine', 'nutrition'].filter(f => has(f));
   const upgradeOptions = hasAnySub
-    ? ENGINE_UPGRADE_OPTIONS.filter(opt => PLAN_FEATURES[opt.key].some(f => !has(f)))
+    ? ENGINE_UPGRADE_OPTIONS.filter(opt => {
+        const planFeats = PLAN_FEATURES[opt.key];
+        const keepsAll = currentFeatures.every(f => planFeats.includes(f));
+        const addsNew = planFeats.some(f => !has(f));
+        return keepsAll && addsNew;
+      })
     : ENGINE_UPGRADE_OPTIONS;
 
   // Build description for each option based on what user currently has
