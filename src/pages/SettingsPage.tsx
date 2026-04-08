@@ -126,37 +126,65 @@ export default function SettingsPage({ session }: { session: Session }) {
             {loading ? <div className="page-loading"><div className="loading-pulse" /></div> : (
               <>
                 {/* Subscription Section */}
-                <div className="settings-card" style={hasSubscription || profile.role === 'admin' ? { borderColor: 'var(--accent)', background: 'var(--accent-glow)' } : {}}>
-                  <h2 className="settings-card-title">Subscription</h2>
-                  {hasSubscription || profile.role === 'admin' ? (
-                    <>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                        {profile.role === 'admin' ? (
-                          <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--accent)', background: 'rgba(255,58,58,0.1)', padding: '3px 10px', borderRadius: 4 }}>
-                            All Access (Admin)
-                          </span>
-                        ) : userFeatures.map(f => (
-                          <span key={f} style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--accent)', background: 'rgba(255,58,58,0.1)', padding: '3px 10px', borderRadius: 4 }}>
-                            {f.replace(/_/g, ' ')}
-                          </span>
-                        ))}
-                      </div>
-                      <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 16 }}>Update payment method, change plan, or cancel anytime.</p>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button className="auth-btn" onClick={openBillingPortal} disabled={portalLoading}>
-                          {portalLoading ? 'Opening...' : 'Manage subscription'}
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 16 }}>You're on the free plan. Upgrade to unlock all features.</p>
-                      <button className="auth-btn" onClick={() => navigate('/checkout')}>
-                        Upgrade
-                      </button>
-                    </>
-                  )}
-                </div>
+                {(() => {
+                  const featureLabels: Record<string, string> = { ai_chat: 'AI Coach', nutrition: 'Nutrition', programming: 'AI Programming', engine: 'Engine' };
+                  const hasAllAccess = userFeatures.includes('ai_chat') && userFeatures.includes('programming') && userFeatures.includes('engine') && userFeatures.includes('nutrition');
+
+                  // Determine plan name from features
+                  let planName = 'Free';
+                  if (profile.role === 'admin') planName = 'All Access (Admin)';
+                  else if (hasAllAccess) planName = 'All Access';
+                  else if (userFeatures.includes('programming')) planName = 'AI Programming';
+                  else if (userFeatures.includes('engine')) planName = 'Year of the Engine';
+                  else if (userFeatures.includes('ai_chat') && userFeatures.includes('nutrition')) planName = 'AI Coach + AI Nutrition';
+                  else if (userFeatures.includes('nutrition')) planName = 'AI Nutrition';
+                  else if (userFeatures.includes('ai_chat')) planName = 'AI Coach';
+
+                  return (
+                    <div className="settings-card" style={hasSubscription || profile.role === 'admin' ? { borderColor: 'var(--accent)', background: 'var(--accent-glow)' } : {}}>
+                      <h2 className="settings-card-title">Subscription</h2>
+                      {hasSubscription || profile.role === 'admin' ? (
+                        <>
+                          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{planName}</div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+                            {profile.role === 'admin' ? (
+                              <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--accent)', background: 'rgba(255,58,58,0.1)', padding: '3px 10px', borderRadius: 4 }}>
+                                All Features
+                              </span>
+                            ) : userFeatures.map(f => (
+                              <span key={f} style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--accent)', background: 'rgba(255,58,58,0.1)', padding: '3px 10px', borderRadius: 4 }}>
+                                {featureLabels[f] || f.replace(/_/g, ' ')}
+                              </span>
+                            ))}
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {!hasAllAccess && profile.role !== 'admin' && (
+                              <button className="auth-btn" onClick={() => navigate('/checkout')}>
+                                Upgrade Plan
+                              </button>
+                            )}
+                            <button
+                              className="auth-btn"
+                              style={!hasAllAccess && profile.role !== 'admin' ? { background: 'var(--surface2)', color: 'var(--text)' } : undefined}
+                              onClick={openBillingPortal}
+                              disabled={portalLoading}
+                            >
+                              {portalLoading ? 'Opening...' : 'Manage Billing'}
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 4 }}>You're on the free plan.</p>
+                          <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 16 }}>Upgrade to unlock AI coaching, programming, conditioning, and nutrition tracking.</p>
+                          <button className="auth-btn" onClick={() => navigate('/checkout')}>
+                            View Plans
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
                 {/* Athlete Profile Link */}
                 <div className="settings-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/profile')}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
