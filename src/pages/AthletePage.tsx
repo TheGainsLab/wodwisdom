@@ -941,10 +941,10 @@ export default function AthletePage({ session }: { session: Session }) {
                       const profileLocked = isFreeUser && lastProfileAnalysis != null;
                       const profileOnCooldown = !isAdmin && profileCooldown > 0;
 
-                      const trainingCooldown = lastTrainingAnalysis ? Math.ceil((new Date(lastTrainingAnalysis).getTime() + 14 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000)) : 0;
+                      const trainingCooldown = lastTrainingAnalysis ? Math.ceil((new Date(lastTrainingAnalysis).getTime() + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000)) : 0;
                       const trainingOnCooldown = !isAdmin && trainingCooldown > 0;
 
-                      const nutritionCooldown = lastNutritionAnalysis ? Math.ceil((new Date(lastNutritionAnalysis).getTime() + 14 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000)) : 0;
+                      const nutritionCooldown = lastNutritionAnalysis ? Math.ceil((new Date(lastNutritionAnalysis).getTime() + 7 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000)) : 0;
                       const nutritionOnCooldown = !isAdmin && nutritionCooldown > 0;
 
                       return (
@@ -977,7 +977,7 @@ export default function AthletePage({ session }: { session: Session }) {
                                 Training Analysis
                               </span>
                             ) : analysisLoading === 'training' ? 'Analyzing...'
-                              : trainingOnCooldown ? `Available in ${trainingCooldown} days`
+                              : trainingOnCooldown ? `Available in ${trainingCooldown} days — allows data to accumulate`
                               : 'Training Analysis'}
                           </button>
                           {!canTrainingAnalysis && (
@@ -998,7 +998,7 @@ export default function AthletePage({ session }: { session: Session }) {
                                 Nutrition Analysis
                               </span>
                             ) : analysisLoading === 'nutrition' ? 'Analyzing...'
-                              : nutritionOnCooldown ? `Available in ${nutritionCooldown} days`
+                              : nutritionOnCooldown ? `Available in ${nutritionCooldown} days — allows data to accumulate`
                               : 'Nutrition Analysis'}
                           </button>
                           {!canNutritionAnalysis && (
