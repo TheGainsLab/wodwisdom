@@ -292,6 +292,13 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                 >
                   {hasOtherSub ? 'Upgrade to All Access — $49.99/mo' : 'Upgrade to AI Programming — $29.99/mo'}
                 </button>
+
+                <button
+                  onClick={() => navigate(-1 as any)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', marginTop: 8, fontFamily: 'inherit' }}
+                >
+                  Go Back
+                </button>
               </div>
             ) : programs.length === 0 ? (
               <div className="empty-state">
