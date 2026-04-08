@@ -117,7 +117,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
             </button>
             <h1>Engine</h1>
           </header>
-          <EnginePaywall />
+          <EnginePaywall hasFeature={hasFeature} />
         </div>
       </div>
     );

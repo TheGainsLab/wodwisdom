@@ -117,7 +117,7 @@ export default function NutritionCalendarPage({ session }: { session: Session })
             <h1>Nutrition Calendar</h1>
           </header>
           <div className="page-body">
-            <NutritionPaywall />
+            <NutritionPaywall hasFeature={hasFeature} />
           </div>
         </div>
       </div>

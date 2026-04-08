@@ -208,7 +208,7 @@ export default function NutritionDashboardPage({ session }: { session: Session }
             </button>
             <h1>Nutrition</h1>
           </header>
-          <NutritionPaywall />
+          <NutritionPaywall hasFeature={hasFeature} />
         </div>
       </div>
     );
