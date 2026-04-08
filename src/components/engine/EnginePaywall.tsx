@@ -102,8 +102,8 @@ export default function EnginePaywall({ hasFeature }: Props) {
   };
 
   return (
-    <div className="engine-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="engine-card" style={{ maxWidth: 480, width: '100%', textAlign: 'center' }}>
+    <div className="engine-page" style={{ padding: '24px 0' }}>
+      <div className="engine-card" style={{ maxWidth: 480, width: '100%', textAlign: 'center', margin: '0 auto' }}>
         <div className="engine-section" style={{ alignItems: 'center' }}>
           {/* Hero */}
           <div style={{
