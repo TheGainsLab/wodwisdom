@@ -169,17 +169,12 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
   const currentDay = progress?.engine_current_day ?? 1;
   const totalDays = workouts.length;
 
-  // Derive months unlocked from where the user actually is in the program.
-  // The static engine_months_unlocked field was never auto-incremented, so
-  // we compute it: find which month the current day falls in and unlock
-  // all months up to and including that one.
-  const currentDayWorkout = workouts[currentDay - 1];
-  const currentMonth = currentDayWorkout?.month ?? 1;
-  const monthsUnlocked = Math.max(progress?.engine_months_unlocked ?? 1, currentMonth);
+  // Use engine_months_unlocked from the database — incremented by payment webhooks
+  const monthsUnlocked = progress?.engine_months_unlocked ?? 1;
   const completedCount = completedDays.size;
   const pct = totalDays > 0 ? Math.round((completedCount / totalDays) * 100) : 0;
   const monthMap = groupByMonth(workouts);
-  const months = Array.from(monthMap.keys()).sort((a, b) => a - b);
+  const months = Array.from(monthMap.keys()).sort((a, b) => a - b).filter(m => m <= monthsUnlocked);
 
   // Month-level data (when drilled in)
   const monthDays = selectedMonth != null ? (monthMap.get(selectedMonth) ?? []) : [];

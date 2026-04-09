@@ -34,20 +34,37 @@ Deno.serve(async (req) => {
 
     const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const token = authHeader.replace("Bearer ", "");
-    const {
-      data: { user },
-      error: authErr,
-    } = await supa.auth.getUser(token);
 
-    if (authErr || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+    // Support server-to-server calls from webhook (user_id in body or header)
+    let userId: string | null = null;
+    let userToken: string | null = null;
+    const webhookUserId = req.headers.get("x-webhook-user-id");
+
+    if (webhookUserId && token === SUPABASE_SERVICE_KEY) {
+      // Called from webhook with service role key — trust the user_id
+      userId = webhookUserId;
+    } else {
+      // Called from frontend with user token
+      const {
+        data: { user },
+        error: authErr,
+      } = await supa.auth.getUser(token);
+
+      if (authErr || !user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+      userId = user.id;
+      userToken = token;
     }
 
     const body = await req.json().catch(() => ({}));
     const programId: string | null = body?.program_id ?? null;
+    // If user_id provided in body (from webhook), use it
+    if (body?.user_id && !webhookUserId) userId = body.user_id;
+    const authToken = userToken || `Bearer ${SUPABASE_SERVICE_KEY}`;
 
     if (!programId) {
       return new Response(
@@ -61,7 +78,7 @@ Deno.serve(async (req) => {
       .from("programs")
       .select("id, user_id, generated_months, source")
       .eq("id", programId)
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle();
 
     if (progErr || !program) {
@@ -87,7 +104,7 @@ Deno.serve(async (req) => {
     const { count: recentEvalCount } = await supa
       .from("profile_evaluations")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .gte("created_at", thirtyDaysAgo.toISOString());
 
     if ((recentEvalCount ?? 0) > 0) {
@@ -95,7 +112,7 @@ Deno.serve(async (req) => {
       const { data: latestEval } = await supa
         .from("profile_evaluations")
         .select("month_number")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -115,7 +132,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: authToken.startsWith("Bearer ") ? authToken : `Bearer ${authToken}`,
       },
       body: JSON.stringify({
         month_number: nextMonth,
@@ -143,7 +160,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: authToken.startsWith("Bearer ") ? authToken : `Bearer ${authToken}`,
       },
       body: JSON.stringify({
         evaluation_id: evaluationId,

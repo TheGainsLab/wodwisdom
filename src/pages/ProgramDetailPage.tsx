@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksDisplay';
 
@@ -66,6 +67,7 @@ function workoutSummaryLines(text: string): SummaryLine[] {
 export default function ProgramDetailPage({ session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAdmin } = useEntitlements(session.user.id);
   const [program, setProgram] = useState<{ id: string; name: string; source?: string; generated_months?: number } | null>(null);
   const [allWorkouts, setAllWorkouts] = useState<ProgramWorkout[]>([]);
   const [completedWorkoutIds, setCompletedWorkoutIds] = useState<Set<string>>(new Set());
@@ -108,7 +110,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     setProgram(prog);
     const { data: wk } = await supabase
       .from('program_workouts')
-      .select('id, week_num, day_num, workout_text, sort_order')
+      .select('id, week_num, day_num, workout_text, sort_order, month_number')
       .eq('program_id', id)
       .order('sort_order');
     setAllWorkouts(wk || []);
@@ -272,14 +274,33 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                 )}
                 <div className="program-days-accordion">
                   {(() => {
-                    // Group workouts into weeks of 5
-                    const weeks: { weekNum: number; days: ProgramWorkout[] }[] = [];
-                    workouts.forEach((w, i) => {
-                      const weekIndex = Math.floor(i / 5);
-                      if (!weeks[weekIndex]) weeks[weekIndex] = { weekNum: weekIndex + 1, days: [] };
-                      weeks[weekIndex].days.push(w);
+                    // Group workouts by month, then into weeks of 5 within each month
+                    const monthGroups = new Map<number, ProgramWorkout[]>();
+                    workouts.forEach((w) => {
+                      const month = (w as any).month_number || 1;
+                      if (!monthGroups.has(month)) monthGroups.set(month, []);
+                      monthGroups.get(month)!.push(w);
                     });
-                    return weeks.map((week, wi) => (
+                    const sortedMonths = Array.from(monthGroups.keys()).sort((a, b) => a - b);
+                    const hasMultipleMonths = sortedMonths.length > 1 || (program?.generated_months || 1) > 1;
+
+                    return sortedMonths.map(month => {
+                      const monthWorkouts = monthGroups.get(month)!;
+                      const weeks: { weekNum: number; days: ProgramWorkout[] }[] = [];
+                      monthWorkouts.forEach((w, i) => {
+                        const weekIndex = Math.floor(i / 5);
+                        if (!weeks[weekIndex]) weeks[weekIndex] = { weekNum: (month - 1) * 4 + weekIndex + 1, days: [] };
+                        weeks[weekIndex].days.push(w);
+                      });
+
+                      return (
+                        <div key={month}>
+                          {hasMultipleMonths && (
+                            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)', margin: '24px 0 12px', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                              Month {month}
+                            </div>
+                          )}
+                          {weeks.map((week, wi) => (
                       <div key={wi} className="program-week-group">
                         <div className="program-week-label">Week {week.weekNum}</div>
                         {week.days.map((w) => {
@@ -388,14 +409,17 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           );
                         })}
                       </div>
-                    ));
+                          ))}
+                        </div>
+                      );
+                    });
                   })()}
                 </div>
-                {isGenerated && (
+                {isGenerated && isAdmin && (
                   <div style={{ marginTop: 24, padding: '16px', background: 'var(--surface2)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
-                        Month {program.generated_months || 1} of training
+                        Month {program.generated_months || 1} of training (Admin)
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                         {generatingNextMonth
