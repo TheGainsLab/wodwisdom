@@ -158,6 +158,56 @@ Deno.serve(async (req) => {
 
     const { question, history = [], source_filter, include_profile = false, workout_id } = await req.json();
 
+    // ── Topic classifier: block off-topic questions before RAG ──
+    // Skip classification for workout coaching (always relevant)
+    if (!workout_id) {
+      try {
+        const classifyResp = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "x-api-key": ANTHROPIC_API_KEY!,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 10,
+            system: "Classify the user's question as either 'allow' or 'block'. Reply with ONLY that one word.\n\nallow: fitness, exercise, training, programming, coaching, nutrition, diet, recipes, meal planning, health, wellness, recovery, sleep, stress management, injury prevention, mobility, anatomy, physiology, supplements, body composition, weight management, athletic performance, competition prep, CrossFit, weightlifting, conditioning, endurance, strength, flexibility, mental health as it relates to training.\n\nblock: anything completely unrelated to health, fitness, or wellness — homework, coding, business, legal, financial, creative writing, travel, entertainment, politics, relationships (non-health), technology, etc.",
+            messages: [{ role: "user", content: question.substring(0, 500) }],
+          }),
+        }, 5_000);
+
+        if (classifyResp.ok) {
+          const classifyData = await classifyResp.json();
+          const classification = classifyData.content?.[0]?.text?.trim()?.toLowerCase();
+          if (classification === "block") {
+            // Return a polite decline as a streaming SSE response for consistency
+            const decline = "I'm your fitness and wellness coach — I'm best at helping with training, nutrition, recovery, and everything related to being a healthier, fitter human. That question is a bit outside my lane. What can I help you with on the fitness side?";
+            const encoder = new TextEncoder();
+            const stream = new ReadableStream({
+              start(controller) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "sources", sources: [] })}\n\n`));
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "delta", text: decline })}\n\n`));
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                  type: "done",
+                  summary: "",
+                  usage: isFreeTier
+                    ? { tier: "free", total_questions: totalCount, free_limit: FREE_LIMIT }
+                    : { tier: "paid", daily_questions: dailyCount, daily_limit: DAILY_LIMIT },
+                })}\n\n`));
+                controller.close();
+              },
+            });
+            return new Response(stream, {
+              headers: { ...cors, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+            });
+          }
+        }
+      } catch {
+        // If classifier fails, allow the question through — don't block users due to classifier errors
+      }
+    }
+
     // Fetch workout context if this is a coaching conversation
     let workoutContext = "";
     let contextType: string | null = null;
