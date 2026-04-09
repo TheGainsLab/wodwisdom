@@ -135,36 +135,9 @@ export default function EnginePaywall({ hasFeature }: Props) {
             </div>
           </div>
 
-          <hr className="engine-divider" style={{ width: '100%' }} />
-
-          {/* Bottom CTAs */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
-            {upgradeOptions.map(opt => (
-              <button
-                key={opt.key}
-                className="engine-btn engine-btn-primary"
-                onClick={() => navigate(`/checkout?plan=${opt.key}&interval=monthly`)}
-                style={{
-                  width: '100%', flexDirection: 'column',
-                  padding: '16px 20px', gap: 4,
-                  border: opt.featured ? '2px solid var(--accent)' : undefined,
-                }}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Zap size={16} /> {opt.name} — {opt.price}
-                </span>
-                {hasAnySub && (
-                  <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>
-                    {describeOption(opt)}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
           <button
             onClick={() => navigate(-1 as any)}
-            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', marginTop: 4, fontFamily: 'inherit' }}
+            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', marginTop: 8, fontFamily: 'inherit' }}
           >
             Go Back
           </button>
