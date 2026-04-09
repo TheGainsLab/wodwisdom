@@ -547,7 +547,7 @@ export async function loadUserProgress(): Promise<EngineUserProgress | null> {
   return data;
 }
 
-/** Save the user's chosen program version (initial selection). */
+/** Save the user's chosen program version (initial selection) and set months unlocked to 1. */
 export async function saveProgramVersion(version: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -555,7 +555,7 @@ export async function saveProgramVersion(version: string): Promise<void> {
   const { error } = await supabase
     .from('athlete_profiles')
     .upsert(
-      { user_id: user.id, engine_program_version: version },
+      { user_id: user.id, engine_program_version: version, engine_months_unlocked: 1 },
       { onConflict: 'user_id' }
     );
 

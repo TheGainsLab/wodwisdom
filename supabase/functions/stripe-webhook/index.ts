@@ -215,6 +215,93 @@ serve(async (req) => {
         break;
       }
 
+      case "invoice.payment_succeeded": {
+        const invoice = event.data.object;
+        const customerId = invoice.customer;
+        const subscriptionId = invoice.subscription;
+
+        // Skip if not a subscription invoice (e.g. one-time charges)
+        if (!subscriptionId) break;
+
+        // Skip initial subscription creation — handled by checkout.session.completed
+        // billing_reason: "subscription_create" = first payment, "subscription_cycle" = renewal
+        if (invoice.billing_reason === "subscription_create") {
+          console.log("[webhook] Skipping initial payment — handled by checkout.session.completed");
+          break;
+        }
+
+        console.log(`[webhook] Recurring payment: customer=${customerId}, subscription=${subscriptionId}`);
+
+        // Find user
+        const { data: payProfiles } = await supa.from("profiles").select("id").eq("stripe_customer_id", customerId).limit(1);
+        if (!payProfiles || payProfiles.length === 0) break;
+        const payUserId = payProfiles[0].id;
+
+        // Check what entitlements the user has
+        const { data: payEntitlements } = await supa
+          .from("user_entitlements")
+          .select("feature")
+          .eq("user_id", payUserId)
+          .or("expires_at.is.null,expires_at.gt." + new Date().toISOString());
+
+        const payFeatures = new Set((payEntitlements || []).map(e => e.feature));
+
+        // Programming users: trigger next month generation
+        if (payFeatures.has("programming")) {
+          // Find the user's most recent generated program
+          const { data: programs } = await supa
+            .from("programs")
+            .select("id, generated_months")
+            .eq("user_id", payUserId)
+            .eq("source", "generated")
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+          if (programs && programs.length > 0) {
+            const program = programs[0];
+            const nextMonth = (program.generated_months || 1) + 1;
+            console.log(`[webhook] Triggering month ${nextMonth} generation for program ${program.id}`);
+
+            // Call generate-next-month using service role (no user token needed)
+            const genUrl = `${SUPABASE_URL}/functions/v1/generate-next-month`;
+            try {
+              await fetchWithTimeout(genUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
+                  "x-webhook-user-id": payUserId,
+                },
+                body: JSON.stringify({ program_id: program.id, user_id: payUserId }),
+              }, 30_000);
+            } catch (e) {
+              console.error("[webhook] Failed to trigger program generation:", e);
+            }
+          }
+        }
+
+        // Engine users: unlock next month
+        if (payFeatures.has("engine")) {
+          const { data: athleteProfile } = await supa
+            .from("athlete_profiles")
+            .select("engine_months_unlocked")
+            .eq("user_id", payUserId)
+            .maybeSingle();
+
+          if (athleteProfile) {
+            const currentUnlocked = athleteProfile.engine_months_unlocked || 1;
+            const newUnlocked = currentUnlocked + 1;
+            console.log(`[webhook] Unlocking engine month ${newUnlocked} for user ${payUserId}`);
+            await supa
+              .from("athlete_profiles")
+              .update({ engine_months_unlocked: newUnlocked })
+              .eq("user_id", payUserId);
+          }
+        }
+
+        break;
+      }
+
       default:
         console.log("Unhandled event:", event.type);
     }
