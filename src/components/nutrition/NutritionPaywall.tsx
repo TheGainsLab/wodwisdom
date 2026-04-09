@@ -1,11 +1,11 @@
 import { useNavigate } from 'react-router-dom';
-import { Apple, Camera, Search, BookOpen, BarChart3, Utensils, ScanBarcode } from 'lucide-react';
+import { Apple } from 'lucide-react';
 
 interface Props {
   hasFeature?: (feature: string) => boolean;
 }
 
-/** All plans that include nutrition, ordered by price */
+/** Plans to show on the Nutrition paywall — focused options, not every plan */
 const NUTRITION_UPGRADE_OPTIONS = [
   {
     key: 'nutrition',
@@ -20,18 +20,6 @@ const NUTRITION_UPGRADE_OPTIONS = [
     includes: ['AI Coach', 'Nutrition'],
   },
   {
-    key: 'programming',
-    name: 'AI Programming',
-    price: '$29.99/mo',
-    includes: ['AI Coach', 'Nutrition', 'AI Programming'],
-  },
-  {
-    key: 'engine',
-    name: 'Year of the Engine',
-    price: '$29.99/mo',
-    includes: ['AI Coach', 'Nutrition', 'Year of the Engine'],
-  },
-  {
     key: 'all_access',
     name: 'All Access',
     price: '$49.99/mo',
@@ -43,19 +31,8 @@ const NUTRITION_UPGRADE_OPTIONS = [
 const PLAN_FEATURES: Record<string, string[]> = {
   nutrition: ['nutrition'],
   coach_nutrition: ['ai_chat', 'nutrition'],
-  programming: ['programming', 'ai_chat', 'nutrition'],
-  engine: ['engine', 'ai_chat', 'nutrition'],
   all_access: ['ai_chat', 'programming', 'engine', 'nutrition'],
 };
-
-const FEATURE_LIST = [
-  { icon: Search, text: 'Search 900,000+ foods with detailed nutrition data' },
-  { icon: Camera, text: 'Snap a photo to auto-identify foods and macros' },
-  { icon: ScanBarcode, text: 'Barcode scanner for packaged foods' },
-  { icon: BookOpen, text: 'Save meal templates for quick daily logging' },
-  { icon: Utensils, text: 'Favorites for foods you eat regularly' },
-  { icon: BarChart3, text: 'Daily macro tracking with calorie targets' },
-];
 
 export default function NutritionPaywall({ hasFeature }: Props) {
   const navigate = useNavigate();
@@ -63,13 +40,10 @@ export default function NutritionPaywall({ hasFeature }: Props) {
   const has = (f: string) => hasFeature ? hasFeature(f) : false;
   const hasAnySub = has('ai_chat') || has('programming') || has('engine');
 
-  // Filter to plans that keep all current features AND add at least one new one
   const currentFeatures = ['ai_chat', 'programming', 'engine', 'nutrition'].filter(f => has(f));
   const upgradeOptions = NUTRITION_UPGRADE_OPTIONS.filter(opt => {
     const planFeats = PLAN_FEATURES[opt.key];
-    const keepsAll = currentFeatures.every(f => planFeats.includes(f));
-    const addsNew = planFeats.some(f => !has(f));
-    return keepsAll && addsNew;
+    return currentFeatures.every(f => planFeats.includes(f)) && planFeats.some(f => !has(f));
   });
 
   const featureMap: Record<string, string> = {
@@ -118,10 +92,8 @@ export default function NutritionPaywall({ hasFeature }: Props) {
                 className="engine-btn engine-btn-primary"
                 onClick={() => navigate(`/checkout?plan=${opt.key}&interval=monthly`)}
                 style={{
-                  width: '100%',
-                  flexDirection: 'column',
-                  padding: '16px 20px',
-                  gap: 4,
+                  width: '100%', flexDirection: 'column',
+                  padding: '16px 20px', gap: 4,
                   border: opt.featured ? '2px solid var(--accent)' : undefined,
                 }}
               >
@@ -137,60 +109,31 @@ export default function NutritionPaywall({ hasFeature }: Props) {
             ))}
           </div>
 
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+            Nutrition is also included with AI Programming, Year of the Engine, and All Access.
+          </p>
+
           <hr className="engine-divider" style={{ width: '100%' }} />
 
           {/* Features */}
-          <div style={{ width: '100%', textAlign: 'left' }}>
-            <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 14, textAlign: 'center' }}>
-              What You Get
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {FEATURE_LIST.map(({ icon: Icon, text }) => (
-                <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, color: 'var(--text-dim)' }}>
-                  <div style={{
-                    width: 32, height: 32, borderRadius: 8, background: 'var(--surface2)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}>
-                    <Icon size={16} style={{ color: 'var(--accent)' }} />
-                  </div>
-                  {text}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <hr className="engine-divider" style={{ width: '100%' }} />
-
-          {/* Bottom upgrade options */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
-            {upgradeOptions.map(opt => (
-              <button
-                key={opt.key}
-                className="engine-btn engine-btn-primary"
-                onClick={() => navigate(`/checkout?plan=${opt.key}&interval=monthly`)}
-                style={{
-                  width: '100%',
-                  flexDirection: 'column',
-                  padding: '16px 20px',
-                  gap: 4,
-                  border: opt.featured ? '2px solid var(--accent)' : undefined,
-                }}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Apple size={16} /> {opt.name} — {opt.price}
-                </span>
-                {hasAnySub && (
-                  <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>
-                    {describeOption(opt)}
-                  </span>
-                )}
-              </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', textAlign: 'left' }}>
+            {[
+              'Search 900,000+ foods with detailed nutrition data',
+              'Snap a photo to auto-identify foods and macros',
+              'Barcode scanner for packaged foods',
+              'Meal templates and favorites for quick logging',
+              'Daily macro tracking with calorie targets',
+            ].map(text => (
+              <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: 'var(--text-dim)' }}>
+                <span style={{ color: 'var(--accent)', fontSize: 16, flexShrink: 0 }}>&#10003;</span>
+                {text}
+              </div>
             ))}
           </div>
 
           <button
             onClick={() => navigate(-1 as any)}
-            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', marginTop: 4, fontFamily: 'inherit' }}
+            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', marginTop: 8, fontFamily: 'inherit' }}
           >
             Go Back
           </button>
