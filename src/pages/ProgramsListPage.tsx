@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
-import { Plus, Zap, User, Brain, Dumbbell, MessageSquare, RefreshCw, BarChart3 } from 'lucide-react';
+import { Plus, Zap, Brain } from 'lucide-react';
 
 interface Program {
   id: string;
@@ -244,73 +244,18 @@ export default function ProgramsListPage({ session }: { session: Session }) {
 
                 <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 20px' }} />
 
-                {/* How It Works */}
-                <p style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 16 }}>
-                  How It Works
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'left', marginBottom: 24 }}>
-                  {[
-                    { step: '1', title: 'Build Your Profile', desc: 'Enter your lifts, skills, conditioning benchmarks, and goals' },
-                    { step: '2', title: 'Get Your Evaluation', desc: 'AI analyzes your strengths, weaknesses, and priorities' },
-                    { step: '3', title: 'Receive Your Program', desc: 'A custom training program built around your numbers and goals' },
-                    { step: '4', title: 'Train & Adapt', desc: 'Log results, get coaching, and watch your program evolve' },
-                  ].map(({ step, title, desc }) => (
-                    <div key={step} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                      <div style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: '50%',
-                        background: 'var(--accent)',
-                        color: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 13,
-                        fontWeight: 700,
-                        flexShrink: 0,
-                      }}>
-                        {step}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{title}</div>
-                        <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>{desc}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 20px' }} />
-
                 {/* Features */}
-                <p style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 16 }}>
-                  What You Get
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'left', marginBottom: 24 }}>
-                  {([
-                    [User, 'Personalized to You', 'Every workout built from your lifts, skills, and conditioning level'],
-                    [Brain, 'AI Evaluation', 'Detailed analysis of your strengths, weaknesses, and priorities'],
-                    [Dumbbell, 'Custom Programming', 'Training blocks designed for your numbers, equipment, and goals'],
-                    [MessageSquare, 'Built-in Coaching', 'Training intent, movement cues, pacing strategy for every session'],
-                    [RefreshCw, 'Adaptive Programs', 'Log results and the AI adjusts — flag weaknesses, increase challenges'],
-                    [BarChart3, 'Training Analysis', 'Track progress over time with AI-powered training reviews'],
-                  ] as const).map(([Icon, title, desc]) => (
-                    <div key={title} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                      <div style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
-                        background: 'var(--surface2)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}>
-                        <Icon size={16} style={{ color: 'var(--accent)' }} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{title}</div>
-                        <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>{desc}</div>
-                      </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left', marginBottom: 24 }}>
+                  {[
+                    'Personalized programs from your athlete profile',
+                    'AI evaluation of strengths and weaknesses',
+                    'Session-by-session coaching cues',
+                    'Programs adapt as you train and log results',
+                    'Training analysis and progress tracking',
+                  ].map(text => (
+                    <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: 'var(--text-dim)' }}>
+                      <span style={{ color: 'var(--accent)', fontSize: 16, flexShrink: 0 }}>&#10003;</span>
+                      {text}
                     </div>
                   ))}
                 </div>
