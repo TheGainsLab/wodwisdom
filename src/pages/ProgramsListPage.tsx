@@ -260,57 +260,6 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                   ))}
                 </div>
 
-                <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 20px' }} />
-
-                {/* Bottom upgrade options */}
-                {(() => {
-                  const has = (f: string) => hasFeature(f);
-                  const hasAnySub = has('ai_chat') || has('engine') || has('nutrition');
-
-                  const options = [
-                    { key: 'programming', name: 'AI Programming', price: '$29.99/mo',
-                      includes: ['AI Coach', 'Nutrition', 'AI Programming'],
-                      features: ['programming', 'ai_chat', 'nutrition'] },
-                    { key: 'all_access', name: 'All Access', price: '$49.99/mo',
-                      includes: ['AI Coach', 'Nutrition', 'AI Programming', 'Year of the Engine'],
-                      features: ['ai_chat', 'programming', 'engine', 'nutrition'],
-                      featured: true },
-                  ].filter(opt => {
-                    const curr = ['ai_chat', 'programming', 'engine', 'nutrition'].filter(f => has(f));
-                    return curr.every(f => opt.features.includes(f)) && opt.features.some(f => !has(f));
-                  });
-
-                  const fMap: Record<string, string> = {
-                    'AI Coach': 'ai_chat', 'Nutrition': 'nutrition',
-                    'Year of the Engine': 'engine', 'AI Programming': 'programming',
-                  };
-                  const desc = (opt: typeof options[0]) => {
-                    const kept = opt.includes.filter(l => fMap[l] && has(fMap[l]));
-                    const gained = opt.includes.filter(l => !fMap[l] || !has(fMap[l]));
-                    const parts: string[] = [];
-                    if (kept.length > 0) parts.push('Keep ' + kept.join(', '));
-                    if (gained.length > 0) parts.push('Add ' + gained.join(', '));
-                    return parts.join(' · ');
-                  };
-
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {options.map(opt => (
-                        <button
-                          key={opt.key}
-                          className="auth-btn"
-                          onClick={() => navigate(`/checkout?plan=${opt.key}&interval=monthly`)}
-                          style={{ width: '100%', display: 'flex', flexDirection: 'column', padding: '16px 20px', gap: 4,
-                            border: opt.featured ? '2px solid var(--accent)' : undefined }}
-                        >
-                          <span style={{ fontWeight: 700 }}>{opt.name} — {opt.price}</span>
-                          {hasAnySub && <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>{desc(opt)}</span>}
-                        </button>
-                      ))}
-                    </div>
-                  );
-                })()}
-
                 <button
                   onClick={() => navigate(-1 as any)}
                   style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 14, cursor: 'pointer', marginTop: 12, fontFamily: 'inherit' }}
