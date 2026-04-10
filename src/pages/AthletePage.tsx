@@ -324,19 +324,15 @@ export default function AthletePage({ session }: { session: Session }) {
   const [error, setError] = useState('');
   const [isDirty, setIsDirty] = useState(true);
   const [isNewUser, setIsNewUser] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<{ kind: 'profile' | 'training' | 'nutrition'; text: string; evaluationId?: string | null } | null>(null);
-  const [analysisLoading, setAnalysisLoading] = useState<'profile' | 'training' | 'nutrition' | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<{ kind: 'profile'; text: string; evaluationId?: string | null } | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState<'profile' | null>(null);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [tdeeOverride, setTdeeOverride] = useState<string>('');
   const [editingTdee, setEditingTdee] = useState(false);
   const [lastProfileAnalysis, setLastProfileAnalysis] = useState<string | null>(null);
-  const [lastTrainingAnalysis, setLastTrainingAnalysis] = useState<string | null>(null);
-  const [lastNutritionAnalysis, setLastNutritionAnalysis] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const { hasFeature, isAdmin } = useEntitlements(session.user.id);
-  const canTrainingAnalysis = isAdmin || hasFeature('engine') || hasFeature('programming');
-  const canNutritionAnalysis = isAdmin || hasFeature('nutrition');
 
   // Evaluation history
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
@@ -372,11 +368,9 @@ export default function AthletePage({ session }: { session: Session }) {
     }
     if (trainingRes.data) {
       setTrainingEvaluations(trainingRes.data);
-      if (trainingRes.data.length > 0) setLastTrainingAnalysis(trainingRes.data[0].created_at);
     }
     if (nutritionRes.data) {
       setNutritionEvaluations(nutritionRes.data);
-      if (nutritionRes.data.length > 0) setLastNutritionAnalysis(nutritionRes.data[0].created_at);
     }
   };
 
@@ -426,7 +420,6 @@ export default function AthletePage({ session }: { session: Session }) {
       }
       if (trainingEvalRes.data) {
         setTrainingEvaluations(trainingEvalRes.data);
-        if (trainingEvalRes.data.length > 0) setLastTrainingAnalysis(trainingEvalRes.data[0].created_at);
       }
       setLoading(false);
     });
@@ -471,52 +464,6 @@ export default function AthletePage({ session }: { session: Session }) {
       if (data?.error) throw new Error(data.error || 'Analysis failed');
       setAnalysisResult({
         kind: 'profile',
-        text: data?.analysis,
-        evaluationId: data?.evaluation_id ?? null,
-      });
-      fetchEvaluations();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Analysis failed');
-    } finally {
-      setAnalysisLoading(null);
-    }
-  };
-
-  const fetchTrainingAnalysis = async () => {
-    setAnalysisLoading('training');
-    setAnalysisResult(null);
-    setError('');
-    try {
-      const { data, error } = await supabase.functions.invoke('training-analysis', {
-        body: {},
-      });
-      if (error) throw new Error(error.message || 'Analysis failed');
-      if (data?.error) throw new Error(data.error || 'Analysis failed');
-      setAnalysisResult({
-        kind: 'training',
-        text: data?.analysis,
-        evaluationId: data?.evaluation_id ?? null,
-      });
-      fetchEvaluations();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Analysis failed');
-    } finally {
-      setAnalysisLoading(null);
-    }
-  };
-
-  const fetchNutritionAnalysis = async () => {
-    setAnalysisLoading('nutrition');
-    setAnalysisResult(null);
-    setError('');
-    try {
-      const { data, error } = await supabase.functions.invoke('nutrition-analysis', {
-        body: {},
-      });
-      if (error) throw new Error(error.message || 'Analysis failed');
-      if (data?.error) throw new Error(data.error || 'Analysis failed');
-      setAnalysisResult({
-        kind: 'nutrition',
         text: data?.analysis,
         evaluationId: data?.evaluation_id ?? null,
       });
@@ -965,7 +912,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   {analysisResult && (
                     <div className="workout-review-section" style={{ marginTop: 0 }}>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
-                        {analysisResult.kind === 'profile' ? 'Profile Evaluation' : analysisResult.kind === 'training' ? 'Training Evaluation' : 'Nutrition Evaluation'}
+                        Profile Evaluation
                       </h3>
                       <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(analysisResult.text) }} />
                     </div>
