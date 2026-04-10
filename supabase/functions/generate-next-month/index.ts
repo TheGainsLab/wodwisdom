@@ -1,16 +1,16 @@
 /**
  * Generate next month of a program.
- * Orchestrates: profile evaluation → program generation → atomic delivery.
+ * Orchestrates: profile + training + nutrition evaluation → program generation → atomic delivery.
  *
  * Input: { program_id: string }
  * Flow:
  *   1. Look up the program and determine the next month number
  *   2. Run profile-analysis with month context (eval saved as invisible)
- *   3. Trigger generate-program with month_number + program_id (appends workouts, makes eval visible)
- *   4. Return job_id for polling
+ *   3. Run training-analysis and nutrition-analysis in parallel (results appended to evaluation)
+ *   4. Trigger generate-program with month_number + program_id (appends workouts, makes eval visible)
+ *   5. Return job_id for polling
  *
- * This will be triggered by payment webhooks in the future.
- * For now, it can be called manually for testing.
+ * Triggered by: payment webhooks, quarterly cron, or admin manual button.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -151,9 +151,47 @@ Deno.serve(async (req) => {
 
     const evalData = await evalResp.json();
     const evaluationId = evalData.evaluation_id;
-    console.log(`[generate-next-month] Evaluation created (month ${nextMonth}, visible=false)`);
+    console.log(`[generate-next-month] Profile evaluation created (month ${nextMonth}, visible=false)`);
 
-    // 4. Trigger program generation with month context
+    // 4. Run training and nutrition analysis in parallel
+    //    Results are appended to the profile evaluation for a comprehensive monthly review
+    const analysisAuthHeader = authToken.startsWith("Bearer ") ? authToken : `Bearer ${authToken}`;
+    const [trainingResult, nutritionResult] = await Promise.allSettled([
+      fetch(`${SUPABASE_URL}/functions/v1/training-analysis`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: analysisAuthHeader },
+        body: JSON.stringify({}),
+      }).then(r => r.json()),
+      fetch(`${SUPABASE_URL}/functions/v1/nutrition-analysis`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: analysisAuthHeader },
+        body: JSON.stringify({}),
+      }).then(r => r.json()),
+    ]);
+
+    const trainingAnalysis = trainingResult.status === "fulfilled" && trainingResult.value?.analysis
+      ? trainingResult.value.analysis : null;
+    const nutritionAnalysis = nutritionResult.status === "fulfilled" && nutritionResult.value?.analysis
+      ? nutritionResult.value.analysis : null;
+
+    console.log(`[generate-next-month] Training analysis: ${trainingAnalysis ? 'yes' : 'none'}, Nutrition analysis: ${nutritionAnalysis ? 'yes' : 'none'}`);
+
+    // Append training and nutrition analysis to the profile evaluation
+    if (trainingAnalysis || nutritionAnalysis) {
+      const existingAnalysis = evalData.analysis || "";
+      const sections = [existingAnalysis];
+      if (trainingAnalysis) sections.push(`\n\n---\n\n## Training Review\n\n${trainingAnalysis}`);
+      if (nutritionAnalysis) sections.push(`\n\n---\n\n## Nutrition Review\n\n${nutritionAnalysis}`);
+
+      await supa
+        .from("profile_evaluations")
+        .update({ analysis: sections.join("") })
+        .eq("id", evaluationId);
+
+      console.log(`[generate-next-month] Combined evaluation updated with training/nutrition`);
+    }
+
+    // 5. Trigger program generation with month context
     //    This will append 20 workouts and make the evaluation visible on completion
     const genUrl = `${SUPABASE_URL}/functions/v1/generate-program`;
     const genResp = await fetch(genUrl, {
