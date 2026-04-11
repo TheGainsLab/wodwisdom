@@ -12,6 +12,7 @@ interface Program {
   created_at: string;
   source?: string;
   workout_count?: number;
+  generated_months?: number;
 }
 
 export default function ProgramsListPage({ session }: { session: Session }) {
@@ -37,7 +38,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
       const [progData, profileRes, evalRes] = await Promise.all([
         supabase
           .from('programs')
-          .select('id, name, created_at, source, program_workouts(count)')
+          .select('id, name, created_at, source, generated_months, program_workouts(count)')
           .eq('user_id', session.user.id)
           .neq('committed', false)
           .order('created_at', { ascending: false }),
@@ -299,35 +300,51 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                   const bIsOwn = b.source !== 'external' ? 0 : 1;
                   if (aIsOwn !== bIsOwn) return aIsOwn - bIsOwn;
                   return 0;
-                }).map(p => {
+                }).flatMap(p => {
                   const isOwn = p.source !== 'external';
-                  return (
-                  <div
-                    key={p.id}
-                    className="history-item"
-                    style={{ borderLeft: '3px solid var(--accent)' }}
-                    onClick={() => navigate(`/programs/${p.id}`)}
-                  >
-                    <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      {isOwn && <Zap size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
-                      <span className="history-question">{p.name}</span>
-                      <span className="history-time">
-                        {p.workout_count} workout{p.workout_count !== 1 ? 's' : ''}
-                      </span>
-                      <div className="program-list-actions" onClick={e => e.stopPropagation()}>
-                        <button type="button" className="program-list-btn" onClick={() => navigate(`/programs/${p.id}/edit`)} title="Edit">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                        </button>
-                        <button type="button" className="program-list-btn program-list-btn-delete" onClick={e => handleDelete(e, p.id)} title="Delete">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
-                        </button>
+                  const isGenerated = p.source === 'generated';
+                  const months = isGenerated && (p.generated_months || 1) > 1
+                    ? Array.from({ length: p.generated_months || 1 }, (_, i) => i + 1).reverse()
+                    : [0]; // 0 = show as single program (non-generated or single month)
+
+                  return months.map(month => {
+                    const isMonthCard = month > 0;
+                    const label = isMonthCard ? `Month ${month}` : p.name;
+                    const workoutsPerMonth = 20;
+                    const workoutLabel = isMonthCard
+                      ? `${workoutsPerMonth} workouts`
+                      : `${p.workout_count} workout${p.workout_count !== 1 ? 's' : ''}`;
+
+                    return (
+                      <div
+                        key={isMonthCard ? `${p.id}-m${month}` : p.id}
+                        className="history-item"
+                        style={{ borderLeft: '3px solid var(--accent)' }}
+                        onClick={() => navigate(isMonthCard ? `/programs/${p.id}?month=${month}` : `/programs/${p.id}`)}
+                      >
+                        <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {isOwn && <Zap size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
+                          <span className="history-question">{label}</span>
+                          <span className="history-time">{workoutLabel}</span>
+                          {!isMonthCard && (
+                            <div className="program-list-actions" onClick={e => e.stopPropagation()}>
+                              <button type="button" className="program-list-btn" onClick={() => navigate(`/programs/${p.id}/edit`)} title="Edit">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                              </button>
+                              <button type="button" className="program-list-btn program-list-btn-delete" onClick={e => handleDelete(e, p.id)} title="Delete">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {!isMonthCard && (
+                          <div className="history-answer" style={{ padding: '8px 18px 14px', fontSize: 12, color: 'var(--text-dim)' }}>
+                            Created {formatDate(p.created_at)}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    <div className="history-answer" style={{ padding: '8px 18px 14px', fontSize: 12, color: 'var(--text-dim)' }}>
-                      Created {formatDate(p.created_at)}
-                    </div>
-                  </div>
-                  );
+                    );
+                  });
                 })}
 
                 {/* Add Program button — admin only */}
