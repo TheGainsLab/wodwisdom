@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
@@ -67,6 +67,8 @@ function workoutSummaryLines(text: string): SummaryLine[] {
 export default function ProgramDetailPage({ session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const monthFilter = searchParams.get('month') ? parseInt(searchParams.get('month')!, 10) : null;
   const { isAdmin } = useEntitlements(session.user.id);
   const [program, setProgram] = useState<{ id: string; name: string; source?: string; generated_months?: number } | null>(null);
   const [allWorkouts, setAllWorkouts] = useState<ProgramWorkout[]>([]);
@@ -189,7 +191,9 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     if (!error) setProgram(p => p ? { ...p, name: trimmed } : null);
   };
 
-  const workouts = allWorkouts;
+  const workouts = monthFilter
+    ? allWorkouts.filter((w: any) => (w.month_number || 1) === monthFilter)
+    : allWorkouts;
   const completedCount = workouts.filter(w => completedWorkoutIds.has(w.id)).length;
   const isGenerated = program?.source === 'generated' || program?.name?.startsWith('Month ');
 
@@ -244,7 +248,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
               onKeyDown={e => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
             />
           ) : (
-            <h1>Program</h1>
+            <h1>{monthFilter ? `Month ${monthFilter}` : 'Program'}</h1>
           )}
         </header>
         <div className="page-body">
