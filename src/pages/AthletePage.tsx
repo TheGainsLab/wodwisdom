@@ -327,6 +327,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const [analysisResult, setAnalysisResult] = useState<{ kind: 'profile'; text: string; evaluationId?: string | null } | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState<'profile' | null>(null);
   const [generateLoading, setGenerateLoading] = useState(false);
+  const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
   const [tdeeOverride, setTdeeOverride] = useState<string>('');
   const [editingTdee, setEditingTdee] = useState(false);
   const [lastProfileAnalysis, setLastProfileAnalysis] = useState<string | null>(null);
@@ -394,7 +395,14 @@ export default function AthletePage({ session }: { session: Session }) {
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(20),
-    ]).then(([profileRes, evalRes, trainingEvalRes]) => {
+      supabase
+        .from('programs')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('source', 'generated')
+        .limit(1),
+    ]).then(([profileRes, evalRes, trainingEvalRes, programsRes]) => {
+      setHasGeneratedProgram(!!(programsRes.data && programsRes.data.length > 0));
       if (!profileRes.data) {
         setIsNewUser(true);
       }
@@ -920,33 +928,35 @@ export default function AthletePage({ session }: { session: Session }) {
                   </div>
                 </CollapsibleSection>
 
-                {/* Generate Program */}
-                {(() => {
+                {/* Generate Program — hidden once a program exists (auto-generated monthly) */}
+                {(!hasGeneratedProgram || isAdmin) && (() => {
                   const canGenerate = isAdmin || hasFeature('programming');
                   const isFreeUser = !hasFeature('ai_chat') && !hasFeature('engine') && !hasFeature('programming') && !hasFeature('nutrition') && !isAdmin;
                   const upgradeRoute = isFreeUser ? '/checkout' : '/settings';
                   return (
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ background: 'var(--surface2)', color: 'var(--text)' }}
-                      onClick={canGenerate ? handleGenerateProgram : () => navigate(upgradeRoute)}
-                      disabled={canGenerate && generateLoading}
-                    >
-                      {canGenerate ? (
-                        generateLoading ? 'Generating...' : 'Generate Program'
-                      ) : (
-                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                          Generate Program
-                        </span>
+                    <>
+                      <button
+                        type="button"
+                        className="auth-btn"
+                        style={{ background: 'var(--surface2)', color: 'var(--text)' }}
+                        onClick={canGenerate ? handleGenerateProgram : () => navigate(upgradeRoute)}
+                        disabled={canGenerate && generateLoading}
+                      >
+                        {canGenerate ? (
+                          generateLoading ? 'Generating...' : isAdmin && hasGeneratedProgram ? 'Generate Program (Admin)' : 'Generate Program'
+                        ) : (
+                          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                            Generate Program
+                          </span>
+                        )}
+                      </button>
+                      {!canGenerate && (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Requires AI Programming or All Access subscription</span>
                       )}
-                    </button>
+                    </>
                   );
                 })()}
-                {!(isAdmin || hasFeature('programming')) && (
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Requires AI Programming or All Access subscription</span>
-                )}
 
                 {/* Evaluation History */}
                 {(evaluations.length > 0 || trainingEvaluations.length > 0 || nutritionEvaluations.length > 0) && (
