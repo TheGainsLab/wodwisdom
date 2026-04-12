@@ -119,10 +119,10 @@ export default function NutritionPaywall({ hasFeature }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', textAlign: 'left' }}>
             {[
               'Search 900,000+ foods with detailed nutrition data',
-              'Snap a photo to auto-identify foods and macros',
-              'Barcode scanner for packaged foods',
-              'Meal templates and favorites for quick logging',
-              'Daily macro tracking with calorie targets',
+              'Snap a photo to instantly log your calories and macros',
+              'Barcode scanner to build favorites as you shop',
+              'Build meal templates from favorite restaurants',
+              'Daily tracking vs TDEE to ensure proper fueling',
             ].map(text => (
               <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: 'var(--text-dim)' }}>
                 <span style={{ color: 'var(--accent)', fontSize: 16, flexShrink: 0 }}>&#10003;</span>
