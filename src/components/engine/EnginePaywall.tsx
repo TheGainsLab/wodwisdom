@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Zap, TrendingUp, Timer, Calendar, BarChart3, Dumbbell, Clock } from 'lucide-react';
+import { Zap, TrendingUp, Timer, BarChart3, Dumbbell, Clock } from 'lucide-react';
 
 interface Props {
   hasFeature?: (feature: string) => boolean;
@@ -28,12 +28,11 @@ const PLAN_FEATURES: Record<string, string[]> = {
 };
 
 const FEATURES = [
-  { icon: TrendingUp, text: 'Personalized pace targets from time trial baselines' },
-  { icon: Timer, text: 'Built-in interval timer with work/rest tracking' },
-  { icon: Calendar, text: 'Progressive month-by-month unlock system' },
-  { icon: BarChart3, text: 'Performance analytics and trend tracking' },
-  { icon: Dumbbell, text: '20+ workout frameworks across all energy systems' },
-  { icon: Clock, text: '8 programs from 3 to 5 days per week' },
+  { icon: TrendingUp, text: 'Workouts calibrated to your fitness level' },
+  { icon: Timer, text: 'Workout history, breakdown, and pacing every session' },
+  { icon: BarChart3, text: 'Detailed analytics to track every aspect of your Engine' },
+  { icon: Dumbbell, text: '20+ workout frameworks to develop all aspects of your capacity' },
+  { icon: Clock, text: 'Get access to 8 different programs' },
 ];
 
 export default function EnginePaywall({ hasFeature }: Props) {
