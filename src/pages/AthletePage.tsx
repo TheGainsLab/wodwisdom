@@ -204,68 +204,6 @@ interface NutritionEvaluation {
   created_at: string;
 }
 
-/** Build human-readable diff lines between two profile snapshots */
-function buildProfileDiffs(prev: ProfileSnapshot, current: ProfileSnapshot): string[] {
-  const diffs: string[] = [];
-  const u = current.units === 'kg' ? 'kg' : 'lbs';
-
-  // Basics
-  if (prev.bodyweight && current.bodyweight && prev.bodyweight !== current.bodyweight) {
-    const diff = current.bodyweight - prev.bodyweight;
-    diffs.push(`Bodyweight: ${prev.bodyweight} → ${current.bodyweight} ${u} (${diff > 0 ? '+' : ''}${diff})`);
-  }
-  if (prev.age != null && current.age != null && prev.age !== current.age) {
-    diffs.push(`Age: ${prev.age} → ${current.age}`);
-  }
-  if (prev.height != null && current.height != null && prev.height !== current.height) {
-    diffs.push(`Height: ${prev.height} → ${current.height}`);
-  }
-  if (prev.gender !== current.gender) {
-    diffs.push(`Gender: ${prev.gender || '—'} → ${current.gender || '—'}`);
-  }
-
-  // Lifts
-  const allLiftKeys = new Set([...Object.keys(prev.lifts || {}), ...Object.keys(current.lifts || {})]);
-  for (const key of allLiftKeys) {
-    const prevVal = prev.lifts?.[key];
-    const curVal = current.lifts?.[key];
-    if (prevVal && curVal && prevVal !== curVal) {
-      const diff = curVal - prevVal;
-      const label = LIFT_GROUPS.flatMap(g => g.lifts).find(l => l.key === key)?.label || key.replace(/_/g, ' ');
-      diffs.push(`${label}: ${prevVal} → ${curVal} ${u} (${diff > 0 ? '+' : ''}${diff})`);
-    } else if (!prevVal && curVal && curVal > 0) {
-      const label = LIFT_GROUPS.flatMap(g => g.lifts).find(l => l.key === key)?.label || key.replace(/_/g, ' ');
-      diffs.push(`${label}: new — ${curVal} ${u}`);
-    }
-  }
-
-  // Skills
-  const levelOrder: Record<string, number> = { none: 0, beginner: 1, intermediate: 2, advanced: 3 };
-  const allSkillKeys = new Set([...Object.keys(prev.skills || {}), ...Object.keys(current.skills || {})]);
-  for (const key of allSkillKeys) {
-    const prevVal = prev.skills?.[key];
-    const curVal = current.skills?.[key];
-    if (prevVal && curVal && prevVal !== curVal && curVal !== 'none') {
-      const arrow = (levelOrder[curVal] || 0) > (levelOrder[prevVal] || 0) ? ' ↑' : ' ↓';
-      const label = SKILL_GROUPS.flatMap(g => g.skills).find(s => s.key === key)?.label || key.replace(/_/g, ' ');
-      diffs.push(`${label}: ${prevVal} → ${curVal}${arrow}`);
-    }
-  }
-
-  // Conditioning
-  const allCondKeys = new Set([...Object.keys(prev.conditioning || {}), ...Object.keys(current.conditioning || {})]);
-  for (const key of allCondKeys) {
-    const prevVal = prev.conditioning?.[key];
-    const curVal = current.conditioning?.[key];
-    if (prevVal != null && curVal != null && String(prevVal) !== String(curVal)) {
-      const label = CONDITIONING_GROUPS.flatMap(g => g.benchmarks).find(b => b.key === key)?.label || key.replace(/_/g, ' ');
-      diffs.push(`${label}: ${prevVal} → ${curVal}`);
-    }
-  }
-
-  return diffs;
-}
-
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
