@@ -171,7 +171,7 @@ export default function ProgramsFeaturePage() {
             <div className="feature-text">
               <h3 style={{ textAlign: 'center' }}>Step 3 — Your program</h3>
               <p>
-                The AI combines your evaluation with your profile and builds a training program around you. Every training block is designed for your numbers, your equipment, your goals.
+                AI combines your evaluation, your profile and your goals to build a training program which optimizes your results.
               </p>
               <img src="/images/Program-Card.png" alt="Sample program day" className="feature-img" />
             </div>
@@ -189,10 +189,9 @@ export default function ProgramsFeaturePage() {
                 Tap Coach to get personalized assistance — review the training intent to understand the goals for the day, with links to sources at the bottom.
               </p>
               <img src="/images/coach-overview.png" alt="Coach view with training intent and expandable sections" className="feature-img" />
-              <p>
-                Click on a specific section for more detailed information.
-              </p>
+              <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '24px 0' }} />
               <img src="/images/coach-skills.png" alt="Skills coaching with movement cues and common faults" className="feature-img" />
+              <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '24px 0' }} />
               <img src="/images/coach-metcon.png" alt="MetCon coaching with pacing strategy and movement cues" className="feature-img" />
             </div>
           </div>
