@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, getAuthHeaders, ADJUST_WORKOUT_ENDPOINT } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
@@ -99,6 +99,8 @@ function AutoTextarea({ value, onChange, placeholder }: {
 export default function ProgramEditPage({ session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const monthFilter = searchParams.get('month') ? parseInt(searchParams.get('month')!, 10) : null;
   const { isAdmin } = useEntitlements(session.user.id);
   const [programName, setProgramName] = useState('');
   const [programSource, setProgramSource] = useState<string | null>(null);
@@ -134,11 +136,14 @@ export default function ProgramEditPage({ session }: { session: Session }) {
     }
     setProgramName(prog.name);
     setProgramSource(prog.source || null);
-    const { data: wk } = await supabase
+    let wkQuery = supabase
       .from('program_workouts')
-      .select('id, workout_text, sort_order')
-      .eq('program_id', id)
-      .order('sort_order');
+      .select('id, workout_text, sort_order, month_number')
+      .eq('program_id', id);
+    if (monthFilter) {
+      wkQuery = wkQuery.eq('month_number', monthFilter);
+    }
+    const { data: wk } = await wkQuery.order('sort_order');
     const loaded = (wk || []).map((w, i) => {
       const parsed = parseWorkoutBlocks(w.workout_text);
       return {
@@ -155,7 +160,7 @@ export default function ProgramEditPage({ session }: { session: Session }) {
     loadedDbIdsRef.current = loaded.map(w => w.dbId!);
     setError('');
     setLoading(false);
-  }, [id, session.user.id]);
+  }, [id, session.user.id, monthFilter]);
 
   useEffect(() => {
     if (!id) return;
