@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, getAuthHeaders, ADJUST_WORKOUT_ENDPOINT } from '../lib/supabase';
+import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 
 const BLOCK_LABELS = ['Warm-up', 'Skills', 'Strength', 'Metcon', 'Cool down'] as const;
@@ -98,6 +99,7 @@ function AutoTextarea({ value, onChange, placeholder }: {
 export default function ProgramEditPage({ session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAdmin } = useEntitlements(session.user.id);
   const [programName, setProgramName] = useState('');
   const [programSource, setProgramSource] = useState<string | null>(null);
   const [originalWorkoutCount, setOriginalWorkoutCount] = useState(0);
@@ -552,14 +554,16 @@ export default function ProgramEditPage({ session }: { session: Session }) {
                   const maxExtra = 4;
                   const addedCount = workouts.length - originalWorkoutCount;
                   const remaining = maxExtra - addedCount;
-                  const canAdd = !isGenerated || remaining > 0;
+                  // Admins bypass the limit entirely
+                  const limited = isGenerated && !isAdmin;
+                  const canAdd = !limited || remaining > 0;
 
                   if (!canAdd) return null;
 
                   return (
                     <button type="button" className="add-program-cta" onClick={addWorkout} style={{ marginTop: 12 }}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                      {isGenerated ? `Add workout (${remaining} remaining)` : 'Add workout'}
+                      {limited ? `Add workout (${remaining} remaining)` : 'Add workout'}
                     </button>
                   );
                 })()}
