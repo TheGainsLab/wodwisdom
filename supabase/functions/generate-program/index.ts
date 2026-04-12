@@ -232,18 +232,56 @@ async function fetchEvaluationHistory(
   supa: ReturnType<typeof createClient>,
   userId: string
 ): Promise<string> {
-  const { data: evals } = await supa
-    .from("profile_evaluations")
-    .select("month_number, analysis, created_at")
-    .eq("user_id", userId)
-    .eq("visible", true)
-    .order("created_at", { ascending: true });
+  // Fetch profile, training, and nutrition evaluations in parallel, all grouped by month
+  const [profileRes, trainingRes, nutritionRes] = await Promise.all([
+    supa.from("profile_evaluations")
+      .select("month_number, analysis, created_at")
+      .eq("user_id", userId)
+      .eq("visible", true)
+      .order("month_number", { ascending: true }),
+    supa.from("training_evaluations")
+      .select("month_number, analysis, created_at")
+      .eq("user_id", userId)
+      .order("month_number", { ascending: true }),
+    supa.from("nutrition_evaluations")
+      .select("month_number, analysis, created_at")
+      .eq("user_id", userId)
+      .order("month_number", { ascending: true }),
+  ]);
 
-  if (!evals || evals.length === 0) return "";
+  const profileEvals = profileRes.data || [];
+  const trainingEvals = trainingRes.data || [];
+  const nutritionEvals = nutritionRes.data || [];
 
-  const parts = evals.map((e: { month_number: number; analysis: string; created_at: string }) => {
-    const date = new Date(e.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" });
-    return `Month ${e.month_number} (${date}):\n${e.analysis}`;
+  if (profileEvals.length === 0 && trainingEvals.length === 0 && nutritionEvals.length === 0) return "";
+
+  // Group all evaluations by month_number
+  const byMonth = new Map<number, { profile?: string; training?: string; nutrition?: string; date: string }>();
+  const ensureMonth = (m: number, created_at: string) => {
+    if (!byMonth.has(m)) {
+      byMonth.set(m, { date: new Date(created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" }) });
+    }
+    return byMonth.get(m)!;
+  };
+
+  for (const e of profileEvals as Array<{ month_number: number; analysis: string; created_at: string }>) {
+    ensureMonth(e.month_number, e.created_at).profile = e.analysis;
+  }
+  for (const e of trainingEvals as Array<{ month_number: number; analysis: string; created_at: string }>) {
+    ensureMonth(e.month_number || 1, e.created_at).training = e.analysis;
+  }
+  for (const e of nutritionEvals as Array<{ month_number: number; analysis: string; created_at: string }>) {
+    ensureMonth(e.month_number || 1, e.created_at).nutrition = e.analysis;
+  }
+
+  const months = Array.from(byMonth.keys()).sort((a, b) => a - b);
+  const parts = months.map(m => {
+    const group = byMonth.get(m)!;
+    const sections: string[] = [`Month ${m} (${group.date}):`];
+    if (group.profile) sections.push(`## Profile\n${group.profile}`);
+    if (group.training) sections.push(`## Training Review\n${group.training}`);
+    if (group.nutrition) sections.push(`## Nutrition Review\n${group.nutrition}`);
+    return sections.join("\n\n");
   });
 
   return "EVALUATION HISTORY (longitudinal progression):\n\n" + parts.join("\n\n---\n\n");

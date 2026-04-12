@@ -167,6 +167,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Parse optional month context from request body
+    let monthNumber = 1;
+    let programId: string | null = null;
+    try {
+      const body = await req.json();
+      if (body?.month_number) monthNumber = Number(body.month_number);
+      if (body?.program_id) programId = body.program_id;
+    } catch {
+      // no body, use defaults
+    }
+
     // Fetch profile, food entries (7 days), and recent training in parallel
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const [profileRes, foodRes, recentTraining] = await Promise.all([
@@ -236,10 +247,12 @@ Deno.serve(async (req) => {
     const analysis = data.content?.[0]?.text?.trim() || "Unable to generate analysis.";
 
     // Save nutrition evaluation
-    const evalRow = {
+    const evalRow: Record<string, unknown> = {
       user_id: user.id,
       analysis,
       nutrition_snapshot: nutritionSnapshot,
+      month_number: monthNumber,
+      visible: true,
       profile_snapshot: {
         bodyweight: profileData.bodyweight ?? null,
         units: profileData.units || "lbs",
@@ -249,6 +262,7 @@ Deno.serve(async (req) => {
       },
       training_snapshot: recentTraining || "",
     };
+    if (programId) evalRow.program_id = programId;
 
     const { data: savedEval, error: insertErr } = await supa
       .from("nutrition_evaluations")
