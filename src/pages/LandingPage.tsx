@@ -3,19 +3,24 @@ import { useNavigate, Link } from 'react-router-dom';
 import GainsLogo from '../components/GainsLogo';
 import '../landing.css';
 
+/** Inline styled plan name — bold + accent color, used throughout FAQs */
+const PN: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <strong style={{ color: 'var(--accent)' }}>{children}</strong>
+);
+
 const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   {
     q: 'How can I try it before paying?',
-    a: <><a href="/auth?signup=1" style={{ color: 'var(--accent)', fontWeight: 600 }}>Create a free account</a> to get access to AI Coach, the AI trained on the methodology, physiology and biochemistry. AI Coach is also included with AI Programming, Year of the Engine and All Access Programs.</>,
+    a: <><a href="/auth?signup=1" style={{ color: 'var(--accent)', fontWeight: 600 }}>Create a free account</a> to get access to <PN>AI Coach</PN>, the AI trained on the methodology, physiology and biochemistry. <PN>AI Coach</PN> is also included with <PN>AI Programming</PN>, <PN>Year of the Engine</PN> and <PN>All Access</PN> Programs.</>,
   },
   {
-    q: "What's the difference between the plans?",
+    q: "What's the difference among the programs?",
     a: <>
-      <strong>AI Coach</strong> is an AI trained on the methodology. Get advice about anything related to fitness. It's like having access to a high-level coach 24/7.
+      <PN>AI Coach</PN> is an AI trained on the methodology. Get advice about anything related to fitness. It's like having access to a high-level coach 24/7.
       <br /><br />
-      <strong>Year of the Engine</strong> is a personalized conditioning program for athletes at any level.
+      <PN>Year of the Engine</PN> is a personalized conditioning program for athletes at any level.
       <br /><br />
-      <strong>AI Programming</strong> is customized programming written by an AI trained on methodology. Complete a user profile and the AI writes a program tailored precisely to you. Log your results and the AI learns, updating your training so you always get exactly what you need.
+      <PN>AI Programming</PN> is customized programming written by an AI trained on methodology. Complete a user profile and the AI writes a program tailored precisely to you. Log your results and the AI learns, updating your training so you always get exactly what you need.
     </>,
   },
   {
@@ -24,15 +29,15 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'What else is included with my Year of the Engine subscription?',
-    a: <>All <strong>Year of the Engine</strong> subscribers also get access to the <strong>AI Coach</strong> feature and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
+    a: <>All <PN>Year of the Engine</PN> subscribers also get access to the <PN>AI Coach</PN> feature and the <PN>AI Nutrition</PN> feature with unlimited usage at no additional cost.</>,
   },
   {
     q: 'What else is included with my AI Programming subscription?',
-    a: <>All <strong>AI Programming</strong> subscribers also get access to the <strong>AI Coach</strong> feature with 20 questions a day and the <strong>Nutrition</strong> feature with unlimited usage at no additional cost.</>,
+    a: <>All <PN>AI Programming</PN> subscribers also get access to the <PN>AI Coach</PN> feature with 20 questions a day and the <PN>AI Nutrition</PN> feature with unlimited usage at no additional cost.</>,
   },
   {
     q: 'What is included in the All Access membership?',
-    a: <>All Access members get access to <strong>AI Programming</strong>, <strong>Year of the Engine</strong>, <strong>AI Coach</strong>, and <strong>Nutrition</strong>. All of this for under $50 a month.</>,
+    a: <><PN>All Access</PN> members get access to <PN>AI Programming</PN>, <PN>Year of the Engine</PN>, <PN>AI Coach</PN>, and <PN>AI Nutrition</PN>. All of this for under $50 a month.</>,
   },
   {
     q: 'I have additional questions. How can I contact you?',
@@ -76,10 +81,15 @@ export default function LandingPage() {
         </p>
       </section>
 
+      {/* ===== Divider ===== */}
+      <div className="landing-container" style={{ padding: '0 24px' }}>
+        <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: 0 }} />
+      </div>
+
       {/* ===== How to Work With Us ===== */}
       <section className="landing-explainer">
         <div className="landing-container">
-          <h2 className="landing-section-title">What we offer</h2>
+          <h2 className="landing-section-title">Let's Make Some Gains</h2>
           <div className="landing-offerings-grid">
             <div className="landing-offering-card">
               <h3>AI Coach</h3>
@@ -108,6 +118,9 @@ export default function LandingPage() {
           </div>
           <div style={{ textAlign: 'center', marginTop: 32 }}>
             <Link to="/auth?signup=1" className="landing-cta">Try it Free</Link>
+            <p style={{ marginTop: 16, fontSize: 14, color: 'var(--text-dim)', maxWidth: 560, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.6 }}>
+              Create a free account, quickly fill out a profile, and get personalized guidance from an AI coach trained on the methodology, plus an in-depth evaluation of your fitness — free!
+            </p>
           </div>
         </div>
       </section>
@@ -115,6 +128,9 @@ export default function LandingPage() {
       {/* ===== Pricing ===== */}
       <section id="pricing" className="landing-pricing">
         <div className="landing-container">
+          <p style={{ textAlign: 'center', fontSize: 15, color: 'var(--text-dim)', maxWidth: 640, margin: '0 auto 24px', lineHeight: 1.6 }}>
+            Personalized training and coaching for less than you'd pay for most group programs. Even bigger savings for quarterly plans and combined services.
+          </p>
           <div className="landing-pricing-table">
             <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
               <button
