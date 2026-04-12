@@ -99,6 +99,8 @@ export default function ProgramEditPage({ session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [programName, setProgramName] = useState('');
+  const [programSource, setProgramSource] = useState<string | null>(null);
+  const [originalWorkoutCount, setOriginalWorkoutCount] = useState(0);
   const [workouts, setWorkouts] = useState<EditableWorkout[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -119,7 +121,7 @@ export default function ProgramEditPage({ session }: { session: Session }) {
     setLoading(true);
     const { data: prog, error: progErr } = await supabase
       .from('programs')
-      .select('id, name')
+      .select('id, name, source')
       .eq('id', id)
       .eq('user_id', session.user.id)
       .single();
@@ -129,6 +131,7 @@ export default function ProgramEditPage({ session }: { session: Session }) {
       return;
     }
     setProgramName(prog.name);
+    setProgramSource(prog.source || null);
     const { data: wk } = await supabase
       .from('program_workouts')
       .select('id, workout_text, sort_order')
@@ -146,6 +149,7 @@ export default function ProgramEditPage({ session }: { session: Session }) {
       };
     });
     setWorkouts(loaded);
+    setOriginalWorkoutCount(loaded.length);
     loadedDbIdsRef.current = loaded.map(w => w.dbId!);
     setError('');
     setLoading(false);
@@ -543,10 +547,22 @@ export default function ProgramEditPage({ session }: { session: Session }) {
                   ))}
                 </div>
 
-                <button type="button" className="add-program-cta" onClick={addWorkout} style={{ marginTop: 12 }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                  Add workout
-                </button>
+                {(() => {
+                  const isGenerated = programSource === 'generated';
+                  const maxExtra = 4;
+                  const addedCount = workouts.length - originalWorkoutCount;
+                  const remaining = maxExtra - addedCount;
+                  const canAdd = !isGenerated || remaining > 0;
+
+                  if (!canAdd) return null;
+
+                  return (
+                    <button type="button" className="add-program-cta" onClick={addWorkout} style={{ marginTop: 12 }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                      {isGenerated ? `Add workout (${remaining} remaining)` : 'Add workout'}
+                    </button>
+                  );
+                })()}
 
                 <div className="program-actions" style={{ marginTop: 24 }}>
                   <button className="auth-btn" onClick={saveProgram} disabled={saving}>
