@@ -100,7 +100,6 @@ export default function ProgramEditPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const [programName, setProgramName] = useState('');
   const [programSource, setProgramSource] = useState<string | null>(null);
-  const [generatedMonths, setGeneratedMonths] = useState(1);
   const [originalWorkoutCount, setOriginalWorkoutCount] = useState(0);
   const [workouts, setWorkouts] = useState<EditableWorkout[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,7 +121,7 @@ export default function ProgramEditPage({ session }: { session: Session }) {
     setLoading(true);
     const { data: prog, error: progErr } = await supabase
       .from('programs')
-      .select('id, name, source, generated_months')
+      .select('id, name, source')
       .eq('id', id)
       .eq('user_id', session.user.id)
       .single();
@@ -133,7 +132,6 @@ export default function ProgramEditPage({ session }: { session: Session }) {
     }
     setProgramName(prog.name);
     setProgramSource(prog.source || null);
-    setGeneratedMonths(prog.generated_months || 1);
     const { data: wk } = await supabase
       .from('program_workouts')
       .select('id, workout_text, sort_order')
