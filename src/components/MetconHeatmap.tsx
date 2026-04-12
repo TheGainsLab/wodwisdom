@@ -9,7 +9,9 @@ interface HeatmapCell {
 }
 
 interface DrillDownItem {
+  block_id: string;
   block_label: string | null;
+  block_text: string | null;
   score: string | null;
   percentile: number;
   performance_tier: string | null;
@@ -68,6 +70,7 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
   const [drillDown, setDrillDown] = useState<{ movement: string; td: string } | null>(null);
   const [drillItems, setDrillItems] = useState<DrillDownItem[]>([]);
   const [drillLoading, setDrillLoading] = useState(false);
+  const [expandedBlockId, setExpandedBlockId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -105,7 +108,9 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
       console.error('get_metcon_drilldown error:', error);
     } else if (data) {
       const items: DrillDownItem[] = (data as any[]).map((row) => ({
+        block_id: row.block_id,
         block_label: row.block_label,
+        block_text: row.block_text,
         score: row.score,
         percentile: row.percentile,
         performance_tier: row.performance_tier,
@@ -152,43 +157,89 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No results found.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {drillItems.map((item, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '12px 16px',
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                }}
-              >
-                <span style={{
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: 15,
-                  fontWeight: 700,
-                  color: percentileTextColor(item.percentile),
-                  minWidth: 36,
-                }}>
-                  {item.percentile}
-                </span>
-                <span style={{ flex: 1, fontSize: 14, color: 'var(--text)' }}>
-                  {item.block_label || 'Metcon'}
-                </span>
-                <span style={{
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: 13,
-                  color: 'var(--text-dim)',
-                }}>
-                  {item.score || '—'}
-                </span>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  {item.workout_date ? new Date(item.workout_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
-                </span>
-              </div>
-            ))}
+            {drillItems.map((item) => {
+              const isExpanded = expandedBlockId === item.block_id;
+              return (
+                <div
+                  key={item.block_id}
+                  style={{
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setExpandedBlockId(isExpanded ? null : item.block_id)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '12px 16px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text)',
+                      fontFamily: 'inherit',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <span style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: 15,
+                      fontWeight: 700,
+                      color: percentileTextColor(item.percentile),
+                      minWidth: 36,
+                    }}>
+                      {item.percentile}
+                    </span>
+                    <span style={{ flex: 1, fontSize: 14, color: 'var(--text)' }}>
+                      {item.block_label || 'Metcon'}
+                    </span>
+                    <span style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: 13,
+                      color: 'var(--text-dim)',
+                    }}>
+                      {item.score || '—'}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      {item.workout_date ? new Date(item.workout_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>
+                      {isExpanded ? '▲' : '▼'}
+                    </span>
+                  </button>
+                  {isExpanded && (
+                    <div style={{
+                      padding: '12px 16px',
+                      borderTop: '1px solid var(--border)',
+                      background: 'var(--surface2)',
+                    }}>
+                      {item.block_text ? (
+                        <pre style={{
+                          margin: 0,
+                          fontFamily: 'inherit',
+                          fontSize: 13,
+                          lineHeight: 1.6,
+                          color: 'var(--text-dim)',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                        }}>
+                          {item.block_text}
+                        </pre>
+                      ) : (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                          No workout details saved.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
