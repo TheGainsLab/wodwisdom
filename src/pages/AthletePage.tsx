@@ -879,51 +879,65 @@ export default function AthletePage({ session }: { session: Session }) {
                   onClick={async () => {
                     await saveProfile();
                     if (isDirty) return; // save failed
-                    fetchProfileAnalysis();
+                    if (!hasGeneratedProgram) fetchProfileAnalysis();
                   }}
                   disabled={saving || !!analysisLoading}
                   style={!isDirty && !analysisLoading ? { background: '#2ec486', color: 'white' } : undefined}
                 >
-                  {saving ? 'Saving...' : analysisLoading === 'profile' ? 'Analyzing...' : !isDirty ? 'Saved ✓' : 'Save & Analyze'}
+                  {saving ? 'Saving...' : analysisLoading === 'profile' ? 'Analyzing...' : !isDirty ? 'Saved ✓' : hasGeneratedProgram ? 'Save Profile' : 'Save & Analyze'}
                 </button>
 
                 {/* AI Analysis */}
                 <CollapsibleSection title="AI Analysis">
                   <div style={{ borderColor: 'rgba(255,58,58,.2)', background: 'var(--accent-glow)', padding: 16, borderRadius: 8, marginBottom: 16 }}>
-                  <p className="athlete-card-subtitle">Your profile analysis is generated when you save. Training and nutrition reviews are included with each month of programming.</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                    {(() => {
-                      const isFreeUser = !hasFeature('ai_chat') && !hasFeature('engine') && !hasFeature('programming') && !hasFeature('nutrition') && !isAdmin;
-                      const upgradeRoute = isFreeUser ? '/checkout' : '/settings';
-                      const profileLocked = isFreeUser && lastProfileAnalysis != null;
-                      const profileCooldown = lastProfileAnalysis ? Math.ceil((new Date(lastProfileAnalysis).getTime() + 30 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000)) : 0;
-                      const profileOnCooldown = !isAdmin && profileCooldown > 0;
+                  {hasGeneratedProgram ? (
+                    <>
+                      <p className="athlete-card-subtitle">Your evaluations are generated automatically with each month of programming. Training and nutrition reviews are included when data is available.</p>
+                      {analysisResult && (
+                        <div className="workout-review-section" style={{ marginTop: 12 }}>
+                          <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
+                            Latest Evaluation
+                          </h3>
+                          <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(analysisResult.text) }} />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="athlete-card-subtitle">Save your profile to generate your first analysis. Training and nutrition reviews are included with each month of programming.</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                        {(() => {
+                          const isFreeUser = !hasFeature('ai_chat') && !hasFeature('engine') && !hasFeature('programming') && !hasFeature('nutrition') && !isAdmin;
+                          const upgradeRoute = isFreeUser ? '/checkout' : '/settings';
+                          const profileLocked = isFreeUser && lastProfileAnalysis != null;
+                          const profileCooldown = lastProfileAnalysis ? Math.ceil((new Date(lastProfileAnalysis).getTime() + 30 * 24 * 60 * 60 * 1000 - Date.now()) / (24 * 60 * 60 * 1000)) : 0;
+                          const profileOnCooldown = !isAdmin && profileCooldown > 0;
 
-                      return (
-                        <>
-                          <button
-                            type="button"
-                            className="auth-btn"
-                            style={{ background: 'var(--surface2)', color: 'var(--text)' }}
-                            onClick={profileLocked ? () => navigate(upgradeRoute) : fetchProfileAnalysis}
-                            disabled={!!analysisLoading || profileOnCooldown}
-                          >
-                            {analysisLoading === 'profile' ? 'Analyzing...'
-                              : profileLocked ? 'Upgrade for more analyses'
-                              : profileOnCooldown ? `Available in ${profileCooldown} days`
-                              : 'Run Profile Analysis'}
-                          </button>
-                        </>
-                      );
-                    })()}
-                  </div>
-                  {analysisResult && (
-                    <div className="workout-review-section" style={{ marginTop: 0 }}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
-                        Profile Evaluation
-                      </h3>
-                      <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(analysisResult.text) }} />
-                    </div>
+                          return (
+                            <button
+                              type="button"
+                              className="auth-btn"
+                              style={{ background: 'var(--surface2)', color: 'var(--text)' }}
+                              onClick={profileLocked ? () => navigate(upgradeRoute) : fetchProfileAnalysis}
+                              disabled={!!analysisLoading || profileOnCooldown}
+                            >
+                              {analysisLoading === 'profile' ? 'Analyzing...'
+                                : profileLocked ? 'Upgrade for more analyses'
+                                : profileOnCooldown ? `Available in ${profileCooldown} days`
+                                : 'Run Profile Analysis'}
+                            </button>
+                          );
+                        })()}
+                      </div>
+                      {analysisResult && (
+                        <div className="workout-review-section" style={{ marginTop: 0 }}>
+                          <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
+                            Profile Evaluation
+                          </h3>
+                          <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(analysisResult.text) }} />
+                        </div>
+                      )}
+                    </>
                   )}
                   </div>
                 </CollapsibleSection>
