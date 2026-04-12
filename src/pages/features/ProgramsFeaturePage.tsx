@@ -9,6 +9,7 @@ const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
 
 export default function ProgramsFeaturePage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [evalExpanded, setEvalExpanded] = useState(false);
 
   const buyProgramming = async () => {
     setCheckoutLoading(true);
@@ -87,7 +88,14 @@ export default function ProgramsFeaturePage() {
                 <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
                   Profile Evaluation
                 </h3>
-                <div className="workout-review-content">
+                <div
+                  className="workout-review-content"
+                  style={{
+                    maxHeight: evalExpanded ? 'none' : 380,
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }}
+                >
                   <p>
                     Looking at your profile, you're a well-rounded athlete with some clear strengths and specific areas that need work.
                   </p>
@@ -120,7 +128,36 @@ export default function ProgramsFeaturePage() {
                   <p>
                     You've got the strength and skill base of a competitive master's athlete. Clean up these technical gaps and you'll see everything improve.
                   </p>
+
+                  {!evalExpanded && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      height: 80,
+                      background: 'linear-gradient(to bottom, transparent, var(--surface))',
+                      pointerEvents: 'none',
+                    }} />
+                  )}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setEvalExpanded(e => !e)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--accent)',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    marginTop: 12,
+                    fontFamily: 'inherit',
+                    padding: 0,
+                  }}
+                >
+                  {evalExpanded ? 'Show less ↑' : 'Read more ↓'}
+                </button>
               </div>
             </div>
           </div>
