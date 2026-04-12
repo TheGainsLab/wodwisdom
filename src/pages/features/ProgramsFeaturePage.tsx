@@ -65,9 +65,7 @@ export default function ProgramsFeaturePage() {
                 Five minutes to build the profile that powers your program.
               </p>
               <ul>
-                <li>Strength numbers and lift ratios</li>
-                <li>Gymnastics skill levels</li>
-                <li>Conditioning benchmarks across modalities</li>
+                <li>Strength, skill levels, and conditioning benchmarks</li>
                 <li>Training history and goals</li>
               </ul>
               <ProfileMockup />
