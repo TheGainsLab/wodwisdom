@@ -271,11 +271,11 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                 {/* Features */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left', marginBottom: 24 }}>
                   {[
-                    'Personalized programs from your athlete profile',
-                    'AI evaluation of strengths and weaknesses',
-                    'Session-by-session coaching cues',
-                    'Programs adapt as you train and log results',
-                    'Training analysis and progress tracking',
+                    'Personalized training based on your goals and fitness level',
+                    'Comprehensive evaluations of fitness, training, and nutrition',
+                    'Personalized coaching for every training session',
+                    'AI updates your programs as you go',
+                    'Comprehensive analytics to track all aspects of your performance',
                   ].map(text => (
                     <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: 'var(--text-dim)' }}>
                       <span style={{ color: 'var(--accent)', fontSize: 16, flexShrink: 0 }}>&#10003;</span>
