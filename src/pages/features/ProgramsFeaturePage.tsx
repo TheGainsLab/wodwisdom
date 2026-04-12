@@ -189,10 +189,13 @@ export default function ProgramsFeaturePage() {
                 Tap Coach to get personalized assistance — review the training intent to understand the goals for the day, with links to sources at the bottom.
               </p>
               <img src="/images/coach-overview.png" alt="Coach view with training intent and expandable sections" className="feature-img" />
-              <p>
+              <p style={{ marginTop: 32 }}>
                 Click on a specific section for more detailed information.
               </p>
               <img src="/images/coach-skills.png" alt="Skills coaching with movement cues and common faults" className="feature-img" />
+              <p style={{ marginTop: 32 }}>
+                Pacing and guidance before each MetCon to maximize every workout.
+              </p>
               <img src="/images/coach-metcon.png" alt="MetCon coaching with pacing strategy and movement cues" className="feature-img" />
             </div>
           </div>
