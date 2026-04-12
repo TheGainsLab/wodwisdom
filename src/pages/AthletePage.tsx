@@ -330,7 +330,6 @@ export default function AthletePage({ session }: { session: Session }) {
   const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
   const [tdeeOverride, setTdeeOverride] = useState<string>('');
   const [editingTdee, setEditingTdee] = useState(false);
-  const [lastProfileAnalysis, setLastProfileAnalysis] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const { hasFeature, isAdmin } = useEntitlements(session.user.id);
@@ -365,7 +364,6 @@ export default function AthletePage({ session }: { session: Session }) {
     ]);
     if (profileRes.data) {
       setEvaluations(profileRes.data);
-      if (profileRes.data.length > 0) setLastProfileAnalysis(profileRes.data[0].created_at);
     }
     if (trainingRes.data) {
       setTrainingEvaluations(trainingRes.data);
@@ -424,7 +422,6 @@ export default function AthletePage({ session }: { session: Session }) {
       }
       if (evalRes.data) {
         setEvaluations(evalRes.data);
-        if (evalRes.data.length > 0) setLastProfileAnalysis(evalRes.data[0].created_at);
       }
       if (trainingEvalRes.data) {
         setTrainingEvaluations(trainingEvalRes.data);
