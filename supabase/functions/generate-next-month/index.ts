@@ -154,42 +154,26 @@ Deno.serve(async (req) => {
     console.log(`[generate-next-month] Profile evaluation created (month ${nextMonth}, visible=false)`);
 
     // 4. Run training and nutrition analysis in parallel
-    //    Results are appended to the profile evaluation for a comprehensive monthly review
+    //    Each saves to its own table (training_evaluations, nutrition_evaluations)
+    //    tagged with the same month_number and program_id — UI groups them by month.
     const analysisAuthHeader = authToken.startsWith("Bearer ") ? authToken : `Bearer ${authToken}`;
+    const analysisBody = JSON.stringify({ month_number: nextMonth, program_id: programId });
     const [trainingResult, nutritionResult] = await Promise.allSettled([
       fetch(`${SUPABASE_URL}/functions/v1/training-analysis`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: analysisAuthHeader },
-        body: JSON.stringify({}),
+        body: analysisBody,
       }).then(r => r.json()),
       fetch(`${SUPABASE_URL}/functions/v1/nutrition-analysis`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: analysisAuthHeader },
-        body: JSON.stringify({}),
+        body: analysisBody,
       }).then(r => r.json()),
     ]);
 
-    const trainingAnalysis = trainingResult.status === "fulfilled" && trainingResult.value?.analysis
-      ? trainingResult.value.analysis : null;
-    const nutritionAnalysis = nutritionResult.status === "fulfilled" && nutritionResult.value?.analysis
-      ? nutritionResult.value.analysis : null;
-
-    console.log(`[generate-next-month] Training analysis: ${trainingAnalysis ? 'yes' : 'none'}, Nutrition analysis: ${nutritionAnalysis ? 'yes' : 'none'}`);
-
-    // Append training and nutrition analysis to the profile evaluation
-    if (trainingAnalysis || nutritionAnalysis) {
-      const existingAnalysis = evalData.analysis || "";
-      const sections = [existingAnalysis];
-      if (trainingAnalysis) sections.push(`\n\n---\n\n## Training Review\n\n${trainingAnalysis}`);
-      if (nutritionAnalysis) sections.push(`\n\n---\n\n## Nutrition Review\n\n${nutritionAnalysis}`);
-
-      await supa
-        .from("profile_evaluations")
-        .update({ analysis: sections.join("") })
-        .eq("id", evaluationId);
-
-      console.log(`[generate-next-month] Combined evaluation updated with training/nutrition`);
-    }
+    const trainingOk = trainingResult.status === "fulfilled" && trainingResult.value?.analysis;
+    const nutritionOk = nutritionResult.status === "fulfilled" && nutritionResult.value?.analysis;
+    console.log(`[generate-next-month] Training: ${trainingOk ? 'saved' : 'none'}, Nutrition: ${nutritionOk ? 'saved' : 'none'}`);
 
     // 5. Trigger program generation with month context
     //    This will append 20 workouts and make the evaluation visible on completion

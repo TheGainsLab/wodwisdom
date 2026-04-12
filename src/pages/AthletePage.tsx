@@ -204,68 +204,6 @@ interface NutritionEvaluation {
   created_at: string;
 }
 
-/** Build human-readable diff lines between two profile snapshots */
-function buildProfileDiffs(prev: ProfileSnapshot, current: ProfileSnapshot): string[] {
-  const diffs: string[] = [];
-  const u = current.units === 'kg' ? 'kg' : 'lbs';
-
-  // Basics
-  if (prev.bodyweight && current.bodyweight && prev.bodyweight !== current.bodyweight) {
-    const diff = current.bodyweight - prev.bodyweight;
-    diffs.push(`Bodyweight: ${prev.bodyweight} → ${current.bodyweight} ${u} (${diff > 0 ? '+' : ''}${diff})`);
-  }
-  if (prev.age != null && current.age != null && prev.age !== current.age) {
-    diffs.push(`Age: ${prev.age} → ${current.age}`);
-  }
-  if (prev.height != null && current.height != null && prev.height !== current.height) {
-    diffs.push(`Height: ${prev.height} → ${current.height}`);
-  }
-  if (prev.gender !== current.gender) {
-    diffs.push(`Gender: ${prev.gender || '—'} → ${current.gender || '—'}`);
-  }
-
-  // Lifts
-  const allLiftKeys = new Set([...Object.keys(prev.lifts || {}), ...Object.keys(current.lifts || {})]);
-  for (const key of allLiftKeys) {
-    const prevVal = prev.lifts?.[key];
-    const curVal = current.lifts?.[key];
-    if (prevVal && curVal && prevVal !== curVal) {
-      const diff = curVal - prevVal;
-      const label = LIFT_GROUPS.flatMap(g => g.lifts).find(l => l.key === key)?.label || key.replace(/_/g, ' ');
-      diffs.push(`${label}: ${prevVal} → ${curVal} ${u} (${diff > 0 ? '+' : ''}${diff})`);
-    } else if (!prevVal && curVal && curVal > 0) {
-      const label = LIFT_GROUPS.flatMap(g => g.lifts).find(l => l.key === key)?.label || key.replace(/_/g, ' ');
-      diffs.push(`${label}: new — ${curVal} ${u}`);
-    }
-  }
-
-  // Skills
-  const levelOrder: Record<string, number> = { none: 0, beginner: 1, intermediate: 2, advanced: 3 };
-  const allSkillKeys = new Set([...Object.keys(prev.skills || {}), ...Object.keys(current.skills || {})]);
-  for (const key of allSkillKeys) {
-    const prevVal = prev.skills?.[key];
-    const curVal = current.skills?.[key];
-    if (prevVal && curVal && prevVal !== curVal && curVal !== 'none') {
-      const arrow = (levelOrder[curVal] || 0) > (levelOrder[prevVal] || 0) ? ' ↑' : ' ↓';
-      const label = SKILL_GROUPS.flatMap(g => g.skills).find(s => s.key === key)?.label || key.replace(/_/g, ' ');
-      diffs.push(`${label}: ${prevVal} → ${curVal}${arrow}`);
-    }
-  }
-
-  // Conditioning
-  const allCondKeys = new Set([...Object.keys(prev.conditioning || {}), ...Object.keys(current.conditioning || {})]);
-  for (const key of allCondKeys) {
-    const prevVal = prev.conditioning?.[key];
-    const curVal = current.conditioning?.[key];
-    if (prevVal != null && curVal != null && String(prevVal) !== String(curVal)) {
-      const label = CONDITIONING_GROUPS.flatMap(g => g.benchmarks).find(b => b.key === key)?.label || key.replace(/_/g, ' ');
-      diffs.push(`${label}: ${prevVal} → ${curVal}`);
-    }
-  }
-
-  return diffs;
-}
-
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -351,13 +289,13 @@ export default function AthletePage({ session }: { session: Session }) {
         .limit(20),
       supabase
         .from('training_evaluations')
-        .select('id, profile_snapshot, training_snapshot, analysis, created_at')
+        .select('id, profile_snapshot, training_snapshot, analysis, created_at, month_number')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(20),
       supabase
         .from('nutrition_evaluations')
-        .select('id, nutrition_snapshot, analysis, created_at')
+        .select('id, nutrition_snapshot, analysis, created_at, month_number')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(20),
@@ -389,7 +327,7 @@ export default function AthletePage({ session }: { session: Session }) {
         .limit(20),
       supabase
         .from('training_evaluations')
-        .select('id, profile_snapshot, training_snapshot, analysis, created_at')
+        .select('id, profile_snapshot, training_snapshot, analysis, created_at, month_number')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(20),
@@ -588,18 +526,6 @@ export default function AthletePage({ session }: { session: Session }) {
       setIsDirty(false);
     }
     setSaving(false);
-  };
-
-  // Build current profile snapshot for diff comparison
-  const currentSnapshot: ProfileSnapshot = {
-    lifts,
-    skills,
-    conditioning,
-    bodyweight: bodyweight ? parseFloat(bodyweight) : null,
-    units,
-    age: age ? parseInt(age, 10) : null,
-    height: height ? parseFloat(height) : null,
-    gender: gender || undefined,
   };
 
   return (
@@ -914,175 +840,90 @@ export default function AthletePage({ session }: { session: Session }) {
                   );
                 })()}
 
-                {/* AI Evaluation History */}
+                {/* AI Evaluation History — grouped by month */}
                 {(evaluations.length > 0 || trainingEvaluations.length > 0 || nutritionEvaluations.length > 0) && (
                   <CollapsibleSection title="AI Evaluation History">
-                  <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>Past AI evaluations. Click to expand.</p>
+                  <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>Past AI evaluations grouped by month. Click a section to expand.</p>
 
-                  {evaluations.length > 0 && (
-                    <>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>Profile Evaluations</h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: trainingEvaluations.length > 0 ? 20 : 0 }}>
-                        {evaluations.map((ev, idx) => {
-                          const isExpanded = expandedEvalId === ev.id;
-                          const prevEval = evaluations[idx + 1] || null;
-                          const diffs = prevEval ? buildProfileDiffs(prevEval.profile_snapshot, ev.profile_snapshot) : [];
-                          const monthLabel = (ev as any).month_number > 1 ? `Month ${(ev as any).month_number} — ` : '';
+                  {(() => {
+                    // Group all evaluations by month_number
+                    type EvalEntry = { id: string; analysis?: string; created_at: string; month_number?: number; profile_snapshot?: any };
+                    const byMonth = new Map<number, { date: string; profile?: EvalEntry; training?: EvalEntry; nutrition?: EvalEntry }>();
 
+                    const ensureMonth = (m: number, created_at: string) => {
+                      if (!byMonth.has(m)) byMonth.set(m, { date: created_at });
+                      return byMonth.get(m)!;
+                    };
+
+                    for (const ev of evaluations) {
+                      const m = (ev as any).month_number || 1;
+                      ensureMonth(m, ev.created_at).profile = ev as EvalEntry;
+                    }
+                    for (const ev of trainingEvaluations) {
+                      const m = (ev as any).month_number || 1;
+                      ensureMonth(m, ev.created_at).training = ev as EvalEntry;
+                    }
+                    for (const ev of nutritionEvaluations) {
+                      const m = (ev as any).month_number || 1;
+                      ensureMonth(m, ev.created_at).nutrition = ev as EvalEntry;
+                    }
+
+                    const months = Array.from(byMonth.keys()).sort((a, b) => b - a); // Most recent first
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {months.map(m => {
+                          const group = byMonth.get(m)!;
                           return (
-                            <div key={ev.id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                              <button
-                                type="button"
-                                onClick={() => setExpandedEvalId(isExpanded ? null : ev.id)}
-                                style={{
-                                  width: '100%',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  padding: '12px 16px',
-                                  background: 'var(--bg)',
-                                  border: 'none',
-                                  color: 'var(--text)',
-                                  cursor: 'pointer',
-                                  fontFamily: 'inherit',
-                                  fontSize: 14,
-                                }}
-                              >
-                                <span style={{ fontWeight: 600 }}>{monthLabel}{formatDate(ev.created_at)}</span>
-                                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
-                              </button>
-                              {isExpanded && (
-                                <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-                                  {diffs.length > 0 && (
-                                    <div style={{ marginBottom: 16 }}>
-                                      <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: '#2ec486', marginBottom: 8 }}>
-                                        Changes since {formatDate(prevEval!.created_at)}
-                                      </h4>
-                                      <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-dim)' }}>
-                                        {diffs.map((d, i) => <div key={i}>{d}</div>)}
-                                      </div>
-                                    </div>
-                                  )}
-                                  {idx === evaluations.length - 1 && diffs.length === 0 && (
-                                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12, fontStyle: 'italic' }}>First evaluation — no prior data to compare.</div>
-                                  )}
-                                  {(() => {
-                                    const currentDiffs = buildProfileDiffs(ev.profile_snapshot, currentSnapshot);
-                                    if (currentDiffs.length === 0) return null;
-                                    return (
-                                      <div style={{ marginBottom: 16 }}>
-                                        <h4 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 8 }}>
-                                          Changes since then (vs current)
-                                        </h4>
-                                        <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-dim)' }}>
-                                          {currentDiffs.map((d, i) => <div key={i}>{d}</div>)}
+                            <div key={m}>
+                              <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10 }}>
+                                Month {m} — {formatDate(group.date)}
+                              </h3>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {(['profile', 'training', 'nutrition'] as const).map(kind => {
+                                  const ev = group[kind];
+                                  if (!ev) return null;
+                                  const label = kind === 'profile' ? 'Profile Evaluation' : kind === 'training' ? 'Training Review' : 'Nutrition Review';
+                                  const isExpanded = expandedEvalId === ev.id;
+                                  return (
+                                    <div key={ev.id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => setExpandedEvalId(isExpanded ? null : ev.id)}
+                                        style={{
+                                          width: '100%',
+                                          display: 'flex',
+                                          justifyContent: 'space-between',
+                                          alignItems: 'center',
+                                          padding: '12px 16px',
+                                          background: 'var(--bg)',
+                                          border: 'none',
+                                          color: 'var(--text)',
+                                          cursor: 'pointer',
+                                          fontFamily: 'inherit',
+                                          fontSize: 14,
+                                        }}
+                                      >
+                                        <span style={{ fontWeight: 600 }}>{label}</span>
+                                        <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
+                                      </button>
+                                      {isExpanded && ev.analysis && (
+                                        <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                                          <div className="workout-review-section" style={{ marginTop: 0 }}>
+                                            <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.analysis) }} />
+                                          </div>
                                         </div>
-                                      </div>
-                                    );
-                                  })()}
-                                  {ev.analysis && (
-                                    <div className="workout-review-section" style={{ marginTop: 0 }}>
-                                      <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.analysis) }} />
+                                      )}
                                     </div>
-                                  )}
-                                </div>
-                              )}
+                                  );
+                                })}
+                              </div>
                             </div>
                           );
                         })}
                       </div>
-                    </>
-                  )}
-
-                  {trainingEvaluations.length > 0 && (
-                    <>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>Training Evaluations</h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: nutritionEvaluations.length > 0 ? 20 : 0 }}>
-                        {trainingEvaluations.map((ev) => {
-                          const isExpanded = expandedEvalId === ev.id;
-
-                          return (
-                            <div key={ev.id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                              <button
-                                type="button"
-                                onClick={() => setExpandedEvalId(isExpanded ? null : ev.id)}
-                                style={{
-                                  width: '100%',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  padding: '12px 16px',
-                                  background: 'var(--bg)',
-                                  border: 'none',
-                                  color: 'var(--text)',
-                                  cursor: 'pointer',
-                                  fontFamily: 'inherit',
-                                  fontSize: 14,
-                                }}
-                              >
-                                <span style={{ fontWeight: 600 }}>{formatDate(ev.created_at)}</span>
-                                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
-                              </button>
-                              {isExpanded && (
-                                <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-                                  {ev.analysis && (
-                                    <div className="workout-review-section" style={{ marginTop: 0 }}>
-                                      <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.analysis) }} />
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
-
-                  {nutritionEvaluations.length > 0 && (
-                    <>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>Nutrition Evaluations</h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {nutritionEvaluations.map((ev) => {
-                          const isExpanded = expandedEvalId === ev.id;
-
-                          return (
-                            <div key={ev.id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                              <button
-                                type="button"
-                                onClick={() => setExpandedEvalId(isExpanded ? null : ev.id)}
-                                style={{
-                                  width: '100%',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  padding: '12px 16px',
-                                  background: 'var(--bg)',
-                                  border: 'none',
-                                  color: 'var(--text)',
-                                  cursor: 'pointer',
-                                  fontFamily: 'inherit',
-                                  fontSize: 14,
-                                }}
-                              >
-                                <span style={{ fontWeight: 600 }}>{formatDate(ev.created_at)}</span>
-                                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
-                              </button>
-                              {isExpanded && (
-                                <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-                                  {ev.analysis && (
-                                    <div className="workout-review-section" style={{ marginTop: 0 }}>
-                                      <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.analysis) }} />
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
+                    );
+                  })()}
                   </CollapsibleSection>
                 )}
               </>

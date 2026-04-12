@@ -120,6 +120,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Parse optional month context from request body
+    let monthNumber = 1;
+    let programId: string | null = null;
+    try {
+      const body = await req.json();
+      if (body?.month_number) monthNumber = Number(body.month_number);
+      if (body?.program_id) programId = body.program_id;
+    } catch {
+      // no body, use defaults
+    }
+
     // Fetch profile and recent training in parallel
     const [profileRes, recentTraining] = await Promise.all([
       supa
@@ -174,10 +185,12 @@ Deno.serve(async (req) => {
     const analysis = data.content?.[0]?.text?.trim() || "Unable to generate analysis.";
 
     // Save training evaluation
-    const evalRow = {
+    const evalRow: Record<string, unknown> = {
       user_id: user.id,
       analysis,
       training_snapshot: recentTraining,
+      month_number: monthNumber,
+      visible: true,
       profile_snapshot: {
         lifts: profileData.lifts || {},
         skills: profileData.skills || {},
@@ -189,6 +202,7 @@ Deno.serve(async (req) => {
         gender: profileData.gender ?? null,
       },
     };
+    if (programId) evalRow.program_id = programId;
 
     const { data: savedEval, error: insertErr } = await supa
       .from("training_evaluations")
