@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
-import { Plus, Zap, Brain } from 'lucide-react';
+import { Plus, Zap, Brain, ClipboardList } from 'lucide-react';
 
 interface Program {
   id: string;
@@ -169,6 +169,34 @@ export default function ProgramsListPage({ session }: { session: Session }) {
         </header>
         <div className="page-body">
           <div className="programs-list-wrap">
+            {/* View Training Log button — for paid users who have programs */}
+            {(hasProgramming || hasEngine || isAdmin) && (
+              <button
+                type="button"
+                onClick={() => navigate('/training-log')}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  padding: '12px 16px',
+                  marginBottom: 16,
+                  background: 'var(--surface2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10,
+                  color: 'var(--text)',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                }}
+              >
+                <ClipboardList size={16} style={{ color: 'var(--accent)' }} />
+                View Training Log
+              </button>
+            )}
+
             {/* Engine card */}
             {hasEngine && (
               <div
