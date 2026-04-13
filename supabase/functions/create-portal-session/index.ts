@@ -23,7 +23,7 @@ serve(async (req) => {
     if (!profile?.stripe_customer_id) throw new Error("No subscription to manage");
 
     const origin = req.headers.get("Origin") ?? "";
-    const baseUrl = ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.wodwisdom.com";
+    const baseUrl = ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.thegainslab.com";
     const returnUrl = `${baseUrl}/settings`;
 
     const params = new URLSearchParams({

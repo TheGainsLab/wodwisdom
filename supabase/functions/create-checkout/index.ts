@@ -57,7 +57,7 @@ serve(async (req) => {
     }
 
     const origin = req.headers.get("Origin") ?? "";
-    const baseUrl = ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.wodwisdom.com";
+    const baseUrl = ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.thegainslab.com";
     // Include session_id in success URL so CheckoutCompletePage can look up the email
     const successUrl = `${baseUrl}/checkout/complete?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${baseUrl}/checkout`;
