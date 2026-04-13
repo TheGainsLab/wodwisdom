@@ -68,6 +68,12 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
+      // Safety net: claim any pending subscription that matches this user's
+      // email. Runs on every app load for logged-in users; no-op if nothing
+      // to claim. Backs up the claim_pending_subscription trigger.
+      if (session) {
+        supabase.rpc('claim_my_pending_subscription').then(() => {}, () => {});
+      }
     }).catch(() => {
       setLoading(false);
     });
@@ -75,6 +81,10 @@ export default function App() {
       setSession(session);
       if (event === 'PASSWORD_RECOVERY') {
         window.location.href = '/settings';
+      }
+      // Safety net: try to claim any pending subscription on sign-in.
+      if (event === 'SIGNED_IN' && session) {
+        supabase.rpc('claim_my_pending_subscription').then(() => {}, () => {});
       }
     });
     return () => subscription.unsubscribe();
