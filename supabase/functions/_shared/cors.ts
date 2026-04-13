@@ -1,6 +1,4 @@
 export const ALLOWED_ORIGINS = [
-  "https://www.wodwisdom.com",
-  "https://wodwisdom.com",
   "https://www.thegainslab.com",
   "https://thegainslab.com",
 ];
