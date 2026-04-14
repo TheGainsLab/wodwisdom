@@ -14,6 +14,26 @@ import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { ChevronLeft, Clock, Activity, ArrowLeft } from 'lucide-react';
 
+// ── Helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Adaptive-precision formatter for analytics values. Keeps enough decimals
+ * to preserve signal for small-magnitude metrics (e.g. miles) while staying
+ * readable for large cal/meter values. Always keeps at least 1 decimal so
+ * averages retain precision.
+ *
+ *   v < 1      → 3 decimals   0.142
+ *   1 ≤ v < 10 → 2 decimals   1.42
+ *   v ≥ 10     → 1 decimal    18.5, 285.0
+ */
+function formatCompactNumber(value: number | null | undefined): string {
+  if (value == null || !isFinite(value)) return '—';
+  const abs = Math.abs(value);
+  if (abs < 1) return value.toFixed(3);
+  if (abs < 10) return value.toFixed(2);
+  return value.toFixed(1);
+}
+
 // ── Types ────────────────────────────────────────────────────────────
 
 type View =
@@ -154,7 +174,7 @@ function HorizontalBarChart({ data, labels, maxValue, unit = '' }: {
             <div className="ea-bar-track">
               <div className="ea-bar-fill" style={{ width: `${pct}%` }} />
             </div>
-            <span className="ea-bar-value">{Math.round(value)}{unit}</span>
+            <span className="ea-bar-value">{formatCompactNumber(value)}{unit}</span>
           </div>
         );
       })}
@@ -504,11 +524,11 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
             {selModality && paceStats.peak !== null && (
               <div className="engine-card" style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
                 <div style={{ textAlign: 'center' }}>
-                  <div className="engine-stat-value" style={{ fontSize: 22 }}>{Math.round(paceStats.peak!)}</div>
+                  <div className="engine-stat-value" style={{ fontSize: 22 }}>{formatCompactNumber(paceStats.peak!)}</div>
                   <div className="engine-stat-label">Peak Pace ({paceStats.units}/min)</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
-                  <div className="engine-stat-value" style={{ fontSize: 22 }}>{Math.round(paceStats.average!)}</div>
+                  <div className="engine-stat-value" style={{ fontSize: 22 }}>{formatCompactNumber(paceStats.average!)}</div>
                   <div className="engine-stat-label">Avg Pace ({paceStats.units}/min)</div>
                 </div>
               </div>
@@ -610,7 +630,7 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
         const avgOutput = dtSessions.reduce((sum, s) => sum + (s.total_output ?? 0), 0) / dtSessions.length;
         const withPace = dtSessions.filter(s => s.actual_pace && s.actual_pace > 0);
         const avgPace = withPace.length > 0 ? withPace.reduce((sum, s) => sum + (s.actual_pace ?? 0), 0) / withPace.length : 0;
-        return { dayType: dt, count: dtSessions.length, avgOutput: Math.round(avgOutput), avgPace: Math.round(avgPace), units: dtSessions[0].units ?? '' };
+        return { dayType: dt, count: dtSessions.length, avgOutput, avgPace, units: dtSessions[0].units ?? '' };
       }).filter(Boolean) as { dayType: string; count: number; avgOutput: number; avgPace: number; units: string }[]);
 
     const sorted = [...comparisonData].sort((a, b) => {
@@ -716,7 +736,7 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{bl.units ?? 'cal'} in 10 min</div>
                 {bl.calculated_rpm != null && (
                   <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>
-                    {bl.calculated_rpm.toFixed(1)} {bl.units ?? 'cal'}/min
+                    {formatCompactNumber(bl.calculated_rpm)} {bl.units ?? 'cal'}/min
                   </div>
                 )}
               </div>
@@ -763,14 +783,14 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
                       <div className="ea-dual-track">
                         <div className="ea-dual-fill-target" style={{ width: `${(target / maxPace) * 100}%` }} />
                       </div>
-                      <span className="ea-dual-value">{Math.round(target)}</span>
+                      <span className="ea-dual-value">{formatCompactNumber(target)}</span>
                     </div>
                     <div className="ea-dual-row">
                       <span className="ea-dual-label" style={{ color: 'var(--accent)' }}>Actual</span>
                       <div className="ea-dual-track">
                         <div className="ea-dual-fill-actual" style={{ width: `${(actual / maxPace) * 100}%` }} />
                       </div>
-                      <span className="ea-dual-value">{Math.round(actual)}</span>
+                      <span className="ea-dual-value">{formatCompactNumber(actual)}</span>
                     </div>
                   </div>
                 </div>
