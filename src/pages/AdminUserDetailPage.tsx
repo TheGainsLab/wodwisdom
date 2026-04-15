@@ -243,8 +243,22 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                 )}
 
                 {/* Workouts */}
-                <SectionHeader>Training Log</SectionHeader>
-                <div className="admin-stats-grid">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 32, marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', margin: 0 }}>
+                    Training Log
+                  </h3>
+                  <button
+                    onClick={() => navigate(`/admin/users/${id}/workouts`)}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
+                  >
+                    View logs →
+                  </button>
+                </div>
+                <div
+                  className="admin-stats-grid"
+                  onClick={() => navigate(`/admin/users/${id}/workouts`)}
+                  style={{ cursor: 'pointer' }}
+                >
                   <StatCard label="Workouts Logged" value={workouts?.total_logged || 0} />
                   <StatCard label="Last 30 Days" value={workouts?.logged_30d || 0} />
                 </div>
