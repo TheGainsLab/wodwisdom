@@ -140,9 +140,23 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                 )}
 
                 {/* Profile Completeness */}
-                <SectionHeader>Athlete Profile</SectionHeader>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 32, marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', margin: 0 }}>
+                    Athlete Profile
+                  </h3>
+                  <button
+                    onClick={() => navigate(`/admin/users/${id}/athlete-profile`)}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
+                  >
+                    View full →
+                  </button>
+                </div>
                 {athlete ? (
-                  <div className="admin-stats-grid">
+                  <div
+                    className="admin-stats-grid"
+                    onClick={() => navigate(`/admin/users/${id}/athlete-profile`)}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <StatCard label="Lifts" value={athlete.lift_count || 0} sub={athlete.has_lifts ? 'entered' : 'none'} />
                     <StatCard label="Skills" value={athlete.skill_count || 0} sub={athlete.has_skills ? 'assessed' : 'none'} />
                     <StatCard label="Conditioning" value={athlete.has_conditioning ? 'Yes' : 'No'} />
