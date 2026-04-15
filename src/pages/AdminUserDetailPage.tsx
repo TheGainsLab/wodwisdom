@@ -169,8 +169,22 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                 )}
 
                 {/* Chat Usage */}
-                <SectionHeader>Chat</SectionHeader>
-                <div className="admin-stats-grid">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 32, marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', margin: 0 }}>
+                    Chat
+                  </h3>
+                  <button
+                    onClick={() => navigate(`/admin/users/${id}/chat`)}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
+                  >
+                    View transcripts →
+                  </button>
+                </div>
+                <div
+                  className="admin-stats-grid"
+                  onClick={() => navigate(`/admin/users/${id}/chat`)}
+                  style={{ cursor: 'pointer' }}
+                >
                   <StatCard label="Total Questions" value={chat?.total_questions || 0} />
                   <StatCard label="Last 7 Days" value={chat?.questions_7d || 0} />
                   <StatCard label="Last 30 Days" value={chat?.questions_30d || 0} />
