@@ -28,7 +28,7 @@ export default function ChatPage({ session }: { session: Session }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState<'journal' | 'all'>('journal');
+  const [sourceFilter, setSourceFilter] = useState<'journal' | 'all'>('all');
   const [includeProfile, setIncludeProfile] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [dailyUsage, setDailyUsage] = useState(0);
