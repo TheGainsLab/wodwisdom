@@ -183,8 +183,22 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                 )}
 
                 {/* Engine */}
-                <SectionHeader>Engine</SectionHeader>
-                <div className="admin-stats-grid">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 32, marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', margin: 0 }}>
+                    Engine
+                  </h3>
+                  <button
+                    onClick={() => navigate(`/admin/users/${id}/engine-sessions`)}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
+                  >
+                    View sessions →
+                  </button>
+                </div>
+                <div
+                  className="admin-stats-grid"
+                  onClick={() => navigate(`/admin/users/${id}/engine-sessions`)}
+                  style={{ cursor: 'pointer' }}
+                >
                   <StatCard label="Sessions" value={engine?.total_sessions || 0} />
                   <StatCard label="Last 30 Days" value={engine?.sessions_30d || 0} />
                   <StatCard label="Avg Performance" value={engine?.avg_performance_ratio || '—'} />
