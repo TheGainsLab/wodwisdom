@@ -45,7 +45,7 @@ export default function AdminWorkoutLogDetailPage({ session }: { session: Sessio
       setLoading(true);
       const { data: result, error: err } = await supabase.rpc('admin_get_workout_log', {
         target_user_id: id,
-        log_id: workoutId,
+        p_log_id: workoutId,
       });
       if (err) setError(err.message);
       else setData(result);
