@@ -229,8 +229,22 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                 )}
 
                 {/* Nutrition */}
-                <SectionHeader>Nutrition</SectionHeader>
-                <div className="admin-stats-grid">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 32, marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', margin: 0 }}>
+                    Nutrition
+                  </h3>
+                  <button
+                    onClick={() => navigate(`/admin/users/${id}/nutrition`)}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
+                  >
+                    View log →
+                  </button>
+                </div>
+                <div
+                  className="admin-stats-grid"
+                  onClick={() => navigate(`/admin/users/${id}/nutrition`)}
+                  style={{ cursor: 'pointer' }}
+                >
                   <StatCard label="Total Entries" value={nutrition?.total_entries || 0} />
                   <StatCard label="Days Logged" value={nutrition?.days_logged || 0} />
                   <StatCard label="Last 30 Days" value={nutrition?.entries_30d || 0} />
