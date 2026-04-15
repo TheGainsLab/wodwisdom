@@ -57,20 +57,17 @@ export default function AdminSubPageLayout({ session, userId, title, children }:
     })();
   }, [session.user.id]);
 
-  // Fetch target user summary (name, email, plan).
+  // Fetch target user summary via admin RPC (bypasses RLS via SECURITY DEFINER).
   useEffect(() => {
     if (adminCheck !== 'allowed' || !userId) return;
     (async () => {
-      const [{ data: profile }, { data: ents }] = await Promise.all([
-        supabase.from('profiles').select('full_name, email, role').eq('id', userId).single(),
-        supabase.from('user_entitlements').select('feature').eq('user_id', userId),
-      ]);
-      const featureSet = new Set((ents ?? []).map((e: { feature: string }) => e.feature));
+      const { data, error } = await supabase.rpc('admin_get_user_summary', { target_user_id: userId });
+      if (error || !data) return;
       setSummary({
-        full_name: profile?.full_name ?? null,
-        email: profile?.email ?? null,
-        role: profile?.role ?? null,
-        entitlement_features: Array.from(featureSet),
+        full_name: data.full_name ?? null,
+        email: data.email ?? null,
+        role: data.role ?? null,
+        entitlement_features: Array.isArray(data.entitlement_features) ? data.entitlement_features : [],
       });
     })();
   }, [userId, adminCheck]);
