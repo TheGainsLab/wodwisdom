@@ -244,17 +244,33 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                 )}
 
                 {/* Evaluations */}
-                {data.evaluations && data.evaluations.length > 0 && (
-                  <>
-                    <SectionHeader>Evaluations</SectionHeader>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {data.evaluations.map((e: any) => (
-                        <div key={e.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 14px', fontSize: 12, color: 'var(--text-dim)' }}>
-                          {new Date(e.created_at).toLocaleDateString()}
-                        </div>
-                      ))}
-                    </div>
-                  </>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 32, marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', margin: 0 }}>
+                    Evaluations
+                  </h3>
+                  <button
+                    onClick={() => navigate(`/admin/users/${id}/evaluations`)}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
+                  >
+                    View all →
+                  </button>
+                </div>
+                {data.evaluations && data.evaluations.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {data.evaluations.map((e: any) => (
+                      <button
+                        key={e.id}
+                        onClick={() => navigate(`/admin/users/${id}/evaluations/profile/${e.id}`)}
+                        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 14px', fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: "'Outfit', sans-serif" }}
+                      >
+                        Profile · {new Date(e.created_at).toLocaleDateString()}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 16, color: 'var(--text-muted)', fontSize: 13 }}>
+                    No profile evaluations yet.
+                  </div>
                 )}
 
                 <div style={{ height: 40 }} />
