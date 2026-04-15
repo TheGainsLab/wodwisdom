@@ -65,17 +65,35 @@ function buildAthleteContext(
   return parts.join("\n");
 }
 
+// Shared spine for all coaching personas. Mode-specific addenda are appended below.
+const COACH_SPINE =
+  "You are an expert coach. Your influences are CrossFit methodology — Greg Glassman's foundational writings, the CrossFit Level 1 Training Guide, the CrossFit Journal — alongside strength-science literature and exercise physiology.\n\n" +
+  "VOICE: Coach-to-coach, direct, practical, no fluff. Conversational paragraphs, not blog posts. Minimal headers and bullets. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Avoid excessive formatting. Avoid opening every answer with the same quote.\n\n" +
+  "GROUNDING & ATTRIBUTION:\n" +
+  "- When the RELEVANT ARTICLES section below contains material that directly supports your answer, weave it in naturally with attribution to the article and author. Do not list sources at the end — work them into the prose.\n" +
+  "- When that section is empty, weak, or doesn't address the question, answer from CrossFit methodology and your coaching expertise. Speak as the coach: \"standard programming is…\", \"the methodology calls for…\", \"in my experience…\". Do NOT name a specific article, journal, author, guide, or publication. Do NOT invent quotations. Do NOT attribute claims to \"the articles,\" \"the journal,\" \"the materials,\" \"the sources,\" or any specific publication unless that exact content appears in the RELEVANT ARTICLES section below.\n" +
+  "- Never mention retrieval, your knowledge base, your training, your access to information, your limitations, or what you do or don't have. Never break character. You are a coach answering a coach.\n\n" +
+  "META-QUESTIONS: If asked about your background, methodology, what you draw from, or your influences, answer in-character — describe your influences (CrossFit methodology, Glassman's writings, the Level 1 guide, the CrossFit Journal, strength-science literature, exercise physiology). Never describe yourself as an AI. Never reference \"provided context,\" \"retrieved sources,\" or any retrieval mechanism.";
+
 const JOURNAL_SYSTEM_PROMPT =
-  "You are an expert CrossFit coach and knowledge base assistant built on hundreds of CrossFit Journal articles and foundational documents by Greg Glassman and other subject-matter experts. VOICE: Coach-to-coach, direct, practical, no fluff. Conversational paragraphs, not blog posts. Minimal headers and bullets. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Ground answers in the provided article context when available. Cite sources naturally. Emphasize points of performance for movement questions. For nutrition, reference the CrossFit prescription when relevant. If context does not cover the question, supplement with general knowledge but be transparent. Avoid opening every answer with the same quote. Avoid excessive formatting. Do not list sources at the end, weave them in naturally.";
+  COACH_SPINE +
+  "\n\nFOCUS: Emphasize points of performance for movement questions. For nutrition, reference the CrossFit prescription when relevant.";
 
 const SCIENCE_SYSTEM_PROMPT =
-  "You are a medical physiology expert grounded in the Textbook of Medical Physiology (Guyton & Hall). Explain concepts clearly using accurate physiological terminology. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Ground answers in the provided article context when available. Cite sources naturally. Use clinical examples when helpful to illustrate concepts. If context does not cover the question, say so transparently rather than guessing. Avoid excessive formatting. Do not list sources at the end, weave them in naturally.";
+  COACH_SPINE +
+  "\n\nFOCUS: Lean into accurate physiological terminology and clinical examples when explaining mechanisms. When questions touch medical physiology (Guyton & Hall territory), be precise but keep the coach voice.";
 
 const STRENGTH_SYSTEM_PROMPT =
-  "You are a strength and conditioning expert grounded in strength-science literature. Focus on programming, periodization, biomechanics, and the physiology of strength. Coach-to-coach voice, practical and evidence-based. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Ground answers in the provided context when available. Cite sources naturally. Emphasize application to training—how to program, progress, and avoid common errors. If context does not cover the question, supplement with general knowledge but be transparent. Avoid excessive formatting. Do not list sources at the end, weave them in naturally.";
+  COACH_SPINE +
+  "\n\nFOCUS: Strength and conditioning — programming, periodization, biomechanics, and the physiology of strength. Emphasize application to training: how to program, progress, and avoid common errors.";
 
 const ALL_SYSTEM_PROMPT =
-  "You are an expert coach and knowledge base assistant grounded in CrossFit methodology, strength-science literature, and exercise physiology. Coach-to-coach voice, direct, practical, evidence-based. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Ground answers in the provided context when available. When referencing physiological mechanisms, be accurate but accessible — explain the science in terms an experienced coach would understand. Cite sources naturally. If context does not cover the question, supplement with general knowledge but be transparent. Avoid excessive formatting. Do not list sources at the end, weave them in naturally.";
+  COACH_SPINE +
+  "\n\nFOCUS: Integrate CrossFit methodology, strength-science, and exercise physiology fluidly. When referencing physiological mechanisms, be accurate but accessible — explain the science in terms an experienced coach would understand.";
+
+const WORKOUT_COACHING_PROMPT =
+  COACH_SPINE +
+  "\n\nFOCUS: You are coaching an athlete through a specific training session described below. Be specific to the movements, loads, and time domains in the session. Answer questions about today's workout using the context provided.";
 
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -158,6 +176,13 @@ Deno.serve(async (req) => {
 
     const { question, history = [], source_filter, include_profile = false, workout_id } = await req.json();
 
+    // Build a short conversational context (last 2 turns) for the query rewriter
+    const recentTurnsForRewrite = (history || [])
+      .slice(-2)
+      .filter((m: { role: string }) => m.role === "user" || m.role === "assistant")
+      .map((m: { role: string; content: string }) => `${m.role.toUpperCase()}: ${(m.content || "").substring(0, 500)}`)
+      .join("\n");
+
     // ── Topic classifier: block off-topic questions before RAG ──
     // Skip classification for workout coaching (always relevant)
     if (!workout_id) {
@@ -225,38 +250,92 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Generate embedding and (optionally) recent training + program in parallel
+    // ── Query rewriting: turn the raw user message + last 2 turns into a clean,
+    // standalone search query. Returns "META" for meta-questions / small talk so
+    // we can skip retrieval entirely and answer in-character. Skipped for
+    // workout coaching (the workout itself is the context).
+    let searchQuery = question.substring(0, 2000);
+    let isMeta = false;
+    if (!workout_id) {
+      try {
+        const userBlock = recentTurnsForRewrite
+          ? `Recent conversation:\n${recentTurnsForRewrite}\n\nLatest user message:\n${question}`
+          : `User message:\n${question}`;
+        const rewriteResp = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "x-api-key": ANTHROPIC_API_KEY!,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 80,
+            system:
+              "You rewrite user messages into clean standalone search queries for a CrossFit / strength-science / exercise-physiology knowledge base.\n\n" +
+              "Rules:\n" +
+              "- Output ONE search query as a single line — topical keywords and phrases, no conversational filler.\n" +
+              "- If the latest message is a follow-up, fold in the relevant topical context from the recent conversation so the query stands alone.\n" +
+              "- Strip irrelevant specifics (exact numbers, names, dates) unless they are the topic itself.\n" +
+              "- If the user is asking a meta-question about you, your background, your sources, your training, your methodology, what you can do, or how you work — output exactly the single token META and nothing else.\n" +
+              "- If the message is small talk, a greeting, or has no clear topical question — output exactly the single token META and nothing else.\n" +
+              "- Do not answer the question. Do not explain. Output only the search query OR the token META.",
+            messages: [{ role: "user", content: userBlock }],
+          }),
+        }, 5_000);
+        if (rewriteResp.ok) {
+          const rewriteData = await rewriteResp.json();
+          const text = (rewriteData.content?.[0]?.text || "").trim();
+          if (text.toUpperCase() === "META") {
+            isMeta = true;
+          } else if (text) {
+            searchQuery = text.substring(0, 500);
+          }
+        }
+      } catch {
+        // Rewriter failed — fall back to the raw question. Never block on rewrite errors.
+      }
+    }
+    console.log(`[chat] rewrite: "${question.substring(0, 80)}" -> ${isMeta ? "META" : `"${searchQuery.substring(0, 120)}"`}`);
+
+    // Generate embedding (skipped for META) + (optionally) recent training + program in parallel
     const [embData, recentTraining, programContext] = await Promise.all([
-      fetchWithTimeout("https://api.openai.com/v1/embeddings", {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer " + OPENAI_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "text-embedding-3-small",
-          input: question.substring(0, 2000),
-        }),
-      }, 10_000).then((r) => r.json()),
+      isMeta
+        ? Promise.resolve(null)
+        : fetchWithTimeout("https://api.openai.com/v1/embeddings", {
+            method: "POST",
+            headers: {
+              Authorization: "Bearer " + OPENAI_API_KEY,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "text-embedding-3-small",
+              input: searchQuery,
+            }),
+          }, 10_000).then((r) => r.json()),
       include_profile ? fetchAndFormatRecentHistory(supa, user.id) : Promise.resolve(""),
       include_profile ? fetchAndFormatProgramContext(supa, user.id) : Promise.resolve(""),
     ]);
-    const queryEmb = embData.data[0].embedding;
+    const queryEmb = embData?.data?.[0]?.embedding;
 
-    // Retrieve matching chunks from vector store, filtered by category
-    const { data: chunks } = source_filter === "all"
-      ? await supa.rpc("match_chunks_multi", {
-          query_embedding: queryEmb,
-          match_threshold: 0.25,
-          match_count: 6,
-          filter_categories: ["journal", "science", "strength-science"],
-        })
-      : await supa.rpc("match_chunks_filtered", {
-          query_embedding: queryEmb,
-          match_threshold: 0.25,
-          match_count: 6,
-          filter_category: source_filter || "journal",
-        });
+    // Retrieve matching chunks from vector store, filtered by category. Skipped for META.
+    let chunks: Array<{ title: string; author: string; source: string; content: string; similarity: number }> | null = null;
+    if (!isMeta && queryEmb) {
+      const result = source_filter === "all"
+        ? await supa.rpc("match_chunks_multi", {
+            query_embedding: queryEmb,
+            match_threshold: 0.4,
+            match_count: 6,
+            filter_categories: ["journal", "science", "strength-science"],
+          })
+        : await supa.rpc("match_chunks_filtered", {
+            query_embedding: queryEmb,
+            match_threshold: 0.4,
+            match_count: 6,
+            filter_category: source_filter || "journal",
+          });
+      chunks = result.data;
+    }
 
     const sources: { title: string; author: string; source: string; similarity: number }[] = [];
     let context = "";
@@ -305,12 +384,13 @@ Deno.serve(async (req) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: 1024,
+        temperature: 0.3,
         stream: true,
         system:
           (workoutContext
-            ? "You are coaching an athlete through a specific training session. Answer questions about today's workout using the provided context. Be specific to the movements, loads, and time domains in the session. Coach-to-coach voice, direct, practical. Keep answers 150-300 words for simple questions, up to 500 for complex ones. Cite sources naturally when relevant."
+            ? WORKOUT_COACHING_PROMPT
             : (source_filter === "all" ? ALL_SYSTEM_PROMPT : source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : source_filter === "strength-science" ? STRENGTH_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT)
           ) +
           (include_profile || workoutContext
