@@ -271,15 +271,29 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                 {/* Programs */}
                 {data.programs && data.programs.length > 0 && (
                   <>
-                    <SectionHeader>Programs</SectionHeader>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 32, marginBottom: 12 }}>
+                      <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', margin: 0 }}>
+                        Programs
+                      </h3>
+                      <button
+                        onClick={() => navigate(`/admin/users/${id}/programs`)}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
+                      >
+                        View all →
+                      </button>
+                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {data.programs.map((p: any) => (
-                        <div key={p.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <button
+                          key={p.id}
+                          onClick={() => navigate(`/admin/users/${id}/programs/${p.id}`)}
+                          style={{ textAlign: 'left', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', fontFamily: "'Outfit', sans-serif", color: 'var(--text)' }}
+                        >
                           <div>
                             <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
                             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{p.source} &middot; {p.workout_count} workouts &middot; {new Date(p.created_at).toLocaleDateString()}</div>
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </>
