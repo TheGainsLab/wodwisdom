@@ -29,7 +29,6 @@ export default function ChatPage({ session }: { session: Session }) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<'journal' | 'all'>('all');
-  const [includeProfile, setIncludeProfile] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [dailyUsage, setDailyUsage] = useState(0);
   const [dailyLimit, setDailyLimit] = useState(20);
@@ -106,7 +105,7 @@ export default function ChatPage({ session }: { session: Session }) {
       const resp = await fetch(CHAT_ENDPOINT, {
         method: 'POST',
         headers: await getAuthHeaders(),
-        body: JSON.stringify({ question, history: [...messages, userMsg].slice(-10), source_filter: sourceFilter, include_profile: includeProfile }),
+        body: JSON.stringify({ question, history: [...messages, userMsg].slice(-10), source_filter: sourceFilter }),
       });
 
       const contentType = resp.headers.get('Content-Type') || '';
@@ -370,16 +369,6 @@ export default function ChatPage({ session }: { session: Session }) {
           </div>
         ) : (
           <div className="input-area">
-            <div className="profile-include-row">
-              <button
-                type="button"
-                className={'profile-include-btn' + (includeProfile ? ' active' : '')}
-                onClick={() => setIncludeProfile(v => !v)}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                Include my profile &amp; recent results
-              </button>
-            </div>
             <div className="input-row">
               <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} rows={1} placeholder="" />
               <button className="send-btn" onClick={() => sendMessage()} disabled={isLoading || !input.trim()}>
