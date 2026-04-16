@@ -205,13 +205,13 @@ export default function ProgramsFeaturePage() {
             <div className="feature-text">
               <h3 style={{ textAlign: 'center' }}>Step 5 — Ongoing</h3>
               <p>
-                We don't send you a program and wish you the best.
+                AI is with you every time you train.
               </p>
               <p>
                 Log your results and the program adapts. Flag weaknesses and the AI adjusts. Demonstrate proficiency and the challenges increase. Update your profile anytime.
               </p>
               <p>
-                Every month, AI reviews your profile and training, updates your evaluation, and generates the next month of training.
+                Every month, AI evaluates your performance and updates your evaluation, then generates another month of training. Your evaluation history tells the story of your progress.
               </p>
             </div>
           </div>
