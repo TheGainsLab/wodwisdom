@@ -85,13 +85,11 @@ export default defineConfig({
             urlPattern: /^https:\/\/hsiqzmbfulmfxbvbsdwz\.supabase\.co\/auth\/.*/i,
             handler: 'NetworkOnly',
           },
-          // NOTE: Supabase Edge Functions are deliberately NOT handled here.
-          // The chat function uses SSE streaming, and Workbox's NetworkOnly
-          // strategy mangles streaming responses on iOS Safari PWAs. With no
-          // matching rule, requests bypass the service worker entirely and
-          // go through the browser's native fetch, which handles SSE
-          // correctly on every platform. Non-streaming edge functions work
-          // fine without SW interception too.
+          {
+            // Supabase Edge Functions - network only (AI responses, mutations)
+            urlPattern: /^https:\/\/hsiqzmbfulmfxbvbsdwz\.supabase\.co\/functions\/.*/i,
+            handler: 'NetworkOnly',
+          },
           {
             // Static images in public/images
             urlPattern: /\/images\/.+\.(png|jpg|jpeg|webp|svg)$/i,
