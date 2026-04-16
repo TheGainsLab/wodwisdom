@@ -548,10 +548,22 @@ Deno.serve(async (req) => {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
+        // Track whether the stream is still open. If the client disconnects,
+        // controller.enqueue throws — we switch to "closed" mode and stop
+        // trying to write, but keep draining the Claude response so we can
+        // still persist the full answer to the DB.
+        let clientClosed = false;
+        const safeEnqueue = (data: string) => {
+          if (clientClosed) return;
+          try {
+            controller.enqueue(encoder.encode(data));
+          } catch {
+            clientClosed = true;
+          }
+        };
+
         // Send sources as the first event so the frontend has them ready
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ type: "sources", sources: clientSources })}\n\n`)
-        );
+        safeEnqueue(`data: ${JSON.stringify({ type: "sources", sources: clientSources })}\n\n`);
 
         let fullAnswer = "";
         let inputTokens = 0;
@@ -580,9 +592,7 @@ Deno.serve(async (req) => {
 
                 if (event.type === "content_block_delta" && event.delta?.text) {
                   fullAnswer += event.delta.text;
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ type: "delta", text: event.delta.text })}\n\n`)
-                  );
+                  safeEnqueue(`data: ${JSON.stringify({ type: "delta", text: event.delta.text })}\n\n`);
                 }
 
                 if (event.type === "message_delta" && event.usage) {
@@ -598,7 +608,7 @@ Deno.serve(async (req) => {
             }
           }
 
-          // Persist message to database
+          // Persist message to database — runs even if the client disconnected
           const { data: msgRow } = await supa
             .from("chat_messages")
             .insert({
@@ -625,27 +635,27 @@ Deno.serve(async (req) => {
             ? { tier: "free", total_questions: totalCount + 1, free_limit: FREE_LIMIT }
             : { tier: "paid", daily_questions: dailyCount + 1, daily_limit: DAILY_LIMIT };
 
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "done",
-                message_id: msgRow?.id,
-                usage: {
-                  input_tokens: inputTokens,
-                  output_tokens: outputTokens,
-                  ...usagePayload,
-                },
-              })}\n\n`
-            )
+          safeEnqueue(
+            `data: ${JSON.stringify({
+              type: "done",
+              message_id: msgRow?.id,
+              usage: {
+                input_tokens: inputTokens,
+                output_tokens: outputTokens,
+                ...usagePayload,
+              },
+            })}\n\n`
           );
         } catch (err) {
           console.error("Stream processing error:", err);
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "error", error: "Stream interrupted" })}\n\n`)
-          );
+          safeEnqueue(`data: ${JSON.stringify({ type: "error", error: "Stream interrupted" })}\n\n`);
         }
 
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // Stream already closed by the client — safe to ignore
+        }
       },
     });
 
