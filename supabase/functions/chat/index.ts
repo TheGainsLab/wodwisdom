@@ -122,19 +122,28 @@ Deno.serve(async (req) => {
     // Determine subscription tier via entitlements
     const [{ data: profile }, { data: entitlements }] = await Promise.all([
       supa.from("profiles").select("role").eq("id", user.id).single(),
-      supa.from("user_entitlements").select("id")
+      supa.from("user_entitlements").select("feature")
         .eq("user_id", user.id)
-        .eq("feature", "ai_chat")
-        .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
-        .limit(1),
+        .in("feature", ["ai_chat", "engine", "programming"])
+        .or("expires_at.is.null,expires_at.gt." + new Date().toISOString()),
     ]);
 
-    const isFreeTier = profile?.role !== "admin" && (!entitlements || entitlements.length === 0);
+    const features = new Set((entitlements || []).map((e: { feature: string }) => e.feature));
+    const isAdmin = profile?.role === "admin";
+    const isFreeTier = !isAdmin && !features.has("ai_chat");
+    type UserTier = "free_trial" | "coach_standalone" | "engine" | "ai_programming" | "all_access";
+    const userTier: UserTier =
+      isAdmin ? "all_access" :
+      features.has("engine") && features.has("programming") ? "all_access" :
+      features.has("engine") ? "engine" :
+      features.has("programming") ? "ai_programming" :
+      features.has("ai_chat") ? "coach_standalone" :
+      "free_trial";
 
-    // Fetch athlete profile for prompt personalization
+    // Fetch athlete profile for prompt personalization (including Engine state)
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
-      .select("lifts, skills, conditioning, bodyweight, units, gender")
+      .select("lifts, skills, conditioning, bodyweight, units, gender, engine_program_version, engine_current_day, engine_months_unlocked")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -174,7 +183,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { question, history = [], source_filter, include_profile = false, workout_id } = await req.json();
+    const { question, history = [], source_filter, workout_id } = await req.json();
+    console.log(`[chat] tier: ${userTier}, hasProfile: ${!!athleteProfile}, engineDay: ${athleteProfile?.engine_current_day || "n/a"}`);
 
     // Build a short conversational context (last 2 turns) for the query rewriter
     const recentTurnsForRewrite = (history || [])
@@ -250,6 +260,95 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── Engine context: look up the user's current position + framework ──
+    let engineContext = "";
+    if ((userTier === "engine" || userTier === "all_access") && athleteProfile?.engine_current_day && athleteProfile?.engine_program_version) {
+      try {
+        const { data: mapping } = await supa
+          .from("engine_program_mapping")
+          .select("engine_workout_day_number, week_number")
+          .eq("engine_program_id", athleteProfile.engine_program_version)
+          .eq("program_sequence_order", athleteProfile.engine_current_day)
+          .maybeSingle();
+
+        if (mapping) {
+          const [{ data: catalogDay }, { data: programInfo }] = await Promise.all([
+            supa.from("engine_workouts")
+              .select("day_type, month, phase")
+              .eq("program_type", "main_5day")
+              .eq("day_number", mapping.engine_workout_day_number)
+              .maybeSingle(),
+            supa.from("engine_programs")
+              .select("name, total_days")
+              .eq("id", athleteProfile.engine_program_version)
+              .maybeSingle(),
+          ]);
+
+          if (catalogDay) {
+            const dayTypeName = catalogDay.day_type
+              ? (await supa.from("engine_day_types").select("name").eq("id", catalogDay.day_type).maybeSingle()).data?.name
+              : null;
+
+            const parts: string[] = [];
+            parts.push(`Program: ${programInfo?.name || "Year of the Engine"}`);
+            parts.push(`Progress: Day ${athleteProfile.engine_current_day} of ${programInfo?.total_days || 720} (Month ${catalogDay.month}, Week ${mapping.week_number || "?"})`);
+            parts.push(`Months unlocked: ${athleteProfile.engine_months_unlocked}`);
+            if (dayTypeName) parts.push(`Current day type: ${dayTypeName}`);
+            engineContext = "\n\nENGINE PROGRAM:\n" + parts.join("\n");
+          }
+        }
+      } catch (err) {
+        console.error("[chat] Engine context lookup failed:", err);
+      }
+    }
+
+    // ── AI Program context: derive position from workout logs ──
+    let aiProgramContext = "";
+    if ((userTier === "ai_programming" || userTier === "all_access") && !workout_id) {
+      try {
+        const { data: program } = await supa
+          .from("programs")
+          .select("id, name")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (program) {
+          const { data: programWorkouts } = await supa
+            .from("program_workouts")
+            .select("id, week_num, day_num, sort_order")
+            .eq("program_id", program.id)
+            .order("sort_order");
+
+          if (programWorkouts && programWorkouts.length > 0) {
+            const workoutIds = programWorkouts.map((w: { id: string }) => w.id);
+            const { data: completedLogs } = await supa
+              .from("workout_logs")
+              .select("source_id")
+              .eq("user_id", user.id)
+              .eq("source_type", "program")
+              .in("source_id", workoutIds);
+
+            const completedIds = new Set((completedLogs || []).map((l: { source_id: string }) => l.source_id));
+            const totalDays = programWorkouts.length;
+            const completedDays = completedIds.size;
+            const currentWorkout = programWorkouts.find((w: { id: string }) => !completedIds.has(w.id));
+
+            const parts: string[] = [];
+            parts.push(`Program: "${program.name}"`);
+            parts.push(`Progress: ${completedDays} of ${totalDays} days completed`);
+            if (currentWorkout) {
+              parts.push(`Current: Week ${currentWorkout.week_num}, Day ${currentWorkout.day_num}`);
+            }
+            aiProgramContext = "\n\nAI PROGRAM:\n" + parts.join("\n");
+          }
+        }
+      } catch (err) {
+        console.error("[chat] AI Program context lookup failed:", err);
+      }
+    }
+
     // ── Query rewriting: turn the raw user message + last 2 turns into a clean,
     // standalone search query. Returns "META" for meta-questions / small talk so
     // we can skip retrieval entirely and answer in-character. Skipped for
@@ -298,7 +397,10 @@ Deno.serve(async (req) => {
     }
     console.log(`[chat] rewrite: "${question.substring(0, 80)}" -> ${isMeta ? "META" : `"${searchQuery.substring(0, 120)}"`}`);
 
-    // Generate embedding (skipped for META) + (optionally) recent training + program in parallel
+    // Generate embedding (skipped for META) + recent training + program context in parallel.
+    // Context is auto-included for any user with data — no toggle gate.
+    const shouldFetchHistory = !isFreeTier;
+    const shouldFetchProgram = userTier === "ai_programming" || userTier === "all_access" || userTier === "coach_standalone";
     const [embData, recentTraining, programContext] = await Promise.all([
       isMeta
         ? Promise.resolve(null)
@@ -313,8 +415,8 @@ Deno.serve(async (req) => {
               input: searchQuery,
             }),
           }, 10_000).then((r) => r.json()),
-      include_profile ? fetchAndFormatRecentHistory(supa, user.id) : Promise.resolve(""),
-      include_profile ? fetchAndFormatProgramContext(supa, user.id) : Promise.resolve(""),
+      shouldFetchHistory ? fetchAndFormatRecentHistory(supa, user.id) : Promise.resolve(""),
+      shouldFetchProgram ? fetchAndFormatProgramContext(supa, user.id) : Promise.resolve(""),
     ]);
     const queryEmb = embData?.data?.[0]?.embedding;
 
@@ -389,16 +491,35 @@ Deno.serve(async (req) => {
         temperature: 0.3,
         stream: true,
         system:
+          // Base prompt (persona + mode focus)
           (workoutContext
             ? WORKOUT_COACHING_PROMPT
             : (source_filter === "all" ? ALL_SYSTEM_PROMPT : source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : source_filter === "strength-science" ? STRENGTH_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT)
           ) +
-          (include_profile || workoutContext
-            ? buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units, athleteProfile?.gender) +
-              (recentTraining ? "\n\n" + recentTraining : "") +
-              (programContext ? "\n\n" + programContext : "")
-            : "") +
+          // Tier addendum — tells the coach who they're talking to
+          (userTier === "free_trial"
+            ? `\n\nUSER TIER: Free trial (question ${totalCount + 1} of ${FREE_LIMIT}). The user is new — be warm and make this answer land. No profile on file.`
+            : userTier === "coach_standalone"
+            ? "\n\nUSER TIER: AI Coach subscriber (no program). Answer as a pure coach."
+            : userTier === "engine"
+            ? "\n\nUSER TIER: Year of the Engine subscriber. Ground answers in their current framework and programming when relevant."
+            : userTier === "ai_programming"
+            ? "\n\nUSER TIER: AI Programming subscriber. Ground answers in their current program structure and training."
+            : "\n\nUSER TIER: All Access subscriber. The user has both the Engine conditioning program and AI Programming."
+          ) +
+          // Athlete profile (auto-included if data exists)
+          buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units, athleteProfile?.gender) +
+          // Engine program context (if applicable)
+          engineContext +
+          // AI Program context (if applicable)
+          aiProgramContext +
+          // Recent training history
+          (recentTraining ? "\n\n" + recentTraining : "") +
+          // User program workouts (non-Engine)
+          (programContext ? "\n\n" + programContext : "") +
+          // Workout coaching context (specific day)
           workoutContext +
+          // RAG-retrieved articles
           context,
         messages,
       }),
