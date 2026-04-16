@@ -285,15 +285,16 @@ Deno.serve(async (req) => {
           ]);
 
           if (catalogDay) {
-            const dayTypeName = catalogDay.day_type
-              ? (await supa.from("engine_day_types").select("name").eq("id", catalogDay.day_type).maybeSingle()).data?.name
+            const dayTypeRow = catalogDay.day_type
+              ? (await supa.from("engine_day_types").select("name, coaching_intent").eq("id", catalogDay.day_type).maybeSingle()).data
               : null;
 
             const parts: string[] = [];
             parts.push(`Program: ${programInfo?.name || "Year of the Engine"}`);
             parts.push(`Progress: Day ${athleteProfile.engine_current_day} of ${programInfo?.total_days || 720} (Month ${catalogDay.month}, Week ${mapping.week_number || "?"})`);
             parts.push(`Months unlocked: ${athleteProfile.engine_months_unlocked}`);
-            if (dayTypeName) parts.push(`Current day type: ${dayTypeName}`);
+            if (dayTypeRow?.name) parts.push(`Current day type: ${dayTypeRow.name}`);
+            if (dayTypeRow?.coaching_intent) parts.push(dayTypeRow.coaching_intent);
             engineContext = "\n\nENGINE PROGRAM:\n" + parts.join("\n");
           }
         }
