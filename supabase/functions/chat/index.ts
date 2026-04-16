@@ -260,9 +260,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Engine context: look up the user's current position + framework ──
-    let engineContext = "";
-    if ((userTier === "engine" || userTier === "all_access") && athleteProfile?.engine_current_day && athleteProfile?.engine_program_version) {
+    // Kick off Engine context + AI Program position lookups in the background
+    // so they run in parallel with the rewriter and embedding/history/program fetches.
+    // These no longer sit on the critical path before streaming starts.
+    const engineContextPromise: Promise<string> = (async () => {
+      if (!((userTier === "engine" || userTier === "all_access") && athleteProfile?.engine_current_day && athleteProfile?.engine_program_version)) {
+        return "";
+      }
       try {
         const { data: mapping } = await supa
           .from("engine_program_mapping")
@@ -270,42 +274,42 @@ Deno.serve(async (req) => {
           .eq("engine_program_id", athleteProfile.engine_program_version)
           .eq("program_sequence_order", athleteProfile.engine_current_day)
           .maybeSingle();
+        if (!mapping) return "";
 
-        if (mapping) {
-          const [{ data: catalogDay }, { data: programInfo }] = await Promise.all([
-            supa.from("engine_workouts")
-              .select("day_type, month, phase")
-              .eq("program_type", "main_5day")
-              .eq("day_number", mapping.engine_workout_day_number)
-              .maybeSingle(),
-            supa.from("engine_programs")
-              .select("name, total_days")
-              .eq("id", athleteProfile.engine_program_version)
-              .maybeSingle(),
-          ]);
+        const [{ data: catalogDay }, { data: programInfo }] = await Promise.all([
+          supa.from("engine_workouts")
+            .select("day_type, month, phase")
+            .eq("program_type", "main_5day")
+            .eq("day_number", mapping.engine_workout_day_number)
+            .maybeSingle(),
+          supa.from("engine_programs")
+            .select("name, total_days")
+            .eq("id", athleteProfile.engine_program_version)
+            .maybeSingle(),
+        ]);
+        if (!catalogDay) return "";
 
-          if (catalogDay) {
-            const dayTypeRow = catalogDay.day_type
-              ? (await supa.from("engine_day_types").select("name, coaching_intent").eq("id", catalogDay.day_type).maybeSingle()).data
-              : null;
+        const dayTypeRow = catalogDay.day_type
+          ? (await supa.from("engine_day_types").select("name, coaching_intent").eq("id", catalogDay.day_type).maybeSingle()).data
+          : null;
 
-            const parts: string[] = [];
-            parts.push(`Program: ${programInfo?.name || "Year of the Engine"}`);
-            parts.push(`Progress: Day ${athleteProfile.engine_current_day} of ${programInfo?.total_days || 720} (Month ${catalogDay.month}, Week ${mapping.week_number || "?"})`);
-            parts.push(`Months unlocked: ${athleteProfile.engine_months_unlocked}`);
-            if (dayTypeRow?.name) parts.push(`Current day type: ${dayTypeRow.name}`);
-            if (dayTypeRow?.coaching_intent) parts.push(dayTypeRow.coaching_intent);
-            engineContext = "\n\nENGINE PROGRAM:\n" + parts.join("\n");
-          }
-        }
+        const parts: string[] = [];
+        parts.push(`Program: ${programInfo?.name || "Year of the Engine"}`);
+        parts.push(`Progress: Day ${athleteProfile.engine_current_day} of ${programInfo?.total_days || 720} (Month ${catalogDay.month}, Week ${mapping.week_number || "?"})`);
+        parts.push(`Months unlocked: ${athleteProfile.engine_months_unlocked}`);
+        if (dayTypeRow?.name) parts.push(`Current day type: ${dayTypeRow.name}`);
+        if (dayTypeRow?.coaching_intent) parts.push(dayTypeRow.coaching_intent);
+        return "\n\nENGINE PROGRAM:\n" + parts.join("\n");
       } catch (err) {
         console.error("[chat] Engine context lookup failed:", err);
+        return "";
       }
-    }
+    })();
 
-    // ── AI Program context: derive position from workout logs ──
-    let aiProgramContext = "";
-    if ((userTier === "ai_programming" || userTier === "all_access") && !workout_id) {
+    const aiProgramContextPromise: Promise<string> = (async () => {
+      if (!((userTier === "ai_programming" || userTier === "all_access") && !workout_id)) {
+        return "";
+      }
       try {
         const { data: program } = await supa
           .from("programs")
@@ -314,41 +318,40 @@ Deno.serve(async (req) => {
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
+        if (!program) return "";
 
-        if (program) {
-          const { data: programWorkouts } = await supa
-            .from("program_workouts")
-            .select("id, week_num, day_num, sort_order")
-            .eq("program_id", program.id)
-            .order("sort_order");
+        const { data: programWorkouts } = await supa
+          .from("program_workouts")
+          .select("id, week_num, day_num, sort_order")
+          .eq("program_id", program.id)
+          .order("sort_order");
+        if (!programWorkouts || programWorkouts.length === 0) return "";
 
-          if (programWorkouts && programWorkouts.length > 0) {
-            const workoutIds = programWorkouts.map((w: { id: string }) => w.id);
-            const { data: completedLogs } = await supa
-              .from("workout_logs")
-              .select("source_id")
-              .eq("user_id", user.id)
-              .eq("source_type", "program")
-              .in("source_id", workoutIds);
+        const workoutIds = programWorkouts.map((w: { id: string }) => w.id);
+        const { data: completedLogs } = await supa
+          .from("workout_logs")
+          .select("source_id")
+          .eq("user_id", user.id)
+          .eq("source_type", "program")
+          .in("source_id", workoutIds);
 
-            const completedIds = new Set((completedLogs || []).map((l: { source_id: string }) => l.source_id));
-            const totalDays = programWorkouts.length;
-            const completedDays = completedIds.size;
-            const currentWorkout = programWorkouts.find((w: { id: string }) => !completedIds.has(w.id));
+        const completedIds = new Set((completedLogs || []).map((l: { source_id: string }) => l.source_id));
+        const totalDays = programWorkouts.length;
+        const completedDays = completedIds.size;
+        const currentWorkout = programWorkouts.find((w: { id: string }) => !completedIds.has(w.id));
 
-            const parts: string[] = [];
-            parts.push(`Program: "${program.name}"`);
-            parts.push(`Progress: ${completedDays} of ${totalDays} days completed`);
-            if (currentWorkout) {
-              parts.push(`Current: Week ${currentWorkout.week_num}, Day ${currentWorkout.day_num}`);
-            }
-            aiProgramContext = "\n\nAI PROGRAM:\n" + parts.join("\n");
-          }
+        const parts: string[] = [];
+        parts.push(`Program: "${program.name}"`);
+        parts.push(`Progress: ${completedDays} of ${totalDays} days completed`);
+        if (currentWorkout) {
+          parts.push(`Current: Week ${currentWorkout.week_num}, Day ${currentWorkout.day_num}`);
         }
+        return "\n\nAI PROGRAM:\n" + parts.join("\n");
       } catch (err) {
         console.error("[chat] AI Program context lookup failed:", err);
+        return "";
       }
-    }
+    })();
 
     // ── Query rewriting: turn the raw user message + last 2 turns into a clean,
     // standalone search query. Returns "META" for meta-questions / small talk so
@@ -398,11 +401,12 @@ Deno.serve(async (req) => {
     }
     console.log(`[chat] rewrite: "${question.substring(0, 80)}" -> ${isMeta ? "META" : `"${searchQuery.substring(0, 120)}"`}`);
 
-    // Generate embedding (skipped for META) + recent training + program context in parallel.
+    // Generate embedding (skipped for META) + recent training + program context in parallel
+    // alongside the Engine + AI Program context promises kicked off earlier.
     // Context is auto-included for any user with data — no toggle gate.
     const shouldFetchHistory = !isFreeTier;
     const shouldFetchProgram = userTier === "ai_programming" || userTier === "all_access" || userTier === "coach_standalone";
-    const [embData, recentTraining, programContext] = await Promise.all([
+    const [embData, recentTraining, programContext, engineContext, aiProgramContext] = await Promise.all([
       isMeta
         ? Promise.resolve(null)
         : fetchWithTimeout("https://api.openai.com/v1/embeddings", {
@@ -418,6 +422,8 @@ Deno.serve(async (req) => {
           }, 10_000).then((r) => r.json()),
       shouldFetchHistory ? fetchAndFormatRecentHistory(supa, user.id) : Promise.resolve(""),
       shouldFetchProgram ? fetchAndFormatProgramContext(supa, user.id) : Promise.resolve(""),
+      engineContextPromise,
+      aiProgramContextPromise,
     ]);
     const queryEmb = embData?.data?.[0]?.embedding;
 
