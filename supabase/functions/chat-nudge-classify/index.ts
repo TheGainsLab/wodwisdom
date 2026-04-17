@@ -134,7 +134,6 @@ Return JSON only.`;
 
   const data = await resp.json();
   const raw: string = data?.content?.[0]?.text ?? "";
-  console.log("[nudge] haiku raw output:", raw);
   const relevant = parseClassifierJSON(raw);
 
   // Ensure we never return a section that wasn't in the empty list.
@@ -195,10 +194,7 @@ Deno.serve(async (req) => {
     const features = new Set((entitlements || []).map((e: { feature: string }) => e.feature));
     const isPaid = isAdmin || features.has("ai_chat") || features.has("engine") || features.has("programming");
 
-    console.log("[nudge] user:", user.id, "isAdmin:", isAdmin, "isPaid:", isPaid);
-
     if (isPaid) {
-      console.log("[nudge] skipping — paid/admin");
       return new Response(
         JSON.stringify({ should_nudge: false, missing_relevant_sections: [] }),
         { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
@@ -212,9 +208,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const missing = emptySections(athleteProfile as ProfileRow | null);
-    console.log("[nudge] missing sections:", missing);
     if (missing.length === 0) {
-      console.log("[nudge] skipping — profile complete");
       return new Response(
         JSON.stringify({ should_nudge: false, missing_relevant_sections: [] }),
         { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
@@ -222,7 +216,6 @@ Deno.serve(async (req) => {
     }
 
     const relevant = await callHaikuClassifier(missing, question, answer);
-    console.log("[nudge] haiku returned relevant:", relevant);
 
     return new Response(
       JSON.stringify({
