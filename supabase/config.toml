@@ -126,3 +126,6 @@ verify_jwt = false
 
 [functions.checkout-session-info]
 verify_jwt = false
+
+[functions.chat-nudge-classify]
+verify_jwt = false
