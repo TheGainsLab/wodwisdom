@@ -13,6 +13,7 @@ import {
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { SKILL_DISPLAY_NAMES } from "../_shared/skill-priorities.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { getTierStatus } from "../_shared/tier-status.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
@@ -896,6 +897,32 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: "program_id is required for Month 2+ generation" }),
         { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
       );
+    }
+
+    // Gate first-month generation on complete T3 (training context). Month 2+
+    // runs off an existing program, so we don't re-gate mid-program.
+    if (monthNumber === 1) {
+      const { data: athleteProfile } = await supa
+        .from("athlete_profiles")
+        .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, days_per_week, session_length_minutes, gym_type, years_training, injuries_constraints, training_split")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const tierStatus = getTierStatus(athleteProfile);
+      if (!tierStatus.canRunPrograms) {
+        const missing = [
+          ...tierStatus.tier1.missing.map((f) => `basics.${f}`),
+          ...tierStatus.tier2.missing.map((f) => `athletic.${f}`),
+          ...tierStatus.tier3.missing.map((f) => `training_context.${f}`),
+        ];
+        return new Response(
+          JSON.stringify({
+            error: "TIER_INCOMPLETE",
+            message: "Fill in your training context to generate a program tailored to your week.",
+            missing_fields: missing,
+          }),
+          { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
+        );
+      }
     }
     // Fetch evaluation: use provided id, or most recent
     let evalRow: {

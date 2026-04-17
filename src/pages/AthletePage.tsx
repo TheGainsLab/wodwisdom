@@ -498,7 +498,7 @@ export default function AthletePage({ session }: { session: Session }) {
         body: {},
       });
       if (error) throw new Error(error.message || 'Analysis failed');
-      if (data?.error) throw new Error(data.error || 'Analysis failed');
+      if (data?.error) throw new Error(data.message || data.error || 'Analysis failed');
       setAnalysisResult({
         kind: 'profile',
         text: data?.analysis,
@@ -521,7 +521,7 @@ export default function AthletePage({ session }: { session: Session }) {
         body: analysisResult?.evaluationId ? { evaluation_id: analysisResult.evaluationId } : {},
       });
       if (error) throw new Error(error.message || 'Failed to generate program');
-      if (data?.error) throw new Error(data.error || 'Failed to generate program');
+      if (data?.error) throw new Error(data.message || data.error || 'Failed to generate program');
       const jobId = data?.job_id;
       if (!jobId) throw new Error('No job ID returned');
 
@@ -1035,32 +1035,64 @@ export default function AthletePage({ session }: { session: Session }) {
                   </CollapsibleSection>
                 </TierCard>
 
-                <button
-                  className="auth-btn"
-                  onClick={async () => {
-                    await saveProfile();
-                    if (isDirty) return; // save failed
-                    if (!hasGeneratedProgram) fetchProfileAnalysis();
-                  }}
-                  disabled={saving || !!analysisLoading}
-                  style={!isDirty && !analysisLoading ? { background: '#2ec486', color: 'white' } : undefined}
-                >
-                  {saving ? 'Saving...' : analysisLoading === 'profile' ? 'Analyzing...' : !isDirty ? 'Saved ✓' : hasGeneratedProgram ? 'Save Profile' : 'Save & Analyze'}
-                </button>
+                {(() => {
+                  const willAnalyze = tierStatus.canRunEval && !hasGeneratedProgram;
+                  const saveBtnLabel = saving
+                    ? 'Saving...'
+                    : analysisLoading === 'profile'
+                      ? 'Analyzing...'
+                      : !isDirty
+                        ? 'Saved ✓'
+                        : willAnalyze
+                          ? 'Save & Analyze'
+                          : 'Save Profile';
+                  return (
+                    <>
+                      <button
+                        className="auth-btn"
+                        onClick={async () => {
+                          await saveProfile();
+                          if (isDirty) return; // save failed
+                          if (willAnalyze) fetchProfileAnalysis();
+                        }}
+                        disabled={saving || !!analysisLoading}
+                        style={!isDirty && !analysisLoading ? { background: '#2ec486', color: 'white' } : undefined}
+                      >
+                        {saveBtnLabel}
+                      </button>
+                      {!tierStatus.canRunEval && !hasGeneratedProgram && (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
+                          Finish your Basics, Lifts, Skills, and Conditioning to run your free evaluation.
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {/* Generate Program — hidden once a program exists (auto-generated monthly) */}
                 {(!hasGeneratedProgram || isAdmin) && (() => {
                   const canGenerate = isAdmin || hasFeature('programming');
                   const isFreeUser = !hasFeature('ai_chat') && !hasFeature('engine') && !hasFeature('programming') && !hasFeature('nutrition') && !isAdmin;
                   const upgradeRoute = isFreeUser ? '/checkout' : '/settings';
+                  const tierBlocked = canGenerate && !tierStatus.canRunPrograms;
+                  const disabled = (canGenerate && generateLoading) || tierBlocked;
+                  const genTitle = tierBlocked
+                    ? 'Fill in your training context to generate a program tailored to your week.'
+                    : undefined;
                   return (
                     <>
                       <button
                         type="button"
                         className="auth-btn"
-                        style={{ background: 'var(--surface2)', color: 'var(--text)' }}
-                        onClick={canGenerate ? handleGenerateProgram : () => navigate(upgradeRoute)}
-                        disabled={canGenerate && generateLoading}
+                        style={{
+                          background: 'var(--surface2)',
+                          color: 'var(--text)',
+                          opacity: tierBlocked ? 0.55 : undefined,
+                          cursor: tierBlocked ? 'not-allowed' : undefined,
+                        }}
+                        onClick={canGenerate ? (tierBlocked ? undefined : handleGenerateProgram) : () => navigate(upgradeRoute)}
+                        disabled={disabled}
+                        title={genTitle}
                       >
                         {canGenerate ? (
                           generateLoading ? 'Generating...' : isAdmin && hasGeneratedProgram ? 'Generate Program (Admin)' : 'Generate Program'
@@ -1073,6 +1105,11 @@ export default function AthletePage({ session }: { session: Session }) {
                       </button>
                       {!canGenerate && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Requires AI Programming or All Access subscription</span>
+                      )}
+                      {tierBlocked && (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
+                          Fill in your training context to generate a program tailored to your week.
+                        </span>
                       )}
                     </>
                   );
