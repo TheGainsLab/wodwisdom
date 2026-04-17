@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
+import { getTierStatus } from "../_shared/tier-status.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -10,52 +11,23 @@ const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 const MAX_Q_CHARS = 2000;
 const MAX_A_CHARS = 6000;
 
-type ProfileSection = "lifts" | "skills" | "conditioning" | "equipment";
-const ALL_SECTIONS: ProfileSection[] = ["lifts", "skills", "conditioning", "equipment"];
+// Section names the classifier and templates speak in. T3 sections (equipment,
+// training context) are intentionally excluded — chat nudges are scoped to T1
+// and T2 only. T3 lives on the profile page itself.
+type NudgeSection = "basics" | "lifts" | "skills" | "conditioning";
+const ALL_NUDGE_SECTIONS: NudgeSection[] = ["basics", "lifts", "skills", "conditioning"];
 
-type ProfileRow = {
-  lifts: Record<string, number> | null;
-  skills: Record<string, string> | null;
-  conditioning: Record<string, string | number> | null;
-  equipment: Record<string, boolean> | null;
+const SECTION_LABELS: Record<NudgeSection, string> = {
+  basics: "the user's basic profile (age, weight, height, gender)",
+  lifts: "1RM strength numbers (back squat, bench press, deadlift, snatch, clean & jerk)",
+  skills: "proficiency on gymnastics/olympic skills (muscle-ups, handstand walk, double-unders, etc.)",
+  conditioning: "benchmark workout times or capacity (Fran, 5K row, mile run, etc.)",
 };
-
-function emptySections(profile: ProfileRow | null): ProfileSection[] {
-  if (!profile) return [...ALL_SECTIONS];
-  const missing: ProfileSection[] = [];
-
-  const liftsPresent =
-    !!profile.lifts &&
-    Object.values(profile.lifts).some((v) => typeof v === "number" && v > 0);
-  if (!liftsPresent) missing.push("lifts");
-
-  const skillsPresent =
-    !!profile.skills &&
-    Object.values(profile.skills).some((v) => v != null && String(v).trim() !== "");
-  if (!skillsPresent) missing.push("skills");
-
-  const conditioningPresent =
-    !!profile.conditioning &&
-    Object.values(profile.conditioning).some((v) => v != null && String(v).trim() !== "");
-  if (!conditioningPresent) missing.push("conditioning");
-
-  const equipmentPresent =
-    !!profile.equipment && Object.keys(profile.equipment).length > 0;
-  if (!equipmentPresent) missing.push("equipment");
-
-  return missing;
-}
 
 const CLASSIFIER_SYSTEM = `You are a classifier that decides whether a fitness coaching answer would have been MATERIALLY better with specific missing user profile data.
 
-Profile sections that may be empty:
-- lifts: 1RM strength numbers (back squat, bench press, deadlift, clean, snatch, etc.)
-- skills: proficiency on gymnastics/olympic skills (muscle-ups, handstand walk, double-unders, rope climbs, etc.)
-- conditioning: benchmark workout times or capacity (Fran, 5K row, mile run, max HR, etc.)
-- equipment: what equipment the athlete has access to
-
 You will be given:
-- EMPTY SECTIONS: the subset of {lifts, skills, conditioning, equipment} the user has not filled in.
+- EMPTY SECTIONS: the subset of profile sections the user has not filled in. Each section is described.
 - QUESTION: the user's question.
 - ANSWER: the coaching answer that was given.
 
@@ -70,18 +42,18 @@ Return nothing for:
 Output format: return ONLY valid JSON, no prose, no code fences.
 Shape: {"missing_relevant_sections": ["lifts"]}
 If none apply: {"missing_relevant_sections": []}
-Only include sections from the EMPTY SECTIONS list.`;
+Only include sections from the EMPTY SECTIONS list using the exact section keys.`;
 
-function parseClassifierJSON(raw: string): ProfileSection[] {
+function parseClassifierJSON(raw: string, allowed: Set<NudgeSection>): NudgeSection[] {
   if (!raw) return [];
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) return [];
   try {
     const parsed = JSON.parse(match[0]) as { missing_relevant_sections?: unknown };
     if (!Array.isArray(parsed.missing_relevant_sections)) return [];
-    const valid = new Set(ALL_SECTIONS);
     return parsed.missing_relevant_sections.filter(
-      (s: unknown): s is ProfileSection => typeof s === "string" && valid.has(s as ProfileSection)
+      (s: unknown): s is NudgeSection =>
+        typeof s === "string" && allowed.has(s as NudgeSection)
     );
   } catch {
     return [];
@@ -89,16 +61,18 @@ function parseClassifierJSON(raw: string): ProfileSection[] {
 }
 
 async function callHaikuClassifier(
-  emptyList: ProfileSection[],
+  candidates: NudgeSection[],
   question: string,
   answer: string
-): Promise<ProfileSection[]> {
-  if (!ANTHROPIC_API_KEY) return [];
+): Promise<NudgeSection[]> {
+  if (!ANTHROPIC_API_KEY || candidates.length === 0) return [];
 
   const q = question.slice(0, MAX_Q_CHARS);
   const a = answer.slice(0, MAX_A_CHARS);
 
-  const userContent = `EMPTY SECTIONS: ${emptyList.join(", ")}
+  const sectionLines = candidates.map((s) => `- ${s}: ${SECTION_LABELS[s]}`).join("\n");
+  const userContent = `EMPTY SECTIONS:
+${sectionLines}
 
 QUESTION:
 ${q}
@@ -134,12 +108,15 @@ Return JSON only.`;
 
   const data = await resp.json();
   const raw: string = data?.content?.[0]?.text ?? "";
-  const relevant = parseClassifierJSON(raw);
-
-  // Ensure we never return a section that wasn't in the empty list.
-  const emptySet = new Set(emptyList);
-  return relevant.filter((s) => emptySet.has(s));
+  const allowed = new Set(candidates);
+  return parseClassifierJSON(raw, allowed);
 }
+
+const SKIP_NUDGE = (cors: Record<string, string>) =>
+  new Response(
+    JSON.stringify({ should_nudge: false, missing_relevant_sections: [] }),
+    { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
+  );
 
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -172,14 +149,9 @@ Deno.serve(async (req) => {
     const question: string = typeof body?.question === "string" ? body.question : "";
     const answer: string = typeof body?.answer === "string" ? body.answer : "";
 
-    if (!question || !answer) {
-      return new Response(
-        JSON.stringify({ should_nudge: false, missing_relevant_sections: [] }),
-        { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
-      );
-    }
+    if (!question || !answer) return SKIP_NUDGE(cors);
 
-    // Paid users get no nudge (per product decision — revisit later).
+    // Paid users and admins get no nudge.
     const [{ data: profile }, { data: entitlements }] = await Promise.all([
       supa.from("profiles").select("role").eq("id", user.id).single(),
       supa
@@ -193,29 +165,34 @@ Deno.serve(async (req) => {
     const isAdmin = profile?.role === "admin";
     const features = new Set((entitlements || []).map((e: { feature: string }) => e.feature));
     const isPaid = isAdmin || features.has("ai_chat") || features.has("engine") || features.has("programming");
+    if (isPaid) return SKIP_NUDGE(cors);
 
-    if (isPaid) {
-      return new Response(
-        JSON.stringify({ should_nudge: false, missing_relevant_sections: [] }),
-        { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
-      );
-    }
-
+    // Pull all profile fields needed for tier status (T1 + T2 + T3). We only
+    // nudge based on T1 and T2, but getTierStatus needs the full picture to
+    // know nextTier correctly.
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
-      .select("lifts, skills, conditioning, equipment")
+      .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, days_per_week, session_length_minutes, gym_type, years_training, injuries_constraints, training_split")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    const missing = emptySections(athleteProfile as ProfileRow | null);
-    if (missing.length === 0) {
-      return new Response(
-        JSON.stringify({ should_nudge: false, missing_relevant_sections: [] }),
-        { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
+    const tierStatus = getTierStatus(athleteProfile);
+
+    // Lowest incomplete tier wins. Skip if T1 + T2 are both done — we don't
+    // nudge T3 in chat (per product decision).
+    let candidates: NudgeSection[] = [];
+    if (!tierStatus.tier1.complete) {
+      candidates = ["basics"];
+    } else if (!tierStatus.tier2.complete) {
+      // tier2.missing is a subset of {'lifts', 'skills', 'conditioning'}
+      candidates = tierStatus.tier2.missing.filter(
+        (s): s is NudgeSection => (ALL_NUDGE_SECTIONS as readonly string[]).includes(s)
       );
+    } else {
+      return SKIP_NUDGE(cors);
     }
 
-    const relevant = await callHaikuClassifier(missing, question, answer);
+    const relevant = await callHaikuClassifier(candidates, question, answer);
 
     return new Response(
       JSON.stringify({
@@ -226,9 +203,6 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     console.error("chat-nudge-classify error:", err);
-    return new Response(
-      JSON.stringify({ should_nudge: false, missing_relevant_sections: [] }),
-      { status: 200, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
-    );
+    return SKIP_NUDGE(getCorsHeaders(req));
   }
 });
