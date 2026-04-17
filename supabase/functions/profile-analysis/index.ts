@@ -6,6 +6,7 @@ import {
 } from "../_shared/rag.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { getTierStatus } from "../_shared/tier-status.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -189,24 +190,25 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    const profileData: ProfileData = athleteProfile || {};
-    const profileStr = formatProfile(profileData);
-
-    const hasLifts =
-      profileData.lifts && Object.keys(profileData.lifts).length > 0 && Object.values(profileData.lifts).some((v: unknown) => (v as number) > 0);
-    const hasSkills =
-      profileData.skills && Object.keys(profileData.skills).length > 0 && Object.entries(profileData.skills).some(([, v]) => v && v !== "none");
-    const hasConditioning =
-      profileData.conditioning && Object.keys(profileData.conditioning).length > 0 && Object.values(profileData.conditioning).some((v) => v !== "" && v != null);
-
-    if (!hasLifts && !hasSkills && !hasConditioning) {
+    // Gate: T1 (basics) + T2 (athletic data) must be strictly complete.
+    const tierStatus = getTierStatus(athleteProfile);
+    if (!tierStatus.canRunEval) {
+      const missing = [
+        ...tierStatus.tier1.missing.map((f) => `basics.${f}`),
+        ...tierStatus.tier2.missing.map((f) => `athletic.${f}`),
+      ];
       return new Response(
         JSON.stringify({
-          analysis: "Add your lifts, skills, or conditioning to get a profile analysis. Fill out the sections above and try again.",
+          error: "TIER_INCOMPLETE",
+          message: "Finish your Basics, Lifts, Skills, and Conditioning to run your free evaluation.",
+          missing_fields: missing,
         }),
-        { headers: { ...cors, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }
+
+    const profileData: ProfileData = athleteProfile || {};
+    const profileStr = formatProfile(profileData);
 
     // Parse optional month_number and program_id from request body
     let monthNumber = 1;
