@@ -1,6 +1,6 @@
 export type ProfileSection = 'lifts' | 'skills' | 'conditioning' | 'equipment';
 
-const PROFILE_HREF = '/athlete';
+const PROFILE_HREF = '/profile';
 
 const GENERIC_TEMPLATES: string[] = [
   `I can be more precise once you [complete your profile](${PROFILE_HREF}) — you'll also get your free fitness analysis.`,
