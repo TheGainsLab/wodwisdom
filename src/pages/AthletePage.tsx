@@ -542,9 +542,9 @@ export default function AthletePage({ session }: { session: Session }) {
           <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {isNewUser && (
               <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
-                <h2 className="settings-card-title" style={{ marginBottom: 8 }}>Welcome to GAINS</h2>
+                <h2 className="settings-card-title" style={{ marginBottom: 8 }}>Get your free fitness analysis</h2>
                 <p style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-                  Complete your profile and click <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Analysis</span> to get a comprehensive breakdown of your fitness and priorities for improvement. After that, take your profile over to <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Coach</span> and ask the AI Coach anything you want about fitness. AI Coach uses your data and the methodology to tailor every response to you.
+                  Five minutes here unlocks a comprehensive <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Analysis</span> of your strengths, gaps, and priorities — yours to keep or take to your coach. It also sharpens every answer from the <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Coach</span>, so your questions get responses tailored to your lifts, skills, and conditioning.
                 </p>
               </div>
             )}

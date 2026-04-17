@@ -9,6 +9,7 @@ import { OfflineMessage } from '../components/OfflineBanner';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { Clock, Bookmark } from 'lucide-react';
 import { cacheGet, cacheSet, chatHistoryKey } from '../lib/offlineCache';
+import { pickNudgeTemplate, type ProfileSection } from '../lib/chatNudgeTemplates';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -89,6 +90,24 @@ export default function ChatPage({ session }: { session: Session }) {
 
   const isPaywalled = tier === 'free' && totalQuestions >= freeLimit;
 
+  const maybeAppendNudge = async (assistantIdx: number, question: string, answer: string) => {
+    if (!answer || answer.startsWith('Error:')) return;
+    try {
+      const { data, error } = await supabase.functions.invoke('chat-nudge-classify', {
+        body: { question, answer },
+      });
+      if (error || !data || !data.should_nudge) return;
+      const sections = (data.missing_relevant_sections || []) as ProfileSection[];
+      const template = pickNudgeTemplate(sections);
+      if (!template) return;
+      setMessages(prev => prev.map((m, i) =>
+        i === assistantIdx ? { ...m, content: m.content + '\n\n' + template } : m
+      ));
+    } catch {
+      // Silent failure — no nudge shown.
+    }
+  };
+
   const sendMessage = async (text?: string) => {
     const question = text || input.trim();
     if (!question || isLoading || isPaywalled) return;
@@ -137,6 +156,7 @@ export default function ChatPage({ session }: { session: Session }) {
             setDailyLimit(data.usage.daily_limit);
           }
         }
+        maybeAppendNudge(assistantIdx, question, data.answer);
       } else {
         // Handle streaming SSE response
         const reader = resp.body!.getReader();
@@ -204,6 +224,8 @@ export default function ChatPage({ session }: { session: Session }) {
         setMessages(prev => prev.map((m, i) =>
           i === assistantIdx && m.streaming ? { ...m, sources, streaming: false } : m
         ));
+
+        maybeAppendNudge(assistantIdx, question, accumulatedContent);
       }
 
     } catch (err: any) {
