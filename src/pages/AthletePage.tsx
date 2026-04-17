@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { classifyAthlete } from '../utils/classify-athlete';
 import { calculateTDEE } from '../utils/tdee';
+import { getTierStatus, type AthleteProfileInput, type TierSection } from '../utils/tier-status';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 import { formatMarkdown } from '../lib/formatMarkdown';
@@ -164,6 +165,27 @@ const CONDITIONING_GROUPS = [
 const SKILL_LEVELS = ['none', 'beginner', 'intermediate', 'advanced'] as const;
 type SkillLevel = typeof SKILL_LEVELS[number];
 
+const GYM_TYPES = [
+  { value: 'affiliate', label: 'CrossFit Affiliate' },
+  { value: 'commercial', label: 'Commercial Gym' },
+  { value: 'home', label: 'Home Gym' },
+  { value: 'mixed', label: 'Mixed' },
+] as const;
+
+const YEARS_TRAINING_BUCKETS = [
+  { value: 'under_1', label: 'Under 1 year' },
+  { value: '1_to_3', label: '1 – 3 years' },
+  { value: '3_to_5', label: '3 – 5 years' },
+  { value: '5_to_10', label: '5 – 10 years' },
+  { value: 'over_10', label: '10+ years' },
+] as const;
+
+const TRAINING_SPLITS = [
+  { value: 'single_sessions', label: 'Single sessions' },
+  { value: 'doubles', label: 'Double days (AM/PM)' },
+  { value: 'flexible', label: 'Flexible' },
+] as const;
+
 const LEVEL_LABELS: Record<SkillLevel, string> = {
   none: 'None',
   beginner: 'Beginner',
@@ -238,6 +260,65 @@ function CollapsibleSection({ title, defaultExpanded = false, children }: { titl
   );
 }
 
+function TierCard({
+  tierNumber,
+  title,
+  unlocks,
+  status,
+  defaultExpanded = false,
+  children,
+}: {
+  tierNumber: 1 | 2 | 3;
+  title: string;
+  unlocks: string;
+  status: TierSection;
+  defaultExpanded?: boolean;
+  children: React.ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const accent = status.complete ? '#2ec486' : 'var(--accent)';
+  return (
+    <div className="settings-card" style={{ borderColor: status.complete ? '#2ec486' : undefined }}>
+      <button
+        type="button"
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: 0,
+          margin: 0,
+          background: 'none',
+          border: 'none',
+          color: 'inherit',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          textAlign: 'left',
+        }}
+      >
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <span style={{
+              fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px',
+              color: accent,
+            }}>
+              Tier {tierNumber}
+            </span>
+            {status.complete && (
+              <span style={{ fontSize: 12, color: '#2ec486', fontWeight: 700 }}>Complete ✓</span>
+            )}
+          </div>
+          <h2 className="settings-card-title" style={{ marginBottom: 2 }}>{title}</h2>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Unlocks: {unlocks}</div>
+        </div>
+        <span style={{ fontSize: 14, color: 'var(--text-dim)', flexShrink: 0, marginLeft: 12 }}>{expanded ? '▲' : '▼'}</span>
+      </button>
+      {expanded && <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>{children}</div>}
+    </div>
+  );
+}
+
 export default function AthletePage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [age, setAge] = useState<string>('');
@@ -268,6 +349,13 @@ export default function AthletePage({ session }: { session: Session }) {
   const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
   const [tdeeOverride, setTdeeOverride] = useState<string>('');
   const [editingTdee, setEditingTdee] = useState(false);
+  // Tier 3 — training context
+  const [daysPerWeek, setDaysPerWeek] = useState<string>('');
+  const [sessionLengthMinutes, setSessionLengthMinutes] = useState<string>('');
+  const [gymType, setGymType] = useState<string>('');
+  const [yearsTraining, setYearsTraining] = useState<string>('');
+  const [injuriesConstraints, setInjuriesConstraints] = useState<string>('');
+  const [trainingSplit, setTrainingSplit] = useState<string>('');
 
   const navigate = useNavigate();
   const { hasFeature, isAdmin } = useEntitlements(session.user.id);
@@ -315,7 +403,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, gym_type, years_training, injuries_constraints, training_split')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -356,6 +444,12 @@ export default function AthletePage({ session }: { session: Session }) {
         setUnits((d.units as 'lbs' | 'kg') || 'lbs');
         setGender((d.gender as 'male' | 'female') || '');
         setTdeeOverride(d.tdee_override != null ? String(d.tdee_override) : '');
+        setDaysPerWeek(d.days_per_week != null ? String(d.days_per_week) : '');
+        setSessionLengthMinutes(d.session_length_minutes != null ? String(d.session_length_minutes) : '');
+        setGymType(d.gym_type || '');
+        setYearsTraining(d.years_training || '');
+        setInjuriesConstraints(d.injuries_constraints || '');
+        setTrainingSplit(d.training_split || '');
         setIsDirty(false);
       }
       if (evalRes.data) {
@@ -496,6 +590,10 @@ export default function AthletePage({ session }: { session: Session }) {
       lifts: cleanLifts,
     });
 
+    const daysPerWeekNum = daysPerWeek === '' ? null : parseInt(daysPerWeek, 10);
+    const sessionLengthNum = sessionLengthMinutes === '' ? null : parseInt(sessionLengthMinutes, 10);
+    const injuriesVal = injuriesConstraints.trim() === '' ? null : injuriesConstraints.trim();
+
     const { error: err } = await supabase
       .from('athlete_profiles')
       .upsert(
@@ -511,6 +609,12 @@ export default function AthletePage({ session }: { session: Session }) {
           height: heightNum && !isNaN(heightNum) ? heightNum : null,
           gender: genderVal,
           tdee_override: tdeeOverrideNum && !isNaN(tdeeOverrideNum) ? tdeeOverrideNum : null,
+          days_per_week: daysPerWeekNum && !isNaN(daysPerWeekNum) ? daysPerWeekNum : null,
+          session_length_minutes: sessionLengthNum && !isNaN(sessionLengthNum) ? sessionLengthNum : null,
+          gym_type: gymType || null,
+          years_training: yearsTraining || null,
+          injuries_constraints: injuriesVal,
+          training_split: trainingSplit || null,
           ...levels,
           updated_at: new Date().toISOString(),
         },
@@ -528,6 +632,26 @@ export default function AthletePage({ session }: { session: Session }) {
     setSaving(false);
   };
 
+  // Live tier status, computed from current form state (not yet saved values).
+  const tierStatusInput: AthleteProfileInput = {
+    age: age ? parseInt(age, 10) : null,
+    height: height ? parseFloat(height) : null,
+    bodyweight: bodyweight ? parseFloat(bodyweight) : null,
+    gender: gender || null,
+    units,
+    lifts,
+    skills,
+    conditioning,
+    equipment,
+    days_per_week: daysPerWeek ? parseInt(daysPerWeek, 10) : null,
+    session_length_minutes: sessionLengthMinutes ? parseInt(sessionLengthMinutes, 10) : null,
+    gym_type: gymType || null,
+    years_training: yearsTraining || null,
+    injuries_constraints: injuriesConstraints || null,
+    training_split: trainingSplit || null,
+  };
+  const tierStatus = getTierStatus(tierStatusInput);
+
   return (
     <div className="app-layout">
       <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
@@ -542,9 +666,9 @@ export default function AthletePage({ session }: { session: Session }) {
           <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {isNewUser && (
               <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
-                <h2 className="settings-card-title" style={{ marginBottom: 8 }}>Get your free fitness analysis</h2>
+                <h2 className="settings-card-title" style={{ marginBottom: 8 }}>Your profile, three tiers</h2>
                 <p style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-                  Five minutes here unlocks a comprehensive <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Analysis</span> of your strengths, gaps, and priorities — yours to keep or take to your coach. It also sharpens every answer from the <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Coach</span>, so your questions get responses tailored to your lifts, skills, and conditioning.
+                  Each tier unlocks more from the app. <strong style={{ color: 'var(--text)' }}>Tier 1</strong> tailors every AI Coach answer to you. <strong style={{ color: 'var(--text)' }}>Tier 2</strong> unlocks your free <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Fitness Analysis</span> — yours to keep or take to your coach. <strong style={{ color: 'var(--text)' }}>Tier 3</strong> unlocks <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Programming</span> built around your week.
                 </p>
               </div>
             )}
@@ -554,10 +678,14 @@ export default function AthletePage({ session }: { session: Session }) {
               <div className="page-loading"><div className="loading-pulse" /></div>
             ) : (
               <>
-                {/* Basics */}
-                <div className="settings-card">
-                  <h2 className="settings-card-title">Basics</h2>
-
+                {/* Tier 1 — Basics */}
+                <TierCard
+                  tierNumber={1}
+                  title="Basics"
+                  unlocks="Tailored answers from the AI Coach"
+                  status={tierStatus.tier1}
+                  defaultExpanded={tierStatus.nextTier === 1}
+                >
                   {/* Units toggle — prominent, first choice */}
                   <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
                     <button
@@ -688,36 +816,16 @@ export default function AthletePage({ session }: { session: Session }) {
                       </div>
                     );
                   })()}
-                </div>
+                </TierCard>
 
-                {/* Equipment */}
-                <CollapsibleSection title="Equipment">
-                  <p className="athlete-card-subtitle">Uncheck any equipment you don't have or don't want programmed.</p>
-                  {EQUIPMENT_GROUPS.map(group => (
-                    <div key={group.title} style={{ marginBottom: 20 }}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
-                      <div className="skill-list">
-                        {group.items.map(item => (
-                          <label
-                            key={item.key}
-                            className="skill-row"
-                            style={{ cursor: 'pointer', userSelect: 'none' }}
-                          >
-                            <span className="skill-name">{item.label}</span>
-                            <input
-                              type="checkbox"
-                              checked={equipment[item.key] ?? true}
-                              onChange={e => { setEquipment(prev => ({ ...prev, [item.key]: e.target.checked })); markDirty(); }}
-                              style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer' }}
-                            />
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </CollapsibleSection>
-
-                {/* 1RM Lifts */}
+                {/* Tier 2 — Athletic Data */}
+                <TierCard
+                  tierNumber={2}
+                  title="Athletic Data"
+                  unlocks="Your free AI Fitness Analysis"
+                  status={tierStatus.tier2}
+                  defaultExpanded={tierStatus.nextTier === 2}
+                >
                 <CollapsibleSection title={`1RM Lifts (${units})`}>
                   <p className="athlete-card-subtitle">Enter your one-rep max weights in {units}</p>
                   {LIFT_GROUPS.map(group => (
@@ -774,7 +882,7 @@ export default function AthletePage({ session }: { session: Session }) {
 
                 {/* Conditioning Benchmarks */}
                 <CollapsibleSection title="Conditioning Benchmarks">
-                  <p className="athlete-card-subtitle">Running and rowing times (MM:SS), bike in calories.</p>
+                  <p className="athlete-card-subtitle">Running and rowing times (MM:SS), bike in calories. Fill at least 2.</p>
                   {CONDITIONING_GROUPS.map(group => (
                     <div key={group.title} style={{ marginBottom: 20 }}>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
@@ -796,6 +904,136 @@ export default function AthletePage({ session }: { session: Session }) {
                     </div>
                   ))}
                 </CollapsibleSection>
+                </TierCard>
+
+                {/* Tier 3 — Training Context */}
+                <TierCard
+                  tierNumber={3}
+                  title="Training Context"
+                  unlocks="AI Programming tailored to your week"
+                  status={tierStatus.tier3}
+                  defaultExpanded={tierStatus.nextTier === 3}
+                >
+                  <div className="settings-card" style={{ padding: 16 }}>
+                    <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>Tell the AI how you train.</p>
+
+                    <div className="lift-grid" style={{ marginBottom: 16 }}>
+                      <div className="lift-item">
+                        <span className="lift-label">Days / week</span>
+                        <input
+                          className="lift-input"
+                          type="number"
+                          min="1"
+                          max="7"
+                          placeholder="—"
+                          value={daysPerWeek}
+                          onChange={e => { setDaysPerWeek(e.target.value); markDirty(); }}
+                        />
+                      </div>
+                      <div className="lift-item">
+                        <span className="lift-label">Session length (min)</span>
+                        <input
+                          className="lift-input"
+                          type="number"
+                          min="10"
+                          max="240"
+                          step="5"
+                          placeholder="—"
+                          value={sessionLengthMinutes}
+                          onChange={e => { setSessionLengthMinutes(e.target.value); markDirty(); }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>Where you train</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {GYM_TYPES.map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            className={'skill-level-btn' + (gymType === opt.value ? ' active' : '')}
+                            onClick={() => { setGymType(opt.value); markDirty(); }}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>Years training</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {YEARS_TRAINING_BUCKETS.map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            className={'skill-level-btn' + (yearsTraining === opt.value ? ' active' : '')}
+                            onClick={() => { setYearsTraining(opt.value); markDirty(); }}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>Training split</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {TRAINING_SPLITS.map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            className={'skill-level-btn' + (trainingSplit === opt.value ? ' active' : '')}
+                            onClick={() => { setTrainingSplit(opt.value); markDirty(); }}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>
+                        Injuries or movement constraints <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(type "none" if none)</span>
+                      </div>
+                      <textarea
+                        className="lift-input"
+                        rows={3}
+                        placeholder='e.g. "right shoulder — no overhead pressing"'
+                        value={injuriesConstraints}
+                        onChange={e => { setInjuriesConstraints(e.target.value); markDirty(); }}
+                        style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
+                      />
+                    </div>
+                  </div>
+
+                  <CollapsibleSection title="Equipment">
+                    <p className="athlete-card-subtitle">Uncheck any equipment you don't have or don't want programmed.</p>
+                    {EQUIPMENT_GROUPS.map(group => (
+                      <div key={group.title} style={{ marginBottom: 20 }}>
+                        <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
+                        <div className="skill-list">
+                          {group.items.map(item => (
+                            <label
+                              key={item.key}
+                              className="skill-row"
+                              style={{ cursor: 'pointer', userSelect: 'none' }}
+                            >
+                              <span className="skill-name">{item.label}</span>
+                              <input
+                                type="checkbox"
+                                checked={equipment[item.key] ?? true}
+                                onChange={e => { setEquipment(prev => ({ ...prev, [item.key]: e.target.checked })); markDirty(); }}
+                                style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </CollapsibleSection>
+                </TierCard>
 
                 <button
                   className="auth-btn"
