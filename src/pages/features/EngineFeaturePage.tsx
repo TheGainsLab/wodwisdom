@@ -8,76 +8,44 @@ const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
 
 const ENGINE_PROGRAMS = [
   {
-    name: 'Year of the Engine',
+    name: 'Year of the Engine - Classic',
     freq: '5x/week',
-    days: 720,
-    months: 36,
-    description: 'The full 720-day program — 5 sessions per week across 36 months.',
-    who: 'Athletes committed to long-term conditioning development.',
-    emphasis: 'All 20 training frameworks in a structured progression. Builds every energy system systematically over 36 months.',
+    description: 'The original conditioning super-cycle. 720 days, 5 sessions per week, 36 months — 12 three-month cycles, each adding another layer to your capacity across all 20 training frameworks. Builds exceptional work capacity for any task.',
   },
   {
-    name: 'Year of the Engine (3-Day)',
+    name: 'Year of the Engine - Classic (3-Day)',
     freq: '3x/week',
-    days: 432,
-    months: 36,
-    description: 'Same program quality at 3 sessions per week — 432 training days.',
-    who: 'Athletes who train conditioning 3 days and use the other days for strength, sport, or recovery.',
-    emphasis: 'Same frameworks as the 5-day, fewer sessions per week. Every session still fully calibrated to you.',
+    description: 'The original super-cycle, three days a week. Every phase, every framework, every adaptation — built for athletes who are training for more than one thing at once. Exceptional capacity without the five-day commitment.',
   },
   {
-    name: 'Engine: Varied Order',
+    name: 'Engine Mini Cycle',
     freq: '5x/week',
-    days: 720,
-    months: 36,
-    description: 'All 720 days in a shuffled sequence for returning athletes.',
-    who: 'Athletes who completed Year of the Engine (or part of it) and want fresh stimulus without repeating the same order.',
-    emphasis: 'Same workouts, different sequence. Your ML performance data carries over — the AI already knows your engine.',
+    description: 'The original super-cycle in four-week micro-cycles. All 20 frameworks in a year, then harder variations as you progress. Your ML data and personalized calibration carry over — and if you\u2019ve been through YoE before, this is a more intense progression through familiar territory.',
   },
   {
-    name: 'Engine: Varied Order (3-Day)',
+    name: 'Engine Mini Cycle (3-Day)',
     freq: '3x/week',
-    days: 432,
-    months: 36,
-    description: '432 days in a shuffled sequence at 3 sessions per week.',
-    who: 'Returning 3-day athletes who want variety.',
-    emphasis: 'Shuffled 3-day variant. All calibration data carries over.',
+    description: 'Train the three day version of super-cycle in four-week micro-cycles. All 20 frameworks in a year, then harder variations as you progress. Your ML data and personalized calibration carry over — and if you\u2019ve been through YoE before, this is a more intense progression through familiar territory.',
   },
   {
-    name: 'VO2 Max (3-Day)',
+    name: 'VO3',
     freq: '3x/week',
-    days: 144,
-    months: 12,
-    description: 'A 12-month VO2 Max emphasis program.',
-    who: 'Athletes focused on raising their aerobic ceiling — max aerobic power, oxygen uptake, and high-output interval capacity.',
-    emphasis: 'Heavy on max aerobic power intervals, devour (accumulating work), and infinity (multi-block supra-threshold). Polarized base work for recovery.',
+    description: 'VO2 Max, three days a week. VO3 targets your aerobic ceiling — max aerobic power, oxygen uptake, and high-output interval capacity — across 12 months of structured progression. Heavy on MAP intervals, accumulation work, and multi-block supra-threshold efforts. Polarized base work keeps recovery honest. Built for athletes who want to raise the ceiling, not just train under it.',
   },
   {
-    name: 'VO2 Max (4-Day)',
+    name: 'VO2+2 (4-Day)',
     freq: '4x/week',
-    days: 192,
-    months: 12,
-    description: 'A 12-month VO2 Max emphasis program at 4 sessions per week.',
-    who: 'Athletes who want aggressive VO2 Max development with an extra session per week.',
-    emphasis: 'Same VO2 Max focus as the 3-day with more volume — additional MAP and polarized sessions each week.',
+    description: 'VO2 Max with more room to work. Four days a week — two high-intensity VO2 sessions to build a more powerful engine, two Zone 2 sessions to build a bigger tank. 12 months of structured progression that develops both simultaneously. For athletes who want aggressive VO2 Max development without sacrificing aerobic endurance.',
   },
   {
     name: 'Hyrox Race Prep (3-Day)',
     freq: '3x/week',
-    days: 144,
-    months: 12,
-    description: 'A 12-month Hyrox race preparation program.',
-    who: 'Athletes training for Hyrox or similar functional fitness races.',
-    emphasis: 'Towers, synthesis, afterburner, and flux — frameworks that build sustained output, pace changes, and race-specific conditioning.',
+    description: 'Twelve months of race-specific conditioning, three days a week. Built around the demands of Hyrox — sustained output, pace transitions, and the ability to keep moving when it gets uncomfortable. Frameworks targeting every layer of race fitness: power, synthesis, and the capacity to finish strong. For athletes who race Hyrox or want to.',
   },
   {
     name: 'Hyrox Race Prep (5-Day)',
     freq: '5x/week',
-    days: 240,
-    months: 12,
-    description: 'A 12-month Hyrox race preparation program at 5 sessions per week.',
-    who: 'Dedicated Hyrox competitors who want maximum preparation volume.',
-    emphasis: 'Full 5-day race prep with towers, synthesis, afterburner, flux, and polarized recovery sessions.',
+    description: 'The full race prep block, five days a week. Same Hyrox-specific frameworks as the 3-day — sustained output, pace transitions, race-finish capacity — with two additional sessions that build the aerobic foundation underneath. For dedicated competitors who want to arrive at the start line with nothing left to prove in training.',
   },
 ];
 
@@ -111,7 +79,7 @@ function ProgramsLibrary() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: expanded ? 10 : 0 }}>
                   <div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>{prog.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>{prog.freq} · {prog.months} months</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>{prog.freq}</div>
                   </div>
                   <svg
                     width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" strokeWidth="2"
@@ -122,20 +90,9 @@ function ProgramsLibrary() {
                 </div>
                 {expanded && (
                   <div style={{ animation: 'fadeUp .2s ease' }}>
-                    <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 12 }}>
+                    <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>
                       {prog.description}
                     </p>
-                    <div style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 8 }}>
-                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Who it's for: </span>
-                      <span style={{ color: 'var(--text)' }}>{prog.who}</span>
-                    </div>
-                    <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Training emphasis: </span>
-                      <span style={{ color: 'var(--text)' }}>{prog.emphasis}</span>
-                    </div>
-                    <div style={{ marginTop: 10 }}>
-                      <span className="engine-badge engine-badge--default">{prog.days} days</span>
-                    </div>
                   </div>
                 )}
               </div>
