@@ -595,14 +595,18 @@ export async function loadProgramVersion(): Promise<string> {
 /**
  * Switch the user to a different program variant.
  *
- * Resets engine_current_day to 1 in the new program. Previous logic tried
- * to preserve "the same month" across programs of different sizes, which
- * produced nonsensical jumps (e.g. day 121 in a 36-month program → day 73
- * in a 12-month program). A clean reset is honest: the new program has
- * its own sequence, and its first day is the first day. Athletes who
- * want to start further in can navigate to any unlocked day from the
- * dashboard and start it there — completing that day advances
- * engine_current_day via the existing advanceCurrentDay() path.
+ * engine_current_day is set to 1 + the user's highest completed
+ * program_day_number within the new program, defaulting to 1 if they
+ * have no completions in that program yet. This mirrors how current_day
+ * advances during normal training (via advanceCurrentDay at workout
+ * completion) and gives sensible behavior in three cases:
+ *
+ *   - Brand-new program (no prior training in it): starts at Day 1.
+ *   - Returning to a program with existing completions: picks up at the
+ *     day right after the furthest day they've completed.
+ *   - Switching to a program where the highest completion happens to
+ *     equal the program's total_days: clamps to total_days so the
+ *     "Start Day N" button doesn't point past the end.
  *
  * What this does NOT touch:
  *   - engine_months_unlocked (paid access persists across switches)
@@ -613,11 +617,36 @@ export async function switchProgram(newProgramId: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
+  // Highest completed program_day_number in the new program, if any.
+  const { data: maxRow } = await supabase
+    .from('engine_workout_sessions')
+    .select('program_day_number')
+    .eq('user_id', user.id)
+    .eq('program_version', newProgramId)
+    .eq('completed', true)
+    .not('program_day_number', 'is', null)
+    .order('program_day_number', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const maxCompleted = maxRow?.program_day_number ?? 0;
+
+  // Cap at the program's total_days so a user who has literally completed
+  // the whole program doesn't end up pointing past its end.
+  const { data: programRow } = await supabase
+    .from('engine_programs')
+    .select('total_days')
+    .eq('id', newProgramId)
+    .maybeSingle();
+  const totalDays = programRow?.total_days ?? Number.MAX_SAFE_INTEGER;
+
+  const newCurrentDay = Math.min(maxCompleted + 1, totalDays);
+
   const { error } = await supabase
     .from('athlete_profiles')
     .update({
       engine_program_version: newProgramId,
-      engine_current_day: 1,
+      engine_current_day: newCurrentDay,
     })
     .eq('user_id', user.id);
 
