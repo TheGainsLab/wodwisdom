@@ -446,13 +446,13 @@ Deno.serve(async (req) => {
             query_embedding: queryEmb,
             match_threshold: 0.4,
             match_count: 6,
-            filter_categories: ["journal", "science", "strength-science"],
+            filter_categories: ["journal", "science", "strength-science", "engine"],
           })
-        : await supa.rpc("match_chunks_filtered", {
+        : await supa.rpc("match_chunks_multi", {
             query_embedding: queryEmb,
             match_threshold: 0.4,
             match_count: 6,
-            filter_category: source_filter || "journal",
+            filter_categories: [source_filter || "journal", "engine"],
           });
       chunks = result.data;
     }
