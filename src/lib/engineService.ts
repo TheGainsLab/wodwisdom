@@ -305,13 +305,29 @@ export async function getWorkoutsForProgram(
 
 // ─── Completed sessions (user-scoped) ────────────────────────────────
 
-/** Load all completed workout sessions for the current user. */
-export async function loadCompletedSessions(): Promise<EngineWorkoutSession[]> {
-  const { data, error } = await supabase
+/**
+ * Load completed workout sessions for the current user.
+ *
+ * @param programId Optional program version. When provided, results are
+ *   scoped to that program only — used by the dashboard so "Completed: N"
+ *   reflects progress in the user's current program. When omitted, returns
+ *   every completed session across every program the user has touched —
+ *   used by analytics so the training history stays continuous.
+ */
+export async function loadCompletedSessions(
+  programId?: string
+): Promise<EngineWorkoutSession[]> {
+  let query = supabase
     .from('engine_workout_sessions')
     .select('*')
     .eq('completed', true)
     .order('date', { ascending: false });
+
+  if (programId) {
+    query = query.eq('program_version', programId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return data ?? [];
