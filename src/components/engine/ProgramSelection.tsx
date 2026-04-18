@@ -73,7 +73,7 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
           </h2>
           <p className="engine-subheader">
             {isSwitching
-              ? 'Select a new program variant. You\'ll pick up at the same month in the new program.'
+              ? 'Select a new program variant. You\'ll start at Day 1 — your unlocked months and completed workouts are preserved.'
               : 'Select the training program that fits your schedule. You can change this later.'}
           </p>
           <hr className="engine-divider" />
@@ -130,8 +130,9 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
                       lineHeight: 1.5,
                       color: 'var(--text)',
                     }}>
-                      You'll pick up at the same month in this program.
-                      Your completed workouts and analytics are preserved.
+                      You'll start at Day 1 in this program. Your unlocked
+                      months and completed workouts are preserved — switch
+                      back anytime and pick up where you left off.
                       <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
                         <button
                           className="engine-btn engine-btn-primary engine-btn-sm"
