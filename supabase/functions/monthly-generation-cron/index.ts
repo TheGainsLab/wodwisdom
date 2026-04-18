@@ -136,15 +136,16 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (athleteProfile) {
-          const currentUnlocked = athleteProfile.engine_months_unlocked || 1;
+          const currentUnlocked = athleteProfile.engine_months_unlocked ?? 0;
           const lastUpdated = new Date(athleteProfile.updated_at || 0);
           const daysSinceLastUnlock = (Date.now() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
 
           // Check we haven't exceeded 3 months per quarter
           const monthsInCurrentQuarter = ((currentUnlocked - 1) % 3) + 1;
 
-          if (daysSinceLastUnlock >= 30 && monthsInCurrentQuarter < 3) {
-            const newUnlocked = currentUnlocked + 1;
+          // Cap at 36 months total (matches webhook cap).
+          if (daysSinceLastUnlock >= 30 && monthsInCurrentQuarter < 3 && currentUnlocked < 36) {
+            const newUnlocked = Math.min(currentUnlocked + 1, 36);
             results.push(`Engine: unlocking month ${newUnlocked} for user ${userId}`);
 
             await supa

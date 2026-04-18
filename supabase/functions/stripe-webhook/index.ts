@@ -223,14 +223,10 @@ serve(async (req) => {
         // Skip if not a subscription invoice (e.g. one-time charges)
         if (!subscriptionId) break;
 
-        // Skip initial subscription creation — handled by checkout.session.completed
-        // billing_reason: "subscription_create" = first payment, "subscription_cycle" = renewal
-        if (invoice.billing_reason === "subscription_create") {
-          console.log("[webhook] Skipping initial payment — handled by checkout.session.completed");
-          break;
-        }
-
-        console.log(`[webhook] Recurring payment: customer=${customerId}, subscription=${subscriptionId}`);
+        // Handle every successful subscription payment — initial and renewals
+        // alike. engine_months_unlocked is raised here as the single source of
+        // truth for Engine content access.
+        console.log(`[webhook] Subscription payment: customer=${customerId}, subscription=${subscriptionId}, billing_reason=${invoice.billing_reason}`);
 
         // Find user
         const { data: payProfiles } = await supa.from("profiles").select("id").eq("stripe_customer_id", customerId).limit(1);
@@ -280,7 +276,9 @@ serve(async (req) => {
           }
         }
 
-        // Engine users: unlock next month
+        // Engine users: unlock next month (capped at 36). Also creates the
+        // athlete_profiles row if it doesn't exist yet — an Engine subscriber
+        // who pays before picking a program still gets their first month.
         if (payFeatures.has("engine")) {
           const { data: athleteProfile } = await supa
             .from("athlete_profiles")
@@ -288,15 +286,69 @@ serve(async (req) => {
             .eq("user_id", payUserId)
             .maybeSingle();
 
-          if (athleteProfile) {
-            const currentUnlocked = athleteProfile.engine_months_unlocked || 1;
-            const newUnlocked = currentUnlocked + 1;
+          const currentUnlocked = athleteProfile?.engine_months_unlocked ?? 0;
+          const newUnlocked = Math.min(currentUnlocked + 1, 36);
+          if (newUnlocked > currentUnlocked) {
             console.log(`[webhook] Unlocking engine month ${newUnlocked} for user ${payUserId}`);
             await supa
               .from("athlete_profiles")
-              .update({ engine_months_unlocked: newUnlocked })
-              .eq("user_id", payUserId);
+              .upsert(
+                { user_id: payUserId, engine_months_unlocked: newUnlocked },
+                { onConflict: "user_id" }
+              );
+          } else {
+            console.log(`[webhook] Engine months at cap (36) for user ${payUserId} — no increment`);
           }
+        }
+
+        break;
+      }
+
+      case "charge.refunded": {
+        const charge = event.data.object;
+        const customerId = charge.customer;
+        if (!customerId) break;
+
+        // Look up the user by their Stripe customer id.
+        const { data: refundProfiles } = await supa
+          .from("profiles")
+          .select("id")
+          .eq("stripe_customer_id", customerId)
+          .limit(1);
+        if (!refundProfiles || refundProfiles.length === 0) break;
+        const refundUserId = refundProfiles[0].id;
+
+        console.log(`[webhook] Refund: customer=${customerId}, user=${refundUserId}, charge=${charge.id}, amount_refunded=${charge.amount_refunded}`);
+
+        // Only decrement if the user currently has an active Engine
+        // entitlement. Refund-after-cancel cases: the entitlement is already
+        // gone, access is already revoked, so a no-op is correct here. Admin
+        // override handles edge cases per product decision.
+        const { data: refundEntitlements } = await supa
+          .from("user_entitlements")
+          .select("feature")
+          .eq("user_id", refundUserId)
+          .eq("feature", "engine")
+          .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
+          .limit(1);
+        if (!refundEntitlements || refundEntitlements.length === 0) break;
+
+        // Decrement engine_months_unlocked by 1, floored at 0.
+        const { data: refundAthleteProfile } = await supa
+          .from("athlete_profiles")
+          .select("engine_months_unlocked")
+          .eq("user_id", refundUserId)
+          .maybeSingle();
+        if (!refundAthleteProfile) break;
+
+        const refundCurrent = refundAthleteProfile.engine_months_unlocked ?? 0;
+        const refundNew = Math.max(refundCurrent - 1, 0);
+        if (refundNew < refundCurrent) {
+          console.log(`[webhook] Refund: engine months ${refundCurrent} -> ${refundNew} for user ${refundUserId}`);
+          await supa
+            .from("athlete_profiles")
+            .update({ engine_months_unlocked: refundNew })
+            .eq("user_id", refundUserId);
         }
 
         break;

@@ -555,7 +555,7 @@ export async function saveProgramVersion(version: string): Promise<void> {
   const { error } = await supabase
     .from('athlete_profiles')
     .upsert(
-      { user_id: user.id, engine_program_version: version, engine_months_unlocked: 1 },
+      { user_id: user.id, engine_program_version: version },
       { onConflict: 'user_id' }
     );
 
