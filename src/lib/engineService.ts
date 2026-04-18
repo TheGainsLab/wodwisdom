@@ -45,6 +45,7 @@ export interface EngineProgramMapping {
   engine_workout_day_number: number;
   program_sequence_order: number;
   week_number: number | null;
+  month: number;
 }
 
 export interface EngineWorkoutSession {
@@ -288,11 +289,18 @@ export async function getWorkoutsForProgram(
     if (data) workouts.push(...data);
   }
 
-  // Return in mapping sequence order
+  // Return in mapping sequence order, with month overridden from the
+  // program mapping (not the catalog). Specialty programs curate days
+  // from across the 720-day catalog, so the catalog's month column is
+  // meaningless for them; engine_program_mapping.month owns the truth.
   const byDay = new Map(workouts.map((w) => [w.day_number, w]));
-  return mapping
-    .map((m) => byDay.get(m.engine_workout_day_number))
-    .filter((w): w is EngineWorkout => w != null);
+  const result: EngineWorkout[] = [];
+  for (const m of mapping) {
+    const w = byDay.get(m.engine_workout_day_number);
+    if (!w) continue;
+    result.push({ ...w, month: m.month });
+  }
+  return result;
 }
 
 // ─── Completed sessions (user-scoped) ────────────────────────────────

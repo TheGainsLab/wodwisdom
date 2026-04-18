@@ -33,14 +33,17 @@ function dayTypeBadge(dayType: string): string {
 }
 
 function groupByMonth(workouts: EngineWorkout[]): Map<number, EngineWorkout[]> {
+  // Input is already in program sequence order (see getWorkoutsForProgram),
+  // so iteration order naturally preserves the program's intended within-
+  // month ordering. For YoE where catalog day == sequence, this matches the
+  // old day_number-sorted behavior. For specialty programs where catalog
+  // days jump around, preserving sequence order gives the user the correct
+  // in-program progression instead of a random catalog-order shuffle.
   const map = new Map<number, EngineWorkout[]>();
   for (const w of workouts) {
     const m = w.month ?? 1;
     if (!map.has(m)) map.set(m, []);
     map.get(m)!.push(w);
-  }
-  for (const days of map.values()) {
-    days.sort((a, b) => a.day_number - b.day_number);
   }
   return map;
 }
