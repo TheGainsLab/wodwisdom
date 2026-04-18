@@ -84,7 +84,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
       if (p?.engine_program_version) {
         const [wk, sessions] = await Promise.all([
           getWorkoutsForProgram(p.engine_program_version),
-          loadCompletedSessions(),
+          loadCompletedSessions(p.engine_program_version),
         ]);
         setWorkouts(wk);
         setCompletedDays(
