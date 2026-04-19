@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { fetchAndFormatProgramContext } from "../_shared/training-program.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
@@ -112,6 +112,158 @@ const WORKOUT_COACHING_PROMPT =
   COACH_SPINE +
   "\n\nFOCUS: You are coaching an athlete through a specific training session described below. Be specific to the movements, loads, and time domains in the session. Answer questions about today's workout using the context provided.";
 
+/**
+ * Build a rich Engine-coaching context block: today's day type + coaching
+ * intent, program location, recent 14-day history, upcoming 3 days, and
+ * current time trial baselines. Used when a chat request comes from the
+ * Engine review page scoped to a specific day.
+ *
+ * Returns an empty string if any required record is missing (gracefully
+ * degrades to normal chat rather than erroring out).
+ */
+async function buildEngineCoachingContext(
+  supa: SupabaseClient,
+  userId: string,
+  programVersion: string,
+  engineProgramDay: number,
+): Promise<string> {
+  // Mapping row for the requested day
+  const { data: mapping } = await supa
+    .from("engine_program_mapping")
+    .select("engine_workout_day_number, month, week_number")
+    .eq("engine_program_id", programVersion)
+    .eq("program_sequence_order", engineProgramDay)
+    .maybeSingle();
+  if (!mapping) return "";
+
+  // Fetch catalog workout, program metadata, recent sessions, upcoming
+  // mapping rows, and time trial baselines in parallel.
+  const [
+    { data: workout },
+    { data: programInfo },
+    { data: recentSessions },
+    { data: upcomingMappings },
+    { data: timeTrials },
+  ] = await Promise.all([
+    supa
+      .from("engine_workouts")
+      .select("day_type, phase, total_duration_minutes, base_intensity_percent")
+      .eq("day_number", mapping.engine_workout_day_number)
+      .maybeSingle(),
+    supa
+      .from("engine_programs")
+      .select("name, total_days, total_months")
+      .eq("id", programVersion)
+      .maybeSingle(),
+    supa
+      .from("engine_workout_sessions")
+      .select("date, day_type, program_day_number, performance_ratio, perceived_exertion, average_heart_rate")
+      .eq("user_id", userId)
+      .eq("program_version", programVersion)
+      .eq("completed", true)
+      .order("date", { ascending: false })
+      .limit(14),
+    supa
+      .from("engine_program_mapping")
+      .select("program_sequence_order, engine_workout_day_number, month")
+      .eq("engine_program_id", programVersion)
+      .gt("program_sequence_order", engineProgramDay)
+      .order("program_sequence_order", { ascending: true })
+      .limit(3),
+    supa
+      .from("engine_time_trials")
+      .select("modality, total_output, calculated_rpm, units, date")
+      .eq("user_id", userId)
+      .eq("is_current", true),
+  ]);
+
+  if (!workout) return "";
+
+  // Day type + coaching intent for today's session
+  const { data: dayTypeRow } = workout.day_type
+    ? await supa
+        .from("engine_day_types")
+        .select("name, coaching_intent")
+        .eq("id", workout.day_type)
+        .maybeSingle()
+    : { data: null };
+
+  // Resolve day-type names for upcoming days
+  let upcomingBlock = "";
+  if (upcomingMappings && upcomingMappings.length > 0) {
+    const upcomingDayNumbers = upcomingMappings.map((m) => m.engine_workout_day_number);
+    const { data: upcomingWorkouts } = await supa
+      .from("engine_workouts")
+      .select("day_number, day_type")
+      .in("day_number", upcomingDayNumbers);
+
+    const dayTypeIds = Array.from(
+      new Set((upcomingWorkouts || []).map((w: { day_type: string }) => w.day_type).filter(Boolean)),
+    );
+    const { data: dayTypeRows } = dayTypeIds.length > 0
+      ? await supa.from("engine_day_types").select("id, name").in("id", dayTypeIds)
+      : { data: [] as { id: string; name: string }[] };
+
+    const nameById = new Map((dayTypeRows || []).map((d) => [d.id, d.name]));
+    const typeByDayNum = new Map(
+      (upcomingWorkouts || []).map((w: { day_number: number; day_type: string }) => [w.day_number, w.day_type]),
+    );
+
+    const lines = upcomingMappings.map((m) => {
+      const catalogType = typeByDayNum.get(m.engine_workout_day_number) ?? "";
+      const typeName = (nameById.get(catalogType) as string | undefined) ?? "unknown";
+      return `- Day ${m.program_sequence_order} (Month ${m.month}): ${typeName}`;
+    });
+    upcomingBlock = "\nUPCOMING DAYS:\n" + lines.join("\n");
+  }
+
+  // Assemble
+  const parts: string[] = ["\n\nENGINE PROGRAM CONTEXT:"];
+  parts.push(`Program: ${programInfo?.name ?? "Year of the Engine"}`);
+  parts.push(`Total: ${programInfo?.total_days ?? 720} days across ${programInfo?.total_months ?? 36} months`);
+  parts.push(`Position: Day ${engineProgramDay} (Month ${mapping.month}, Week ${mapping.week_number ?? "?"})`);
+
+  parts.push("\nTODAY'S SESSION:");
+  if (dayTypeRow?.name) parts.push(`Day type: ${dayTypeRow.name}`);
+  if (workout.total_duration_minutes) parts.push(`Target duration: ${workout.total_duration_minutes} minutes`);
+  if (workout.base_intensity_percent) parts.push(`Base intensity: ${workout.base_intensity_percent}%`);
+  if (dayTypeRow?.coaching_intent) parts.push("", dayTypeRow.coaching_intent);
+
+  if (recentSessions && recentSessions.length > 0) {
+    parts.push(`\nRECENT TRAINING (last ${recentSessions.length} sessions, most recent first):`);
+    for (const s of recentSessions) {
+      const bits: string[] = [s.date];
+      if (s.day_type) bits.push((s.day_type as string).replace(/_/g, " "));
+      if (s.program_day_number != null) bits.push(`Day ${s.program_day_number}`);
+      if (s.performance_ratio != null) bits.push(`pace ratio ${Number(s.performance_ratio).toFixed(2)}`);
+      if (s.perceived_exertion != null) bits.push(`RPE ${s.perceived_exertion}`);
+      if (s.average_heart_rate != null) bits.push(`HR ${s.average_heart_rate}`);
+      parts.push(`- ${bits.join(" | ")}`);
+    }
+  } else {
+    parts.push("\nRECENT TRAINING: no completed sessions in this program yet.");
+  }
+
+  if (upcomingBlock) parts.push(upcomingBlock);
+
+  if (timeTrials && timeTrials.length > 0) {
+    parts.push("\nCURRENT TIME TRIAL BASELINES:");
+    for (const tt of timeTrials) {
+      const bits: string[] = [tt.modality as string];
+      if (tt.total_output != null) bits.push(`${tt.total_output} ${tt.units ?? ""}`.trim());
+      if (tt.calculated_rpm != null) bits.push(`rpm ${Number(tt.calculated_rpm).toFixed(2)}`);
+      if (tt.date) bits.push(`(set ${tt.date})`);
+      parts.push(`- ${bits.join(" — ")}`);
+    }
+  }
+
+  parts.push(
+    "\nYou are coaching this athlete through today's Engine session. Ground advice in today's day type and coaching intent, the recent training patterns, and the time trial baselines when relevant.",
+  );
+
+  return parts.join("\n");
+}
+
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -200,8 +352,20 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { question, history = [], source_filter, workout_id } = await req.json();
-    console.log(`[chat] tier: ${userTier}, hasProfile: ${!!athleteProfile}, engineDay: ${athleteProfile?.engine_current_day || "n/a"}`);
+    const { question, history = [], source_filter, workout_id, engine_program_day } = await req.json();
+    console.log(`[chat] tier: ${userTier}, hasProfile: ${!!athleteProfile}, engineDay: ${athleteProfile?.engine_current_day || "n/a"}, engineProgramDay: ${engine_program_day ?? "n/a"}`);
+
+    // Engine coaching mode: the Engine review page scopes the coach to a
+    // specific day by passing engine_program_day. When present and the user
+    // is an Engine subscriber, we build a rich Engine context block, lock
+    // retrieval to the engine + journal categories, and use the workout
+    // coaching prompt. Otherwise this is a normal chat call and nothing
+    // about the request changes.
+    const engineCoachingMode =
+      typeof engine_program_day === "number" &&
+      engine_program_day > 0 &&
+      (userTier === "engine" || userTier === "all_access") &&
+      !!athleteProfile?.engine_program_version;
 
     // Build a short conversational context (last 2 turns) for the query rewriter
     const recentTurnsForRewrite = (history || [])
@@ -211,8 +375,9 @@ Deno.serve(async (req) => {
       .join("\n");
 
     // ── Topic classifier: block off-topic questions before RAG ──
-    // Skip classification for workout coaching (always relevant)
-    if (!workout_id) {
+    // Skip classification for workout coaching and engine-day coaching
+    // (always relevant — the scoped context is the topic).
+    if (!workout_id && !engineCoachingMode) {
       try {
         const classifyResp = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
           method: "POST",
@@ -277,46 +442,23 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Engine context: look up the user's current position + framework ──
+    // ── Engine coaching context (scoped to a specific day) ──
+    // The old per-user auto-injection that fired on every Engine chat has
+    // been removed. Engine context is now only built when the request
+    // explicitly scopes to a day via engine_program_day (the Engine review
+    // page). General /chat questions from Engine users no longer carry
+    // engine context unless they ask from the review page.
     let engineContext = "";
-    if ((userTier === "engine" || userTier === "all_access") && athleteProfile?.engine_current_day && athleteProfile?.engine_program_version) {
+    if (engineCoachingMode && athleteProfile?.engine_program_version) {
       try {
-        const { data: mapping } = await supa
-          .from("engine_program_mapping")
-          .select("engine_workout_day_number, week_number")
-          .eq("engine_program_id", athleteProfile.engine_program_version)
-          .eq("program_sequence_order", athleteProfile.engine_current_day)
-          .maybeSingle();
-
-        if (mapping) {
-          const [{ data: catalogDay }, { data: programInfo }] = await Promise.all([
-            supa.from("engine_workouts")
-              .select("day_type, month, phase")
-              .eq("program_type", "main_5day")
-              .eq("day_number", mapping.engine_workout_day_number)
-              .maybeSingle(),
-            supa.from("engine_programs")
-              .select("name, total_days")
-              .eq("id", athleteProfile.engine_program_version)
-              .maybeSingle(),
-          ]);
-
-          if (catalogDay) {
-            const dayTypeRow = catalogDay.day_type
-              ? (await supa.from("engine_day_types").select("name, coaching_intent").eq("id", catalogDay.day_type).maybeSingle()).data
-              : null;
-
-            const parts: string[] = [];
-            parts.push(`Program: ${programInfo?.name || "Year of the Engine"}`);
-            parts.push(`Progress: Day ${athleteProfile.engine_current_day} of ${programInfo?.total_days || 720} (Month ${catalogDay.month}, Week ${mapping.week_number || "?"})`);
-            parts.push(`Months unlocked: ${athleteProfile.engine_months_unlocked}`);
-            if (dayTypeRow?.name) parts.push(`Current day type: ${dayTypeRow.name}`);
-            if (dayTypeRow?.coaching_intent) parts.push(dayTypeRow.coaching_intent);
-            engineContext = "\n\nENGINE PROGRAM:\n" + parts.join("\n");
-          }
-        }
+        engineContext = await buildEngineCoachingContext(
+          supa,
+          user.id,
+          athleteProfile.engine_program_version,
+          engine_program_day,
+        );
       } catch (err) {
-        console.error("[chat] Engine context lookup failed:", err);
+        console.error("[chat] Engine coaching context failed:", err);
       }
     }
 
@@ -439,21 +581,22 @@ Deno.serve(async (req) => {
     const queryEmb = embData?.data?.[0]?.embedding;
 
     // Retrieve matching chunks from vector store, filtered by category. Skipped for META.
+    // Engine coaching mode locks retrieval to ['engine', 'journal'] regardless of
+    // the caller's source_filter — science/strength-science are off-topic for
+    // Engine pacing and day-type coaching.
     let chunks: Array<{ title: string; author: string; source: string; content: string; similarity: number }> | null = null;
     if (!isMeta && queryEmb) {
-      const result = source_filter === "all"
-        ? await supa.rpc("match_chunks_multi", {
-            query_embedding: queryEmb,
-            match_threshold: 0.4,
-            match_count: 6,
-            filter_categories: ["journal", "science", "strength-science", "engine"],
-          })
-        : await supa.rpc("match_chunks_multi", {
-            query_embedding: queryEmb,
-            match_threshold: 0.4,
-            match_count: 6,
-            filter_categories: [source_filter || "journal", "engine"],
-          });
+      const filterCategories = engineCoachingMode
+        ? ["engine", "journal"]
+        : source_filter === "all"
+          ? ["journal", "science", "strength-science", "engine"]
+          : [source_filter || "journal", "engine"];
+      const result = await supa.rpc("match_chunks_multi", {
+        query_embedding: queryEmb,
+        match_threshold: 0.4,
+        match_count: 6,
+        filter_categories: filterCategories,
+      });
       chunks = result.data;
     }
 
@@ -510,7 +653,7 @@ Deno.serve(async (req) => {
         stream: true,
         system:
           // Base prompt (persona + mode focus)
-          (workoutContext
+          (workoutContext || engineCoachingMode
             ? WORKOUT_COACHING_PROMPT
             : (source_filter === "all" ? ALL_SYSTEM_PROMPT : source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : source_filter === "strength-science" ? STRENGTH_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT)
           ) +

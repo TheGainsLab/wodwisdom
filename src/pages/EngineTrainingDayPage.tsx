@@ -1580,6 +1580,13 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
             <button
               className="engine-btn engine-btn-primary"
+              onClick={() => navigate(`/engine/training/${dayNumber}/review`)}
+              style={{ width: '100%' }}
+            >
+              Talk to Coach
+            </button>
+            <button
+              className="engine-btn engine-btn-secondary"
               onClick={() => navigate('/engine')}
               style={{ width: '100%' }}
             >

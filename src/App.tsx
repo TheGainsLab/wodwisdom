@@ -46,6 +46,7 @@ const ProgramReviewPage = lazy(() => import('./pages/ProgramReviewPage'));
 // Engine
 const EngineDashboardPage = lazy(() => import('./pages/EngineDashboardPage'));
 const EngineTrainingDayPage = lazy(() => import('./pages/EngineTrainingDayPage'));
+const EngineTrainingDayReviewPage = lazy(() => import('./pages/EngineTrainingDayReviewPage'));
 const EngineAnalyticsPage = lazy(() => import('./pages/EngineAnalyticsPage'));
 const EngineTaxonomyPage = lazy(() => import('./pages/EngineTaxonomyPage'));
 
@@ -168,6 +169,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/engine" element={<EngineDashboardPage session={session} />} />
             <Route path="/engine/dashboard" element={<EngineDashboardPage session={session} />} />
             <Route path="/engine/training/:dayNumber" element={<EngineTrainingDayPage session={session} />} />
+            <Route path="/engine/training/:dayNumber/review" element={<EngineTrainingDayReviewPage session={session} />} />
             <Route path="/engine/analytics" element={<EngineAnalyticsPage session={session} />} />
             <Route path="/engine/taxonomy" element={<EngineTaxonomyPage session={session} />} />
             <Route path="/nutrition" element={<NutritionDashboardPage session={session} />} />
