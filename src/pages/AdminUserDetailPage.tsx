@@ -54,6 +54,208 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+interface EmailSendRow {
+  id: string;
+  template_key: string;
+  subject: string;
+  status: string;
+  sent_at: string;
+}
+
+function statusColor(status: string): string {
+  switch (status) {
+    case 'sent': return '#6ea8fe';
+    case 'delivered': return '#2ec486';
+    case 'opened': return '#2ec486';
+    case 'clicked': return '#2ec486';
+    case 'bounced': return 'var(--accent)';
+    case 'failed': return 'var(--accent)';
+    default: return 'var(--text-muted)';
+  }
+}
+
+function EmailSection({ userId, userEmail, userName }: { userId: string; userEmail: string; userName: string }) {
+  const [templateKey, setTemplateKey] = useState<'welcome_back' | 'custom'>('custom');
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [confirmArmed, setConfirmArmed] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const [sends, setSends] = useState<EmailSendRow[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  const loadHistory = async () => {
+    setLoadingHistory(true);
+    const { data } = await supabase
+      .from('email_sends')
+      .select('id, template_key, subject, status, sent_at')
+      .eq('user_id', userId)
+      .order('sent_at', { ascending: false })
+      .limit(10);
+    setSends((data as EmailSendRow[] | null) ?? []);
+    setLoadingHistory(false);
+  };
+
+  useEffect(() => {
+    loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  const armSend = () => {
+    setError('');
+    if (templateKey === 'custom') {
+      if (!subject.trim()) { setError('Subject is required'); return; }
+      if (!body.trim()) { setError('Message body is required'); return; }
+    }
+    setConfirmArmed(true);
+  };
+
+  const cancelArm = () => {
+    setConfirmArmed(false);
+    setError('');
+  };
+
+  const doSend = async () => {
+    setSending(true);
+    setError('');
+    try {
+      const payload = templateKey === 'custom'
+        ? { user_id: userId, template_key: 'custom', subject, body }
+        : { user_id: userId, template_key: 'welcome_back' };
+      const { data, error: invokeErr } = await supabase.functions.invoke('admin-send-email', { body: payload });
+      if (invokeErr) throw new Error(invokeErr.message || 'Send failed');
+      if (data?.error) throw new Error(data.error);
+      setSubject('');
+      setBody('');
+      setConfirmArmed(false);
+      await loadHistory();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Send failed');
+    }
+    setSending(false);
+  };
+
+  const previewSubject = templateKey === 'welcome_back' ? 'Just checking in' : (subject || '(no subject)');
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 32, marginBottom: 12 }}>
+        <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', margin: 0 }}>
+          Email
+        </h3>
+      </div>
+
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div>
+          <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Template</label>
+          <select
+            value={templateKey}
+            onChange={(e) => { setTemplateKey(e.target.value as 'welcome_back' | 'custom'); setConfirmArmed(false); setError(''); }}
+            style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: "'Outfit', sans-serif", fontSize: 14 }}
+          >
+            <option value="custom">Custom message</option>
+            <option value="welcome_back">Welcome Back (reactivation)</option>
+          </select>
+        </div>
+
+        {templateKey === 'custom' ? (
+          <>
+            <div>
+              <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Subject</label>
+              <input
+                type="text"
+                value={subject}
+                onChange={(e) => { setSubject(e.target.value); setConfirmArmed(false); }}
+                placeholder="Just checking in"
+                style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: "'Outfit', sans-serif", fontSize: 14 }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                Message <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--text-muted)' }}>— use {'{first_name}'} for personalization. Blank lines become paragraphs.</span>
+              </label>
+              <textarea
+                value={body}
+                onChange={(e) => { setBody(e.target.value); setConfirmArmed(false); }}
+                rows={8}
+                placeholder={`Hey {first_name},\n\nJust checking in — wanted to see how training is going. Anything I can help with?\n\n— Matt`}
+                style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: "'Outfit', sans-serif", fontSize: 14, resize: 'vertical', lineHeight: 1.5 }}
+              />
+            </div>
+          </>
+        ) : (
+          <div style={{ background: 'var(--surface2)', border: '1px solid var(--border-light)', borderRadius: 8, padding: 12, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+            Reactivation template. Subject: <strong style={{ color: 'var(--text)' }}>Just checking in</strong>. The body explains the chat is now usable without a profile, includes the AI Coach CTA, and a soft mention of paid plans. The user's first name is interpolated automatically.
+          </div>
+        )}
+
+        {error && (
+          <div style={{ fontSize: 13, color: 'var(--accent)', padding: '8px 0' }}>{error}</div>
+        )}
+
+        {!confirmArmed ? (
+          <button
+            onClick={armSend}
+            disabled={sending}
+            style={{ alignSelf: 'flex-start', background: 'var(--accent)', color: '#ffffff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif", cursor: sending ? 'not-allowed' : 'pointer', opacity: sending ? 0.6 : 1 }}
+          >
+            Send →
+          </button>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12, background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+              Sending to <strong style={{ color: 'var(--text)' }}>{userName}</strong> ({userEmail})
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+              Subject: <strong style={{ color: 'var(--text)' }}>{previewSubject}</strong>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={doSend}
+                disabled={sending}
+                style={{ background: '#2ec486', color: '#ffffff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif", cursor: sending ? 'not-allowed' : 'pointer', opacity: sending ? 0.6 : 1 }}
+              >
+                {sending ? 'Sending…' : 'Confirm Send'}
+              </button>
+              <button
+                onClick={cancelArm}
+                disabled={sending}
+                style={{ background: 'transparent', color: 'var(--text-dim)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 18px', fontSize: 14, fontWeight: 600, fontFamily: "'Outfit', sans-serif", cursor: sending ? 'not-allowed' : 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Email History</div>
+        {loadingHistory ? (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Loading…</div>
+        ) : sends.length === 0 ? (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No emails sent yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {sends.map((s) => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13 }}>
+                <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap', minWidth: 130 }}>{new Date(s.sent_at).toLocaleString()}</span>
+                <span style={{ color: 'var(--text-dim)', minWidth: 100 }}>{s.template_key.replace(/_/g, ' ')}</span>
+                <span style={{ flex: 1, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.subject}</span>
+                <span style={{
+                  fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
+                  color: statusColor(s.status), background: statusColor(s.status) + '20',
+                  padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap',
+                }}>{s.status}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 export default function AdminUserDetailPage({ session: _session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -166,6 +368,15 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 16, color: 'var(--text-muted)', fontSize: 13 }}>
                     No athlete profile created yet.
                   </div>
+                )}
+
+                {/* Email */}
+                {id && profile?.email && (
+                  <EmailSection
+                    userId={id}
+                    userEmail={profile.email}
+                    userName={profile.full_name || profile.email}
+                  />
                 )}
 
                 {/* Chat Usage */}
