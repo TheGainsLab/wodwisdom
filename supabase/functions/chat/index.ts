@@ -147,7 +147,7 @@ async function buildEngineCoachingContext(
   ] = await Promise.all([
     supa
       .from("engine_workouts")
-      .select("day_type, phase, total_duration_minutes, base_intensity_percent")
+      .select("day_type, phase")
       .eq("day_number", mapping.engine_workout_day_number)
       .maybeSingle(),
     supa
@@ -225,8 +225,6 @@ async function buildEngineCoachingContext(
 
   parts.push("\nTODAY'S SESSION:");
   if (dayTypeRow?.name) parts.push(`Day type: ${dayTypeRow.name}`);
-  if (workout.total_duration_minutes) parts.push(`Target duration: ${workout.total_duration_minutes} minutes`);
-  if (workout.base_intensity_percent) parts.push(`Base intensity: ${workout.base_intensity_percent}%`);
   if (dayTypeRow?.coaching_intent) parts.push("", dayTypeRow.coaching_intent);
 
   if (recentSessions && recentSessions.length > 0) {

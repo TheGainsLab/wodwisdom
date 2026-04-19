@@ -277,15 +277,13 @@ export default function EngineTrainingDayReviewPage({ session: _session }: { ses
                   </p>
                 </div>
 
-                {workout && (
+                {workout?.block_count ? (
                   <div className="settings-card" style={{ marginTop: 12 }}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, fontSize: 13, color: 'var(--text-dim)' }}>
-                      {workout.total_duration_minutes ? <span>Target duration: {workout.total_duration_minutes} min</span> : null}
-                      {workout.base_intensity_percent ? <span>Base intensity: {workout.base_intensity_percent}%</span> : null}
-                      {workout.block_count ? <span>Blocks: {workout.block_count}</span> : null}
+                    <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                      {workout.block_count === 1 ? 'Single-block session' : `${workout.block_count}-block session`}
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 <CoachChat engineProgramDay={programDay} />
               </>
