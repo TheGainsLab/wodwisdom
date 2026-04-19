@@ -1222,13 +1222,22 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   )}
                 </div>
               ) : (
-                <button
-                  className="engine-btn engine-btn-primary"
-                  onClick={handleStartWorkout}
-                  style={{ width: '100%' }}
-                >
-                  <Play size={18} /> Start Workout
-                </button>
+                <>
+                  <button
+                    className="engine-btn engine-btn-primary"
+                    onClick={handleStartWorkout}
+                    style={{ width: '100%' }}
+                  >
+                    <Play size={18} /> Start Workout
+                  </button>
+                  <button
+                    className="engine-btn engine-btn-secondary"
+                    onClick={() => navigate(`/engine/training/${dayNumber}/review`)}
+                    style={{ width: '100%', marginTop: 8 }}
+                  >
+                    Talk to Coach
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -1580,13 +1589,6 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
             <button
               className="engine-btn engine-btn-primary"
-              onClick={() => navigate(`/engine/training/${dayNumber}/review`)}
-              style={{ width: '100%' }}
-            >
-              Talk to Coach
-            </button>
-            <button
-              className="engine-btn engine-btn-secondary"
               onClick={() => navigate('/engine')}
               style={{ width: '100%' }}
             >
