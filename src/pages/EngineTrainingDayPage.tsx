@@ -1233,9 +1233,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   <button
                     className="engine-btn engine-btn-secondary"
                     onClick={() => navigate(`/engine/training/${dayNumber}/review`)}
-                    style={{ width: '100%', marginTop: 8 }}
+                    style={{ width: '100%', marginTop: 8, color: '#ffffff' }}
                   >
-                    Talk to Coach
+                    AI Coach
                   </button>
                 </>
               )}
