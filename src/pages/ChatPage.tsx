@@ -29,7 +29,6 @@ export default function ChatPage({ session }: { session: Session }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState<'journal' | 'all'>('journal');
   const [navOpen, setNavOpen] = useState(false);
   const [dailyUsage, setDailyUsage] = useState(0);
   const [dailyLimit, setDailyLimit] = useState(20);
@@ -124,7 +123,7 @@ export default function ChatPage({ session }: { session: Session }) {
       const resp = await fetch(CHAT_ENDPOINT, {
         method: 'POST',
         headers: await getAuthHeaders(),
-        body: JSON.stringify({ question, history: [...messages, userMsg].slice(-10), source_filter: sourceFilter }),
+        body: JSON.stringify({ question, history: [...messages, userMsg].slice(-10) }),
       });
 
       const contentType = resp.headers.get('Content-Type') || '';
@@ -277,17 +276,6 @@ export default function ChatPage({ session }: { session: Session }) {
 
 
 
-  const scienceToggle = (
-    <button
-      className={"source-btn " + (sourceFilter === 'all' ? "active" : "")}
-      onClick={() => setSourceFilter(sourceFilter === 'all' ? 'journal' : 'all')}
-      style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 3h6l-1 7h4l-7 11 2-7H9l1-4z" /></svg>
-      Science Mode
-    </button>
-  );
-
   const usagePill = tier === 'free'
     ? <div className="usage-pill">{totalQuestions}/{freeLimit} free</div>
     : <div className="usage-pill">{dailyUsage}/{dailyLimit}</div>;
@@ -300,7 +288,6 @@ export default function ChatPage({ session }: { session: Session }) {
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <div className="source-toggle">{scienceToggle}</div>
           {tierLoaded && usagePill}
           <div style={{ display: 'flex', gap: 12, marginLeft: 'auto' }}>
             <button onClick={() => navigate('/history')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text-dim)' }} title="History">

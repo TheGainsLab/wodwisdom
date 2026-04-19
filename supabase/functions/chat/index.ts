@@ -507,13 +507,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Query rewriting: turn the raw user message + last 2 turns into a clean,
-    // standalone search query. Returns "META" for meta-questions / small talk so
-    // we can skip retrieval entirely and answer in-character. Skipped for
-    // workout coaching (the workout itself is the context).
+    // ── Rewriter + router (single Haiku call) ──
+    // Emits JSON: { type, search_query }. Type drives system prompt
+    // selection, RAG retrieval categories, and whether to inject profile.
+    // Search query is used for embedding / retrieval. Scoped requests
+    // (workout_id, engine_program_day) bypass this entirely.
     let searchQuery = question.substring(0, 2000);
-    let isMeta = false;
-    if (!workout_id) {
+    let questionType: "methodology" | "personal_programming" | "meta" = "personal_programming";
+    if (!workout_id && !engineCoachingMode) {
       try {
         const userBlock = recentTurnsForRewrite
           ? `Recent conversation:\n${recentTurnsForRewrite}\n\nLatest user message:\n${question}`
@@ -527,33 +528,48 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             model: "claude-haiku-4-5-20251001",
-            max_tokens: 80,
+            max_tokens: 120,
             system:
-              "You rewrite user messages into clean standalone search queries for a CrossFit / strength-science / exercise-physiology knowledge base.\n\n" +
-              "Rules:\n" +
-              "- Output ONE search query as a single line — topical keywords and phrases, no conversational filler.\n" +
-              "- If the latest message is a follow-up, fold in the relevant topical context from the recent conversation so the query stands alone.\n" +
-              "- Strip irrelevant specifics (exact numbers, names, dates) unless they are the topic itself.\n" +
-              "- If the user is asking a meta-question about you, your background, your sources, your training, your methodology, what you can do, or how you work — output exactly the single token META and nothing else.\n" +
-              "- If the message is small talk, a greeting, or has no clear topical question — output exactly the single token META and nothing else.\n" +
-              "- Do not answer the question. Do not explain. Output only the search query OR the token META.",
+              "You are a question classifier and query rewriter for a CrossFit / strength-science / exercise-physiology coaching app. Given the user's latest message (and last 2 conversation turns for context), output JSON with two fields.\n\n" +
+              "FIELDS:\n" +
+              '1. "type" — one of:\n' +
+              '   - "methodology": explains a concept, principle, or mechanism. Personal data does not change the answer. Examples: "what\'s Zone 2", "explain carbohydrate metabolism", "why do we do Fran", "explain a devour day".\n' +
+              '   - "personal_programming": asks for guidance specific to themselves — their lifts, their programming, a workout for them, pacing for their session. Examples: "what should I squat tomorrow", "give me a workout", "how should I pace this 5k", "rate my workout yesterday".\n' +
+              '   - "meta": about the AI itself, the app, product capabilities, or small talk. Examples: "who are you", "what can you do", "can you build programs", "hey", "where is my history".\n\n' +
+              '2. "search_query" — a clean standalone search query string for the topical RAG lookup. For "meta" questions, output null. For others: topical keywords and phrases, no conversational filler. Fold in relevant topical context from recent conversation. Strip irrelevant specifics (exact numbers, names, dates) unless they are the topic itself. Preserve proper nouns that ARE the topic (day type names like "devour", program names like "Year of the Engine", named benchmarks).\n\n' +
+              "TIEBREAKER for ambiguous questions: personal_programming > methodology > meta.\n\n" +
+              "OUTPUT: ONLY valid JSON, one object, no prose, no code fences. Examples:\n" +
+              '{"type":"methodology","search_query":"Zone 2 training aerobic base"}\n' +
+              '{"type":"personal_programming","search_query":"back squat programming progression"}\n' +
+              '{"type":"meta","search_query":null}',
             messages: [{ role: "user", content: userBlock }],
           }),
         }, 5_000);
         if (rewriteResp.ok) {
           const rewriteData = await rewriteResp.json();
           const text = (rewriteData.content?.[0]?.text || "").trim();
-          if (text.toUpperCase() === "META") {
-            isMeta = true;
-          } else if (text) {
-            searchQuery = text.substring(0, 500);
+          const match = text.match(/\{[\s\S]*\}/);
+          if (match) {
+            try {
+              const parsed = JSON.parse(match[0]);
+              const t = parsed?.type;
+              if (t === "methodology" || t === "personal_programming" || t === "meta") {
+                questionType = t;
+              }
+              if (typeof parsed?.search_query === "string" && parsed.search_query.trim() !== "") {
+                searchQuery = parsed.search_query.trim().substring(0, 500);
+              }
+            } catch {
+              // JSON parse failed — stick with defaults (personal_programming + raw question)
+            }
           }
         }
       } catch {
-        // Rewriter failed — fall back to the raw question. Never block on rewrite errors.
+        // Rewriter/router failed — fall back to defaults. Never block on errors.
       }
     }
-    console.log(`[chat] rewrite: "${question.substring(0, 80)}" -> ${isMeta ? "META" : `"${searchQuery.substring(0, 120)}"`}`);
+    const isMeta = questionType === "meta";
+    console.log(`[chat] router: type=${questionType}, query="${isMeta ? "(skipped)" : searchQuery.substring(0, 120)}"`);
 
     // Generate embedding (skipped for META) + recent training + program context in parallel.
     // Context is auto-included for any user with data — no toggle gate.
@@ -579,16 +595,17 @@ Deno.serve(async (req) => {
     const queryEmb = embData?.data?.[0]?.embedding;
 
     // Retrieve matching chunks from vector store, filtered by category. Skipped for META.
-    // Engine coaching mode locks retrieval to ['engine', 'journal'] regardless of
-    // the caller's source_filter — science/strength-science are off-topic for
-    // Engine pacing and day-type coaching.
+    // Engine coaching mode locks retrieval to ['engine', 'journal']. The router's
+    // questionType drives retrieval otherwise: methodology pulls from all categories
+    // (physiology questions benefit from the science chunks); personal_programming
+    // stays narrow on coaching-flavored content.
     let chunks: Array<{ title: string; author: string; source: string; content: string; similarity: number }> | null = null;
     if (!isMeta && queryEmb) {
       const filterCategories = engineCoachingMode
         ? ["engine", "journal"]
-        : source_filter === "all"
+        : questionType === "methodology"
           ? ["journal", "science", "strength-science", "engine"]
-          : [source_filter || "journal", "engine"];
+          : ["journal", "engine"];
       const result = await supa.rpc("match_chunks_multi", {
         query_embedding: queryEmb,
         match_threshold: 0.4,
@@ -653,7 +670,9 @@ Deno.serve(async (req) => {
           // Base prompt (persona + mode focus)
           (workoutContext || engineCoachingMode
             ? WORKOUT_COACHING_PROMPT
-            : (source_filter === "all" ? ALL_SYSTEM_PROMPT : source_filter === "science" ? SCIENCE_SYSTEM_PROMPT : source_filter === "strength-science" ? STRENGTH_SYSTEM_PROMPT : JOURNAL_SYSTEM_PROMPT)
+            : questionType === "methodology"
+              ? ALL_SYSTEM_PROMPT
+              : JOURNAL_SYSTEM_PROMPT
           ) +
           // Tier addendum — tells the coach who they're talking to and which
           // products are allowed to be mentioned per the guidance-moment rules.
@@ -667,8 +686,13 @@ Deno.serve(async (req) => {
             ? "\n\nUSER TIER: AI Programming subscriber. Ground answers in their current program structure and training. They already have AI Nutrition bundled.\nProducts available to mention (only per the guidance-moment rules): Year of the Engine, All Access."
             : "\n\nUSER TIER: All Access subscriber. The user has everything — Engine, AI Programming, AI Nutrition, AI Coach.\nProducts available to mention: NONE. Mention no products under any circumstances."
           ) +
-          // Athlete profile (auto-included if data exists)
-          buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units, athleteProfile?.gender) +
+          // Athlete profile — injected for everything except pure meta
+          // questions, where the profile is noise. Scoped requests
+          // (workout_id / engine_program_day) always get profile.
+          (questionType === "meta" && !workoutContext && !engineCoachingMode
+            ? ""
+            : buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units, athleteProfile?.gender)
+          ) +
           // Engine program context (if applicable)
           engineContext +
           // AI Program context (if applicable)
