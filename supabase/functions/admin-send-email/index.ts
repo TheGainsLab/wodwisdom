@@ -57,27 +57,49 @@ function renderWelcomeBack(name: string): RenderedTemplate {
 }
 
 function renderCustom(subject: string, body: string, name: string): RenderedTemplate {
-  // Body comes from the admin composer as plain text. We escape HTML, then
-  // convert blank-line-separated paragraphs to <p> blocks and bare URLs to
-  // anchors. Keeps the email simple and predictable.
+  // Body comes from the admin composer as plain-text-with-extras. Three
+  // kinds of formatting are supported:
+  //   1. Blank-line-separated paragraphs -> <p> blocks
+  //   2. Bare http/https URLs -> clickable anchors (auto-link)
+  //   3. Markdown links [text](url) -> anchors with custom link text
+  //      (http/https/mailto only, sanitized)
+  //
+  // Ordering is tricky: we extract markdown links first (before HTML
+  // escaping) and replace each with an opaque sentinel token. After
+  // escaping + paragraph splitting + bare-URL auto-linking, we swap the
+  // sentinels back in. This guarantees neither the escaper nor the
+  // bare-URL regex mangles the markdown link's href / text.
   const safeName = escapeHtml(name);
-  const safeBody = escapeHtml(body);
+
+  const linkPlaceholders: string[] = [];
+  const MARKDOWN_LINK = /\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^)\s]+)\)/g;
+  const bodyWithTokens = body.replace(MARKDOWN_LINK, (_, text, url) => {
+    const i = linkPlaceholders.length;
+    linkPlaceholders.push(
+      `<a href="${escapeHtml(url)}" style="color: #ff3a3a;">${escapeHtml(text)}</a>`,
+    );
+    return `§§MDL${i}§§`;
+  });
+
+  const safeBody = escapeHtml(bodyWithTokens);
   const paragraphs = safeBody
     .split(/\n\s*\n/)
     .map((p) => p.replace(/\n/g, "<br/>").trim())
     .filter((p) => p.length > 0);
-  const linked = paragraphs.map((p) =>
+  const autoLinked = paragraphs.map((p) =>
     p.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color: #ff3a3a;">$1</a>'),
   );
-  // Substitute {first_name} if the admin used it in the body.
-  const withName = linked.map((p) => p.replace(/\{first_name\}/g, safeName));
+  const withName = autoLinked.map((p) => p.replace(/\{first_name\}/g, safeName));
+  const withLinks = withName.map((p) =>
+    p.replace(/§§MDL(\d+)§§/g, (_, i) => linkPlaceholders[Number(i)] || ""),
+  );
   // Custom messages are 1:1 personal check-ins — no "you're getting this
   // because…" footer. They should read like a regular note from a person.
   // Templated sends (e.g. welcome_back) still carry their own disclosure
   // and, eventually, an unsubscribe link for bulk campaigns.
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a1a; line-height: 1.6;">
-      ${withName.map((p) => `<p>${p}</p>`).join("\n      ")}
+      ${withLinks.map((p) => `<p>${p}</p>`).join("\n      ")}
     </div>
   `.trim();
   return {
