@@ -594,6 +594,20 @@ export default function AthletePage({ session }: { session: Session }) {
     const sessionLengthNum = sessionLengthMinutes === '' ? null : parseInt(sessionLengthMinutes, 10);
     const injuriesVal = injuriesConstraints.trim() === '' ? null : injuriesConstraints.trim();
 
+    // Fill any unrated skill with 'none' on save. The UI already shows
+    // None as the default selection for unrated skills (via `|| 'none'`
+    // in the button className), so persisting that defaulted value keeps
+    // the DB aligned with what the user sees. Tier 2 completion keys on
+    // the presence of every skill key — without this, users who scroll
+    // past skills they can't do silently leave them out of the jsonb
+    // and Tier 2 never ticks off.
+    const filledSkills: Record<string, SkillLevel> = { ...skills };
+    for (const group of SKILL_GROUPS) {
+      for (const skill of group.skills) {
+        if (!filledSkills[skill.key]) filledSkills[skill.key] = 'none';
+      }
+    }
+
     const { error: err } = await supabase
       .from('athlete_profiles')
       .upsert(
@@ -601,7 +615,7 @@ export default function AthletePage({ session }: { session: Session }) {
           user_id: session.user.id,
           lifts: cleanLifts,
           equipment,
-          skills,
+          skills: filledSkills,
           conditioning: cleanConditioning,
           bodyweight: bw && !isNaN(bw) ? bw : null,
           units,
@@ -853,7 +867,7 @@ export default function AthletePage({ session }: { session: Session }) {
 
                 {/* Skills Assessment */}
                 <CollapsibleSection title="Skills Assessment">
-                  <p className="athlete-card-subtitle">Rate your current ability for each skill. {SKILL_LEVEL_GUIDELINE}</p>
+                  <p className="athlete-card-subtitle">Every skill defaults to <strong>None</strong> — tap to upgrade any you can do. {SKILL_LEVEL_GUIDELINE}</p>
                   {SKILL_GROUPS.map(group => (
                     <div key={group.title} style={{ marginBottom: 24 }}>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 12 }}>{group.title}</h3>
