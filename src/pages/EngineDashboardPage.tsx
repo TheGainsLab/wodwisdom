@@ -109,7 +109,18 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
 
   const hasAccess = hasFeature('engine');
 
-  if (!loading && !entLoading && !hasAccess) {
+  if (entLoading) {
+    return (
+      <div className="app-layout">
+        <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
+        <div className="main-content">
+          <div className="page-loading"><div className="loading-pulse" /></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
     return (
       <div className="app-layout">
         <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
