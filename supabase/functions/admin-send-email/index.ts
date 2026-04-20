@@ -56,27 +56,49 @@ function renderWelcomeBack(name: string): RenderedTemplate {
   };
 }
 
+/**
+ * Apply `**bold**` and `*italic*` emphasis to already-HTML-escaped text.
+ * Bold runs first so remaining single-* pairs become italic. Italic
+ * requires non-whitespace on both sides of the content to avoid matching
+ * incidental asterisks like "3 * 4 = 12".
+ */
+function applyEmphasis(s: string): string {
+  return s
+    .replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*\s][^*\n]*?[^*\s]|[^*\s])\*/g, "<em>$1</em>");
+}
+
 function renderCustom(subject: string, body: string, name: string): RenderedTemplate {
-  // Body comes from the admin composer as plain-text-with-extras. Three
+  // Body comes from the admin composer as plain-text-with-extras. Four
   // kinds of formatting are supported:
   //   1. Blank-line-separated paragraphs -> <p> blocks
   //   2. Bare http/https URLs -> clickable anchors (auto-link)
   //   3. Markdown links [text](url) -> anchors with custom link text
-  //      (http/https/mailto only, sanitized)
+  //      (http/https/mailto only, sanitized). Emphasis inside the link
+  //      text is supported (e.g. [**click here**](url)).
+  //   4. **bold** and *italic* emphasis
   //
-  // Ordering is tricky: we extract markdown links first (before HTML
-  // escaping) and replace each with an opaque sentinel token. After
-  // escaping + paragraph splitting + bare-URL auto-linking, we swap the
-  // sentinels back in. This guarantees neither the escaper nor the
-  // bare-URL regex mangles the markdown link's href / text.
+  // Ordering is tricky: markdown links are extracted first (before HTML
+  // escaping) and replaced with opaque sentinel tokens. After escaping +
+  // paragraph splitting + {first_name} + emphasis + bare-URL auto-linking,
+  // the sentinels are swapped back in. This order guarantees that:
+  //   - Neither the escaper nor the bare-URL regex mangles a markdown
+  //     link's href / text.
+  //   - Emphasis applies to plain text, but not to the auto-linked URL
+  //     itself (we emit anchors after emphasis, so <em> can't land
+  //     inside <a href="...">).
   const safeName = escapeHtml(name);
 
   const linkPlaceholders: string[] = [];
   const MARKDOWN_LINK = /\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^)\s]+)\)/g;
   const bodyWithTokens = body.replace(MARKDOWN_LINK, (_, text, url) => {
     const i = linkPlaceholders.length;
+    // Emphasis inside the link text: escape the text first, then run
+    // emphasis on the escaped string so <strong>/<em> tags are emitted
+    // without being re-escaped.
+    const safeText = applyEmphasis(escapeHtml(text));
     linkPlaceholders.push(
-      `<a href="${escapeHtml(url)}" style="color: #ff3a3a;">${escapeHtml(text)}</a>`,
+      `<a href="${escapeHtml(url)}" style="color: #ff3a3a;">${safeText}</a>`,
     );
     return `§§MDL${i}§§`;
   });
@@ -86,11 +108,15 @@ function renderCustom(subject: string, body: string, name: string): RenderedTemp
     .split(/\n\s*\n/)
     .map((p) => p.replace(/\n/g, "<br/>").trim())
     .filter((p) => p.length > 0);
-  const autoLinked = paragraphs.map((p) =>
+  const withName = paragraphs.map((p) => p.replace(/\{first_name\}/g, safeName));
+  // Emphasis first, then auto-link bare URLs. If we auto-linked first, a
+  // URL containing `*` (rare but legal, e.g., query params) would get its
+  // middle wrapped in <em>, breaking the anchor.
+  const withEmphasis = withName.map((p) => applyEmphasis(p));
+  const autoLinked = withEmphasis.map((p) =>
     p.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color: #ff3a3a;">$1</a>'),
   );
-  const withName = autoLinked.map((p) => p.replace(/\{first_name\}/g, safeName));
-  const withLinks = withName.map((p) =>
+  const withLinks = autoLinked.map((p) =>
     p.replace(/§§MDL(\d+)§§/g, (_, i) => linkPlaceholders[Number(i)] || ""),
   );
   // Custom messages are 1:1 personal check-ins — no "you're getting this

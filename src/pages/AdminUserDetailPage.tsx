@@ -172,7 +172,7 @@ function EmailSection({ userId, userEmail, userName }: { userId: string; userEma
             </div>
             <div>
               <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                Message <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--text-muted)' }}>— use {'{first_name}'} for personalization. Blank lines become paragraphs.</span>
+                Message <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--text-muted)' }}>— use {'{first_name}'} for personalization. Blank lines = paragraphs. Supports **bold**, *italic*, and [text](url) links.</span>
               </label>
               <textarea
                 value={body}
