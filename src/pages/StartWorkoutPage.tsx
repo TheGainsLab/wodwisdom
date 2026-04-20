@@ -579,7 +579,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             // Load previously saved entries to restore strength/metcon/skills values
             const { data: savedEntryRows } = await supabase
               .from('workout_log_entries')
-              .select('block_label, movement, sets, reps, weight, weight_unit, rpe, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, faults_observed, sort_order')
+              .select('block_label, movement, sets, reps, weight, weight_unit, rpe, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, faults_observed, scaling_note, sort_order')
               .eq('log_id', ipLog.id)
               .order('sort_order');
 
