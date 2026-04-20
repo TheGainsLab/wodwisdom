@@ -53,6 +53,19 @@ interface SkillsEntryValues {
   variation?: string;
 }
 
+interface AccessoryEntryValues {
+  movement: string;
+  sets?: number;
+  reps_completed?: number;
+  weight?: number;
+  weight_unit?: 'lbs' | 'kg';
+  hold_seconds?: number;
+  distance?: number;
+  distance_unit?: 'm' | 'ft';
+  rpe?: number;
+  notes?: string;
+}
+
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   'warm-up': 'Warm-up & Mobility',
   mobility: 'Mobility',
@@ -271,11 +284,13 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   const [entryValues, setEntryValues] = useState<Record<string, EntryValues>>({});
   const [metconEntries, setMetconEntries] = useState<Record<string, MetconEntryValues>>({});
   const [skillsEntries, setSkillsEntries] = useState<Record<string, SkillsEntryValues>>({});
+  const [accessoryEntries, setAccessoryEntries] = useState<Record<string, AccessoryEntryValues>>({});
   const [workRates, setWorkRates] = useState<MovementWorkRate[]>([]);
   const [blockScores, setBlockScores] = useState<Record<number, string>>({});
   const [blockRx, setBlockRx] = useState<Record<number, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [parsingSkills, setParsingSkills] = useState(false);
+  const [parsingAccessories, setParsingAccessories] = useState(false);
   const [parsingMetcon, setParsingMetcon] = useState(false);
   // Faults from cached coach review, keyed by entry key (e.g. "0-sk0", "1-m2")
   const [reviewFaults, setReviewFaults] = useState<Record<string, string[]>>({});
@@ -475,6 +490,56 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
       setSkillsEntries(initialSkills);
       if (needsParse) setParsingSkills(false);
 
+      // Pre-fill accessory per-movement entries (LLM parse with lazy caching)
+      const initialAccessory: Record<string, AccessoryEntryValues> = {};
+      const accessoryBlocks = loaded
+        .map((b, bi) => ({ block: b, bi }))
+        .filter(({ block }) => block.type === 'accessory');
+
+      const accessoryNeedsParse = accessoryBlocks.some(({ block }) => !block.parsed_tasks?.length);
+      if (accessoryNeedsParse) setParsingAccessories(true);
+
+      await Promise.all(
+        accessoryBlocks.map(async ({ block, bi }) => {
+          let movements: AccessoryEntryValues[];
+
+          if (block.parsed_tasks && block.parsed_tasks.length > 0) {
+            movements = block.parsed_tasks;
+          } else {
+            try {
+              const { data: fnData, error: fnErr } = await supabase.functions.invoke('parse-accessory', {
+                body: { block_text: block.text, block_id: block.id },
+              });
+              if (fnErr || !fnData?.movements) {
+                console.error('parse-accessory failed:', fnErr);
+                movements = [];
+              } else {
+                movements = (fnData.movements as { movement: string; sets: number | null; reps: number | null; weight: number | null; weight_unit: 'lbs' | 'kg' | null; hold_seconds: number | null; distance: number | null; distance_unit: 'm' | 'ft' | null; notes: string | null }[]).map(m => ({
+                  movement: m.movement,
+                  sets: m.sets ?? undefined,
+                  reps_completed: m.reps ?? undefined,
+                  weight: m.weight ?? undefined,
+                  weight_unit: m.weight_unit ?? undefined,
+                  hold_seconds: m.hold_seconds ?? undefined,
+                  distance: m.distance ?? undefined,
+                  distance_unit: m.distance_unit ?? undefined,
+                  notes: m.notes ?? undefined,
+                }));
+              }
+            } catch (e) {
+              console.error('parse-accessory call error:', e);
+              movements = [];
+            }
+          }
+
+          movements.forEach((mv, mi) => {
+            initialAccessory[`${bi}-ac${mi}`] = mv;
+          });
+        }),
+      );
+      setAccessoryEntries(initialAccessory);
+      if (accessoryNeedsParse) setParsingAccessories(false);
+
       // Check for an existing in-progress workout log to resume
       {
         const { data: ipLog } = await supabase
@@ -522,6 +587,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
               const restoredEntries: Record<string, EntryValues> = { ...initial };
               const restoredMetcon: Record<string, MetconEntryValues> = { ...initialMetcon };
               const restoredSkills: Record<string, SkillsEntryValues> = { ...initialSkills };
+              const restoredAccessory: Record<string, AccessoryEntryValues> = { ...initialAccessory };
 
               // Group entries by block_label to figure out which block index they belong to
               for (const entry of savedEntryRows) {
@@ -562,12 +628,27 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                     quality: (entry.quality as SkillsEntryValues['quality']) ?? undefined,
                     variation: entry.variation ?? undefined,
                   };
+                } else if (block.type === 'accessory') {
+                  const key = `${bi}-ac${entry.sort_order}`;
+                  restoredAccessory[key] = {
+                    movement: entry.movement,
+                    sets: entry.sets ?? undefined,
+                    reps_completed: entry.reps_completed ?? undefined,
+                    weight: entry.weight ?? undefined,
+                    weight_unit: (entry.weight_unit as 'lbs' | 'kg') ?? undefined,
+                    hold_seconds: entry.hold_seconds ?? undefined,
+                    distance: entry.distance ?? undefined,
+                    distance_unit: (entry.distance_unit as 'm' | 'ft') ?? undefined,
+                    rpe: entry.rpe ?? undefined,
+                    notes: entry.scaling_note ?? undefined,
+                  };
                 }
               }
 
               setEntryValues(restoredEntries);
               setMetconEntries(restoredMetcon);
               setSkillsEntries(restoredSkills);
+              setAccessoryEntries(restoredAccessory);
             }
           }
         }
@@ -645,6 +726,13 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
 
   const setSkillEntry = (key: string, field: keyof SkillsEntryValues, value: unknown) => {
     setSkillsEntries(prev => ({
+      ...prev,
+      [key]: { ...prev[key], [field]: value },
+    }));
+  };
+
+  const setAccessoryEntry = (key: string, field: keyof AccessoryEntryValues, value: unknown) => {
+    setAccessoryEntries(prev => ({
       ...prev,
       [key]: { ...prev[key], [field]: value },
     }));
@@ -765,6 +853,32 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             quality: sk.quality ?? null,
             variation: sk.variation?.trim() || null,
             faults_observed: f?.length ? f : null,
+          };
+        });
+    } else if (b.type === 'accessory') {
+      const acKeys = Object.keys(accessoryEntries)
+        .filter(k => k.startsWith(`${bi}-ac`))
+        .sort((a, b2) => parseInt(a.split('-ac')[1], 10) - parseInt(b2.split('-ac')[1], 10));
+      entries = acKeys
+        .filter(key => accessoryEntries[key]?.movement?.trim())
+        .map(key => {
+          const ac = accessoryEntries[key];
+          return {
+            movement: ac.movement.trim(),
+            sets: ac.sets ?? null,
+            reps: null,
+            weight: ac.weight ?? null,
+            weight_unit: ac.weight_unit || userUnits,
+            rpe: ac.rpe ?? null,
+            scaling_note: ac.notes?.trim() || null,
+            set_number: null,
+            reps_completed: ac.reps_completed ?? null,
+            hold_seconds: ac.hold_seconds ?? null,
+            distance: ac.distance ?? null,
+            distance_unit: ac.distance_unit ?? null,
+            quality: null,
+            variation: null,
+            faults_observed: null,
           };
         });
     }
@@ -998,6 +1112,43 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                 quality: sk.quality ?? null,
                 variation: sk.variation?.trim() || null,
                 faults_observed: f?.length ? f : null,
+              };
+            });
+          return {
+            label: b.label,
+            type: b.type,
+            text: b.text,
+            score: null,
+            rx: false,
+            notes: blockNotes[bi]?.trim() || null,
+            entries,
+          };
+        }
+
+        if (b.type === 'accessory') {
+          const acKeys = Object.keys(accessoryEntries)
+            .filter(k => k.startsWith(`${bi}-ac`))
+            .sort((a, b2) => parseInt(a.split('-ac')[1], 10) - parseInt(b2.split('-ac')[1], 10));
+          const entries = acKeys
+            .filter(key => accessoryEntries[key]?.movement?.trim())
+            .map(key => {
+              const ac = accessoryEntries[key];
+              return {
+                movement: ac.movement.trim(),
+                sets: ac.sets ?? null,
+                reps: null,
+                weight: ac.weight ?? null,
+                weight_unit: ac.weight_unit || userUnits,
+                rpe: ac.rpe ?? null,
+                scaling_note: ac.notes?.trim() || null,
+                set_number: null,
+                reps_completed: ac.reps_completed ?? null,
+                hold_seconds: ac.hold_seconds ?? null,
+                distance: ac.distance ?? null,
+                distance_unit: ac.distance_unit ?? null,
+                quality: null,
+                variation: null,
+                faults_observed: null,
               };
             });
           return {
@@ -1434,7 +1585,106 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                       );
                     })()}
 
-                    {(block.type === 'warm-up' || block.type === 'mobility' || block.type === 'cool-down' || block.type === 'accessory') && (
+                    {block.type === 'accessory' && (() => {
+                      const acKeys = Object.keys(accessoryEntries)
+                        .filter(k => k.startsWith(`${bi}-ac`))
+                        .sort((a, b2) => parseInt(a.split('-ac')[1], 10) - parseInt(b2.split('-ac')[1], 10));
+
+                      return (
+                        <>
+                          {parsingAccessories && acKeys.length === 0 && (
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Parsing accessory movements…</div>
+                            </div>
+                          )}
+                          {acKeys.length > 0 && (
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Accessory movements (confirm or adjust)</div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                {acKeys.map(key => {
+                                  const ac = accessoryEntries[key];
+                                  if (!ac) return null;
+                                  return (
+                                    <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                      <input
+                                        type="text"
+                                        value={ac.movement}
+                                        onChange={e => setAccessoryEntry(key, 'movement', e.target.value)}
+                                        style={{ ...compactInputStyle, width: '100%' }}
+                                      />
+                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)' }}>
+                                        <span style={{ width: 44 }}>Sets</span>
+                                        <span style={{ width: 44 }}>Reps</span>
+                                        <span style={{ width: 56 }}>Wt</span>
+                                        <span style={{ width: 56 }}>Hold (s)</span>
+                                        <span style={{ width: 56 }}>Dist</span>
+                                        <span style={{ width: 40 }}>RPE</span>
+                                      </div>
+                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                        <input
+                                          type="number"
+                                          placeholder=""
+                                          value={ac.sets ?? ''}
+                                          onChange={e => setAccessoryEntry(key, 'sets', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                          style={{ ...compactInputStyle, width: 44 }}
+                                        />
+                                        <input
+                                          type="number"
+                                          placeholder=""
+                                          value={ac.reps_completed ?? ''}
+                                          onChange={e => setAccessoryEntry(key, 'reps_completed', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                          style={{ ...compactInputStyle, width: 44 }}
+                                        />
+                                        <input
+                                          type="number"
+                                          placeholder=""
+                                          value={ac.weight ?? ''}
+                                          onChange={e => setAccessoryEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
+                                          style={{ ...compactInputStyle, width: 56 }}
+                                        />
+                                        <input
+                                          type="number"
+                                          placeholder=""
+                                          value={ac.hold_seconds ?? ''}
+                                          onChange={e => setAccessoryEntry(key, 'hold_seconds', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                          style={{ ...compactInputStyle, width: 56 }}
+                                        />
+                                        <input
+                                          type="number"
+                                          placeholder=""
+                                          value={ac.distance ?? ''}
+                                          onChange={e => setAccessoryEntry(key, 'distance', e.target.value ? parseFloat(e.target.value) : undefined)}
+                                          style={{ ...compactInputStyle, width: 56 }}
+                                        />
+                                        <select
+                                          value={ac.rpe ?? ''}
+                                          onChange={e => setAccessoryEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                          style={{ ...compactInputStyle, width: 40, padding: '8px 4px', border: ac.rpe == null ? '1px solid var(--border)' : '1px solid var(--border)' }}
+                                        >
+                                          <option value=""></option>
+                                          {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
+                                        </select>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          <div className="field" style={{ marginTop: 8 }}>
+                            <label>Notes</label>
+                            <input
+                              type="text"
+                              placeholder=""
+                              value={blockNotes[bi] ?? ''}
+                              onChange={e => setBlockNotes(prev => ({ ...prev, [bi]: e.target.value }))}
+                            />
+                          </div>
+                        </>
+                      );
+                    })()}
+
+                    {(block.type === 'warm-up' || block.type === 'mobility' || block.type === 'cool-down') && (
                       <div className="field" style={{ marginTop: 8 }}>
                         <label>Notes</label>
                         <input
