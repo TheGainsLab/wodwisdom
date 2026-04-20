@@ -7,9 +7,8 @@
  *   T1 — Basics (age, height, bodyweight, gender, units)
  *   T2 — Athletic data (required lifts, all skills rated, ≥ 2 conditioning
  *        benchmarks). Required to run the free Profile Evaluation.
- *   T3 — Training context (days/week, session length, gym type, years
- *        training, injuries text, training split, equipment). Required to
- *        run AI Programming.
+ *   T3 — Training context (days/week, session length, injuries text,
+ *        equipment). Required to run AI Programming.
  */
 
 export const REQUIRED_T1_FIELDS = [
@@ -55,10 +54,7 @@ export const MIN_CONDITIONING_BENCHMARKS = 2;
 export const REQUIRED_T3_FIELDS = [
   'days_per_week',
   'session_length_minutes',
-  'gym_type',
-  'years_training',
   'injuries_constraints',
-  'training_split',
   'equipment',
 ] as const;
 
@@ -97,10 +93,7 @@ export interface AthleteProfileInput {
   equipment?: Record<string, boolean> | null;
   days_per_week?: number | null;
   session_length_minutes?: number | null;
-  gym_type?: string | null;
-  years_training?: string | null;
   injuries_constraints?: string | null;
-  training_split?: string | null;
 }
 
 function isNumberSet(v: unknown): boolean {
@@ -162,10 +155,7 @@ export function getTierStatus(profile: AthleteProfileInput | null | undefined): 
   const t3Missing: string[] = [];
   if (!isNumberSet(p.days_per_week)) t3Missing.push('days_per_week');
   if (!isNumberSet(p.session_length_minutes)) t3Missing.push('session_length_minutes');
-  if (!isStringSet(p.gym_type)) t3Missing.push('gym_type');
-  if (!isStringSet(p.years_training)) t3Missing.push('years_training');
   if (!isStringSet(p.injuries_constraints)) t3Missing.push('injuries_constraints');
-  if (!isStringSet(p.training_split)) t3Missing.push('training_split');
   const equipment = p.equipment ?? {};
   if (Object.keys(equipment).length === 0) t3Missing.push('equipment');
   const tier3: TierSection = { complete: t3Missing.length === 0, missing: t3Missing };

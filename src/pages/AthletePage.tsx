@@ -165,27 +165,6 @@ const CONDITIONING_GROUPS = [
 const SKILL_LEVELS = ['none', 'beginner', 'intermediate', 'advanced'] as const;
 type SkillLevel = typeof SKILL_LEVELS[number];
 
-const GYM_TYPES = [
-  { value: 'affiliate', label: 'CrossFit Affiliate' },
-  { value: 'commercial', label: 'Commercial Gym' },
-  { value: 'home', label: 'Home Gym' },
-  { value: 'mixed', label: 'Mixed' },
-] as const;
-
-const YEARS_TRAINING_BUCKETS = [
-  { value: 'under_1', label: 'Under 1 year' },
-  { value: '1_to_3', label: '1 – 3 years' },
-  { value: '3_to_5', label: '3 – 5 years' },
-  { value: '5_to_10', label: '5 – 10 years' },
-  { value: 'over_10', label: '10+ years' },
-] as const;
-
-const TRAINING_SPLITS = [
-  { value: 'single_sessions', label: 'Single sessions' },
-  { value: 'doubles', label: 'Double days (AM/PM)' },
-  { value: 'flexible', label: 'Flexible' },
-] as const;
-
 const LEVEL_LABELS: Record<SkillLevel, string> = {
   none: 'None',
   beginner: 'Beginner',
@@ -352,10 +331,7 @@ export default function AthletePage({ session }: { session: Session }) {
   // Tier 3 — training context
   const [daysPerWeek, setDaysPerWeek] = useState<string>('');
   const [sessionLengthMinutes, setSessionLengthMinutes] = useState<string>('');
-  const [gymType, setGymType] = useState<string>('');
-  const [yearsTraining, setYearsTraining] = useState<string>('');
   const [injuriesConstraints, setInjuriesConstraints] = useState<string>('');
-  const [trainingSplit, setTrainingSplit] = useState<string>('');
 
   const navigate = useNavigate();
   const { hasFeature, isAdmin } = useEntitlements(session.user.id);
@@ -403,7 +379,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, gym_type, years_training, injuries_constraints, training_split')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -446,10 +422,7 @@ export default function AthletePage({ session }: { session: Session }) {
         setTdeeOverride(d.tdee_override != null ? String(d.tdee_override) : '');
         setDaysPerWeek(d.days_per_week != null ? String(d.days_per_week) : '');
         setSessionLengthMinutes(d.session_length_minutes != null ? String(d.session_length_minutes) : '');
-        setGymType(d.gym_type || '');
-        setYearsTraining(d.years_training || '');
         setInjuriesConstraints(d.injuries_constraints || '');
-        setTrainingSplit(d.training_split || '');
         setIsDirty(false);
       }
       if (evalRes.data) {
@@ -625,10 +598,7 @@ export default function AthletePage({ session }: { session: Session }) {
           tdee_override: tdeeOverrideNum && !isNaN(tdeeOverrideNum) ? tdeeOverrideNum : null,
           days_per_week: daysPerWeekNum && !isNaN(daysPerWeekNum) ? daysPerWeekNum : null,
           session_length_minutes: sessionLengthNum && !isNaN(sessionLengthNum) ? sessionLengthNum : null,
-          gym_type: gymType || null,
-          years_training: yearsTraining || null,
           injuries_constraints: injuriesVal,
-          training_split: trainingSplit || null,
           ...levels,
           updated_at: new Date().toISOString(),
         },
@@ -659,10 +629,7 @@ export default function AthletePage({ session }: { session: Session }) {
     equipment,
     days_per_week: daysPerWeek ? parseInt(daysPerWeek, 10) : null,
     session_length_minutes: sessionLengthMinutes ? parseInt(sessionLengthMinutes, 10) : null,
-    gym_type: gymType || null,
-    years_training: yearsTraining || null,
     injuries_constraints: injuriesConstraints || null,
-    training_split: trainingSplit || null,
   };
   const tierStatus = getTierStatus(tierStatusInput);
 
@@ -956,54 +923,6 @@ export default function AthletePage({ session }: { session: Session }) {
                           value={sessionLengthMinutes}
                           onChange={e => { setSessionLengthMinutes(e.target.value); markDirty(); }}
                         />
-                      </div>
-                    </div>
-
-                    <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>Where you train</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {GYM_TYPES.map(opt => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            className={'skill-level-btn' + (gymType === opt.value ? ' active' : '')}
-                            onClick={() => { setGymType(opt.value); markDirty(); }}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>Years training</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {YEARS_TRAINING_BUCKETS.map(opt => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            className={'skill-level-btn' + (yearsTraining === opt.value ? ' active' : '')}
-                            onClick={() => { setYearsTraining(opt.value); markDirty(); }}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>Training split</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {TRAINING_SPLITS.map(opt => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            className={'skill-level-btn' + (trainingSplit === opt.value ? ' active' : '')}
-                            onClick={() => { setTrainingSplit(opt.value); markDirty(); }}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
                       </div>
                     </div>
 
