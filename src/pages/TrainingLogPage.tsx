@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import WorkoutCalendar from '../components/WorkoutCalendar';
 import MetconHeatmap from '../components/MetconHeatmap';
+import { useEntitlements } from '../hooks/useEntitlements';
 
 interface WorkoutLog {
   id: string;
@@ -82,6 +83,15 @@ function getMetconTypeLabel(text: string): string {
 
 export default function TrainingLogPage({ session }: { session: Session }) {
   const navigate = useNavigate();
+  const { hasFeature, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
+  const hasAccess = isAdmin || hasFeature('programming');
+
+  useEffect(() => {
+    if (!entLoading && !hasAccess) {
+      navigate('/programs', { replace: true });
+    }
+  }, [entLoading, hasAccess, navigate]);
+
   const [navOpen, setNavOpen] = useState(false);
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [blocksByLog, setBlocksByLog] = useState<Record<string, WorkoutLogBlock[]>>({});
@@ -303,6 +313,17 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     if (block.block_type === 'metcon') return getMetconTypeLabel(block.block_text);
     return BLOCK_TYPE_LABELS[block.block_type] || block.block_type;
   };
+
+  if (entLoading || !hasAccess) {
+    return (
+      <div className="app-layout">
+        <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
+        <div className="main-content">
+          <div className="page-loading"><div className="loading-pulse" /></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-layout">
