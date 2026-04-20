@@ -71,10 +71,13 @@ function renderCustom(subject: string, body: string, name: string): RenderedTemp
   );
   // Substitute {first_name} if the admin used it in the body.
   const withName = linked.map((p) => p.replace(/\{first_name\}/g, safeName));
+  // Custom messages are 1:1 personal check-ins — no "you're getting this
+  // because…" footer. They should read like a regular note from a person.
+  // Templated sends (e.g. welcome_back) still carry their own disclosure
+  // and, eventually, an unsubscribe link for bulk campaigns.
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a1a; line-height: 1.6;">
       ${withName.map((p) => `<p>${p}</p>`).join("\n      ")}
-      <p style="font-size: 11px; color: #888; margin-top: 32px;">You're getting this because you signed up for The Gains Lab.</p>
     </div>
   `.trim();
   return {
