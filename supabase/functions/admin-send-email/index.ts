@@ -56,28 +56,76 @@ function renderWelcomeBack(name: string): RenderedTemplate {
   };
 }
 
+/**
+ * Apply `**bold**` and `*italic*` emphasis to already-HTML-escaped text.
+ * Bold runs first so remaining single-* pairs become italic. Italic
+ * requires non-whitespace on both sides of the content to avoid matching
+ * incidental asterisks like "3 * 4 = 12".
+ */
+function applyEmphasis(s: string): string {
+  return s
+    .replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*\s][^*\n]*?[^*\s]|[^*\s])\*/g, "<em>$1</em>");
+}
+
 function renderCustom(subject: string, body: string, name: string): RenderedTemplate {
-  // Body comes from the admin composer as plain text. We escape HTML, then
-  // convert blank-line-separated paragraphs to <p> blocks and bare URLs to
-  // anchors. Keeps the email simple and predictable.
+  // Body comes from the admin composer as plain-text-with-extras. Four
+  // kinds of formatting are supported:
+  //   1. Blank-line-separated paragraphs -> <p> blocks
+  //   2. Bare http/https URLs -> clickable anchors (auto-link)
+  //   3. Markdown links [text](url) -> anchors with custom link text
+  //      (http/https/mailto only, sanitized). Emphasis inside the link
+  //      text is supported (e.g. [**click here**](url)).
+  //   4. **bold** and *italic* emphasis
+  //
+  // Ordering is tricky: markdown links are extracted first (before HTML
+  // escaping) and replaced with opaque sentinel tokens. After escaping +
+  // paragraph splitting + {first_name} + emphasis + bare-URL auto-linking,
+  // the sentinels are swapped back in. This order guarantees that:
+  //   - Neither the escaper nor the bare-URL regex mangles a markdown
+  //     link's href / text.
+  //   - Emphasis applies to plain text, but not to the auto-linked URL
+  //     itself (we emit anchors after emphasis, so <em> can't land
+  //     inside <a href="...">).
   const safeName = escapeHtml(name);
-  const safeBody = escapeHtml(body);
+
+  const linkPlaceholders: string[] = [];
+  const MARKDOWN_LINK = /\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^)\s]+)\)/g;
+  const bodyWithTokens = body.replace(MARKDOWN_LINK, (_, text, url) => {
+    const i = linkPlaceholders.length;
+    // Emphasis inside the link text: escape the text first, then run
+    // emphasis on the escaped string so <strong>/<em> tags are emitted
+    // without being re-escaped.
+    const safeText = applyEmphasis(escapeHtml(text));
+    linkPlaceholders.push(
+      `<a href="${escapeHtml(url)}" style="color: #ff3a3a;">${safeText}</a>`,
+    );
+    return `§§MDL${i}§§`;
+  });
+
+  const safeBody = escapeHtml(bodyWithTokens);
   const paragraphs = safeBody
     .split(/\n\s*\n/)
     .map((p) => p.replace(/\n/g, "<br/>").trim())
     .filter((p) => p.length > 0);
-  const linked = paragraphs.map((p) =>
+  const withName = paragraphs.map((p) => p.replace(/\{first_name\}/g, safeName));
+  // Emphasis first, then auto-link bare URLs. If we auto-linked first, a
+  // URL containing `*` (rare but legal, e.g., query params) would get its
+  // middle wrapped in <em>, breaking the anchor.
+  const withEmphasis = withName.map((p) => applyEmphasis(p));
+  const autoLinked = withEmphasis.map((p) =>
     p.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color: #ff3a3a;">$1</a>'),
   );
-  // Substitute {first_name} if the admin used it in the body.
-  const withName = linked.map((p) => p.replace(/\{first_name\}/g, safeName));
+  const withLinks = autoLinked.map((p) =>
+    p.replace(/§§MDL(\d+)§§/g, (_, i) => linkPlaceholders[Number(i)] || ""),
+  );
   // Custom messages are 1:1 personal check-ins — no "you're getting this
   // because…" footer. They should read like a regular note from a person.
   // Templated sends (e.g. welcome_back) still carry their own disclosure
   // and, eventually, an unsubscribe link for bulk campaigns.
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a1a; line-height: 1.6;">
-      ${withName.map((p) => `<p>${p}</p>`).join("\n      ")}
+      ${withLinks.map((p) => `<p>${p}</p>`).join("\n      ")}
     </div>
   `.trim();
   return {
