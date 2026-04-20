@@ -129,3 +129,6 @@ verify_jwt = false
 
 [functions.chat-nudge-classify]
 verify_jwt = false
+
+[functions.admin-send-email]
+verify_jwt = false
