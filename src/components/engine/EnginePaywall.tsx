@@ -49,7 +49,14 @@ export default function EnginePaywall({ hasFeature }: Props) {
       })
     : ENGINE_UPGRADE_OPTIONS;
 
-  const describeOption = (opt: typeof ENGINE_UPGRADE_OPTIONS[0]) => {
+  const describeOption = (opt: typeof ENGINE_UPGRADE_OPTIONS[0], idx: number, all: typeof ENGINE_UPGRADE_OPTIONS) => {
+    if (!hasAnySub) {
+      if (idx === 0) return opt.includes.join(' + ');
+      const prev = new Set(all[idx - 1].includes);
+      const added = opt.includes.filter(l => !prev.has(l));
+      if (added.length === 0) return opt.includes.join(' + ');
+      return 'Everything above + ' + added.join(' + ');
+    }
     const kept: string[] = [];
     const gained: string[] = [];
     const featureMap: Record<string, string> = {
@@ -89,7 +96,7 @@ export default function EnginePaywall({ hasFeature }: Props) {
 
           {/* Upgrade options */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
-            {upgradeOptions.map(opt => (
+            {upgradeOptions.map((opt, idx) => (
               <button
                 key={opt.key}
                 className="engine-btn engine-btn-primary"
@@ -103,11 +110,9 @@ export default function EnginePaywall({ hasFeature }: Props) {
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Zap size={16} /> {opt.name} — {opt.price}
                 </span>
-                {hasAnySub && (
-                  <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>
-                    {describeOption(opt)}
-                  </span>
-                )}
+                <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>
+                  {describeOption(opt, idx, upgradeOptions)}
+                </span>
               </button>
             ))}
           </div>
@@ -117,7 +122,7 @@ export default function EnginePaywall({ hasFeature }: Props) {
           {/* Features */}
           <div style={{ width: '100%', textAlign: 'left' }}>
             <h3 style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 14, textAlign: 'center' }}>
-              Every Program Includes
+              Every Engine Program Includes
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {FEATURES.map(({ icon: Icon, text }) => (

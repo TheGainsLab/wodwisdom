@@ -51,7 +51,14 @@ export default function NutritionPaywall({ hasFeature }: Props) {
     'Year of the Engine': 'engine', 'AI Programming': 'programming',
   };
 
-  const describeOption = (opt: typeof NUTRITION_UPGRADE_OPTIONS[0]) => {
+  const describeOption = (opt: typeof NUTRITION_UPGRADE_OPTIONS[0], idx: number, all: typeof NUTRITION_UPGRADE_OPTIONS) => {
+    if (!hasAnySub) {
+      if (idx === 0) return opt.includes.join(' + ');
+      const prev = new Set(all[idx - 1].includes);
+      const added = opt.includes.filter(l => !prev.has(l));
+      if (added.length === 0) return opt.includes.join(' + ');
+      return 'Everything above + ' + added.join(' + ');
+    }
     const kept: string[] = [];
     const gained: string[] = [];
     for (const label of opt.includes) {
@@ -86,7 +93,7 @@ export default function NutritionPaywall({ hasFeature }: Props) {
 
           {/* Upgrade options */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
-            {upgradeOptions.map(opt => (
+            {upgradeOptions.map((opt, idx) => (
               <button
                 key={opt.key}
                 className="engine-btn engine-btn-primary"
@@ -100,11 +107,9 @@ export default function NutritionPaywall({ hasFeature }: Props) {
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Apple size={16} /> {opt.name} — {opt.price}
                 </span>
-                {hasAnySub && (
-                  <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>
-                    {describeOption(opt)}
-                  </span>
-                )}
+                <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>
+                  {describeOption(opt, idx, upgradeOptions)}
+                </span>
               </button>
             ))}
           </div>
