@@ -62,7 +62,8 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
-  'warm-up': 'Warm-up',
+  'warm-up': 'Warm-up & Mobility',
+  mobility: 'Mobility',
   skills: 'Skills',
   strength: 'Strength',
   metcon: 'Metcon',

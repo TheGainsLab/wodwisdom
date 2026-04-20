@@ -96,33 +96,33 @@ const GENERATE_PROMPT = `Generate a 4-week training program for the athlete desc
 Use the REFERENCE material and COACHING GUIDELINES below to guide all programming decisions — periodization approach, loading schemes, skill progressions, metcon design, and deload strategy.
 OUTPUT RULES:
 - Complete every block in the template provided.
-- Format EVERY block as MULTI-LINE text — NEVER use commas to join movements on one line. This applies to ALL blocks: Warm-up, Mobility, Skills, Strength, Metcon, and Cool down.
+- Format EVERY block as MULTI-LINE text — NEVER use commas to join movements on one line. This applies to ALL blocks: Warm-up & Mobility, Skills, Strength, Accessory, Metcon, and Cool down.
   • First line after the header: the format or scheme ONLY (e.g. "3 Rounds For Time:", "EMOM 12 min:", "5×3 @75%"). Do NOT put a movement on this line.
   • Following lines: one movement or drill per line. Each movement gets its own line.
   • Last line (if applicable): notes, rest periods, target time, or scaling.
 
 FORMATTING EXAMPLES (follow these exactly):
   BAD — never do this:
-    Warm-up: 400m row, 10 pass-throughs, 10 air squats, hip circles
-    Mobility: 90/90 switches, couch stretch 1 min/side
+    Warm-up & Mobility: 400m row, 10 pass-throughs, 90/90 switches
+    Accessory: 3x12 DB curls, 3x30s plank
     Metcon: 5 RFT: 10 Box Jump Overs 30/24, 8 HSPU
   GOOD — always do this:
-    Warm-up:
+    Warm-up & Mobility:
     400m row
     10 pass-throughs
     10 air squats
-    hip circles
+    90/90 switches 1 min/side
 
-    Mobility:
-    90/90 switches
-    couch stretch 1 min/side
+    Accessory:
+    3x12 DB hammer curls @ 25 lbs
+    3x30s hollow hold
+    3x40m suitcase carry @ 50 lbs/hand
 
     Metcon:
     5 RFT:
     10 Box Jump Overs 30/24
     8 HSPU
-- Each block header (Warm-up:, Mobility:, Skills:, Strength:, Metcon:, Cool down:) MUST appear on its own line starting at position 0. Never nest one block inside another. Content lines for a block go on the lines BELOW its header.
-- Warm-up: and Mobility: are SEPARATE blocks. Do NOT put mobility content inside the Warm-up block. Warm-up is general preparation; Mobility is targeted drills on a separate line.
+- Each block header (Warm-up & Mobility:, Skills:, Strength:, Accessory:, Metcon:, Cool down:) MUST appear on its own line starting at position 0. Never nest one block inside another. Content lines for a block go on the lines BELOW its header.
 - Do not add, remove, or reorder any headers.
 - Prescribe weights using the athlete's 1RMs where applicable. Use / for M/F Rx (e.g. 95/65).
 - Metcon examples in the REFERENCE section are real CrossFit workouts. Use them for structural inspiration only — adapt to the athlete's profile and eligibility rules, never copy verbatim.`;
@@ -159,10 +159,10 @@ function buildProgramSkeleton(monthNumber: number = 1): string {
     for (let day = 1; day <= 5; day++) {
       const dayNum = dayOffset + (week - 1) * 5 + day;
       lines.push(`Day ${dayNum}:`);
-      lines.push(`Warm-up: `);
-      lines.push(`Mobility: `);
+      lines.push(`Warm-up & Mobility: `);
       lines.push(`Skills: `);
       lines.push(`Strength: `);
+      lines.push(`Accessory: `);
       lines.push(`Metcon: `);
       lines.push(`Cool down: `);
       lines.push(``);
@@ -522,6 +522,16 @@ async function processJob(
     const profile = evalRow.profile_snapshot || {};
     const profileStr = formatProfile(profile);
     console.log(`[generate-program] Profile: ${profileStr.length} chars, lifts=${Object.keys(profile.lifts || {}).length}, skills=${Object.keys(profile.skills || {}).length}`);
+    // Injuries & movement constraints — fetched live (not snapshot) so the latest info is always used.
+    const { data: athleteForInjuries } = await supa
+      .from("athlete_profiles")
+      .select("injuries_constraints")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const injuriesText = (athleteForInjuries?.injuries_constraints || "").trim();
+    const injuriesBlock = injuriesText && injuriesText.toLowerCase() !== "none"
+      ? `\nINJURIES OR MOVEMENT CONSTRAINTS:\n${injuriesText}\nRespect these across ALL blocks. Avoid movements that aggravate the flagged region; use the Accessory block for corrective/prehab work.\n`
+      : "";
     const analysisStr = evalRow.analysis || "No detailed analysis.";
     console.log(`[generate-program] Analysis: ${analysisStr.length} chars`);
     // For Month 2+, fetch extended training history (full month) and previous program context
@@ -591,15 +601,17 @@ ${profileStr}
 UNIT SYSTEM: This athlete uses ${unitLabel}. All weights in the program (strength percentages, barbell loads, dumbbell weights, wall ball weights, etc.) MUST be written in ${unitLabel}. Do not mix units.
 
 ${analysisStr}
-${trainingBlock}${metconEligibility}${equipmentConstraint}
-MOBILITY BLOCK RULES:
-The Mobility: block goes after Warm-up and targets areas needed for that day's training.
-- Keep it brief: 1 focus area and 1-2 suggested drills max (e.g. "Hip mobility — 90/90 switches, couch stretch 1 min/side").
-- Match the focus to the day's movements: hip/ankle for squat days, thoracic/shoulder for overhead days, posterior chain for hinge days.
+${trainingBlock}${metconEligibility}${equipmentConstraint}${injuriesBlock}
+WARM-UP & MOBILITY BLOCK RULES:
+The Warm-up & Mobility: block is a single combined block that progresses from general preparation to targeted drills for the day's work.
+- 4-8 minutes of general prep (light cardio, dynamic stretching, activation) followed by 2-4 targeted drills for the day's primary movements.
+- Match the targeted drills to the day's work: hip/ankle for squat days, thoracic/shoulder for overhead days, posterior chain for hinge days.
 - If the athlete has a movement flagged as a mobility limiter, weave that area into relevant days throughout the program.
-- This is advisory — a reminder, not a rigid checklist. Keep the tone casual and coach-like.
+- Progression is general → specific. Lift-specific warm-up sets belong in the Strength block, not here.
+- Keep it concise and coach-like.
 
 STRENGTH SLOT RULES:
+Compound multi-joint lifts only. Isolation and hypertrophy work lives in the Accessory block, not here.
 The STRENGTH HIERARCHY above (if present) dictates priority, but you MUST also ensure movement-pattern diversity across the 5 weekly Strength slots.
 
 MOVEMENT PATTERN DISTRIBUTION (per week):
@@ -626,6 +638,25 @@ Use the SKILLS ANALYSIS above to decide what goes in each day's Skills: block. Y
 - Related progressions are a single track, not separate skills. For example: strict HSPU, wall-facing HSPU, and deficit HSPU are one progression — pick the variant that matches the athlete's level and periodize across weeks (drill → load → test), don't scatter all three randomly.
 - Week 4 is deload — reduce skill volume, keep only the top 1-2 priority skills at 1x each.
 - Vary the drill, not just the movement. If L-sit appears 3x in a week, each session should have a different focus (e.g. tuck hold for time, single-leg extension, parallette L-sit).
+
+ACCESSORY BLOCK RULES:
+The Accessory: block is for hypertrophy, weak-point work, injury prevention, and midline/core. It complements the day's Strength and Metcon — do NOT pile on the same muscle groups those blocks are already hitting.
+- Program 2-4 movements per session. Scale volume to the athlete's session length: ~45 min session = 1-2 movements, ~60 min = 2-3, ~90 min = 3-4.
+- EVERY accessory block MUST include at least one midline/core element (hollow hold, plank variant, L-sit, hanging leg raise, weighted sit-up, Pallof press, or a loaded carry).
+- Typical rep schemes: 2-4 sets × 8-15 reps for load-based movements, 30-60s for isometric holds, distance in meters for carries.
+- Format each movement as parseable:
+  • Load-based: "3x12 DB hammer curls @ 25 lbs"
+  • Isometric: "3x30s hollow hold"
+  • Distance: "3x40m farmer carry @ 50 lbs/hand"
+- Target weak points revealed by the athlete's profile: shoulder health → face pulls, Y-T-W, external rotation; grip → carries, dead hangs; posterior chain → good mornings, GHD raises, reverse hypers.
+- If the athlete has flagged INJURIES OR MOVEMENT CONSTRAINTS, use the Accessory block for corrective/prehab work targeting the flagged region (e.g., rotator cuff work for shoulder issues, glute bridges for low back, VMO work for knee pain). Do NOT program movements that aggravate the flagged region.
+- Bridge movements (loaded carries, GHD back extensions, anti-rotation work) count toward both the midline requirement AND an accessory slot.
+- Week 4 deload: reduce to 1-2 movements at lower volume and intensity.
+
+COOL DOWN BLOCK RULES:
+- 2-4 minutes of easy movement (walk, easy row/bike, or light stretching) plus 2-3 static stretches for the day's primary muscle groups.
+- Match the focus to what was trained today: hips/quads for squat days, pecs/lats for pressing days, posterior chain for deadlift days.
+- Keep it brief, casual, advisory — not a rigid checklist.
 
 Complete the following program template. Fill in every block using multi-line formatting (scheme on the first line, one movement per line after that). Do not add or remove any headers.
 ${skeleton}`;
@@ -691,12 +722,13 @@ ${skeleton}`;
       // FIX 2: dayHeaders regex uses Day N:
       const dayHeaders = (programText.match(/^Day \d+:/gmi) || []);
       // Count blocks per type for diagnostics
-      const warmupCount = (programText.match(/^Warm-up:/gmi) || []).length;
+      const warmupCount = (programText.match(/^Warm-up\s*&\s*Mobility:/gmi) || []).length;
       const skillsCount = (programText.match(/^Skills:/gmi) || []).length;
       const strengthCount = (programText.match(/^Strength:/gmi) || []).length;
+      const accessoryCount = (programText.match(/^Accessory:/gmi) || []).length;
       const metconCount = (programText.match(/^Metcon:/gmi) || []).length;
       const cooldownCount = (programText.match(/^Cool\s*down:/gmi) || []).length;
-      console.log(`[generate-program] Attempt ${attempt}: ${apiElapsed}s, stop=${stopReason}, tokens=${inputTokens}in/${outputTokens}out, chars=${programText.length}, days=${dayHeaders.length}, blocks=[warmup=${warmupCount},skills=${skillsCount},strength=${strengthCount},metcon=${metconCount},cooldown=${cooldownCount}]`);
+      console.log(`[generate-program] Attempt ${attempt}: ${apiElapsed}s, stop=${stopReason}, tokens=${inputTokens}in/${outputTokens}out, chars=${programText.length}, days=${dayHeaders.length}, blocks=[warmup=${warmupCount},skills=${skillsCount},strength=${strengthCount},accessory=${accessoryCount},metcon=${metconCount},cooldown=${cooldownCount}]`);
       // Too short — retry with context
       if (!programText || programText.length < 100) {
         if (attempt < MAX_ATTEMPTS) {
@@ -792,8 +824,15 @@ ${skeleton}`;
         throw new Error("Failed to save workouts");
       }
       // Extract and insert blocks
-      const BLOCK_LABELS = ["Warm-up", "Mobility", "Skills", "Strength", "Metcon", "Cool down"];
-      const BLOCK_TYPE_MAP: Record<string, string> = { "warm-up": "warm-up", "mobility": "mobility", "skills": "skills", "strength": "strength", "metcon": "metcon", "cool down": "cool-down" };
+      const BLOCK_LABELS = ["Warm-up & Mobility", "Skills", "Strength", "Accessory", "Metcon", "Cool down"];
+      const BLOCK_TYPE_MAP: Record<string, string> = {
+        "warm-up & mobility": "warm-up",
+        "skills": "skills",
+        "strength": "strength",
+        "accessory": "accessory",
+        "metcon": "metcon",
+        "cool down": "cool-down",
+      };
       if (insertedWks?.length) {
         const blockRows: { program_workout_id: string; block_type: string; block_order: number; block_text: string }[] = [];
         for (const w of insertedWks) {

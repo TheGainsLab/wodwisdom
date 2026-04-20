@@ -94,6 +94,9 @@ verify_jwt = false
 [functions.parse-strength]
 verify_jwt = false
 
+[functions.parse-accessory]
+verify_jwt = false
+
 [functions.save-workout-block]
 verify_jwt = false
 
