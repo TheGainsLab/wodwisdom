@@ -54,10 +54,11 @@ interface SkillsEntryValues {
 }
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
-  'warm-up': 'Warm-up',
+  'warm-up': 'Warm-up & Mobility',
   mobility: 'Mobility',
   skills: 'Skills',
   strength: 'Strength',
+  accessory: 'Accessory',
   metcon: 'Metcon',
   'cool-down': 'Cool Down',
 };
@@ -1433,7 +1434,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                       );
                     })()}
 
-                    {(block.type === 'warm-up' || block.type === 'mobility' || block.type === 'cool-down') && (
+                    {(block.type === 'warm-up' || block.type === 'mobility' || block.type === 'cool-down' || block.type === 'accessory') && (
                       <div className="field" style={{ marginTop: 8 }}>
                         <label>Notes</label>
                         <input
