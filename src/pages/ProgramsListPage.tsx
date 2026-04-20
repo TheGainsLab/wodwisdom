@@ -267,7 +267,14 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                     'AI Coach': 'ai_chat', 'Nutrition': 'nutrition',
                     'Year of the Engine': 'engine', 'AI Programming': 'programming',
                   };
-                  const desc = (opt: typeof options[0]) => {
+                  const desc = (opt: typeof options[0], idx: number) => {
+                    if (!hasAnySub) {
+                      if (idx === 0) return opt.includes.join(' + ');
+                      const prev = new Set(options[idx - 1].includes);
+                      const added = opt.includes.filter(l => !prev.has(l));
+                      if (added.length === 0) return opt.includes.join(' + ');
+                      return 'Everything above + ' + added.join(' + ');
+                    }
                     const kept = opt.includes.filter(l => fMap[l] && has(fMap[l]));
                     const gained = opt.includes.filter(l => !fMap[l] || !has(fMap[l]));
                     const parts: string[] = [];
@@ -278,7 +285,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
 
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-                      {options.map(opt => (
+                      {options.map((opt, idx) => (
                         <button
                           key={opt.key}
                           className="auth-btn"
@@ -287,7 +294,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                             border: opt.featured ? '2px solid var(--accent)' : undefined }}
                         >
                           <span style={{ fontWeight: 700 }}>{opt.name} — {opt.price}</span>
-                          {hasAnySub && <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>{desc(opt)}</span>}
+                          <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>{desc(opt, idx)}</span>
                         </button>
                       ))}
                     </div>
