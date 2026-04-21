@@ -985,6 +985,35 @@ ${skeleton}`;
         // On final attempt, log but proceed — partial compliance is better than failure
         console.warn(`[generate-program] Final attempt still has ${metconViolations.length} violations — saving anyway`);
       }
+      // Shadow classifier — run classify-day-type in parallel for each day.
+      // Do NOT gate/retry on mismatches; just collect results for the dataset.
+      const classifyStart = Date.now();
+      const classifications = await Promise.all(
+        parsedWorkouts.map(async (pw) => {
+          if (!pw.day_type) return { actual: null as string | null, confidence: null as number | null };
+          try {
+            const { data, error } = await supa.functions.invoke("classify-day-type", {
+              body: { day_text: pw.workout_text, expected_archetype: pw.day_type },
+            });
+            if (error || !data) return { actual: null, confidence: null };
+            const actual = typeof data.actual_archetype === "string" ? data.actual_archetype : null;
+            const confidence = typeof data.confidence === "number" ? data.confidence : null;
+            return { actual, confidence };
+          } catch (err) {
+            console.error(`[classify-day-type] error on day ${pw.sort_order + 1}:`, err);
+            return { actual: null, confidence: null };
+          }
+        }),
+      );
+      const classifyElapsed = ((Date.now() - classifyStart) / 1000).toFixed(1);
+      const matchCount = classifications.filter((c, i) => c.actual && c.actual === parsedWorkouts[i].day_type).length;
+      const mismatches = classifications
+        .map((c, i) => ({ c, expected: parsedWorkouts[i].day_type, dayNum: parsedWorkouts[i].sort_order + 1 }))
+        .filter((x) => x.c.actual && x.c.actual !== x.expected);
+      console.log(`[generate-program] Classifier (shadow): ${classifyElapsed}s, match=${matchCount}/${classifications.length}, mismatches=${mismatches.length}`);
+      for (const m of mismatches) {
+        console.log(`  Day ${m.dayNum}: expected=${m.expected}, classified=${m.c.actual} (conf=${m.c.confidence})`);
+      }
       // For Month 1: create new program. For Month 2+: append to existing program.
       let progId: string;
       if (isContinuation && existingProgramId) {
@@ -1014,8 +1043,8 @@ ${skeleton}`;
         progId = prog.id;
         console.log("[generate-program] Created new program");
       }
-      // Insert workouts with month_number and day_type
-      const wkRows = parsedWorkouts.map((pw) => ({
+      // Insert workouts with month_number, day_type, and shadow classifier output
+      const wkRows = parsedWorkouts.map((pw, i) => ({
         program_id: progId,
         week_num: pw.week_num,
         day_num: pw.day_num,
@@ -1023,6 +1052,8 @@ ${skeleton}`;
         sort_order: pw.sort_order,
         month_number: monthNumber,
         day_type: pw.day_type,
+        classified_archetype: classifications[i]?.actual ?? null,
+        classified_confidence: classifications[i]?.confidence ?? null,
       }));
       const { data: insertedWks, error: wkErr } = await supa
         .from("program_workouts")
