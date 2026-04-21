@@ -12,11 +12,11 @@
  * The block_type values here MUST match the strings stored on
  * program_workout_blocks.block_type. Existing tracked values:
  *   'warm-up', 'mobility', 'skills', 'strength', 'metcon',
- *   'cool-down', 'accessory', 'aerobic'
+ *   'cool-down', 'accessory', 'active-recovery'
  *
- * 'aerobic' is new for the Recovery Day Z2 block — it lives outside the
- * Metcon block_type because its purpose, intensity, and parsing
- * expectations are different.
+ * 'active-recovery' is the Recovery Day's easy-movement block — parses
+ * separately from warm-up / cool-down because it has different time,
+ * purpose, and user-logging expectations.
  */
 
 export type DayArchetype = "strength" | "metcon" | "fitness" | "skill" | "recovery";
@@ -189,7 +189,7 @@ export const ARCHETYPES: Record<DayArchetype, ArchetypeSpec> = {
     archetype: "recovery",
     displayLabel: "Recovery Day",
     defaultTotalMinutes: 35,
-    purpose: "Active recovery — blood flow, parasympathetic recovery, movement without intensity.",
+    purpose: "Active recovery — blood flow, parasympathetic recovery, movement without intensity. This is NOT aerobic training (that's Engine's job).",
     blocks: [
       {
         type: "warm-up",
@@ -198,10 +198,10 @@ export const ARCHETYPES: Record<DayArchetype, ArchetypeSpec> = {
         purpose: "Joint-by-joint opening + foam rolling on chronic tight areas. This is the main mobility session of the week.",
       },
       {
-        type: "aerobic",
-        header: "Zone 2 Aerobic",
+        type: "active-recovery",
+        header: "Active Recovery",
         minutes: [20, 30],
-        purpose: "Conversational pace, HR ~65-75% max. Easy row / bike / walk / swim / yoga flow / mobility circuit. If breathing hard, slow down.",
+        purpose: "Low-intensity movement at conversational pace. Easy walk / easy bike / light row / yoga flow / mobility circuit. If breathing hard, slow down. Purpose is blood flow and parasympathetic recovery — NOT training stimulus.",
       },
       {
         type: "cool-down",
@@ -224,6 +224,6 @@ export const ALL_BLOCK_HEADERS = [
   "Strength",
   "Accessory",
   "Metcon",
-  "Zone 2 Aerobic",
+  "Active Recovery",
   "Cool down",
 ] as const;

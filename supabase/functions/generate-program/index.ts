@@ -128,7 +128,7 @@ FORMATTING EXAMPLES (follow these exactly):
     10 Box Jump Overs 30/24
     8 HSPU
 - Each day header includes the archetype tag in square brackets (e.g., "Day 1: [Strength Day]"). The blocks for that day are dictated by the archetype — DO NOT add or remove blocks beyond what the template provides.
-- Block headers (Warm-up & Mobility:, Skills:, Strength:, Accessory:, Metcon:, Zone 2 Aerobic:, Cool down:) MUST appear on their own line starting at position 0. Never nest one block inside another. Content lines for a block go on the lines BELOW its header.
+- Block headers (Warm-up & Mobility:, Skills:, Strength:, Accessory:, Metcon:, Active Recovery:, Cool down:) MUST appear on their own line starting at position 0. Never nest one block inside another. Content lines for a block go on the lines BELOW its header.
 - Do not add, remove, or reorder any headers.
 - Prescribe weights using the athlete's 1RMs where applicable. Use / for M/F Rx (e.g. 95/65).
 - Metcon examples in the REFERENCE section are real CrossFit workouts. Use them for structural inspiration only — adapt to the athlete's profile and eligibility rules, never copy verbatim.`;
@@ -735,9 +735,9 @@ FITNESS DAY:
     if (usedArchetypes.has("recovery")) {
       archetypeRulesLines.push(`
 RECOVERY DAY:
-- Blocks: Warm-up & Mobility, Zone 2 Aerobic, Cool down. NO other blocks — do not add Skills, Strength, Accessory, or Metcon.
+- Blocks: Warm-up & Mobility, Active Recovery, Cool down. NO other blocks — do not add Skills, Strength, Accessory, or Metcon.
 - Warm-up & Mobility doubles as the week's main mobility session: joint-by-joint opening + foam rolling on chronic tight areas.
-- Zone 2 Aerobic is 20-30 min at conversational pace (HR ~65-75% max). Options: easy row, easy bike, walk, swim, yoga flow, mobility circuit. If breathing hard, slow down.
+- Active Recovery is 20-30 min of low-intensity movement. Easy walk, easy bike, light row, yoga flow, or mobility circuit. Conversational pace only. This is NOT aerobic training — purpose is blood flow and parasympathetic recovery, not stimulus.
 - Cool down: 2-3 static stretches + 2-3 min of slow nasal breathing for parasympathetic emphasis.`);
     }
     const archetypeRules = archetypeRulesLines.join("\n");
@@ -1037,14 +1037,14 @@ ${skeleton}`;
       }
       // Extract and insert blocks. Block set varies by archetype, so try all
       // possible headers and only persist the ones actually present.
-      const BLOCK_LABELS = ["Warm-up & Mobility", "Skills", "Strength", "Accessory", "Metcon", "Zone 2 Aerobic", "Cool down"];
+      const BLOCK_LABELS = ["Warm-up & Mobility", "Skills", "Strength", "Accessory", "Metcon", "Active Recovery", "Cool down"];
       const BLOCK_TYPE_MAP: Record<string, string> = {
         "warm-up & mobility": "warm-up",
         "skills": "skills",
         "strength": "strength",
         "accessory": "accessory",
         "metcon": "metcon",
-        "zone 2 aerobic": "aerobic",
+        "active recovery": "active-recovery",
         "cool down": "cool-down",
       };
       if (insertedWks?.length) {
