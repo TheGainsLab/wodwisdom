@@ -18,83 +18,100 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
 const PRIMARY_GOALS = [
-  "crossfit_competitor",
-  "hybrid",
-  "general_fitness",
-  "strength_focused",
-  "conditioning_focused",
-  "sport_specific",
-  "body_composition",
-  "health",
+  "fitness",
+  "competitor",
+  "strength_and_power",
 ] as const;
 
-const EMPHASIS_BLOCKS = ["strength", "skills", "metcon", "accessory", "aerobic"] as const;
+const SECONDARY_EMPHASIS = [
+  "weight_loss",
+  "muscle_gain",
+  "health",
+  "longevity",
+  "mobility",
+  "event_prep",
+] as const;
+
+const EMPHASIS_BLOCKS = ["strength", "skills", "metcon", "accessory"] as const;
 
 const SYSTEM_PROMPT = `You parse a CrossFit/fitness athlete's free-text training goal into structured JSON.
 
 Return ONLY a JSON object with this shape:
 {
   "primary_goal": one of [${PRIMARY_GOALS.join(", ")}],
-  "secondary_goals": array of the same enum, excluding the primary (empty array if none),
+  "secondary_emphasis": array of [${SECONDARY_EMPHASIS.join(", ")}] (empty array if none),
   "time_horizon": string or null — brief description like "8 weeks", "next year", "ongoing",
   "named_event": string or null — specific event like "CrossFit Open", "Murph", "Hyrox", "Boston Marathon",
-  "emphasis": array of [${EMPHASIS_BLOCKS.join(", ")}] — which block types to prioritize (order matters, most important first)
+  "emphasis_blocks": array of [${EMPHASIS_BLOCKS.join(", ")}] — which block types to prioritize (order matters, most important first)
 }
 
-Guidance:
-- crossfit_competitor: preparing for Open / Quarterfinals / Semifinals / Games level competition
-- hybrid: balanced CrossFit-style athlete, no specialty, wants to be good at everything
-- general_fitness: healthspan, look and feel better, no competitive goal
-- strength_focused: prioritize the big lifts, conditioning is maintenance
-- conditioning_focused: prioritize engine work, strength is maintenance
-- sport_specific: Hyrox, obstacle racing, trail running, triathlon, field sport prep
-- body_composition: weight loss, fat loss, muscle gain — physical appearance goals
-- health: blood pressure, blood sugar, longevity, rehab
+Primary goal definitions:
+- fitness: balanced general physical preparedness. The default when an athlete doesn't have a competitive or specialty focus. Wants to be strong, conditioned, and capable across movement domains. No competition pressure.
+- competitor: training for CrossFit-style competition (Open, Quarterfinals, local throwdowns). Higher gymnastics / Olympic lifting volume, more metcon exposure, peaking around named events.
+- strength_and_power: prioritize the big barbell lifts (squat, deadlift, press, Olympic). Conditioning is maintenance. More accessory volume for hypertrophy and weak-point work.
+
+Secondary emphasis (independent of primary goal — captures lifestyle / aesthetic / health goals):
+- weight_loss: lose body fat
+- muscle_gain: add lean mass
+- health: blood pressure, blood sugar, cardiovascular markers
+- longevity: healthspan, mobility through aging
+- mobility: improve range of motion, address imbalances
+- event_prep: training for a specific named event (use when "named_event" is set)
 
 Examples:
 Input: "Prep for the Open next year and add 20 lbs to my deadlift"
-Output: { "primary_goal": "crossfit_competitor", "secondary_goals": ["strength_focused"], "time_horizon": "next year", "named_event": "CrossFit Open", "emphasis": ["metcon", "strength", "skills"] }
+Output: { "primary_goal": "competitor", "secondary_emphasis": ["event_prep", "muscle_gain"], "time_horizon": "next year", "named_event": "CrossFit Open", "emphasis_blocks": ["metcon", "strength", "skills"] }
 
 Input: "I just want to feel good and lose some belly fat"
-Output: { "primary_goal": "body_composition", "secondary_goals": ["general_fitness"], "time_horizon": null, "named_event": null, "emphasis": ["metcon", "strength", "accessory"] }
+Output: { "primary_goal": "fitness", "secondary_emphasis": ["weight_loss"], "time_horizon": null, "named_event": null, "emphasis_blocks": ["metcon", "strength", "accessory"] }
 
 Input: "Train for Murph in May, then just stay in shape"
-Output: { "primary_goal": "sport_specific", "secondary_goals": ["general_fitness"], "time_horizon": "until May", "named_event": "Murph", "emphasis": ["aerobic", "metcon", "skills"] }
+Output: { "primary_goal": "fitness", "secondary_emphasis": ["event_prep"], "time_horizon": "until May", "named_event": "Murph", "emphasis_blocks": ["metcon", "skills", "strength"] }
 
-Input: "Be strong and conditioned for whatever life throws at me, maybe some Hyrox"
-Output: { "primary_goal": "hybrid", "secondary_goals": ["sport_specific"], "time_horizon": "ongoing", "named_event": "Hyrox", "emphasis": ["metcon", "strength", "aerobic"] }
+Input: "I want a big squat and deadlift, look strong, conditioning is whatever"
+Output: { "primary_goal": "strength_and_power", "secondary_emphasis": ["muscle_gain"], "time_horizon": "ongoing", "named_event": null, "emphasis_blocks": ["strength", "accessory", "metcon"] }
 
-If the goal is empty or unclear, default to primary_goal "general_fitness" with emphasis ["metcon", "strength", "skills"].
+Input: "Be strong and conditioned for whatever life throws at me"
+Output: { "primary_goal": "fitness", "secondary_emphasis": [], "time_horizon": "ongoing", "named_event": null, "emphasis_blocks": ["metcon", "strength", "skills"] }
+
+If the goal is empty or unclear, default to primary_goal "fitness" with emphasis_blocks ["metcon", "strength", "skills"] and empty secondary_emphasis.
 
 Output valid JSON only, no markdown fences.`;
 
 interface ParsedGoal {
   primary_goal: typeof PRIMARY_GOALS[number];
-  secondary_goals: typeof PRIMARY_GOALS[number][];
+  secondary_emphasis: typeof SECONDARY_EMPHASIS[number][];
   time_horizon: string | null;
   named_event: string | null;
-  emphasis: typeof EMPHASIS_BLOCKS[number][];
+  emphasis_blocks: typeof EMPHASIS_BLOCKS[number][];
 }
 
 function validateGoal(raw: unknown): ParsedGoal {
-  const g = raw as Partial<ParsedGoal>;
+  const g = raw as Partial<ParsedGoal> & Record<string, unknown>;
   const primary = typeof g.primary_goal === "string" && PRIMARY_GOALS.includes(g.primary_goal as typeof PRIMARY_GOALS[number])
     ? g.primary_goal as typeof PRIMARY_GOALS[number]
-    : "general_fitness";
-  const secondary = Array.isArray(g.secondary_goals)
-    ? g.secondary_goals.filter((x): x is typeof PRIMARY_GOALS[number] =>
-        typeof x === "string" && PRIMARY_GOALS.includes(x as typeof PRIMARY_GOALS[number]) && x !== primary)
-    : [];
-  const emphasis = Array.isArray(g.emphasis)
-    ? g.emphasis.filter((x): x is typeof EMPHASIS_BLOCKS[number] =>
-        typeof x === "string" && EMPHASIS_BLOCKS.includes(x as typeof EMPHASIS_BLOCKS[number]))
-    : ["metcon", "strength", "skills"];
+    : "fitness";
+  // Accept either secondary_emphasis (new shape) or secondary_goals (legacy callers)
+  const rawSecondary = Array.isArray(g.secondary_emphasis)
+    ? g.secondary_emphasis
+    : Array.isArray(g.secondary_goals)
+      ? g.secondary_goals
+      : [];
+  const secondary_emphasis = rawSecondary.filter((x: unknown): x is typeof SECONDARY_EMPHASIS[number] =>
+    typeof x === "string" && SECONDARY_EMPHASIS.includes(x as typeof SECONDARY_EMPHASIS[number]));
+  const rawEmphasis = Array.isArray(g.emphasis_blocks)
+    ? g.emphasis_blocks
+    : Array.isArray(g.emphasis)
+      ? g.emphasis
+      : ["metcon", "strength", "skills"];
+  const emphasis_blocks = rawEmphasis.filter((x: unknown): x is typeof EMPHASIS_BLOCKS[number] =>
+    typeof x === "string" && EMPHASIS_BLOCKS.includes(x as typeof EMPHASIS_BLOCKS[number]));
   return {
     primary_goal: primary,
-    secondary_goals: secondary,
+    secondary_emphasis,
     time_horizon: typeof g.time_horizon === "string" && g.time_horizon.trim() ? g.time_horizon.trim() : null,
     named_event: typeof g.named_event === "string" && g.named_event.trim() ? g.named_event.trim() : null,
-    emphasis,
+    emphasis_blocks,
   };
 }
 
