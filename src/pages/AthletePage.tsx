@@ -165,6 +165,14 @@ const CONDITIONING_GROUPS = [
 const SKILL_LEVELS = ['none', 'beginner', 'intermediate', 'advanced'] as const;
 type SkillLevel = typeof SKILL_LEVELS[number];
 
+const SELF_PERCEPTION_LEVELS = [
+  { value: 'beginner', label: 'Beginner' },
+  { value: 'intermediate', label: 'Intermediate' },
+  { value: 'advanced', label: 'Advanced' },
+  { value: 'competitive', label: 'Competitive' },
+  { value: 'not_sure', label: 'Not sure' },
+] as const;
+
 const LEVEL_LABELS: Record<SkillLevel, string> = {
   none: 'None',
   beginner: 'Beginner',
@@ -332,6 +340,8 @@ export default function AthletePage({ session }: { session: Session }) {
   const [daysPerWeek, setDaysPerWeek] = useState<string>('');
   const [sessionLengthMinutes, setSessionLengthMinutes] = useState<string>('');
   const [injuriesConstraints, setInjuriesConstraints] = useState<string>('');
+  const [goal, setGoal] = useState<string>('');
+  const [selfPerceptionLevel, setSelfPerceptionLevel] = useState<string>('');
 
   const navigate = useNavigate();
   const { hasFeature, isAdmin } = useEntitlements(session.user.id);
@@ -379,7 +389,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, self_perception_level')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -423,6 +433,8 @@ export default function AthletePage({ session }: { session: Session }) {
         setDaysPerWeek(d.days_per_week != null ? String(d.days_per_week) : '');
         setSessionLengthMinutes(d.session_length_minutes != null ? String(d.session_length_minutes) : '');
         setInjuriesConstraints(d.injuries_constraints || '');
+        setGoal(d.goal || '');
+        setSelfPerceptionLevel(d.self_perception_level || '');
         setIsDirty(false);
       }
       if (evalRes.data) {
@@ -599,6 +611,8 @@ export default function AthletePage({ session }: { session: Session }) {
           days_per_week: daysPerWeekNum && !isNaN(daysPerWeekNum) ? daysPerWeekNum : null,
           session_length_minutes: sessionLengthNum && !isNaN(sessionLengthNum) ? sessionLengthNum : null,
           injuries_constraints: injuriesVal,
+          goal: goal.trim() || null,
+          self_perception_level: selfPerceptionLevel || null,
           ...levels,
           updated_at: new Date().toISOString(),
         },
@@ -630,6 +644,8 @@ export default function AthletePage({ session }: { session: Session }) {
     days_per_week: daysPerWeek ? parseInt(daysPerWeek, 10) : null,
     session_length_minutes: sessionLengthMinutes ? parseInt(sessionLengthMinutes, 10) : null,
     injuries_constraints: injuriesConstraints || null,
+    goal: goal.trim() || null,
+    self_perception_level: selfPerceptionLevel || null,
   };
   const tierStatus = getTierStatus(tierStatusInput);
 
@@ -923,6 +939,38 @@ export default function AthletePage({ session }: { session: Session }) {
                           value={sessionLengthMinutes}
                           onChange={e => { setSessionLengthMinutes(e.target.value); markDirty(); }}
                         />
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>
+                        What are your goals? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(free text)</span>
+                      </div>
+                      <textarea
+                        className="lift-input"
+                        rows={3}
+                        placeholder='e.g. "Prep for the Open next year, also want to add 20 lbs to my deadlift and drop my 5K under 22 min"'
+                        value={goal}
+                        onChange={e => { setGoal(e.target.value); markDirty(); }}
+                        style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>
+                        What level do you think you are? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {SELF_PERCEPTION_LEVELS.map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            className={'skill-level-btn' + (selfPerceptionLevel === opt.value ? ' active' : '')}
+                            onClick={() => { setSelfPerceptionLevel(opt.value); markDirty(); }}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
 

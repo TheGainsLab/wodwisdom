@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
     // Fetch current profile
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
-      .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender")
+      .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, goal, self_perception_level, days_per_week, session_length_minutes, injuries_constraints")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -291,6 +291,11 @@ Deno.serve(async (req) => {
         age: profileData.age ?? null,
         height: profileData.height ?? null,
         gender: profileData.gender ?? null,
+        goal: (profileData as { goal?: string | null }).goal ?? null,
+        self_perception_level: (profileData as { self_perception_level?: string | null }).self_perception_level ?? null,
+        days_per_week: (profileData as { days_per_week?: number | null }).days_per_week ?? null,
+        session_length_minutes: (profileData as { session_length_minutes?: number | null }).session_length_minutes ?? null,
+        injuries_constraints: (profileData as { injuries_constraints?: string | null }).injuries_constraints ?? null,
       },
     };
     if (programId) evalRow.program_id = programId;
