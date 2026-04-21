@@ -918,24 +918,24 @@ export default function AthletePage({ session }: { session: Session }) {
 
                     <div className="lift-grid" style={{ marginBottom: 16 }}>
                       <div className="lift-item">
-                        <span className="lift-label">Days / week</span>
+                        <span className="lift-label">Days / week <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11 }}>(3–6 days)</span></span>
                         <input
                           className="lift-input"
                           type="number"
-                          min="1"
-                          max="7"
+                          min="3"
+                          max="6"
                           placeholder="—"
                           value={daysPerWeek}
                           onChange={e => { setDaysPerWeek(e.target.value); markDirty(); }}
                         />
                       </div>
                       <div className="lift-item">
-                        <span className="lift-label">Session length (min)</span>
+                        <span className="lift-label">Session length (min) <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11 }}>(30–120 min)</span></span>
                         <input
                           className="lift-input"
                           type="number"
-                          min="10"
-                          max="240"
+                          min="30"
+                          max="120"
                           step="5"
                           placeholder="—"
                           value={sessionLengthMinutes}
