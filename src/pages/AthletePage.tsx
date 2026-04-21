@@ -577,7 +577,9 @@ export default function AthletePage({ session }: { session: Session }) {
 
     const daysPerWeekNum = daysPerWeek === '' ? null : parseInt(daysPerWeek, 10);
     const sessionLengthNum = sessionLengthMinutes === '' ? null : parseInt(sessionLengthMinutes, 10);
-    const injuriesVal = injuriesConstraints.trim() === '' ? null : injuriesConstraints.trim();
+    // Default empty injuries field to "None" so T3 still completes for
+    // users who have no constraints and skip the field.
+    const injuriesVal = injuriesConstraints.trim() === '' ? 'None' : injuriesConstraints.trim();
 
     // Fill any unrated skill with 'none' on save. The UI already shows
     // None as the default selection for unrated skills (via `|| 'none'`
@@ -643,7 +645,7 @@ export default function AthletePage({ session }: { session: Session }) {
     equipment,
     days_per_week: daysPerWeek ? parseInt(daysPerWeek, 10) : null,
     session_length_minutes: sessionLengthMinutes ? parseInt(sessionLengthMinutes, 10) : null,
-    injuries_constraints: injuriesConstraints || null,
+    injuries_constraints: injuriesConstraints.trim() || 'None',
     goal: goal.trim() || null,
     self_perception_level: selfPerceptionLevel || null,
   };
@@ -952,7 +954,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         placeholder='e.g. "Prep for the Open next year, also want to add 20 lbs to my deadlift and drop my 5K under 22 min"'
                         value={goal}
                         onChange={e => { setGoal(e.target.value); markDirty(); }}
-                        style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
+                        style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
                       />
                     </div>
 
@@ -981,10 +983,10 @@ export default function AthletePage({ session }: { session: Session }) {
                       <textarea
                         className="lift-input"
                         rows={3}
-                        placeholder='e.g. "right shoulder — no overhead pressing"'
+                        placeholder='e.g. "right shoulder — no overhead pressing". Leave blank or type "none" if you have no constraints.'
                         value={injuriesConstraints}
                         onChange={e => { setInjuriesConstraints(e.target.value); markDirty(); }}
-                        style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
+                        style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
                       />
                     </div>
                   </div>
