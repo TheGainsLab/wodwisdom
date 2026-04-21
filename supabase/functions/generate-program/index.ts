@@ -770,6 +770,40 @@ RECOVERY DAY:
 - Allow all advanced schemes plus benchmark workout exposure (Fran, Helen, Grace, etc.).`,
     };
 
+    // Session length modifier — dials volume up or down within each block based
+    // on how long the athlete has per session. Composes multiplicatively with
+    // the experience tier modifier (i.e., novice at 30 min = 0.7 × 0.7 = 0.49×
+    // baseline; competitor at 90+ min = 1.2 × 1.2 = 1.44× baseline).
+    const sessionMin = athleteLive?.session_length_minutes ?? 60;
+    const sessionBracket = sessionMin < 45 ? "30-44"
+      : sessionMin < 60 ? "45-59"
+      : sessionMin < 75 ? "60-74"
+      : sessionMin < 90 ? "75-89"
+      : "90+";
+    const sessionMultiplier = sessionMin < 45 ? "0.70×"
+      : sessionMin < 60 ? "0.85×"
+      : sessionMin < 75 ? "1.00×"
+      : sessionMin < 90 ? "1.10×"
+      : "1.20×";
+    const sessionGuidance = sessionMin < 45
+      ? "Heavily condensed session. Accessory block is optional and often cut. Strength: max 3 working sets. Metcon: short time domains only (sub-12 min). Warm-up & Mobility: ~8 min max."
+      : sessionMin < 60
+      ? "Condensed session. Accessory reduced to 1-2 movements. Strength: standard scheme with fewer sets. Metcon: short to medium time domains."
+      : sessionMin < 75
+      ? "Default prescriptions per archetype spec."
+      : sessionMin < 90
+      ? "Extra room to work. Add one extra accessory movement, slightly longer Strength or Metcon blocks. Skill block can include an extra progression variant on Skill Days."
+      : "Maximum block durations. Secondary lift allowed on Strength Day. Metcon can run to the long end. Skill Day can fit a test set plus two progression tracks. More accessory volume.";
+    const sessionLengthModifier = `SESSION LENGTH MODIFIER (${sessionMin} min / bracket ${sessionBracket}, volume ${sessionMultiplier}):
+- ${sessionGuidance}
+- When trimming is needed (volume < 1.0×), cut in this priority order:
+  1. Accessory first (it's the most optional block)
+  2. Skills (reduce to a primer on Metcon Days and Fitness Days if time is very tight)
+  3. Warm-up & Mobility (can shrink from 15 min to ~8 min if needed)
+  4. NEVER trim the archetype's main event — Strength Day keeps its Strength block, Metcon Day keeps its Metcon, Skill Day keeps its extended Skills block.
+- When expanding (volume > 1.0×), add depth to the archetype's main event first, then Accessory, then Skills.
+- This modifier COMPOSES with the experience tier modifier. Apply both multiplicatively — e.g., novice + 30 min = 0.7 × 0.7 = ~0.49× baseline; competitor + 90+ min = 1.2 × 1.2 = ~1.44× baseline.`;
+
     const userPrompt = `ATHLETE PROFILE:
 ${profileStr}
 
@@ -782,6 +816,8 @@ ${archetypePlan}
 ${archetypeRules}
 
 ${tierModifier[tier]}
+
+${sessionLengthModifier}
 
 WARM-UP & MOBILITY BLOCK RULES:
 The Warm-up & Mobility: block is a single combined block that progresses from general preparation to targeted drills for the day's work.
