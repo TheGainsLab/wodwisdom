@@ -154,7 +154,7 @@ METCON DESIGN RULES (apply to every Metcon: block — note Metcon does NOT appea
 6. DEVELOPING SKILLS BAN (HARD CONSTRAINT) — The following movements are NOT allowed in any Metcon: block. They belong exclusively in the Skills: block. This is non-negotiable — zero exceptions.
    BANNED FROM METCONS: {developingSkills}`;
 /* ------------------------------------------------------------------ */
-/*  SKELETON BUILDER — full 20-day template                           */
+/*  SKELETON BUILDER — variable-shape template from weekly pattern     */
 /* ------------------------------------------------------------------ */
 /**
  * Variable-shape skeleton builder. Emits the day count and block composition
@@ -451,9 +451,10 @@ function validateMetcons(
     }
   }
 
-  // Rule 1 frequency cap: no movement in more than 6 of 20 metcons
-  // Build a simple word-frequency map of full metcon texts
-  // We check for known movement patterns rather than individual words
+  // Rule 1 frequency cap: no movement in more than 30% of metcons across
+  // the program. Cap scales with total metcon count (which varies by
+  // archetype pattern) — not a hardcoded number.
+  // We check for known movement patterns rather than individual words.
   const movementDayCount = new Map<string, number[]>();
   const MOVEMENT_PATTERNS = [
     "thruster", "clean and jerk", "clean & jerk", "power clean", "squat clean", "hang clean",
@@ -482,11 +483,13 @@ function validateMetcons(
     }
   }
 
+  const totalMetcons = metcons.length;
+  const freqCap = Math.max(2, Math.ceil(totalMetcons * 0.30));
   for (const [movement, days] of movementDayCount) {
-    if (days.length > 6) {
+    if (days.length > freqCap) {
       violations.push({
         rule: "Rule 1 (Frequency Cap)",
-        detail: `"${movement}" appears in ${days.length}/20 metcons (max 6). Days: ${days.join(", ")}.`,
+        detail: `"${movement}" appears in ${days.length}/${totalMetcons} metcons (max ${freqCap} = 30% of program metcons). Days: ${days.join(", ")}.`,
       });
     }
   }
@@ -979,7 +982,7 @@ ${skeleton}`;
         if (attempt < MAX_ATTEMPTS) {
           const violationList = metconViolations.map((v) => `- ${v.rule}: ${v.detail}`).join("\n");
           messages.push({ role: "assistant", content: programText });
-          messages.push({ role: "user", content: `That program has metcon rule violations:\n${violationList}\n\nPlease fix these violations and output the complete 20-day program again.` });
+          messages.push({ role: "user", content: `That program has metcon rule violations:\n${violationList}\n\nPlease fix these violations and output the complete ${expectedDayCount}-day program again.` });
           continue;
         }
         // On final attempt, log but proceed — partial compliance is better than failure
