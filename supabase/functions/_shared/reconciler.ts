@@ -8,15 +8,19 @@
  * before generation.
  */
 
-import type { DomainLevels } from "./level-interpreter.ts";
+import type { DomainLevels, ExperienceTier } from "./level-interpreter.ts";
 import { calibrationDelta } from "./level-interpreter.ts";
+import type { DayArchetype } from "./archetype-specs.ts";
+import { getMonthlyPattern, normalizeDaysPerWeek } from "./weekly-patterns.ts";
+
+export type PrimaryGoal = "fitness" | "competitor" | "strength_and_power";
 
 export interface ParsedGoal {
-  primary_goal: string;
-  secondary_goals: string[];
+  primary_goal: PrimaryGoal;
+  secondary_emphasis: string[];
   time_horizon: string | null;
   named_event: string | null;
-  emphasis: string[];
+  emphasis_blocks: string[];
 }
 
 export interface ParsedInjury {
@@ -52,6 +56,12 @@ export interface InterpretedProfile {
   /** Flat list of prohibited movement strings from all injuries, for prompt use. */
   prohibited_movements: string[];
   caution_movements: string[];
+  /** Tier used for generation (after upward-only ratchet). */
+  effective_tier: ExperienceTier;
+  /** Days per week clamped to supported range (3-6). */
+  days_per_week: 3 | 4 | 5 | 6;
+  /** Archetypes per week for the next month. weeks[0..2] = baseline, weeks[3] = deload. */
+  weekly_pattern: { weeks: DayArchetype[][]; baseline: DayArchetype[]; deload: DayArchetype[] };
 }
 
 function detectBlockers(goal: ParsedGoal, injuries: ParsedInjuries): Blocker[] {
@@ -65,20 +75,37 @@ function detectBlockers(goal: ParsedGoal, injuries: ParsedInjuries): Blocker[] {
   );
 
   // CrossFit competitor goal + overhead restriction is a fundamental conflict.
-  if (goal.primary_goal === "crossfit_competitor" && hasOverheadRestriction) {
+  if (goal.primary_goal === "competitor" && hasOverheadRestriction) {
     blockers.push({
       kind: "goal_injury_conflict",
       description:
         "Competition-level CrossFit programming requires overhead pressing (snatch, jerk, push press, HSPU). The listed injury prohibits these movements.",
       suggested_resolution:
-        "Either clear overhead movement with a medical professional and update the injury note, or adjust the goal to a non-overhead-dependent track (e.g., strength_focused or hybrid).",
+        "Either clear overhead movement with a medical professional and update the injury note, or change the goal to fitness or strength_and_power.",
     });
   }
 
-  // Competitor goal + no strict muscle-ups signaled in programming-worthy way
-  // is a GAP, not a blocker — handled elsewhere. Don't block on it.
-
   return blockers;
+}
+
+/**
+ * Apply upward-only tier ratchet. If the previous tier was higher than the
+ * newly-derived tier, keep the previous tier — never demote month-over-month
+ * unless the athlete explicitly resets their profile.
+ */
+const TIER_RANK: Record<ExperienceTier, number> = {
+  novice: 0,
+  intermediate: 1,
+  advanced: 2,
+  competitor: 3,
+};
+const RANK_TO_TIER: ExperienceTier[] = ["novice", "intermediate", "advanced", "competitor"];
+
+function ratchetTier(newTier: ExperienceTier, previousTier: ExperienceTier | null | undefined): ExperienceTier {
+  if (!previousTier) return newTier;
+  const newRank = TIER_RANK[newTier] ?? 0;
+  const prevRank = TIER_RANK[previousTier] ?? 0;
+  return RANK_TO_TIER[Math.max(newRank, prevRank)];
 }
 
 export function reconcileProfile(args: {
@@ -86,9 +113,13 @@ export function reconcileProfile(args: {
   injuries: ParsedInjuries;
   levels: DomainLevels;
   self_perception_level: string | null;
+  days_per_week: number | null | undefined;
+  /** Previous month's effective tier — used for upward-only ratchet. */
+  previous_tier?: ExperienceTier | null;
 }): InterpretedProfile {
-  const { goal, injuries, levels, self_perception_level } = args;
-  const calibration = calibrationDelta(self_perception_level, levels.experience_tier);
+  const { goal, injuries, levels, self_perception_level, days_per_week, previous_tier } = args;
+  const effective_tier = ratchetTier(levels.experience_tier, previous_tier ?? null);
+  const calibration = calibrationDelta(self_perception_level, effective_tier);
   const blockers = detectBlockers(goal, injuries);
   const prohibited_movements = Array.from(
     new Set(injuries.constraints.flatMap((c) => c.prohibited_movements)),
@@ -96,6 +127,8 @@ export function reconcileProfile(args: {
   const caution_movements = Array.from(
     new Set(injuries.constraints.flatMap((c) => c.caution_movements)),
   );
+  const normalizedDays = normalizeDaysPerWeek(days_per_week);
+  const monthlyPattern = getMonthlyPattern(goal.primary_goal, normalizedDays);
   return {
     goal,
     injuries,
@@ -105,6 +138,13 @@ export function reconcileProfile(args: {
     blockers,
     prohibited_movements,
     caution_movements,
+    effective_tier,
+    days_per_week: normalizedDays,
+    weekly_pattern: {
+      weeks: monthlyPattern.weeks,
+      baseline: monthlyPattern.baseline,
+      deload: monthlyPattern.deload,
+    },
   };
 }
 
@@ -115,13 +155,13 @@ export function formatInterpretedProfile(ip: InterpretedProfile): string {
   lines.push("");
   lines.push("Goal:");
   lines.push(`  Primary: ${ip.goal.primary_goal}`);
-  if (ip.goal.secondary_goals.length > 0) {
-    lines.push(`  Secondary: ${ip.goal.secondary_goals.join(", ")}`);
+  if (ip.goal.secondary_emphasis.length > 0) {
+    lines.push(`  Secondary emphasis: ${ip.goal.secondary_emphasis.join(", ")}`);
   }
   if (ip.goal.time_horizon) lines.push(`  Time horizon: ${ip.goal.time_horizon}`);
   if (ip.goal.named_event) lines.push(`  Named event: ${ip.goal.named_event}`);
-  if (ip.goal.emphasis.length > 0) {
-    lines.push(`  Emphasis (most → least): ${ip.goal.emphasis.join(" → ")}`);
+  if (ip.goal.emphasis_blocks.length > 0) {
+    lines.push(`  Emphasis (most → least): ${ip.goal.emphasis_blocks.join(" → ")}`);
   }
   lines.push("");
   lines.push("Evidence-based levels:");
@@ -132,7 +172,16 @@ export function formatInterpretedProfile(ip: InterpretedProfile): string {
   if (liftDetails) lines.push(`  By lift: ${liftDetails}`);
   lines.push(`  Skills: ${ip.levels.skills.overall} (${ip.levels.skills.proficient_count} intermediate+ of ${ip.levels.skills.total_rated} rated)`);
   lines.push(`  Conditioning: ${ip.levels.conditioning.overall} (${ip.levels.conditioning.benchmarks_present} benchmarks provided)`);
-  lines.push(`  Experience tier: ${ip.levels.experience_tier}`);
+  lines.push(`  Experience tier (raw): ${ip.levels.experience_tier}`);
+  if (ip.effective_tier !== ip.levels.experience_tier) {
+    lines.push(`  Effective tier (after upward ratchet): ${ip.effective_tier}`);
+  } else {
+    lines.push(`  Effective tier: ${ip.effective_tier}`);
+  }
+  lines.push("");
+  lines.push(`Schedule: ${ip.days_per_week} days/week`);
+  lines.push(`Weekly pattern (Weeks 1-3): ${ip.weekly_pattern.baseline.map((a) => a).join(" → ")}`);
+  lines.push(`Week 4 (deload): ${ip.weekly_pattern.deload.map((a) => a).join(" → ")}`);
   lines.push("");
   if (ip.self_perception_level && ip.self_perception_level !== "not_sure") {
     lines.push(`Self-perception: ${ip.self_perception_level}`);

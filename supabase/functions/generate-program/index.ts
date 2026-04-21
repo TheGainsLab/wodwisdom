@@ -17,6 +17,8 @@ import { getTierStatus } from "../_shared/tier-status.ts";
 import { interpretLevels } from "../_shared/level-interpreter.ts";
 import { reconcileProfile, formatInterpretedProfile } from "../_shared/reconciler.ts";
 import type { ParsedGoal, ParsedInjuries } from "../_shared/reconciler.ts";
+import { ARCHETYPES } from "../_shared/archetype-specs.ts";
+import type { DayArchetype } from "../_shared/archetype-specs.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
@@ -125,53 +127,74 @@ FORMATTING EXAMPLES (follow these exactly):
     5 RFT:
     10 Box Jump Overs 30/24
     8 HSPU
-- Each block header (Warm-up & Mobility:, Skills:, Strength:, Accessory:, Metcon:, Cool down:) MUST appear on its own line starting at position 0. Never nest one block inside another. Content lines for a block go on the lines BELOW its header.
+- Each day header includes the archetype tag in square brackets (e.g., "Day 1: [Strength Day]"). The blocks for that day are dictated by the archetype — DO NOT add or remove blocks beyond what the template provides.
+- Block headers (Warm-up & Mobility:, Skills:, Strength:, Accessory:, Metcon:, Active Recovery:, Cool down:) MUST appear on their own line starting at position 0. Never nest one block inside another. Content lines for a block go on the lines BELOW its header.
 - Do not add, remove, or reorder any headers.
 - Prescribe weights using the athlete's 1RMs where applicable. Use / for M/F Rx (e.g. 95/65).
 - Metcon examples in the REFERENCE section are real CrossFit workouts. Use them for structural inspiration only — adapt to the athlete's profile and eligibility rules, never copy verbatim.`;
 
 const METCON_GUIDANCE = `
 
-METCON DESIGN RULES (apply to every Metcon: block):
+METCON DESIGN RULES (apply to every Metcon: block — note Metcon does NOT appear on every day, only on Metcon Days, Fitness Days, and some Skill/Recovery patterns):
 
-1. BREADTH OVER WEAKNESS — Metcons draw from movements the athlete is PROFICIENT at (intermediate or advanced). Weaknesses and developing skills belong in the Skills block, not the Metcon. If the athlete is advanced at ring muscle-ups, use them in metcons. If the athlete is beginner at HSPU, never put HSPU in a metcon — that stays in the skill block. See the METCON MOVEMENT ELIGIBILITY section for the explicit lists. FREQUENCY CAP: No single movement may appear in more than 6 of the 20 metcons across the program. Spread variety — if you reach 6 uses, pick a different movement.
+1. BREADTH OVER WEAKNESS — Metcons draw from movements the athlete is PROFICIENT at (intermediate or advanced). Weaknesses and developing skills belong in the Skills block, not the Metcon. If the athlete is advanced at ring muscle-ups, use them in metcons. If the athlete is beginner at HSPU, never put HSPU in a metcon — that stays in the skill block. See the METCON MOVEMENT ELIGIBILITY section for the explicit lists. FREQUENCY CAP: No single movement may appear in more than 30% of the metcons across the program. Spread variety.
 
-2. MONOSTRUCTURAL CAP — Across the 5 metcons in any single week, at most 2 may include a monostructural cardio element (row, bike, ski erg, run — any of these count). This is a hard cap. Weeks 1-4 each independently enforce this limit.
+2. MONOSTRUCTURAL CAP — Across the metcons in any single week, at most half may include a monostructural cardio element (row, bike, ski erg, run — any of these count). For weeks with 1-2 metcons, allow at most 1 monostructural metcon.
 
-3. LOADING PREFERENCES — When a metcon calls for a weighted movement, prefer barbells and dumbbells over kettlebells. Kettlebells are acceptable when the movement is inherently KB-based (e.g., Turkish get-ups, KB swings) but do not substitute KBs for movements that can use a barbell or dumbbell. BARBELL CYCLING: Do not repeat the same barbell movement in back-to-back metcons (e.g., if Day 3's metcon has thrusters, Day 4's metcon should not). Rotate barbell movements across days.
+3. LOADING PREFERENCES — When a metcon calls for a weighted movement, prefer barbells and dumbbells over kettlebells. Kettlebells are acceptable when the movement is inherently KB-based (e.g., Turkish get-ups, KB swings) but do not substitute KBs for movements that can use a barbell or dumbbell. BARBELL CYCLING: Do not repeat the same barbell movement in back-to-back metcons (e.g., if a metcon has thrusters, the next metcon in the week should not). Rotate barbell movements across days.
 
 4. TIME DOMAIN DISTRIBUTION (per week) — Assign a target time domain to each metcon:
    - Short: sub-8 minutes
    - Medium: 8-15 minutes
    - Long: 15+ minutes
-   Each week must include at least 1 short, 1 medium, and 1 long metcon. No single category may appear more than 3 times in one week. Design the rep schemes, round counts, and movement complexity to fit the target time domain.
+   For weeks with 3+ metcons, include at least 1 short, 1 medium, and 1 long. For weeks with 2 metcons, include at least 2 different domains. For weeks with 1 metcon, vary the domain across weeks. No single category may appear in more than half the week's metcons.
 
-5. COMPLEMENT THE STRENGTH BLOCK — If a day's Strength block is squat-dominant, the Metcon must NOT be squat-dominant. If Strength is pressing, the Metcon should not be press-heavy. The metcon should use complementary movement patterns to avoid overloading the same muscle groups.
+5. COMPLEMENT THE STRENGTH BLOCK — If a day's Strength block is squat-dominant, the Metcon must NOT be squat-dominant. If Strength is pressing, the Metcon should not be press-heavy. The metcon should use complementary movement patterns to avoid overloading the same muscle groups. Apply same logic across adjacent days — if yesterday was a heavy squat Strength Day, today's Metcon (if any) should not be squat-dominant.
 
 6. DEVELOPING SKILLS BAN (HARD CONSTRAINT) — The following movements are NOT allowed in any Metcon: block. They belong exclusively in the Skills: block. This is non-negotiable — zero exceptions.
    BANNED FROM METCONS: {developingSkills}`;
 /* ------------------------------------------------------------------ */
 /*  SKELETON BUILDER — full 20-day template                           */
 /* ------------------------------------------------------------------ */
-function buildProgramSkeleton(monthNumber: number = 1): string {
-  const dayOffset = (monthNumber - 1) * 20;
+/**
+ * Variable-shape skeleton builder. Emits the day count and block composition
+ * dictated by `weeks` (an array of 4 week-arrays of archetypes).
+ *
+ * The day_offset grows each month so day numbers stay continuous across
+ * months (Month 2 starts at Day N+1 where N is the last day of Month 1's
+ * actual day count, not a hardcoded 20).
+ */
+function buildProgramSkeleton(args: {
+  monthNumber: number;
+  weeks: import("../_shared/archetype-specs.ts").DayArchetype[][];
+}): { skeleton: string; daysInMonth: number } {
+  const { monthNumber, weeks } = args;
   const weekOffset = (monthNumber - 1) * 4;
   const lines: string[] = [];
-  for (let week = 1; week <= 4; week++) {
-    lines.push(`Week ${weekOffset + week}`);
-    for (let day = 1; day <= 5; day++) {
-      const dayNum = dayOffset + (week - 1) * 5 + day;
-      lines.push(`Day ${dayNum}:`);
-      lines.push(`Warm-up & Mobility: `);
-      lines.push(`Skills: `);
-      lines.push(`Strength: `);
-      lines.push(`Accessory: `);
-      lines.push(`Metcon: `);
-      lines.push(`Cool down: `);
+  let dayCounter = 0;
+  // For continuous day numbering across months, count prior days from prior
+  // months' patterns. Caller should pass a consistent `weeks` shape per month
+  // to avoid drift; for v1 we just use this month's day count and offset by
+  // (monthNumber-1) * thisMonthDayCount.
+  const daysPerWeek = weeks[0]?.length ?? 5;
+  const dayOffset = (monthNumber - 1) * (daysPerWeek * 4);
+
+  for (let weekIdx = 0; weekIdx < weeks.length; weekIdx++) {
+    const weekDays = weeks[weekIdx];
+    lines.push(`Week ${weekOffset + weekIdx + 1}`);
+    for (let dayIdx = 0; dayIdx < weekDays.length; dayIdx++) {
+      const archetype = weekDays[dayIdx];
+      const spec = ARCHETYPES[archetype];
+      dayCounter++;
+      const dayNum = dayOffset + dayCounter;
+      lines.push(`Day ${dayNum}: [${spec.displayLabel}]`);
+      for (const block of spec.blocks) {
+        lines.push(`${block.header}: `);
+      }
       lines.push(``);
     }
   }
-  return lines.join("\n");
+  return { skeleton: lines.join("\n"), daysInMonth: dayCounter };
 }
 
 /* ------------------------------------------------------------------ */
@@ -550,11 +573,11 @@ async function processJob(
     console.log(`[generate-program] Classifiers: ${((Date.now() - classifierStart) / 1000).toFixed(1)}s`);
 
     const parsedGoal: ParsedGoal = (goalResult?.data?.goal as ParsedGoal) ?? {
-      primary_goal: "general_fitness",
-      secondary_goals: [],
+      primary_goal: "fitness",
+      secondary_emphasis: [],
       time_horizon: null,
       named_event: null,
-      emphasis: ["metcon", "strength", "skills"],
+      emphasis_blocks: ["metcon", "strength", "skills"],
     };
     const parsedInjuries: ParsedInjuries = (injuriesResult?.data as ParsedInjuries) ?? {
       constraints: [],
@@ -571,14 +594,29 @@ async function processJob(
       skills: profile.skills,
       conditioning: profile.conditioning,
     });
+    // Look up previous month's effective tier (for upward-only ratchet).
+    let previousTier: import("../_shared/level-interpreter.ts").ExperienceTier | null = null;
+    if (existingProgramId) {
+      const { data: prevProgram } = await supa
+        .from("programs")
+        .select("experience_tier_at_gen")
+        .eq("id", existingProgramId)
+        .maybeSingle();
+      const t = prevProgram?.experience_tier_at_gen;
+      if (t === "novice" || t === "intermediate" || t === "advanced" || t === "competitor") {
+        previousTier = t;
+      }
+    }
     const interpretedProfile = reconcileProfile({
       goal: parsedGoal,
       injuries: parsedInjuries,
       levels,
       self_perception_level: selfPerception,
+      days_per_week: athleteLive?.days_per_week ?? null,
+      previous_tier: previousTier,
     });
     const interpretedBlock = "\n" + formatInterpretedProfile(interpretedProfile) + "\n";
-    console.log(`[generate-program] Interpreted: goal=${interpretedProfile.goal.primary_goal}, tier=${interpretedProfile.levels.experience_tier}, blockers=${interpretedProfile.blockers.length}`);
+    console.log(`[generate-program] Interpreted: goal=${interpretedProfile.goal.primary_goal}, tier=${interpretedProfile.effective_tier} (raw ${interpretedProfile.levels.experience_tier}), days=${interpretedProfile.days_per_week}, pattern=[${interpretedProfile.weekly_pattern.baseline.join(",")}], blockers=${interpretedProfile.blockers.length}`);
 
     // Persist the reconciler output onto the evaluation row for admin audit.
     if (evalRow.id) {
@@ -621,8 +659,11 @@ async function processJob(
     // Fetch strength guidelines from coaching_guidelines table
     const guidelinesBlock = await fetchCoachingGuidelines(supa, scopes);
     console.log(`[generate-program] Guidelines: ${guidelinesBlock ? guidelinesBlock.length + ' chars' : 'none'}`);
-    const skeleton = buildProgramSkeleton(monthNumber);
-    console.log(`[generate-program] Skeleton: ${skeleton.length} chars, ${(skeleton.match(/^Day \d+:/gm) || []).length} day headers`);
+    const { skeleton, daysInMonth } = buildProgramSkeleton({
+      monthNumber,
+      weeks: interpretedProfile.weekly_pattern.weeks,
+    });
+    console.log(`[generate-program] Skeleton: ${skeleton.length} chars, ${(skeleton.match(/^Day \d+:/gm) || []).length} day headers, ${daysInMonth} days in month`);
     // Derive metcon-eligible vs skill-block-only movements
     const proficientSkills: string[] = [];
     const developingSkills: string[] = [];
@@ -650,6 +691,82 @@ async function processJob(
       }
     }
     const unitLabel = profile.units === "kg" ? "kg" : "lbs";
+    // Archetype-aware prompt sections
+    const archetypePlanLines: string[] = ["ARCHETYPE PLAN (this month):"];
+    interpretedProfile.weekly_pattern.weeks.forEach((week, wi) => {
+      const label = wi === 3 ? `Week ${wi + 1} (DELOAD)` : `Week ${wi + 1}`;
+      archetypePlanLines.push(`  ${label}: ${week.map((a) => ARCHETYPES[a].displayLabel).join(" → ")}`);
+    });
+    const archetypePlan = archetypePlanLines.join("\n");
+
+    // Per-archetype rules — only emit rules for archetypes present in the pattern
+    const usedArchetypes = new Set<DayArchetype>();
+    interpretedProfile.weekly_pattern.weeks.forEach((w) => w.forEach((a) => usedArchetypes.add(a)));
+    const archetypeRulesLines: string[] = ["ARCHETYPE-SPECIFIC RULES:"];
+    if (usedArchetypes.has("strength")) {
+      archetypeRulesLines.push(`
+STRENGTH DAY:
+- Blocks: Warm-up & Mobility, Strength, Accessory, Cool down. NO Skills, NO Metcon — do not add these headers.
+- The Strength block is the day's main event (30-40 min). Use heavy schemes: 5x3 @85%, 3x1 build to heavy, cluster sets, tempo (3-second eccentrics). Adequate rest 3-5 min between working sets.
+- Accessory volume is HIGHER on Strength Day than on Fitness Day: 3-4 movements, hypertrophy rep ranges (3 sets x 10-15 reps), targeting muscle groups NOT hit by today's primary lift.
+- Optional secondary lift if time permits: supplementary movement at 70%, lower volume.`);
+    }
+    if (usedArchetypes.has("metcon")) {
+      archetypeRulesLines.push(`
+METCON DAY:
+- Blocks: Warm-up & Mobility, Skills (PRIMER), Metcon, Cool down. NO Strength, NO Accessory — do not add these headers.
+- The Skills block here is a brief 5-8 min PRIMER — not progression work. Activation or movement rehearsal for the metcon (e.g., light pressing if the metcon has HSPU).
+- Metcon is the main event (15-25 min). Pick ONE time-domain target for this day (short / medium / long) per the time-domain distribution rule.
+- Complement nearby Strength Days: if yesterday was squat-heavy Strength, today's Metcon avoids squats.`);
+    }
+    if (usedArchetypes.has("skill")) {
+      archetypeRulesLines.push(`
+SKILL DAY:
+- Blocks: Warm-up & Mobility, Skills (EXTENDED), Strength (SECONDARY), Cool down. NO Accessory, NO Metcon — do not add these headers.
+- Skills is the main event (25-30 min). 2-3 skill tracks with deep progression work: foundational variant → advanced variant. End with a test set demonstrating progress.
+- Strength here is SECONDARY (15-20 min): one lift that supports today's skill work (strict press if skill was HSPU, weighted pull-ups if skill was pull-ups). Moderate volume at 70-80%, NOT max effort.`);
+    }
+    if (usedArchetypes.has("fitness")) {
+      archetypeRulesLines.push(`
+FITNESS DAY:
+- Blocks: full 6-block template (Warm-up & Mobility, Skills, Strength, Accessory, Metcon, Cool down).
+- Balanced moderate volume per block — nothing is the star. Skills 8-12 min, Strength 15-20 min @ 75-85%, Accessory 8-12 min (2-3 movements with at least one midline), Metcon 10-20 min.`);
+    }
+    if (usedArchetypes.has("recovery")) {
+      archetypeRulesLines.push(`
+RECOVERY DAY:
+- Blocks: Warm-up & Mobility, Active Recovery, Cool down. NO other blocks — do not add Skills, Strength, Accessory, or Metcon.
+- Warm-up & Mobility doubles as the week's main mobility session: joint-by-joint opening + foam rolling on chronic tight areas.
+- Active Recovery is 20-30 min of low-intensity movement. Easy walk, easy bike, light row, yoga flow, or mobility circuit. Conversational pace only. This is NOT aerobic training — purpose is blood flow and parasympathetic recovery, not stimulus.
+- Cool down: 2-3 static stretches + 2-3 min of slow nasal breathing for parasympathetic emphasis.`);
+    }
+    const archetypeRules = archetypeRulesLines.join("\n");
+
+    // Experience tier modifier
+    const tier = interpretedProfile.effective_tier;
+    const tierModifier: Record<typeof tier, string> = {
+      novice: `EXPERIENCE TIER MODIFIER (${tier}):
+- Volume: 0.7x baseline — fewer working sets, conservative rep counts.
+- Strength loading: cap percentages at 75% 1RM. Use 5-8 rep ranges, no 1RM attempts.
+- Skills: keep on foundational variants. Progression only after a variant is owned.
+- No tempo / cluster / complex schemes. Focus on movement quality.`,
+      intermediate: `EXPERIENCE TIER MODIFIER (${tier}):
+- Volume: 1.0x baseline.
+- Strength loading: typical percentages 75-85%. Occasional heavy singles allowed.
+- Skills: standard progression cadence.
+- Standard schemes with some variation.`,
+      advanced: `EXPERIENCE TIER MODIFIER (${tier}):
+- Volume: 1.1x baseline — more working sets, slightly higher density.
+- Strength loading: percentages up to 90%. Tempo work (3-second eccentrics, paused reps) and cluster sets are appropriate.
+- Skills: aggressive progression — drill, load, test cadence.
+- Allow complexes, EMOMs with technical movements.`,
+      competitor: `EXPERIENCE TIER MODIFIER (${tier}):
+- Volume: 1.2x baseline.
+- Strength loading: percentages up to 95%, periodic heavy singles, peaking cycles.
+- Skills: competition-relevant variants always present, test sets every 2-3 weeks.
+- Allow all advanced schemes plus benchmark workout exposure (Fran, Helen, Grace, etc.).`,
+    };
+
     const userPrompt = `ATHLETE PROFILE:
 ${profileStr}
 
@@ -657,6 +774,12 @@ UNIT SYSTEM: This athlete uses ${unitLabel}. All weights in the program (strengt
 
 ${analysisStr}
 ${trainingBlock}${metconEligibility}${equipmentConstraint}${interpretedBlock}
+${archetypePlan}
+
+${archetypeRules}
+
+${tierModifier[tier]}
+
 WARM-UP & MOBILITY BLOCK RULES:
 The Warm-up & Mobility: block is a single combined block that progresses from general preparation to targeted drills for the day's work.
 - 4-8 minutes of general prep (light cardio, dynamic stretching, activation) followed by 2-4 targeted drills for the day's primary movements.
@@ -665,17 +788,17 @@ The Warm-up & Mobility: block is a single combined block that progresses from ge
 - Progression is general → specific. Lift-specific warm-up sets belong in the Strength block, not here.
 - Keep it concise and coach-like.
 
-STRENGTH SLOT RULES:
+STRENGTH BLOCK RULES (apply when the Strength block appears in a day):
 Compound multi-joint lifts only. Isolation and hypertrophy work lives in the Accessory block, not here.
-The STRENGTH HIERARCHY above (if present) dictates priority, but you MUST also ensure movement-pattern diversity across the 5 weekly Strength slots.
+The STRENGTH HIERARCHY above (if present) dictates priority, but you MUST also ensure movement-pattern diversity across all Strength blocks in a week (count varies by archetype pattern).
 
-MOVEMENT PATTERN DISTRIBUTION (per week):
-- Olympic lifts (snatch variants, clean variants, jerks): 2 slots max per week. Alternate snatch-family and clean-family days.
-- Squat (back squat, front squat, overhead squat): 1-2 slots per week. Rotate variants across weeks — do not repeat the same squat variant in the same week.
-- Press (strict press, push press, bench press, push jerk): 1 slot per week minimum. Every athlete needs pressing volume.
-- Hinge/Pull (deadlift, RDL, clean pull, snatch pull): 1 slot per week minimum. Posterior chain work is non-negotiable.
+MOVEMENT PATTERN DISTRIBUTION (across all Strength blocks in the week):
+- Olympic lifts (snatch variants, clean variants, jerks): no more than 40% of the week's Strength slots. Alternate snatch-family and clean-family across days.
+- Squat (back squat, front squat, overhead squat): 1-2 slots per week if available, rotate variants across weeks — do not repeat the same squat variant in the same week.
+- Press (strict press, push press, bench press, push jerk): include at least 1 pressing slot per week if there are 3+ Strength blocks. For weeks with fewer Strength blocks, rotate pressing across weeks so it appears at least every other week.
+- Hinge/Pull (deadlift, RDL, clean pull, snatch pull): include at least 1 hinge slot per week if there are 3+ Strength blocks; otherwise rotate across weeks.
 - If the athlete provided a lift, try to include it at least once across the 4-week program — but not at the expense of cluttering weeks. LOW priority lifts can be omitted if slots are tight.
-- A movement flagged as a mobility limiter in the STRENGTH ANALYSIS (e.g. overhead squat limited by ankle/thoracic mobility) is accessory or warm-up work — it does NOT fulfill a movement-pattern slot. Program it as light technique work alongside the day's main lift, not as the Strength block's primary movement.
+- A movement flagged as a mobility limiter in the STRENGTH ANALYSIS is accessory or warm-up work — it does NOT fulfill a movement-pattern slot. Program it as light technique work alongside the day's main lift, not as the Strength block's primary movement.
 
 PRIORITY RULES (within the pattern constraints above):
 - HIGH priority movements get 2+ slots per week. These are the athlete's limiters — give them the most volume.
@@ -684,15 +807,15 @@ PRIORITY RULES (within the pattern constraints above):
 - Follow the hierarchy ordering strictly. If the hierarchy says deadlift is LOW, do not program heavy deadlifts twice a week.
 - Vary the specific exercises within a movement pattern across weeks (e.g. for "olympic lifts": clean & jerk one day, snatch complex another).
 
-SKILL SLOT RULES:
-Use the SKILLS ANALYSIS above to decide what goes in each day's Skills: block. You are the coach — distribute skills intelligently across 20 days.
-- "Needs Attention" skills are the highest priority. Program their progression track 2x per week — alternate between the foundational and advanced variant across the two slots. Never the same variant twice in a week.
-- "Intermediate" skills get 1-2x per week to keep progressing.
-- "Strong" skills are maintenance only — 0-1x per week or use them as metcon components instead.
-- Never program the same skill on consecutive days (e.g. not Day 3 and Day 4).
-- Related progressions are a single track, not separate skills. For example: strict HSPU, wall-facing HSPU, and deficit HSPU are one progression — pick the variant that matches the athlete's level and periodize across weeks (drill → load → test), don't scatter all three randomly.
-- Week 4 is deload — reduce skill volume, keep only the top 1-2 priority skills at 1x each.
-- Vary the drill, not just the movement. If L-sit appears 3x in a week, each session should have a different focus (e.g. tuck hold for time, single-leg extension, parallette L-sit).
+SKILLS BLOCK RULES (apply when the Skills block appears in a day; NOTE: on Metcon Days the Skills block is a brief 5-8 min PRIMER, NOT progression work):
+Use the SKILLS ANALYSIS above to decide skill content. You are the coach — distribute skills intelligently across the days that include a Skills block.
+- "Needs Attention" skills are the highest priority. Program their progression track when Skills blocks are available — alternate foundational and advanced variants. Never the same variant twice in a week.
+- "Intermediate" skills get exposure to keep progressing.
+- "Strong" skills are maintenance only or used as metcon components instead.
+- Never program the same skill on consecutive days.
+- Related progressions are a single track, not separate skills. For example: strict HSPU, wall-facing HSPU, and deficit HSPU are one progression — pick the variant that matches the athlete's level and periodize across weeks (drill → load → test).
+- Vary the drill, not just the movement. Each session should have a different focus angle.
+- On Metcon Days, the Skills block is a primer — light activation only, NOT progression work.
 
 ACCESSORY BLOCK RULES:
 The Accessory: block is for hypertrophy, weak-point work, injury prevention, and midline/core. It complements the day's Strength and Metcon — do NOT pile on the same muscle groups those blocks are already hitting.
@@ -794,38 +917,57 @@ ${skeleton}`;
         }
         throw new Error("Generated program was empty or too short");
       }
-      // Day count validation — Month N expects days offset by (monthNumber-1)*20
-      const dayOffset = (monthNumber - 1) * 20;
+      // Day count validation — varies by archetype pattern (3, 4, 5, or 6 days/week × 4 weeks).
+      const expectedDayCount = daysInMonth;
+      const dayOffset = (monthNumber - 1) * expectedDayCount;
       const expectedFirstDay = dayOffset + 1;
-      const expectedLastDay = dayOffset + 20;
-      if (dayHeaders.length < 20) {
+      const expectedLastDay = dayOffset + expectedDayCount;
+      const daysPerWeek = interpretedProfile.days_per_week;
+      if (dayHeaders.length < expectedDayCount) {
         if (attempt < MAX_ATTEMPTS) {
-          console.warn(`[generate-program] Attempt ${attempt}: only ${dayHeaders.length}/20 days, retrying with correction...`);
+          console.warn(`[generate-program] Attempt ${attempt}: only ${dayHeaders.length}/${expectedDayCount} days, retrying with correction...`);
           messages.push({ role: "assistant", content: programText });
-          messages.push({ role: "user", content: `That program only contained ${dayHeaders.length} days. It must have exactly 20 days (Day ${expectedFirstDay} through Day ${expectedLastDay}). Please output the complete program with all 20 days.` });
+          messages.push({ role: "user", content: `That program only contained ${dayHeaders.length} days. It must have exactly ${expectedDayCount} days (Day ${expectedFirstDay} through Day ${expectedLastDay}). Please output the complete program with all ${expectedDayCount} days.` });
           continue;
         }
-        throw new Error(`Program contained ${dayHeaders.length}/20 days after ${MAX_ATTEMPTS} attempts`);
+        throw new Error(`Program contained ${dayHeaders.length}/${expectedDayCount} days after ${MAX_ATTEMPTS} attempts`);
       }
       // Save program directly (bypasses preprocess-program HTTP call)
       console.log(`[generate-program] Saving program inline: ${programText.length} chars, name="${programName}"`);
-      // Parse AI output into workouts using Day N: markers
-      const dayParts = programText.replace(/\r\n/g, "\n").split(/^Day (\d+):/mi);
-      const parsedWorkouts: { week_num: number; day_num: number; workout_text: string; sort_order: number }[] = [];
+      // Parse AI output into workouts using Day N: markers (header may include "[Archetype]" suffix)
+      const dayParts = programText.replace(/\r\n/g, "\n").split(/^Day (\d+):.*$/mi);
+      const parsedWorkouts: { week_num: number; day_num: number; workout_text: string; sort_order: number; day_type: string | null }[] = [];
+      // Build lookup of expected archetype per absolute day number for this month
+      const archetypeByDayNum = new Map<number, DayArchetype>();
+      let dayCounter = 0;
+      interpretedProfile.weekly_pattern.weeks.forEach((week) => {
+        week.forEach((arch) => {
+          dayCounter++;
+          archetypeByDayNum.set(dayOffset + dayCounter, arch);
+        });
+      });
       for (let pi = 1; pi < dayParts.length - 1; pi += 2) {
         const n = parseInt(dayParts[pi], 10);
         const wText = dayParts[pi + 1].trim();
         if (!wText) continue;
-        parsedWorkouts.push({ week_num: Math.ceil(n / 5), day_num: ((n - 1) % 5) + 1, workout_text: wText, sort_order: n - 1 });
+        const week_num = Math.ceil((n - dayOffset) / daysPerWeek);
+        const day_num = ((n - dayOffset - 1) % daysPerWeek) + 1;
+        parsedWorkouts.push({
+          week_num,
+          day_num,
+          workout_text: wText,
+          sort_order: n - 1,
+          day_type: archetypeByDayNum.get(n) ?? null,
+        });
       }
-      if (parsedWorkouts.length !== 20) {
+      if (parsedWorkouts.length !== expectedDayCount) {
         if (attempt < MAX_ATTEMPTS) {
-          console.warn(`[generate-program] Attempt ${attempt}: parsed ${parsedWorkouts.length}/20 workouts, retrying...`);
+          console.warn(`[generate-program] Attempt ${attempt}: parsed ${parsedWorkouts.length}/${expectedDayCount} workouts, retrying...`);
           messages.push({ role: "assistant", content: programText });
-          messages.push({ role: "user", content: `That program failed validation: Expected exactly 20 workouts, got ${parsedWorkouts.length}. Please output the complete program with exactly 20 days (Day ${expectedFirstDay} through Day ${expectedLastDay}), filling in every block of the template.` });
+          messages.push({ role: "user", content: `That program failed validation: Expected exactly ${expectedDayCount} workouts, got ${parsedWorkouts.length}. Please output the complete program with exactly ${expectedDayCount} days (Day ${expectedFirstDay} through Day ${expectedLastDay}), filling in every block of the template.` });
           continue;
         }
-        throw new Error(`Expected 20 workouts, got ${parsedWorkouts.length}`);
+        throw new Error(`Expected ${expectedDayCount} workouts, got ${parsedWorkouts.length}`);
       }
       // Validate metcon blocks against rules
       const metconViolations = validateMetcons(parsedWorkouts, developingSkills);
@@ -848,24 +990,39 @@ ${skeleton}`;
       if (isContinuation && existingProgramId) {
         progId = existingProgramId;
         console.log(`[generate-program] Appending month ${monthNumber} to existing program`);
+        // Update with current month's pattern + tier (latest snapshot wins)
+        await supa
+          .from("programs")
+          .update({
+            weekly_pattern: interpretedProfile.weekly_pattern,
+            experience_tier_at_gen: interpretedProfile.effective_tier,
+          })
+          .eq("id", progId);
       } else {
         const { data: prog, error: progErr } = await supa
           .from("programs")
-          .insert({ user_id: userId, name: programName, source: "generated" })
+          .insert({
+            user_id: userId,
+            name: programName,
+            source: "generated",
+            weekly_pattern: interpretedProfile.weekly_pattern,
+            experience_tier_at_gen: interpretedProfile.effective_tier,
+          })
           .select("id")
           .single();
         if (progErr || !prog) throw new Error("Failed to create program");
         progId = prog.id;
         console.log("[generate-program] Created new program");
       }
-      // Insert workouts with month_number
-      const wkRows = parsedWorkouts.map((pw, idx) => ({
+      // Insert workouts with month_number and day_type
+      const wkRows = parsedWorkouts.map((pw) => ({
         program_id: progId,
         week_num: pw.week_num,
         day_num: pw.day_num,
         workout_text: pw.workout_text,
         sort_order: pw.sort_order,
         month_number: monthNumber,
+        day_type: pw.day_type,
       }));
       const { data: insertedWks, error: wkErr } = await supa
         .from("program_workouts")
@@ -878,14 +1035,16 @@ ${skeleton}`;
         }
         throw new Error("Failed to save workouts");
       }
-      // Extract and insert blocks
-      const BLOCK_LABELS = ["Warm-up & Mobility", "Skills", "Strength", "Accessory", "Metcon", "Cool down"];
+      // Extract and insert blocks. Block set varies by archetype, so try all
+      // possible headers and only persist the ones actually present.
+      const BLOCK_LABELS = ["Warm-up & Mobility", "Skills", "Strength", "Accessory", "Metcon", "Active Recovery", "Cool down"];
       const BLOCK_TYPE_MAP: Record<string, string> = {
         "warm-up & mobility": "warm-up",
         "skills": "skills",
         "strength": "strength",
         "accessory": "accessory",
         "metcon": "metcon",
+        "active recovery": "active-recovery",
         "cool down": "cool-down",
       };
       if (insertedWks?.length) {

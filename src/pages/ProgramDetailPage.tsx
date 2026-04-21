@@ -20,7 +20,16 @@ interface ProgramWorkout {
   day_num: number;
   workout_text: string;
   sort_order: number;
+  day_type?: string | null;
 }
+
+const DAY_TYPE_LABELS: Record<string, string> = {
+  strength: 'Strength Day',
+  metcon: 'Metcon Day',
+  fitness: 'Fitness Day',
+  skill: 'Skill Day',
+  recovery: 'Recovery Day',
+};
 
 const SUMMARY_LABELS = ['skills', 'strength', 'metcon', 'accessory'] as const;
 
@@ -112,7 +121,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     setProgram(prog);
     const { data: wk } = await supabase
       .from('program_workouts')
-      .select('id, week_num, day_num, workout_text, sort_order, month_number')
+      .select('id, week_num, day_num, workout_text, sort_order, month_number, day_type')
       .eq('program_id', id)
       .order('sort_order');
     setAllWorkouts(wk || []);
@@ -290,11 +299,17 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
 
                     return sortedMonths.map(month => {
                       const monthWorkouts = monthGroups.get(month)!;
+                      // Group by week_num written by the generator (handles variable
+                      // days_per_week across the new archetype-based generation).
                       const weeks: { weekNum: number; days: ProgramWorkout[] }[] = [];
-                      monthWorkouts.forEach((w, i) => {
-                        const weekIndex = Math.floor(i / 5);
-                        if (!weeks[weekIndex]) weeks[weekIndex] = { weekNum: (month - 1) * 4 + weekIndex + 1, days: [] };
-                        weeks[weekIndex].days.push(w);
+                      const weekMap = new Map<number, ProgramWorkout[]>();
+                      monthWorkouts.forEach((w) => {
+                        const wn = w.week_num || 1;
+                        if (!weekMap.has(wn)) weekMap.set(wn, []);
+                        weekMap.get(wn)!.push(w);
+                      });
+                      Array.from(weekMap.keys()).sort((a, b) => a - b).forEach((wn) => {
+                        weeks.push({ weekNum: (month - 1) * 4 + wn, days: weekMap.get(wn)!.sort((a, b) => a.day_num - b.day_num) });
                       });
 
                       return (
@@ -327,7 +342,15 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                     ) : (
                                       <span className="program-day-dot" />
                                     )}
-                                    <span className="program-day-label">Day {(w.sort_order % 5) + 1}</span>
+                                    <span className="program-day-label">Day {w.day_num}</span>
+                                    {w.day_type && DAY_TYPE_LABELS[w.day_type] && (
+                                      <span className="program-day-archetype" style={{
+                                        fontSize: 11, color: 'var(--text-dim)', marginLeft: 6,
+                                        textTransform: 'uppercase', letterSpacing: 0.5,
+                                      }}>
+                                        {DAY_TYPE_LABELS[w.day_type]}
+                                      </span>
+                                    )}
                                     {done && <span className="program-completed-badge">Done</span>}
                                     {ip && <span className="program-in-progress-badge">{ip.savedCount}/{ip.totalBlocks} blocks</span>}
                                   </div>
@@ -392,7 +415,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                   <div className="program-day-actions">
                                     <button
                                       className="auth-btn"
-                                      onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_id: w.id, program_id: id, week_num: week.weekNum, day_num: (w.sort_order % 5) + 1 } })}
+                                      onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_id: w.id, program_id: id, week_num: week.weekNum, day_num: w.day_num } })}
                                       style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: done ? 'var(--text-dim)' : 'var(--text)' }}
                                     >
                                       Coach
