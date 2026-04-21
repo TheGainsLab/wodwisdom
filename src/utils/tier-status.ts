@@ -8,7 +8,7 @@
  *   T2 — Athletic data (required lifts, all skills rated, ≥ 2 conditioning
  *        benchmarks). Required to run the free Profile Evaluation.
  *   T3 — Training context (days/week, session length, injuries text,
- *        equipment). Required to run AI Programming.
+ *        goal, equipment). Required to run AI Programming.
  */
 
 export const REQUIRED_T1_FIELDS = [
@@ -55,6 +55,7 @@ export const REQUIRED_T3_FIELDS = [
   'days_per_week',
   'session_length_minutes',
   'injuries_constraints',
+  'goal',
   'equipment',
 ] as const;
 
@@ -94,6 +95,8 @@ export interface AthleteProfileInput {
   days_per_week?: number | null;
   session_length_minutes?: number | null;
   injuries_constraints?: string | null;
+  goal?: string | null;
+  self_perception_level?: string | null;
 }
 
 function isNumberSet(v: unknown): boolean {
@@ -156,6 +159,7 @@ export function getTierStatus(profile: AthleteProfileInput | null | undefined): 
   if (!isNumberSet(p.days_per_week)) t3Missing.push('days_per_week');
   if (!isNumberSet(p.session_length_minutes)) t3Missing.push('session_length_minutes');
   if (!isStringSet(p.injuries_constraints)) t3Missing.push('injuries_constraints');
+  if (!isStringSet(p.goal)) t3Missing.push('goal');
   const equipment = p.equipment ?? {};
   if (Object.keys(equipment).length === 0) t3Missing.push('equipment');
   const tier3: TierSection = { complete: t3Missing.length === 0, missing: t3Missing };

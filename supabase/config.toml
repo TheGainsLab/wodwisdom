@@ -94,6 +94,12 @@ verify_jwt = false
 [functions.parse-strength]
 verify_jwt = false
 
+[functions.parse-goal]
+verify_jwt = false
+
+[functions.parse-injuries]
+verify_jwt = false
+
 [functions.parse-accessory]
 verify_jwt = false
 

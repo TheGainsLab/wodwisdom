@@ -14,6 +14,9 @@ import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { SKILL_DISPLAY_NAMES } from "../_shared/skill-priorities.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { getTierStatus } from "../_shared/tier-status.ts";
+import { interpretLevels } from "../_shared/level-interpreter.ts";
+import { reconcileProfile, formatInterpretedProfile } from "../_shared/reconciler.ts";
+import type { ParsedGoal, ParsedInjuries } from "../_shared/reconciler.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
@@ -522,16 +525,68 @@ async function processJob(
     const profile = evalRow.profile_snapshot || {};
     const profileStr = formatProfile(profile);
     console.log(`[generate-program] Profile: ${profileStr.length} chars, lifts=${Object.keys(profile.lifts || {}).length}, skills=${Object.keys(profile.skills || {}).length}`);
-    // Injuries & movement constraints — fetched live (not snapshot) so the latest info is always used.
-    const { data: athleteForInjuries } = await supa
+    // ── Pre-generation classifier pipeline ────────────────────────────────
+    // Fetch the live fields we need (goal + self-perception + injuries + T3 numerics)
+    // since profile_snapshot may be stale on Month 2+ generations.
+    const { data: athleteLive } = await supa
       .from("athlete_profiles")
-      .select("injuries_constraints")
+      .select("injuries_constraints, goal, self_perception_level, days_per_week, session_length_minutes")
       .eq("user_id", userId)
       .maybeSingle();
-    const injuriesText = (athleteForInjuries?.injuries_constraints || "").trim();
-    const injuriesBlock = injuriesText && injuriesText.toLowerCase() !== "none"
-      ? `\nINJURIES OR MOVEMENT CONSTRAINTS:\n${injuriesText}\nRespect these across ALL blocks. Avoid movements that aggravate the flagged region; use the Accessory block for corrective/prehab work.\n`
-      : "";
+    const goalText = (athleteLive?.goal ?? "").trim();
+    const injuriesText = (athleteLive?.injuries_constraints ?? "").trim();
+    const selfPerception = athleteLive?.self_perception_level ?? null;
+
+    // Fire classifiers in parallel
+    const classifierStart = Date.now();
+    const [goalResult, injuriesResult] = await Promise.all([
+      goalText
+        ? supa.functions.invoke("parse-goal", { body: { goal_text: goalText } })
+        : Promise.resolve({ data: null, error: null }),
+      injuriesText
+        ? supa.functions.invoke("parse-injuries", { body: { injuries_text: injuriesText } })
+        : Promise.resolve({ data: { constraints: [], summary: "No reported injuries or constraints." }, error: null }),
+    ]);
+    console.log(`[generate-program] Classifiers: ${((Date.now() - classifierStart) / 1000).toFixed(1)}s`);
+
+    const parsedGoal: ParsedGoal = (goalResult?.data?.goal as ParsedGoal) ?? {
+      primary_goal: "general_fitness",
+      secondary_goals: [],
+      time_horizon: null,
+      named_event: null,
+      emphasis: ["metcon", "strength", "skills"],
+    };
+    const parsedInjuries: ParsedInjuries = (injuriesResult?.data as ParsedInjuries) ?? {
+      constraints: [],
+      summary: "No reported injuries or constraints.",
+    };
+
+    // Rule-based level interpretation + reconcile
+    const levels = interpretLevels({
+      age: profile.age,
+      gender: profile.gender,
+      bodyweight: profile.bodyweight,
+      units: profile.units,
+      lifts: profile.lifts,
+      skills: profile.skills,
+      conditioning: profile.conditioning,
+    });
+    const interpretedProfile = reconcileProfile({
+      goal: parsedGoal,
+      injuries: parsedInjuries,
+      levels,
+      self_perception_level: selfPerception,
+    });
+    const interpretedBlock = "\n" + formatInterpretedProfile(interpretedProfile) + "\n";
+    console.log(`[generate-program] Interpreted: goal=${interpretedProfile.goal.primary_goal}, tier=${interpretedProfile.levels.experience_tier}, blockers=${interpretedProfile.blockers.length}`);
+
+    // Persist the reconciler output onto the evaluation row for admin audit.
+    if (evalRow.id) {
+      await supa
+        .from("profile_evaluations")
+        .update({ interpreted_profile: interpretedProfile })
+        .eq("id", evalRow.id);
+    }
     const analysisStr = evalRow.analysis || "No detailed analysis.";
     console.log(`[generate-program] Analysis: ${analysisStr.length} chars`);
     // For Month 2+, fetch extended training history (full month) and previous program context
@@ -601,7 +656,7 @@ ${profileStr}
 UNIT SYSTEM: This athlete uses ${unitLabel}. All weights in the program (strength percentages, barbell loads, dumbbell weights, wall ball weights, etc.) MUST be written in ${unitLabel}. Do not mix units.
 
 ${analysisStr}
-${trainingBlock}${metconEligibility}${equipmentConstraint}${injuriesBlock}
+${trainingBlock}${metconEligibility}${equipmentConstraint}${interpretedBlock}
 WARM-UP & MOBILITY BLOCK RULES:
 The Warm-up & Mobility: block is a single combined block that progresses from general preparation to targeted drills for the day's work.
 - 4-8 minutes of general prep (light cardio, dynamic stretching, activation) followed by 2-4 targeted drills for the day's primary movements.
