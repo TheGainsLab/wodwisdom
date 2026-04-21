@@ -1188,7 +1188,7 @@ Deno.serve(async (req) => {
     if (monthNumber === 1) {
       const { data: athleteProfile } = await supa
         .from("athlete_profiles")
-        .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, days_per_week, session_length_minutes, gym_type, years_training, injuries_constraints, training_split")
+        .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, days_per_week, session_length_minutes, injuries_constraints, goal, self_perception_level")
         .eq("user_id", user.id)
         .maybeSingle();
       const tierStatus = getTierStatus(athleteProfile);
