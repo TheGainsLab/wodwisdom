@@ -253,6 +253,9 @@ function TierCard({
   unlocks,
   status,
   defaultExpanded = false,
+  locked = false,
+  lockMessage,
+  onUpgrade,
   children,
 }: {
   tierNumber: 1 | 2 | 3;
@@ -260,12 +263,28 @@ function TierCard({
   unlocks: string;
   status: TierSection;
   defaultExpanded?: boolean;
+  /** When true, the card is visually muted and the children are replaced with a locked message + upgrade CTA. */
+  locked?: boolean;
+  /** Replaces the "Unlocks: ..." line when locked. E.g., "Requires AI Programming subscription". */
+  lockMessage?: string;
+  /** Click handler for the upgrade CTA shown when locked. */
+  onUpgrade?: () => void;
   children: React.ReactNode;
 }) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-  const accent = status.complete ? '#2ec486' : 'var(--accent)';
+  const [expanded, setExpanded] = useState(defaultExpanded && !locked);
+  const accent = locked
+    ? 'var(--text-muted)'
+    : status.complete
+      ? '#2ec486'
+      : 'var(--accent)';
   return (
-    <div className="settings-card" style={{ borderColor: status.complete ? '#2ec486' : undefined }}>
+    <div
+      className="settings-card"
+      style={{
+        borderColor: locked ? 'var(--border)' : status.complete ? '#2ec486' : undefined,
+        opacity: locked ? 0.75 : 1,
+      }}
+    >
       <button
         type="button"
         onClick={() => setExpanded(e => !e)}
@@ -292,16 +311,45 @@ function TierCard({
             }}>
               Tier {tierNumber}
             </span>
-            {status.complete && (
+            {locked ? (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                Locked
+              </span>
+            ) : status.complete ? (
               <span style={{ fontSize: 12, color: '#2ec486', fontWeight: 700 }}>Complete ✓</span>
-            )}
+            ) : null}
           </div>
           <h2 className="settings-card-title" style={{ marginBottom: 2 }}>{title}</h2>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Unlocks: {unlocks}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+            {locked && lockMessage ? lockMessage : `Unlocks: ${unlocks}`}
+          </div>
         </div>
         <span style={{ fontSize: 14, color: 'var(--text-dim)', flexShrink: 0, marginLeft: 12 }}>{expanded ? '▲' : '▼'}</span>
       </button>
-      {expanded && <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>{children}</div>}
+      {expanded && (
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {locked ? (
+            <div style={{ padding: 12, background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 10 }}>
+                {lockMessage || 'This tier requires a subscription.'}
+              </div>
+              {onUpgrade && (
+                <button
+                  type="button"
+                  className="auth-btn"
+                  onClick={onUpgrade}
+                  style={{ padding: '8px 16px', fontSize: 13 }}
+                >
+                  Upgrade →
+                </button>
+              )}
+            </div>
+          ) : (
+            children
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -677,6 +725,107 @@ export default function AthletePage({ session }: { session: Session }) {
               <div className="page-loading"><div className="loading-pulse" /></div>
             ) : (
               <>
+                {/* Evaluation Status Card — first-class entry point for the free Tier 2 evaluation.
+                    Four states based on tier completeness + evaluation existence + current analysis run. */}
+                {(() => {
+                  const hasEvaluation = evaluations.length > 0;
+                  const canRun = tierStatus.canRunEval;
+                  const running = analysisLoading === 'profile';
+                  const latestEval = evaluations[0];
+                  if (running) {
+                    return (
+                      <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div className="loading-pulse" style={{ width: 20, height: 20, flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 2 }}>Running your evaluation…</div>
+                            <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>This takes 20–30 seconds.</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (hasEvaluation) {
+                    const when = latestEval.created_at
+                      ? new Date(latestEval.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+                      : '';
+                    return (
+                      <div className="settings-card" style={{ borderColor: '#2ec486' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                          <div>
+                            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: '#2ec486', marginBottom: 4 }}>
+                              Fitness Evaluation · Ready
+                            </div>
+                            <div style={{ fontSize: 15, fontWeight: 600 }}>Your evaluation is ready</div>
+                            {when && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Last run: {when}</div>}
+                          </div>
+                          <button
+                            className="auth-btn"
+                            style={{ padding: '8px 16px', fontSize: 13 }}
+                            onClick={() => setExpandedEvalId(latestEval.id)}
+                          >
+                            View Evaluation →
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (canRun) {
+                    return (
+                      <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                          <div>
+                            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 4 }}>
+                              Free Fitness Evaluation · Ready to run
+                            </div>
+                            <div style={{ fontSize: 15, fontWeight: 600 }}>Your profile is ready — run your free evaluation</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Takes 20–30 seconds. You'll get a personalized breakdown of your strengths, weaknesses, and priorities.</div>
+                          </div>
+                          <button
+                            className="auth-btn"
+                            style={{ padding: '10px 20px', fontSize: 14, background: 'var(--accent)', color: 'white' }}
+                            onClick={async () => {
+                              if (isDirty) {
+                                await saveProfile();
+                              }
+                              fetchProfileAnalysis();
+                            }}
+                            disabled={saving || !!analysisLoading}
+                          >
+                            Run Evaluation →
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  // Locked — tell them what's missing
+                  const missingSections: string[] = [];
+                  if (!tierStatus.tier1.complete) missingSections.push('Basics');
+                  if (tierStatus.tier2.missing.includes('lifts')) missingSections.push('Lifts');
+                  if (tierStatus.tier2.missing.includes('skills')) missingSections.push('Skills');
+                  if (tierStatus.tier2.missing.includes('conditioning')) missingSections.push('Conditioning');
+                  return (
+                    <div className="settings-card">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--text-dim)' }}><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--text-muted)', marginBottom: 4 }}>
+                            Free Fitness Evaluation · Locked
+                          </div>
+                          <div style={{ fontSize: 15, fontWeight: 600 }}>Complete your profile to unlock</div>
+                          {missingSections.length > 0 && (
+                            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+                              Still needed: {missingSections.join(', ')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Tier 1 — Basics */}
                 <TierCard
                   tierNumber={1}
@@ -821,7 +970,7 @@ export default function AthletePage({ session }: { session: Session }) {
                 <TierCard
                   tierNumber={2}
                   title="Athletic Data"
-                  unlocks="Your free AI Fitness Analysis"
+                  unlocks="Free Fitness Evaluation"
                   status={tierStatus.tier2}
                   defaultExpanded={tierStatus.nextTier === 2}
                 >
@@ -905,13 +1054,16 @@ export default function AthletePage({ session }: { session: Session }) {
                 </CollapsibleSection>
                 </TierCard>
 
-                {/* Tier 3 — Training Context */}
+                {/* Tier 3 — Training Context (locked for non-subscribers) */}
                 <TierCard
                   tierNumber={3}
                   title="Training Context"
                   unlocks="AI Programming tailored to your week"
                   status={tierStatus.tier3}
-                  defaultExpanded={tierStatus.nextTier === 3}
+                  defaultExpanded={tierStatus.nextTier === 3 && (isAdmin || hasFeature('programming'))}
+                  locked={!isAdmin && !hasFeature('programming')}
+                  lockMessage="Requires AI Programming subscription"
+                  onUpgrade={() => navigate('/features/programs')}
                 >
                   <div className="settings-card" style={{ padding: 16 }}>
                     <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>Tell the AI how you train.</p>
@@ -1020,26 +1172,42 @@ export default function AthletePage({ session }: { session: Session }) {
 
                 {(() => {
                   const willAnalyze = tierStatus.canRunEval && !hasGeneratedProgram;
+                  const hasEvaluation = evaluations.length > 0;
+                  // Clean + eligible + no eval yet → show a direct "Run Free Evaluation" trigger
+                  // so users who saved earlier (before becoming eligible) aren't stranded at "Saved ✓".
+                  const canRunEvalNow = willAnalyze && !isDirty && !hasEvaluation && !saving && !analysisLoading;
                   const saveBtnLabel = saving
                     ? 'Saving...'
                     : analysisLoading === 'profile'
-                      ? 'Analyzing...'
-                      : !isDirty
-                        ? 'Saved ✓'
-                        : willAnalyze
-                          ? 'Save & Analyze'
-                          : 'Save Profile';
+                      ? 'Running evaluation...'
+                      : canRunEvalNow
+                        ? 'Run Free Evaluation'
+                        : !isDirty
+                          ? 'Saved ✓'
+                          : willAnalyze
+                            ? 'Save & Run Free Evaluation'
+                            : 'Save Profile';
                   return (
                     <>
                       <button
                         className="auth-btn"
                         onClick={async () => {
+                          if (canRunEvalNow) {
+                            fetchProfileAnalysis();
+                            return;
+                          }
                           await saveProfile();
                           if (isDirty) return; // save failed
                           if (willAnalyze) fetchProfileAnalysis();
                         }}
                         disabled={saving || !!analysisLoading}
-                        style={!isDirty && !analysisLoading ? { background: '#2ec486', color: 'white' } : undefined}
+                        style={
+                          canRunEvalNow
+                            ? { background: 'var(--accent)', color: 'white' }
+                            : !isDirty && !analysisLoading
+                              ? { background: '#2ec486', color: 'white' }
+                              : undefined
+                        }
                       >
                         {saveBtnLabel}
                       </button>
