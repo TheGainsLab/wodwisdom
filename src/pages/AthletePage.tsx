@@ -681,6 +681,16 @@ export default function AthletePage({ session }: { session: Session }) {
   };
 
   // Live tier status, computed from current form state (not yet saved values).
+  // Mirror the save-time backfill: treat unrated skills as 'none' so T2 ticks
+  // complete as soon as the user fills lifts + conditioning, without needing
+  // to tap every single skill in the UI. Matches the "defaults to None — tap
+  // to upgrade" hint shown above the skills grid.
+  const filledSkillsForTierCheck: Record<string, SkillLevel> = { ...skills };
+  for (const group of SKILL_GROUPS) {
+    for (const s of group.skills) {
+      if (!filledSkillsForTierCheck[s.key]) filledSkillsForTierCheck[s.key] = 'none';
+    }
+  }
   const tierStatusInput: AthleteProfileInput = {
     age: age ? parseInt(age, 10) : null,
     height: height ? parseFloat(height) : null,
@@ -688,7 +698,7 @@ export default function AthletePage({ session }: { session: Session }) {
     gender: gender || null,
     units,
     lifts,
-    skills,
+    skills: filledSkillsForTierCheck,
     conditioning,
     equipment,
     days_per_week: daysPerWeek ? parseInt(daysPerWeek, 10) : null,
