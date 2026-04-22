@@ -671,10 +671,14 @@ export default function AthletePage({ session }: { session: Session }) {
 
     if (err) {
       setError(err.message);
-    } else if (isNewUser) {
-      setIsNewUser(false);
-      navigate('/');
     } else {
+      // Clear isNewUser and isDirty but STAY on /profile. The evaluation
+      // flow (Save & Run Free Evaluation → Running… → Your evaluation is
+      // ready) only works if the user stays on this page to see the
+      // status card and button flip through their states. The legacy
+      // "navigate to chat on first save" behavior actively broke that
+      // flow by unmounting the component mid-click.
+      if (isNewUser) setIsNewUser(false);
       setIsDirty(false);
     }
     setSaving(false);
