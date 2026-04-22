@@ -591,7 +591,7 @@ export default function AthletePage({ session }: { session: Session }) {
     }
   };
 
-  const saveProfile = async () => {
+  const saveProfile = async (): Promise<boolean> => {
     setSaving(true);
     setError('');
 
@@ -671,17 +671,19 @@ export default function AthletePage({ session }: { session: Session }) {
 
     if (err) {
       setError(err.message);
-    } else {
-      // Clear isNewUser and isDirty but STAY on /profile. The evaluation
-      // flow (Save & Run Free Evaluation → Running… → Your evaluation is
-      // ready) only works if the user stays on this page to see the
-      // status card and button flip through their states. The legacy
-      // "navigate to chat on first save" behavior actively broke that
-      // flow by unmounting the component mid-click.
-      if (isNewUser) setIsNewUser(false);
-      setIsDirty(false);
+      setSaving(false);
+      return false;
     }
+    // Clear isNewUser and isDirty but STAY on /profile. The evaluation
+    // flow (Save & Run Free Evaluation → Running… → Your evaluation is
+    // ready) only works if the user stays on this page to see the
+    // status card and button flip through their states. The legacy
+    // "navigate to chat on first save" behavior actively broke that
+    // flow by unmounting the component mid-click.
+    if (isNewUser) setIsNewUser(false);
+    setIsDirty(false);
     setSaving(false);
+    return true;
   };
 
   // Live tier status, computed from current form state (not yet saved values).
@@ -800,7 +802,8 @@ export default function AthletePage({ session }: { session: Session }) {
                             style={{ padding: '10px 20px', fontSize: 14, background: 'var(--accent)', color: 'white' }}
                             onClick={async () => {
                               if (isDirty) {
-                                await saveProfile();
+                                const ok = await saveProfile();
+                                if (!ok) return;
                               }
                               fetchProfileAnalysis();
                             }}
@@ -1210,8 +1213,8 @@ export default function AthletePage({ session }: { session: Session }) {
                             fetchProfileAnalysis();
                             return;
                           }
-                          await saveProfile();
-                          if (isDirty) return; // save failed
+                          const ok = await saveProfile();
+                          if (!ok) return;
                           if (willAnalyze) fetchProfileAnalysis();
                         }}
                         disabled={saving || !!analysisLoading}
