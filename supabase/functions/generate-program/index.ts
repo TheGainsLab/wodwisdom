@@ -1222,6 +1222,58 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Server-side one-program limit for Month 1 generation. Defense-in-depth
+    // covering races, double-submits, multi-tab, and any UI gate drift.
+    // Admins bypass both checks for testing.
+    if (monthNumber === 1) {
+      const { data: adminProfile } = await supa
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+      const isAdmin = adminProfile?.role === "admin";
+
+      if (!isAdmin) {
+        // Check 1: is there an in-flight generation job for this user?
+        const { data: activeJobs } = await supa
+          .from("program_jobs")
+          .select("id, status, updated_at")
+          .eq("user_id", user.id)
+          .in("status", ["pending", "processing"]);
+        // Guard against stale jobs (stuck over 10 minutes — treat as abandoned)
+        const liveJob = activeJobs?.find((j) => {
+          const updated = j.updated_at ? new Date(j.updated_at).getTime() : 0;
+          return Date.now() - updated < 10 * 60 * 1000;
+        });
+        if (liveJob) {
+          return new Response(
+            JSON.stringify({
+              error: "GENERATION_IN_PROGRESS",
+              message: "A program is already being generated. Please wait for it to finish.",
+              job_id: liveJob.id,
+            }),
+            { status: 409, headers: { ...cors, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Check 2: does the user already have a completed generated program?
+        const { count: existingCount } = await supa
+          .from("programs")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("source", "generated");
+        if ((existingCount ?? 0) > 0) {
+          return new Response(
+            JSON.stringify({
+              error: "PROGRAM_EXISTS",
+              message: "You already have a generated program. Delete it to start a new one.",
+            }),
+            { status: 409, headers: { ...cors, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    }
+
     // Gate first-month generation on complete T3 (training context). Month 2+
     // runs off an existing program, so we don't re-gate mid-program.
     if (monthNumber === 1) {
