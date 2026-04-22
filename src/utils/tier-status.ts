@@ -5,8 +5,8 @@
  *
  * Tiers:
  *   T1 — Basics (age, height, bodyweight, gender, units)
- *   T2 — Athletic data (required lifts, all skills rated, ≥ 2 conditioning
- *        benchmarks). Required to run the free Profile Evaluation.
+ *   T2 — Athletic data (required lifts, all skills rated, all conditioning
+ *        benchmarks filled). Required to run the free Profile Evaluation.
  *   T3 — Training context (days/week, session length, injuries text,
  *        goal, equipment). Required to run AI Programming.
  */
@@ -49,7 +49,20 @@ export const ALL_SKILL_KEYS = [
   'pistols',
 ] as const;
 
-export const MIN_CONDITIONING_BENCHMARKS = 2;
+export const MIN_CONDITIONING_BENCHMARKS = 2; // retained for external callers; T2 now requires every key filled
+
+/** All conditioning benchmark keys the form asks about. Must match
+ *  CONDITIONING_GROUPS in AthletePage.tsx — T2 is only complete when
+ *  the user has filled every one of these. */
+export const ALL_CONDITIONING_KEYS = [
+  '1_mile_run',
+  '5k_run',
+  '1k_row',
+  '2k_row',
+  '5k_row',
+  '1min_bike_cals',
+  '10min_bike_cals',
+] as const;
 
 export const REQUIRED_T3_FIELDS = [
   'days_per_week',
@@ -107,21 +120,6 @@ function isStringSet(v: unknown): boolean {
   return typeof v === 'string' && v.trim() !== '';
 }
 
-function countFilledBenchmarks(
-  conditioning: Record<string, string | number | null | undefined> | null | undefined
-): number {
-  if (!conditioning) return 0;
-  let count = 0;
-  for (const v of Object.values(conditioning)) {
-    if (v == null) continue;
-    if (typeof v === 'number') {
-      if (v > 0) count++;
-    } else if (String(v).trim() !== '') {
-      count++;
-    }
-  }
-  return count;
-}
 
 export function getTierStatus(profile: AthleteProfileInput | null | undefined): TierStatus {
   const p: AthleteProfileInput = profile ?? {};
@@ -145,8 +143,14 @@ export function getTierStatus(profile: AthleteProfileInput | null | undefined): 
     return v == null || (typeof v === 'string' && v.trim() === '');
   });
 
-  const conditioningCount = countFilledBenchmarks(p.conditioning);
-  const conditioningComplete = conditioningCount >= MIN_CONDITIONING_BENCHMARKS;
+  const conditioning = p.conditioning ?? {};
+  const conditioningMissing = ALL_CONDITIONING_KEYS.filter((k) => {
+    const v = conditioning[k];
+    if (v == null) return true;
+    if (typeof v === 'number') return !(v > 0);
+    return String(v).trim() === '';
+  });
+  const conditioningComplete = conditioningMissing.length === 0;
 
   const t2Missing: string[] = [];
   if (liftsMissing.length > 0) t2Missing.push('lifts');
@@ -212,12 +216,19 @@ export function skillsStatus(
 export function conditioningStatus(
   conditioning: Record<string, string | number | null | undefined> | null | undefined
 ): TierSection & { count: number; required: number } {
-  const count = countFilledBenchmarks(conditioning);
-  const complete = count >= MIN_CONDITIONING_BENCHMARKS;
+  const c = conditioning ?? {};
+  const missing = ALL_CONDITIONING_KEYS.filter((k) => {
+    const v = c[k];
+    if (v == null) return true;
+    if (typeof v === 'number') return !(v > 0);
+    return String(v).trim() === '';
+  });
+  const count = ALL_CONDITIONING_KEYS.length - missing.length;
+  const complete = missing.length === 0;
   return {
     complete,
-    missing: complete ? [] : [`need ${MIN_CONDITIONING_BENCHMARKS - count} more`],
+    missing: complete ? [] : missing.map((k) => String(k)),
     count,
-    required: MIN_CONDITIONING_BENCHMARKS,
+    required: ALL_CONDITIONING_KEYS.length,
   };
 }
