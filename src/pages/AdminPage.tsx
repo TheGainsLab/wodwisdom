@@ -312,6 +312,34 @@ export default function AdminPage({ session }: { session: Session }) {
                           <div style={{ fontSize: 14, fontWeight: 600 }}>{u.full_name || 'No name'}</div>
                           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{u.email}</div>
                         </div>
+                        {(() => {
+                          // Email outreach indicator. Red = never, Yellow = stale (>14d), Green = recent (<=14d).
+                          const count = Number(u.email_count ?? 0);
+                          const lastAt = u.last_email_at ? new Date(u.last_email_at) : null;
+                          const daysSince = lastAt ? Math.floor((Date.now() - lastAt.getTime()) / 86400000) : null;
+                          const color = count === 0
+                            ? 'var(--danger, #e74c3c)'
+                            : daysSince != null && daysSince > 14
+                              ? '#f1c40f'
+                              : '#2ec486';
+                          const tooltip = count === 0
+                            ? 'Never emailed'
+                            : `${count} email${count !== 1 ? 's' : ''} · last ${lastAt!.toLocaleDateString()} (${daysSince}d ago)`;
+                          return (
+                            <span
+                              title={tooltip}
+                              aria-label={tooltip}
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                background: color,
+                                flexShrink: 0,
+                                display: 'inline-block',
+                              }}
+                            />
+                          );
+                        })()}
                         {u.role === 'admin' && (
                           <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: 'var(--accent)', background: 'var(--accent-glow)', padding: '2px 8px', borderRadius: 4 }}>Admin</span>
                         )}
