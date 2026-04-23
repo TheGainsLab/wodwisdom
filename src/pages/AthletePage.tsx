@@ -402,11 +402,15 @@ export default function AthletePage({ session }: { session: Session }) {
 
   const fetchEvaluations = async () => {
     const [profileRes, trainingRes, nutritionRes] = await Promise.all([
+      // Only surface complete evaluations. Pending/failed rows (created by
+      // the async-job kickoff in profile-analysis) have analysis=null and
+      // must not appear as "ready" in the status card.
       supabase
         .from('profile_evaluations')
         .select('id, profile_snapshot, analysis, created_at, month_number, visible')
         .eq('user_id', session.user.id)
         .eq('visible', true)
+        .eq('status', 'complete')
         .order('created_at', { ascending: false })
         .limit(20),
       supabase
@@ -445,6 +449,7 @@ export default function AthletePage({ session }: { session: Session }) {
         .select('id, profile_snapshot, analysis, created_at, month_number, visible')
         .eq('user_id', session.user.id)
         .eq('visible', true)
+        .eq('status', 'complete')
         .order('created_at', { ascending: false })
         .limit(20),
       supabase
