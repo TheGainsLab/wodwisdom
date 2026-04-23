@@ -1,3 +1,19 @@
+/**
+ * profile-analysis — async job pattern.
+ *
+ * On request: validates auth + tier gate, inserts a profile_evaluations
+ * row with status='pending', kicks the RAG + Claude work into a
+ * background task via EdgeRuntime.waitUntil, and returns the
+ * evaluation_id immediately (~1s). The client polls
+ * profile-analysis-status until status='complete' or 'failed'.
+ *
+ * This pattern is required because the full synchronous analysis runs
+ * 15-30 seconds (OpenAI embeddings + vector search + Claude call), which
+ * iOS Safari routinely aborts with a "TypeError: Load failed" error when
+ * the device locks or the tab backgrounds.
+ */
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   searchChunks,
@@ -24,6 +40,12 @@ interface ProfileData {
   age?: number | null;
   height?: number | null;
   gender?: string | null;
+  equipment?: Record<string, boolean> | null;
+  goal?: string | null;
+  self_perception_level?: string | null;
+  days_per_week?: number | null;
+  session_length_minutes?: number | null;
+  injuries_constraints?: string | null;
 }
 
 function formatProfile(profile: ProfileData): string {
@@ -57,7 +79,6 @@ function formatProfile(profile: ProfileData): string {
   return parts.join("\n") || "No profile data.";
 }
 
-/** Build RAG context across all domains */
 async function retrieveRAGContext(
   supa: ReturnType<typeof createClient>,
   profileData: ProfileData
@@ -67,7 +88,6 @@ async function retrieveRAGContext(
   try {
     const promises: Promise<import("../_shared/rag.ts").RAGChunk[]>[] = [];
 
-    // Strength
     const liftNames = profileData.lifts
       ? Object.keys(profileData.lifts).map((k) => k.replace(/_/g, " ")).join(", ")
       : "";
@@ -78,7 +98,6 @@ async function retrieveRAGContext(
       searchChunks(supa, liftNames ? `strength training periodization load prescription ${liftNames}` : "strength training periodization load prescription squat deadlift", "strength-science", OPENAI_API_KEY, 2, 0.25)
     );
 
-    // Skills
     const skillNames = profileData.skills
       ? Object.entries(profileData.skills)
           .filter(([, v]) => v && v !== "none")
@@ -89,7 +108,6 @@ async function retrieveRAGContext(
       searchChunks(supa, `CrossFit gymnastics skill progression ${skillNames}`, "journal", OPENAI_API_KEY, 4, 0.25)
     );
 
-    // Conditioning
     promises.push(
       searchChunks(supa, "CrossFit conditioning engine aerobic capacity work capacity rowing running", "journal", OPENAI_API_KEY, 4, 0.25)
     );
@@ -106,7 +124,6 @@ async function retrieveRAGContext(
   }
 }
 
-/** Build a comparison string if a previous evaluation exists */
 function buildComparisonContext(
   previousEval: { profile_snapshot: ProfileData; created_at: string } | null,
   currentProfile: ProfileData
@@ -118,7 +135,6 @@ function buildComparisonContext(
   const u = currentProfile.units === "kg" ? "kg" : "lbs";
   const date = new Date(previousEval.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
-  // Compare lifts
   if (currentProfile.lifts && prev.lifts) {
     for (const [key, val] of Object.entries(currentProfile.lifts)) {
       const prevVal = prev.lifts[key];
@@ -129,7 +145,6 @@ function buildComparisonContext(
     }
   }
 
-  // Compare skills
   if (currentProfile.skills && prev.skills) {
     const levelOrder: Record<string, number> = { none: 0, beginner: 1, intermediate: 2, advanced: 3 };
     for (const [key, val] of Object.entries(currentProfile.skills)) {
@@ -141,7 +156,6 @@ function buildComparisonContext(
     }
   }
 
-  // Compare conditioning
   if (currentProfile.conditioning && prev.conditioning) {
     for (const [key, val] of Object.entries(currentProfile.conditioning)) {
       const prevVal = prev.conditioning?.[key];
@@ -154,6 +168,109 @@ function buildComparisonContext(
   if (changes.length === 0) return "";
 
   return `\n\nCHANGES SINCE LAST EVALUATION (${date}):\n${changes.join("\n")}\n\nAcknowledge meaningful progress or regressions. Be specific about what improved.`;
+}
+
+/** Background task: does the heavy work and writes result back to the evaluation row. */
+async function runAnalysis(
+  supa: ReturnType<typeof createClient>,
+  evalId: string,
+  userId: string,
+  profileData: ProfileData,
+  monthNumber: number,
+): Promise<void> {
+  const start = Date.now();
+  console.log(`[profile-analysis] Job ${evalId} start`);
+  try {
+    await supa
+      .from("profile_evaluations")
+      .update({ status: "processing" })
+      .eq("id", evalId);
+
+    const profileStr = formatProfile(profileData);
+    const isContinuation = monthNumber > 1;
+
+    const { data: prevEval } = await supa
+      .from("profile_evaluations")
+      .select("profile_snapshot, created_at, analysis")
+      .eq("user_id", userId)
+      .neq("id", evalId)
+      .eq("status", "complete")
+      .not("analysis", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const trainingDays = isContinuation ? 35 : 14;
+    const trainingMaxLines = isContinuation ? 60 : 30;
+
+    const [ragContext, comparisonContext, recentTraining] = await Promise.all([
+      retrieveRAGContext(supa, profileData),
+      Promise.resolve(buildComparisonContext(prevEval, profileData)),
+      fetchAndFormatRecentHistory(supa, userId, { days: trainingDays, maxLines: trainingMaxLines }),
+    ]);
+    const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
+
+    const userPrompt = `Here is an athlete's full profile:\n\n${profileStr}${trainingBlock}\n\nGive this athlete a comprehensive profile evaluation. Cover all domains they have data for — strength, skills, and conditioning — in a single cohesive assessment.\n\nYour evaluation should:\n- Identify their strongest areas and their biggest limiters\n- Use bodyweight ratios for lifts (e.g. back squat ~1.5-2x BW), lift-to-lift ratios (e.g. front squat ~85% of back squat, snatch ~60-65% of back squat), and standard CrossFit benchmarks\n- For skills, consider prerequisite chains (strict before kipping, kipping before butterfly) and competition frequency\n- For conditioning, assess work capacity and compare across modalities (run vs row vs bike)\n- Connect the dots across domains — how do their strengths and weaknesses in one area affect another?\n- End with 2-3 clear priorities for improvement, ranked by impact\n\nWrite like a coach talking to the athlete. Be direct, specific, and concise. No bullet-point tier lists — write in short paragraphs.${comparisonContext}`;
+
+    const systemPrompt = SYSTEM_PROMPT + ragContext;
+
+    if (!ANTHROPIC_API_KEY) {
+      throw new Error("ANTHROPIC_API_KEY not configured");
+    }
+
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1500,
+        stream: false,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      console.error(`[profile-analysis] Job ${evalId} Claude error:`, err);
+      throw new Error("Failed to generate analysis");
+    }
+
+    const data = await resp.json();
+    const analysis = data.content?.[0]?.text?.trim() || "Unable to generate analysis.";
+
+    await supa
+      .from("profile_evaluations")
+      .update({
+        analysis,
+        status: "complete",
+        ready_at: new Date().toISOString(),
+      })
+      .eq("id", evalId);
+
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    console.log(`[profile-analysis] Job ${evalId} complete in ${elapsed}s (${analysis.length} chars)`);
+  } catch (e) {
+    const message = (e as Error).message || "Analysis failed";
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    console.error(`[profile-analysis] Job ${evalId} FAILED after ${elapsed}s:`, message);
+    try {
+      await supa
+        .from("profile_evaluations")
+        .update({
+          status: "failed",
+          error: message,
+          ready_at: new Date().toISOString(),
+        })
+        .eq("id", evalId);
+    } catch (cleanupErr) {
+      console.error(`[profile-analysis] Job ${evalId} failed to mark failure:`, cleanupErr);
+    }
+  }
 }
 
 Deno.serve(async (req) => {
@@ -183,14 +300,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch current profile
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
       .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, goal, self_perception_level, days_per_week, session_length_minutes, injuries_constraints")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    // Gate: T1 (basics) + T2 (athletic data) must be strictly complete.
     const tierStatus = getTierStatus(athleteProfile);
     if (!tierStatus.canRunEval) {
       const missing = [
@@ -208,9 +323,7 @@ Deno.serve(async (req) => {
     }
 
     const profileData: ProfileData = athleteProfile || {};
-    const profileStr = formatProfile(profileData);
 
-    // Parse optional month_number and program_id from request body
     let monthNumber = 1;
     let programId: string | null = null;
     try {
@@ -222,63 +335,12 @@ Deno.serve(async (req) => {
     }
     const isContinuation = monthNumber > 1;
 
-    // Fetch previous evaluation for comparison
-    const { data: prevEval } = await supa
-      .from("profile_evaluations")
-      .select("profile_snapshot, created_at, analysis")
-      .eq("user_id", user.id)
-      .not("analysis", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    // For Month 2+, use extended training history (full month) to capture more data
-    const trainingDays = isContinuation ? 35 : 14;
-    const trainingMaxLines = isContinuation ? 60 : 30;
-
-    // Build RAG context, comparison, and recent training in parallel
-    const [ragContext, comparisonContext, recentTraining] = await Promise.all([
-      retrieveRAGContext(supa, profileData),
-      Promise.resolve(buildComparisonContext(prevEval, profileData)),
-      fetchAndFormatRecentHistory(supa, user.id, { days: trainingDays, maxLines: trainingMaxLines }),
-    ]);
-    const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
-
-    const userPrompt = `Here is an athlete's full profile:\n\n${profileStr}${trainingBlock}\n\nGive this athlete a comprehensive profile evaluation. Cover all domains they have data for — strength, skills, and conditioning — in a single cohesive assessment.\n\nYour evaluation should:\n- Identify their strongest areas and their biggest limiters\n- Use bodyweight ratios for lifts (e.g. back squat ~1.5-2x BW), lift-to-lift ratios (e.g. front squat ~85% of back squat, snatch ~60-65% of back squat), and standard CrossFit benchmarks\n- For skills, consider prerequisite chains (strict before kipping, kipping before butterfly) and competition frequency\n- For conditioning, assess work capacity and compare across modalities (run vs row vs bike)\n- Connect the dots across domains — how do their strengths and weaknesses in one area affect another?\n- End with 2-3 clear priorities for improvement, ranked by impact\n\nWrite like a coach talking to the athlete. Be direct, specific, and concise. No bullet-point tier lists — write in short paragraphs.${comparisonContext}`;
-
-    const systemPrompt = SYSTEM_PROMPT + ragContext;
-
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1500,
-        stream: false,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
-
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      console.error("Claude API error:", err);
-      throw new Error("Failed to generate analysis");
-    }
-
-    const data = await resp.json();
-    const analysis = data.content?.[0]?.text?.trim() || "Unable to generate analysis.";
-
-    // Save evaluation
-    // For Month 2+ triggered by generate-next-month, set visible=false
-    // (will be made visible when the program generation completes)
+    // Insert the job row with status='pending' and the profile snapshot.
+    // Analysis is populated by the background task.
     const evalRow: Record<string, unknown> = {
       user_id: user.id,
-      analysis,
+      analysis: null,
+      status: "pending",
       month_number: monthNumber,
       visible: isContinuation ? false : true,
       profile_snapshot: {
@@ -291,11 +353,11 @@ Deno.serve(async (req) => {
         age: profileData.age ?? null,
         height: profileData.height ?? null,
         gender: profileData.gender ?? null,
-        goal: (profileData as { goal?: string | null }).goal ?? null,
-        self_perception_level: (profileData as { self_perception_level?: string | null }).self_perception_level ?? null,
-        days_per_week: (profileData as { days_per_week?: number | null }).days_per_week ?? null,
-        session_length_minutes: (profileData as { session_length_minutes?: number | null }).session_length_minutes ?? null,
-        injuries_constraints: (profileData as { injuries_constraints?: string | null }).injuries_constraints ?? null,
+        goal: profileData.goal ?? null,
+        self_perception_level: profileData.self_perception_level ?? null,
+        days_per_week: profileData.days_per_week ?? null,
+        session_length_minutes: profileData.session_length_minutes ?? null,
+        injuries_constraints: profileData.injuries_constraints ?? null,
       },
     };
     if (programId) evalRow.program_id = programId;
@@ -306,17 +368,27 @@ Deno.serve(async (req) => {
       .select("id, created_at")
       .single();
 
-    if (insertErr) {
-      console.error("Failed to save evaluation:", insertErr);
+    if (insertErr || !savedEval) {
+      console.error("Failed to create evaluation row:", insertErr);
+      return new Response(
+        JSON.stringify({ error: "Failed to start evaluation" }),
+        { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
+      );
     }
+
+    // Fire the background task. Supabase's EdgeRuntime.waitUntil keeps the
+    // request alive for the return below and the task continues after.
+    EdgeRuntime.waitUntil(
+      runAnalysis(supa, savedEval.id, user.id, profileData, monthNumber)
+    );
 
     return new Response(
       JSON.stringify({
-        analysis,
-        evaluation_id: savedEval?.id || null,
-        created_at: savedEval?.created_at || null,
+        evaluation_id: savedEval.id,
+        status: "pending",
+        created_at: savedEval.created_at,
       }),
-      { headers: { ...cors, "Content-Type": "application/json" } }
+      { status: 202, headers: { ...cors, "Content-Type": "application/json" } }
     );
   } catch (e) {
     return new Response(
