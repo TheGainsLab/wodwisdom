@@ -527,46 +527,17 @@ export default function AthletePage({ session }: { session: Session }) {
     setAnalysisResult(null);
     setError('');
     try {
-      // Kick off the async job — returns evaluation_id immediately.
-      const { data: kickoff, error: kickoffErr } = await supabase.functions.invoke('profile-analysis', {
+      const { data, error } = await supabase.functions.invoke('profile-analysis', {
         body: {},
       });
-      if (kickoffErr) throw new Error(kickoffErr.message || 'Analysis failed');
-      if (kickoff?.error) throw new Error(kickoff.message || kickoff.error || 'Analysis failed');
-      const evaluationId: string | null = kickoff?.evaluation_id ?? null;
-      if (!evaluationId) throw new Error('No evaluation id returned');
-
-      // Poll status. Mirrors handleGenerateProgram's backoff pattern.
-      // Each poll is a fast (<500ms) request — iOS Safari tolerates these
-      // fine even across screen locks, which is why we don't do the work
-      // synchronously in the initial request.
-      let delay = 3000;
-      const maxDelay = 8000;
-      const maxAttempts = 80; // ~400s worst case
-
-      for (let i = 0; i < maxAttempts; i++) {
-        await new Promise((r) => setTimeout(r, delay));
-        const { data: status, error: statusErr } = await supabase.functions.invoke('profile-analysis-status', {
-          body: { evaluation_id: evaluationId },
-        });
-        if (statusErr) throw new Error(statusErr.message || 'Failed to check analysis status');
-        if (status?.error && status?.status !== 'failed') throw new Error(status.error);
-
-        if (status?.status === 'complete') {
-          setAnalysisResult({
-            kind: 'profile',
-            text: status.analysis,
-            evaluationId,
-          });
-          fetchEvaluations();
-          return;
-        }
-        if (status?.status === 'failed') {
-          throw new Error(status.error || 'Analysis failed');
-        }
-        delay = Math.min(delay + 1000, maxDelay);
-      }
-      throw new Error('Analysis timed out');
+      if (error) throw new Error(error.message || 'Analysis failed');
+      if (data?.error) throw new Error(data.message || data.error || 'Analysis failed');
+      setAnalysisResult({
+        kind: 'profile',
+        text: data?.analysis,
+        evaluationId: data?.evaluation_id ?? null,
+      });
+      fetchEvaluations();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
     } finally {
@@ -672,35 +643,57 @@ export default function AthletePage({ session }: { session: Session }) {
       }
     }
 
-    const { error: err } = await supabase
-      .from('athlete_profiles')
-      .upsert(
-        {
-          user_id: session.user.id,
-          lifts: cleanLifts,
-          equipment,
-          skills: filledSkills,
-          conditioning: cleanConditioning,
-          bodyweight: bw && !isNaN(bw) ? bw : null,
-          units,
-          age: ageNum && !isNaN(ageNum) ? ageNum : null,
-          height: heightNum && !isNaN(heightNum) ? heightNum : null,
-          gender: genderVal,
-          tdee_override: tdeeOverrideNum && !isNaN(tdeeOverrideNum) ? tdeeOverrideNum : null,
-          days_per_week: daysPerWeekNum && !isNaN(daysPerWeekNum) ? daysPerWeekNum : null,
-          session_length_minutes: sessionLengthNum && !isNaN(sessionLengthNum) ? sessionLengthNum : null,
-          injuries_constraints: injuriesVal,
-          goal: goal.trim() || null,
-          self_perception_level: selfPerceptionLevel || null,
-          ...levels,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id' }
-      );
+    const payload = {
+      user_id: session.user.id,
+      lifts: cleanLifts,
+      equipment,
+      skills: filledSkills,
+      conditioning: cleanConditioning,
+      bodyweight: bw && !isNaN(bw) ? bw : null,
+      units,
+      age: ageNum && !isNaN(ageNum) ? ageNum : null,
+      height: heightNum && !isNaN(heightNum) ? heightNum : null,
+      gender: genderVal,
+      tdee_override: tdeeOverrideNum && !isNaN(tdeeOverrideNum) ? tdeeOverrideNum : null,
+      days_per_week: daysPerWeekNum && !isNaN(daysPerWeekNum) ? daysPerWeekNum : null,
+      session_length_minutes: sessionLengthNum && !isNaN(sessionLengthNum) ? sessionLengthNum : null,
+      injuries_constraints: injuriesVal,
+      goal: goal.trim() || null,
+      self_perception_level: selfPerceptionLevel || null,
+      ...levels,
+      updated_at: new Date().toISOString(),
+    };
 
-    if (err) {
-      setError(err.message);
+    // iOS Safari occasionally drops the first fetch after an idle period
+    // with a transport-level "TypeError: Load failed". supabase-js sometimes
+    // surfaces that in { error }, sometimes as a thrown exception — handle
+    // both, and retry once on the network-class messages before giving up.
+    const attempt = async (): Promise<string | null> => {
+      try {
+        const { error } = await supabase
+          .from('athlete_profiles')
+          .upsert(payload, { onConflict: 'user_id' });
+        return error?.message ?? null;
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e);
+      }
+    };
+    const isNetworkError = (msg: string | null) =>
+      !!msg && /load failed|failed to fetch|networkerror/i.test(msg);
+
+    let errMsg: string | null = null;
+    try {
+      errMsg = await attempt();
+      if (isNetworkError(errMsg)) {
+        await new Promise((r) => setTimeout(r, 500));
+        errMsg = await attempt();
+      }
+    } finally {
       setSaving(false);
+    }
+
+    if (errMsg) {
+      setError(errMsg);
       return false;
     }
     // Clear isNewUser and isDirty but STAY on /profile. The evaluation
@@ -711,7 +704,6 @@ export default function AthletePage({ session }: { session: Session }) {
     // flow by unmounting the component mid-click.
     if (isNewUser) setIsNewUser(false);
     setIsDirty(false);
-    setSaving(false);
     return true;
   };
 

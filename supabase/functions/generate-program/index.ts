@@ -265,7 +265,6 @@ async function fetchEvaluationHistory(
       .select("month_number, analysis, created_at")
       .eq("user_id", userId)
       .eq("visible", true)
-      .eq("status", "complete")
       .order("month_number", { ascending: true }),
     supa.from("training_evaluations")
       .select("month_number, analysis, created_at")
@@ -1305,26 +1304,21 @@ Deno.serve(async (req) => {
       id?: string;
       profile_snapshot: ProfileData;
       analysis: string | null;
-      status?: string | null;
     } | null = null;
     if (evaluationId) {
       const { data } = await supa
         .from("profile_evaluations")
-        .select("id, profile_snapshot, analysis, status")
+        .select("id, profile_snapshot, analysis")
         .eq("id", evaluationId)
         .eq("user_id", user.id)
         .maybeSingle();
       evalRow = data;
     }
     if (!evalRow) {
-      // Fall back to the most recent COMPLETED evaluation. Pending/failed
-      // rows (from the async job pattern) would have analysis=null and
-      // shouldn't be used to generate a program.
       const { data } = await supa
         .from("profile_evaluations")
-        .select("id, profile_snapshot, analysis, status")
+        .select("id, profile_snapshot, analysis")
         .eq("user_id", user.id)
-        .eq("status", "complete")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -1333,16 +1327,6 @@ Deno.serve(async (req) => {
     if (!evalRow) {
       return new Response(
         JSON.stringify({ error: "No profile analysis found. Run AI analysis first, then generate program." }),
-        { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
-      );
-    }
-    // Reject an explicitly-specified evaluation that's still pending/failed.
-    if (evalRow.status && evalRow.status !== "complete") {
-      return new Response(
-        JSON.stringify({
-          error: "EVALUATION_NOT_READY",
-          message: `Evaluation is ${evalRow.status}. Wait for it to finish or re-run it.`,
-        }),
         { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }

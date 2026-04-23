@@ -34,9 +34,6 @@ verify_jwt = false
 [functions.profile-analysis]
 verify_jwt = false
 
-[functions.profile-analysis-status]
-verify_jwt = false
-
 [functions.analyze-program]
 verify_jwt = false
 

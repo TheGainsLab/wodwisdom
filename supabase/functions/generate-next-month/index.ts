@@ -151,46 +151,7 @@ Deno.serve(async (req) => {
 
     const evalData = await evalResp.json();
     const evaluationId = evalData.evaluation_id;
-    console.log(`[generate-next-month] Profile evaluation kicked off (month ${nextMonth}, id ${evaluationId})`);
-
-    // profile-analysis is now an async job (to survive iOS Safari client
-    // timeouts). Poll its status endpoint until it's complete before
-    // continuing — the rest of the pipeline expects a completed analysis
-    // to exist when generate-program runs.
-    if (evaluationId) {
-      const statusUrl = `${SUPABASE_URL}/functions/v1/profile-analysis-status`;
-      const statusAuthHeader = authToken.startsWith("Bearer ") ? authToken : `Bearer ${authToken}`;
-      const maxWaitMs = 3 * 60 * 1000;
-      const pollMs = 4000;
-      const startWait = Date.now();
-      let done = false;
-      while (Date.now() - startWait < maxWaitMs) {
-        await new Promise((r) => setTimeout(r, pollMs));
-        const statusResp = await fetch(statusUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: statusAuthHeader },
-          body: JSON.stringify({ evaluation_id: evaluationId }),
-        });
-        if (!statusResp.ok) continue;
-        const s = await statusResp.json().catch(() => ({}));
-        if (s?.status === "complete") { done = true; break; }
-        if (s?.status === "failed") {
-          console.error(`[generate-next-month] Profile analysis failed: ${s.error}`);
-          return new Response(
-            JSON.stringify({ error: "Profile evaluation failed", detail: s.error }),
-            { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
-          );
-        }
-      }
-      if (!done) {
-        console.error(`[generate-next-month] Profile analysis timed out after ${maxWaitMs}ms`);
-        return new Response(
-          JSON.stringify({ error: "Profile evaluation timed out" }),
-          { status: 504, headers: { ...cors, "Content-Type": "application/json" } }
-        );
-      }
-      console.log(`[generate-next-month] Profile evaluation complete`);
-    }
+    console.log(`[generate-next-month] Profile evaluation created (month ${nextMonth}, visible=false)`);
 
     // 4. Run training and nutrition analysis in parallel
     //    Each saves to its own table (training_evaluations, nutrition_evaluations)
