@@ -335,6 +335,41 @@ Deno.serve(async (req) => {
     }
     const isContinuation = monthNumber > 1;
 
+    // Credit gate. Free users get one manual eval (month_number=1).
+    // Admins bypass. Cron-driven continuations don't consume the pool —
+    // those are bundled with the active subscription's monthly rollover.
+    if (!isContinuation) {
+      const { data: profile } = await supa
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+      const isAdmin = profile?.role === "admin";
+
+      if (!isAdmin) {
+        const { data: remaining, error: creditErr } = await supa.rpc(
+          "consume_eval_credit",
+          { p_user_id: user.id }
+        );
+        if (creditErr) {
+          console.error("consume_eval_credit failed:", creditErr);
+          return new Response(
+            JSON.stringify({ error: "Failed to start evaluation" }),
+            { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
+          );
+        }
+        if (remaining == null || remaining < 0) {
+          return new Response(
+            JSON.stringify({
+              error: "EVALUATION_LIMIT_REACHED",
+              message: "You've used your free evaluation. Subscribers receive ongoing monthly analysis automatically.",
+            }),
+            { status: 403, headers: { ...cors, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    }
+
     // Insert the job row with status='pending' and the profile snapshot.
     // Analysis is populated by the background task.
     const evalRow: Record<string, unknown> = {
