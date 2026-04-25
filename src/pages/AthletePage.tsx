@@ -399,6 +399,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const [trainingEvaluations, setTrainingEvaluations] = useState<TrainingEvaluation[]>([]);
   const [nutritionEvaluations, setNutritionEvaluations] = useState<NutritionEvaluation[]>([]);
   const [expandedEvalId, setExpandedEvalId] = useState<string | null>(null);
+  const [evalCreditsRemaining, setEvalCreditsRemaining] = useState<number>(1);
 
   const fetchEvaluations = async () => {
     const [profileRes, trainingRes, nutritionRes] = await Promise.all([
@@ -441,7 +442,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, self_perception_level')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, self_perception_level, eval_credits_remaining')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -488,6 +489,7 @@ export default function AthletePage({ session }: { session: Session }) {
         setInjuriesConstraints(d.injuries_constraints || '');
         setGoal(d.goal || '');
         setSelfPerceptionLevel(d.self_perception_level || '');
+        setEvalCreditsRemaining(typeof d.eval_credits_remaining === 'number' ? d.eval_credits_remaining : 1);
         setIsDirty(false);
       }
       if (evalRes.data) {
@@ -800,7 +802,8 @@ export default function AthletePage({ session }: { session: Session }) {
                     Four states based on tier completeness + evaluation existence + current analysis run. */}
                 {(() => {
                   const hasEvaluation = evaluations.length > 0;
-                  const canRun = tierStatus.canRunEval;
+                  const hasEvalCredit = isAdmin || evalCreditsRemaining > 0;
+                  const canRun = tierStatus.canRunEval && hasEvalCredit;
                   const running = analysisLoading === 'profile';
                   const latestEval = evaluations[0];
                   if (running) {
@@ -1243,7 +1246,11 @@ export default function AthletePage({ session }: { session: Session }) {
                 </TierCard>
 
                 {(() => {
-                  const willAnalyze = tierStatus.canRunEval && !hasGeneratedProgram;
+                  // Credit gate. Free users get one manual eval (server-enforced
+                  // via consume_eval_credit). Admins bypass. Once exhausted, the
+                  // "Save & Run" button collapses back to plain "Save Profile".
+                  const hasEvalCredit = isAdmin || evalCreditsRemaining > 0;
+                  const willAnalyze = tierStatus.canRunEval && !hasGeneratedProgram && hasEvalCredit;
                   const hasEvaluation = evaluations.length > 0;
                   // Clean + eligible + no eval yet → show a direct "Run Free Evaluation" trigger
                   // so users who saved earlier (before becoming eligible) aren't stranded at "Saved ✓".
