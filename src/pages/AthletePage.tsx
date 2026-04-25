@@ -217,6 +217,34 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+/**
+ * Extract a human-readable message from a supabase-js v2 functions error.
+ * v2 wraps non-2xx responses in a FunctionsHttpError whose `.message` is
+ * just "Edge Function returned a non-2xx status code" — the actual body
+ * (where our friendly `message` / `error` fields live) is on `.context`
+ * as a Response that we have to read ourselves. Returns null if the body
+ * yields no usable text; callers can then fall back to a generic.
+ */
+async function extractFunctionError(err: unknown): Promise<string | null> {
+  if (!err) return null;
+  const ctx = (err as { context?: Response }).context;
+  if (ctx && typeof ctx.json === 'function') {
+    try {
+      const body = await ctx.json();
+      if (body && typeof body === 'object') {
+        const m = (body as { message?: unknown }).message;
+        if (typeof m === 'string' && m.trim()) return m;
+        const e = (body as { error?: unknown }).error;
+        if (typeof e === 'string' && e.trim()) return e;
+      }
+    } catch {
+      // body wasn't JSON, was empty, or was already consumed
+    }
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return null;
+}
+
 function CollapsibleSection({ title, defaultExpanded = false, children }: { title: string; defaultExpanded?: boolean; children: React.ReactNode }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   return (
@@ -538,7 +566,10 @@ export default function AthletePage({ session }: { session: Session }) {
       const { data: kickoff, error: kickoffErr } = await supabase.functions.invoke('profile-analysis', {
         body: {},
       });
-      if (kickoffErr) throw new Error(kickoffErr.message || 'Analysis failed');
+      if (kickoffErr) {
+        const m = await extractFunctionError(kickoffErr);
+        throw new Error(m || 'Analysis failed');
+      }
       if (kickoff?.error) throw new Error(kickoff.message || kickoff.error || 'Analysis failed');
       const evaluationId: string | null = kickoff?.evaluation_id ?? null;
       if (!evaluationId) throw new Error('No evaluation id returned');
@@ -556,7 +587,10 @@ export default function AthletePage({ session }: { session: Session }) {
         const { data: status, error: statusErr } = await supabase.functions.invoke('profile-analysis-status', {
           body: { evaluation_id: evaluationId },
         });
-        if (statusErr) throw new Error(statusErr.message || 'Failed to check analysis status');
+        if (statusErr) {
+          const m = await extractFunctionError(statusErr);
+          throw new Error(m || 'Failed to check analysis status');
+        }
         if (status?.error && status?.status !== 'failed') throw new Error(status.error);
 
         if (status?.status === 'complete') {
@@ -832,6 +866,11 @@ export default function AthletePage({ session }: { session: Session }) {
                             </div>
                             <div style={{ fontSize: 15, fontWeight: 600 }}>Your evaluation is ready</div>
                             {when && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Last run: {when}</div>}
+                            {!hasEvalCredit && (
+                              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
+                                Subscribers receive ongoing monthly analysis automatically.
+                              </div>
+                            )}
                           </div>
                           <button
                             className="auth-btn"
@@ -840,6 +879,27 @@ export default function AthletePage({ session }: { session: Session }) {
                           >
                             View Evaluation →
                           </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  // Tier complete but credit used (rare — eval row deleted/failed
+                  // and never replaced). Tell the user explicitly so they're not
+                  // stuck staring at a profile that "looks ready" but has no run
+                  // button and no ready-card.
+                  if (tierStatus.canRunEval && !hasEvalCredit) {
+                    return (
+                      <div className="settings-card">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div>
+                            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--text-muted)', marginBottom: 4 }}>
+                              Free Fitness Evaluation · Used
+                            </div>
+                            <div style={{ fontSize: 15, fontWeight: 600 }}>You've used your free evaluation</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+                              Subscribers receive ongoing monthly analysis automatically.
+                            </div>
+                          </div>
                         </div>
                       </div>
                     );
