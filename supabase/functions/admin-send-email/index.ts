@@ -5,7 +5,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("ADMIN_FROM_EMAIL") || "coach@thegainslab.com";
-const SENDER_NAME = "Matt — The Gains Lab";
+const SENDER_NAME = "The Gains Lab";
 const SITE_URL = Deno.env.get("SITE_URL") || "https://thegainslab.com";
 
 function escapeHtml(s: string): string {
