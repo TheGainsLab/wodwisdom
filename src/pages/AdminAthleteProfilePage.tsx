@@ -8,9 +8,9 @@ import AdminSubPageLayout from '../components/admin/AdminSubPageLayout';
 
 const PROGRAM_VERSION_LABELS: Record<string, string> = {
   main_5day: 'Main 5-Day',
-  main_5day_varied: 'Main 5-Day — Varied',
+  main_5day_varied: 'Main 5-Day — Mini Cycle',
   main_3day: 'Main 3-Day',
-  main_3day_varied: 'Main 3-Day — Varied',
+  main_3day_varied: 'Main 3-Day — Mini Cycle',
   hyrox_5day: 'HYROX 5-Day',
   hyrox_3day: 'HYROX 3-Day',
   high_rocks: 'HIGHROCKS',
