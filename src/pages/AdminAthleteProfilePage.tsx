@@ -16,7 +16,7 @@ const PROGRAM_VERSION_LABELS: Record<string, string> = {
   high_rocks: 'HIGHROCKS',
   vo2_maximizer: 'VO₂ Maximizer',
   vo2max_4day: 'VO₂ Max 4-Day',
-  vo2max_3day: 'VO₂ Max 3-Day',
+  vo2max_3day: 'VO3 (3-Day)',
 };
 
 const EQUIPMENT_LABELS: Record<string, string> = {

@@ -28,7 +28,7 @@ const ENGINE_PROGRAMS = [
     description: 'Train the three day version of super-cycle in four-week micro-cycles. All 20 frameworks in a year, then harder variations as you progress. Your ML data and personalized calibration carry over — and if you\u2019ve been through YoE before, this is a more intense progression through familiar territory.',
   },
   {
-    name: 'VO3',
+    name: 'VO3 (3-Day)',
     freq: '3x/week',
     description: 'VO2 Max, three days a week. VO3 targets your aerobic ceiling — max aerobic power, oxygen uptake, and high-output interval capacity — across 12 months of structured progression. Heavy on MAP intervals, accumulation work, and multi-block supra-threshold efforts. Polarized base work keeps recovery honest. Built for athletes who want to raise the ceiling, not just train under it.',
   },

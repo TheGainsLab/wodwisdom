@@ -13,3 +13,9 @@ WHERE id = 'main_5day_varied';
 UPDATE engine_programs
 SET name = 'Engine Mini Cycle (3-Day)'
 WHERE id = 'main_3day_varied';
+
+-- Rename "VO2 Max (3-Day)" → "VO3 (3-Day)" in the program picker so
+-- the DB matches the marketing page (which already calls it VO3).
+UPDATE engine_programs
+SET name = 'VO3 (3-Day)'
+WHERE id = 'vo2max_3day';
