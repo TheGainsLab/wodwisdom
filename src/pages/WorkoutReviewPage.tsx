@@ -370,36 +370,81 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
     setReview(null);
     setIsLoading(true);
 
-    try {
-      const { data, error } = await supabase.functions.invoke('workout-review', {
-        body: { workout_text: trimmed, source_id: fromProgramState?.source_id },
-      });
-
-      if (error) {
-        if (error instanceof FunctionsHttpError && error.context) {
-          try {
-            const body = await error.context.json();
-            if (body?.code === 'FREE_LIMIT') setTotalUsage(3);
-          } catch {}
-        }
-        throw new Error((error as { message?: string }).message || 'Something went wrong');
-      }
-      if (data?.error) throw new Error(data.error || 'Something went wrong');
-
-      const reviewData = data?.review as WorkoutReview;
+    const finalize = (reviewData: WorkoutReview, cached: boolean) => {
       setReview(reviewData);
-      // Persist review: localStorage by source_id for cross-session cache, sessionStorage as fallback
       try {
         const payload = JSON.stringify({ workoutText: trimmed, review: reviewData });
         if (fromProgramState?.source_id) {
           localStorage.setItem(`wr_review_${fromProgramState.source_id}`, payload);
         }
         sessionStorage.setItem('wr_last_review', payload);
-      } catch {}
-      // Only bump usage counter when it wasn't a cached response
-      if (!data?.cached && (!tierLoaded || tier === 'free')) {
+      } catch {
+        // localStorage / sessionStorage may throw under quota or private mode
+      }
+      if (!cached && (!tierLoaded || tier === 'free')) {
         setTotalUsage(prev => prev + 1);
       }
+    };
+
+    try {
+      // Kick off the async job. Two return shapes:
+      //   1. cache hit  → { review, cached: true }                   (terminal)
+      //   2. new job    → { review_id, status: 'pending' }           (poll below)
+      const { data: kickoff, error: kickoffErr } = await supabase.functions.invoke('workout-review', {
+        body: { workout_text: trimmed, source_id: fromProgramState?.source_id },
+      });
+
+      if (kickoffErr) {
+        if (kickoffErr instanceof FunctionsHttpError && kickoffErr.context) {
+          try {
+            const body = await kickoffErr.context.json();
+            if (body?.code === 'FREE_LIMIT') setTotalUsage(3);
+            const msg = body?.message || body?.error;
+            if (typeof msg === 'string' && msg.trim()) throw new Error(msg);
+          } catch (e) {
+            if (e instanceof Error && e.message) throw e;
+          }
+        }
+        throw new Error((kickoffErr as { message?: string }).message || 'Something went wrong');
+      }
+      if (kickoff?.error) throw new Error(kickoff.error || 'Something went wrong');
+
+      // Cache hit — review is in the kickoff response, nothing to poll.
+      if (kickoff?.review) {
+        finalize(kickoff.review as WorkoutReview, !!kickoff?.cached);
+        return;
+      }
+
+      // New job. Poll status with backoff, mirroring profile-analysis's
+      // pattern. Each poll is a small fast request iOS Safari tolerates
+      // even across screen locks and tab backgrounding.
+      const reviewId: string | null = kickoff?.review_id ?? null;
+      if (!reviewId) throw new Error('No review id returned');
+
+      let delay = 3000;
+      const maxDelay = 8000;
+      const maxAttempts = 80; // ~400s worst case
+
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise((r) => setTimeout(r, delay));
+        const { data: status, error: statusErr } = await supabase.functions.invoke('workout-review-status', {
+          body: { review_id: reviewId },
+        });
+        if (statusErr) {
+          // Transient network blip — keep polling within attempt budget.
+          delay = Math.min(delay + 1000, maxDelay);
+          continue;
+        }
+        if (status?.status === 'complete' && status?.review) {
+          finalize(status.review as WorkoutReview, false);
+          return;
+        }
+        if (status?.status === 'failed') {
+          throw new Error(status.error || 'Workout review failed');
+        }
+        delay = Math.min(delay + 1000, maxDelay);
+      }
+      throw new Error('Review timed out');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to analyze workout');
     } finally {
