@@ -335,9 +335,12 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
     (async () => {
       const [{ data: profile }, { data: entitlements }] = await Promise.all([
         supabase.from('profiles').select('role').eq('id', session.user.id).single(),
+        // AI Programming and All Access are the plans that bundle Coach
+        // access. Both grant the `programming` feature. Year of the Engine
+        // (engine), Coach-only (ai_chat), and Nutrition do not.
         supabase.from('user_entitlements').select('id')
           .eq('user_id', session.user.id)
-          .eq('feature', 'workout_review')
+          .eq('feature', 'programming')
           .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
           .limit(1),
       ]);

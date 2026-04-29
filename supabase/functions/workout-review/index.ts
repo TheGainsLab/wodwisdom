@@ -561,12 +561,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch entitlements, athlete profile, and recent training in parallel
+    // Fetch entitlements, athlete profile, and recent training in parallel.
+    // AI Programming and All Access are the plans that bundle Coach access;
+    // both grant the `programming` feature via PLAN_ENTITLEMENTS in the
+    // stripe-webhook. Year of the Engine, Coach-only, and Nutrition do not.
     const [profileRes, entitlementRes, athleteRes, recentTraining] = await Promise.all([
       supa.from("profiles").select("role").eq("id", user.id).single(),
       supa.from("user_entitlements").select("id")
         .eq("user_id", user.id)
-        .eq("feature", "workout_review")
+        .eq("feature", "programming")
         .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
         .limit(1),
       supa.from("athlete_profiles").select("lifts, skills, conditioning, bodyweight, units, age, height, gender").eq("user_id", user.id).maybeSingle(),
