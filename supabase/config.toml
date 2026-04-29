@@ -16,6 +16,9 @@ verify_jwt = false
 [functions.workout-review]
 verify_jwt = false
 
+[functions.workout-review-status]
+verify_jwt = false
+
 [functions.create-checkout]
 verify_jwt = false
 

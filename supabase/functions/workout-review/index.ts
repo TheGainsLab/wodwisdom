@@ -305,6 +305,180 @@ function parseJSON(raw: string): Record<string, unknown> | null {
   }
 }
 
+/**
+ * Background task: runs the heavy review pipeline (RAG + 4 parallel
+ * Claude calls + parse + assemble) and updates the workout_reviews row
+ * with status='complete' + review JSON, or status='failed' + error
+ * message. Fired via EdgeRuntime.waitUntil so the kickoff request can
+ * return immediately — the client polls workout-review-status until
+ * the row hits a terminal state, sidestepping iOS Safari's 15-30s
+ * fetch-drop window entirely.
+ */
+async function runReview(
+  supa: ReturnType<typeof createClient>,
+  reviewId: string,
+  trimmed: string,
+  sourceId: string | null,
+  athleteProfile: AthleteProfileData | null,
+  profileStr: string,
+  recentStr: string,
+): Promise<void> {
+  const start = Date.now();
+  console.log(`[workout-review] Job ${reviewId} start`);
+  try {
+    await supa
+      .from("workout_reviews")
+      .update({ status: "processing" })
+      .eq("id", reviewId);
+
+    const buildUserContent = (workoutSection: string): string =>
+      `ATHLETE PROFILE:\n${profileStr}\n\nRECENT TRAINING (last 14 days):\n${recentStr}\n\nWORKOUT:\n${workoutSection}`;
+
+    const sources: { title: string; author: string; source: string }[] = [];
+
+    // Fetch pre-extracted blocks from DB (written by preprocess-program)
+    let blockRows: { block_type: string; block_text: string; block_order: number }[] = [];
+    if (sourceId) {
+      const { data } = await supa
+        .from("program_workout_blocks")
+        .select("block_type, block_text, block_order")
+        .eq("program_workout_id", sourceId)
+        .order("block_order");
+      blockRows = (data || []) as typeof blockRows;
+    }
+
+    const blockTextByType: Record<string, string> = {};
+    for (const b of blockRows) {
+      blockTextByType[b.block_type] = b.block_text;
+    }
+
+    const fullWorkoutText = blockRows.length > 0
+      ? blockRows.map((b) => `${b.block_type}: ${b.block_text}`).join("\n")
+      : trimmed;
+
+    // Step 1: RAG queries in parallel
+    const [journalChunks, strengthChunks] = await Promise.all([
+      searchChunks(supa, fullWorkoutText, "journal", OPENAI_API_KEY!, 4, 0.25),
+      searchChunks(supa, fullWorkoutText, "strength-science", OPENAI_API_KEY!, 4, 0.25),
+    ]);
+
+    const allChunks = deduplicateChunks([...journalChunks, ...strengthChunks]);
+    for (const c of allChunks) {
+      sources.push({ title: c.title, author: c.author || "", source: c.source || "" });
+    }
+
+    const journalContext = journalChunks.length > 0
+      ? "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(journalChunks, 4)
+      : "";
+    const strengthContext = strengthChunks.length > 0
+      ? "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(strengthChunks, 4)
+      : "";
+    const intentContext = allChunks.length > 0
+      ? "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(allChunks, 4)
+      : "";
+
+    // Step 2: Per-block Claude calls — only for blocks that exist
+    const claudeOpts = (system: string, userContent: string, maxTokens: number) => ({
+      apiKey: ANTHROPIC_API_KEY!, system, userContent, maxTokens,
+    });
+
+    const stagger = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const calls: Promise<[string, string]>[] = [];
+
+    calls.push(
+      callClaude(claudeOpts(INTENT_PROMPT + intentContext, buildUserContent(fullWorkoutText), 384))
+        .then((r): [string, string] => ["intent", r])
+    );
+
+    if (blockTextByType["metcon"]) {
+      const metconIntent = detectSessionIntent(blockTextByType["metcon"], "metcon", athleteProfile);
+      calls.push(
+        stagger(500).then(() => callClaude(claudeOpts(applyIntentModifier(METCON_PROMPT, metconIntent) + journalContext, buildUserContent(blockTextByType["metcon"]), 1024)))
+          .then((r): [string, string] => ["metcon", r])
+      );
+    }
+    if (blockTextByType["strength"]) {
+      const strengthIntent = detectSessionIntent(blockTextByType["strength"], "strength", athleteProfile);
+      calls.push(
+        stagger(1000).then(() => callClaude(claudeOpts(applyIntentModifier(STRENGTH_PROMPT, strengthIntent) + strengthContext, buildUserContent(blockTextByType["strength"]), 1024)))
+          .then((r): [string, string] => ["strength", r])
+      );
+    }
+    if (blockTextByType["skills"]) {
+      const skillsIntent = detectSessionIntent(blockTextByType["skills"], "skills", athleteProfile);
+      calls.push(
+        stagger(1500).then(() => callClaude(claudeOpts(applyIntentModifier(SKILLS_PROMPT, skillsIntent) + journalContext, buildUserContent(blockTextByType["skills"]), 1024)))
+          .then((r): [string, string] => ["skills", r])
+      );
+    }
+
+    const results = await Promise.all(calls);
+    const resultMap: Record<string, string> = {};
+    for (const [key, raw] of results) {
+      resultMap[key] = raw;
+    }
+
+    // Step 3: Parse responses and assemble
+    const intentParsed = parseJSON(resultMap["intent"] || "");
+    const blocks: Record<string, unknown>[] = [];
+
+    if (resultMap["skills"]) {
+      const parsed = parseJSON(resultMap["skills"]);
+      if (parsed?.block_type) {
+        parsed.prescription = blockTextByType["skills"] || "";
+        blocks.push(parsed);
+      }
+    }
+    if (resultMap["strength"]) {
+      const parsed = parseJSON(resultMap["strength"]);
+      if (parsed?.block_type) {
+        parsed.prescription = blockTextByType["strength"] || "";
+        blocks.push(parsed);
+      }
+    }
+    if (resultMap["metcon"]) {
+      const parsed = parseJSON(resultMap["metcon"]);
+      if (parsed?.block_type) {
+        parsed.prescription = blockTextByType["metcon"] || "";
+        blocks.push(parsed);
+      }
+    }
+
+    const review = {
+      intent: intentParsed?.intent || resultMap["intent"] || "Unable to parse intent.",
+      blocks,
+      sources,
+    };
+
+    await supa
+      .from("workout_reviews")
+      .update({
+        review,
+        status: "complete",
+        ready_at: new Date().toISOString(),
+      })
+      .eq("id", reviewId);
+
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    console.log(`[workout-review] Job ${reviewId} complete in ${elapsed}s`);
+  } catch (e) {
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    const message = e instanceof Error ? e.message : String(e);
+    console.error(`[workout-review] Job ${reviewId} FAILED after ${elapsed}s:`, message);
+    const { error: updateErr } = await supa
+      .from("workout_reviews")
+      .update({
+        status: "failed",
+        error: message,
+        ready_at: new Date().toISOString(),
+      })
+      .eq("id", reviewId);
+    if (updateErr) {
+      console.error(`[workout-review] Failed to mark ${reviewId} as failed:`, updateErr);
+    }
+  }
+}
+
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -442,147 +616,47 @@ Deno.serve(async (req) => {
     }
 
     // -----------------------------------------------------------------------
-    // Shared user content builder
+    // Async-job kickoff. The heavy work (RAG + 4 parallel Claude calls)
+    // routinely runs 15-30s — long enough that iOS Safari abandons the
+    // fetch and the client hangs on the loading screen with no signal.
+    // We insert a pending row, fire the work as a background task via
+    // EdgeRuntime.waitUntil, and return immediately. The client polls
+    // workout-review-status until the row reaches 'complete' or 'failed'.
     // -----------------------------------------------------------------------
-    function buildUserContent(workoutSection: string): string {
-      return `ATHLETE PROFILE:\n${profileStr}\n\nRECENT TRAINING (last 14 days):\n${recentStr}\n\nWORKOUT:\n${workoutSection}`;
-    }
-
-    let review: Record<string, unknown>;
-    const sources: { title: string; author: string; source: string }[] = [];
-
-    // Fetch pre-extracted blocks from DB (written by preprocess-program)
-    let blockRows: { block_type: string; block_text: string; block_order: number }[] = [];
-    if (source_id) {
-      const { data } = await supa
-        .from("program_workout_blocks")
-        .select("block_type, block_text, block_order")
-        .eq("program_workout_id", source_id)
-        .order("block_order");
-      blockRows = (data || []) as typeof blockRows;
-    }
-
-    // Map block types to their text
-    const blockTextByType: Record<string, string> = {};
-    for (const b of blockRows) {
-      blockTextByType[b.block_type] = b.block_text;
-    }
-
-    // Full workout text for intent call (all blocks)
-    const fullWorkoutText = blockRows.length > 0
-      ? blockRows.map((b) => `${b.block_type}: ${b.block_text}`).join("\n")
-      : trimmed;
-
-    // Step 1: RAG queries in parallel
-    const [journalChunks, strengthChunks] = await Promise.all([
-      searchChunks(supa, fullWorkoutText, "journal", OPENAI_API_KEY!, 4, 0.25),
-      searchChunks(supa, fullWorkoutText, "strength-science", OPENAI_API_KEY!, 4, 0.25),
-    ]);
-
-    const allChunks = deduplicateChunks([...journalChunks, ...strengthChunks]);
-    for (const c of allChunks) {
-      sources.push({ title: c.title, author: c.author || "", source: c.source || "" });
-    }
-
-    const journalContext = journalChunks.length > 0
-      ? "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(journalChunks, 4)
-      : "";
-    const strengthContext = strengthChunks.length > 0
-      ? "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(strengthChunks, 4)
-      : "";
-    const intentContext = allChunks.length > 0
-      ? "\n\nREFERENCE MATERIAL:\n" + formatChunksAsContext(allChunks, 4)
-      : "";
-
-    // Step 2: Per-block Claude calls — only for blocks that exist
-    const claudeOpts = (system: string, userContent: string, maxTokens: number) => ({
-      apiKey: ANTHROPIC_API_KEY!, system, userContent, maxTokens,
-    });
-
-    const stagger = (ms: number) => new Promise((r) => setTimeout(r, ms));
-    const calls: Promise<[string, string]>[] = [];
-
-    // Intent always runs (full session context)
-    calls.push(
-      callClaude(claudeOpts(INTENT_PROMPT + intentContext, buildUserContent(fullWorkoutText), 384))
-        .then((r): [string, string] => ["intent", r])
-    );
-
-    if (blockTextByType["metcon"]) {
-      const metconIntent = detectSessionIntent(blockTextByType["metcon"], "metcon", athleteProfile);
-      calls.push(
-        stagger(500).then(() => callClaude(claudeOpts(applyIntentModifier(METCON_PROMPT, metconIntent) + journalContext, buildUserContent(blockTextByType["metcon"]), 1024)))
-          .then((r): [string, string] => ["metcon", r])
-      );
-    }
-    if (blockTextByType["strength"]) {
-      const strengthIntent = detectSessionIntent(blockTextByType["strength"], "strength", athleteProfile);
-      calls.push(
-        stagger(1000).then(() => callClaude(claudeOpts(applyIntentModifier(STRENGTH_PROMPT, strengthIntent) + strengthContext, buildUserContent(blockTextByType["strength"]), 1024)))
-          .then((r): [string, string] => ["strength", r])
-      );
-    }
-    if (blockTextByType["skills"]) {
-      const skillsIntent = detectSessionIntent(blockTextByType["skills"], "skills", athleteProfile);
-      calls.push(
-        stagger(1500).then(() => callClaude(claudeOpts(applyIntentModifier(SKILLS_PROMPT, skillsIntent) + journalContext, buildUserContent(blockTextByType["skills"]), 1024)))
-          .then((r): [string, string] => ["skills", r])
-      );
-    }
-
-    const results = await Promise.all(calls);
-    const resultMap: Record<string, string> = {};
-    for (const [key, raw] of results) {
-      resultMap[key] = raw;
-    }
-
-    // Step 3: Parse responses and assemble
-    const intentParsed = parseJSON(resultMap["intent"] || "");
-    const blocks: Record<string, unknown>[] = [];
-
-    if (resultMap["skills"]) {
-      const parsed = parseJSON(resultMap["skills"]);
-      if (parsed?.block_type) {
-        parsed.prescription = blockTextByType["skills"] || "";
-        blocks.push(parsed);
-      }
-    }
-    if (resultMap["strength"]) {
-      const parsed = parseJSON(resultMap["strength"]);
-      if (parsed?.block_type) {
-        parsed.prescription = blockTextByType["strength"] || "";
-        blocks.push(parsed);
-      }
-    }
-    if (resultMap["metcon"]) {
-      const parsed = parseJSON(resultMap["metcon"]);
-      if (parsed?.block_type) {
-        parsed.prescription = blockTextByType["metcon"] || "";
-        blocks.push(parsed);
-      }
-    }
-
-    review = {
-      intent: intentParsed?.intent || resultMap["intent"] || "Unable to parse intent.",
-      blocks,
-      sources: [],
-    };
-
-    // Attach sources to review
-    review.sources = sources;
-
-    // Persist to workout_reviews
-    await supa.from("workout_reviews").insert({
+    const insertPayload: Record<string, unknown> = {
       user_id: user.id,
       workout_text: trimmed,
-      review,
-      ...(source_id ? { source_id } : {}),
-    });
+      review: null,
+      status: "pending",
+    };
+    if (source_id) insertPayload.source_id = source_id;
 
-    return new Response(JSON.stringify({ review }), {
-      status: 200,
-      headers: { ...cors, "Content-Type": "application/json" },
-    });
+    const { data: pending, error: insertErr } = await supa
+      .from("workout_reviews")
+      .insert(insertPayload)
+      .select("id, created_at")
+      .single();
+
+    if (insertErr || !pending) {
+      console.error("[workout-review] Failed to create pending row:", insertErr);
+      return new Response(
+        JSON.stringify({ error: "Failed to start workout review" }),
+        { status: 500, headers: { ...cors, "Content-Type": "application/json" } },
+      );
+    }
+
+    EdgeRuntime.waitUntil(
+      runReview(supa, pending.id, trimmed, source_id ?? null, athleteProfile, profileStr, recentStr),
+    );
+
+    return new Response(
+      JSON.stringify({
+        review_id: pending.id,
+        status: "pending",
+        created_at: pending.created_at,
+      }),
+      { status: 202, headers: { ...cors, "Content-Type": "application/json" } },
+    );
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500,
