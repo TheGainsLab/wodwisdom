@@ -230,6 +230,19 @@ export default function AdminPage({ session }: { session: Session }) {
                   <StatCard label="Input Tokens" value={Number(featureUsage.total_input_tokens).toLocaleString()} />
                   <StatCard label="Output Tokens" value={Number(featureUsage.total_output_tokens).toLocaleString()} />
                 </div>
+                <div style={{ marginTop: 12 }}>
+                  <button
+                    onClick={() => navigate('/admin/ratings')}
+                    style={{
+                      background: 'var(--accent-glow)', color: 'var(--accent)',
+                      border: '1px solid var(--border)', borderRadius: 8,
+                      padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      fontFamily: "'Outfit', sans-serif",
+                    }}
+                  >
+                    View Chat Ratings →
+                  </button>
+                </div>
 
                 {/* Daily trend */}
                 {featureUsage.chat_by_day && featureUsage.chat_by_day.length > 0 && (

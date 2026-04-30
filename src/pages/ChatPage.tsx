@@ -8,7 +8,7 @@ import ProfileBanner from '../components/ProfileBanner';
 import { formatMarkdown } from '../lib/formatMarkdown';
 import { OfflineMessage } from '../components/OfflineBanner';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
-import { Clock, Bookmark } from 'lucide-react';
+import { Clock, Bookmark, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { cacheGet, cacheSet, chatHistoryKey } from '../lib/offlineCache';
 import { pickNudgeTemplate, type ProfileSection } from '../lib/chatNudgeTemplates';
 
@@ -18,6 +18,7 @@ interface Message {
   sources?: { title: string; author: string; source: string }[];
   message_id?: string;
   bookmarked?: boolean;
+  rating?: 1 | -1 | null;
   summary?: string;
   summarizing?: boolean;
   streaming?: boolean;
@@ -49,6 +50,35 @@ export default function ChatPage({ session }: { session: Session }) {
       });
     }
   }, [online]);
+
+  // Refresh ratings from server for any messages we know about. Runs whenever
+  // the set of message_ids changes (e.g. after cached messages load, or after
+  // a new assistant message gets its message_id from the streaming "done"
+  // event). Cached state can be stale; the DB is the source of truth.
+  useEffect(() => {
+    if (!online) return;
+    const ids = messages.filter(m => m.message_id).map(m => m.message_id!) as string[];
+    if (ids.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('chat_message_ratings')
+        .select('message_id, rating')
+        .eq('user_id', session.user.id)
+        .in('message_id', ids);
+      if (cancelled || !data) return;
+      const byId = new Map<string, 1 | -1>(
+        (data as { message_id: string; rating: 1 | -1 }[]).map(r => [r.message_id, r.rating])
+      );
+      setMessages(prev => prev.map(m => {
+        if (!m.message_id) return m;
+        const next = byId.get(m.message_id) ?? null;
+        return m.rating === next ? m : { ...m, rating: next };
+      }));
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online, messages.map(m => m.message_id || '').join(',')]);
 
   // Cache messages whenever they change (skip empty/streaming)
   useEffect(() => {
@@ -144,7 +174,7 @@ export default function ChatPage({ session }: { session: Session }) {
         const data = await resp.json();
         setMessages(prev => prev.map((m, i) =>
           i === assistantIdx
-            ? { ...m, content: data.answer, sources: data.sources, message_id: data.message_id, bookmarked: false, streaming: false }
+            ? { ...m, content: data.answer, sources: data.sources, message_id: data.message_id, bookmarked: false, rating: null, streaming: false }
             : m
         ));
         if (data.usage) {
@@ -195,7 +225,7 @@ export default function ChatPage({ session }: { session: Session }) {
               if (event.type === 'done') {
                 setMessages(prev => prev.map((m, i) =>
                   i === assistantIdx
-                    ? { ...m, content: accumulatedContent, sources, message_id: event.message_id, bookmarked: false, streaming: false }
+                    ? { ...m, content: accumulatedContent, sources, message_id: event.message_id, bookmarked: false, rating: null, streaming: false }
                     : m
                 ));
                 if (event.usage) {
@@ -253,6 +283,30 @@ export default function ChatPage({ session }: { session: Session }) {
       await supabase.from('bookmarks').insert({ user_id: session.user.id, message_id: msgId });
     }
     setMessages(prev => prev.map((m, i) => i === idx ? { ...m, bookmarked: !m.bookmarked } : m));
+  };
+
+  const setRating = async (msgId: string, idx: number, value: 1 | -1) => {
+    const msg = messages[idx];
+    if (!msg || !msgId) return;
+    const previous = msg.rating ?? null;
+    const next = previous === value ? null : value;
+    setMessages(prev => prev.map((m, i) => i === idx ? { ...m, rating: next } : m));
+    try {
+      if (next === null) {
+        await supabase.from('chat_message_ratings')
+          .delete()
+          .eq('user_id', session.user.id)
+          .eq('message_id', msgId);
+      } else {
+        await supabase.from('chat_message_ratings')
+          .upsert(
+            { user_id: session.user.id, message_id: msgId, rating: next },
+            { onConflict: 'message_id,user_id' }
+          );
+      }
+    } catch {
+      setMessages(prev => prev.map((m, i) => i === idx ? { ...m, rating: previous } : m));
+    }
   };
 
   const summarizeMessage = async (msgId: string, idx: number) => {
@@ -326,6 +380,38 @@ export default function ChatPage({ session }: { session: Session }) {
                 {m.role === 'assistant' && (
                   <div className="msg-header">
                     <span className="msg-avatar">G</span>
+                    {m.message_id && !m.streaming && (
+                      <>
+                        <button
+                          className="rating-btn"
+                          aria-label={m.rating === 1 ? 'Remove thumbs up' : 'Thumbs up'}
+                          aria-pressed={m.rating === 1}
+                          title="Helpful"
+                          onClick={() => setRating(m.message_id!, i, 1)}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            padding: 4, marginLeft: 4, display: 'inline-flex',
+                            color: m.rating === 1 ? '#2ec486' : 'var(--text-dim)',
+                          }}
+                        >
+                          <ThumbsUp size={14} fill={m.rating === 1 ? '#2ec486' : 'none'} strokeWidth={2} />
+                        </button>
+                        <button
+                          className="rating-btn"
+                          aria-label={m.rating === -1 ? 'Remove thumbs down' : 'Thumbs down'}
+                          aria-pressed={m.rating === -1}
+                          title="Not helpful"
+                          onClick={() => setRating(m.message_id!, i, -1)}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            padding: 4, display: 'inline-flex',
+                            color: m.rating === -1 ? '#e74c3c' : 'var(--text-dim)',
+                          }}
+                        >
+                          <ThumbsDown size={14} fill={m.rating === -1 ? '#e74c3c' : 'none'} strokeWidth={2} />
+                        </button>
+                      </>
+                    )}
                     {m.message_id && <button className={"bookmark-btn " + (m.bookmarked ? "active" : "")} onClick={() => toggleBookmark(m.message_id!, i)}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill={m.bookmarked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
                     </button>}
