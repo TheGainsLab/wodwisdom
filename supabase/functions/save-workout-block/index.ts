@@ -67,6 +67,8 @@ interface SaveBlockBody {
     notes?: string | null;
     sort_order: number;
     entries?: Entry[];
+    capped?: boolean | null;
+    capped_reps?: number | null;
     percentile?: number | null;
     performance_tier?: string | null;
     median_benchmark?: string | null;
@@ -184,6 +186,12 @@ Deno.serve(async (req) => {
       : "other";
     const blockText = block.text?.trim() || "";
 
+    const isCapped = block.capped === true;
+    const cappedReps =
+      isCapped && typeof block.capped_reps === "number" && Number.isFinite(block.capped_reps)
+        ? Math.max(0, Math.floor(block.capped_reps))
+        : null;
+
     const { data: insertedBlock, error: blockErr } = await supa
       .from("workout_log_blocks")
       .insert({
@@ -191,15 +199,17 @@ Deno.serve(async (req) => {
         block_type: blockType,
         block_label: block.label?.trim() || null,
         block_text: blockText,
-        score: block.score?.trim() || null,
+        score: isCapped ? null : block.score?.trim() || null,
         rx: block.rx ?? false,
         notes: block.notes?.trim() || null,
         sort_order: block.sort_order,
+        capped: isCapped,
+        capped_reps: cappedReps,
         percentile:
-          block.percentile != null && block.percentile >= 1 && block.percentile <= 99
+          !isCapped && block.percentile != null && block.percentile >= 1 && block.percentile <= 99
             ? block.percentile
             : null,
-        performance_tier: block.performance_tier?.trim() || null,
+        performance_tier: isCapped ? null : block.performance_tier?.trim() || null,
         median_benchmark: block.median_benchmark?.trim() || null,
         excellent_benchmark: block.excellent_benchmark?.trim() || null,
         time_domain:

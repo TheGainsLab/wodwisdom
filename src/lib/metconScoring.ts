@@ -366,6 +366,10 @@ export function scoreMetcon(
  * Parse a score string to a numeric value for comparison.
  * - For Time: "6:45" → 405 (seconds)
  * - AMRAP: "8+15" → 8015 (rounds × 1000 + reps)
+ *
+ * For-time scores require MM:SS or HH:MM:SS — a bare number returns 0
+ * (which scoreMetcon treats as "no valid score") to prevent capped athletes
+ * who entered just their reps from being ranked as elite finishers.
  */
 export function parseScore(score: string, workoutType: string): number {
   const cleaned = score.trim();
@@ -385,6 +389,9 @@ export function parseScore(score: string, workoutType: string): number {
     if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
     if (parts.length === 2) return parts[0] * 60 + parts[1];
   }
+
+  // For-time scores must be a time. Bare numbers are not a valid finish time.
+  if (workoutType === 'for_time') return 0;
 
   return parseFloat(cleaned) || 0;
 }

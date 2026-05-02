@@ -46,6 +46,8 @@ interface LogBlock {
   notes?: string | null;
   entries?: LogEntry[];
   // Scoring fields (metcon blocks only)
+  capped?: boolean | null;
+  capped_reps?: number | null;
   percentile?: number | null;
   performance_tier?: string | null;
   median_benchmark?: string | null;
@@ -197,19 +199,26 @@ Deno.serve(async (req) => {
           ? (b.type ?? "other")
           : "other";
         const blockText = b.text?.trim() || "";
+        const isCapped = b.capped === true;
+        const cappedReps =
+          isCapped && typeof b.capped_reps === "number" && Number.isFinite(b.capped_reps)
+            ? Math.max(0, Math.floor(b.capped_reps))
+            : null;
         return {
           log_id: log.id,
           block_type: blockType,
           block_label: b.label?.trim() || null,
           block_text: blockText,
-          score: b.score?.trim() || null,
+          score: isCapped ? null : (b.score?.trim() || null),
           rx: b.rx ?? false,
           notes: b.notes?.trim() || null,
           sort_order: i,
-          percentile: b.percentile != null && b.percentile >= 1 && b.percentile <= 99
+          capped: isCapped,
+          capped_reps: cappedReps,
+          percentile: !isCapped && b.percentile != null && b.percentile >= 1 && b.percentile <= 99
             ? b.percentile
             : null,
-          performance_tier: b.performance_tier?.trim() || null,
+          performance_tier: isCapped ? null : (b.performance_tier?.trim() || null),
           median_benchmark: b.median_benchmark?.trim() || null,
           excellent_benchmark: b.excellent_benchmark?.trim() || null,
           time_domain: blockType === "metcon" && blockText ? inferTimeDomain(blockText) : null,
