@@ -129,7 +129,7 @@ FORMATTING EXAMPLES (follow these exactly):
     8 HSPU
 - Each day header includes the archetype tag in square brackets (e.g., "Day 1: [Strength Day]"). The blocks for that day are dictated by the archetype — DO NOT add or remove blocks beyond what the template provides.
 - Block headers (Warm-up & Mobility:, Skills:, Strength:, Accessory:, Metcon:, Active Recovery:, Cool down:) MUST appear on their own line starting at position 0. Never nest one block inside another. Content lines for a block go on the lines BELOW its header.
-- Do not add, remove, or reorder any headers.
+- Do not add, remove, or reorder any headers. EVERY block listed in a day's skeleton MUST appear in that day's output WITH content under it. Skipping a block (e.g., omitting Warm-up & Mobility on day 2 even though the skeleton lists it) is a hard failure — the program will be rejected and regenerated.
 - Prescribe weights using the athlete's 1RMs where applicable. Use / for M/F Rx (e.g. 95/65).
 - Metcon examples in the REFERENCE section are real CrossFit workouts. Use them for structural inspiration only — adapt to the athlete's profile and eligibility rules, never copy verbatim.`;
 
@@ -1024,6 +1024,54 @@ ${skeleton}`;
         }
         // On final attempt, log but proceed — partial compliance is better than failure
         console.warn(`[generate-program] Final attempt still has ${metconViolations.length} violations — saving anyway`);
+      }
+
+      // Validate per-day block completeness — the LLM has been observed dropping
+      // blocks (especially Warm-up & Mobility) on days 2+ even though the
+      // skeleton lists them. Check every parsed day against its archetype's
+      // required block headers and retry with a specific correction list.
+      const blockViolations: { dayNum: number; archetype: string; missing: string[] }[] = [];
+      for (const pw of parsedWorkouts) {
+        if (!pw.day_type) continue;
+        const spec = ARCHETYPES[pw.day_type as DayArchetype];
+        if (!spec) continue;
+        const text = pw.workout_text;
+        const missing = spec.blocks
+          .map((b) => b.header)
+          .filter((header) => {
+            // Match the header at line-start, allowing flexible whitespace
+            // around "&" so "Warm-up & Mobility" matches "Warm-up&Mobility" too.
+            const escaped = header
+              .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+              .replace(/&/g, "\\s*&\\s*");
+            const re = new RegExp(`^\\s*${escaped}\\s*:`, "mi");
+            return !re.test(text);
+          });
+        if (missing.length > 0) {
+          blockViolations.push({
+            dayNum: pw.sort_order + 1,
+            archetype: pw.day_type,
+            missing,
+          });
+        }
+      }
+      if (blockViolations.length > 0) {
+        console.warn(`[generate-program] Attempt ${attempt}: ${blockViolations.length} days missing required blocks`);
+        for (const v of blockViolations) {
+          console.warn(`  Day ${v.dayNum} (${v.archetype}): missing ${v.missing.join(", ")}`);
+        }
+        if (attempt < MAX_ATTEMPTS) {
+          const violationList = blockViolations
+            .map((v) => `- Day ${v.dayNum} (${v.archetype}) is missing: ${v.missing.join(", ")}`)
+            .join("\n");
+          messages.push({ role: "assistant", content: programText });
+          messages.push({
+            role: "user",
+            content: `That program is missing required blocks on these days:\n${violationList}\n\nEvery day must include EVERY block listed in its skeleton, with content under each header. Please regenerate the complete ${expectedDayCount}-day program with all required blocks present on every day.`,
+          });
+          continue;
+        }
+        console.warn(`[generate-program] Final attempt still missing blocks — saving anyway`);
       }
       // Shadow classifier — run classify-day-type in parallel for each day.
       // Do NOT gate/retry on mismatches; just collect results for the dataset.
