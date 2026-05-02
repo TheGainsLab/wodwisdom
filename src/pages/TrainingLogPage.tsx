@@ -28,6 +28,8 @@ interface WorkoutLogBlock {
   performance_tier: string | null;
   median_benchmark: string | null;
   excellent_benchmark: string | null;
+  capped: boolean | null;
+  capped_reps: number | null;
 }
 
 interface WorkoutLogEntry {
@@ -211,7 +213,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         const [{ data: blocks }, { data: entries }] = await Promise.all([
           supabase
             .from('workout_log_blocks')
-            .select('id, log_id, block_type, block_label, block_text, score, rx, sort_order, percentile, performance_tier, median_benchmark, excellent_benchmark')
+            .select('id, log_id, block_type, block_label, block_text, score, rx, sort_order, percentile, performance_tier, median_benchmark, excellent_benchmark, capped, capped_reps')
             .in('log_id', logIds),
           supabase
             .from('workout_log_entries')
@@ -393,7 +395,14 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                               <span className="wc-day-detail-type">{getBlockLabel(block)}</span>
                               {block.score && <span className="wc-day-detail-score">{block.score}</span>}
                               {block.rx && <span style={{ fontSize: 11, background: 'var(--accent-glow)', color: 'var(--accent)', padding: '1px 6px', borderRadius: 4 }}>Rx</span>}
-                              {block.percentile != null && (
+                              {block.capped ? (
+                                <span style={{
+                                  fontSize: 11, padding: '1px 6px', borderRadius: 4, fontWeight: 600,
+                                  background: 'rgba(234,179,8,0.15)', color: '#eab308',
+                                }}>
+                                  {block.capped_reps != null ? `Capped @ ${block.capped_reps} reps` : 'Capped'}
+                                </span>
+                              ) : block.percentile != null && (
                                 <span style={{
                                   fontSize: 11, padding: '1px 6px', borderRadius: 4, fontWeight: 600,
                                   background: block.percentile >= 75 ? 'rgba(34,197,94,0.15)' : block.percentile >= 40 ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
@@ -720,7 +729,14 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                             {block.rx && (
                                               <span style={{ fontSize: 11, background: 'var(--accent-glow)', color: 'var(--accent)', padding: '1px 6px', borderRadius: 4 }}>Rx</span>
                                             )}
-                                            {block.percentile != null && (
+                                            {block.capped ? (
+                                              <span style={{
+                                                fontSize: 11, padding: '1px 6px', borderRadius: 4, fontWeight: 600,
+                                                background: 'rgba(234,179,8,0.15)', color: '#eab308',
+                                              }}>
+                                                {block.capped_reps != null ? `Capped @ ${block.capped_reps} reps` : 'Capped'}
+                                              </span>
+                                            ) : block.percentile != null && (
                                               <span style={{
                                                 fontSize: 11,
                                                 padding: '1px 6px',

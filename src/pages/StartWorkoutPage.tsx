@@ -288,6 +288,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   const [workRates, setWorkRates] = useState<MovementWorkRate[]>([]);
   const [blockScores, setBlockScores] = useState<Record<number, string>>({});
   const [blockRx, setBlockRx] = useState<Record<number, boolean>>({});
+  const [blockCapped, setBlockCapped] = useState<Record<number, boolean>>({});
+  const [blockCappedReps, setBlockCappedReps] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
   const [parsingSkills, setParsingSkills] = useState(false);
   const [parsingAccessories, setParsingAccessories] = useState(false);
@@ -556,7 +558,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           // Load previously saved blocks
           const { data: savedBlockRows } = await supabase
             .from('workout_log_blocks')
-            .select('sort_order, block_type, block_label, block_text, score, rx, notes')
+            .select('sort_order, block_type, block_label, block_text, score, rx, notes, capped, capped_reps')
             .eq('log_id', ipLog.id)
             .order('sort_order');
 
@@ -568,10 +570,16 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
               if (sb.notes) {
                 setBlockNotes(prev => ({ ...prev, [sb.sort_order]: sb.notes }));
               }
-              // Restore score/rx for metcon blocks
+              // Restore score/rx/capped for metcon blocks
               if (sb.block_type === 'metcon') {
                 if (sb.score) setBlockScores(prev => ({ ...prev, [sb.sort_order]: sb.score }));
                 setBlockRx(prev => ({ ...prev, [sb.sort_order]: sb.rx ?? true }));
+                if (sb.capped) {
+                  setBlockCapped(prev => ({ ...prev, [sb.sort_order]: true }));
+                  if (sb.capped_reps != null) {
+                    setBlockCappedReps(prev => ({ ...prev, [sb.sort_order]: String(sb.capped_reps) }));
+                  }
+                }
               }
             }
             setSavedBlocks(savedSet);
@@ -883,23 +891,29 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         });
     }
 
-    // Compute scoring for metcon blocks
+    // Compute scoring for metcon blocks. Skip when capped — there's no
+    // meaningful percentile without a finish time.
     const benchmarks = blockBenchmarks[bi];
+    const isCapped = b.type === 'metcon' && (blockCapped[bi] ?? false);
     const scoreStr = blockScores[bi]?.trim() || '';
     const wType = inferWorkoutType([b]);
-    const scoring = b.type === 'metcon' && benchmarks && scoreStr
+    const scoring = b.type === 'metcon' && benchmarks && scoreStr && !isCapped
       ? scoreMetcon(scoreStr, wType, benchmarks)
       : null;
+    const cappedRepsRaw = blockCappedReps[bi]?.trim();
+    const cappedReps = isCapped && cappedRepsRaw ? parseInt(cappedRepsRaw, 10) : null;
 
     return {
       label: b.label,
       type: b.type,
       text: b.text,
-      score,
+      score: isCapped ? null : score,
       rx,
       notes: blockNotes[bi]?.trim() || null,
       sort_order: bi,
       entries,
+      capped: isCapped,
+      capped_reps: Number.isFinite(cappedReps) ? cappedReps : null,
       percentile: scoring?.percentile ?? null,
       performance_tier: scoring?.performanceTier ?? null,
       median_benchmark: benchmarks?.medianScore !== '--' ? benchmarks?.medianScore : null,
@@ -1063,22 +1077,28 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
               };
             });
 
-          // Compute percentile if benchmarks and score are available
+          // Compute percentile if benchmarks and score are available.
+          // Skip when capped — there's no meaningful percentile without a finish time.
           const benchmarks = blockBenchmarks[bi];
           const scoreStr = blockScores[bi]?.trim() || '';
           const wType = inferWorkoutType([b]);
-          const scoring = benchmarks && scoreStr
+          const isCapped = blockCapped[bi] ?? false;
+          const scoring = benchmarks && scoreStr && !isCapped
             ? scoreMetcon(scoreStr, wType, benchmarks)
             : null;
+          const cappedRepsRaw = blockCappedReps[bi]?.trim();
+          const cappedRepsNum = isCapped && cappedRepsRaw ? parseInt(cappedRepsRaw, 10) : null;
 
           return {
             label: b.label,
             type: b.type,
             text: b.text,
-            score: scoreStr || null,
+            score: isCapped ? null : (scoreStr || null),
             rx: blockRx[bi] ?? true,
             notes: blockNotes[bi]?.trim() || null,
             entries,
+            capped: isCapped,
+            capped_reps: Number.isFinite(cappedRepsNum) ? cappedRepsNum : null,
             percentile: scoring?.percentile ?? null,
             performance_tier: scoring?.performanceTier ?? null,
             median_benchmark: benchmarks?.medianScore !== '--' ? benchmarks?.medianScore : null,
@@ -1324,16 +1344,45 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                         .filter(k => k.startsWith(`${bi}-m`))
                         .sort((a, b2) => parseInt(a.split('-m')[1], 10) - parseInt(b2.split('-m')[1], 10));
 
+                      const isForTime = inferWorkoutType([block]) === 'for_time';
+                      const isCapped = blockCapped[bi] ?? false;
+
                       return (
                         <>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                            <input type="checkbox" id={`rx-${bi}`} checked={blockRx[bi] ?? true} onChange={e => setBlockRx(prev => ({ ...prev, [bi]: e.target.checked }))} />
-                            <label htmlFor={`rx-${bi}`} style={{ fontSize: 14, color: 'var(--text-dim)' }}>Rx</label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <input type="checkbox" id={`rx-${bi}`} checked={blockRx[bi] ?? true} onChange={e => setBlockRx(prev => ({ ...prev, [bi]: e.target.checked }))} />
+                              <label htmlFor={`rx-${bi}`} style={{ fontSize: 14, color: 'var(--text-dim)' }}>Rx</label>
+                            </div>
+                            {isForTime && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <input
+                                  type="checkbox"
+                                  id={`capped-${bi}`}
+                                  checked={isCapped}
+                                  onChange={e => setBlockCapped(prev => ({ ...prev, [bi]: e.target.checked }))}
+                                />
+                                <label htmlFor={`capped-${bi}`} style={{ fontSize: 14, color: 'var(--text-dim)' }}>Capped</label>
+                              </div>
+                            )}
                           </div>
-                          <div className="field" style={{ marginBottom: 16 }}>
-                            <label>Score</label>
-                            <input type="text" placeholder="e.g. 4:48 or 8+12" value={blockScores[bi] ?? ''} onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))} />
-                          </div>
+                          {isCapped ? (
+                            <div className="field" style={{ marginBottom: 16 }}>
+                              <label>Reps completed at cap</label>
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                placeholder="e.g. 142"
+                                value={blockCappedReps[bi] ?? ''}
+                                onChange={e => setBlockCappedReps(prev => ({ ...prev, [bi]: e.target.value }))}
+                              />
+                            </div>
+                          ) : (
+                            <div className="field" style={{ marginBottom: 16 }}>
+                              <label>Score</label>
+                              <input type="text" placeholder="e.g. 4:48 or 8+12" value={blockScores[bi] ?? ''} onChange={e => setBlockScores(prev => ({ ...prev, [bi]: e.target.value }))} />
+                            </div>
+                          )}
 
                           {parsingMetcon && mvKeys.length === 0 && (
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
