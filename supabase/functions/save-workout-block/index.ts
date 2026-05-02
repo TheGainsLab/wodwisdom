@@ -123,21 +123,26 @@ Deno.serve(async (req) => {
     // ── 1. Ensure parent workout_logs row exists ──────────────────
     let logId = body.log_id ?? null;
 
+    let preExistingStatus: "in_progress" | "completed" | null = null;
+
     if (logId) {
-      // Verify ownership
+      // Verify ownership. We allow editing logs in either status — completed
+      // logs are editable via the "Edit logged workout" flow, in-progress logs
+      // via the normal resume flow.
       const { data: existing } = await supa
         .from("workout_logs")
-        .select("id")
+        .select("id, status")
         .eq("id", logId)
         .eq("user_id", user.id)
-        .eq("status", "in_progress")
+        .in("status", ["in_progress", "completed"])
         .single();
       if (!existing) {
         return new Response(
-          JSON.stringify({ error: "In-progress workout not found" }),
+          JSON.stringify({ error: "Workout log not found" }),
           { status: 404, headers: { ...cors, "Content-Type": "application/json" } }
         );
       }
+      preExistingStatus = existing.status as "in_progress" | "completed";
     } else {
       // Create a new in-progress log
       const workoutText = body.workout_text?.trim() || "";
@@ -307,9 +312,11 @@ Deno.serve(async (req) => {
     }
 
     // ── 4. Auto-complete: if all loggable blocks are saved, mark completed ──
+    // Skip when editing a log that was already completed — we don't want a
+    // partial save during edit to flip status, and the log is already done.
     let autoCompleted = false;
     const sourceId = body.source_id ?? null;
-    if (sourceId) {
+    if (sourceId && preExistingStatus !== "completed") {
       // Count saved blocks for this log (exclude warm-up/cool-down)
       const { count: savedCount } = await supa
         .from("workout_log_blocks")
