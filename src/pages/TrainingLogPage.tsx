@@ -386,7 +386,22 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                     {logsByDate[selectedDate].map(log => {
                       const logBlocks = blocksByLog[log.id] || [];
                       const logEntries = entriesByLog[log.id] || [];
-                      return logBlocks.length > 0 ? (
+                      return (
+                        <div key={log.id} style={{ marginBottom: 8 }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+                            <button
+                              onClick={() => navigate('/workout/start', { state: { edit_log_id: log.id } })}
+                              style={{
+                                background: 'none', border: '1px solid var(--border)', borderRadius: 6,
+                                color: 'var(--text-dim)', cursor: 'pointer', padding: '4px 10px',
+                                fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
+                                fontFamily: "'Outfit', sans-serif",
+                              }}
+                            >
+                              Edit
+                            </button>
+                          </div>
+                          {logBlocks.length > 0 ? (
                         logBlocks.map((block, i) => {
                           const blockEntries = logEntries.filter(e => e.block_id === block.id);
                           return (
@@ -455,11 +470,13 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                           );
                         })
                       ) : (
-                        <div key={log.id} className="wc-day-detail-block">
+                        <div className="wc-day-detail-block">
                           <div className="wc-day-detail-block-header">
                             <span className="wc-day-detail-type">{TYPE_LABELS[log.workout_type] || log.workout_type}</span>
                           </div>
                           <div className="wc-day-detail-text">{log.workout_text}</div>
+                        </div>
+                      )}
                         </div>
                       );
                     })}
@@ -710,6 +727,22 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                             const logEntries = entriesByLog[log.id] || [];
                             return (
                               <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate('/workout/start', { state: { edit_log_id: log.id } });
+                                    }}
+                                    style={{
+                                      background: 'none', border: '1px solid var(--border)', borderRadius: 6,
+                                      color: 'var(--text-dim)', cursor: 'pointer', padding: '4px 12px',
+                                      fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
+                                      fontFamily: "'Outfit', sans-serif",
+                                    }}
+                                  >
+                                    Edit Workout
+                                  </button>
+                                </div>
                                 {logBlocks.length > 0 ? (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                     {logBlocks.map((block, i) => {

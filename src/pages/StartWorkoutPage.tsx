@@ -278,7 +278,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const workoutDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [workoutDate, setWorkoutDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [workoutType, setWorkoutType] = useState('other');
   const [blockNotes, setBlockNotes] = useState<Record<number, string>>({});
   const [entryValues, setEntryValues] = useState<Record<string, EntryValues>>({});
@@ -302,16 +302,21 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   const [inProgressLogId, setInProgressLogId] = useState<string | null>(null);
   const [savedBlocks, setSavedBlocks] = useState<Set<number>>(new Set());
   const [savingBlock, setSavingBlock] = useState<number | null>(null);
+  // In edit mode the source_id is resolved from the log being edited rather
+  // than passed via location.state. Cached so save paths can read it later.
+  const [resolvedSourceId, setResolvedSourceId] = useState<string | null>(null);
   const [userUnits, setUserUnits] = useState<'lbs' | 'kg'>('lbs');
 
   const sourceState = location.state as {
     workout_text?: string;
     source_id?: string;
+    edit_log_id?: string;
   } | null;
+  const isEditMode = !!sourceState?.edit_log_id;
 
   // Fetch blocks from program_workout_blocks on mount
   useEffect(() => {
-    if (!sourceState?.source_id) {
+    if (!sourceState?.source_id && !sourceState?.edit_log_id) {
       setLoading(false);
       setError('No workout selected');
       return;
@@ -320,12 +325,39 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     (async () => {
       setLoading(true);
 
+      // Edit mode: resolve source_id from the existing log first so the rest
+      // of the load flow (fetch program blocks, restore state) works the same.
+      let localSourceId = sourceState.source_id ?? null;
+      if (sourceState.edit_log_id) {
+        const { data: editLog, error: editLogErr } = await supabase
+          .from('workout_logs')
+          .select('id, source_id, workout_text, workout_date')
+          .eq('id', sourceState.edit_log_id)
+          .maybeSingle();
+        if (editLogErr || !editLog) {
+          setError('Could not load workout to edit');
+          setLoading(false);
+          return;
+        }
+        if (!editLog.source_id) {
+          setError('This workout cannot be edited (no program reference)');
+          setLoading(false);
+          return;
+        }
+        if (!localSourceId) localSourceId = editLog.source_id;
+        // Preserve the original log date so saves don't silently move the
+        // workout to today's calendar slot.
+        if (editLog.workout_date) setWorkoutDate(editLog.workout_date);
+        setInProgressLogId(editLog.id);
+      }
+      setResolvedSourceId(localSourceId);
+
       // Fetch blocks, work rates, and user units in parallel
       const [blocksRes, ratesRes, unitsRes] = await Promise.all([
         supabase
           .from('program_workout_blocks')
           .select('id, block_type, block_text, block_order, parsed_tasks')
-          .eq('program_workout_id', sourceState.source_id!)
+          .eq('program_workout_id', localSourceId!)
           .order('block_order'),
         supabase
           .from('movements')
@@ -542,16 +574,25 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
       setAccessoryEntries(initialAccessory);
       if (accessoryNeedsParse) setParsingAccessories(false);
 
-      // Check for an existing in-progress workout log to resume
+      // Resolve which log (if any) to restore form state from. In edit mode
+      // the caller picked the exact log; otherwise we look for an in-progress
+      // resume on this source_id.
       {
-        const { data: ipLog } = await supabase
-          .from('workout_logs')
-          .select('id')
-          .eq('source_id', sourceState.source_id!)
-          .eq('status', 'in_progress')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        let logToRestore: { id: string } | null = null;
+        if (sourceState.edit_log_id) {
+          logToRestore = { id: sourceState.edit_log_id };
+        } else {
+          const { data: ipLog } = await supabase
+            .from('workout_logs')
+            .select('id')
+            .eq('source_id', localSourceId!)
+            .eq('status', 'in_progress')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          logToRestore = ipLog ?? null;
+        }
+        const ipLog = logToRestore;
 
         if (ipLog) {
           setInProgressLogId(ipLog.id);
@@ -666,7 +707,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
       const { data: reviewRow } = await supabase
         .from('workout_reviews')
         .select('review')
-        .eq('source_id', sourceState.source_id!)
+        .eq('source_id', localSourceId!)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -716,7 +757,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
 
       setLoading(false);
     })();
-  }, [sourceState?.source_id]);
+  }, [sourceState?.source_id, sourceState?.edit_log_id]);
 
   const setEntry = (key: string, field: keyof EntryValues, value: unknown) => {
     setEntryValues(prev => ({
@@ -935,7 +976,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
       const { data, error: fnErr } = await supabase.functions.invoke('save-workout-block', {
         body: {
           log_id: inProgressLogId,
-          source_id: sourceState?.source_id || null,
+          source_id: resolvedSourceId || sourceState?.source_id || null,
           workout_date: workoutDate,
           workout_text: workoutText,
           workout_type: workoutType,
@@ -976,7 +1017,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         const { data, error: fnErr } = await supabase.functions.invoke('save-workout-block', {
           body: {
             log_id: inProgressLogId,
-            source_id: sourceState?.source_id || null,
+            source_id: resolvedSourceId || sourceState?.source_id || null,
             workout_date: workoutDate,
             workout_text: workoutText,
             workout_type: workoutType,
@@ -1202,7 +1243,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           workout_date: workoutDate,
           workout_text: workoutText,
           workout_type: workoutType,
-          source_id: sourceState?.source_id || null,
+          source_id: resolvedSourceId || sourceState?.source_id || null,
           notes: null,
           blocks: logBlocks,
           status: 'completed',
@@ -1227,7 +1268,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>{inProgressLogId ? 'Resume Workout' : 'Start Workout'}</h1>
+          <h1>{isEditMode ? 'Edit Workout' : inProgressLogId ? 'Resume Workout' : 'Start Workout'}</h1>
         </header>
 
         <div className="page-body">
