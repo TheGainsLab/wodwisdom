@@ -383,8 +383,11 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                     </div>
                     {logsByDate[selectedDate].map(log => {
                       const logBlocks = blocksByLog[log.id] || [];
+                      const logEntries = entriesByLog[log.id] || [];
                       return logBlocks.length > 0 ? (
-                        logBlocks.map((block, i) => (
+                        logBlocks.map((block, i) => {
+                          const blockEntries = logEntries.filter(e => e.block_id === block.id);
+                          return (
                           <div key={`${log.id}-${i}`} className="wc-day-detail-block">
                             <div className="wc-day-detail-block-header">
                               <span className="wc-day-detail-type">{getBlockLabel(block)}</span>
@@ -399,8 +402,49 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                               )}
                             </div>
                             <div className="wc-day-detail-text">{block.block_text}</div>
+                            {blockEntries.length > 0 && (
+                              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                {block.block_type === 'strength' && blockEntries.some(e => e.set_number != null) ? (
+                                  (() => {
+                                    const byMovement = new Map<string, WorkoutLogEntry[]>();
+                                    for (const e of blockEntries) {
+                                      const list = byMovement.get(e.movement) || [];
+                                      list.push(e);
+                                      byMovement.set(e.movement, list);
+                                    }
+                                    return [...byMovement.entries()].map(([movement, rows]) => (
+                                      <div key={movement}>
+                                        <div style={{ fontWeight: 600, fontSize: 13 }}>{formatMovementName(movement)}</div>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+                                          {rows.map((r, ri) => (
+                                            <span key={ri} style={{ fontSize: 12, color: 'var(--text-dim)', background: 'var(--surface2)', padding: '2px 6px', borderRadius: 4, fontFamily: 'JetBrains Mono' }}>
+                                              S{r.set_number}: {r.reps ?? '?'}@{r.weight ?? '?'}{r.weight_unit}{r.rpe != null ? ` RPE ${r.rpe}` : ''}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ));
+                                  })()
+                                ) : (
+                                  blockEntries.map((entry, ei) => (
+                                    <div key={ei} style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                                      <span style={{ fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(entry.movement)}</span>
+                                      {entry.sets != null && entry.reps != null && <span> {entry.sets}x{entry.reps}</span>}
+                                      {entry.reps != null && entry.sets == null && <span> x{entry.reps}</span>}
+                                      {entry.reps_completed != null && <span> x{entry.reps_completed} reps</span>}
+                                      {entry.hold_seconds != null && <span> {entry.hold_seconds}s hold</span>}
+                                      {entry.weight != null && <span> @{entry.weight}{entry.weight_unit}</span>}
+                                      {entry.distance != null && <span> {entry.distance}{entry.distance_unit || 'm'}</span>}
+                                      {entry.rpe != null && <span> RPE {entry.rpe}</span>}
+                                      {entry.scaling_note && <span style={{ fontStyle: 'italic' }}> ({entry.scaling_note})</span>}
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            )}
                           </div>
-                        ))
+                          );
+                        })
                       ) : (
                         <div key={log.id} className="wc-day-detail-block">
                           <div className="wc-day-detail-block-header">
