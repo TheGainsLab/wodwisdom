@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useDebounce } from '../hooks/useDebounce';
 import Nav from '../components/Nav';
 
-interface ChatMessage { id: string; question: string; answer: string; sources: any[]; context_type?: string | null; created_at: string; summary?: string; }
+interface ChatMessage { id: string; question: string; answer: string; sources: any[]; context_type?: string | null; created_at: string; summary?: string; bookmarked?: boolean; }
 
 function formatMd(t: string): string {
   return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/\n\n/g,'</p><p>').replace(/\n- /g,'<br>\u2022 ').replace(/\n/g,'<br>').replace(/^/,'<p>').replace(/$/,'</p>');
@@ -48,6 +48,52 @@ export default function HistoryPage({ session }: { session: Session }) {
     supabase.from('chat_messages').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(100)
       .then(({ data }) => { if (data) setMessages(data); setLoading(false); });
   }, []);
+
+  // Hydrate bookmark state for any messages we know about. Re-runs when the
+  // message id set changes (initial load, search results swap in/out).
+  useEffect(() => {
+    const ids = [
+      ...messages.map(m => m.id),
+      ...(searchResults ?? []).map(m => m.id),
+    ];
+    const unique = Array.from(new Set(ids));
+    if (unique.length === 0) return;
+    let cancelled = false;
+    supabase
+      .from('bookmarks')
+      .select('message_id')
+      .eq('user_id', session.user.id)
+      .in('message_id', unique)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const bookmarked = new Set((data as { message_id: string }[]).map(b => b.message_id));
+        setMessages(prev => prev.map(m => bookmarked.has(m.id) === !!m.bookmarked ? m : { ...m, bookmarked: bookmarked.has(m.id) }));
+        setSearchResults(prev => prev === null ? prev : prev.map(m => bookmarked.has(m.id) === !!m.bookmarked ? m : { ...m, bookmarked: bookmarked.has(m.id) }));
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.map(m => m.id).join(','), (searchResults ?? []).map(m => m.id).join(',')]);
+
+  const toggleBookmark = async (msgId: string, currentlyBookmarked: boolean) => {
+    // Optimistic update across both lists
+    const apply = (list: ChatMessage[]) =>
+      list.map(m => m.id === msgId ? { ...m, bookmarked: !currentlyBookmarked } : m);
+    setMessages(prev => apply(prev));
+    setSearchResults(prev => prev === null ? prev : apply(prev));
+    try {
+      if (currentlyBookmarked) {
+        await supabase.from('bookmarks').delete().eq('user_id', session.user.id).eq('message_id', msgId);
+      } else {
+        await supabase.from('bookmarks').insert({ user_id: session.user.id, message_id: msgId });
+      }
+    } catch {
+      // Roll back on failure
+      const rollback = (list: ChatMessage[]) =>
+        list.map(m => m.id === msgId ? { ...m, bookmarked: currentlyBookmarked } : m);
+      setMessages(prev => rollback(prev));
+      setSearchResults(prev => prev === null ? prev : rollback(prev));
+    }
+  };
 
   useEffect(() => {
     if (!debouncedSearch.trim()) {
@@ -144,6 +190,18 @@ export default function HistoryPage({ session }: { session: Session }) {
                      ) : null;
                    })()}
                    <span className="history-time">{formatDate(msg.created_at)}</span>
+                   <button
+                     className={"bookmark-btn " + (msg.bookmarked ? "active" : "")}
+                     onClick={(e) => { e.stopPropagation(); toggleBookmark(msg.id, !!msg.bookmarked); }}
+                     aria-label={msg.bookmarked ? 'Remove bookmark' : 'Save to bookmarks'}
+                     title={msg.bookmarked ? 'Bookmarked' : 'Save'}
+                     style={{
+                       background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                       display: 'inline-flex', color: msg.bookmarked ? 'var(--accent)' : 'var(--text-dim)',
+                     }}
+                   >
+                     <svg width="14" height="14" viewBox="0 0 24 24" fill={msg.bookmarked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
+                   </button>
                  </div>
                  {expanded === msg.id && (
                    <div className="history-answer">
