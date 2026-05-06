@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { localDateString } from '../lib/localDate';
 import Nav from '../components/Nav';
 import { BlockContent } from '../components/WorkoutBlocksDisplay';
 import {
@@ -278,7 +279,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [workoutDate, setWorkoutDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [workoutDate, setWorkoutDate] = useState<string>(() => localDateString());
   const [workoutType, setWorkoutType] = useState('other');
   const [blockNotes, setBlockNotes] = useState<Record<number, string>>({});
   const [entryValues, setEntryValues] = useState<Record<string, EntryValues>>({});

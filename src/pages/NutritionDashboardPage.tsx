@@ -20,11 +20,12 @@ import FoodDetailSheet from '../components/nutrition/FoodDetailSheet';
 import FavoritesSheet from '../components/nutrition/FavoritesSheet';
 import MealTemplatesSheet from '../components/nutrition/MealTemplatesSheet';
 import MealBuilderSheet from '../components/nutrition/MealBuilderSheet';
+import { localDateString } from '../lib/localDate';
 
 // ── Helpers ──
 
 function formatDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  return localDateString(date);
 }
 
 function displayDate(date: Date): string {
