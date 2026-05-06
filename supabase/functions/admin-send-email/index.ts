@@ -68,7 +68,19 @@ function applyEmphasis(s: string): string {
     .replace(/\*([^*\s][^*\n]*?[^*\s]|[^*\s])\*/g, "<em>$1</em>");
 }
 
-function renderCustom(subject: string, body: string, name: string): RenderedTemplate {
+const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_IMAGES = 4;
+const VALID_CID = /^[A-Za-z0-9._-]+$/;
+
+interface InboundAttachment {
+  cid: string;
+  filename: string;
+  content_type: string;
+  content_base64: string;
+}
+
+function renderCustom(subject: string, body: string, name: string, attachments: InboundAttachment[]): RenderedTemplate {
   // Body comes from the admin composer as plain-text-with-extras. Four
   // kinds of formatting are supported:
   //   1. Blank-line-separated paragraphs -> <p> blocks
@@ -88,6 +100,14 @@ function renderCustom(subject: string, body: string, name: string): RenderedTemp
   //     itself (we emit anchors after emphasis, so <em> can't land
   //     inside <a href="...">).
   const safeName = escapeHtml(name);
+
+  // Map [image:N] tokens to the cid of the matching attachment. Tokens
+  // for missing/removed attachments fall through and get stripped.
+  const cidByNumber = new Map<string, string>();
+  for (const a of attachments) {
+    const m = a.cid.match(/^img-(\d+)-/);
+    if (m) cidByNumber.set(m[1], a.cid);
+  }
 
   const linkPlaceholders: string[] = [];
   const MARKDOWN_LINK = /\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^)\s]+)\)/g;
@@ -119,13 +139,23 @@ function renderCustom(subject: string, body: string, name: string): RenderedTemp
   const withLinks = autoLinked.map((p) =>
     p.replace(/§§MDL(\d+)§§/g, (_, i) => linkPlaceholders[Number(i)] || ""),
   );
+  // Replace [image:N] tokens with inline <img src="cid:..."> tags. Tokens
+  // for which no attachment exists are stripped silently.
+  const IMG_STYLE = "max-width: 100%; height: auto; border-radius: 8px; margin: 12px 0; display: block;";
+  const withImages = withLinks.map((p) =>
+    p.replace(/\[image:(\d+)\]/g, (_match, n: string) => {
+      const cid = cidByNumber.get(n);
+      if (!cid) return "";
+      return `<img src="cid:${escapeHtml(cid)}" alt="" style="${IMG_STYLE}" />`;
+    }),
+  );
   // Custom messages are 1:1 personal check-ins — no "you're getting this
   // because…" footer. They should read like a regular note from a person.
   // Templated sends (e.g. welcome_back) still carry their own disclosure
   // and, eventually, an unsubscribe link for bulk campaigns.
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a1a; line-height: 1.6;">
-      ${withLinks.map((p) => `<p>${p}</p>`).join("\n      ")}
+      ${withImages.map((p) => `<p>${p}</p>`).join("\n      ")}
     </div>
   `.trim();
   return {
@@ -178,7 +208,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { user_id, template_key, subject, body: customBody, campaign_key } = body || {};
+    const { user_id, template_key, subject, body: customBody, campaign_key, attachments: rawAttachments } = body || {};
     if (!user_id || !template_key) {
       return new Response(
         JSON.stringify({ error: "user_id and template_key are required" }),
@@ -201,6 +231,46 @@ Deno.serve(async (req) => {
 
     const recipientName = firstName(recipientProfile.full_name, recipientProfile.email);
 
+    // Validate attachments (custom template only). Reject anything
+    // outside the image whitelist or above size/count limits.
+    const attachments: InboundAttachment[] = [];
+    if (template_key === "custom" && Array.isArray(rawAttachments)) {
+      if (rawAttachments.length > MAX_IMAGES) {
+        return new Response(
+          JSON.stringify({ error: `Max ${MAX_IMAGES} images per email` }),
+          { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
+        );
+      }
+      for (const a of rawAttachments) {
+        if (
+          !a || typeof a.cid !== "string" || !VALID_CID.test(a.cid) ||
+          typeof a.filename !== "string" ||
+          typeof a.content_type !== "string" ||
+          !ALLOWED_IMAGE_TYPES.includes(a.content_type) ||
+          typeof a.content_base64 !== "string"
+        ) {
+          return new Response(
+            JSON.stringify({ error: "Invalid attachment" }),
+            { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
+          );
+        }
+        // Approximate decoded size from base64 length: bytes ≈ (len * 3) / 4
+        const approxBytes = Math.floor((a.content_base64.length * 3) / 4);
+        if (approxBytes > MAX_IMAGE_BYTES) {
+          return new Response(
+            JSON.stringify({ error: `Image ${a.filename} exceeds 4MB limit` }),
+            { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
+          );
+        }
+        attachments.push({
+          cid: a.cid,
+          filename: a.filename,
+          content_type: a.content_type,
+          content_base64: a.content_base64,
+        });
+      }
+    }
+
     // Render the template
     let rendered: RenderedTemplate;
     if (template_key === "welcome_back") {
@@ -214,7 +284,7 @@ Deno.serve(async (req) => {
           { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
         );
       }
-      rendered = renderCustom(customSubject, customText, recipientName);
+      rendered = renderCustom(customSubject, customText, recipientName, attachments);
     } else {
       return new Response(
         JSON.stringify({ error: `Unknown template_key: ${template_key}` }),
@@ -222,20 +292,30 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Send via Resend
+    // Send via Resend. Inline images use content_id so the rendered
+    // <img src="cid:..."> tags resolve in the recipient's mail client.
+    const resendPayload: Record<string, unknown> = {
+      from: `${SENDER_NAME} <${FROM_EMAIL}>`,
+      to: [recipientProfile.email],
+      subject: rendered.subject,
+      html: rendered.html,
+      reply_to: FROM_EMAIL,
+    };
+    if (attachments.length > 0) {
+      resendPayload.attachments = attachments.map((a) => ({
+        filename: a.filename,
+        content: a.content_base64,
+        content_type: a.content_type,
+        content_id: a.cid,
+      }));
+    }
     const resendResp = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${RESEND_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        from: `${SENDER_NAME} <${FROM_EMAIL}>`,
-        to: [recipientProfile.email],
-        subject: rendered.subject,
-        html: rendered.html,
-        reply_to: FROM_EMAIL,
-      }),
+      body: JSON.stringify(resendPayload),
     });
 
     if (!resendResp.ok) {
