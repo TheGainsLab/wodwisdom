@@ -1,8 +1,33 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
+
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB
+const MAX_IMAGES_PER_EMAIL = 4;
+
+interface ComposerImage {
+  cid: string;
+  filename: string;
+  content_type: string;
+  content_base64: string;
+  preview_url: string;
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
@@ -78,11 +103,114 @@ function EmailSection({ userId, userEmail, userName }: { userId: string; userEma
   const [templateKey, setTemplateKey] = useState<'welcome_back' | 'custom'>('custom');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
+  const [images, setImages] = useState<ComposerImage[]>([]);
   const [confirmArmed, setConfirmArmed] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [sends, setSends] = useState<EmailSendRow[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imgCounterRef = useRef(0);
+
+  const addImage = async (file: File): Promise<string | null> => {
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      return `Unsupported file type: ${file.type || 'unknown'}`;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      return `Image too large (${Math.round(file.size / 1024 / 1024)}MB). Max 4MB.`;
+    }
+    if (images.length >= MAX_IMAGES_PER_EMAIL) {
+      return `Max ${MAX_IMAGES_PER_EMAIL} images per email.`;
+    }
+    let content_base64: string;
+    try {
+      content_base64 = await fileToBase64(file);
+    } catch {
+      return 'Failed to read image file';
+    }
+    imgCounterRef.current += 1;
+    const n = imgCounterRef.current;
+    const cid = `img-${n}-${Date.now().toString(36)}`;
+    const filename = file.name || `image-${n}.${(file.type.split('/')[1] || 'png')}`;
+    const preview_url = URL.createObjectURL(file);
+    const next: ComposerImage = { cid, filename, content_type: file.type, content_base64, preview_url };
+    setImages((prev) => [...prev, next]);
+
+    // Insert [image:N] token at the textarea cursor (or at end if no focus)
+    const ta = textareaRef.current;
+    const token = `[image:${n}]`;
+    if (ta && document.activeElement === ta) {
+      const start = ta.selectionStart ?? body.length;
+      const end = ta.selectionEnd ?? body.length;
+      const before = body.slice(0, start);
+      const after = body.slice(end);
+      const needsLeadingNewline = before.length > 0 && !before.endsWith('\n');
+      const insertion = (needsLeadingNewline ? '\n' : '') + token + (after.startsWith('\n') ? '' : '\n');
+      const newBody = before + insertion + after;
+      setBody(newBody);
+      // Restore caret just after the token
+      requestAnimationFrame(() => {
+        const pos = before.length + insertion.length;
+        ta.focus();
+        ta.setSelectionRange(pos, pos);
+      });
+    } else {
+      setBody((prev) => (prev.length > 0 && !prev.endsWith('\n') ? `${prev}\n${token}\n` : `${prev}${token}\n`));
+    }
+    setConfirmArmed(false);
+    return null;
+  };
+
+  const handleFiles = async (files: FileList | File[]) => {
+    const arr = Array.from(files);
+    for (const f of arr) {
+      const err = await addImage(f);
+      if (err) { setError(err); return; }
+    }
+    setError('');
+  };
+
+  const removeImage = (cid: string) => {
+    const target = images.find((x) => x.cid === cid);
+    if (target) URL.revokeObjectURL(target.preview_url);
+    setImages((prev) => prev.filter((x) => x.cid !== cid));
+    // Strip the [image:N] token from the body. We don't renumber remaining
+    // images on screen, so the body's token order may have gaps — that's
+    // fine, the renderer matches by number, not position.
+    const idxMatch = target ? Number(target.cid.split('-')[1]) : NaN;
+    if (Number.isFinite(idxMatch)) {
+      const re = new RegExp(`\\n?\\[image:${idxMatch}\\]\\n?`, 'g');
+      setBody((prev) => prev.replace(re, ''));
+    }
+    setConfirmArmed(false);
+  };
+
+  const onPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files: File[] = [];
+    for (const it of Array.from(items)) {
+      if (it.kind === 'file') {
+        const f = it.getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      void handleFiles(files);
+    }
+  };
+
+  const onDrop = (e: React.DragEvent<HTMLTextAreaElement>) => {
+    if (!e.dataTransfer?.files?.length) return;
+    e.preventDefault();
+    void handleFiles(e.dataTransfer.files);
+  };
+
+  const onDragOver = (e: React.DragEvent<HTMLTextAreaElement>) => {
+    if (e.dataTransfer?.types?.includes('Files')) e.preventDefault();
+  };
 
   const loadHistory = async () => {
     setLoadingHistory(true);
@@ -119,14 +247,25 @@ function EmailSection({ userId, userEmail, userName }: { userId: string; userEma
     setSending(true);
     setError('');
     try {
+      const attachments = templateKey === 'custom'
+        ? images.map((img) => ({
+            cid: img.cid,
+            filename: img.filename,
+            content_type: img.content_type,
+            content_base64: img.content_base64,
+          }))
+        : [];
       const payload = templateKey === 'custom'
-        ? { user_id: userId, template_key: 'custom', subject, body }
+        ? { user_id: userId, template_key: 'custom', subject, body, attachments }
         : { user_id: userId, template_key: 'welcome_back' };
       const { data, error: invokeErr } = await supabase.functions.invoke('admin-send-email', { body: payload });
       if (invokeErr) throw new Error(invokeErr.message || 'Send failed');
       if (data?.error) throw new Error(data.error);
       setSubject('');
       setBody('');
+      images.forEach((img) => URL.revokeObjectURL(img.preview_url));
+      setImages([]);
+      imgCounterRef.current = 0;
       setConfirmArmed(false);
       await loadHistory();
     } catch (e) {
@@ -172,15 +311,66 @@ function EmailSection({ userId, userEmail, userName }: { userId: string; userEma
             </div>
             <div>
               <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                Message <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--text-muted)' }}>— use {'{first_name}'} for personalization. Blank lines = paragraphs. Supports **bold**, *italic*, and [text](url) links.</span>
+                Message <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--text-muted)' }}>— use {'{first_name}'} for personalization. Blank lines = paragraphs. Supports **bold**, *italic*, and [text](url) links. Paste, drop, or attach images to insert them inline.</span>
               </label>
               <textarea
+                ref={textareaRef}
                 value={body}
                 onChange={(e) => { setBody(e.target.value); setConfirmArmed(false); }}
+                onPaste={onPaste}
+                onDrop={onDrop}
+                onDragOver={onDragOver}
                 rows={8}
                 placeholder={`Hey {first_name},\n\nJust checking in — wanted to see how training is going. Anything I can help with?\n\n— Matt`}
                 style={{ width: '100%', padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontFamily: "'Outfit', sans-serif", fontSize: 14, resize: 'vertical', lineHeight: 1.5 }}
               />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={ALLOWED_IMAGE_TYPES.join(',')}
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    if (e.target.files) void handleFiles(e.target.files);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={images.length >= MAX_IMAGES_PER_EMAIL}
+                  style={{ background: 'transparent', color: 'var(--text-dim)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", cursor: images.length >= MAX_IMAGES_PER_EMAIL ? 'not-allowed' : 'pointer', opacity: images.length >= MAX_IMAGES_PER_EMAIL ? 0.5 : 1 }}
+                >
+                  Attach image
+                </button>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  {images.length}/{MAX_IMAGES_PER_EMAIL} · max 4MB each
+                </span>
+              </div>
+              {images.length > 0 && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                  {images.map((img, i) => {
+                    const n = Number(img.cid.split('-')[1]);
+                    return (
+                      <div key={img.cid} style={{ position: 'relative', width: 84, height: 84, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--surface2)' }}>
+                        <img src={img.preview_url} alt={img.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <span style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 3 }}>
+                          {Number.isFinite(n) ? n : i + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeImage(img.cid)}
+                          aria-label="Remove image"
+                          style={{ position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 9, border: 'none', background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: 12, lineHeight: 1, cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </>
         ) : (
