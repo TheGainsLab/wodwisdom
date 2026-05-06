@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 
 type Tab = 'overview' | 'engagement' | 'users';
+type SubscriberFilter = 'all' | 'subscribers' | 'non_subscribers';
 
 // ── Shared Components ──
 
@@ -69,6 +70,7 @@ export default function AdminPage({ session }: { session: Session }) {
   // Users data
   const [users, setUsers] = useState<any[]>([]);
   const [userSearch, setUserSearch] = useState('');
+  const [subscriberFilter, setSubscriberFilter] = useState<SubscriberFilter>('all');
 
   useEffect(() => {
     supabase.from('profiles').select('role').eq('id', session.user.id).single()
@@ -135,12 +137,18 @@ export default function AdminPage({ session }: { session: Session }) {
   }
 
   // Filtered users
-  const filteredUsers = userSearch
-    ? users.filter(u =>
-        (u.full_name || '').toLowerCase().includes(userSearch.toLowerCase()) ||
-        (u.email || '').toLowerCase().includes(userSearch.toLowerCase())
-      )
-    : users;
+  const filteredUsers = users.filter(u => {
+    if (subscriberFilter === 'subscribers' && !u.is_paid_subscriber) return false;
+    if (subscriberFilter === 'non_subscribers' && u.is_paid_subscriber) return false;
+    if (userSearch) {
+      const q = userSearch.toLowerCase();
+      if (
+        !(u.full_name || '').toLowerCase().includes(q) &&
+        !(u.email || '').toLowerCase().includes(q)
+      ) return false;
+    }
+    return true;
+  });
 
   const maxTrend = featureUsage?.chat_by_day
     ? Math.max(...featureUsage.chat_by_day.map((d: any) => d.questions), 1)
@@ -290,7 +298,7 @@ export default function AdminPage({ session }: { session: Session }) {
             activeTab === 'users' ? (
               <>
                 {/* Search */}
-                <div style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 12 }}>
                   <input
                     type="text"
                     placeholder="Search by name or email..."
@@ -302,6 +310,23 @@ export default function AdminPage({ session }: { session: Session }) {
                       color: 'var(--text)', fontFamily: "'Outfit', sans-serif",
                     }}
                   />
+                </div>
+
+                {/* Subscriber filter */}
+                <div className="source-toggle" style={{ marginBottom: 12 }}>
+                  {([
+                    ['all', 'All'],
+                    ['subscribers', 'Subscribers'],
+                    ['non_subscribers', 'Non-subscribers'],
+                  ] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      className={'source-btn ' + (subscriberFilter === key ? 'active' : '')}
+                      onClick={() => setSubscriberFilter(key)}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
 
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
