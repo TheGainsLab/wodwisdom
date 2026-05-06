@@ -22,6 +22,11 @@ CREATE TABLE IF NOT EXISTS public.daily_usage (
 CREATE UNIQUE INDEX IF NOT EXISTS daily_usage_user_id_date_key
   ON public.daily_usage (user_id, date);
 
+-- Lock down anon/authenticated key access. Edge functions touch this
+-- table via the service role, which bypasses RLS, so no policies are
+-- needed.
+ALTER TABLE public.daily_usage ENABLE ROW LEVEL SECURITY;
+
 CREATE OR REPLACE FUNCTION public.get_daily_usage(check_user_id uuid)
 RETURNS integer
 LANGUAGE sql

@@ -76,6 +76,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const syncTimezone = (userId: string) => {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (!tz) return;
+      supabase.from('profiles').update({ timezone: tz })
+        .eq('id', userId).neq('timezone', tz)
+        .then(() => {}, () => {});
+    };
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
@@ -84,6 +92,7 @@ export default function App() {
       // to claim. Backs up the claim_pending_subscription trigger.
       if (session) {
         supabase.rpc('claim_my_pending_subscription').then(() => {}, () => {});
+        syncTimezone(session.user.id);
       }
     }).catch(() => {
       setLoading(false);
@@ -96,6 +105,7 @@ export default function App() {
       // Safety net: try to claim any pending subscription on sign-in.
       if (event === 'SIGNED_IN' && session) {
         supabase.rpc('claim_my_pending_subscription').then(() => {}, () => {});
+        syncTimezone(session.user.id);
       }
     });
     return () => subscription.unsubscribe();
