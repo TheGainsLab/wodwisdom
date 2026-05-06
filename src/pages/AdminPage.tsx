@@ -87,13 +87,15 @@ export default function AdminPage({ session }: { session: Session }) {
     try {
       switch (tab) {
         case 'overview': {
-          const { data, error } = await supabase.rpc('admin_overview_stats');
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+          const { data, error } = await supabase.rpc('admin_overview_stats', { tz });
           if (error) throw new Error(error.message);
           setOverviewStats(data);
           break;
         }
         case 'engagement': {
-          const { data, error } = await supabase.rpc('admin_feature_usage', { days_back: engagementPeriod });
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+          const { data, error } = await supabase.rpc('admin_feature_usage', { days_back: engagementPeriod, tz });
           if (error) throw new Error(error.message);
           setFeatureUsage(data);
           break;

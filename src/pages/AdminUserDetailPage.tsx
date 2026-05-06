@@ -268,7 +268,8 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
     if (!id) return;
     (async () => {
       setLoading(true);
-      const { data: result, error: err } = await supabase.rpc('admin_user_detail', { target_user_id: id });
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      const { data: result, error: err } = await supabase.rpc('admin_user_detail', { target_user_id: id, tz });
       if (err) { setError(err.message); setLoading(false); return; }
       setData(result);
       setLoading(false);
