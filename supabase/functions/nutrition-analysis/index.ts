@@ -79,11 +79,11 @@ function estimateMacroTargets(profile: ProfileData, tdee: number): string {
 }
 
 /** Group food entries by date and compute daily totals + per-meal breakdown. */
-function formatNutritionLog(entries: FoodEntry[]): { summary: string; snapshot: object } {
+function formatNutritionLog(entries: FoodEntry[], tz: string): { summary: string; snapshot: object } {
   // Group by date
   const byDate: Record<string, FoodEntry[]> = {};
   for (const e of entries) {
-    const date = e.logged_at.slice(0, 10);
+    const date = new Date(e.logged_at).toLocaleDateString('en-CA', { timeZone: tz });
     if (!byDate[date]) byDate[date] = [];
     byDate[date].push(e);
   }
@@ -180,7 +180,7 @@ Deno.serve(async (req) => {
 
     // Fetch profile, food entries (7 days), and recent training in parallel
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const [profileRes, foodRes, recentTraining] = await Promise.all([
+    const [profileRes, foodRes, recentTraining, userProfileRes] = await Promise.all([
       supa
         .from("athlete_profiles")
         .select("lifts, skills, conditioning, bodyweight, units, age, height, gender, tdee_override")
@@ -193,10 +193,16 @@ Deno.serve(async (req) => {
         .gte("logged_at", sevenDaysAgo)
         .order("logged_at", { ascending: true }),
       fetchAndFormatRecentHistory(supa, user.id, { days: 7, maxLines: 30 }),
+      supa
+        .from("profiles")
+        .select("timezone")
+        .eq("id", user.id)
+        .maybeSingle(),
     ]);
 
     const profileData: ProfileData = profileRes.data || {};
     const foodEntries: FoodEntry[] = foodRes.data || [];
+    const userTz: string = userProfileRes.data?.timezone || "UTC";
 
     if (foodEntries.length === 0) {
       return new Response(
@@ -207,14 +213,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { summary: nutritionSummary, snapshot: nutritionSnapshot } = formatNutritionLog(foodEntries);
+    const { summary: nutritionSummary, snapshot: nutritionSnapshot } = formatNutritionLog(foodEntries, userTz);
     const profileStr = formatProfile(profileData);
     const tdee = estimateTDEE(profileData);
     const macroTargets = tdee ? estimateMacroTargets(profileData, tdee) : "";
     const trainingBlock = recentTraining ? `\n\nRECENT TRAINING (same 7-day window):\n${recentTraining}` : "";
 
     // Build completeness caveat
-    const daysLogged = new Set(foodEntries.map((e) => e.logged_at.slice(0, 10))).size;
+    const daysLogged = new Set(foodEntries.map((e) => new Date(e.logged_at).toLocaleDateString('en-CA', { timeZone: userTz }))).size;
     const completenessNote = daysLogged < 4
       ? `\n\nNOTE: Only ${daysLogged} of 7 days have food logs. Acknowledge this data gap — analysis may not reflect full eating patterns.`
       : "";

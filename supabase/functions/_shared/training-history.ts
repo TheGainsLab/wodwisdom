@@ -393,9 +393,14 @@ export async function fetchAndFormatRecentHistory(
   options?: { days?: number; maxLines?: number }
 ): Promise<string> {
   const days = options?.days ?? 14;
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const { data: profileRow } = await supa
+    .from("profiles")
+    .select("timezone")
+    .eq("id", userId)
+    .maybeSingle();
+  const userTz: string = profileRow?.timezone || "UTC";
+  const cutoffStr = new Date(Date.now() - days * 86400000)
+    .toLocaleDateString('en-CA', { timeZone: userTz });
 
   // Fetch regular workout logs and Engine sessions in parallel
   const [{ data: logs }, { data: engineSessions }] = await Promise.all([
