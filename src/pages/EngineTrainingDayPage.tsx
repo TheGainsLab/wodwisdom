@@ -22,6 +22,7 @@ import {
   type EnginePerformanceMetrics,
   calculateWorkDurationMinutes,
 } from '../lib/engineService';
+import { localDateString } from '../lib/localDate';
 import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertTriangle } from 'lucide-react';
@@ -622,7 +623,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
       // Save session
       await saveWorkoutSession({
-        date: new Date().toISOString().split('T')[0],
+        date: localDateString(),
         program_day: dayNumber,
         program_day_number: dayNumber,
         day_type: workout.day_type,

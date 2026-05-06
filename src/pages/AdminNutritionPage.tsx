@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { localDateString } from '../lib/localDate';
 import AdminSubPageLayout from '../components/admin/AdminSubPageLayout';
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -69,7 +70,7 @@ function humanize(s: string | null | undefined): string {
 }
 
 function formatISODate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return localDateString(d);
 }
 
 function parseISODate(s: string): Date {
