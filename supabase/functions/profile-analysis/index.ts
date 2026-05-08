@@ -23,6 +23,12 @@ import {
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { getTierStatus } from "../_shared/tier-status.ts";
+import { deriveAthleteDiagnostic, type AthleteDiagnostic } from "../_shared/derive-athlete-diagnostic.ts";
+import {
+  formatActiveFlagRules,
+  formatLiftFindings,
+  formatSkillsFindings,
+} from "../_shared/diagnostic-formatters.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -48,35 +54,58 @@ interface ProfileData {
   injuries_constraints?: string | null;
 }
 
-function formatProfile(profile: ProfileData): string {
-  const parts: string[] = [];
+function formatProfile(profile: ProfileData, diagnostic: AthleteDiagnostic): string {
+  const sections: string[] = [];
   const u = profile.units === "kg" ? "kg" : "lbs";
-  if (profile.age != null && profile.age > 0) parts.push(`Age: ${profile.age}`);
-  if (profile.height != null && profile.height > 0) parts.push(`Height: ${profile.height} ${profile.units === "kg" ? "cm" : "in"}`);
-  if (profile.bodyweight && profile.bodyweight > 0) parts.push(`Bodyweight: ${profile.bodyweight} ${u}`);
-  if (profile.gender) parts.push(`Gender: ${profile.gender}`);
-  if (profile.lifts && Object.keys(profile.lifts).length > 0) {
-    const liftStr = Object.entries(profile.lifts)
-      .filter(([, v]) => v > 0)
-      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v} ${u}`)
-      .join(", ");
-    if (liftStr) parts.push("1RM Lifts — " + liftStr);
+
+  // Basics (Tier 1) — short consecutive lines.
+  const basics: string[] = [];
+  if (profile.age != null && profile.age > 0) basics.push(`Age: ${profile.age}`);
+  if (profile.height != null && profile.height > 0) basics.push(`Height: ${profile.height} ${profile.units === "kg" ? "cm" : "in"}`);
+  if (profile.bodyweight && profile.bodyweight > 0) basics.push(`Bodyweight: ${profile.bodyweight} ${u}`);
+  if (profile.gender) basics.push(`Gender: ${profile.gender}`);
+  if (basics.length > 0) sections.push(basics.join("\n"));
+
+  // Lifts findings — replaces the legacy "1RM Lifts —" prose line.
+  if (diagnostic.meta.inputs_complete.lifts) {
+    sections.push(formatLiftFindings(diagnostic));
   }
-  if (profile.skills && Object.keys(profile.skills).length > 0) {
-    const skillStr = Object.entries(profile.skills)
-      .filter(([, v]) => v && v !== "none")
-      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
-      .join(", ");
-    if (skillStr) parts.push("Skills — " + skillStr);
+
+  // Skills findings — replaces the legacy "Skills —" prose line.
+  if (diagnostic.meta.inputs_complete.skills) {
+    sections.push(formatSkillsFindings(diagnostic));
   }
+
+  // Conditioning — passthrough (Engine handles the conditioning diagnostic).
   if (profile.conditioning && Object.keys(profile.conditioning).length > 0) {
     const condStr = Object.entries(profile.conditioning)
       .filter(([, v]) => v !== "" && v != null)
       .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
       .join(", ");
-    if (condStr) parts.push("Conditioning — " + condStr);
+    if (condStr) sections.push("Conditioning — " + condStr);
   }
-  return parts.join("\n") || "No profile data.";
+
+  // Equipment unavailable (Tier 3) — mirrors program generator: only flag what's missing.
+  if (profile.equipment) {
+    const unavailable = Object.entries(profile.equipment)
+      .filter(([, v]) => v === false)
+      .map(([k]) => k.replace(/_/g, " "));
+    if (unavailable.length > 0) sections.push("Equipment NOT available — " + unavailable.join(", "));
+  }
+
+  // Training context (Tier 3): goal, injuries, self-perception, schedule.
+  const ctx: string[] = [];
+  if (profile.goal && profile.goal.trim()) ctx.push(`Goal: ${profile.goal.trim()}`);
+  const inj = profile.injuries_constraints?.trim();
+  if (inj && !/^(none|n\/a|na)$/i.test(inj)) ctx.push(`Injuries/Constraints: ${inj}`);
+  if (profile.self_perception_level && profile.self_perception_level !== "not_sure") {
+    ctx.push(`Self-perceived level: ${profile.self_perception_level.replace(/_/g, " ")}`);
+  }
+  if (profile.days_per_week && profile.days_per_week > 0) ctx.push(`Training frequency: ${profile.days_per_week} days/week`);
+  if (profile.session_length_minutes && profile.session_length_minutes > 0) ctx.push(`Session length: ${profile.session_length_minutes} min`);
+  if (ctx.length > 0) sections.push("Training Context — " + ctx.join("; "));
+
+  return sections.join("\n\n") || "No profile data.";
 }
 
 async function retrieveRAGContext(
@@ -186,7 +215,8 @@ async function runAnalysis(
       .update({ status: "processing" })
       .eq("id", evalId);
 
-    const profileStr = formatProfile(profileData);
+    const diagnostic = deriveAthleteDiagnostic(profileData);
+    const profileStr = formatProfile(profileData, diagnostic);
     const isContinuation = monthNumber > 1;
 
     const { data: prevEval } = await supa
@@ -210,9 +240,10 @@ async function runAnalysis(
     ]);
     const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
 
-    const userPrompt = `Here is an athlete's full profile:\n\n${profileStr}${trainingBlock}\n\nGive this athlete a comprehensive profile evaluation. Cover all domains they have data for — strength, skills, and conditioning — in a single cohesive assessment.\n\nYour evaluation should:\n- Identify their strongest areas and their biggest limiters\n- Use bodyweight ratios for lifts (e.g. back squat ~1.5-2x BW), lift-to-lift ratios (e.g. front squat ~85% of back squat, snatch ~60-65% of back squat), and standard CrossFit benchmarks\n- For skills, consider prerequisite chains (strict before kipping, kipping before butterfly) and competition frequency\n- For conditioning, assess work capacity and compare across modalities (run vs row vs bike)\n- Connect the dots across domains — how do their strengths and weaknesses in one area affect another?\n- End with 2-3 clear priorities for improvement, ranked by impact\n\nWrite like a coach talking to the athlete. Be direct, specific, and concise. No bullet-point tier lists — write in short paragraphs.${comparisonContext}`;
+    const userPrompt = `Here is an athlete's full profile:\n\n${profileStr}${trainingBlock}\n\nGive this athlete a comprehensive profile evaluation. Cover all domains they have data for — strength, skills, and conditioning — in a single cohesive assessment.\n\nYour evaluation should:\n- Identify their strongest areas and their biggest limiters\n- Ground your strength assessment in the structured ATHLETE LIFT FINDINGS section (per-lift levels, active flags, accessory pool). The math is already done — interpret it, don't redo it.\n- For skills, consider prerequisite chains (strict before kipping, kipping before butterfly) and competition frequency\n- For conditioning, assess work capacity and compare across modalities (run vs row vs bike)\n- Connect the dots across domains — how do their strengths and weaknesses in one area affect another?\n- If a Training Context section is present, weigh their stated goal, injuries/constraints, training frequency, session length, and any unavailable equipment when choosing priorities. Don't recommend movements blocked by their constraints, and skew priorities toward what serves their goal in the time and equipment they have. If their self-perceived level diverges from what their data shows, address that gap directly.\n- End with 2-3 clear priorities for improvement, ranked by impact and feasibility given their constraints, time available, and goal\n\nWrite like a coach talking to the athlete. Be direct, specific, and concise. No bullet-point tier lists — write in short paragraphs.${comparisonContext}`;
 
-    const systemPrompt = SYSTEM_PROMPT + ragContext;
+    const flagRules = formatActiveFlagRules(diagnostic);
+    const systemPrompt = SYSTEM_PROMPT + (flagRules ? "\n\n" + flagRules : "") + ragContext;
 
     if (!ANTHROPIC_API_KEY) {
       throw new Error("ANTHROPIC_API_KEY not configured");
@@ -249,6 +280,7 @@ async function runAnalysis(
         analysis,
         status: "complete",
         ready_at: new Date().toISOString(),
+        diagnostic_snapshot: diagnostic,
       })
       .eq("id", evalId);
 

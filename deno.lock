@@ -1,0 +1,47 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@std/assert@*": "1.0.19",
+    "jsr:@std/internal@^1.0.12": "1.0.13"
+  },
+  "jsr": {
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/internal@1.0.13": {
+      "integrity": "2f9546691d4ac2d32859c82dff284aaeac980ddeca38430d07941e7e288725c0"
+    }
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@eslint/js@^9.39.1",
+        "npm:@supabase/supabase-js@^2.95.3",
+        "npm:@types/dompurify@^3.0.5",
+        "npm:@types/node@^24.10.1",
+        "npm:@types/react-dom@^19.2.3",
+        "npm:@types/react@^19.2.7",
+        "npm:@vitejs/plugin-react@^5.1.1",
+        "npm:dompurify@^3.3.3",
+        "npm:eslint-plugin-react-hooks@^7.0.1",
+        "npm:eslint-plugin-react-refresh@~0.4.24",
+        "npm:eslint@^9.39.1",
+        "npm:globals@^16.5.0",
+        "npm:html5-qrcode@^2.3.8",
+        "npm:lucide-react@0.575",
+        "npm:mammoth@^1.11.0",
+        "npm:react-dom@^19.2.0",
+        "npm:react-router-dom@^7.13.0",
+        "npm:react@^19.2.0",
+        "npm:tsx@^4.19.0",
+        "npm:typescript-eslint@^8.48.0",
+        "npm:typescript@~5.9.3",
+        "npm:vite-plugin-pwa@^1.2.0",
+        "npm:vite@^7.3.1"
+      ]
+    }
+  }
+}

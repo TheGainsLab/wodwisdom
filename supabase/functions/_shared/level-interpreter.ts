@@ -15,6 +15,18 @@ export type PerformanceLevel = "below_average" | "average" | "above_average" | "
 
 export type ExperienceTier = "novice" | "intermediate" | "advanced" | "competitor";
 
+/**
+ * Per-lift level taxonomy used by the new strength diagnostic. Three levels,
+ * gender-specific BW bands. Only assigned to the four BW-classified lifts
+ * (back_squat, deadlift, bench_press, press); the ten ratio-only lifts get a
+ * synthetic level via the diagnostic's anchor rule, not via direct BW math.
+ *
+ * Coexists with the legacy PerformanceLevel/ExperienceTier path during
+ * migration. The legacy chain is slated for deletion once the diagnostic
+ * is wired into generate-program (Phase 3 of the migration).
+ */
+export type PerLiftLevel = "beginner" | "intermediate" | "advanced";
+
 export interface LevelInputs {
   age?: number | null;
   gender?: string | null;
@@ -84,6 +96,76 @@ function classifyLift(
   if (ratio >= thresholds.above) return "above_average";
   if (ratio >= thresholds.avg) return "average";
   return "below_average";
+}
+
+// ============================================================
+// New per-lift level classifier (3 levels, gender-specific bands)
+// Used by the strength diagnostic. Parallel to legacy classifyLift above.
+// ============================================================
+
+interface BwBand {
+  intermediate_min: number; // ratio at which beginner → intermediate
+  advanced_min: number;     // ratio at which intermediate → advanced
+}
+
+const MALE_BW_BANDS_3LEVEL: Record<string, BwBand> = {
+  back_squat:  { intermediate_min: 1.25, advanced_min: 1.86 },
+  deadlift:    { intermediate_min: 1.41, advanced_min: 2.21 },
+  bench_press: { intermediate_min: 0.91, advanced_min: 1.46 },
+  press:       { intermediate_min: 0.60, advanced_min: 0.86 },
+};
+
+const FEMALE_BW_BANDS_3LEVEL: Record<string, BwBand> = {
+  back_squat:  { intermediate_min: 0.86, advanced_min: 1.36 },
+  deadlift:    { intermediate_min: 1.00, advanced_min: 1.76 },
+  bench_press: { intermediate_min: 0.71, advanced_min: 1.06 },
+  press:       { intermediate_min: 0.45, advanced_min: 0.66 },
+};
+
+// Alias map: legacy keys → canonical form keys. Pre-existing drift where
+// the athlete profile form stores strict press as `press` but legacy bands
+// used `strict_press` is fixed here.
+const LIFT_KEY_ALIASES: Record<string, string> = {
+  strict_press: "press",
+};
+
+function canonicalLiftKey(key: string): string {
+  return LIFT_KEY_ALIASES[key] ?? key;
+}
+
+/**
+ * Classify a lift into beginner / intermediate / advanced for the new
+ * strength diagnostic.
+ *
+ * Returns null when:
+ *   - weight or bodyweight is missing/invalid
+ *   - the lift is not BW-classified (the 10 ratio-only lifts: front_squat,
+ *     overhead_squat, snatch, clean, etc.). Those get a synthetic level via
+ *     the diagnostic's anchor rule, not direct BW math.
+ *
+ * Age adjustment uses the same scaling as the legacy classifier so the two
+ * systems stay coherent during migration.
+ */
+export function classifyPerLiftLevel(
+  lift: string,
+  weight: number,
+  bodyweight: number,
+  gender: string | null | undefined,
+  age: number | null | undefined,
+): PerLiftLevel | null {
+  if (!weight || weight <= 0 || !bodyweight || bodyweight <= 0) return null;
+  const key = canonicalLiftKey(lift);
+  const isFemale = (gender ?? "").toLowerCase() === "female";
+  const bands = isFemale ? FEMALE_BW_BANDS_3LEVEL[key] : MALE_BW_BANDS_3LEVEL[key];
+  if (!bands) return null;
+
+  const intermediate_min = ageAdjust(bands.intermediate_min, age);
+  const advanced_min = ageAdjust(bands.advanced_min, age);
+  const ratio = weight / bodyweight;
+
+  if (ratio >= advanced_min) return "advanced";
+  if (ratio >= intermediate_min) return "intermediate";
+  return "beginner";
 }
 
 function skillToScore(level: string | null | undefined): number {

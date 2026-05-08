@@ -872,13 +872,31 @@ export default function AthletePage({ session }: { session: Session }) {
                               </div>
                             )}
                           </div>
-                          <button
-                            className="auth-btn"
-                            style={{ padding: '8px 16px', fontSize: 13 }}
-                            onClick={() => setExpandedEvalId(latestEval.id)}
-                          >
-                            View Evaluation →
-                          </button>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {hasEvalCredit && (
+                              <button
+                                className="auth-btn"
+                                style={{ padding: '8px 16px', fontSize: 13 }}
+                                onClick={async () => {
+                                  if (isDirty) {
+                                    const ok = await saveProfile();
+                                    if (!ok) return;
+                                  }
+                                  fetchProfileAnalysis();
+                                }}
+                                disabled={saving || !!analysisLoading}
+                              >
+                                Run New
+                              </button>
+                            )}
+                            <button
+                              className="auth-btn"
+                              style={{ padding: '8px 16px', fontSize: 13 }}
+                              onClick={() => setExpandedEvalId(latestEval.id)}
+                            >
+                              View Evaluation →
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
