@@ -19,6 +19,12 @@ import { reconcileProfile, formatInterpretedProfile } from "../_shared/reconcile
 import type { ParsedGoal, ParsedInjuries } from "../_shared/reconciler.ts";
 import { ARCHETYPES } from "../_shared/archetype-specs.ts";
 import type { DayArchetype } from "../_shared/archetype-specs.ts";
+import { deriveAthleteDiagnostic, type AthleteDiagnostic } from "../_shared/derive-athlete-diagnostic.ts";
+import {
+  formatActiveFlagRules,
+  formatLiftFindings,
+  formatSkillsFindings,
+} from "../_shared/diagnostic-formatters.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
@@ -34,43 +40,48 @@ interface ProfileData {
   height?: number | null;
   gender?: string | null;
 }
-function formatProfile(profile: ProfileData): string {
-  const parts: string[] = [];
+function formatProfile(profile: ProfileData, diagnostic: AthleteDiagnostic): string {
+  const sections: string[] = [];
   const u = profile.units === "kg" ? "kg" : "lbs";
-  if (profile.age != null && profile.age > 0) parts.push(`Age: ${profile.age}`);
-  if (profile.height != null && profile.height > 0) parts.push(`Height: ${profile.height} ${profile.units === "kg" ? "cm" : "in"}`);
-  if (profile.bodyweight && profile.bodyweight > 0) parts.push(`Bodyweight: ${profile.bodyweight} ${u}`);
-  if (profile.gender) parts.push(`Gender: ${profile.gender}`);
-  if (profile.lifts && Object.keys(profile.lifts).length > 0) {
-    const liftStr = Object.entries(profile.lifts)
-      .filter(([, v]) => v > 0)
-      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v} ${u}`)
-      .join(", ");
-    if (liftStr) parts.push("1RM Lifts — " + liftStr);
+
+  // Basics (Tier 1) — short consecutive lines.
+  const basics: string[] = [];
+  if (profile.age != null && profile.age > 0) basics.push(`Age: ${profile.age}`);
+  if (profile.height != null && profile.height > 0) basics.push(`Height: ${profile.height} ${profile.units === "kg" ? "cm" : "in"}`);
+  if (profile.bodyweight && profile.bodyweight > 0) basics.push(`Bodyweight: ${profile.bodyweight} ${u}`);
+  if (profile.gender) basics.push(`Gender: ${profile.gender}`);
+  if (basics.length > 0) sections.push(basics.join("\n"));
+
+  // Lifts findings — replaces the legacy "1RM Lifts —" prose line.
+  if (diagnostic.meta.inputs_complete.lifts) {
+    sections.push(formatLiftFindings(diagnostic));
   }
-  if (profile.skills && Object.keys(profile.skills).length > 0) {
-    const skillStr = Object.entries(profile.skills)
-      .filter(([, v]) => v && v !== "none")
-      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
-      .join(", ");
-    if (skillStr) parts.push("Skills — " + skillStr);
+
+  // Skills findings — replaces the legacy "Skills —" prose line.
+  if (diagnostic.meta.inputs_complete.skills) {
+    sections.push(formatSkillsFindings(diagnostic));
   }
+
+  // Conditioning passthrough (Engine handles the conditioning diagnostic).
   if (profile.conditioning && Object.keys(profile.conditioning).length > 0) {
     const condStr = Object.entries(profile.conditioning)
       .filter(([, v]) => v !== "" && v != null)
       .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
       .join(", ");
-    if (condStr) parts.push("Conditioning — " + condStr);
+    if (condStr) sections.push("Conditioning — " + condStr);
   }
+
+  // Equipment unavailable.
   if (profile.equipment && Object.keys(profile.equipment).length > 0) {
     const unavailable = Object.entries(profile.equipment)
       .filter(([, v]) => v === false)
       .map(([k]) => k.replace(/_/g, " "));
     if (unavailable.length > 0) {
-      parts.push("Equipment NOT available — " + unavailable.join(", "));
+      sections.push("Equipment NOT available — " + unavailable.join(", "));
     }
   }
-  return parts.join("\n") || "No profile data.";
+
+  return sections.join("\n\n") || "No profile data.";
 }
 /* ------------------------------------------------------------------ */
 /*  Fetch active coaching guidelines from DB                          */
@@ -130,7 +141,7 @@ FORMATTING EXAMPLES (follow these exactly):
 - Each day header includes the archetype tag in square brackets (e.g., "Day 1: [Strength Day]"). The blocks for that day are dictated by the archetype — DO NOT add or remove blocks beyond what the template provides.
 - Block headers (Warm-up & Mobility:, Skills:, Strength:, Accessory:, Metcon:, Active Recovery:, Cool down:) MUST appear on their own line starting at position 0. Never nest one block inside another. Content lines for a block go on the lines BELOW its header.
 - Do not add, remove, or reorder any headers. EVERY block listed in a day's skeleton MUST appear in that day's output WITH content under it. Skipping a block (e.g., omitting Warm-up & Mobility on day 2 even though the skeleton lists it) is a hard failure — the program will be rejected and regenerated.
-- Prescribe weights using the athlete's 1RMs where applicable. Use / for M/F Rx (e.g. 95/65).
+- Prescribed loading per lift is in the ATHLETE LIFT FINDINGS section (see "Permissible bounds"). Stay within each lift's cycle ceiling for weeks 1-3 and the deload ceiling for week 4. Pick set/rep schemes only from the lift's "allowed schemes" list — never use a scheme outside it. Convert percentages to actual weights using the athlete's 1RM and round to plate math (5 lb / 2.5 kg). Use / for M/F Rx (e.g. 95/65).
 - Metcon examples in the REFERENCE section are real CrossFit workouts. Use them for structural inspiration only — adapt to the athlete's profile and eligibility rules, never copy verbatim.`;
 
 const METCON_GUIDANCE = `
@@ -550,8 +561,9 @@ async function processJob(
     const isContinuation = monthNumber > 1 && existingProgramId != null;
     console.log(`[generate-program] Month ${monthNumber}, continuation=${isContinuation}`);
     const profile = evalRow.profile_snapshot || {};
-    const profileStr = formatProfile(profile);
-    console.log(`[generate-program] Profile: ${profileStr.length} chars, lifts=${Object.keys(profile.lifts || {}).length}, skills=${Object.keys(profile.skills || {}).length}`);
+    const diagnostic = deriveAthleteDiagnostic(profile);
+    const profileStr = formatProfile(profile, diagnostic);
+    console.log(`[generate-program] Profile: ${profileStr.length} chars, lifts=${Object.keys(profile.lifts || {}).length}, skills=${Object.keys(profile.skills || {}).length}, flags=${diagnostic.lifts.flags.length}+${diagnostic.skills.flags.length}`);
     // ── Pre-generation classifier pipeline ────────────────────────────────
     // Fetch the live fields we need (goal + self-perception + injuries + T3 numerics)
     // since profile_snapshot may be stale on Month 2+ generations.
@@ -598,19 +610,12 @@ async function processJob(
       skills: profile.skills,
       conditioning: profile.conditioning,
     });
-    // Look up previous month's effective tier (for upward-only ratchet).
-    let previousTier: import("../_shared/level-interpreter.ts").ExperienceTier | null = null;
-    if (existingProgramId) {
-      const { data: prevProgram } = await supa
-        .from("programs")
-        .select("experience_tier_at_gen")
-        .eq("id", existingProgramId)
-        .maybeSingle();
-      const t = prevProgram?.experience_tier_at_gen;
-      if (t === "novice" || t === "intermediate" || t === "advanced" || t === "competitor") {
-        previousTier = t;
-      }
-    }
+    // Previous-tier upward ratchet retired alongside the legacy experience_tier
+    // path. reconcileProfile still accepts previous_tier to keep its signature
+    // stable during the migration; we pass null and let the (legacy) reconciler
+    // compute its own scalar fresh each month — nothing in the strength path
+    // reads it anymore.
+    const previousTier: import("../_shared/level-interpreter.ts").ExperienceTier | null = null;
     const interpretedProfile = reconcileProfile({
       goal: parsedGoal,
       injuries: parsedInjuries,
@@ -620,7 +625,7 @@ async function processJob(
       previous_tier: previousTier,
     });
     const interpretedBlock = "\n" + formatInterpretedProfile(interpretedProfile) + "\n";
-    console.log(`[generate-program] Interpreted: goal=${interpretedProfile.goal.primary_goal}, tier=${interpretedProfile.effective_tier} (raw ${interpretedProfile.levels.experience_tier}), days=${interpretedProfile.days_per_week}, pattern=[${interpretedProfile.weekly_pattern.baseline.join(",")}], blockers=${interpretedProfile.blockers.length}`);
+    console.log(`[generate-program] Interpreted: goal=${interpretedProfile.goal.primary_goal}, days=${interpretedProfile.days_per_week}, pattern=[${interpretedProfile.weekly_pattern.baseline.join(",")}], blockers=${interpretedProfile.blockers.length}, lift_flags=${diagnostic.lifts.flags.length}, skill_flags=${diagnostic.skills.flags.length}, focus=[${diagnostic.skills.active_focus.join(",")}]`);
 
     // Persist the reconciler output onto the evaluation row for admin audit.
     if (evalRow.id) {
@@ -746,35 +751,11 @@ RECOVERY DAY:
     }
     const archetypeRules = archetypeRulesLines.join("\n");
 
-    // Experience tier modifier
-    const tier = interpretedProfile.effective_tier;
-    const tierModifier: Record<typeof tier, string> = {
-      novice: `EXPERIENCE TIER MODIFIER (${tier}):
-- Volume: 0.7x baseline — fewer working sets, conservative rep counts.
-- Strength loading: cap percentages at 75% 1RM. Use 5-8 rep ranges, no 1RM attempts.
-- Skills: keep on foundational variants. Progression only after a variant is owned.
-- No tempo / cluster / complex schemes. Focus on movement quality.`,
-      intermediate: `EXPERIENCE TIER MODIFIER (${tier}):
-- Volume: 1.0x baseline.
-- Strength loading: typical percentages 75-85%. Occasional heavy singles allowed.
-- Skills: standard progression cadence.
-- Standard schemes with some variation.`,
-      advanced: `EXPERIENCE TIER MODIFIER (${tier}):
-- Volume: 1.1x baseline — more working sets, slightly higher density.
-- Strength loading: percentages up to 90%. Tempo work (3-second eccentrics, paused reps) and cluster sets are appropriate.
-- Skills: aggressive progression — drill, load, test cadence.
-- Allow complexes, EMOMs with technical movements.`,
-      competitor: `EXPERIENCE TIER MODIFIER (${tier}):
-- Volume: 1.2x baseline.
-- Strength loading: percentages up to 95%, periodic heavy singles, peaking cycles.
-- Skills: competition-relevant variants always present, test sets every 2-3 weeks.
-- Allow all advanced schemes plus benchmark workout exposure (Fran, Helen, Grace, etc.).`,
-    };
-
-    // Session length modifier — dials volume up or down within each block based
-    // on how long the athlete has per session. Composes multiplicatively with
-    // the experience tier modifier (i.e., novice at 30 min = 0.7 × 0.7 = 0.49×
-    // baseline; competitor at 90+ min = 1.2 × 1.2 = 1.44× baseline).
+    // Session length modifier — dials volume up or down within each block
+    // based on how long the athlete has per session.
+    // Per-lift loading ceilings + allowed scheme menus come from the
+    // diagnostic (see ATHLETE LIFT FINDINGS); they replace what the old
+    // tier modifier carried for strength/loading/scheme selection.
     const sessionMin = athleteLive?.session_length_minutes ?? 60;
     const sessionBracket = sessionMin < 45 ? "30-44"
       : sessionMin < 60 ? "45-59"
@@ -803,7 +784,7 @@ RECOVERY DAY:
   3. Warm-up & Mobility (can shrink from 15 min to ~8 min if needed)
   4. NEVER trim the archetype's main event — Strength Day keeps its Strength block, Metcon Day keeps its Metcon, Skill Day keeps its extended Skills block.
 - When expanding (volume > 1.0×), add depth to the archetype's main event first, then Accessory, then Skills.
-- This modifier COMPOSES with the experience tier modifier. Apply both multiplicatively — e.g., novice + 30 min = 0.7 × 0.7 = ~0.49× baseline; competitor + 90+ min = 1.2 × 1.2 = ~1.44× baseline.`;
+- Use the per-lift loading ceilings and allowed_schemes in ATHLETE LIFT FINDINGS to bound strength prescriptions; this session modifier governs total volume per block.`;
 
     const userPrompt = `ATHLETE PROFILE:
 ${profileStr}
@@ -815,8 +796,6 @@ ${trainingBlock}${metconEligibility}${equipmentConstraint}${interpretedBlock}
 ${archetypePlan}
 
 ${archetypeRules}
-
-${tierModifier[tier]}
 
 ${sessionLengthModifier}
 
@@ -830,28 +809,26 @@ The Warm-up & Mobility: block is a single combined block that progresses from ge
 
 STRENGTH BLOCK RULES (apply when the Strength block appears in a day):
 Compound multi-joint lifts only. Isolation and hypertrophy work lives in the Accessory block, not here.
-The STRENGTH HIERARCHY above (if present) dictates priority, but you MUST also ensure movement-pattern diversity across all Strength blocks in a week (count varies by archetype pattern).
+
+Drive choices from ATHLETE LIFT FINDINGS:
+- Per-lift levels (BW-classified + synthetic) tell you how heavy each lift can go. Use the Permissible bounds table for cycle / deload ceilings and allowed_schemes.
+- Active flags (technique / mobility category) identify the athlete's limiters. Bias strength + accessory volume toward addressing them; draw accessory work from the curated Accessory pool tied to those flags.
+- Lifts at advanced level need only maintenance volume; lifts at beginner level get progressive volume across the cycle.
 
 MOVEMENT PATTERN DISTRIBUTION (across all Strength blocks in the week):
 - Olympic lifts (snatch variants, clean variants, jerks): no more than 40% of the week's Strength slots. Alternate snatch-family and clean-family across days.
 - Squat (back squat, front squat, overhead squat): 1-2 slots per week if available, rotate variants across weeks — do not repeat the same squat variant in the same week.
 - Press (strict press, push press, bench press, push jerk): include at least 1 pressing slot per week if there are 3+ Strength blocks. For weeks with fewer Strength blocks, rotate pressing across weeks so it appears at least every other week.
 - Hinge/Pull (deadlift, RDL, clean pull, snatch pull): include at least 1 hinge slot per week if there are 3+ Strength blocks; otherwise rotate across weeks.
-- If the athlete provided a lift, try to include it at least once across the 4-week program — but not at the expense of cluttering weeks. LOW priority lifts can be omitted if slots are tight.
-- A movement flagged as a mobility limiter in the STRENGTH ANALYSIS is accessory or warm-up work — it does NOT fulfill a movement-pattern slot. Program it as light technique work alongside the day's main lift, not as the Strength block's primary movement.
-
-PRIORITY RULES (within the pattern constraints above):
-- HIGH priority movements get 2+ slots per week. These are the athlete's limiters — give them the most volume.
-- MODERATE priority movements get 1 slot per week.
-- LOW priority movements get 0-1 slots per week. Do NOT waste training time on movements the athlete is already strong at.
-- Follow the hierarchy ordering strictly. If the hierarchy says deadlift is LOW, do not program heavy deadlifts twice a week.
+- A movement flagged with category "mobility" in ATHLETE LIFT FINDINGS is accessory or warm-up work — it does NOT fulfill a movement-pattern slot. Program it as light technique work alongside the day's main lift, not as the Strength block's primary movement.
 - Vary the specific exercises within a movement pattern across weeks (e.g. for "olympic lifts": clean & jerk one day, snatch complex another).
 
 SKILLS BLOCK RULES (apply when the Skills block appears in a day; NOTE: on Metcon Days the Skills block is a brief 5-8 min PRIMER, NOT progression work):
-Use the SKILLS ANALYSIS above to decide skill content. You are the coach — distribute skills intelligently across the days that include a Skills block.
-- "Needs Attention" skills are the highest priority. Program their progression track when Skills blocks are available — alternate foundational and advanced variants. Never the same variant twice in a week.
-- "Intermediate" skills get exposure to keep progressing.
-- "Strong" skills are maintenance only or used as metcon components instead.
+Use ATHLETE SKILLS FINDINGS to decide skill content. The "Top active focus" list (eligibility-filtered, prerequisite-aware, priority-ranked) is your guide.
+- Skills in the active focus list get progression volume on Skills blocks. Alternate foundational and advanced variants across the week.
+- Skills at intermediate level (not in active focus) get exposure to keep progressing.
+- Skills at advanced level are maintenance only or used as metcon components.
+- A skill with a prerequisite_gap flag is demoted — don't include it in metcons or program weighted/advanced variants. Build the missing prerequisite (which IS in the active focus) first.
 - Never program the same skill on consecutive days.
 - Related progressions are a single track, not separate skills. For example: strict HSPU, wall-facing HSPU, and deficit HSPU are one progression — pick the variant that matches the athlete's level and periodize across weeks (drill → load → test).
 - Vary the drill, not just the movement. Each session should have a different focus angle.
@@ -890,7 +867,9 @@ ${skeleton}`;
         .replace("{evaluationHistory}", evaluationHistory)
         .replace("{previousProgramContext}", previousProgramContext);
     }
-    const systemPrompt = GENERATE_PROMPT + metconGuidance + progressionBlock + guidelinesBlock + ragContext;
+    const flagRules = formatActiveFlagRules(diagnostic);
+    const flagRulesBlock = flagRules ? "\n\n" + flagRules : "";
+    const systemPrompt = GENERATE_PROMPT + metconGuidance + progressionBlock + flagRulesBlock + guidelinesBlock + ragContext;
     console.log(`[generate-program] Prompt sizes: system=${systemPrompt.length} chars, user=${userPrompt.length} chars`);
     if (!ANTHROPIC_API_KEY) {
       throw new Error("Program generation is not configured");
@@ -1113,6 +1092,7 @@ ${skeleton}`;
           .update({
             weekly_pattern: interpretedProfile.weekly_pattern,
             experience_tier_at_gen: interpretedProfile.effective_tier,
+            diagnostic_snapshot: diagnostic,
           })
           .eq("id", progId);
       } else {
@@ -1124,6 +1104,7 @@ ${skeleton}`;
             source: "generated",
             weekly_pattern: interpretedProfile.weekly_pattern,
             experience_tier_at_gen: interpretedProfile.effective_tier,
+            diagnostic_snapshot: diagnostic,
           })
           .select("id")
           .single();
