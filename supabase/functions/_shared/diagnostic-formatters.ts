@@ -303,10 +303,11 @@ export function formatCompetitionProfile(d: AthleteDiagnostic): string {
     lines.push("Competitor bonus active (loading ceilings +3%).");
   }
 
-  // Cohort caveat — keeps the model from comparing apples-to-apples
-  // across stages where cohort sizes differ by orders of magnitude.
+  // Interpretive directive — anchors the rest of the profile, names the
+  // cohort caveat as a calibration cue rather than a discount, and licenses
+  // the model to surface tension when current data and history disagree.
   lines.push("");
-  lines.push("Note: percentiles are cohort-relative within each workout (e.g., Open-cohort = hundreds of thousands; Games-cohort = ~40 elites). Treat as descriptive context, not absolute strength.");
+  lines.push("Interpret the rest of the profile through this section. Percentiles are cohort-relative within each workout (Open ≈ hundreds of thousands; Games ≈ ~40 elites), so calibrate findings against tier peers, not absolute strength. If competition history and current lift / skill / conditioning data diverge, name the gap explicitly rather than ignoring either side.");
 
   // Recent results.
   if (c.recent_evidence.length > 0) {

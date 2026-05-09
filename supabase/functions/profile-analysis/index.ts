@@ -70,6 +70,12 @@ function formatProfile(profile: ProfileData, diagnostic: AthleteDiagnostic): str
   if (profile.gender) basics.push(`Gender: ${profile.gender}`);
   if (basics.length > 0) sections.push(basics.join("\n"));
 
+  // Competition profile (Tier 4) — placed early so the rest of the profile
+  // is interpreted through the competitor's tier and history when linked.
+  if (diagnostic.competition) {
+    sections.push(formatCompetitionProfile(diagnostic));
+  }
+
   // Lifts findings — replaces the legacy "1RM Lifts —" prose line.
   if (diagnostic.meta.inputs_complete.lifts) {
     sections.push(formatLiftFindings(diagnostic));
@@ -78,11 +84,6 @@ function formatProfile(profile: ProfileData, diagnostic: AthleteDiagnostic): str
   // Skills findings — replaces the legacy "Skills —" prose line.
   if (diagnostic.meta.inputs_complete.skills) {
     sections.push(formatSkillsFindings(diagnostic));
-  }
-
-  // Competition profile (Tier 4) — only when athlete is linked + bundle fetched.
-  if (diagnostic.competition) {
-    sections.push(formatCompetitionProfile(diagnostic));
   }
 
   // Conditioning — passthrough (Engine handles the conditioning diagnostic).
