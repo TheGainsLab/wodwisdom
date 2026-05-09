@@ -19,8 +19,10 @@ import type { ParsedGoal, ParsedInjuries } from "../_shared/reconciler.ts";
 import { ARCHETYPES } from "../_shared/archetype-specs.ts";
 import type { DayArchetype } from "../_shared/archetype-specs.ts";
 import { deriveAthleteDiagnostic, type AthleteDiagnostic } from "../_shared/derive-athlete-diagnostic.ts";
+import { fetchTier4Bundle } from "../_shared/fetch-tier4-bundle.ts";
 import {
   formatActiveFlagRules,
+  formatCompetitionProfile,
   formatLiftFindings,
   formatSkillsFindings,
 } from "../_shared/diagnostic-formatters.ts";
@@ -59,6 +61,11 @@ function formatProfile(profile: ProfileData, diagnostic: AthleteDiagnostic): str
   // Skills findings — replaces the legacy "Skills —" prose line.
   if (diagnostic.meta.inputs_complete.skills) {
     sections.push(formatSkillsFindings(diagnostic));
+  }
+
+  // Competition profile (Tier 4) — only when athlete is linked + bundle fetched.
+  if (diagnostic.competition) {
+    sections.push(formatCompetitionProfile(diagnostic));
   }
 
   // Conditioning passthrough (Engine handles the conditioning diagnostic).
@@ -560,17 +567,26 @@ async function processJob(
     const isContinuation = monthNumber > 1 && existingProgramId != null;
     console.log(`[generate-program] Month ${monthNumber}, continuation=${isContinuation}`);
     const profile = evalRow.profile_snapshot || {};
-    const diagnostic = deriveAthleteDiagnostic(profile);
-    const profileStr = formatProfile(profile, diagnostic);
-    console.log(`[generate-program] Profile: ${profileStr.length} chars, lifts=${Object.keys(profile.lifts || {}).length}, skills=${Object.keys(profile.skills || {}).length}, flags=${diagnostic.lifts.flags.length}+${diagnostic.skills.flags.length}`);
     // ── Pre-generation classifier pipeline ────────────────────────────────
-    // Fetch the live fields we need (goal + self-perception + injuries + T3 numerics)
-    // since profile_snapshot may be stale on Month 2+ generations.
+    // Fetch the live fields we need (goal + self-perception + injuries +
+    // T3 numerics + Tier 4 link) since profile_snapshot may be stale on
+    // Month 2+ generations.
     const { data: athleteLive } = await supa
       .from("athlete_profiles")
-      .select("injuries_constraints, goal, self_perception_level, days_per_week, session_length_minutes")
+      .select("injuries_constraints, goal, self_perception_level, days_per_week, session_length_minutes, competition_athlete_id")
       .eq("user_id", userId)
       .maybeSingle();
+    // Tier 4 — fetch the athlete's competition bundle when linked.
+    // Failure-soft: any error returns null and the diagnostic flows through
+    // with `competition: null` exactly as for unlinked athletes.
+    const tier4Bundle = athleteLive?.competition_athlete_id
+      ? await fetchTier4Bundle(athleteLive.competition_athlete_id)
+      : null;
+    const diagnostic = deriveAthleteDiagnostic(profile, {
+      tier4: { bundle: tier4Bundle },
+    });
+    const profileStr = formatProfile(profile, diagnostic);
+    console.log(`[generate-program] Profile: ${profileStr.length} chars, lifts=${Object.keys(profile.lifts || {}).length}, skills=${Object.keys(profile.skills || {}).length}, flags=${diagnostic.lifts.flags.length}+${diagnostic.skills.flags.length}, tier4=${diagnostic.competition ? "linked" : "none"}`);
     const goalText = (athleteLive?.goal ?? "").trim();
     const injuriesText = (athleteLive?.injuries_constraints ?? "").trim();
     const selfPerception = athleteLive?.self_perception_level ?? null;

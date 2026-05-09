@@ -256,6 +256,76 @@ export function formatSkillsFindings(d: AthleteDiagnostic): string {
 }
 
 // ============================================================
+// Competition profile (Tier 4)
+// ============================================================
+
+/**
+ * Format the Tier 4 competition slot as a prompt-ready block.
+ * Returns empty string when athlete isn't linked (diagnostic.competition is null).
+ *
+ * Conservative v1 surface: identity + tier + summary + recent evidence.
+ * No flag interpretation yet — descriptive only.
+ */
+export function formatCompetitionProfile(d: AthleteDiagnostic): string {
+  if (!d.competition) return "";
+
+  const c = d.competition;
+  const lines: string[] = ["COMPETITION PROFILE", ""];
+
+  // Identity + tier + seasons + latest percentile.
+  const tierLabel = c.observed_tier.replace(/_/g, " ");
+  const seasonsLabel = c.seasons_competed === 1 ? "1 season" : `${c.seasons_competed} seasons`;
+  lines.push(`${c.identity.name} (${tierLabel}, ${seasonsLabel}, latest cohort percentile ${c.latest_percentile.toFixed(1)})`);
+  if (c.identity.profile_url) lines.push(`Profile: ${c.identity.profile_url}`);
+
+  // Trend.
+  const t = c.trend;
+  if (t.direction === "new") {
+    lines.push("Trend: new (fewer than 2 seasons — no trajectory available)");
+  } else if (t.points_per_year != null) {
+    const sign = t.points_per_year > 0 ? "+" : "";
+    lines.push(`Trend: ${t.direction} (${sign}${t.points_per_year.toFixed(2)} pp/year)`);
+  } else {
+    lines.push(`Trend: ${t.direction}`);
+  }
+
+  // Consistency.
+  if (c.consistency != null) {
+    const desc = c.consistency < 5
+      ? "steady"
+      : c.consistency < 15
+        ? "moderately variable"
+        : "highly variable";
+    lines.push(`Consistency: ${c.consistency.toFixed(2)} stddev (${desc})`);
+  }
+
+  if (c.competitor_bonus_active) {
+    lines.push("Competitor bonus active (loading ceilings +3%).");
+  }
+
+  // Cohort caveat — keeps the model from comparing apples-to-apples
+  // across stages where cohort sizes differ by orders of magnitude.
+  lines.push("");
+  lines.push("Note: percentiles are cohort-relative within each workout (e.g., Open-cohort = hundreds of thousands; Games-cohort = ~40 elites). Treat as descriptive context, not absolute strength.");
+
+  // Recent results.
+  if (c.recent_evidence.length > 0) {
+    lines.push("");
+    lines.push("Recent results (top by percentile):");
+    for (const r of c.recent_evidence) {
+      const unique = Array.from(new Set(r.movements ?? []));
+      const moves = unique.length === 0
+        ? "(no parsed movements)"
+        : unique.slice(0, 4).join(" + ") + (unique.length > 4 ? " + ..." : "");
+      const td = r.time_domain ? `${r.time_domain} time` : "no time domain";
+      lines.push(`  ${r.workout_label} — ${r.percentile.toFixed(1)}pct (rank ${r.rank}, ${r.raw_score} ${r.scoring_unit}, ${td}): ${moves}`);
+    }
+  }
+
+  return lines.join("\n").trimEnd();
+}
+
+// ============================================================
 // Active flag rules (system prompt)
 // ============================================================
 

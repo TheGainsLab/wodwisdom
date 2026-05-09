@@ -24,8 +24,10 @@ import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { getTierStatus } from "../_shared/tier-status.ts";
 import { deriveAthleteDiagnostic, type AthleteDiagnostic } from "../_shared/derive-athlete-diagnostic.ts";
+import { fetchTier4Bundle } from "../_shared/fetch-tier4-bundle.ts";
 import {
   formatActiveFlagRules,
+  formatCompetitionProfile,
   formatLiftFindings,
   formatSkillsFindings,
 } from "../_shared/diagnostic-formatters.ts";
@@ -52,6 +54,8 @@ interface ProfileData {
   days_per_week?: number | null;
   session_length_minutes?: number | null;
   injuries_constraints?: string | null;
+  /** Tier 4 link — when set, the diagnostic fetches a competition history bundle. */
+  competition_athlete_id?: string | null;
 }
 
 function formatProfile(profile: ProfileData, diagnostic: AthleteDiagnostic): string {
@@ -74,6 +78,11 @@ function formatProfile(profile: ProfileData, diagnostic: AthleteDiagnostic): str
   // Skills findings — replaces the legacy "Skills —" prose line.
   if (diagnostic.meta.inputs_complete.skills) {
     sections.push(formatSkillsFindings(diagnostic));
+  }
+
+  // Competition profile (Tier 4) — only when athlete is linked + bundle fetched.
+  if (diagnostic.competition) {
+    sections.push(formatCompetitionProfile(diagnostic));
   }
 
   // Conditioning — passthrough (Engine handles the conditioning diagnostic).
@@ -215,7 +224,15 @@ async function runAnalysis(
       .update({ status: "processing" })
       .eq("id", evalId);
 
-    const diagnostic = deriveAthleteDiagnostic(profileData);
+    // Tier 4 — fetch the athlete's competition history bundle when linked.
+    // Failure-soft: any error path returns null and the diagnostic flows
+    // through with `competition: null` exactly as for unlinked athletes.
+    const tier4Bundle = profileData.competition_athlete_id
+      ? await fetchTier4Bundle(profileData.competition_athlete_id)
+      : null;
+    const diagnostic = deriveAthleteDiagnostic(profileData, {
+      tier4: { bundle: tier4Bundle },
+    });
     const profileStr = formatProfile(profileData, diagnostic);
     const isContinuation = monthNumber > 1;
 
@@ -334,7 +351,7 @@ Deno.serve(async (req) => {
 
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
-      .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, goal, self_perception_level, days_per_week, session_length_minutes, injuries_constraints")
+      .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, goal, self_perception_level, days_per_week, session_length_minutes, injuries_constraints, competition_athlete_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -425,6 +442,7 @@ Deno.serve(async (req) => {
         days_per_week: profileData.days_per_week ?? null,
         session_length_minutes: profileData.session_length_minutes ?? null,
         injuries_constraints: profileData.injuries_constraints ?? null,
+        competition_athlete_id: profileData.competition_athlete_id ?? null,
       },
     };
     if (programId) evalRow.program_id = programId;

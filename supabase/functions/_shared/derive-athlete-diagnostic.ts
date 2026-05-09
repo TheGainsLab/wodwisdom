@@ -31,6 +31,7 @@ import {
   type MovementCategory,
   type SkillLevel,
 } from "./diagnostic-constants.ts";
+import type { Tier4Bundle } from "./fetch-tier4-bundle.ts";
 
 /** Lifts that get a per-lift level directly from BW × age × gender bands.
  *  All other lifts derive a synthetic level via the anchor rule (Step 5). */
@@ -51,14 +52,22 @@ export interface AthleteProfileInput {
 }
 
 export interface DiagnosticContext {
-  // Reserved for future augmentation layers. The current Step 1-10 logic
-  // ignores everything in here; consumers can pass an empty object.
+  // Reserved for future cohort augmentation; ignored for now.
   cohort?: unknown;
+
+  /**
+   * Tier 4 (linked competition history) augmentation context.
+   * Pass `bundle` populated from fetchTier4Bundle when the athlete is
+   * linked. The diagnostic interprets the bundle into the
+   * AthleteDiagnostic.competition slot and derives competitor_bonus_active.
+   */
   tier4?: {
+    bundle?: Tier4Bundle | null;
     /**
-     * True when the athlete's linked competition record indicates
-     * games-tier or 10+ seasons competed. Drives the +3% loading
-     * ceiling bonus (COMPETITOR_BONUS) when active.
+     * Optional explicit override for the competitor bonus. If omitted, the
+     * diagnostic computes it from the bundle: TRUE when the athlete's
+     * overall_competitive_tier is regionals or games_athlete, OR
+     * seasons_competed >= 10.
      */
     competitor_bonus_active?: boolean;
   };
@@ -154,6 +163,44 @@ export interface SkillsDiagnostic {
 }
 
 // ============================================================
+// Competition (Tier 4) augmentation output
+// ============================================================
+
+export interface CompetitionRecentEvidence {
+  workout_label: string;
+  percentile: number;
+  rank: number;
+  time_domain: "short" | "medium" | "long" | null;
+  raw_score: number;
+  scoring_unit: string;
+  movements: string[];
+}
+
+export interface CompetitionDiagnostic {
+  /** Identity captured at link time (echoed for prompt convenience). */
+  identity: {
+    name: string;
+    profile_url: string | null;
+    competitor_id: string;
+  };
+  /** Highest competitive stage ever reached. */
+  observed_tier: "open_only" | "qualifier" | "regionals" | "games_athlete";
+  seasons_competed: number;
+  /** Cohort percentile in the athlete's most recent season. */
+  latest_percentile: number;
+  trend: {
+    direction: "improving" | "plateau" | "declining" | "new";
+    points_per_year: number | null;
+  };
+  /** Std-dev of cohort percentile across last season's workouts; null if 1 workout. */
+  consistency: number | null;
+  /** Whether the +3% loading bonus fires for this athlete. Mirrors meta.competitor_bonus_active. */
+  competitor_bonus_active: boolean;
+  /** Curated trim of recent_raw_results for prose grounding (top-by-percentile, capped at 5). */
+  recent_evidence: CompetitionRecentEvidence[];
+}
+
+// ============================================================
 // Top-level diagnostic
 // ============================================================
 
@@ -172,8 +219,8 @@ export interface AthleteDiagnostic {
   lifts: LiftDiagnostic;
   skills: SkillsDiagnostic;
 
-  /** Reserved for Tier 4 augmentation. null until that layer ships. */
-  competition: null;
+  /** Tier 4 (linked competition history) findings. Null when athlete isn't linked or fetch failed. */
+  competition: CompetitionDiagnostic | null;
 
   /** Reserved for cohort augmentation. null until that layer ships. */
   cohort: null;
@@ -656,6 +703,79 @@ function countMissingTransitiveDependents(
 }
 
 // ============================================================
+// Tier 4 — competition findings (conservative v1 surface)
+// ============================================================
+
+/**
+ * Compute whether the +3% loading-ceiling competitor bonus fires.
+ *
+ * Rule: TRUE when overall_competitive_tier is regionals or games_athlete,
+ * OR seasons_competed >= 10. Open-only / qualifier athletes with fewer
+ * seasons get FALSE.
+ */
+function computeCompetitorBonusActive(bundle: Tier4Bundle): boolean {
+  const tier = bundle.competition_summary?.overall_competitive_tier;
+  const seasons = bundle.competition_summary?.seasons_competed ?? 0;
+  if (tier === "regionals" || tier === "games_athlete") return true;
+  if (seasons >= 10) return true;
+  return false;
+}
+
+/**
+ * Curate up to 5 recent results for prose grounding. v1 rule: take the
+ * highest-percentile finishes (peaks). Future iteration can mix peaks with
+ * the lowest finish for contrast — for now keep it simple.
+ */
+function curateRecentEvidence(bundle: Tier4Bundle): CompetitionRecentEvidence[] {
+  const results = bundle.recent_raw_results ?? [];
+  if (results.length === 0) return [];
+  // Sort by percentile descending; tie-break by rank ascending (lower rank = better).
+  const sorted = [...results].sort((a, b) => {
+    const dp = (b.percentile ?? 0) - (a.percentile ?? 0);
+    if (dp !== 0) return dp;
+    return (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER);
+  });
+  return sorted.slice(0, 5).map((r) => ({
+    workout_label: r.workout_label,
+    percentile: r.percentile,
+    rank: r.rank,
+    time_domain: r.time_domain,
+    raw_score: r.raw_score,
+    scoring_unit: r.scoring_unit,
+    movements: r.movements ?? [],
+  }));
+}
+
+/**
+ * Build the CompetitionDiagnostic from the raw bundle. Conservative v1
+ * surface: descriptive identity + tier + summary + recent evidence. NO
+ * flag firing yet — flags require cohort-bias handling we haven't
+ * validated end-to-end.
+ */
+export function deriveCompetitionFindings(
+  bundle: Tier4Bundle,
+): CompetitionDiagnostic {
+  const summary = bundle.competition_summary;
+  return {
+    identity: {
+      name: bundle.identity?.name ?? "",
+      profile_url: bundle.identity?.profile_url ?? null,
+      competitor_id: bundle.identity?.competitor_id ?? "",
+    },
+    observed_tier: summary?.overall_competitive_tier ?? "open_only",
+    seasons_competed: summary?.seasons_competed ?? 0,
+    latest_percentile: summary?.latest_percentile ?? 0,
+    trend: {
+      direction: summary?.trend?.direction ?? "new",
+      points_per_year: summary?.trend?.percentile_points_per_year ?? null,
+    },
+    consistency: summary?.consistency ?? null,
+    competitor_bonus_active: computeCompetitorBonusActive(bundle),
+    recent_evidence: curateRecentEvidence(bundle),
+  };
+}
+
+// ============================================================
 // Entry point
 // ============================================================
 
@@ -688,7 +808,15 @@ export function deriveAthleteDiagnostic(
   const syntheticLevels = deriveSyntheticLevels(bwLevels, liftFlags);
 
   // Step 6 — loading ceilings + scheme menus per lift.
-  const competitorBonusActive = ctx.tier4?.competitor_bonus_active === true;
+  // competitor_bonus_active priority:
+  //   1. explicit ctx.tier4.competitor_bonus_active override (test/dev escape hatch)
+  //   2. derived from the linked Tier 4 bundle if present
+  //   3. false (default for unlinked athletes)
+  const competitionFindings = ctx.tier4?.bundle
+    ? deriveCompetitionFindings(ctx.tier4.bundle)
+    : null;
+  const competitorBonusActive = ctx.tier4?.competitor_bonus_active === true
+    || (competitionFindings?.competitor_bonus_active ?? false);
   const loading = computeLoading(bwLevels, syntheticLevels, competitorBonusActive);
 
   // Step 7 — accessory pool merger.
@@ -744,7 +872,7 @@ export function deriveAthleteDiagnostic(
       active_focus: activeFocus,
       metcon_allow_list: metconAllowList,
     },
-    competition: null,
+    competition: competitionFindings,
     cohort: null,
   };
 }
