@@ -14,7 +14,6 @@ import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { SKILL_DISPLAY_NAMES } from "../_shared/skill-priorities.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { getTierStatus } from "../_shared/tier-status.ts";
-import { interpretLevels } from "../_shared/level-interpreter.ts";
 import { reconcileProfile, formatInterpretedProfile } from "../_shared/reconciler.ts";
 import type { ParsedGoal, ParsedInjuries } from "../_shared/reconciler.ts";
 import { ARCHETYPES } from "../_shared/archetype-specs.ts";
@@ -600,29 +599,14 @@ async function processJob(
       summary: "No reported injuries or constraints.",
     };
 
-    // Rule-based level interpretation + reconcile
-    const levels = interpretLevels({
-      age: profile.age,
-      gender: profile.gender,
-      bodyweight: profile.bodyweight,
-      units: profile.units,
-      lifts: profile.lifts,
-      skills: profile.skills,
-      conditioning: profile.conditioning,
-    });
-    // Previous-tier upward ratchet retired alongside the legacy experience_tier
-    // path. reconcileProfile still accepts previous_tier to keep its signature
-    // stable during the migration; we pass null and let the (legacy) reconciler
-    // compute its own scalar fresh each month — nothing in the strength path
-    // reads it anymore.
-    const previousTier: import("../_shared/level-interpreter.ts").ExperienceTier | null = null;
+    // Reconcile parsed goal + injuries + schedule into the InterpretedProfile.
+    // Strength/skills classification has moved to the diagnostic — reconciler
+    // now only handles goal, injuries, weekly_pattern, blockers.
     const interpretedProfile = reconcileProfile({
       goal: parsedGoal,
       injuries: parsedInjuries,
-      levels,
       self_perception_level: selfPerception,
       days_per_week: athleteLive?.days_per_week ?? null,
-      previous_tier: previousTier,
     });
     const interpretedBlock = "\n" + formatInterpretedProfile(interpretedProfile) + "\n";
     console.log(`[generate-program] Interpreted: goal=${interpretedProfile.goal.primary_goal}, days=${interpretedProfile.days_per_week}, pattern=[${interpretedProfile.weekly_pattern.baseline.join(",")}], blockers=${interpretedProfile.blockers.length}, lift_flags=${diagnostic.lifts.flags.length}, skill_flags=${diagnostic.skills.flags.length}, focus=[${diagnostic.skills.active_focus.join(",")}]`);
@@ -1126,12 +1110,12 @@ ${skeleton}`;
       if (isContinuation && existingProgramId) {
         progId = existingProgramId;
         console.log(`[generate-program] Appending month ${monthNumber} to existing program`);
-        // Update with current month's pattern + tier (latest snapshot wins)
+        // Update with current month's pattern + diagnostic (latest snapshot wins).
+        // experience_tier_at_gen is retired — column stays nullable for old rows.
         await supa
           .from("programs")
           .update({
             weekly_pattern: interpretedProfile.weekly_pattern,
-            experience_tier_at_gen: interpretedProfile.effective_tier,
             diagnostic_snapshot: diagnostic,
           })
           .eq("id", progId);
@@ -1143,7 +1127,6 @@ ${skeleton}`;
             name: programName,
             source: "generated",
             weekly_pattern: interpretedProfile.weekly_pattern,
-            experience_tier_at_gen: interpretedProfile.effective_tier,
             diagnostic_snapshot: diagnostic,
           })
           .select("id")

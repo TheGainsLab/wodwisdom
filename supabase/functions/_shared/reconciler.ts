@@ -1,15 +1,14 @@
 /**
- * Profile reconciler — merges classifier outputs (goal, injuries) with
- * interpreter outputs (strength / skills / conditioning levels + experience
- * tier) into a single InterpretedProfile object the generator can consume.
+ * Profile reconciler — merges parsed goal + parsed injuries + schedule into
+ * a single InterpretedProfile object the generator can consume. Also detects
+ * obvious hard blockers (e.g., "CF competitor" + "no overhead pressing") for
+ * UI confirmation before generation.
  *
- * Pure data-shaping — no LLM calls. Also detects obvious hard blockers
- * (e.g., "CF competitor" + "no overhead pressing") for UI confirmation
- * before generation.
+ * Strength / skills / conditioning classification used to live here via the
+ * legacy interpretLevels chain; that's now in the diagnostic
+ * (derive-athlete-diagnostic.ts). The reconciler is goal/injury/schedule only.
  */
 
-import type { DomainLevels, ExperienceTier } from "./level-interpreter.ts";
-import { calibrationDelta } from "./level-interpreter.ts";
 import type { DayArchetype } from "./archetype-specs.ts";
 import { getMonthlyPattern, normalizeDaysPerWeek } from "./weekly-patterns.ts";
 
@@ -46,18 +45,11 @@ export interface Blocker {
 export interface InterpretedProfile {
   goal: ParsedGoal;
   injuries: ParsedInjuries;
-  levels: DomainLevels;
   self_perception_level: string | null;
-  calibration: {
-    delta: number;
-    note: string;
-  };
   blockers: Blocker[];
   /** Flat list of prohibited movement strings from all injuries, for prompt use. */
   prohibited_movements: string[];
   caution_movements: string[];
-  /** Tier used for generation (after upward-only ratchet). */
-  effective_tier: ExperienceTier;
   /** Days per week clamped to supported range (3-6). */
   days_per_week: 3 | 4 | 5 | 6;
   /** Archetypes per week for the next month. weeks[0..2] = baseline, weeks[3] = deload. */
@@ -88,38 +80,13 @@ function detectBlockers(goal: ParsedGoal, injuries: ParsedInjuries): Blocker[] {
   return blockers;
 }
 
-/**
- * Apply upward-only tier ratchet. If the previous tier was higher than the
- * newly-derived tier, keep the previous tier — never demote month-over-month
- * unless the athlete explicitly resets their profile.
- */
-const TIER_RANK: Record<ExperienceTier, number> = {
-  novice: 0,
-  intermediate: 1,
-  advanced: 2,
-  competitor: 3,
-};
-const RANK_TO_TIER: ExperienceTier[] = ["novice", "intermediate", "advanced", "competitor"];
-
-function ratchetTier(newTier: ExperienceTier, previousTier: ExperienceTier | null | undefined): ExperienceTier {
-  if (!previousTier) return newTier;
-  const newRank = TIER_RANK[newTier] ?? 0;
-  const prevRank = TIER_RANK[previousTier] ?? 0;
-  return RANK_TO_TIER[Math.max(newRank, prevRank)];
-}
-
 export function reconcileProfile(args: {
   goal: ParsedGoal;
   injuries: ParsedInjuries;
-  levels: DomainLevels;
   self_perception_level: string | null;
   days_per_week: number | null | undefined;
-  /** Previous month's effective tier — used for upward-only ratchet. */
-  previous_tier?: ExperienceTier | null;
 }): InterpretedProfile {
-  const { goal, injuries, levels, self_perception_level, days_per_week, previous_tier } = args;
-  const effective_tier = ratchetTier(levels.experience_tier, previous_tier ?? null);
-  const calibration = calibrationDelta(self_perception_level, effective_tier);
+  const { goal, injuries, self_perception_level, days_per_week } = args;
   const blockers = detectBlockers(goal, injuries);
   const prohibited_movements = Array.from(
     new Set(injuries.constraints.flatMap((c) => c.prohibited_movements)),
@@ -132,13 +99,10 @@ export function reconcileProfile(args: {
   return {
     goal,
     injuries,
-    levels,
     self_perception_level,
-    calibration,
     blockers,
     prohibited_movements,
     caution_movements,
-    effective_tier,
     days_per_week: normalizedDays,
     weekly_pattern: {
       weeks: monthlyPattern.weeks,
@@ -164,28 +128,12 @@ export function formatInterpretedProfile(ip: InterpretedProfile): string {
     lines.push(`  Emphasis (most → least): ${ip.goal.emphasis_blocks.join(" → ")}`);
   }
   lines.push("");
-  lines.push("Evidence-based levels:");
-  lines.push(`  Strength overall: ${ip.levels.strength.overall}`);
-  const liftDetails = Object.entries(ip.levels.strength.per_lift)
-    .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
-    .join(", ");
-  if (liftDetails) lines.push(`  By lift: ${liftDetails}`);
-  lines.push(`  Skills: ${ip.levels.skills.overall} (${ip.levels.skills.proficient_count} intermediate+ of ${ip.levels.skills.total_rated} rated)`);
-  lines.push(`  Conditioning: ${ip.levels.conditioning.overall} (${ip.levels.conditioning.benchmarks_present} benchmarks provided)`);
-  lines.push(`  Experience tier (raw): ${ip.levels.experience_tier}`);
-  if (ip.effective_tier !== ip.levels.experience_tier) {
-    lines.push(`  Effective tier (after upward ratchet): ${ip.effective_tier}`);
-  } else {
-    lines.push(`  Effective tier: ${ip.effective_tier}`);
-  }
-  lines.push("");
   lines.push(`Schedule: ${ip.days_per_week} days/week`);
   lines.push(`Weekly pattern (Weeks 1-3): ${ip.weekly_pattern.baseline.map((a) => a).join(" → ")}`);
   lines.push(`Week 4 (deload): ${ip.weekly_pattern.deload.map((a) => a).join(" → ")}`);
   lines.push("");
   if (ip.self_perception_level && ip.self_perception_level !== "not_sure") {
     lines.push(`Self-perception: ${ip.self_perception_level}`);
-    lines.push(`Calibration: ${ip.calibration.note}`);
     lines.push("");
   }
   if (ip.injuries.constraints.length > 0) {

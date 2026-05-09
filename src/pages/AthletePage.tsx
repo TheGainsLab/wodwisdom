@@ -131,6 +131,8 @@ const EQUIPMENT_GROUPS = [
       { key: 'box', label: 'Plyo Box' },
       { key: 'wall_ball', label: 'Wall Ball' },
       { key: 'sled', label: 'Sled/Prowler' },
+      { key: 'blocks', label: 'Lifting Blocks' },
+      { key: 'bands', label: 'Resistance Bands' },
     ],
   },
 ];
