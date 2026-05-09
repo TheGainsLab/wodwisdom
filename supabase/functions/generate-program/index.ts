@@ -823,6 +823,35 @@ MOVEMENT PATTERN DISTRIBUTION (across all Strength blocks in the week):
 - A movement flagged with category "mobility" in ATHLETE LIFT FINDINGS is accessory or warm-up work — it does NOT fulfill a movement-pattern slot. Program it as light technique work alongside the day's main lift, not as the Strength block's primary movement.
 - Vary the specific exercises within a movement pattern across weeks (e.g. for "olympic lifts": clean & jerk one day, snatch complex another).
 
+ACCESSORY BLOCK RULES:
+The Accessory block has 2-3 movements per day. Two slot types:
+
+PRIMARY SLOT (1-2 movements, when active flags exist): pull from the curated Accessory pool in ATHLETE LIFT FINDINGS. Pool drills address active limiter flags — loaded technique, position, or mobility work only. The pool is already filtered for level, equipment, and flag relevance. Use it.
+
+SECONDARY SLOT (1-2 movements): general accessory work picked freely by you. This is where standard strength accessories live — RDL, walking lunge, DB row, good morning, glute bridge, hip thrust, single-leg work, weighted carries — plus midline/core (planks, hollow holds, GHD sit-ups, l-sit holds) and prehab (face pulls, scap work, band work). Pick based on the day's primary lift (complement, don't overlap), weekly balance, and athlete-level needs. Always include at least one midline/core movement per day.
+
+Rotate pool movements across the week so each pool drill gets 1-2 exposures, not 3-4. Vary the focus angle each session.
+
+When active flags are absent (the pool is empty in ATHLETE LIFT FINDINGS), accessory selection is fully secondary-slot generic.
+
+Load pool movements per the category guidance below. Load secondary-slot generic accessories like normal strength accessories (60-75% of related primary lift, 3-4 sets of 6-10 reps, or bodyweight where appropriate).
+
+ACCESSORY POOL CATEGORY → LOADING GUIDANCE:
+Pool movements are loaded technique, position, or mobility drills that address active limiters. They are NOT strength accessories — generic strength accessories belong in the SECONDARY slot above. Three categories only — load by the category tag (shown in parentheses next to each pool entry).
+
+- mobility: bodyweight or light band only. Sub-failure. 1-2 sets of 8-12 reps, or 30-60s holds. Movement quality work, not loaded.
+- position: 30-50% of related primary lift, 2-3 sets of 3-5 reps. Emphasis on holds, paused bottom positions, slow eccentrics. Never to failure.
+- technique: 40-50% of related primary lift, 3 sets of 3-5 reps. The pause/tempo/slow component makes 50% feel like 70-80% un-paused. Quality over volume.
+
+Worked examples (athlete with FS 355, jerk 315, OHS 265, snatch 245, clean 325):
+- pause_front_squat (technique, primary = FS 355) → 142-178 lbs × 3 × 3-5 reps
+- jerk_balance (technique, primary = jerk 315) → 126-158 lbs × 3 × 3-5 reps
+- drop_clean (technique, primary = clean 325) → 130-163 lbs × 3 × 3-5 reps
+- sots_press (position, primary = OHS 265) → 80-133 lbs × 2-3 × 3-5 reps
+- snatch_balance (position, primary = snatch 245) → 74-123 lbs × 2-3 × 3-5 reps
+
+Default: when uncertain, err lighter. These are limiter remediation drills, not 1RM builders. Reps NEVER exceed 5 per set on position or technique movements regardless of how light the load feels.
+
 SKILLS BLOCK RULES (apply when the Skills block appears in a day; NOTE: on Metcon Days the Skills block is a brief 5-8 min PRIMER, NOT progression work):
 Use ATHLETE SKILLS FINDINGS to decide skill content. The "Top active focus" list (eligibility-filtered, prerequisite-aware, priority-ranked) is your guide.
 - Skills in the active focus list get progression volume on Skills blocks. Alternate foundational and advanced variants across the week.
@@ -832,6 +861,17 @@ Use ATHLETE SKILLS FINDINGS to decide skill content. The "Top active focus" list
 - Never program the same skill on consecutive days.
 - Related progressions are a single track, not separate skills. For example: strict HSPU, wall-facing HSPU, and deficit HSPU are one progression — pick the variant that matches the athlete's level and periodize across weeks (drill → load → test).
 - Vary the drill, not just the movement. Each session should have a different focus angle.
+
+SKILL DRILL SELECTION (when programming a skill from the active focus list):
+- Read the FULL chain in ATHLETE SKILLS FINDINGS for that skill, not just the target. Every variant on the way to the target has a level — use them all.
+- Pick drills at the level JUST ABOVE the athlete's current best in the chain. Skip variants the athlete is already at intermediate+ on.
+- Foundational variants (e.g., wall-facing HSPU when developing deficit HSPU) are correct ONLY when the athlete is at none/beginner on every earlier rung. When earlier rungs are intermediate+, skip past them and work the next progression.
+
+Examples:
+- Athlete: hspu (kipping) advanced, strict_hspu intermediate, deficit_hspu beginner. Active focus: deficit_hspu.
+  → Program strict HSPU with small deficits (1-2"), strict HSPU volume, or deficit HSPU eccentrics. NOT wall-facing HSPU — that's far below the athlete's level.
+- Athlete: strict_pull_ups beginner, kipping_pull_ups none. Active focus: strict_pull_ups.
+  → Program eccentric pull-ups, banded pull-ups, scap pulls. Foundational variants are correct here because the chain is empty.
 - On Metcon Days, the Skills block is a primer — light activation only, NOT progression work.
 
 ACCESSORY BLOCK RULES:
