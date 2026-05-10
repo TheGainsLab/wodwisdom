@@ -1474,17 +1474,23 @@ export default function AthletePage({ session }: { session: Session }) {
                       return byMonth.get(m)!;
                     };
 
+                    // Queries return newest-first. Keep the first-seen row per
+                    // month so the newest eval wins when multiple exist for the
+                    // same month_number (admin re-runs, retries, etc.).
                     for (const ev of evaluations) {
                       const m = (ev as any).month_number || 1;
-                      ensureMonth(m, ev.created_at).profile = ev as EvalEntry;
+                      const month = ensureMonth(m, ev.created_at);
+                      if (!month.profile) month.profile = ev as EvalEntry;
                     }
                     for (const ev of trainingEvaluations) {
                       const m = (ev as any).month_number || 1;
-                      ensureMonth(m, ev.created_at).training = ev as EvalEntry;
+                      const month = ensureMonth(m, ev.created_at);
+                      if (!month.training) month.training = ev as EvalEntry;
                     }
                     for (const ev of nutritionEvaluations) {
                       const m = (ev as any).month_number || 1;
-                      ensureMonth(m, ev.created_at).nutrition = ev as EvalEntry;
+                      const month = ensureMonth(m, ev.created_at);
+                      if (!month.nutrition) month.nutrition = ev as EvalEntry;
                     }
 
                     const months = Array.from(byMonth.keys()).sort((a, b) => b - a); // Most recent first
