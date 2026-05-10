@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -247,13 +247,34 @@ async function extractFunctionError(err: unknown): Promise<string | null> {
   return null;
 }
 
-function CollapsibleSection({ title, defaultExpanded = false, children }: { title: string; defaultExpanded?: boolean; children: React.ReactNode }) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+function CollapsibleSection({
+  title,
+  defaultExpanded = false,
+  expanded: controlledExpanded,
+  onToggle,
+  sectionRef,
+  children,
+}: {
+  title: string;
+  defaultExpanded?: boolean;
+  expanded?: boolean;
+  onToggle?: (next: boolean) => void;
+  sectionRef?: React.Ref<HTMLDivElement>;
+  children: React.ReactNode;
+}) {
+  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
+  const isControlled = controlledExpanded !== undefined;
+  const expanded = isControlled ? controlledExpanded : internalExpanded;
+  const toggle = () => {
+    const next = !expanded;
+    if (!isControlled) setInternalExpanded(next);
+    onToggle?.(next);
+  };
   return (
-    <div className="settings-card">
+    <div className="settings-card" ref={sectionRef}>
       <button
         type="button"
-        onClick={() => setExpanded(e => !e)}
+        onClick={toggle}
         style={{
           width: '100%',
           display: 'flex',
@@ -429,6 +450,8 @@ export default function AthletePage({ session }: { session: Session }) {
   const [trainingEvaluations, setTrainingEvaluations] = useState<TrainingEvaluation[]>([]);
   const [nutritionEvaluations, setNutritionEvaluations] = useState<NutritionEvaluation[]>([]);
   const [expandedEvalId, setExpandedEvalId] = useState<string | null>(null);
+  const [evalHistoryOpen, setEvalHistoryOpen] = useState(false);
+  const evalHistoryRef = useRef<HTMLDivElement | null>(null);
   const [evalCreditsRemaining, setEvalCreditsRemaining] = useState<number>(1);
 
   const fetchEvaluations = async () => {
@@ -894,7 +917,13 @@ export default function AthletePage({ session }: { session: Session }) {
                             <button
                               className="auth-btn"
                               style={{ padding: '8px 16px', fontSize: 13 }}
-                              onClick={() => setExpandedEvalId(latestEval.id)}
+                              onClick={() => {
+                                setExpandedEvalId(latestEval.id);
+                                setEvalHistoryOpen(true);
+                                requestAnimationFrame(() => {
+                                  evalHistoryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                });
+                              }}
                             >
                               View Evaluation →
                             </button>
@@ -1427,7 +1456,12 @@ export default function AthletePage({ session }: { session: Session }) {
 
                 {/* AI Evaluation History — grouped by month */}
                 {(evaluations.length > 0 || trainingEvaluations.length > 0 || nutritionEvaluations.length > 0) && (
-                  <CollapsibleSection title="AI Evaluation History">
+                  <CollapsibleSection
+                    title="AI Evaluation History"
+                    expanded={evalHistoryOpen}
+                    onToggle={setEvalHistoryOpen}
+                    sectionRef={evalHistoryRef}
+                  >
                   <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>Past AI evaluations grouped by month. Click a section to expand.</p>
 
                   {(() => {
