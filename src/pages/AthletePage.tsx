@@ -7,6 +7,7 @@ import { calculateTDEE } from '../utils/tdee';
 import { getTierStatus, type AthleteProfileInput, type TierSection } from '../utils/tier-status';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
+import CompetitionHistorySection from '../components/CompetitionHistorySection';
 import { formatMarkdown } from '../lib/formatMarkdown';
 
 const LIFT_GROUPS = [
@@ -454,6 +455,10 @@ export default function AthletePage({ session }: { session: Session }) {
   const evalHistoryRef = useRef<HTMLDivElement | null>(null);
   const [evalCreditsRemaining, setEvalCreditsRemaining] = useState<number>(1);
 
+  // Tier 4 — competition history linkage (Phase B v1, admin only)
+  const [initialCompetitionAthleteId, setInitialCompetitionAthleteId] = useState<string | null>(null);
+  const [initialCompetitionAthleteLabel, setInitialCompetitionAthleteLabel] = useState<string | null>(null);
+
   const fetchEvaluations = async () => {
     const [profileRes, trainingRes, nutritionRes] = await Promise.all([
       // Only surface complete evaluations. Pending/failed rows (created by
@@ -495,7 +500,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, self_perception_level, eval_credits_remaining')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, self_perception_level, eval_credits_remaining, competition_athlete_id, competition_athlete_label')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -543,6 +548,8 @@ export default function AthletePage({ session }: { session: Session }) {
         setGoal(d.goal || '');
         setSelfPerceptionLevel(d.self_perception_level || '');
         setEvalCreditsRemaining(typeof d.eval_credits_remaining === 'number' ? d.eval_credits_remaining : 1);
+        setInitialCompetitionAthleteId((d as any).competition_athlete_id ?? null);
+        setInitialCompetitionAthleteLabel((d as any).competition_athlete_label ?? null);
         setIsDirty(false);
       }
       if (evalRes.data) {
@@ -1550,6 +1557,15 @@ export default function AthletePage({ session }: { session: Session }) {
                     );
                   })()}
                   </CollapsibleSection>
+                )}
+
+                {/* Tier 4 — competition history linkage. Phase B v1: admin only. */}
+                {isAdmin && (
+                  <CompetitionHistorySection
+                    userId={session.user.id}
+                    initialLinkedId={initialCompetitionAthleteId}
+                    initialLinkedLabel={initialCompetitionAthleteLabel}
+                  />
                 )}
               </>
             )}

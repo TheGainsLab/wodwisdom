@@ -1,0 +1,441 @@
+/**
+ * CompetitionHistorySection — Phase B v1 admin-only Tier 4 linkage UI.
+ *
+ * Three states:
+ *   - Unlinked          → paste-ID input + Verify
+ *   - Pending-confirm   → identity card + permanence warning + checkbox + Link
+ *   - Linked            → rich bundle view (identity, tier, recent results, etc.)
+ *                         + admin-override "Change linkage" (NOT a normal-user
+ *                         action — production users will not see this).
+ *
+ * Self-contained on purpose: it owns its own state, fetches the bundle from
+ * verify-competition-athlete, and writes the linkage to athlete_profiles
+ * directly. The same component should be liftable to a dedicated
+ * /competition-history route later without restructuring AthletePage.
+ *
+ * Bundle shape mirrors fetch-tier4-bundle.ts on the edge side.
+ */
+
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
+
+interface BundleIdentity {
+  name: string;
+  profile_url: string | null;
+  competitor_id: string;
+}
+
+interface BundleTrend {
+  direction: 'improving' | 'plateau' | 'declining' | 'new';
+  percentile_points_per_year: number | null;
+}
+
+interface BundleSummary {
+  overall_competitive_tier: 'open_only' | 'qualifier' | 'regionals' | 'games_athlete';
+  seasons_competed: number;
+  latest_percentile: number;
+  trend: BundleTrend;
+  consistency: number | null;
+}
+
+interface BundleRecentResult {
+  rank: number;
+  movements: string[];
+  raw_score: number;
+  percentile: number;
+  time_domain: 'short' | 'medium' | 'long' | null;
+  scoring_unit: 'time' | 'reps' | 'load_lbs' | 'distance';
+  workout_label: string;
+}
+
+interface Tier4Bundle {
+  identity: BundleIdentity;
+  competition_summary: BundleSummary;
+  recent_raw_results: BundleRecentResult[];
+}
+
+interface Props {
+  userId: string;
+  initialLinkedId: string | null;
+  initialLinkedLabel: string | null;
+}
+
+type Mode = 'unlinked' | 'pending-confirm' | 'linked';
+
+const TIER_LABEL: Record<BundleSummary['overall_competitive_tier'], string> = {
+  open_only: 'Open Only',
+  qualifier: 'Qualifier',
+  regionals: 'Regionals',
+  games_athlete: 'Games Athlete',
+};
+
+function formatTrend(trend: BundleTrend): string {
+  if (trend.direction === 'new') return 'New (fewer than 2 seasons)';
+  if (trend.percentile_points_per_year != null) {
+    const sign = trend.percentile_points_per_year > 0 ? '+' : '';
+    return `${trend.direction} (${sign}${trend.percentile_points_per_year.toFixed(2)} pp/year)`;
+  }
+  return trend.direction;
+}
+
+function formatConsistency(c: number | null): string {
+  if (c == null) return '—';
+  const desc = c < 5 ? 'steady' : c < 15 ? 'moderately variable' : 'highly variable';
+  return `${c.toFixed(2)} stddev (${desc})`;
+}
+
+export default function CompetitionHistorySection({
+  userId,
+  initialLinkedId,
+  initialLinkedLabel,
+}: Props) {
+  const [expanded, setExpanded] = useState(false);
+  const [mode, setMode] = useState<Mode>(initialLinkedId ? 'linked' : 'unlinked');
+  const [linkedId, setLinkedId] = useState<string | null>(initialLinkedId);
+  const [linkedLabel, setLinkedLabel] = useState<string | null>(initialLinkedLabel);
+
+  // Linking flow (unlinked → pending-confirm → linked)
+  const [pasteId, setPasteId] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [pendingBundle, setPendingBundle] = useState<Tier4Bundle | null>(null);
+  const [confirmChecked, setConfirmChecked] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Linked-state bundle (fetched on mount when already linked)
+  const [linkedBundle, setLinkedBundle] = useState<Tier4Bundle | null>(null);
+  const [bundleLoading, setBundleLoading] = useState(false);
+  const [bundleError, setBundleError] = useState<string | null>(null);
+
+  // Fetch the bundle on mount when already linked. Re-fetch when linkedId
+  // changes (admin override scenario).
+  useEffect(() => {
+    if (mode !== 'linked' || !linkedId) {
+      setLinkedBundle(null);
+      return;
+    }
+    let cancelled = false;
+    setBundleLoading(true);
+    setBundleError(null);
+    (async () => {
+      const { data, error } = await supabase.functions.invoke<{ bundle: Tier4Bundle; error?: string }>(
+        'verify-competition-athlete',
+        { body: { competition_athlete_id: linkedId } },
+      );
+      if (cancelled) return;
+      setBundleLoading(false);
+      if (error || !data?.bundle) {
+        setBundleError('Could not load competition history.');
+        return;
+      }
+      setLinkedBundle(data.bundle);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, linkedId]);
+
+  const onVerify = async () => {
+    const trimmed = pasteId.trim();
+    if (!trimmed) {
+      setVerifyError('Enter a competitor ID.');
+      return;
+    }
+    setVerifying(true);
+    setVerifyError(null);
+    setPendingBundle(null);
+
+    const { data, error } = await supabase.functions.invoke<{ bundle: Tier4Bundle; error?: string }>(
+      'verify-competition-athlete',
+      { body: { competition_athlete_id: trimmed } },
+    );
+    setVerifying(false);
+
+    if (error || !data?.bundle) {
+      setVerifyError('We couldn\'t find that athlete. Double-check the ID and try again.');
+      return;
+    }
+    setPendingBundle(data.bundle);
+    setConfirmChecked(false);
+    setMode('pending-confirm');
+  };
+
+  const onCancelPending = () => {
+    setPendingBundle(null);
+    setConfirmChecked(false);
+    setMode(linkedId ? 'linked' : 'unlinked');
+  };
+
+  const onConfirmLink = async () => {
+    if (!pendingBundle || !confirmChecked) return;
+    setSaving(true);
+    setSaveError(null);
+    const id = pendingBundle.identity.competitor_id;
+    const label = pendingBundle.identity.name;
+    const { error } = await supabase
+      .from('athlete_profiles')
+      .upsert(
+        {
+          user_id: userId,
+          competition_athlete_id: id,
+          competition_athlete_label: label,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' },
+      );
+    setSaving(false);
+    if (error) {
+      setSaveError(error.message || 'Failed to save the linkage.');
+      return;
+    }
+    setLinkedId(id);
+    setLinkedLabel(label);
+    setLinkedBundle(pendingBundle);
+    setPendingBundle(null);
+    setConfirmChecked(false);
+    setPasteId('');
+    setMode('linked');
+  };
+
+  // Admin-only override — clears the linkage so a different ID can be tested.
+  // Production users should not see this; in v1 the parent gates the whole
+  // component on isAdmin so the button is admin-bound by construction.
+  const onAdminOverride = async () => {
+    if (!confirm('Admin override: clear the current linkage? This is not a normal-user flow.')) return;
+    setSaving(true);
+    setSaveError(null);
+    const { error } = await supabase
+      .from('athlete_profiles')
+      .upsert(
+        {
+          user_id: userId,
+          competition_athlete_id: null,
+          competition_athlete_label: null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' },
+      );
+    setSaving(false);
+    if (error) {
+      setSaveError(error.message || 'Failed to clear the linkage.');
+      return;
+    }
+    setLinkedId(null);
+    setLinkedLabel(null);
+    setLinkedBundle(null);
+    setMode('unlinked');
+  };
+
+  return (
+    <div className="settings-card">
+      <button
+        type="button"
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: 0,
+          margin: 0,
+          background: 'none',
+          border: 'none',
+          color: 'inherit',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          textAlign: 'left',
+        }}
+      >
+        <div>
+          <h2 className="settings-card-title" style={{ marginBottom: 0 }}>
+            Competition History <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 13 }}>(optional, admin-only)</span>
+          </h2>
+          {mode === 'linked' && linkedLabel && (
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>Linked: {linkedLabel}</div>
+          )}
+        </div>
+        <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>{expanded ? '▲' : '▼'}</span>
+      </button>
+
+      {expanded && (
+        <div style={{ marginTop: 16 }}>
+          {mode === 'unlinked' && (
+            <div>
+              <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>
+                Paste your CrossFit competitor ID to link your account to your competition history.
+                Once confirmed, this linkage is permanent.
+              </p>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  className="lift-input"
+                  placeholder="Competitor ID (e.g. 153604)"
+                  value={pasteId}
+                  onChange={e => setPasteId(e.target.value)}
+                  style={{ flex: '1 1 200px', minWidth: 0 }}
+                  disabled={verifying}
+                />
+                <button
+                  type="button"
+                  className="auth-btn"
+                  style={{ padding: '8px 16px', fontSize: 13 }}
+                  onClick={onVerify}
+                  disabled={verifying || !pasteId.trim()}
+                >
+                  {verifying ? 'Verifying…' : 'Verify'}
+                </button>
+              </div>
+              {verifyError && (
+                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--danger, #d33)' }}>{verifyError}</div>
+              )}
+            </div>
+          )}
+
+          {mode === 'pending-confirm' && pendingBundle && (
+            <div>
+              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Is this you?</h3>
+              <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>{pendingBundle.identity.name}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>
+                  {TIER_LABEL[pendingBundle.competition_summary.overall_competitive_tier]} ·{' '}
+                  {pendingBundle.competition_summary.seasons_competed} season{pendingBundle.competition_summary.seasons_competed === 1 ? '' : 's'} ·{' '}
+                  latest {pendingBundle.competition_summary.latest_percentile.toFixed(1)} pct
+                </div>
+                {pendingBundle.identity.profile_url && (
+                  <div style={{ fontSize: 12, marginTop: 8 }}>
+                    <a href={pendingBundle.identity.profile_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
+                      View profile on games.crossfit.com →
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              <div style={{
+                background: 'var(--surface2)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                padding: 12,
+                marginBottom: 12,
+                fontSize: 13,
+              }}>
+                <strong>Once linked, this connection is permanent.</strong> Your evaluations and
+                generated programs will reference this competitor going forward.
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 13, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={confirmChecked}
+                  onChange={e => setConfirmChecked(e.target.checked)}
+                />
+                I confirm this is my competition profile
+              </label>
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="auth-btn"
+                  style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface2)', color: 'var(--text)' }}
+                  onClick={onCancelPending}
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="auth-btn"
+                  style={{ padding: '8px 16px', fontSize: 13 }}
+                  onClick={onConfirmLink}
+                  disabled={!confirmChecked || saving}
+                >
+                  {saving ? 'Linking…' : 'Link permanently'}
+                </button>
+              </div>
+              {saveError && (
+                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--danger, #d33)' }}>{saveError}</div>
+              )}
+            </div>
+          )}
+
+          {mode === 'linked' && (
+            <div>
+              {bundleLoading && (
+                <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Loading competition history…</div>
+              )}
+              {bundleError && (
+                <div style={{ fontSize: 13, color: 'var(--danger, #d33)' }}>{bundleError}</div>
+              )}
+              {linkedBundle && (
+                <>
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 16, fontWeight: 600 }}>{linkedBundle.identity.name}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>
+                      {TIER_LABEL[linkedBundle.competition_summary.overall_competitive_tier]} ·{' '}
+                      {linkedBundle.competition_summary.seasons_competed} season{linkedBundle.competition_summary.seasons_competed === 1 ? '' : 's'} ·{' '}
+                      latest {linkedBundle.competition_summary.latest_percentile.toFixed(1)} pct
+                    </div>
+                    {linkedBundle.identity.profile_url && (
+                      <div style={{ fontSize: 12, marginTop: 6 }}>
+                        <a href={linkedBundle.identity.profile_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
+                          View profile on games.crossfit.com →
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', fontSize: 13, marginBottom: 16 }}>
+                    <div style={{ color: 'var(--text-dim)' }}>Trend</div>
+                    <div>{formatTrend(linkedBundle.competition_summary.trend)}</div>
+                    <div style={{ color: 'var(--text-dim)' }}>Consistency</div>
+                    <div>{formatConsistency(linkedBundle.competition_summary.consistency)}</div>
+                  </div>
+
+                  {linkedBundle.recent_raw_results.length > 0 && (
+                    <div style={{ marginBottom: 16 }}>
+                      <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Recent results</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {linkedBundle.recent_raw_results.slice(0, 5).map((r, i) => {
+                          const movements = Array.from(new Set(r.movements ?? []));
+                          const moves = movements.length === 0 ? '—' : movements.slice(0, 4).join(' + ') + (movements.length > 4 ? ' + …' : '');
+                          return (
+                            <div key={i} style={{ fontSize: 12, padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 6 }}>
+                              <div style={{ fontWeight: 600 }}>{r.workout_label}</div>
+                              <div style={{ color: 'var(--text-dim)', marginTop: 2 }}>
+                                rank {r.rank} · {r.percentile.toFixed(1)} pct · {r.raw_score} {r.scoring_unit}
+                                {r.time_domain ? ` · ${r.time_domain} time` : ''}
+                              </div>
+                              <div style={{ color: 'var(--text-dim)', marginTop: 2 }}>{moves}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px dashed var(--border)' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
+                  Admin-only — production users will not see this.
+                </div>
+                <button
+                  type="button"
+                  className="auth-btn"
+                  style={{ padding: '6px 12px', fontSize: 12, background: 'var(--surface2)', color: 'var(--text)' }}
+                  onClick={onAdminOverride}
+                  disabled={saving}
+                >
+                  {saving ? 'Working…' : 'Override: clear linkage'}
+                </button>
+                {saveError && (
+                  <div style={{ marginTop: 8, fontSize: 13, color: 'var(--danger, #d33)' }}>{saveError}</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
