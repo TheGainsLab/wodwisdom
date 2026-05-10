@@ -1,19 +1,22 @@
 /**
- * CompetitionHistorySection — Phase B v1 admin-only Tier 4 linkage UI.
+ * CompetitionHistorySection — admin-only Tier 4 linkage UI (Phase B + C).
  *
  * Three states:
- *   - Unlinked          → paste-ID input + Verify
+ *   - Unlinked          → name search (Phase C) → results list → pick one;
+ *                         plus a paste-ID fallback for direct entry
  *   - Pending-confirm   → identity card + permanence warning + checkbox + Link
  *   - Linked            → rich bundle view (identity, tier, recent results, etc.)
  *                         + admin-override "Change linkage" (NOT a normal-user
  *                         action — production users will not see this).
  *
- * Self-contained on purpose: it owns its own state, fetches the bundle from
- * verify-competition-athlete, and writes the linkage to athlete_profiles
- * directly. The same component should be liftable to a dedicated
- * /competition-history route later without restructuring AthletePage.
+ * Self-contained on purpose: it owns its own state, talks to
+ * search-competition-athletes + verify-competition-athlete, and writes the
+ * linkage to athlete_profiles directly. The same component should be liftable
+ * to a dedicated /competition-history route later without restructuring
+ * AthletePage.
  *
- * Bundle shape mirrors fetch-tier4-bundle.ts on the edge side.
+ * Bundle shape mirrors fetch-tier4-bundle.ts on the edge side; search result
+ * shape mirrors the competition-service /athlete-search contract.
  */
 
 import { useEffect, useState } from 'react';
@@ -54,6 +57,24 @@ interface Tier4Bundle {
   recent_raw_results: BundleRecentResult[];
 }
 
+interface SearchResult {
+  competitor_id: string;
+  name: string;
+  affiliate: string | null;
+  region: string | null;
+  division: string;
+  seasons_competed: number;
+  highest_stage_reached: string;
+  most_recent_season: number;
+  best_finish: string;
+  profile_url: string | null;
+  photo_url: string | null;
+}
+
+// The competition-service returns its own placeholder key (not null) when an
+// athlete has no profile photo. Treat that as "no photo".
+const PLACEHOLDER_PHOTO_SUFFIX = '/athlete-avatar.jpg';
+
 interface Props {
   userId: string;
   initialLinkedId: string | null;
@@ -84,6 +105,41 @@ function formatConsistency(c: number | null): string {
   return `${c.toFixed(2)} stddev (${desc})`;
 }
 
+function Avatar({ name, photoUrl }: { name: string; photoUrl: string | null }) {
+  const [broken, setBroken] = useState(false);
+  const real = !!photoUrl && !photoUrl.endsWith(PLACEHOLDER_PHOTO_SUFFIX) && !broken;
+  if (real) {
+    return (
+      <img
+        src={photoUrl!}
+        alt=""
+        width={40}
+        height={40}
+        style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+        onError={() => setBroken(true)}
+      />
+    );
+  }
+  const initial = (name.trim()[0] || '?').toUpperCase();
+  return (
+    <div style={{
+      width: 40,
+      height: 40,
+      borderRadius: '50%',
+      background: 'var(--surface2)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontWeight: 700,
+      fontSize: 16,
+      color: 'var(--text-dim)',
+      flexShrink: 0,
+    }}>
+      {initial}
+    </div>
+  );
+}
+
 export default function CompetitionHistorySection({
   userId,
   initialLinkedId,
@@ -93,6 +149,13 @@ export default function CompetitionHistorySection({
   const [mode, setMode] = useState<Mode>(initialLinkedId ? 'linked' : 'unlinked');
   const [linkedId, setLinkedId] = useState<string | null>(initialLinkedId);
   const [linkedLabel, setLinkedLabel] = useState<string | null>(initialLinkedLabel);
+
+  // Search flow (Phase C — unlinked mode)
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchDivision, setSearchDivision] = useState<'' | 'men' | 'women'>('');
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 
   // Linking flow (unlinked → pending-confirm → linked)
   const [pasteId, setPasteId] = useState('');
@@ -136,8 +199,10 @@ export default function CompetitionHistorySection({
     };
   }, [mode, linkedId]);
 
-  const onVerify = async () => {
-    const trimmed = pasteId.trim();
+  // Verify an athlete and move to the confirm step. `idOverride` is passed
+  // when the user picked a search result; otherwise the paste-ID input drives.
+  const onVerify = async (idOverride?: string) => {
+    const trimmed = (idOverride ?? pasteId).trim();
     if (!trimmed) {
       setVerifyError('Enter a competitor ID.');
       return;
@@ -153,12 +218,45 @@ export default function CompetitionHistorySection({
     setVerifying(false);
 
     if (error || !data?.bundle) {
-      setVerifyError('We couldn\'t find that athlete. Double-check the ID and try again.');
+      setVerifyError(idOverride
+        ? 'We couldn\'t load competition data for that athlete. They may not have enough history yet.'
+        : 'We couldn\'t find that athlete. Double-check the ID and try again.');
       return;
     }
     setPendingBundle(data.bundle);
     setConfirmChecked(false);
     setMode('pending-confirm');
+  };
+
+  const onSearch = async () => {
+    const q = searchQuery.trim();
+    if (q.length < 3) {
+      setSearchError('Enter at least 3 characters.');
+      return;
+    }
+    setSearching(true);
+    setSearchError(null);
+    setSearchResults([]);
+    const { data, error } = await supabase.functions.invoke<{ results?: SearchResult[]; error?: string }>(
+      'search-competition-athletes',
+      { body: { q, division: searchDivision || undefined } },
+    );
+    setSearching(false);
+    if (error || data?.error) {
+      setSearchError('Search failed. Try again.');
+      return;
+    }
+    const results = data?.results ?? [];
+    if (results.length === 0) {
+      setSearchError('No athletes found. Try a different spelling.');
+      return;
+    }
+    setSearchResults(results);
+  };
+
+  const onSelectResult = (competitorId: string) => {
+    setSearchError(null);
+    onVerify(competitorId);
   };
 
   const onCancelPending = () => {
@@ -195,6 +293,9 @@ export default function CompetitionHistorySection({
     setPendingBundle(null);
     setConfirmChecked(false);
     setPasteId('');
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchError(null);
     setMode('linked');
   };
 
@@ -224,6 +325,10 @@ export default function CompetitionHistorySection({
     setLinkedId(null);
     setLinkedLabel(null);
     setLinkedBundle(null);
+    setPasteId('');
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchError(null);
     setMode('unlinked');
   };
 
@@ -263,29 +368,119 @@ export default function CompetitionHistorySection({
           {mode === 'unlinked' && (
             <div>
               <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>
-                Paste your CrossFit competitor ID to link your account to your competition history.
+                Search for your CrossFit competition profile to link it to your account.
                 Once confirmed, this linkage is permanent.
               </p>
+
+              {/* Search */}
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <input
                   type="text"
                   className="lift-input"
-                  placeholder="Competitor ID (e.g. 153604)"
-                  value={pasteId}
-                  onChange={e => setPasteId(e.target.value)}
-                  style={{ flex: '1 1 200px', minWidth: 0 }}
-                  disabled={verifying}
+                  placeholder="Search by name (e.g. Mathew Fraser)"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && searchQuery.trim().length >= 3 && !searching) onSearch(); }}
+                  style={{ flex: '1 1 220px', minWidth: 0 }}
+                  disabled={searching}
                 />
+                <select
+                  className="lift-input"
+                  value={searchDivision}
+                  onChange={e => setSearchDivision(e.target.value as '' | 'men' | 'women')}
+                  disabled={searching}
+                  style={{ flex: '0 0 auto' }}
+                >
+                  <option value="">All divisions</option>
+                  <option value="men">Men</option>
+                  <option value="women">Women</option>
+                </select>
                 <button
                   type="button"
                   className="auth-btn"
                   style={{ padding: '8px 16px', fontSize: 13 }}
-                  onClick={onVerify}
-                  disabled={verifying || !pasteId.trim()}
+                  onClick={onSearch}
+                  disabled={searching || searchQuery.trim().length < 3}
                 >
-                  {verifying ? 'Verifying…' : 'Verify'}
+                  {searching ? 'Searching…' : 'Search'}
                 </button>
               </div>
+              {searchError && (
+                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--danger, #d33)' }}>{searchError}</div>
+              )}
+
+              {/* Results */}
+              {searchResults.length > 0 && (
+                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {searchResults.map(r => {
+                    const meta = [
+                      r.affiliate,
+                      r.region,
+                      `${r.seasons_competed} season${r.seasons_competed === 1 ? '' : 's'}`,
+                      `best: ${r.best_finish}`,
+                    ].filter(Boolean).join(' · ');
+                    return (
+                      <button
+                        key={r.competitor_id}
+                        type="button"
+                        onClick={() => onSelectResult(r.competitor_id)}
+                        disabled={verifying}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          textAlign: 'left',
+                          padding: '8px 10px',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          background: 'var(--bg)',
+                          color: 'var(--text)',
+                          cursor: verifying ? 'wait' : 'pointer',
+                          fontFamily: 'inherit',
+                          width: '100%',
+                        }}
+                      >
+                        <Avatar name={r.name} photoUrl={r.photo_url} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 14 }}>{r.name} <span style={{ color: 'var(--text-dim)', fontWeight: 400, fontSize: 12 }}>· {r.division}</span></div>
+                          <div style={{ fontSize: 12, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {verifying && (
+                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-dim)' }}>Loading that athlete…</div>
+              )}
+
+              {/* Paste-ID fallback */}
+              <details style={{ marginTop: 14 }}>
+                <summary style={{ fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>Or enter a competitor ID directly</summary>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+                  <input
+                    type="text"
+                    className="lift-input"
+                    placeholder="Competitor ID (e.g. 153604)"
+                    value={pasteId}
+                    onChange={e => setPasteId(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && pasteId.trim() && !verifying) onVerify(); }}
+                    style={{ flex: '1 1 200px', minWidth: 0 }}
+                    disabled={verifying}
+                  />
+                  <button
+                    type="button"
+                    className="auth-btn"
+                    style={{ padding: '8px 16px', fontSize: 13 }}
+                    onClick={() => onVerify()}
+                    disabled={verifying || !pasteId.trim()}
+                  >
+                    {verifying ? 'Verifying…' : 'Verify'}
+                  </button>
+                </div>
+              </details>
+
               {verifyError && (
                 <div style={{ marginTop: 8, fontSize: 13, color: 'var(--danger, #d33)' }}>{verifyError}</div>
               )}

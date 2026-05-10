@@ -156,3 +156,6 @@ verify_jwt = false
 
 [functions.verify-competition-athlete]
 verify_jwt = false
+
+[functions.search-competition-athletes]
+verify_jwt = false
