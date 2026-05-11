@@ -44,8 +44,12 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
 
+  // Lazy-load the catalog the first time the "all" scope is opened. Deps are
+  // [scope, catalog] only — NOT catalogLoading: a loading-flag dep would make
+  // setCatalogLoading(true) re-run this effect, whose cleanup would cancel its
+  // own in-flight fetch (→ stuck on "Loading…" forever).
   useEffect(() => {
-    if (scope !== 'all' || catalog || catalogLoading) return;
+    if (scope !== 'all' || catalog) return;
     let cancelled = false;
     setCatalogLoading(true);
     setCatalogError(null);
@@ -54,8 +58,8 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
         'competition-catalog',
         { body: {} },
       );
-      if (cancelled) return;
       setCatalogLoading(false);
+      if (cancelled) return;
       if (error || data?.error || !Array.isArray(data?.workouts)) {
         setCatalogError('Could not load the workout catalog.');
         return;
@@ -63,7 +67,7 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
       setCatalog(normalizeCatalog(data.workouts));
     })();
     return () => { cancelled = true; };
-  }, [scope, catalog, catalogLoading]);
+  }, [scope, catalog]);
 
   const movements = useMemo(() => movementExposure(history), [history]);
   const filledIds = useMemo(() => new Set(Object.keys(history.byId)), [history]);
