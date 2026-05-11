@@ -581,7 +581,7 @@ async function processJob(
     // Failure-soft: any error returns null and the diagnostic flows through
     // with `competition: null` exactly as for unlinked athletes.
     const tier4Bundle = athleteLive?.competition_athlete_id
-      ? await fetchTier4Bundle(athleteLive.competition_athlete_id)
+      ? await fetchTier4Bundle(athleteLive.competition_athlete_id, { include: ["competency", "signature"] })
       : null;
     const diagnostic = deriveAthleteDiagnostic(profile, {
       tier4: { bundle: tier4Bundle },

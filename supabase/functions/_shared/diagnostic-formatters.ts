@@ -266,6 +266,28 @@ export function formatSkillsFindings(d: AthleteDiagnostic): string {
  * Conservative v1 surface: identity + tier + summary + recent evidence.
  * No flag interpretation yet — descriptive only.
  */
+// Human-readable labels for the stimulus-bucket keys the competition service
+// uses in closable_gaps (`M_dominant`, `gated_present`, etc.).
+const COMPETITION_BUCKET_LABEL: Record<string, string> = {
+  M_dominant: "monostructural-dominant workouts",
+  G_dominant: "gymnastics-dominant workouts",
+  W_dominant: "weightlifting-dominant workouts",
+  O_dominant: "odd-object-dominant workouts",
+  mixed: "mixed-modality workouts",
+  gated_present: "workouts with gate-prone movements (muscle-ups, HSPU, rope climbs, etc.)",
+  gated_absent: "workouts without gate-prone movements",
+  bodyweight: "bodyweight-load workouts",
+  light: "light-load workouts",
+  moderate: "moderate-load workouts",
+  heavy: "heavy-load workouts",
+  short: "short time-domain workouts",
+  medium: "medium time-domain workouts",
+  long: "long time-domain workouts",
+};
+function humanizeCompetitionBucket(b: string): string {
+  return COMPETITION_BUCKET_LABEL[b] ?? b.replace(/_/g, " ");
+}
+
 export function formatCompetitionProfile(d: AthleteDiagnostic): string {
   if (!d.competition) return "";
 
@@ -320,6 +342,32 @@ export function formatCompetitionProfile(d: AthleteDiagnostic): string {
         : unique.slice(0, 4).join(" + ") + (unique.length > 4 ? " + ..." : "");
       const td = r.time_domain ? `${r.time_domain} time` : "no time domain";
       lines.push(`  ${r.workout_label} — ${r.percentile.toFixed(1)}pct (rank ${r.rank}, ${r.raw_score} ${r.scoring_unit}, ${td}): ${moves}`);
+    }
+  }
+
+  // Movement competency — what the linked history implies about gate-prone
+  // movements. Weigh "likely lacking" against an over-optimistic self-report.
+  if (c.movement_competency.length > 0) {
+    const has = c.movement_competency.filter((m) => m.gap_signal === "likely_has").map((m) => m.movement);
+    const lacks = c.movement_competency.filter((m) => m.gap_signal === "likely_lacking").map((m) => m.movement);
+    const unclear = c.movement_competency
+      .filter((m) => m.gap_signal !== "likely_has" && m.gap_signal !== "likely_lacking")
+      .map((m) => m.movement);
+    lines.push("");
+    lines.push("Movement competency (inferred from competition appearances):");
+    if (has.length > 0) lines.push(`  Likely has: ${has.join(", ")}`);
+    if (lacks.length > 0) lines.push(`  Likely lacking: ${lacks.join(", ")} — treat as a real gate gap even if self-reported otherwise.`);
+    if (unclear.length > 0) lines.push(`  Inconclusive (insufficient competition evidence): ${unclear.join(", ")}`);
+  }
+
+  // Closable gaps — buckets where the athlete lags their OWN overall percentile.
+  if (c.closable_gaps.length > 0) {
+    lines.push("");
+    lines.push("Relative weaknesses — lags their own overall; prioritise these:");
+    for (const g of c.closable_gaps) {
+      lines.push(
+        `  ${humanizeCompetitionBucket(g.bucket)}: ${g.cohort_percentile.toFixed(1)}pct, ${g.gap_vs_overall_pp.toFixed(1)}pp below overall (n=${g.n_workouts})`,
+      );
     }
   }
 

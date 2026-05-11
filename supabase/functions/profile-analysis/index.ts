@@ -229,7 +229,7 @@ async function runAnalysis(
     // Failure-soft: any error path returns null and the diagnostic flows
     // through with `competition: null` exactly as for unlinked athletes.
     const tier4Bundle = profileData.competition_athlete_id
-      ? await fetchTier4Bundle(profileData.competition_athlete_id)
+      ? await fetchTier4Bundle(profileData.competition_athlete_id, { include: ["competency", "signature"] })
       : null;
     const diagnostic = deriveAthleteDiagnostic(profileData, {
       tier4: { bundle: tier4Bundle },

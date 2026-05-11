@@ -176,6 +176,24 @@ export interface CompetitionRecentEvidence {
   movements: string[];
 }
 
+export interface CompetitionMovementCompetency {
+  movement: string;
+  /** "likely_has" | "likely_lacking" | "inconclusive" | "thin_evidence" — "no_data" entries are filtered out before reaching here. */
+  gap_signal: string;
+  n_workouts: number;
+}
+
+export interface CompetitionClosableGap {
+  /** "load_class" | "modality" | "time_domain" | "skill_gated" */
+  dimension: string;
+  bucket: string;
+  cohort_percentile: number;
+  worldwide_percentile: number;
+  n_workouts: number;
+  /** Percentage points below the athlete's own overall percentile. */
+  gap_vs_overall_pp: number;
+}
+
 export interface CompetitionDiagnostic {
   /** Identity captured at link time (echoed for prompt convenience). */
   identity: {
@@ -198,6 +216,18 @@ export interface CompetitionDiagnostic {
   competitor_bonus_active: boolean;
   /** Curated trim of recent_raw_results for prose grounding (top-by-percentile, capped at 5). */
   recent_evidence: CompetitionRecentEvidence[];
+  /**
+   * Gate-prone-movement competency proxies from competition data (`?include=competency`),
+   * filtered to entries with a real read (no "no_data"). Empty when not fetched / no signal.
+   * v1: surfaced in the prompt only — does NOT yet override the deterministic prerequisite_gap logic.
+   */
+  movement_competency: CompetitionMovementCompetency[];
+  /**
+   * Buckets where the athlete lags their OWN overall percentile (`?include=signature`),
+   * biggest gap first, filtered to meaningful gaps (>= 2pp), top 3. Empty when not fetched.
+   * "What to prioritise" signal for program-gen / eval.
+   */
+  closable_gaps: CompetitionClosableGap[];
 }
 
 // ============================================================
@@ -752,6 +782,28 @@ function curateRecentEvidence(bundle: Tier4Bundle): CompetitionRecentEvidence[] 
  * flag firing yet — flags require cohort-bias handling we haven't
  * validated end-to-end.
  */
+/** Pass-through of movement-competency reads, dropping the "no_data" noise. */
+function curateMovementCompetency(bundle: Tier4Bundle): CompetitionMovementCompetency[] {
+  return (bundle.movement_competency ?? [])
+    .filter((c) => c.gap_signal && c.gap_signal !== "no_data")
+    .map((c) => ({ movement: c.movement, gap_signal: c.gap_signal, n_workouts: c.n_workouts }));
+}
+
+/** Top-3 buckets where the athlete lags their own overall by >= 2pp (already sorted biggest-first upstream). */
+function curateClosableGaps(bundle: Tier4Bundle): CompetitionClosableGap[] {
+  return (bundle.fitness_signature?.closable_gaps ?? [])
+    .filter((g) => (g.gap_vs_overall_pp ?? 0) >= 2.0)
+    .slice(0, 3)
+    .map((g) => ({
+      dimension: g.dimension,
+      bucket: g.bucket,
+      cohort_percentile: g.cohort_percentile,
+      worldwide_percentile: g.worldwide_percentile,
+      n_workouts: g.n_workouts,
+      gap_vs_overall_pp: g.gap_vs_overall_pp,
+    }));
+}
+
 export function deriveCompetitionFindings(
   bundle: Tier4Bundle,
 ): CompetitionDiagnostic {
@@ -772,6 +824,8 @@ export function deriveCompetitionFindings(
     consistency: summary?.consistency ?? null,
     competitor_bonus_active: computeCompetitorBonusActive(bundle),
     recent_evidence: curateRecentEvidence(bundle),
+    movement_competency: curateMovementCompetency(bundle),
+    closable_gaps: curateClosableGaps(bundle),
   };
 }
 

@@ -120,6 +120,51 @@ export interface Tier4AllResultsEntry {
   };
 }
 
+// ---- movement_competency (opt-in via ?include=competency, bundle 1.4.0) ----
+
+export interface Tier4MovementCompetency {
+  movement: string;
+  /** Proxy for whether the athlete can do this gate-prone movement. */
+  gap_signal: "likely_has" | "likely_lacking" | "inconclusive" | "thin_evidence" | "no_data" | string;
+  n_workouts: number;
+}
+
+// ---- fitness_signature (opt-in via ?include=signature, bundle 1.5.0) ----
+
+export interface Tier4SignatureBucket {
+  n_workouts: number;
+  cohort_percentile: number;
+  worldwide_percentile: number;
+}
+
+export interface Tier4ClosableGap {
+  dimension: "load_class" | "modality" | "time_domain" | "skill_gated" | string;
+  bucket: string;
+  n_workouts: number;
+  cohort_percentile: number;
+  worldwide_percentile: number;
+  /** How far below the athlete's own overall this bucket sits (percentage points). */
+  gap_vs_overall_pp: number;
+}
+
+export interface Tier4StageProgressionEntry {
+  season: number;
+  highest_stage_reached: "open" | "quarterfinals" | "semifinals" | "regional" | "games" | string;
+  season_cohort_percentile: number;
+}
+
+export interface Tier4FitnessSignature {
+  closable_gaps: Tier4ClosableGap[];                 // biggest gap first
+  stage_progression: Tier4StageProgressionEntry[];
+  stimulus_breakdown: {
+    overall: { all: Tier4SignatureBucket };
+    modality: Record<string, Tier4SignatureBucket>;
+    load_class: Record<string, Tier4SignatureBucket>;
+    skill_gated: Record<string, Tier4SignatureBucket>;
+    time_domain: Record<string, Tier4SignatureBucket>;
+  };
+}
+
 export interface Tier4Bundle {
   identity: Tier4Identity;
   movement_affinity: Tier4MovementAffinityEntry[];
@@ -132,6 +177,10 @@ export interface Tier4Bundle {
   >;
   // Present only when requested via ?include=all_results.
   all_results?: Tier4AllResultsEntry[];
+  // Present only when requested via ?include=competency.
+  movement_competency?: Tier4MovementCompetency[];
+  // Present only when requested via ?include=signature.
+  fitness_signature?: Tier4FitnessSignature;
 }
 
 /**
