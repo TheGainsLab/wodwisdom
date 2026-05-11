@@ -21,6 +21,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import type { AllResultsEntry } from '../lib/competitionHistory';
 
 interface BundleIdentity {
   name: string;
@@ -49,12 +50,19 @@ interface BundleRecentResult {
   time_domain: 'short' | 'medium' | 'long' | null;
   scoring_unit: 'time' | 'reps' | 'load_lbs' | 'distance';
   workout_label: string;
+  // Added in profile bundle 1.3.0 (additive).
+  competition_workout_id?: string;
+  worldwide_percentile?: number;
+  cohort_n?: number;
+  worldwide_n?: number;
 }
 
 interface Tier4Bundle {
   identity: BundleIdentity;
   competition_summary: BundleSummary;
   recent_raw_results: BundleRecentResult[];
+  // Present only when fetched with include:['all_results'] (bundle 1.3.0).
+  all_results?: AllResultsEntry[];
 }
 
 interface SearchResult {
@@ -184,7 +192,7 @@ export default function CompetitionHistorySection({
     (async () => {
       const { data, error } = await supabase.functions.invoke<{ bundle: Tier4Bundle; error?: string }>(
         'verify-competition-athlete',
-        { body: { competition_athlete_id: linkedId } },
+        { body: { competition_athlete_id: linkedId, include: ['all_results'] } },
       );
       if (cancelled) return;
       setBundleLoading(false);
@@ -213,7 +221,7 @@ export default function CompetitionHistorySection({
 
     const { data, error } = await supabase.functions.invoke<{ bundle: Tier4Bundle; error?: string }>(
       'verify-competition-athlete',
-      { body: { competition_athlete_id: trimmed } },
+      { body: { competition_athlete_id: trimmed, include: ['all_results'] } },
     );
     setVerifying(false);
 

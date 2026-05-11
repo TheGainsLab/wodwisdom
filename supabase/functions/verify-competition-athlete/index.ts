@@ -68,7 +68,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    const bundle = await fetchTier4Bundle(competitionAthleteId);
+    // Optional ?include= passthrough — e.g. body.include = ["all_results"] for
+    // the rich Linked-state render; omitted for the lightweight verify step.
+    const include = Array.isArray(body?.include)
+      ? body.include.filter((s: unknown): s is string => typeof s === "string" && s.length > 0)
+      : undefined;
+    const since = typeof body?.since === "number" && Number.isFinite(body.since)
+      ? body.since
+      : undefined;
+
+    const bundle = await fetchTier4Bundle(competitionAthleteId, { include, since });
     if (!bundle) {
       // fetchTier4Bundle is failure-soft and collapses 404 / network /
       // malformed-response into null. v1 surfaces a single NOT_FOUND code
