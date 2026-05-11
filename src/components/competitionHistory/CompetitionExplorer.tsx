@@ -1,21 +1,27 @@
 /**
  * CompetitionExplorer — the interactive layer over the competition map:
- * a filter bar (movement / time domain / year), a "your movements" panel
- * (each movement clickable to filter), the filtered grid, and the
- * workout-detail modal. Self-contained so it can later be lifted to a
- * dedicated /competition-history route.
+ * a scope toggle ("your workouts" vs "all competition workouts"), a filter
+ * bar (movement / time domain / year), a "your movements" panel, the
+ * (filtered) grid, and the detail modals. Self-contained so it can later
+ * be lifted to a dedicated /competition-history route.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { supabase } from '../../lib/supabase';
 import type {
   NormalizedCompetitionHistory,
   CompetitionWorkoutEntry,
+  NormalizedCatalog,
+  CatalogWorkoutSummary,
 } from '../../lib/competitionHistory';
-import { movementExposure } from '../../lib/competitionHistory';
+import { movementExposure, normalizeCatalog } from '../../lib/competitionHistory';
 import CompetitionGrid from './CompetitionGrid';
+import CompetitionMap from './CompetitionMap';
 import WorkoutDetail from './WorkoutDetail';
+import CatalogWorkoutCard from './CatalogWorkoutCard';
 
 type TimeDomain = 'short' | 'mid' | 'long';
+type Scope = 'mine' | 'all';
 
 interface Filter {
   movement?: string;
@@ -26,11 +32,41 @@ interface Filter {
 const TIME_DOMAINS: TimeDomain[] = ['short', 'mid', 'long'];
 
 export default function CompetitionExplorer({ history }: { history: NormalizedCompetitionHistory }) {
+  const [scope, setScope] = useState<Scope>('mine');
   const [filter, setFilter] = useState<Filter>({});
   const [selectedWorkout, setSelectedWorkout] = useState<CompetitionWorkoutEntry | null>(null);
+  const [selectedCatalogWorkout, setSelectedCatalogWorkout] = useState<CatalogWorkoutSummary | null>(null);
   const [showAllMovements, setShowAllMovements] = useState(false);
 
+  // Catalog (the full list of competition workouts) — fetched lazily the
+  // first time the "all" scope is opened; cached for the component's life.
+  const [catalog, setCatalog] = useState<NormalizedCatalog | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (scope !== 'all' || catalog || catalogLoading) return;
+    let cancelled = false;
+    setCatalogLoading(true);
+    setCatalogError(null);
+    (async () => {
+      const { data, error } = await supabase.functions.invoke<{ workouts?: CatalogWorkoutSummary[]; error?: string }>(
+        'competition-catalog',
+        { body: {} },
+      );
+      if (cancelled) return;
+      setCatalogLoading(false);
+      if (error || data?.error || !Array.isArray(data?.workouts)) {
+        setCatalogError('Could not load the workout catalog.');
+        return;
+      }
+      setCatalog(normalizeCatalog(data.workouts));
+    })();
+    return () => { cancelled = true; };
+  }, [scope, catalog, catalogLoading]);
+
   const movements = useMemo(() => movementExposure(history), [history]);
+  const filledIds = useMemo(() => new Set(Object.keys(history.byId)), [history]);
 
   const isFiltered = !!(filter.movement || filter.timeDomain || filter.year != null);
 
@@ -44,6 +80,16 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
     };
   }, [isFiltered, filter.year, filter.timeDomain, filter.movement]);
 
+  const matchWorkout = useMemo(() => {
+    if (!isFiltered) return undefined;
+    return (w: CatalogWorkoutSummary): boolean => {
+      if (filter.year != null && w.season !== filter.year) return false;
+      if (filter.timeDomain && w.time_domain?.bucket !== filter.timeDomain) return false;
+      if (filter.movement && !w.movements.includes(filter.movement)) return false;
+      return true;
+    };
+  }, [isFiltered, filter.year, filter.timeDomain, filter.movement]);
+
   const matchedCount = useMemo(() => {
     if (!matchEntry) return history.total;
     let n = 0;
@@ -53,8 +99,32 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
 
   const visibleMovements = showAllMovements ? movements : movements.slice(0, 12);
 
+  const scopeBtn = (s: Scope, label: string) => {
+    const active = scope === s;
+    return (
+      <button
+        type="button"
+        onClick={() => setScope(s)}
+        style={{
+          padding: '6px 12px', fontSize: 12, borderRadius: 6,
+          border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+          background: active ? 'var(--accent)' : 'var(--surface2)',
+          color: active ? '#fff' : 'var(--text)', cursor: 'pointer', fontFamily: 'inherit',
+        }}
+      >
+        {label}
+      </button>
+    );
+  };
+
   return (
     <div>
+      {/* Scope toggle */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        {scopeBtn('mine', 'Your workouts')}
+        {scopeBtn('all', 'All competition workouts')}
+      </div>
+
       {/* Filter bar */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
         <select
@@ -65,9 +135,7 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
         >
           <option value="">All movements</option>
           {movements.map((m) => (
-            <option key={m.name} value={m.name}>
-              {m.name} ({m.workoutCount})
-            </option>
+            <option key={m.name} value={m.name}>{m.name} ({m.workoutCount})</option>
           ))}
         </select>
 
@@ -80,14 +148,10 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
                 type="button"
                 onClick={() => setFilter((f) => ({ ...f, timeDomain: td || undefined }))}
                 style={{
-                  padding: '6px 10px',
-                  fontSize: 12,
-                  borderRadius: 6,
+                  padding: '6px 10px', fontSize: 12, borderRadius: 6,
                   border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
                   background: active ? 'var(--accent)' : 'var(--surface2)',
-                  color: active ? '#fff' : 'var(--text)',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
+                  color: active ? '#fff' : 'var(--text)', cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
                 {td === '' ? 'Any time' : td}
@@ -103,10 +167,11 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
           style={{ flex: '0 0 auto' }}
         >
           <option value="">All years</option>
-          {history.yearsCompeted.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
+          {(scope === 'all' && catalog
+            ? catalog.seasons.map((s) => s.season)
+            : history.yearsCompeted
+          ).map((y) => (
+            <option key={y} value={y}>{y}</option>
           ))}
         </select>
 
@@ -115,23 +180,20 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
             type="button"
             onClick={() => setFilter({})}
             style={{
-              padding: '6px 10px',
-              fontSize: 12,
-              borderRadius: 6,
-              border: '1px solid var(--border)',
-              background: 'none',
-              color: 'var(--text-dim)',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
+              padding: '6px 10px', fontSize: 12, borderRadius: 6,
+              border: '1px solid var(--border)', background: 'none',
+              color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit',
             }}
           >
             Clear
           </button>
         )}
 
-        <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 'auto' }}>
-          {isFiltered ? `showing ${matchedCount} of ${history.total}` : `${history.total} workouts`}
-        </span>
+        {scope === 'mine' && (
+          <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 'auto' }}>
+            {isFiltered ? `showing ${matchedCount} of ${history.total}` : `${history.total} workouts`}
+          </span>
+        )}
       </div>
 
       {/* Your movements */}
@@ -149,14 +211,10 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
                   type="button"
                   onClick={() => setFilter((f) => ({ ...f, movement: active ? undefined : m.name }))}
                   style={{
-                    fontSize: 12,
-                    padding: '3px 9px',
-                    borderRadius: 999,
+                    fontSize: 12, padding: '3px 9px', borderRadius: 999,
                     border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
                     background: active ? 'var(--accent)' : 'var(--surface2)',
-                    color: active ? '#fff' : 'var(--text)',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
+                    color: active ? '#fff' : 'var(--text)', cursor: 'pointer', fontFamily: 'inherit',
                   }}
                 >
                   {m.name} <span style={{ opacity: 0.7 }}>· {m.workoutCount}</span>
@@ -168,14 +226,9 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
                 type="button"
                 onClick={() => setShowAllMovements((v) => !v)}
                 style={{
-                  fontSize: 12,
-                  padding: '3px 9px',
-                  borderRadius: 999,
-                  border: '1px solid var(--border)',
-                  background: 'none',
-                  color: 'var(--text-dim)',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
+                  fontSize: 12, padding: '3px 9px', borderRadius: 999,
+                  border: '1px solid var(--border)', background: 'none',
+                  color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
                 {showAllMovements ? 'show fewer' : `+${movements.length - 12} more`}
@@ -185,11 +238,28 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
         </div>
       )}
 
-      {/* The map */}
-      <CompetitionGrid history={history} onSelectWorkout={setSelectedWorkout} matchEntry={matchEntry} />
+      {/* The grid / map */}
+      {scope === 'mine' ? (
+        <CompetitionGrid history={history} onSelectWorkout={setSelectedWorkout} matchEntry={matchEntry} />
+      ) : catalogLoading ? (
+        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Loading the workout catalog…</div>
+      ) : catalogError ? (
+        <div style={{ fontSize: 13, color: 'var(--danger, #d33)' }}>{catalogError}</div>
+      ) : catalog ? (
+        <CompetitionMap
+          catalog={catalog}
+          filledIds={filledIds}
+          onSelectFilled={(id) => { const e = history.byId[id]; if (e) setSelectedWorkout(e); }}
+          onSelectUnfilled={setSelectedCatalogWorkout}
+          matchWorkout={matchWorkout}
+        />
+      ) : null}
 
       {selectedWorkout && (
         <WorkoutDetail entry={selectedWorkout} onClose={() => setSelectedWorkout(null)} />
+      )}
+      {selectedCatalogWorkout && (
+        <CatalogWorkoutCard workout={selectedCatalogWorkout} onClose={() => setSelectedCatalogWorkout(null)} />
       )}
     </div>
   );

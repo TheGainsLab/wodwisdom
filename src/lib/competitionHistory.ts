@@ -174,6 +174,79 @@ export function normalizeCompetitionHistory(
   };
 }
 
+// ============================================================
+// Catalog (every competition workout) — for the "All"-scope grid
+// ============================================================
+
+/** A row from GET /workouts (the catalog list endpoint). Lighter than an
+ *  AllResultsEntry — movement names only, no `result`. */
+export interface CatalogWorkoutSummary {
+  competition_workout_id: string;
+  season: number;
+  stage: CompetitionStage;
+  ordinal: number | null;
+  workout_name: string;
+  scaled_tier: string;
+  movements: string[];
+  time_domain: { bucket: string; seconds: number | null } | null;
+  scoring: {
+    scoring_unit: ScoringUnit;
+    scoring_direction: 'lower_is_better' | 'higher_is_better';
+    is_dual_scoring: boolean;
+    time_cap_seconds: number | null;
+  } | null;
+  field_size: number | null;
+}
+
+export interface CatalogStageGroup {
+  stage: CompetitionStage;
+  workouts: CatalogWorkoutSummary[]; // ordinal asc; named (null ordinal) last
+}
+export interface CatalogSeasonGroup {
+  season: number;
+  stages: CatalogStageGroup[];       // competition order
+}
+export interface NormalizedCatalog {
+  seasons: CatalogSeasonGroup[];     // season desc
+  byId: Record<string, CatalogWorkoutSummary>;
+  total: number;
+}
+
+export function normalizeCatalog(
+  workouts: CatalogWorkoutSummary[] | undefined | null,
+): NormalizedCatalog {
+  const all = workouts ?? [];
+  const byId: Record<string, CatalogWorkoutSummary> = {};
+  for (const w of all) byId[w.competition_workout_id] = w;
+
+  const byYear = new Map<number, Map<string, CatalogWorkoutSummary[]>>();
+  for (const w of all) {
+    let stages = byYear.get(w.season);
+    if (!stages) { stages = new Map(); byYear.set(w.season, stages); }
+    let list = stages.get(w.stage);
+    if (!list) { list = []; stages.set(w.stage, list); }
+    list.push(w);
+  }
+
+  const cmp = (a: CatalogWorkoutSummary, b: CatalogWorkoutSummary): number => {
+    if (a.ordinal != null && b.ordinal != null) return a.ordinal - b.ordinal;
+    if (a.ordinal != null) return -1;
+    if (b.ordinal != null) return 1;
+    return a.workout_name.localeCompare(b.workout_name);
+  };
+
+  const seasons: CatalogSeasonGroup[] = Array.from(byYear.entries())
+    .sort(([a], [b]) => b - a)
+    .map(([season, stages]) => ({
+      season,
+      stages: Array.from(stages.entries())
+        .sort(([a], [b]) => stageRank(a) - stageRank(b))
+        .map(([stage, list]) => ({ stage, workouts: list.slice().sort(cmp) })),
+    }));
+
+  return { seasons, byId, total: all.length };
+}
+
 /**
  * Flatten the unique movements across all of the athlete's results, with how
  * many of their workouts each appeared in. Newest-first ordering is preserved
