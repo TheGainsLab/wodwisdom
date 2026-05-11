@@ -21,10 +21,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import type { AllResultsEntry, CompetitionWorkoutEntry } from '../lib/competitionHistory';
+import type { AllResultsEntry } from '../lib/competitionHistory';
 import { normalizeCompetitionHistory } from '../lib/competitionHistory';
-import CompetitionGrid from './competitionHistory/CompetitionGrid';
-import WorkoutDetail from './competitionHistory/WorkoutDetail';
+import CompetitionExplorer from './competitionHistory/CompetitionExplorer';
 
 interface BundleIdentity {
   name: string;
@@ -181,7 +180,6 @@ export default function CompetitionHistorySection({
   const [linkedBundle, setLinkedBundle] = useState<Tier4Bundle | null>(null);
   const [bundleLoading, setBundleLoading] = useState(false);
   const [bundleError, setBundleError] = useState<string | null>(null);
-  const [selectedWorkout, setSelectedWorkout] = useState<CompetitionWorkoutEntry | null>(null);
 
   const competitionHistory = useMemo(
     () => normalizeCompetitionHistory(linkedBundle?.all_results),
@@ -342,7 +340,6 @@ export default function CompetitionHistorySection({
     setLinkedId(null);
     setLinkedLabel(null);
     setLinkedBundle(null);
-    setSelectedWorkout(null);
     setPasteId('');
     setSearchQuery('');
     setSearchResults([]);
@@ -606,11 +603,8 @@ export default function CompetitionHistorySection({
 
                   {linkedBundle.all_results && linkedBundle.all_results.length > 0 ? (
                     <div style={{ marginBottom: 16 }}>
-                      <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
-                        Competition map{' '}
-                        <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>· {competitionHistory.total} workouts</span>
-                      </h3>
-                      <CompetitionGrid history={competitionHistory} onSelectWorkout={setSelectedWorkout} />
+                      <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Competition map</h3>
+                      <CompetitionExplorer history={competitionHistory} />
                     </div>
                   ) : linkedBundle.recent_raw_results.length > 0 ? (
                     <div style={{ marginBottom: 16 }}>
@@ -653,10 +647,6 @@ export default function CompetitionHistorySection({
                   <div style={{ marginTop: 8, fontSize: 13, color: 'var(--danger, #d33)' }}>{saveError}</div>
                 )}
               </div>
-
-              {selectedWorkout && (
-                <WorkoutDetail entry={selectedWorkout} onClose={() => setSelectedWorkout(null)} />
-              )}
             </div>
           )}
         </div>

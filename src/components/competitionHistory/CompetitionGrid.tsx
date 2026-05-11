@@ -62,9 +62,12 @@ function Cell({ entry, onClick }: { entry: CompetitionWorkoutEntry; onClick: () 
 export default function CompetitionGrid({
   history,
   onSelectWorkout,
+  matchEntry,
 }: {
   history: NormalizedCompetitionHistory;
   onSelectWorkout: (entry: CompetitionWorkoutEntry) => void;
+  /** When provided, only entries that pass are rendered; empty stages/seasons are dropped. */
+  matchEntry?: (entry: CompetitionWorkoutEntry) => boolean;
 }) {
   if (history.total === 0) {
     return (
@@ -74,9 +77,24 @@ export default function CompetitionGrid({
     );
   }
 
+  const seasons = matchEntry
+    ? history.seasons
+        .map((season) => ({
+          ...season,
+          stages: season.stages
+            .map((stage) => ({ ...stage, entries: stage.entries.filter(matchEntry) }))
+            .filter((stage) => stage.entries.length > 0),
+        }))
+        .filter((season) => season.stages.length > 0)
+    : history.seasons;
+
+  if (seasons.length === 0) {
+    return <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>No workouts match that filter.</div>;
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {history.seasons.map((season) => (
+      {seasons.map((season) => (
         <div key={season.year}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>
             {season.year}
