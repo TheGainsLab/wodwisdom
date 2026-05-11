@@ -87,6 +87,7 @@ const PLACEHOLDER_PHOTO_SUFFIX = '/athlete-avatar.jpg';
 
 interface Props {
   userId: string;
+  userAge: number | null;
   initialLinkedId: string | null;
   initialLinkedLabel: string | null;
   initialLinkedPhotoUrl: string | null;
@@ -154,6 +155,7 @@ function Avatar({ name, photoUrl }: { name: string; photoUrl: string | null }) {
 
 export default function CompetitionHistorySection({
   userId,
+  userAge,
   initialLinkedId,
   initialLinkedLabel,
   initialLinkedPhotoUrl,
@@ -651,7 +653,7 @@ export default function CompetitionHistorySection({
                   {linkedBundle.all_results && linkedBundle.all_results.length > 0 ? (
                     <div style={{ marginBottom: 16 }}>
                       <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Competition map</h3>
-                      <CompetitionExplorer history={competitionHistory} userId={userId} />
+                      <CompetitionExplorer history={competitionHistory} userId={userId} userAge={userAge} />
                     </div>
                   ) : linkedBundle.recent_raw_results.length > 0 ? (
                     <div style={{ marginBottom: 16 }}>

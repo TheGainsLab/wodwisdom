@@ -1567,6 +1567,7 @@ export default function AthletePage({ session }: { session: Session }) {
                 {isAdmin && (
                   <CompetitionHistorySection
                     userId={session.user.id}
+                    userAge={age === '' ? null : (parseInt(age, 10) || null)}
                     initialLinkedId={initialCompetitionAthleteId}
                     initialLinkedLabel={initialCompetitionAthleteLabel}
                     initialLinkedPhotoUrl={initialCompetitionAthletePhotoUrl}

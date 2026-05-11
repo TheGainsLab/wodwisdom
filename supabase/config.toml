@@ -162,3 +162,6 @@ verify_jwt = false
 
 [functions.competition-catalog]
 verify_jwt = false
+
+[functions.competition-placement]
+verify_jwt = false

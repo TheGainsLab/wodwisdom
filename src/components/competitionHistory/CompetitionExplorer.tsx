@@ -14,7 +14,7 @@ import type {
   NormalizedCatalog,
   CatalogWorkoutSummary,
 } from '../../lib/competitionHistory';
-import { movementExposure, normalizeCatalog } from '../../lib/competitionHistory';
+import { movementExposure, normalizeCatalog, ageBandFor } from '../../lib/competitionHistory';
 import CompetitionGrid from './CompetitionGrid';
 import CompetitionMap from './CompetitionMap';
 import WorkoutDetail from './WorkoutDetail';
@@ -40,10 +40,13 @@ const TIME_DOMAINS: TimeDomain[] = ['short', 'mid', 'long'];
 export default function CompetitionExplorer({
   history,
   userId,
+  userAge,
 }: {
   history: NormalizedCompetitionHistory;
   userId: string;
+  userAge: number | null;
 }) {
+  const ageBand = ageBandFor(userAge);
   const [scope, setScope] = useState<Scope>('mine');
   const [filter, setFilter] = useState<Filter>({});
   const [selectedWorkout, setSelectedWorkout] = useState<CompetitionWorkoutEntry | null>(null);
@@ -344,7 +347,7 @@ export default function CompetitionExplorer({
         />
       )}
       {logTarget && (
-        <LogResultForm workout={logTarget} userId={userId} onLogged={onLogged} onClose={() => setLogTarget(null)} />
+        <LogResultForm workout={logTarget} userId={userId} ageBand={ageBand} onLogged={onLogged} onClose={() => setLogTarget(null)} />
       )}
     </div>
   );

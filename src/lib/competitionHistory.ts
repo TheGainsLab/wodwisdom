@@ -175,6 +175,35 @@ export function normalizeCompetitionHistory(
 }
 
 // ============================================================
+// Placement (POST /workouts/{id}/placement) — "where you'd have landed"
+// ============================================================
+
+export interface PlacementResult {
+  field_size: number;
+  worldwide_percentile: number;
+  worldwide_rank: number;
+  cohort?: {
+    age_band: string;
+    cohort_size: number;
+    cohort_percentile?: number;
+    cohort_rank?: number;
+    note?: string;
+  };
+}
+
+/** The competition-service's 7 age buckets, from an age in years. null if unknown. */
+export function ageBandFor(age: number | null | undefined): string | undefined {
+  if (age == null || !Number.isFinite(age) || age <= 0) return undefined;
+  if (age < 18) return 'under_18';
+  if (age <= 34) return 'open_18_34';
+  if (age <= 39) return 'masters_35_39';
+  if (age <= 44) return 'masters_40_44';
+  if (age <= 49) return 'masters_45_49';
+  if (age <= 54) return 'masters_50_54';
+  return 'masters_55_plus';
+}
+
+// ============================================================
 // Catalog (every competition workout) — for the "All"-scope grid
 // ============================================================
 
