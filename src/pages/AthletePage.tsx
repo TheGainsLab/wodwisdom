@@ -458,6 +458,8 @@ export default function AthletePage({ session }: { session: Session }) {
   // Tier 4 — competition history linkage (Phase B v1, admin only)
   const [initialCompetitionAthleteId, setInitialCompetitionAthleteId] = useState<string | null>(null);
   const [initialCompetitionAthleteLabel, setInitialCompetitionAthleteLabel] = useState<string | null>(null);
+  const [initialCompetitionAthletePhotoUrl, setInitialCompetitionAthletePhotoUrl] = useState<string | null>(null);
+  const [initialCompetitionAthleteBestFinish, setInitialCompetitionAthleteBestFinish] = useState<string | null>(null);
 
   const fetchEvaluations = async () => {
     const [profileRes, trainingRes, nutritionRes] = await Promise.all([
@@ -500,7 +502,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, self_perception_level, eval_credits_remaining, competition_athlete_id, competition_athlete_label')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, self_perception_level, eval_credits_remaining, competition_athlete_id, competition_athlete_label, competition_athlete_photo_url, competition_athlete_best_finish')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -550,6 +552,8 @@ export default function AthletePage({ session }: { session: Session }) {
         setEvalCreditsRemaining(typeof d.eval_credits_remaining === 'number' ? d.eval_credits_remaining : 1);
         setInitialCompetitionAthleteId((d as any).competition_athlete_id ?? null);
         setInitialCompetitionAthleteLabel((d as any).competition_athlete_label ?? null);
+        setInitialCompetitionAthletePhotoUrl((d as any).competition_athlete_photo_url ?? null);
+        setInitialCompetitionAthleteBestFinish((d as any).competition_athlete_best_finish ?? null);
         setIsDirty(false);
       }
       if (evalRes.data) {
@@ -1565,6 +1569,8 @@ export default function AthletePage({ session }: { session: Session }) {
                     userId={session.user.id}
                     initialLinkedId={initialCompetitionAthleteId}
                     initialLinkedLabel={initialCompetitionAthleteLabel}
+                    initialLinkedPhotoUrl={initialCompetitionAthletePhotoUrl}
+                    initialLinkedBestFinish={initialCompetitionAthleteBestFinish}
                   />
                 )}
               </>

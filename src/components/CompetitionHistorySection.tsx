@@ -89,6 +89,8 @@ interface Props {
   userId: string;
   initialLinkedId: string | null;
   initialLinkedLabel: string | null;
+  initialLinkedPhotoUrl: string | null;
+  initialLinkedBestFinish: string | null;
 }
 
 type Mode = 'unlinked' | 'pending-confirm' | 'linked';
@@ -154,11 +156,15 @@ export default function CompetitionHistorySection({
   userId,
   initialLinkedId,
   initialLinkedLabel,
+  initialLinkedPhotoUrl,
+  initialLinkedBestFinish,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<Mode>(initialLinkedId ? 'linked' : 'unlinked');
   const [linkedId, setLinkedId] = useState<string | null>(initialLinkedId);
   const [linkedLabel, setLinkedLabel] = useState<string | null>(initialLinkedLabel);
+  const [linkedPhotoUrl, setLinkedPhotoUrl] = useState<string | null>(initialLinkedPhotoUrl);
+  const [linkedBestFinish, setLinkedBestFinish] = useState<string | null>(initialLinkedBestFinish);
 
   // Search flow (Phase C — unlinked mode)
   const [searchQuery, setSearchQuery] = useState('');
@@ -172,6 +178,9 @@ export default function CompetitionHistorySection({
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [pendingBundle, setPendingBundle] = useState<Tier4Bundle | null>(null);
+  // The search result the user picked (carries photo_url + best_finish, which
+  // the bundle doesn't); null on the paste-ID path.
+  const [pendingSearchResult, setPendingSearchResult] = useState<SearchResult | null>(null);
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -222,6 +231,7 @@ export default function CompetitionHistorySection({
       setVerifyError('Enter a competitor ID.');
       return;
     }
+    if (!idOverride) setPendingSearchResult(null); // paste-ID path: no search result
     setVerifying(true);
     setVerifyError(null);
     setPendingBundle(null);
@@ -269,13 +279,15 @@ export default function CompetitionHistorySection({
     setSearchResults(results);
   };
 
-  const onSelectResult = (competitorId: string) => {
+  const onSelectResult = (result: SearchResult) => {
     setSearchError(null);
-    onVerify(competitorId);
+    setPendingSearchResult(result);
+    onVerify(result.competitor_id);
   };
 
   const onCancelPending = () => {
     setPendingBundle(null);
+    setPendingSearchResult(null);
     setConfirmChecked(false);
     setMode(linkedId ? 'linked' : 'unlinked');
   };
@@ -286,6 +298,8 @@ export default function CompetitionHistorySection({
     setSaveError(null);
     const id = pendingBundle.identity.competitor_id;
     const label = pendingBundle.identity.name;
+    const photoUrl = pendingSearchResult?.photo_url ?? null;
+    const bestFinish = pendingSearchResult?.best_finish ?? null;
     const { error } = await supabase
       .from('athlete_profiles')
       .upsert(
@@ -293,6 +307,8 @@ export default function CompetitionHistorySection({
           user_id: userId,
           competition_athlete_id: id,
           competition_athlete_label: label,
+          competition_athlete_photo_url: photoUrl,
+          competition_athlete_best_finish: bestFinish,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' },
@@ -304,8 +320,11 @@ export default function CompetitionHistorySection({
     }
     setLinkedId(id);
     setLinkedLabel(label);
+    setLinkedPhotoUrl(photoUrl);
+    setLinkedBestFinish(bestFinish);
     setLinkedBundle(pendingBundle);
     setPendingBundle(null);
+    setPendingSearchResult(null);
     setConfirmChecked(false);
     setPasteId('');
     setSearchQuery('');
@@ -328,6 +347,8 @@ export default function CompetitionHistorySection({
           user_id: userId,
           competition_athlete_id: null,
           competition_athlete_label: null,
+          competition_athlete_photo_url: null,
+          competition_athlete_best_finish: null,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' },
@@ -339,7 +360,10 @@ export default function CompetitionHistorySection({
     }
     setLinkedId(null);
     setLinkedLabel(null);
+    setLinkedPhotoUrl(null);
+    setLinkedBestFinish(null);
     setLinkedBundle(null);
+    setPendingSearchResult(null);
     setPasteId('');
     setSearchQuery('');
     setSearchResults([]);
@@ -438,7 +462,7 @@ export default function CompetitionHistorySection({
                       <button
                         key={r.competitor_id}
                         type="button"
-                        onClick={() => onSelectResult(r.competitor_id)}
+                        onClick={() => onSelectResult(r)}
                         disabled={verifying}
                         style={{
                           display: 'flex',
@@ -576,30 +600,53 @@ export default function CompetitionHistorySection({
               {bundleError && (
                 <div style={{ fontSize: 13, color: 'var(--danger, #d33)' }}>{bundleError}</div>
               )}
-              {linkedBundle && (
+              {linkedBundle && (() => {
+                const cs = linkedBundle.competition_summary;
+                const wins = Object.values(competitionHistory.byId)
+                  .filter((e) => e.result.workout_rank === 1)
+                  .sort((a, b) => b.year - a.year)
+                  .slice(0, 4);
+                return (
                 <>
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 16, fontWeight: 600 }}>{linkedBundle.identity.name}</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>
-                      {TIER_LABEL[linkedBundle.competition_summary.overall_competitive_tier]} ·{' '}
-                      {linkedBundle.competition_summary.seasons_competed} season{linkedBundle.competition_summary.seasons_competed === 1 ? '' : 's'} ·{' '}
-                      latest {linkedBundle.competition_summary.latest_percentile.toFixed(1)} pct
-                    </div>
-                    {linkedBundle.identity.profile_url && (
-                      <div style={{ fontSize: 12, marginTop: 6 }}>
-                        <a href={linkedBundle.identity.profile_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
-                          View profile on games.crossfit.com →
-                        </a>
+                  {/* Résumé card */}
+                  <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 16 }}>
+                    <Avatar name={linkedBundle.identity.name} photoUrl={linkedPhotoUrl} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 18, fontWeight: 700 }}>{linkedBundle.identity.name}</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>
+                        {TIER_LABEL[cs.overall_competitive_tier]} · {cs.seasons_competed} season{cs.seasons_competed === 1 ? '' : 's'}
+                        {linkedBestFinish ? ` · best: ${linkedBestFinish}` : ''}
                       </div>
-                    )}
+                      {linkedBundle.identity.profile_url && (
+                        <div style={{ fontSize: 12, marginTop: 6 }}>
+                          <a href={linkedBundle.identity.profile_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
+                            View profile on games.crossfit.com →
+                          </a>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', fontSize: 13, marginBottom: 16 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', fontSize: 13, marginBottom: wins.length > 0 ? 12 : 16 }}>
                     <div style={{ color: 'var(--text-dim)' }}>Trend</div>
-                    <div>{formatTrend(linkedBundle.competition_summary.trend)}</div>
+                    <div>{formatTrend(cs.trend)}</div>
                     <div style={{ color: 'var(--text-dim)' }}>Consistency</div>
-                    <div>{formatConsistency(linkedBundle.competition_summary.consistency)}</div>
+                    <div>{formatConsistency(cs.consistency)}</div>
+                    <div style={{ color: 'var(--text-dim)' }}>Latest season</div>
+                    <div>{cs.latest_percentile.toFixed(1)}th pct</div>
                   </div>
+
+                  {wins.length > 0 && (
+                    <div style={{ fontSize: 13, marginBottom: 16 }}>
+                      <span style={{ color: 'var(--text-dim)' }}>Wins · </span>
+                      {wins.map((e, i) => (
+                        <span key={e.competition_workout_id}>
+                          {i > 0 ? ' · ' : ''}
+                          {e.workout_name} <span style={{ color: 'var(--text-dim)' }}>({e.year})</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
                   {linkedBundle.all_results && linkedBundle.all_results.length > 0 ? (
                     <div style={{ marginBottom: 16 }}>
@@ -628,7 +675,8 @@ export default function CompetitionHistorySection({
                     </div>
                   ) : null}
                 </>
-              )}
+                );
+              })()}
 
               <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px dashed var(--border)' }}>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
