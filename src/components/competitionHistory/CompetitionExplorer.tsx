@@ -19,6 +19,12 @@ import CompetitionGrid from './CompetitionGrid';
 import CompetitionMap from './CompetitionMap';
 import WorkoutDetail from './WorkoutDetail';
 import CatalogWorkoutCard from './CatalogWorkoutCard';
+import LogResultForm from './LogResultForm';
+import type { LogResultWorkout } from './LogResultForm';
+
+const STAGE_LABEL: Record<string, string> = {
+  open: 'Open', quarterfinals: 'Quarterfinals', semifinals: 'Semifinals', regional: 'Regionals', games: 'Games',
+};
 
 type TimeDomain = 'short' | 'mid' | 'long';
 type Scope = 'mine' | 'all';
@@ -31,12 +37,47 @@ interface Filter {
 
 const TIME_DOMAINS: TimeDomain[] = ['short', 'mid', 'long'];
 
-export default function CompetitionExplorer({ history }: { history: NormalizedCompetitionHistory }) {
+export default function CompetitionExplorer({
+  history,
+  userId,
+}: {
+  history: NormalizedCompetitionHistory;
+  userId: string;
+}) {
   const [scope, setScope] = useState<Scope>('mine');
   const [filter, setFilter] = useState<Filter>({});
   const [selectedWorkout, setSelectedWorkout] = useState<CompetitionWorkoutEntry | null>(null);
   const [selectedCatalogWorkout, setSelectedCatalogWorkout] = useState<CatalogWorkoutSummary | null>(null);
   const [showAllMovements, setShowAllMovements] = useState(false);
+  // "Try it" — the workout being logged + ids logged this session (optimistic
+  // grid fill; full read-back of competition_workout_results on load is a
+  // follow-up, so for now a just-logged throwback shows green in the "All" map
+  // but not yet in the "Mine" grid).
+  const [logTarget, setLogTarget] = useState<LogResultWorkout | null>(null);
+  const [loggedIds, setLoggedIds] = useState<Set<string>>(new Set());
+
+  const openLogForEntry = (e: CompetitionWorkoutEntry) =>
+    setLogTarget({
+      competition_workout_id: e.competition_workout_id,
+      label: `${e.year} ${STAGE_LABEL[e.stage] ?? e.stage} ${e.workout_name}`,
+      scoring_unit: e.workout.scoring_unit,
+      is_dual_scoring: e.workout.is_dual_scoring,
+      time_cap_seconds: e.workout.time_cap_seconds,
+    });
+  const openLogForCatalog = (w: CatalogWorkoutSummary) =>
+    setLogTarget({
+      competition_workout_id: w.competition_workout_id,
+      label: `${w.season} ${STAGE_LABEL[w.stage] ?? w.stage} ${w.workout_name}`,
+      scoring_unit: w.scoring?.scoring_unit ?? 'time',
+      is_dual_scoring: w.scoring?.is_dual_scoring ?? false,
+      time_cap_seconds: w.scoring?.time_cap_seconds ?? null,
+    });
+  const onLogged = (id: string) => {
+    setLoggedIds((s) => { const n = new Set(s); n.add(id); return n; });
+    setLogTarget(null);
+    setSelectedCatalogWorkout(null);
+    setSelectedWorkout(null);
+  };
 
   // Catalog (the full list of competition workouts) — fetched lazily the
   // first time the "all" scope is opened; the raw rows are cached for the
@@ -48,6 +89,13 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
 
   const movements = useMemo(() => movementExposure(history), [history]);
   const filledIds = useMemo(() => new Set(Object.keys(history.byId)), [history]);
+  // Filled = real competition results (from the bundle) + throwbacks logged this session.
+  const effectiveFilledIds = useMemo(() => {
+    if (loggedIds.size === 0) return filledIds;
+    const s = new Set(filledIds);
+    for (const id of loggedIds) s.add(id);
+    return s;
+  }, [filledIds, loggedIds]);
   // The athlete's competition division (1 = Men, 2 = Women) — the mode of their
   // own results' division (constant in practice); used to filter the catalog.
   const athleteDivision = useMemo(() => {
@@ -270,18 +318,33 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
       ) : catalog ? (
         <CompetitionMap
           catalog={catalog}
-          filledIds={filledIds}
-          onSelectFilled={(id) => { const e = history.byId[id]; if (e) setSelectedWorkout(e); }}
+          filledIds={effectiveFilledIds}
+          onSelectFilled={(id) => {
+            const e = history.byId[id];
+            if (e) setSelectedWorkout(e);
+            else { const w = catalog.byId[id]; if (w) setSelectedCatalogWorkout(w); }  // a throwback we don't have full data for yet
+          }}
           onSelectUnfilled={setSelectedCatalogWorkout}
           matchWorkout={matchWorkout}
         />
       ) : null}
 
       {selectedWorkout && (
-        <WorkoutDetail entry={selectedWorkout} onClose={() => setSelectedWorkout(null)} />
+        <WorkoutDetail
+          entry={selectedWorkout}
+          onClose={() => setSelectedWorkout(null)}
+          onLogAgain={openLogForEntry}
+        />
       )}
       {selectedCatalogWorkout && (
-        <CatalogWorkoutCard workout={selectedCatalogWorkout} onClose={() => setSelectedCatalogWorkout(null)} />
+        <CatalogWorkoutCard
+          workout={selectedCatalogWorkout}
+          onClose={() => setSelectedCatalogWorkout(null)}
+          onTryIt={openLogForCatalog}
+        />
+      )}
+      {logTarget && (
+        <LogResultForm workout={logTarget} userId={userId} onLogged={onLogged} onClose={() => setLogTarget(null)} />
       )}
     </div>
   );

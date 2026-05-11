@@ -47,9 +47,11 @@ function nf(n: number): string {
 export default function WorkoutDetail({
   entry,
   onClose,
+  onLogAgain,
 }: {
   entry: CompetitionWorkoutEntry;
   onClose: () => void;
+  onLogAgain?: (entry: CompetitionWorkoutEntry) => void;
 }) {
   const w = entry.workout;
   const r = entry.result;
@@ -190,6 +192,19 @@ export default function WorkoutDetail({
             </div>
           </div>
         </div>
+
+        {onLogAgain && (
+          <div style={{ marginTop: 16 }}>
+            <button
+              type="button"
+              className="auth-btn"
+              style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface2)', color: 'var(--text)', fontFamily: 'inherit' }}
+              onClick={() => onLogAgain(entry)}
+            >
+              Log this again
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

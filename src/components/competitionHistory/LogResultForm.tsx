@@ -1,0 +1,210 @@
+/**
+ * LogResultForm — log a result for a competition workout you did outside
+ * competition (a "throwback"). Writes a row to competition_workout_results.
+ *
+ * The form shows the field(s) the workout actually uses (no dynamic schema —
+ * just conditional visibility):
+ *   - dual-scoring (time-capped): a "Did you finish under the cap?" checkbox →
+ *     checked = time field (must be < cap), unchecked = reps field.
+ *   - pure for-time (Games etc.): just the time field.
+ *   - AMRAP / for-reps: just the reps field.
+ *   - for-load: just the weight (lbs) field.
+ * RX-only for v1 (no scaling picker). The "where you'd have landed" placement
+ * is shown by the caller after onLogged (v2 piece — needs the workout's
+ * percentile curve).
+ */
+
+import { useState } from 'react';
+import { supabase } from '../../lib/supabase';
+import type { ScoringUnit } from '../../lib/competitionHistory';
+
+export interface LogResultWorkout {
+  competition_workout_id: string;
+  label: string; // e.g. "2014 Open 14.4"
+  scoring_unit: ScoringUnit;
+  is_dual_scoring: boolean;
+  time_cap_seconds: number | null;
+}
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function fmtCap(seconds: number | null): string {
+  if (seconds == null) return 'the cap';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s === 0 ? `${m}:00 cap` : `${m}:${String(s).padStart(2, '0')} cap`;
+}
+
+export default function LogResultForm({
+  workout,
+  userId,
+  onLogged,
+  onClose,
+}: {
+  workout: LogResultWorkout;
+  userId: string;
+  onLogged: (competitionWorkoutId: string) => void;
+  onClose: () => void;
+}) {
+  const dual = workout.is_dual_scoring;
+  // For dual-scoring, the checkbox decides time vs reps. For non-dual, the
+  // workout's scoring_unit decides which single field shows.
+  const [finishedUnderCap, setFinishedUnderCap] = useState(true);
+  const showTime = dual ? finishedUnderCap : workout.scoring_unit === 'time';
+  const showReps = dual ? !finishedUnderCap : workout.scoring_unit === 'reps';
+  const showLoad = !dual && workout.scoring_unit === 'load_lbs';
+  const showDistance = !dual && workout.scoring_unit === 'distance';
+
+  const [min, setMin] = useState('');
+  const [sec, setSec] = useState('');
+  const [reps, setReps] = useState('');
+  const [load, setLoad] = useState('');
+  const [distance, setDistance] = useState('');
+  const [performedAt, setPerformedAt] = useState(todayISO());
+  const [standardsMet, setStandardsMet] = useState(false);
+  const [notes, setNotes] = useState('');
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const buildRow = (): { score_type: ScoringUnit; score_value: number; finished: boolean | null } | string => {
+    if (showTime) {
+      const m = min === '' ? 0 : parseInt(min, 10);
+      const s = sec === '' ? 0 : parseInt(sec, 10);
+      if (isNaN(m) || isNaN(s) || s < 0 || s > 59 || m < 0) return 'Enter a valid time.';
+      const total = m * 60 + s;
+      if (total <= 0) return 'Enter a valid time.';
+      if (dual && finishedUnderCap && workout.time_cap_seconds != null && total >= workout.time_cap_seconds) {
+        return `If you finished, your time must be under the ${fmtCap(workout.time_cap_seconds)}.`;
+      }
+      return { score_type: 'time', score_value: total, finished: dual ? true : null };
+    }
+    if (showReps) {
+      const r = parseInt(reps, 10);
+      if (isNaN(r) || r <= 0 || r > 100000) return 'Enter a valid rep count.';
+      return { score_type: 'reps', score_value: r, finished: dual ? false : null };
+    }
+    if (showLoad) {
+      const l = parseFloat(load);
+      if (isNaN(l) || l <= 0 || l > 2000) return 'Enter a valid weight (lb).';
+      return { score_type: 'load_lbs', score_value: l, finished: null };
+    }
+    if (showDistance) {
+      const d = parseFloat(distance);
+      if (isNaN(d) || d <= 0 || d > 1000000) return 'Enter a valid distance (m).';
+      return { score_type: 'distance', score_value: d, finished: null };
+    }
+    return "This workout's scoring isn't supported for logging yet.";
+  };
+
+  const onSubmit = async () => {
+    setError(null);
+    if (!performedAt || performedAt > todayISO()) { setError('Pick a date — not in the future.'); return; }
+    const built = buildRow();
+    if (typeof built === 'string') { setError(built); return; }
+    setSaving(true);
+    const { error: insErr } = await supabase.from('competition_workout_results').insert({
+      user_id: userId,
+      competition_workout_id: workout.competition_workout_id,
+      score_type: built.score_type,
+      score_value: built.score_value,
+      finished: built.finished,
+      performed_at: performedAt,
+      source: 'throwback',
+      scaling_level: 'rx',
+      standards_met: standardsMet,
+      notes: notes.trim() || null,
+    });
+    setSaving(false);
+    if (insErr) { setError(insErr.message || 'Failed to save.'); return; }
+    onLogged(workout.competition_workout_id);
+  };
+
+  const inputStyle = { fontFamily: 'inherit' as const };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        padding: '24px 16px', overflowY: 'auto', zIndex: 1100,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, maxWidth: 460, width: '100%', padding: 20 }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>Log your result — {workout.label}</div>
+          <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 22, lineHeight: 1, cursor: 'pointer', padding: 4 }}>×</button>
+        </div>
+
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {dual && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={finishedUnderCap} onChange={(e) => setFinishedUnderCap(e.target.checked)} />
+              I finished under the {fmtCap(workout.time_cap_seconds)}
+            </label>
+          )}
+
+          {showTime && (
+            <div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>Your time</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input className="lift-input" style={{ ...inputStyle, width: 64 }} type="number" min={0} placeholder="min" value={min} onChange={(e) => setMin(e.target.value)} />
+                <span>:</span>
+                <input className="lift-input" style={{ ...inputStyle, width: 64 }} type="number" min={0} max={59} placeholder="sec" value={sec} onChange={(e) => setSec(e.target.value)} />
+              </div>
+            </div>
+          )}
+
+          {showReps && (
+            <div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>{dual ? 'Reps completed at the cap' : 'Total reps'}</div>
+              <input className="lift-input" style={{ ...inputStyle, width: 120 }} type="number" min={1} placeholder="reps" value={reps} onChange={(e) => setReps(e.target.value)} />
+            </div>
+          )}
+
+          {showLoad && (
+            <div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>Heaviest load (lb)</div>
+              <input className="lift-input" style={{ ...inputStyle, width: 120 }} type="number" min={1} placeholder="lb" value={load} onChange={(e) => setLoad(e.target.value)} />
+            </div>
+          )}
+
+          {showDistance && (
+            <div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>Distance (m)</div>
+              <input className="lift-input" style={{ ...inputStyle, width: 120 }} type="number" min={1} placeholder="m" value={distance} onChange={(e) => setDistance(e.target.value)} />
+            </div>
+          )}
+
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>Date</div>
+            <input className="lift-input" style={inputStyle} type="date" max={todayISO()} value={performedAt} onChange={(e) => setPerformedAt(e.target.value)} />
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+            <input type="checkbox" checked={standardsMet} onChange={(e) => setStandardsMet(e.target.checked)} />
+            I judged it to competition standards
+          </label>
+
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>Notes <span style={{ color: 'var(--text-muted)' }}>(optional)</span></div>
+            <textarea className="lift-input" rows={2} style={{ ...inputStyle, width: '100%', resize: 'vertical', textAlign: 'left' }} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+
+        {error && <div style={{ marginTop: 10, fontSize: 13, color: 'var(--danger, #d33)' }}>{error}</div>}
+
+        <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+          <button type="button" className="auth-btn" style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface2)', color: 'var(--text)' }} onClick={onClose} disabled={saving}>Cancel</button>
+          <button type="button" className="auth-btn" style={{ padding: '8px 16px', fontSize: 13 }} onClick={onSubmit} disabled={saving}>{saving ? 'Saving…' : 'Log result'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}

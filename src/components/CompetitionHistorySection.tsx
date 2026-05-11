@@ -651,7 +651,7 @@ export default function CompetitionHistorySection({
                   {linkedBundle.all_results && linkedBundle.all_results.length > 0 ? (
                     <div style={{ marginBottom: 16 }}>
                       <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Competition map</h3>
-                      <CompetitionExplorer history={competitionHistory} />
+                      <CompetitionExplorer history={competitionHistory} userId={userId} />
                     </div>
                   ) : linkedBundle.recent_raw_results.length > 0 ? (
                     <div style={{ marginBottom: 16 }}>

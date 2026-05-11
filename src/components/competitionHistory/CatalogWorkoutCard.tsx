@@ -28,9 +28,11 @@ function Badge({ children }: { children: React.ReactNode }) {
 export default function CatalogWorkoutCard({
   workout,
   onClose,
+  onTryIt,
 }: {
   workout: CatalogWorkoutSummary;
   onClose: () => void;
+  onTryIt: (w: CatalogWorkoutSummary) => void;
 }) {
   const stageLabel = STAGE_LABEL[workout.stage] ?? workout.stage;
   const s = workout.scoring;
@@ -92,15 +94,11 @@ export default function CatalogWorkoutCard({
         <div style={{ marginTop: 14 }}>
           <button
             type="button"
-            disabled
-            title="Coming soon"
-            style={{
-              padding: '8px 16px', fontSize: 13, borderRadius: 6,
-              border: '1px solid var(--border)', background: 'var(--surface2)',
-              color: 'var(--text-muted)', cursor: 'not-allowed', fontFamily: 'inherit',
-            }}
+            className="auth-btn"
+            style={{ padding: '8px 16px', fontSize: 13, fontFamily: 'inherit' }}
+            onClick={() => onTryIt(workout)}
           >
-            Try it — coming soon
+            Try it — log a result
           </button>
         </div>
       </div>
