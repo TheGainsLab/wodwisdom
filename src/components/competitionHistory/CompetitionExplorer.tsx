@@ -39,17 +39,26 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
   const [showAllMovements, setShowAllMovements] = useState(false);
 
   // Catalog (the full list of competition workouts) — fetched lazily the
-  // first time the "all" scope is opened; cached for the component's life.
-  const [catalog, setCatalog] = useState<NormalizedCatalog | null>(null);
+  // first time the "all" scope is opened; the raw rows are cached for the
+  // component's life and re-normalized (dedup keyed by the athlete's ids)
+  // whenever filledIds changes.
+  const [catalogRaw, setCatalogRaw] = useState<CatalogWorkoutSummary[] | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
 
+  const movements = useMemo(() => movementExposure(history), [history]);
+  const filledIds = useMemo(() => new Set(Object.keys(history.byId)), [history]);
+  const catalog: NormalizedCatalog | null = useMemo(
+    () => (catalogRaw ? normalizeCatalog(catalogRaw, filledIds) : null),
+    [catalogRaw, filledIds],
+  );
+
   // Lazy-load the catalog the first time the "all" scope is opened. Deps are
-  // [scope, catalog] only — NOT catalogLoading: a loading-flag dep would make
-  // setCatalogLoading(true) re-run this effect, whose cleanup would cancel its
-  // own in-flight fetch (→ stuck on "Loading…" forever).
+  // [scope, catalogRaw] only — NOT catalogLoading: a loading-flag dep would
+  // make setCatalogLoading(true) re-run this effect, whose cleanup would
+  // cancel its own in-flight fetch (→ stuck on "Loading…" forever).
   useEffect(() => {
-    if (scope !== 'all' || catalog) return;
+    if (scope !== 'all' || catalogRaw) return;
     let cancelled = false;
     setCatalogLoading(true);
     setCatalogError(null);
@@ -64,13 +73,10 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
         setCatalogError('Could not load the workout catalog.');
         return;
       }
-      setCatalog(normalizeCatalog(data.workouts));
+      setCatalogRaw(data.workouts);
     })();
     return () => { cancelled = true; };
-  }, [scope, catalog]);
-
-  const movements = useMemo(() => movementExposure(history), [history]);
-  const filledIds = useMemo(() => new Set(Object.keys(history.byId)), [history]);
+  }, [scope, catalogRaw]);
 
   const isFiltered = !!(filter.movement || filter.timeDomain || filter.year != null);
 

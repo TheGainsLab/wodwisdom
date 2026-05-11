@@ -179,7 +179,10 @@ export function normalizeCompetitionHistory(
 // ============================================================
 
 /** A row from GET /workouts (the catalog list endpoint). Lighter than an
- *  AllResultsEntry — movement names only, no `result`. */
+ *  AllResultsEntry — movement names only, no `result`. NOTE: the list endpoint
+ *  does not currently expose a division — it returns separate M/W rows per
+ *  workout (distinct competition_workout_id, same season/stage/ordinal/name).
+ *  `division`/`division_name` are declared optional for when that lands. */
 export interface CatalogWorkoutSummary {
   competition_workout_id: string;
   season: number;
@@ -196,6 +199,9 @@ export interface CatalogWorkoutSummary {
     time_cap_seconds: number | null;
   } | null;
   field_size: number | null;
+  /** Not yet returned by GET /workouts; here for when the catalog exposes it. */
+  division?: number;          // 1 = Men, 2 = Women (crossfit.competitions.division code)
+  division_name?: string;     // "Men" | "Women"
 }
 
 export interface CatalogStageGroup {
@@ -212,10 +218,37 @@ export interface NormalizedCatalog {
   total: number;
 }
 
+/**
+ * @param preferIds when deduping the M/W rows of a workout, keep the entry
+ *   whose id is in this set (the athlete's own competition_workout_id, so the
+ *   cell is correctly "filled" and is their actual version). Falls back to the
+ *   rx entry, then first-seen. TODO: once GET /workouts exposes `division`,
+ *   filter by the athlete's division instead of this heuristic dedup.
+ */
 export function normalizeCatalog(
   workouts: CatalogWorkoutSummary[] | undefined | null,
+  preferIds?: Set<string>,
 ): NormalizedCatalog {
-  const all = workouts ?? [];
+  const raw = workouts ?? [];
+
+  // Dedupe to one entry per (season, stage, ordinal ?? workout_name).
+  const groups = new Map<string, CatalogWorkoutSummary[]>();
+  for (const w of raw) {
+    const key = `${w.season}|${w.stage}|${w.ordinal != null ? `o${w.ordinal}` : `n${w.workout_name}`}`;
+    let g = groups.get(key);
+    if (!g) { g = []; groups.set(key, g); }
+    g.push(w);
+  }
+  const all: CatalogWorkoutSummary[] = [];
+  for (const g of groups.values()) {
+    if (g.length === 1) { all.push(g[0]); continue; }
+    const picked =
+      (preferIds && g.find((w) => preferIds.has(w.competition_workout_id))) ||
+      g.find((w) => w.scaled_tier === 'rx') ||
+      g[0];
+    all.push(picked);
+  }
+
   const byId: Record<string, CatalogWorkoutSummary> = {};
   for (const w of all) byId[w.competition_workout_id] = w;
 
