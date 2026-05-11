@@ -219,19 +219,27 @@ export interface NormalizedCatalog {
 }
 
 /**
- * @param preferIds when deduping the M/W rows of a workout, keep the entry
- *   whose id is in this set (the athlete's own competition_workout_id, so the
- *   cell is correctly "filled" and is their actual version). Falls back to the
- *   rx entry, then first-seen. TODO: once GET /workouts exposes `division`,
- *   filter by the athlete's division instead of this heuristic dedup.
+ * @param preferIds when deduping the remaining rows of a workout (e.g. rx vs
+ *   scaled tiers), keep the entry whose id is in this set (the athlete's own
+ *   competition_workout_id) — else the rx entry, else first-seen.
+ * @param division the athlete's division (1 = Men, 2 = Women, from
+ *   all_results[].division). When the catalog exposes `division`, the list is
+ *   filtered to this division first so each workout appears once.
  */
 export function normalizeCatalog(
   workouts: CatalogWorkoutSummary[] | undefined | null,
   preferIds?: Set<string>,
+  division?: number,
 ): NormalizedCatalog {
-  const raw = workouts ?? [];
+  let raw = workouts ?? [];
 
-  // Dedupe to one entry per (season, stage, ordinal ?? workout_name).
+  // Filter to the athlete's division when the catalog exposes it and we know it.
+  if (division != null && raw.some((w) => w.division != null)) {
+    raw = raw.filter((w) => w.division == null || w.division === division);
+  }
+
+  // Dedupe to one entry per (season, stage, ordinal ?? workout_name) — collapses
+  // any remaining duplicates (e.g. rx/scaled/foundations tiers of the same workout).
   const groups = new Map<string, CatalogWorkoutSummary[]>();
   for (const w of raw) {
     const key = `${w.season}|${w.stage}|${w.ordinal != null ? `o${w.ordinal}` : `n${w.workout_name}`}`;

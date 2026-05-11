@@ -48,9 +48,21 @@ export default function CompetitionExplorer({ history }: { history: NormalizedCo
 
   const movements = useMemo(() => movementExposure(history), [history]);
   const filledIds = useMemo(() => new Set(Object.keys(history.byId)), [history]);
+  // The athlete's competition division (1 = Men, 2 = Women) — the mode of their
+  // own results' division (constant in practice); used to filter the catalog.
+  const athleteDivision = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const e of Object.values(history.byId)) {
+      if (typeof e.division === 'number') counts.set(e.division, (counts.get(e.division) ?? 0) + 1);
+    }
+    let best: number | undefined;
+    let bestN = 0;
+    for (const [d, n] of counts) if (n > bestN) { best = d; bestN = n; }
+    return best;
+  }, [history]);
   const catalog: NormalizedCatalog | null = useMemo(
-    () => (catalogRaw ? normalizeCatalog(catalogRaw, filledIds) : null),
-    [catalogRaw, filledIds],
+    () => (catalogRaw ? normalizeCatalog(catalogRaw, filledIds, athleteDivision) : null),
+    [catalogRaw, filledIds, athleteDivision],
   );
 
   // Lazy-load the catalog the first time the "all" scope is opened. Deps are
