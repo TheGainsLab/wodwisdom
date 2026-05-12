@@ -1,9 +1,10 @@
 /**
  * CompetitionExplorer — the interactive layer over the competition map:
  * a scope toggle ("your workouts" vs "all competition workouts"), a filter
- * bar (movement / time domain / year), a "your movements" panel, the
- * (filtered) grid, and the detail modals. Self-contained so it can later
- * be lifted to a dedicated /competition-history route.
+ * bar (movement / time domain / year), the (filtered) grid, and the detail
+ * modals. (A by-frequency "your movements" view will live on the Movements
+ * tab of the /competition-history route — the movement dropdown here is
+ * alphabetical.)
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -51,7 +52,6 @@ export default function CompetitionExplorer({
   const [filter, setFilter] = useState<Filter>({});
   const [selectedWorkout, setSelectedWorkout] = useState<CompetitionWorkoutEntry | null>(null);
   const [selectedCatalogWorkout, setSelectedCatalogWorkout] = useState<CatalogWorkoutSummary | null>(null);
-  const [showAllMovements, setShowAllMovements] = useState(false);
   // "Try it" — the workout being logged + ids logged this session (optimistic
   // grid fill; full read-back of competition_workout_results on load is a
   // follow-up, so for now a just-logged throwback shows green in the "All" map
@@ -91,6 +91,11 @@ export default function CompetitionExplorer({
   const [catalogError, setCatalogError] = useState<string | null>(null);
 
   const movements = useMemo(() => movementExposure(history), [history]);
+  // Alphabetical for the filter dropdown (movementExposure returns by-frequency).
+  const movementsByName = useMemo(
+    () => movements.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [movements],
+  );
   const filledIds = useMemo(() => new Set(Object.keys(history.byId)), [history]);
   // Filled = real competition results (from the bundle) + throwbacks logged this session.
   const effectiveFilledIds = useMemo(() => {
@@ -170,8 +175,6 @@ export default function CompetitionExplorer({
     return n;
   }, [matchEntry, history]);
 
-  const visibleMovements = showAllMovements ? movements : movements.slice(0, 12);
-
   const scopeBtn = (s: Scope, label: string) => {
     const active = scope === s;
     return (
@@ -207,7 +210,7 @@ export default function CompetitionExplorer({
           style={{ flex: '0 1 auto', maxWidth: 220 }}
         >
           <option value="">All movements</option>
-          {movements.map((m) => (
+          {movementsByName.map((m) => (
             <option key={m.name} value={m.name}>{m.name} ({m.workoutCount})</option>
           ))}
         </select>
@@ -269,48 +272,6 @@ export default function CompetitionExplorer({
         )}
       </div>
 
-      {/* Your movements */}
-      {movements.length > 0 && (
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
-            Your movements
-          </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {visibleMovements.map((m) => {
-              const active = filter.movement === m.name;
-              return (
-                <button
-                  key={m.name}
-                  type="button"
-                  onClick={() => setFilter((f) => ({ ...f, movement: active ? undefined : m.name }))}
-                  style={{
-                    fontSize: 12, padding: '3px 9px', borderRadius: 999,
-                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                    background: active ? 'var(--accent)' : 'var(--surface2)',
-                    color: active ? '#fff' : 'var(--text)', cursor: 'pointer', fontFamily: 'inherit',
-                  }}
-                >
-                  {m.name} <span style={{ opacity: 0.7 }}>· {m.workoutCount}</span>
-                </button>
-              );
-            })}
-            {movements.length > 12 && (
-              <button
-                type="button"
-                onClick={() => setShowAllMovements((v) => !v)}
-                style={{
-                  fontSize: 12, padding: '3px 9px', borderRadius: 999,
-                  border: '1px solid var(--border)', background: 'none',
-                  color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit',
-                }}
-              >
-                {showAllMovements ? 'show fewer' : `+${movements.length - 12} more`}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* The grid / map */}
       {scope === 'mine' ? (
         <CompetitionGrid history={history} onSelectWorkout={setSelectedWorkout} matchEntry={matchEntry} />
@@ -322,6 +283,7 @@ export default function CompetitionExplorer({
         <CompetitionMap
           catalog={catalog}
           filledIds={effectiveFilledIds}
+          entryById={history.byId}
           onSelectFilled={(id) => {
             const e = history.byId[id];
             if (e) setSelectedWorkout(e);

@@ -6,15 +6,25 @@
  * cells showing the ordinal; named workouts (Games events) render as wider
  * cells with the name. Tap a cell → onSelectWorkout.
  *
+ * Seasons collapse: each year header is a ▾/▸ toggle; collapsed seasons show a
+ * one-line summary (`2020 · 24 workouts · 92.3` — count + avg cohort pct). By
+ * default the most recent ~2 seasons are expanded (or all, if the grid is
+ * small); an "Expand all / Collapse all" link is offered. While a filter is
+ * active the collapse machinery steps aside and every matching season renders
+ * open.
+ *
  * v1: every cell is a real-competition result. Stage is conveyed by a subtle
  * accent (Games cells get a gold top-bar). When throwback logging lands, the
  * cell will also carry a "logged" state — the colour machinery is here for it.
  */
 
+import { useState } from 'react';
 import type {
   NormalizedCompetitionHistory,
   CompetitionWorkoutEntry,
+  SeasonGroup,
 } from '../../lib/competitionHistory';
+import { avgCohortPercentile, initialCollapsedSeasons } from '../../lib/competitionHistory';
 
 const STAGE_LABEL: Record<string, string> = {
   open: 'Open',
@@ -59,6 +69,45 @@ function Cell({ entry, onClick }: { entry: CompetitionWorkoutEntry; onClick: () 
   );
 }
 
+function seasonSummary(season: SeasonGroup): string {
+  const entries = season.stages.flatMap((s) => s.entries);
+  const avg = avgCohortPercentile(entries);
+  const n = entries.length;
+  return `${n} workout${n === 1 ? '' : 's'}${avg != null ? ` · ${avg.toFixed(1)}` : ''}`;
+}
+
+function SeasonHeader({
+  year,
+  collapsed,
+  collapsible,
+  summary,
+  onToggle,
+}: {
+  year: number;
+  collapsed: boolean;
+  collapsible: boolean;
+  summary: string;
+  onToggle: () => void;
+}) {
+  const content = (
+    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>
+      {collapsible && <span style={{ display: 'inline-block', width: 14, color: 'var(--text-dim)' }}>{collapsed ? '▸' : '▾'}</span>}
+      {year}
+      {collapsed && <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}> · {summary}</span>}
+    </span>
+  );
+  if (!collapsible) return <div style={{ marginBottom: 8 }}>{content}</div>;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      style={{ display: 'block', width: '100%', textAlign: 'left', padding: 0, margin: '0 0 8px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+    >
+      {content}
+    </button>
+  );
+}
+
 export default function CompetitionGrid({
   history,
   onSelectWorkout,
@@ -69,6 +118,10 @@ export default function CompetitionGrid({
   /** When provided, only entries that pass are rendered; empty stages/seasons are dropped. */
   matchEntry?: (entry: CompetitionWorkoutEntry) => boolean;
 }) {
+  const [collapsed, setCollapsed] = useState<Set<number>>(
+    () => initialCollapsedSeasons(history.yearsCompeted, history.total),
+  );
+
   if (history.total === 0) {
     return (
       <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
@@ -92,45 +145,74 @@ export default function CompetitionGrid({
     return <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>No workouts match that filter.</div>;
   }
 
+  // Collapse only when unfiltered and there's more than one season to manage.
+  const collapsible = !matchEntry && seasons.length > 1;
+  const allCollapsed = seasons.every((s) => collapsed.has(s.year));
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {seasons.map((season) => (
-        <div key={season.year}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>
-            {season.year}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {season.stages.map((stage) => (
-              <div
-                key={stage.stage}
-                style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}
-              >
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--text-dim)',
-                    minWidth: 92,
-                    paddingTop: 11,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                  }}
-                >
-                  {STAGE_LABEL[stage.stage] ?? stage.stage}
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {stage.entries.map((entry) => (
-                    <Cell
-                      key={entry.competition_workout_id}
-                      entry={entry}
-                      onClick={() => onSelectWorkout(entry)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+      {collapsible && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(seasons.map((s) => s.year)))}
+            style={{ fontSize: 12, color: 'var(--text-dim)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            {allCollapsed ? 'Expand all' : 'Collapse all'}
+          </button>
         </div>
-      ))}
+      )}
+      {seasons.map((season) => {
+        const isCollapsed = collapsible && collapsed.has(season.year);
+        return (
+          <div key={season.year}>
+            <SeasonHeader
+              year={season.year}
+              collapsed={isCollapsed}
+              collapsible={collapsible}
+              summary={seasonSummary(season)}
+              onToggle={() => setCollapsed((prev) => {
+                const next = new Set(prev);
+                if (next.has(season.year)) next.delete(season.year);
+                else next.add(season.year);
+                return next;
+              })}
+            />
+            {!isCollapsed && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {season.stages.map((stage) => (
+                  <div
+                    key={stage.stage}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: 'var(--text-dim)',
+                        minWidth: 92,
+                        paddingTop: 11,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}
+                    >
+                      {STAGE_LABEL[stage.stage] ?? stage.stage}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {stage.entries.map((entry) => (
+                        <Cell
+                          key={entry.competition_workout_id}
+                          entry={entry}
+                          onClick={() => onSelectWorkout(entry)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

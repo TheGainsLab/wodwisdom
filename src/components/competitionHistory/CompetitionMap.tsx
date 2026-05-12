@@ -2,14 +2,23 @@
  * CompetitionMap — the "All"-scope grid: every competition workout ever,
  * filled cells = ones the athlete has a result for (gold, tappable into the
  * workout detail), unfilled = the rest (faint/dashed, tappable into a "you
- * haven't done this" card). The collect-them-all map. v1: no per-stage
- * collapse — renders everything; revisit if it's too dense.
+ * haven't done this" card). The collect-them-all map.
+ *
+ * Seasons collapse: each year header is a ▾/▸ toggle; collapsed seasons show a
+ * one-line summary (`2020 · 11/20 · 77.6` — done / season-total / avg cohort
+ * pct over the ones done). By default the most recent ~2 seasons are expanded;
+ * an "Expand all / Collapse all" link is offered. While a filter is active the
+ * collapse machinery steps aside and every matching season renders open.
  */
 
+import { useState } from 'react';
 import type {
   NormalizedCatalog,
+  CatalogSeasonGroup,
   CatalogWorkoutSummary,
+  CompetitionWorkoutEntry,
 } from '../../lib/competitionHistory';
+import { avgCohortPercentile, initialCollapsedSeasons } from '../../lib/competitionHistory';
 
 const STAGE_LABEL: Record<string, string> = {
   open: 'Open',
@@ -63,19 +72,73 @@ function Cell({
   );
 }
 
+function seasonSummary(
+  season: CatalogSeasonGroup,
+  filledIds: Set<string>,
+  entryById?: Record<string, CompetitionWorkoutEntry>,
+): string {
+  const workouts = season.stages.flatMap((st) => st.workouts);
+  const filled = workouts.filter((w) => filledIds.has(w.competition_workout_id));
+  const head = `${filled.length}/${workouts.length}`;
+  if (filled.length === 0 || !entryById) return head;
+  const avg = avgCohortPercentile(filled.map((w) => entryById[w.competition_workout_id]));
+  return avg != null ? `${head} · ${avg.toFixed(1)}` : head;
+}
+
+function SeasonHeader({
+  year,
+  collapsed,
+  collapsible,
+  summary,
+  onToggle,
+}: {
+  year: number;
+  collapsed: boolean;
+  collapsible: boolean;
+  summary: string;
+  onToggle: () => void;
+}) {
+  const content = (
+    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>
+      {collapsible && <span style={{ display: 'inline-block', width: 14, color: 'var(--text-dim)' }}>{collapsed ? '▸' : '▾'}</span>}
+      {year}
+      {collapsed && <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}> · {summary}</span>}
+    </span>
+  );
+  if (!collapsible) return <div style={{ marginBottom: 8 }}>{content}</div>;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      style={{ display: 'block', width: '100%', textAlign: 'left', padding: 0, margin: '0 0 8px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+    >
+      {content}
+    </button>
+  );
+}
+
 export default function CompetitionMap({
   catalog,
   filledIds,
+  entryById,
   onSelectFilled,
   onSelectUnfilled,
   matchWorkout,
 }: {
   catalog: NormalizedCatalog;
   filledIds: Set<string>;
+  /** The athlete's normalized entries by competition_workout_id — used only
+   *  for the collapsed per-season avg-percentile summary (the catalog rows
+   *  themselves carry no result data). */
+  entryById?: Record<string, CompetitionWorkoutEntry>;
   onSelectFilled: (id: string) => void;
   onSelectUnfilled: (w: CatalogWorkoutSummary) => void;
   matchWorkout?: (w: CatalogWorkoutSummary) => boolean;
 }) {
+  const [collapsed, setCollapsed] = useState<Set<number>>(
+    () => initialCollapsedSeasons(catalog.seasons.map((s) => s.season), catalog.total),
+  );
+
   if (catalog.total === 0) {
     return <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Couldn't load the workout catalog.</div>;
   }
@@ -96,54 +159,82 @@ export default function CompetitionMap({
         .filter((s) => s.stages.length > 0)
     : catalog.seasons;
 
+  const collapsible = !matchWorkout && seasons.length > 1;
+  const allCollapsed = seasons.every((s) => collapsed.has(s.season));
+
   return (
     <div>
-      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
-        {filledCount} of {catalog.total} workouts done · {Math.round((filledCount / catalog.total) * 100)}%
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+          {filledCount} of {catalog.total} workouts done · {Math.round((filledCount / catalog.total) * 100)}%
+        </span>
+        {collapsible && (
+          <button
+            type="button"
+            onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(seasons.map((s) => s.season)))}
+            style={{ fontSize: 12, color: 'var(--text-dim)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            {allCollapsed ? 'Expand all' : 'Collapse all'}
+          </button>
+        )}
       </div>
 
       {seasons.length === 0 ? (
         <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>No workouts match that filter.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {seasons.map((season) => (
-            <div key={season.season}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>
-                {season.season}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {season.stages.map((stage) => (
-                  <div key={stage.stage} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: 'var(--text-dim)',
-                        minWidth: 92,
-                        paddingTop: 11,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                      }}
-                    >
-                      {STAGE_LABEL[stage.stage] ?? stage.stage}
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {stage.workouts.map((w) => {
-                        const filled = filledIds.has(w.competition_workout_id);
-                        return (
-                          <Cell
-                            key={w.competition_workout_id}
-                            w={w}
-                            filled={filled}
-                            onClick={() => (filled ? onSelectFilled(w.competition_workout_id) : onSelectUnfilled(w))}
-                          />
-                        );
-                      })}
-                    </div>
+          {seasons.map((season) => {
+            const isCollapsed = collapsible && collapsed.has(season.season);
+            return (
+              <div key={season.season}>
+                <SeasonHeader
+                  year={season.season}
+                  collapsed={isCollapsed}
+                  collapsible={collapsible}
+                  summary={seasonSummary(season, filledIds, entryById)}
+                  onToggle={() => setCollapsed((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(season.season)) next.delete(season.season);
+                    else next.add(season.season);
+                    return next;
+                  })}
+                />
+                {!isCollapsed && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {season.stages.map((stage) => (
+                      <div key={stage.stage} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: 'var(--text-dim)',
+                            minWidth: 92,
+                            paddingTop: 11,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                          }}
+                        >
+                          {STAGE_LABEL[stage.stage] ?? stage.stage}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {stage.workouts.map((w) => {
+                            const filled = filledIds.has(w.competition_workout_id);
+                            return (
+                              <Cell
+                                key={w.competition_workout_id}
+                                w={w}
+                                filled={filled}
+                                onClick={() => (filled ? onSelectFilled(w.competition_workout_id) : onSelectUnfilled(w))}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

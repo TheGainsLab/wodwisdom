@@ -317,6 +317,33 @@ export function normalizeCatalog(
   return { seasons, byId, total: all.length };
 }
 
+/** Which season years to render collapsed by default: none when the grid is
+ *  small (< ~40 cells), otherwise everything but the most recent
+ *  `keepExpanded` seasons. `seasonsNewestFirst` is the season list in display
+ *  order (year desc). */
+export function initialCollapsedSeasons(
+  seasonsNewestFirst: number[],
+  totalCells: number,
+  keepExpanded = 2,
+): Set<number> {
+  if (totalCells < 40 || seasonsNewestFirst.length <= keepExpanded) return new Set();
+  return new Set(seasonsNewestFirst.slice(keepExpanded));
+}
+
+/** Mean cohort_percentile across a set of the athlete's entries (skips
+ *  non-finite values); null when nothing usable. Used for the collapsed
+ *  per-season summary lines in the grid / map. */
+export function avgCohortPercentile(
+  entries: ReadonlyArray<CompetitionWorkoutEntry | undefined>,
+): number | null {
+  const ps: number[] = [];
+  for (const e of entries) {
+    const p = e?.result?.cohort_percentile;
+    if (typeof p === 'number' && Number.isFinite(p)) ps.push(p);
+  }
+  return ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : null;
+}
+
 /**
  * Flatten the unique movements across all of the athlete's results, with how
  * many of their workouts each appeared in. Newest-first ordering is preserved
