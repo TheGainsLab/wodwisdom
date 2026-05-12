@@ -7,8 +7,12 @@
  *   - Unlinked          → name search → results list → pick one;
  *                         plus a paste-ID fallback for direct entry
  *   - Pending-confirm   → identity card + permanence warning + checkbox + Link
- *   - Linked            → résumé card + the competition map (CompetitionExplorer)
- *                         + admin-only "clear linkage" override
+ *   - Linked            → when the rich `all_results` bundle is present: a
+ *                         Summary / Map / Movements tab strip (Summary =
+ *                         compact résumé + stats + wins; Map = CompetitionExplorer;
+ *                         Movements = the fingerprint list, drilling into a
+ *                         pre-filtered Map). Otherwise the recent-results
+ *                         fallback. Plus an admin-only "clear linkage" override.
  *
  * Self-contained: owns its own state, talks to search-competition-athletes +
  * verify-competition-athlete, and writes the linkage to athlete_profiles
@@ -20,7 +24,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { AllResultsEntry } from '../../lib/competitionHistory';
 import { normalizeCompetitionHistory } from '../../lib/competitionHistory';
-import CompetitionExplorer from './CompetitionExplorer';
+import CompetitionExplorer, { type Scope, type Filter } from './CompetitionExplorer';
+import MovementsPanel from './MovementsPanel';
+
+const STAGE_LABEL: Record<string, string> = {
+  open: 'Open', quarterfinals: 'Quarterfinals', semifinals: 'Semifinals', regional: 'Regionals', games: 'Games',
+};
+
+type ExperienceTab = 'summary' | 'map' | 'movements';
 
 interface BundleIdentity {
   name: string;
@@ -198,6 +209,12 @@ export default function CompetitionHistoryExperience({
   const [linkedBundle, setLinkedBundle] = useState<Tier4Bundle | null>(null);
   const [bundleLoading, setBundleLoading] = useState(false);
   const [bundleError, setBundleError] = useState<string | null>(null);
+
+  // Linked-state view: tab strip + the Map's scope/filter (lifted here so the
+  // Movements tab can switch to Map with a movement pre-applied).
+  const [tab, setTab] = useState<ExperienceTab>('summary');
+  const [scope, setScope] = useState<Scope>('mine');
+  const [filter, setFilter] = useState<Filter>({});
 
   const competitionHistory = useMemo(
     () => normalizeCompetitionHistory(linkedBundle?.all_results),
@@ -583,79 +600,143 @@ export default function CompetitionHistoryExperience({
           )}
           {linkedBundle && (() => {
             const cs = linkedBundle.competition_summary;
-            const wins = Object.values(competitionHistory.byId)
+            const h = competitionHistory;
+            const allWins = Object.values(h.byId)
               .filter((e) => e.result.workout_rank === 1)
-              .sort((a, b) => b.year - a.year)
-              .slice(0, 4);
-            return (
-            <>
-              {/* Résumé card */}
-              <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 16 }}>
-                <Avatar name={linkedBundle.identity.name} photoUrl={linkedPhotoUrl} />
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 18, fontWeight: 700 }}>{linkedBundle.identity.name}</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>
-                    {TIER_LABEL[cs.overall_competitive_tier]} · {cs.seasons_competed} season{cs.seasons_competed === 1 ? '' : 's'}
-                    {linkedBestFinish ? ` · best: ${linkedBestFinish}` : ''}
+              .sort((a, b) => b.year - a.year);
+            const wins = allWins.slice(0, 4);
+            const moreWins = allWins.length - wins.length;
+            const hasMap = !!(linkedBundle.all_results && linkedBundle.all_results.length > 0);
+
+            const profileLink = linkedBundle.identity.profile_url ? (
+              <a href={linkedBundle.identity.profile_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>profile ↗</a>
+            ) : null;
+
+            const summaryPanel = (
+              <div>
+                {/* Compact résumé */}
+                <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+                  <Avatar name={linkedBundle.identity.name} photoUrl={linkedPhotoUrl} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 18, fontWeight: 700 }}>{linkedBundle.identity.name}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>
+                      {TIER_LABEL[cs.overall_competitive_tier]} · {cs.seasons_competed} season{cs.seasons_competed === 1 ? '' : 's'}
+                      {linkedBestFinish ? ` · best: ${linkedBestFinish}` : ''}
+                      {profileLink && <> · {profileLink}</>}
+                    </div>
                   </div>
-                  {linkedBundle.identity.profile_url && (
-                    <div style={{ fontSize: 12, marginTop: 6 }}>
-                      <a href={linkedBundle.identity.profile_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
-                        View profile on games.crossfit.com →
-                      </a>
+                </div>
+
+                <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 4 }}>
+                  Trend: <span style={{ color: 'var(--text)' }}>{formatTrend(cs.trend)}</span>{' · '}
+                  Consistency: <span style={{ color: 'var(--text)' }}>{formatConsistency(cs.consistency)}</span>{' · '}
+                  Latest: <span style={{ color: 'var(--text)' }}>{cs.latest_percentile.toFixed(1)}th pct</span>
+                </div>
+
+                {h.total > 0 && (
+                  <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 4 }}>
+                    {h.total} competition workout{h.total === 1 ? '' : 's'} · {h.yearsCompeted.length} season{h.yearsCompeted.length === 1 ? '' : 's'}
+                    {h.stagesSeen.length > 0 ? ` · ${h.stagesSeen.map((s) => STAGE_LABEL[s] ?? s).join(' / ')}` : ''}
+                  </div>
+                )}
+
+                {wins.length > 0 && (
+                  <div style={{ fontSize: 13, marginTop: 8 }}>
+                    <span style={{ color: 'var(--text-dim)' }}>Wins · </span>
+                    {wins.map((e, i) => (
+                      <span key={e.competition_workout_id}>
+                        {i > 0 ? ' · ' : ''}
+                        {e.workout_name} <span style={{ color: 'var(--text-dim)' }}>({e.year})</span>
+                      </span>
+                    ))}
+                    {moreWins > 0 && <span style={{ color: 'var(--text-dim)' }}> · +{moreWins} more</span>}
+                  </div>
+                )}
+              </div>
+            );
+
+            if (!hasMap) {
+              // No rich all_results bundle — résumé + the recent-results fallback, no tabs.
+              return (
+                <>
+                  {summaryPanel}
+                  {linkedBundle.recent_raw_results.length > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Recent results</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {linkedBundle.recent_raw_results.slice(0, 5).map((r, i) => {
+                          const movements = Array.from(new Set(r.movements ?? []));
+                          const moves = movements.length === 0 ? '—' : movements.slice(0, 4).join(' + ') + (movements.length > 4 ? ' + …' : '');
+                          return (
+                            <div key={i} style={{ fontSize: 12, padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 6 }}>
+                              <div style={{ fontWeight: 600 }}>{r.workout_label}</div>
+                              <div style={{ color: 'var(--text-dim)', marginTop: 2 }}>
+                                rank {r.rank} · {r.percentile.toFixed(1)} pct · {r.raw_score} {r.scoring_unit}
+                                {r.time_domain ? ` · ${r.time_domain} time` : ''}
+                              </div>
+                              <div style={{ color: 'var(--text-dim)', marginTop: 2 }}>{moves}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
-                </div>
-              </div>
+                </>
+              );
+            }
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', fontSize: 13, marginBottom: wins.length > 0 ? 12 : 16 }}>
-                <div style={{ color: 'var(--text-dim)' }}>Trend</div>
-                <div>{formatTrend(cs.trend)}</div>
-                <div style={{ color: 'var(--text-dim)' }}>Consistency</div>
-                <div>{formatConsistency(cs.consistency)}</div>
-                <div style={{ color: 'var(--text-dim)' }}>Latest season</div>
-                <div>{cs.latest_percentile.toFixed(1)}th pct</div>
-              </div>
+            const tabBtn = (id: ExperienceTab, label: string) => (
+              <button
+                type="button"
+                onClick={() => setTab(id)}
+                style={{
+                  padding: '8px 4px',
+                  marginBottom: -1,
+                  fontSize: 13,
+                  fontWeight: tab === id ? 700 : 500,
+                  color: tab === id ? 'var(--accent)' : 'var(--text-dim)',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: `2px solid ${tab === id ? 'var(--accent)' : 'transparent'}`,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {label}
+              </button>
+            );
 
-              {wins.length > 0 && (
-                <div style={{ fontSize: 13, marginBottom: 16 }}>
-                  <span style={{ color: 'var(--text-dim)' }}>Wins · </span>
-                  {wins.map((e, i) => (
-                    <span key={e.competition_workout_id}>
-                      {i > 0 ? ' · ' : ''}
-                      {e.workout_name} <span style={{ color: 'var(--text-dim)' }}>({e.year})</span>
-                    </span>
-                  ))}
+            return (
+              <>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
+                  {tabBtn('summary', 'Summary')}
+                  {tabBtn('map', 'Map')}
+                  {tabBtn('movements', 'Movements')}
                 </div>
-              )}
 
-              {linkedBundle.all_results && linkedBundle.all_results.length > 0 ? (
-                <div style={{ marginBottom: 16 }}>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Competition map</h3>
-                  <CompetitionExplorer history={competitionHistory} userId={userId} userAge={userAge} />
+                {tab === 'summary' && summaryPanel}
+
+                {/* The Map stays mounted (display-toggled) so the lazily-fetched
+                    catalog and any throwbacks logged this session survive a tab switch. */}
+                <div style={{ display: tab === 'map' ? 'block' : 'none' }}>
+                  <CompetitionExplorer
+                    history={competitionHistory}
+                    userId={userId}
+                    userAge={userAge}
+                    scope={scope}
+                    setScope={setScope}
+                    filter={filter}
+                    setFilter={setFilter}
+                  />
                 </div>
-              ) : linkedBundle.recent_raw_results.length > 0 ? (
-                <div style={{ marginBottom: 16 }}>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Recent results</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {linkedBundle.recent_raw_results.slice(0, 5).map((r, i) => {
-                      const movements = Array.from(new Set(r.movements ?? []));
-                      const moves = movements.length === 0 ? '—' : movements.slice(0, 4).join(' + ') + (movements.length > 4 ? ' + …' : '');
-                      return (
-                        <div key={i} style={{ fontSize: 12, padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 6 }}>
-                          <div style={{ fontWeight: 600 }}>{r.workout_label}</div>
-                          <div style={{ color: 'var(--text-dim)', marginTop: 2 }}>
-                            rank {r.rank} · {r.percentile.toFixed(1)} pct · {r.raw_score} {r.scoring_unit}
-                            {r.time_domain ? ` · ${r.time_domain} time` : ''}
-                          </div>
-                          <div style={{ color: 'var(--text-dim)', marginTop: 2 }}>{moves}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : null}
-            </>
+
+                {tab === 'movements' && (
+                  <MovementsPanel
+                    history={competitionHistory}
+                    onPick={(name) => { setScope('mine'); setFilter({ movement: name }); setTab('map'); }}
+                  />
+                )}
+              </>
             );
           })()}
 

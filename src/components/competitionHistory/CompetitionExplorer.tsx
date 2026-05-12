@@ -2,12 +2,13 @@
  * CompetitionExplorer — the interactive layer over the competition map:
  * a scope toggle ("your workouts" vs "all competition workouts"), a filter
  * bar (movement / time domain / year), the (filtered) grid, and the detail
- * modals. (A by-frequency "your movements" view will live on the Movements
- * tab of the /competition-history route — the movement dropdown here is
- * alphabetical.)
+ * modals. Scope + filter are owned by the parent (the /competition-history
+ * "Map" tab) so the Movements tab can drill in with a pre-applied filter.
+ * (A by-frequency "your movements" view lives on that Movements tab — the
+ * movement dropdown here is alphabetical.)
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { supabase } from '../../lib/supabase';
 import type {
   NormalizedCompetitionHistory,
@@ -27,10 +28,10 @@ const STAGE_LABEL: Record<string, string> = {
   open: 'Open', quarterfinals: 'Quarterfinals', semifinals: 'Semifinals', regional: 'Regionals', games: 'Games',
 };
 
-type TimeDomain = 'short' | 'mid' | 'long';
-type Scope = 'mine' | 'all';
+export type TimeDomain = 'short' | 'mid' | 'long';
+export type Scope = 'mine' | 'all';
 
-interface Filter {
+export interface Filter {
   movement?: string;
   timeDomain?: TimeDomain;
   year?: number;
@@ -42,14 +43,20 @@ export default function CompetitionExplorer({
   history,
   userId,
   userAge,
+  scope,
+  setScope,
+  filter,
+  setFilter,
 }: {
   history: NormalizedCompetitionHistory;
   userId: string;
   userAge: number | null;
+  scope: Scope;
+  setScope: Dispatch<SetStateAction<Scope>>;
+  filter: Filter;
+  setFilter: Dispatch<SetStateAction<Filter>>;
 }) {
   const ageBand = ageBandFor(userAge);
-  const [scope, setScope] = useState<Scope>('mine');
-  const [filter, setFilter] = useState<Filter>({});
   const [selectedWorkout, setSelectedWorkout] = useState<CompetitionWorkoutEntry | null>(null);
   const [selectedCatalogWorkout, setSelectedCatalogWorkout] = useState<CatalogWorkoutSummary | null>(null);
   // "Try it" — the workout being logged + ids logged this session (optimistic
