@@ -8,11 +8,12 @@
  *                         plus a paste-ID fallback for direct entry
  *   - Pending-confirm   → identity card + permanence warning + checkbox + Link
  *   - Linked            → when the rich `all_results` bundle is present: a
- *                         Summary / Map / Movements tab strip (Summary =
- *                         compact résumé + stats + wins; Map = CompetitionExplorer;
- *                         Movements = the fingerprint list, drilling into a
- *                         pre-filtered Map). Otherwise the recent-results
- *                         fallback. Plus an admin-only "clear linkage" override.
+ *                         Summary / Map / Movements tab strip (Summary = the
+ *                         identity line — name · seasons · workout count;
+ *                         Map = CompetitionExplorer; Movements = the fingerprint
+ *                         list, drilling into a pre-filtered Map). Otherwise the
+ *                         recent-results fallback. Plus an admin-only "clear
+ *                         linkage" override.
  *
  * Self-contained: owns its own state, talks to search-competition-athletes +
  * verify-competition-athlete, and writes the linkage to athlete_profiles
@@ -96,15 +97,8 @@ interface Props {
   isAdmin: boolean;
   initialLinkedId: string | null;
   initialLinkedLabel: string | null;
-  initialLinkedPhotoUrl: string | null;
-  initialLinkedBestFinish: string | null;
   /** Called after a successful link/unlink so the host page can refresh. */
-  onLinkageChange?: (next: {
-    id: string | null;
-    label: string | null;
-    photoUrl: string | null;
-    bestFinish: string | null;
-  }) => void;
+  onLinkageChange?: (next: { id: string | null; label: string | null }) => void;
 }
 
 type Mode = 'unlinked' | 'pending-confirm' | 'linked';
@@ -157,15 +151,11 @@ export default function CompetitionHistoryExperience({
   isAdmin,
   initialLinkedId,
   initialLinkedLabel,
-  initialLinkedPhotoUrl,
-  initialLinkedBestFinish,
   onLinkageChange,
 }: Props) {
   const [mode, setMode] = useState<Mode>(initialLinkedId ? 'linked' : 'unlinked');
   const [linkedId, setLinkedId] = useState<string | null>(initialLinkedId);
   const [linkedLabel, setLinkedLabel] = useState<string | null>(initialLinkedLabel);
-  const [linkedPhotoUrl, setLinkedPhotoUrl] = useState<string | null>(initialLinkedPhotoUrl);
-  const [linkedBestFinish, setLinkedBestFinish] = useState<string | null>(initialLinkedBestFinish);
 
   // Search flow (unlinked mode)
   const [searchQuery, setSearchQuery] = useState('');
@@ -305,6 +295,8 @@ export default function CompetitionHistoryExperience({
     setSaveError(null);
     const id = pendingBundle.identity.competitor_id;
     const label = pendingBundle.identity.name;
+    // photo_url / best_finish carry into the DB row for later use (affiliate
+    // roster etc.) — the competition-history surface itself no longer shows them.
     const photoUrl = pendingSearchResult?.photo_url ?? null;
     const bestFinish = pendingSearchResult?.best_finish ?? null;
     const { error } = await supabase
@@ -327,8 +319,6 @@ export default function CompetitionHistoryExperience({
     }
     setLinkedId(id);
     setLinkedLabel(label);
-    setLinkedPhotoUrl(photoUrl);
-    setLinkedBestFinish(bestFinish);
     setLinkedBundle(pendingBundle);
     setPendingBundle(null);
     setPendingSearchResult(null);
@@ -338,7 +328,7 @@ export default function CompetitionHistoryExperience({
     setSearchResults([]);
     setSearchError(null);
     setMode('linked');
-    onLinkageChange?.({ id, label, photoUrl, bestFinish });
+    onLinkageChange?.({ id, label });
   };
 
   // Admin-only override — clears the linkage so a different ID can be tested.
@@ -367,8 +357,6 @@ export default function CompetitionHistoryExperience({
     }
     setLinkedId(null);
     setLinkedLabel(null);
-    setLinkedPhotoUrl(null);
-    setLinkedBestFinish(null);
     setLinkedBundle(null);
     setPendingSearchResult(null);
     setPasteId('');
@@ -376,7 +364,7 @@ export default function CompetitionHistoryExperience({
     setSearchResults([]);
     setSearchError(null);
     setMode('unlinked');
-    onLinkageChange?.({ id: null, label: null, photoUrl: null, bestFinish: null });
+    onLinkageChange?.({ id: null, label: null });
   };
 
   return (
@@ -590,18 +578,11 @@ export default function CompetitionHistoryExperience({
 
             const summaryPanel = (
               <div>
-                {/* Compact résumé */}
-                <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-                  <Avatar name={linkedBundle.identity.name} photoUrl={linkedPhotoUrl} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 18, fontWeight: 700 }}>{linkedBundle.identity.name}</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>
-                      {TIER_LABEL[cs.overall_competitive_tier]} · {cs.seasons_competed} season{cs.seasons_competed === 1 ? '' : 's'}
-                      {linkedBestFinish ? ` · best: ${linkedBestFinish}` : ''}
-                      {h.total > 0 ? ` · ${h.total} competition workout${h.total === 1 ? '' : 's'}` : ''}
-                      {profileLink && <> · {profileLink}</>}
-                    </div>
-                  </div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{linkedBundle.identity.name}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2, marginBottom: 4 }}>
+                  {cs.seasons_competed} season{cs.seasons_competed === 1 ? '' : 's'}
+                  {h.total > 0 ? ` · ${h.total} competition workout${h.total === 1 ? '' : 's'}` : ''}
+                  {profileLink && <> · {profileLink}</>}
                 </div>
               </div>
             );

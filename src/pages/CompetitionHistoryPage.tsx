@@ -20,8 +20,6 @@ import CompetitionHistoryExperience from '../components/competitionHistory/Compe
 interface Linkage {
   id: string | null;
   label: string | null;
-  photoUrl: string | null;
-  bestFinish: string | null;
 }
 
 export default function CompetitionHistoryPage({ session }: { session: Session }) {
@@ -29,14 +27,14 @@ export default function CompetitionHistoryPage({ session }: { session: Session }
   const { isAdmin, loading: entLoading } = useEntitlements(session.user.id);
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [linkage, setLinkage] = useState<Linkage>({ id: null, label: null, photoUrl: null, bestFinish: null });
+  const [linkage, setLinkage] = useState<Linkage>({ id: null, label: null });
   const [age, setAge] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     supabase
       .from('athlete_profiles')
-      .select('competition_athlete_id, competition_athlete_label, competition_athlete_photo_url, competition_athlete_best_finish, age')
+      .select('competition_athlete_id, competition_athlete_label, age')
       .eq('user_id', session.user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -46,8 +44,6 @@ export default function CompetitionHistoryPage({ session }: { session: Session }
           setLinkage({
             id: (d.competition_athlete_id as string | null) ?? null,
             label: (d.competition_athlete_label as string | null) ?? null,
-            photoUrl: (d.competition_athlete_photo_url as string | null) ?? null,
-            bestFinish: (d.competition_athlete_best_finish as string | null) ?? null,
           });
           const a = d.age == null ? NaN : Number(d.age);
           setAge(Number.isFinite(a) ? a : null);
@@ -84,8 +80,6 @@ export default function CompetitionHistoryPage({ session }: { session: Session }
               isAdmin={isAdmin}
               initialLinkedId={linkage.id}
               initialLinkedLabel={linkage.label}
-              initialLinkedPhotoUrl={linkage.photoUrl}
-              initialLinkedBestFinish={linkage.bestFinish}
               onLinkageChange={setLinkage}
             />
           )}
