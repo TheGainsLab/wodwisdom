@@ -1362,6 +1362,33 @@ export default function AthletePage({ session }: { session: Session }) {
                   </CollapsibleSection>
                 </TierCard>
 
+                {/* Tier 4 — competition history. Sits directly under the intake
+                    tiers (1–3); the feature itself is the /competition-history
+                    route. Phase B v1: admin only. */}
+                {isAdmin && (
+                  <div className="settings-card">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: competitionAthleteId ? '#2ec486' : 'var(--accent)' }}>Tier 4</span>
+                      {competitionAthleteId && <span style={{ fontSize: 12, color: '#2ec486', fontWeight: 700 }}>Linked ✓</span>}
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· optional, admin only</span>
+                    </div>
+                    <h2 className="settings-card-title" style={{ marginBottom: 2 }}>Competition History</h2>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
+                      {competitionAthleteId
+                        ? `Linked: ${competitionAthleteLabel ?? 'your CrossFit profile'}`
+                        : 'Link your CrossFit competition profile — your Open / Quarterfinals / Games history, a completion map, and throwbacks.'}
+                    </div>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      style={{ padding: '8px 16px', fontSize: 13 }}
+                      onClick={() => navigate('/competition-history')}
+                    >
+                      {competitionAthleteId ? 'View your competition history →' : 'Link your competition profile →'}
+                    </button>
+                  </div>
+                )}
+
                 {(() => {
                   // Credit gate. Free users get one manual eval (server-enforced
                   // via consume_eval_credit). Admins bypass. Once exhausted, the
@@ -1558,33 +1585,6 @@ export default function AthletePage({ session }: { session: Session }) {
                     );
                   })()}
                   </CollapsibleSection>
-                )}
-
-                {/* Tier 4 — competition history. The card lives here like Tiers
-                    1–3; the feature itself is the /competition-history route.
-                    Phase B v1: admin only. */}
-                {isAdmin && (
-                  <div className="settings-card">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: competitionAthleteId ? '#2ec486' : 'var(--accent)' }}>Tier 4</span>
-                      {competitionAthleteId && <span style={{ fontSize: 12, color: '#2ec486', fontWeight: 700 }}>Linked ✓</span>}
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· optional, admin only</span>
-                    </div>
-                    <h2 className="settings-card-title" style={{ marginBottom: 2 }}>Competition History</h2>
-                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
-                      {competitionAthleteId
-                        ? `Linked: ${competitionAthleteLabel ?? 'your CrossFit profile'}`
-                        : 'Link your CrossFit competition profile — your Open / Quarterfinals / Games history, a completion map, and throwbacks.'}
-                    </div>
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ padding: '8px 16px', fontSize: 13 }}
-                      onClick={() => navigate('/competition-history')}
-                    >
-                      {competitionAthleteId ? 'View your competition history →' : 'Link your competition profile →'}
-                    </button>
-                  </div>
                 )}
               </>
             )}
