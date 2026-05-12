@@ -317,17 +317,11 @@ export function normalizeCatalog(
   return { seasons, byId, total: all.length };
 }
 
-/** Which season years to render collapsed by default: none when the grid is
- *  small (< ~40 cells), otherwise everything but the most recent
- *  `keepExpanded` seasons. `seasonsNewestFirst` is the season list in display
- *  order (year desc). */
-export function initialCollapsedSeasons(
-  seasonsNewestFirst: number[],
-  totalCells: number,
-  keepExpanded = 2,
-): Set<number> {
-  if (totalCells < 40 || seasonsNewestFirst.length <= keepExpanded) return new Set();
-  return new Set(seasonsNewestFirst.slice(keepExpanded));
+/** Which season years to render collapsed by default — all of them. The user
+ *  expands the years they care about (and "Expand all" un-collapses everything).
+ *  `seasonsNewestFirst` is the season list in display order (year desc). */
+export function initialCollapsedSeasons(seasonsNewestFirst: number[]): Set<number> {
+  return new Set(seasonsNewestFirst);
 }
 
 /** Mean cohort_percentile across a set of the athlete's entries (skips

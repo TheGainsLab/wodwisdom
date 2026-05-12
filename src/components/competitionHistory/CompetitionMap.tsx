@@ -6,9 +6,10 @@
  *
  * Seasons collapse: each year header is a ▾/▸ toggle; collapsed seasons show a
  * one-line summary (`2020 · 11/20 · 77.6` — done / season-total / avg cohort
- * pct over the ones done). By default the most recent ~2 seasons are expanded;
- * an "Expand all / Collapse all" link is offered. While a filter is active the
- * collapse machinery steps aside and every matching season renders open.
+ * pct over the ones done). Every season starts collapsed; tapping a year header
+ * expands it, and an "Expand all / Collapse all" link is offered. While a
+ * filter is active the collapse machinery steps aside and every matching season
+ * renders open.
  */
 
 import { useState } from 'react';
@@ -136,7 +137,7 @@ export default function CompetitionMap({
   matchWorkout?: (w: CatalogWorkoutSummary) => boolean;
 }) {
   const [collapsed, setCollapsed] = useState<Set<number>>(
-    () => initialCollapsedSeasons(catalog.seasons.map((s) => s.season), catalog.total),
+    () => initialCollapsedSeasons(catalog.seasons.map((s) => s.season)),
   );
 
   if (catalog.total === 0) {

@@ -7,11 +7,10 @@
  * cells with the name. Tap a cell → onSelectWorkout.
  *
  * Seasons collapse: each year header is a ▾/▸ toggle; collapsed seasons show a
- * one-line summary (`2020 · 24 workouts · 92.3` — count + avg cohort pct). By
- * default the most recent ~2 seasons are expanded (or all, if the grid is
- * small); an "Expand all / Collapse all" link is offered. While a filter is
- * active the collapse machinery steps aside and every matching season renders
- * open.
+ * one-line summary (`2020 · 24 workouts · 92.3` — count + avg cohort pct).
+ * Every season starts collapsed; tapping a year header expands it, and an
+ * "Expand all / Collapse all" link is offered. While a filter is active the
+ * collapse machinery steps aside and every matching season renders open.
  *
  * v1: every cell is a real-competition result. Stage is conveyed by a subtle
  * accent (Games cells get a gold top-bar). When throwback logging lands, the
@@ -119,7 +118,7 @@ export default function CompetitionGrid({
   matchEntry?: (entry: CompetitionWorkoutEntry) => boolean;
 }) {
   const [collapsed, setCollapsed] = useState<Set<number>>(
-    () => initialCollapsedSeasons(history.yearsCompeted, history.total),
+    () => initialCollapsedSeasons(history.yearsCompeted),
   );
 
   if (history.total === 0) {
