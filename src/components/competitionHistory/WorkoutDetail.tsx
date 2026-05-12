@@ -1,12 +1,13 @@
 /**
  * WorkoutDetail — the universal leaf, shown when a grid cell is tapped.
  *
- * v1 = "you have a score" (Version A), thin-but-real: header + prescription +
- * movement chips + your score + the two-cut ranking (vs your age cohort, vs
- * all of your gender). No field-level stats (cohort averages / percentile
- * curves) — that's the catalog endpoint (#8). No projection / "try it" — that
- * needs the throwback log + catalog. Movement chips are display-only for now;
- * they become drill-down links once the lens filter exists.
+ * v1 = "you have a score" (Version A), thin-but-real: header (name + metadata
+ * badges) + prescription + your score + the two-cut ranking (vs your age
+ * cohort, vs all of your gender). No field-level stats (cohort averages /
+ * percentile curves) — that's the catalog endpoint (#8). No projection / "try
+ * it" — that needs the throwback log + catalog. (Browsing by movement lives on
+ * the Movements tab, so there are no movement chips here — the prescription
+ * already lists every movement.)
  *
  * Rendered as a modal overlay so it doesn't shift the page underneath.
  */
@@ -122,27 +123,6 @@ export default function WorkoutDetail({
             ×
           </button>
         </div>
-
-        {/* Movement chips */}
-        {w.movements.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
-            {w.movements.map((m) => (
-              <span
-                key={`${m.position}-${m.name}`}
-                style={{
-                  fontSize: 12,
-                  padding: '3px 8px',
-                  background: 'var(--surface2)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 999,
-                  color: 'var(--text-dim)',
-                }}
-              >
-                {m.name}
-              </span>
-            ))}
-          </div>
-        )}
 
         {/* Prescription */}
         {w.description && (
