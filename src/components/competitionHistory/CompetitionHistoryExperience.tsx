@@ -120,38 +120,6 @@ const TIER_LABEL: Record<BundleSummary['overall_competitive_tier'], string> = {
   games_athlete: 'Games Athlete',
 };
 
-function ordinal(n: number): string {
-  const m100 = n % 100;
-  if (m100 >= 11 && m100 <= 13) return `${n}th`;
-  switch (n % 10) {
-    case 1: return `${n}st`;
-    case 2: return `${n}nd`;
-    case 3: return `${n}rd`;
-    default: return `${n}th`;
-  }
-}
-
-// Plain-English career direction (the raw pp/year slope belongs under the
-// career-arc chart, when that lands — not in the summary line).
-function trendPhrase(trend: BundleTrend): string {
-  switch (trend.direction) {
-    case 'improving': return 'Trending up';
-    case 'declining': return 'Sliding back';
-    case 'plateau': return 'Holding steady';
-    case 'new': return 'Just getting started';
-    default: return trend.direction;
-  }
-}
-
-// Plain-English season-to-season spread (replaces "4.2 stddev (steady)").
-// null when we don't have enough seasons to say.
-function consistencyPhrase(c: number | null): string | null {
-  if (c == null) return null;
-  if (c < 5) return 'steady season to season';
-  if (c < 15) return 'fairly steady';
-  return 'up and down season to season';
-}
-
 function Avatar({ name, photoUrl }: { name: string; photoUrl: string | null }) {
   const [broken, setBroken] = useState(false);
   const real = !!photoUrl && !photoUrl.endsWith(PLACEHOLDER_PHOTO_SUFFIX) && !broken;
@@ -637,14 +605,6 @@ export default function CompetitionHistoryExperience({
                       {profileLink && <> · {profileLink}</>}
                     </div>
                   </div>
-                </div>
-
-                <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 4 }}>
-                  {[
-                    trendPhrase(cs.trend),
-                    consistencyPhrase(cs.consistency),
-                    `latest finish ${ordinal(Math.round(cs.latest_percentile))} percentile`,
-                  ].filter(Boolean).join(' · ')}
                 </div>
 
                 {h.total > 0 && (
