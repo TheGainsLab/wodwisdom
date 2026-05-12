@@ -27,10 +27,6 @@ import { normalizeCompetitionHistory } from '../../lib/competitionHistory';
 import CompetitionExplorer, { type Scope, type Filter } from './CompetitionExplorer';
 import MovementsPanel from './MovementsPanel';
 
-const STAGE_LABEL: Record<string, string> = {
-  open: 'Open', quarterfinals: 'Quarterfinals', semifinals: 'Semifinals', regional: 'Regionals', games: 'Games',
-};
-
 type ExperienceTab = 'summary' | 'map' | 'movements';
 
 interface BundleIdentity {
@@ -602,17 +598,11 @@ export default function CompetitionHistoryExperience({
                     <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>
                       {TIER_LABEL[cs.overall_competitive_tier]} · {cs.seasons_competed} season{cs.seasons_competed === 1 ? '' : 's'}
                       {linkedBestFinish ? ` · best: ${linkedBestFinish}` : ''}
+                      {h.total > 0 ? ` · ${h.total} competition workout${h.total === 1 ? '' : 's'}` : ''}
                       {profileLink && <> · {profileLink}</>}
                     </div>
                   </div>
                 </div>
-
-                {h.total > 0 && (
-                  <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 4 }}>
-                    {h.total} competition workout{h.total === 1 ? '' : 's'} · {h.yearsCompeted.length} season{h.yearsCompeted.length === 1 ? '' : 's'}
-                    {h.stagesSeen.length > 0 ? ` · ${h.stagesSeen.map((s) => STAGE_LABEL[s] ?? s).join(' / ')}` : ''}
-                  </div>
-                )}
               </div>
             );
 
