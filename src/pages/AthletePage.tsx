@@ -1366,7 +1366,7 @@ export default function AthletePage({ session }: { session: Session }) {
                     tiers (1–3); the feature itself is the /competition-history
                     route. Phase B v1: admin only. */}
                 {isAdmin && (
-                  <div className="settings-card">
+                  <div className="settings-card" style={{ borderColor: competitionAthleteId ? '#2ec486' : undefined }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                       <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: competitionAthleteId ? '#2ec486' : 'var(--accent)' }}>Tier 4</span>
                       {competitionAthleteId && <span style={{ fontSize: 12, color: '#2ec486', fontWeight: 700 }}>Linked ✓</span>}
