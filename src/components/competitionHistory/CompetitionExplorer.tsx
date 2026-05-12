@@ -208,75 +208,80 @@ export default function CompetitionExplorer({
         {scopeBtn('all', 'All competition workouts')}
       </div>
 
-      {/* Filter bar */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-        <select
-          className="lift-input"
-          value={filter.movement ?? ''}
-          onChange={(e) => setFilter((f) => ({ ...f, movement: e.target.value || undefined }))}
-          style={{ flex: '0 1 auto', maxWidth: 220 }}
-        >
-          <option value="">All movements</option>
-          {movementsByName.map((m) => (
-            <option key={m.name} value={m.name}>{m.name} ({m.workoutCount})</option>
-          ))}
-        </select>
+      {/* Filter bar — on mobile the two dropdowns get their own row, then the
+          time-domain buttons + clear + count below. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <select
+            className="lift-input"
+            value={filter.movement ?? ''}
+            onChange={(e) => setFilter((f) => ({ ...f, movement: e.target.value || undefined }))}
+            style={{ flex: '1 1 150px', minWidth: 0 }}
+          >
+            <option value="">All movements</option>
+            {movementsByName.map((m) => (
+              <option key={m.name} value={m.name}>{m.name} ({m.workoutCount})</option>
+            ))}
+          </select>
 
-        <div style={{ display: 'flex', gap: 4 }}>
-          {(['', ...TIME_DOMAINS] as Array<'' | TimeDomain>).map((td) => {
-            const active = (filter.timeDomain ?? '') === td;
-            return (
-              <button
-                key={td || 'all'}
-                type="button"
-                onClick={() => setFilter((f) => ({ ...f, timeDomain: td || undefined }))}
-                style={{
-                  padding: '6px 10px', fontSize: 12, borderRadius: 6,
-                  border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                  background: active ? 'var(--accent)' : 'var(--surface2)',
-                  color: active ? '#fff' : 'var(--text)', cursor: 'pointer', fontFamily: 'inherit',
-                }}
-              >
-                {td === '' ? 'Any time' : td}
-              </button>
-            );
-          })}
+          <select
+            className="lift-input"
+            value={filter.year ?? ''}
+            onChange={(e) => setFilter((f) => ({ ...f, year: e.target.value ? Number(e.target.value) : undefined }))}
+            style={{ flex: '1 1 110px', minWidth: 0 }}
+          >
+            <option value="">All years</option>
+            {(scope === 'all' && catalog
+              ? catalog.seasons.map((s) => s.season)
+              : history.yearsCompeted
+            ).map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
         </div>
 
-        <select
-          className="lift-input"
-          value={filter.year ?? ''}
-          onChange={(e) => setFilter((f) => ({ ...f, year: e.target.value ? Number(e.target.value) : undefined }))}
-          style={{ flex: '0 0 auto' }}
-        >
-          <option value="">All years</option>
-          {(scope === 'all' && catalog
-            ? catalog.seasons.map((s) => s.season)
-            : history.yearsCompeted
-          ).map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['', ...TIME_DOMAINS] as Array<'' | TimeDomain>).map((td) => {
+              const active = (filter.timeDomain ?? '') === td;
+              return (
+                <button
+                  key={td || 'all'}
+                  type="button"
+                  onClick={() => setFilter((f) => ({ ...f, timeDomain: td || undefined }))}
+                  style={{
+                    padding: '6px 10px', fontSize: 12, borderRadius: 6,
+                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                    background: active ? 'var(--accent)' : 'var(--surface2)',
+                    color: active ? '#fff' : 'var(--text)', cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >
+                  {td === '' ? 'Any time' : td}
+                </button>
+              );
+            })}
+          </div>
 
-        {isFiltered && (
-          <button
-            type="button"
-            onClick={() => setFilter({})}
-            style={{
-              padding: '6px 10px', fontSize: 12, borderRadius: 6,
-              border: '1px solid var(--border)', background: 'none',
-              color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit',
-            }}
-          >
-            Clear
-          </button>
-        )}
+          {isFiltered && (
+            <button
+              type="button"
+              onClick={() => setFilter({})}
+              style={{
+                padding: '6px 10px', fontSize: 12, borderRadius: 6,
+                border: '1px solid var(--border)', background: 'none',
+                color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              Clear
+            </button>
+          )}
 
-        {scope === 'mine' && (
-          <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 'auto' }}>
-            {isFiltered ? `showing ${matchedCount} of ${history.total}` : `${history.total} workouts`}
-          </span>
-        )}
+          {scope === 'mine' && (
+            <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 'auto' }}>
+              {isFiltered ? `showing ${matchedCount} of ${history.total}` : `${history.total} workouts`}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* The grid / map */}
