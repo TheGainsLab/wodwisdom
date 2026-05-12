@@ -7,10 +7,12 @@
  * cells with the name. Tap a cell → onSelectWorkout.
  *
  * Seasons collapse: each year header is a ▾/▸ toggle; collapsed seasons show a
- * one-line summary (`2020 · 24 workouts · 92.3` — count + avg cohort pct).
- * Every season starts collapsed; tapping a year header expands it, and an
- * "Expand all / Collapse all" link is offered. While a filter is active the
- * collapse machinery steps aside and every matching season renders open.
+ * one-line, per-stage summary (`2020 · Open 5 · 99 · QF 3 · 88 · Games 8 · 31`
+ * — count + avg cohort pct within each stage; percentiles aren't averaged
+ * across stages since the fields aren't comparable). Every season starts
+ * collapsed; tapping a year header expands it, and an "Expand all / Collapse
+ * all" link is offered. While a filter is active the collapse machinery steps
+ * aside and every matching season renders open.
  *
  * v1: every cell is a real-competition result. Stage is conveyed by a subtle
  * accent (Games cells get a gold top-bar). When throwback logging lands, the
@@ -29,6 +31,15 @@ const STAGE_LABEL: Record<string, string> = {
   open: 'Open',
   quarterfinals: 'Quarterfinals',
   semifinals: 'Semifinals',
+  regional: 'Regionals',
+  games: 'Games',
+};
+
+// Shorter labels for the collapsed-season summary line.
+const STAGE_ABBR: Record<string, string> = {
+  open: 'Open',
+  quarterfinals: 'QF',
+  semifinals: 'Semis',
   regional: 'Regionals',
   games: 'Games',
 };
@@ -68,11 +79,19 @@ function Cell({ entry, onClick }: { entry: CompetitionWorkoutEntry; onClick: () 
   );
 }
 
+// Per-stage breakout: `Open 5 · 99 · QF 3 · 88 · Games 8 · 31`. (The "Mine"
+// grid only carries stages the athlete has entries in — no 0-count stages to
+// skip; and no /total since the catalog isn't loaded here.) Averaging the
+// cohort percentile *across* stages would be meaningless — an Open workout's
+// field is ~300k, a Games event's is ~40 — so each stage gets its own number.
 function seasonSummary(season: SeasonGroup): string {
-  const entries = season.stages.flatMap((s) => s.entries);
-  const avg = avgCohortPercentile(entries);
-  const n = entries.length;
-  return `${n} workout${n === 1 ? '' : 's'}${avg != null ? ` · ${avg.toFixed(1)}` : ''}`;
+  return season.stages
+    .map((st) => {
+      const label = STAGE_ABBR[st.stage] ?? st.stage;
+      const avg = avgCohortPercentile(st.entries);
+      return `${label} ${st.entries.length}${avg != null ? ` · ${Math.round(avg)}` : ''}`;
+    })
+    .join(' · ');
 }
 
 function SeasonHeader({

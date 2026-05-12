@@ -5,11 +5,13 @@
  * haven't done this" card). The collect-them-all map.
  *
  * Seasons collapse: each year header is a ▾/▸ toggle; collapsed seasons show a
- * one-line summary (`2020 · 11/20 · 77.6` — done / season-total / avg cohort
- * pct over the ones done). Every season starts collapsed; tapping a year header
- * expands it, and an "Expand all / Collapse all" link is offered. While a
- * filter is active the collapse machinery steps aside and every matching season
- * renders open.
+ * one-line, per-stage summary (`2020 · Open 5/5 · 99 · QF 3/3 · 88 · Games
+ * 8/14 · 31` — done / stage-total + the avg cohort pct within that stage;
+ * stages with zero done are skipped, percentiles aren't averaged across stages
+ * since the fields aren't comparable). Every season starts collapsed; tapping a
+ * year header expands it, and an "Expand all / Collapse all" link is offered.
+ * While a filter is active the collapse machinery steps aside and every
+ * matching season renders open.
  */
 
 import { useState } from 'react';
@@ -25,6 +27,15 @@ const STAGE_LABEL: Record<string, string> = {
   open: 'Open',
   quarterfinals: 'Quarterfinals',
   semifinals: 'Semifinals',
+  regional: 'Regionals',
+  games: 'Games',
+};
+
+// Shorter labels for the collapsed-season summary line.
+const STAGE_ABBR: Record<string, string> = {
+  open: 'Open',
+  quarterfinals: 'QF',
+  semifinals: 'Semis',
   regional: 'Regionals',
   games: 'Games',
 };
@@ -73,17 +84,29 @@ function Cell({
   );
 }
 
+// Per-stage breakout: `Open 5/5 · 99 · QF 3/3 · 88 · Games 8/14 · 31` — done /
+// stage-total + the avg cohort percentile *within that stage*. Stages the
+// athlete has zero of are skipped (no point telling someone they did 0/14
+// Games events when they never made the Quarterfinals). Averaging the
+// percentile across stages would be meaningless (an Open workout's field is
+// ~300k, a Games event's is ~40), hence the per-stage split. Falls back to
+// `0/<seasonTotal>` for a season with nothing done.
 function seasonSummary(
   season: CatalogSeasonGroup,
   filledIds: Set<string>,
   entryById?: Record<string, CompetitionWorkoutEntry>,
 ): string {
-  const workouts = season.stages.flatMap((st) => st.workouts);
-  const filled = workouts.filter((w) => filledIds.has(w.competition_workout_id));
-  const head = `${filled.length}/${workouts.length}`;
-  if (filled.length === 0 || !entryById) return head;
-  const avg = avgCohortPercentile(filled.map((w) => entryById[w.competition_workout_id]));
-  return avg != null ? `${head} · ${avg.toFixed(1)}` : head;
+  const parts: string[] = [];
+  let seasonTotal = 0;
+  for (const st of season.stages) {
+    seasonTotal += st.workouts.length;
+    const filled = st.workouts.filter((w) => filledIds.has(w.competition_workout_id));
+    if (filled.length === 0) continue;
+    const label = STAGE_ABBR[st.stage] ?? st.stage;
+    const avg = avgCohortPercentile(filled.map((w) => entryById?.[w.competition_workout_id]));
+    parts.push(`${label} ${filled.length}/${st.workouts.length}${avg != null ? ` · ${Math.round(avg)}` : ''}`);
+  }
+  return parts.length > 0 ? parts.join(' · ') : `0/${seasonTotal}`;
 }
 
 function SeasonHeader({
