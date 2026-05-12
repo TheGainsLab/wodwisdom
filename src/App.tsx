@@ -28,6 +28,7 @@ const AdminWorkoutLogDetailPage = lazy(() => import('./pages/AdminWorkoutLogDeta
 const AdminProgramsPage = lazy(() => import('./pages/AdminProgramsPage'));
 const AdminNutritionPage = lazy(() => import('./pages/AdminNutritionPage'));
 const AthletePage = lazy(() => import('./pages/AthletePage'));
+const CompetitionHistoryPage = lazy(() => import('./pages/CompetitionHistoryPage'));
 const WorkoutReviewPage = lazy(() => import('./pages/WorkoutReviewPage'));
 const StartWorkoutPage = lazy(() => import('./pages/StartWorkoutPage'));
 const TrainingLogPage = lazy(() => import('./pages/TrainingLogPage'));
@@ -164,6 +165,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/bookmarks" element={<BookmarksPage session={session} />} />
             <Route path="/settings" element={<SettingsPage session={session} />} />
             <Route path="/profile" element={<AthletePage session={session} />} />
+            <Route path="/competition-history" element={<CompetitionHistoryPage session={session} />} />
             <Route path="/admin" element={<AdminPage session={session} />} />
             <Route path="/admin/ratings" element={<AdminRatingsPage session={session} />} />
             <Route path="/admin/users/:id" element={<AdminUserDetailPage session={session} />} />

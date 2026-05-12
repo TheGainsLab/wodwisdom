@@ -58,7 +58,7 @@ const tabs = [
     key: 'settings',
     label: 'Settings',
     path: '/settings',
-    match: (p: string) => p === '/settings' || p === '/profile' || p === '/checkout',
+    match: (p: string) => p === '/settings' || p === '/profile' || p === '/checkout' || p === '/competition-history',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="12" cy="12" r="3" />

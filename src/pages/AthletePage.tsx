@@ -7,7 +7,6 @@ import { calculateTDEE } from '../utils/tdee';
 import { getTierStatus, type AthleteProfileInput, type TierSection } from '../utils/tier-status';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
-import CompetitionHistorySection from '../components/CompetitionHistorySection';
 import { formatMarkdown } from '../lib/formatMarkdown';
 
 const LIFT_GROUPS = [
@@ -455,11 +454,11 @@ export default function AthletePage({ session }: { session: Session }) {
   const evalHistoryRef = useRef<HTMLDivElement | null>(null);
   const [evalCreditsRemaining, setEvalCreditsRemaining] = useState<number>(1);
 
-  // Tier 4 — competition history linkage (Phase B v1, admin only)
-  const [initialCompetitionAthleteId, setInitialCompetitionAthleteId] = useState<string | null>(null);
-  const [initialCompetitionAthleteLabel, setInitialCompetitionAthleteLabel] = useState<string | null>(null);
-  const [initialCompetitionAthletePhotoUrl, setInitialCompetitionAthletePhotoUrl] = useState<string | null>(null);
-  const [initialCompetitionAthleteBestFinish, setInitialCompetitionAthleteBestFinish] = useState<string | null>(null);
+  // Tier 4 — competition-history linkage. The /profile card only needs to know
+  // whether it's linked (and the athlete's name); the full experience lives at
+  // /competition-history.
+  const [competitionAthleteId, setCompetitionAthleteId] = useState<string | null>(null);
+  const [competitionAthleteLabel, setCompetitionAthleteLabel] = useState<string | null>(null);
 
   const fetchEvaluations = async () => {
     const [profileRes, trainingRes, nutritionRes] = await Promise.all([
@@ -502,7 +501,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, self_perception_level, eval_credits_remaining, competition_athlete_id, competition_athlete_label, competition_athlete_photo_url, competition_athlete_best_finish')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, self_perception_level, eval_credits_remaining, competition_athlete_id, competition_athlete_label')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -550,10 +549,8 @@ export default function AthletePage({ session }: { session: Session }) {
         setGoal(d.goal || '');
         setSelfPerceptionLevel(d.self_perception_level || '');
         setEvalCreditsRemaining(typeof d.eval_credits_remaining === 'number' ? d.eval_credits_remaining : 1);
-        setInitialCompetitionAthleteId((d as any).competition_athlete_id ?? null);
-        setInitialCompetitionAthleteLabel((d as any).competition_athlete_label ?? null);
-        setInitialCompetitionAthletePhotoUrl((d as any).competition_athlete_photo_url ?? null);
-        setInitialCompetitionAthleteBestFinish((d as any).competition_athlete_best_finish ?? null);
+        setCompetitionAthleteId((d as any).competition_athlete_id ?? null);
+        setCompetitionAthleteLabel((d as any).competition_athlete_label ?? null);
         setIsDirty(false);
       }
       if (evalRes.data) {
@@ -1563,16 +1560,31 @@ export default function AthletePage({ session }: { session: Session }) {
                   </CollapsibleSection>
                 )}
 
-                {/* Tier 4 — competition history linkage. Phase B v1: admin only. */}
+                {/* Tier 4 — competition history. The card lives here like Tiers
+                    1–3; the feature itself is the /competition-history route.
+                    Phase B v1: admin only. */}
                 {isAdmin && (
-                  <CompetitionHistorySection
-                    userId={session.user.id}
-                    userAge={age === '' ? null : (parseInt(age, 10) || null)}
-                    initialLinkedId={initialCompetitionAthleteId}
-                    initialLinkedLabel={initialCompetitionAthleteLabel}
-                    initialLinkedPhotoUrl={initialCompetitionAthletePhotoUrl}
-                    initialLinkedBestFinish={initialCompetitionAthleteBestFinish}
-                  />
+                  <div className="settings-card">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: competitionAthleteId ? '#2ec486' : 'var(--accent)' }}>Tier 4</span>
+                      {competitionAthleteId && <span style={{ fontSize: 12, color: '#2ec486', fontWeight: 700 }}>Linked ✓</span>}
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· optional, admin only</span>
+                    </div>
+                    <h2 className="settings-card-title" style={{ marginBottom: 2 }}>Competition History</h2>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
+                      {competitionAthleteId
+                        ? `Linked: ${competitionAthleteLabel ?? 'your CrossFit profile'}`
+                        : 'Link your CrossFit competition profile — your Open / Quarterfinals / Games history, a completion map, and throwbacks.'}
+                    </div>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      style={{ padding: '8px 16px', fontSize: 13 }}
+                      onClick={() => navigate('/competition-history')}
+                    >
+                      {competitionAthleteId ? 'View your competition history →' : 'Link your competition profile →'}
+                    </button>
+                  </div>
                 )}
               </>
             )}
