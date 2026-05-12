@@ -27,6 +27,7 @@ import type { AllResultsEntry } from '../../lib/competitionHistory';
 import { normalizeCompetitionHistory } from '../../lib/competitionHistory';
 import CompetitionExplorer, { type Scope, type Filter } from './CompetitionExplorer';
 import MovementsPanel from './MovementsPanel';
+import SummaryPanel, { type SignatureLite } from './SummaryPanel';
 
 type ExperienceTab = 'summary' | 'map' | 'movements';
 
@@ -70,6 +71,10 @@ interface Tier4Bundle {
   recent_raw_results: BundleRecentResult[];
   // Present only when fetched with include:['all_results'] (bundle 1.3.0).
   all_results?: AllResultsEntry[];
+  // Present only when fetched with include:['signature'] (bundle 1.5.0). Only
+  // the bits the Summary uses are typed here (the full shape lives in the edge
+  // fn's Tier4FitnessSignature).
+  fitness_signature?: SignatureLite;
 }
 
 interface SearchResult {
@@ -182,10 +187,15 @@ export default function CompetitionHistoryExperience({
   const [bundleError, setBundleError] = useState<string | null>(null);
 
   // Linked-state view: tab strip + the Map's scope/filter (lifted here so the
-  // Movements tab can switch to Map with a movement pre-applied).
+  // Movements / Summary tabs can switch to Map with a movement pre-applied).
   const [tab, setTab] = useState<ExperienceTab>('summary');
   const [scope, setScope] = useState<Scope>('mine');
   const [filter, setFilter] = useState<Filter>({});
+  const goToMapForMovement = (movement: string) => {
+    setScope('mine');
+    setFilter({ movement });
+    setTab('map');
+  };
 
   const competitionHistory = useMemo(
     () => normalizeCompetitionHistory(linkedBundle?.all_results),
@@ -205,7 +215,7 @@ export default function CompetitionHistoryExperience({
     (async () => {
       const { data, error } = await supabase.functions.invoke<{ bundle: Tier4Bundle; error?: string }>(
         'verify-competition-athlete',
-        { body: { competition_athlete_id: linkedId, include: ['all_results'] } },
+        { body: { competition_athlete_id: linkedId, include: ['all_results', 'signature'] } },
       );
       if (cancelled) return;
       setBundleLoading(false);
@@ -235,7 +245,7 @@ export default function CompetitionHistoryExperience({
 
     const { data, error } = await supabase.functions.invoke<{ bundle: Tier4Bundle; error?: string }>(
       'verify-competition-athlete',
-      { body: { competition_athlete_id: trimmed, include: ['all_results'] } },
+      { body: { competition_athlete_id: trimmed, include: ['all_results', 'signature'] } },
     );
     setVerifying(false);
 
@@ -569,26 +579,21 @@ export default function CompetitionHistoryExperience({
           )}
           {linkedBundle && (() => {
             const cs = linkedBundle.competition_summary;
-            const h = competitionHistory;
             const hasMap = !!(linkedBundle.all_results && linkedBundle.all_results.length > 0);
 
-            const profileLink = linkedBundle.identity.profile_url ? (
-              <a href={linkedBundle.identity.profile_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>profile ↗</a>
-            ) : null;
-
             const summaryPanel = (
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>{linkedBundle.identity.name}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2, marginBottom: 4 }}>
-                  {cs.seasons_competed} season{cs.seasons_competed === 1 ? '' : 's'}
-                  {h.total > 0 ? ` · ${h.total} competition workout${h.total === 1 ? '' : 's'}` : ''}
-                  {profileLink && <> · {profileLink}</>}
-                </div>
-              </div>
+              <SummaryPanel
+                name={linkedBundle.identity.name}
+                profileUrl={linkedBundle.identity.profile_url}
+                seasonsCompeted={cs.seasons_competed}
+                history={competitionHistory}
+                signature={linkedBundle.fitness_signature}
+                onPickMovement={goToMapForMovement}
+              />
             );
 
             if (!hasMap) {
-              // No rich all_results bundle — résumé + the recent-results fallback, no tabs.
+              // No rich all_results bundle — the brief overview + the recent-results fallback, no tabs.
               return (
                 <>
                   {summaryPanel}
@@ -663,10 +668,7 @@ export default function CompetitionHistoryExperience({
                 </div>
 
                 {tab === 'movements' && (
-                  <MovementsPanel
-                    history={competitionHistory}
-                    onPick={(name) => { setScope('mine'); setFilter({ movement: name }); setTab('map'); }}
-                  />
+                  <MovementsPanel history={competitionHistory} onPick={goToMapForMovement} />
                 )}
               </>
             );
