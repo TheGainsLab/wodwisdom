@@ -618,11 +618,6 @@ export default function CompetitionHistoryExperience({
           {linkedBundle && (() => {
             const cs = linkedBundle.competition_summary;
             const h = competitionHistory;
-            const allWins = Object.values(h.byId)
-              .filter((e) => e.result.workout_rank === 1)
-              .sort((a, b) => b.year - a.year);
-            const wins = allWins.slice(0, 4);
-            const moreWins = allWins.length - wins.length;
             const hasMap = !!(linkedBundle.all_results && linkedBundle.all_results.length > 0);
 
             const profileLink = linkedBundle.identity.profile_url ? (
@@ -656,19 +651,6 @@ export default function CompetitionHistoryExperience({
                   <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 4 }}>
                     {h.total} competition workout{h.total === 1 ? '' : 's'} · {h.yearsCompeted.length} season{h.yearsCompeted.length === 1 ? '' : 's'}
                     {h.stagesSeen.length > 0 ? ` · ${h.stagesSeen.map((s) => STAGE_LABEL[s] ?? s).join(' / ')}` : ''}
-                  </div>
-                )}
-
-                {wins.length > 0 && (
-                  <div style={{ fontSize: 13, marginTop: 8 }}>
-                    <span style={{ color: 'var(--text-dim)' }}>Wins · </span>
-                    {wins.map((e, i) => (
-                      <span key={e.competition_workout_id}>
-                        {i > 0 ? ' · ' : ''}
-                        {e.workout_name} <span style={{ color: 'var(--text-dim)' }}>({e.year})</span>
-                      </span>
-                    ))}
-                    {moreWins > 0 && <span style={{ color: 'var(--text-dim)' }}> · +{moreWins} more</span>}
                   </div>
                 )}
               </div>
