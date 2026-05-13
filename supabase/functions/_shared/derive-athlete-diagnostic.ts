@@ -15,7 +15,6 @@ import { classifyPerLiftLevel, type PerLiftLevel } from "./level-interpreter.ts"
 import {
   ACCESSORY_POOLS,
   ALLOWED_SCHEMES,
-  COMPETITOR_BONUS,
   DELOAD_MODIFIER,
   FLAG_AFFECTED_LIFTS,
   LIFT_FLAG_CATEGORIES,
@@ -23,7 +22,6 @@ import {
   LOADING_CEILINGS,
   METCON_CATEGORIES,
   MOVEMENTS,
-  SCHEMES_REQUIRING_COMPETITOR_BONUS,
   SKILL_PREREQUISITES,
   SKILLS_TOP_N_ACTIVE,
   SYNTHETIC_LEVEL_ANCHOR,
@@ -59,17 +57,10 @@ export interface DiagnosticContext {
    * Tier 4 (linked competition history) augmentation context.
    * Pass `bundle` populated from fetchTier4Bundle when the athlete is
    * linked. The diagnostic interprets the bundle into the
-   * AthleteDiagnostic.competition slot and derives competitor_bonus_active.
+   * AthleteDiagnostic.competition slot.
    */
   tier4?: {
     bundle?: Tier4Bundle | null;
-    /**
-     * Optional explicit override for the competitor bonus. If omitted, the
-     * diagnostic computes it from the bundle: TRUE when the athlete's
-     * overall_competitive_tier is regionals or games_athlete, OR
-     * seasons_competed >= 10.
-     */
-    competitor_bonus_active?: boolean;
   };
 }
 
@@ -97,9 +88,9 @@ export interface LiftFlag {
 
 export interface LiftLoading {
   /**
-   * Max % of 1RM during weeks 1-3 (cycle ceiling, after any competitor
-   * bonus). Null for ratio-only lifts — those have no explicit ceiling
-   * defined; the AI works within the scheme menu and synthetic level.
+   * Max % of 1RM during weeks 1-3 (cycle ceiling). Null for ratio-only lifts —
+   * those have no explicit ceiling defined; the AI works within the scheme
+   * menu and synthetic level.
    */
   cycle_ceiling: number | null;
   /** Max % of 1RM during week 4 (deload). Null when cycle_ceiling is null. */
@@ -212,8 +203,6 @@ export interface CompetitionDiagnostic {
   };
   /** Std-dev of cohort percentile across last season's workouts; null if 1 workout. */
   consistency: number | null;
-  /** Whether the +3% loading bonus fires for this athlete. Mirrors meta.competitor_bonus_active. */
-  competitor_bonus_active: boolean;
   /** Curated trim of recent_raw_results for prose grounding (top-by-percentile, capped at 5). */
   recent_evidence: CompetitionRecentEvidence[];
   /**
@@ -241,7 +230,6 @@ export interface DiagnosticMeta {
     lifts: boolean;  // at least one of the 4 BW-classified lifts present
     skills: boolean; // at least one skill rated
   };
-  competitor_bonus_active: boolean;
 }
 
 export interface AthleteDiagnostic {
@@ -395,19 +383,9 @@ export function deriveSyntheticLevels(
 // Step 6 — loading ceilings + scheme menus
 // ============================================================
 
-/**
- * Resolve the scheme menu for a per-lift level. The competitor bonus only
- * unlocks the very-top schemes (1RM attempt) and only at advanced level.
- */
-function selectAllowedSchemes(
-  level: PerLiftLevel,
-  competitorBonusActive: boolean,
-): string[] {
-  const base = [...ALLOWED_SCHEMES[level]];
-  if (competitorBonusActive && level === "advanced") {
-    base.push(...SCHEMES_REQUIRING_COMPETITOR_BONUS);
-  }
-  return base;
+/** Resolve the scheme menu for a per-lift level. */
+function selectAllowedSchemes(level: PerLiftLevel): string[] {
+  return [...ALLOWED_SCHEMES[level]];
 }
 
 /**
@@ -420,7 +398,6 @@ function selectAllowedSchemes(
 export function computeLoading(
   bwLevels: Record<string, PerLiftLevel | null>,
   syntheticLevels: Record<string, PerLiftLevel | null>,
-  competitorBonusActive: boolean,
 ): Record<string, LiftLoading> {
   const result: Record<string, LiftLoading> = {};
 
@@ -430,14 +407,10 @@ export function computeLoading(
     const baseCeiling = LOADING_CEILINGS[lift]?.[level];
     if (typeof baseCeiling !== "number") continue;
 
-    const cycleCeiling = competitorBonusActive
-      ? baseCeiling + COMPETITOR_BONUS
-      : baseCeiling;
-
     result[lift] = {
-      cycle_ceiling: cycleCeiling,
-      deload_ceiling: cycleCeiling * DELOAD_MODIFIER,
-      allowed_schemes: selectAllowedSchemes(level, competitorBonusActive),
+      cycle_ceiling: baseCeiling,
+      deload_ceiling: baseCeiling * DELOAD_MODIFIER,
+      allowed_schemes: selectAllowedSchemes(level),
     };
   }
 
@@ -447,7 +420,7 @@ export function computeLoading(
     result[lift] = {
       cycle_ceiling: null,
       deload_ceiling: null,
-      allowed_schemes: selectAllowedSchemes(level, competitorBonusActive),
+      allowed_schemes: selectAllowedSchemes(level),
     };
   }
 
@@ -737,21 +710,6 @@ function countMissingTransitiveDependents(
 // ============================================================
 
 /**
- * Compute whether the +3% loading-ceiling competitor bonus fires.
- *
- * Rule: TRUE when overall_competitive_tier is regionals or games_athlete,
- * OR seasons_competed >= 10. Open-only / qualifier athletes with fewer
- * seasons get FALSE.
- */
-function computeCompetitorBonusActive(bundle: Tier4Bundle): boolean {
-  const tier = bundle.competition_summary?.overall_competitive_tier;
-  const seasons = bundle.competition_summary?.seasons_competed ?? 0;
-  if (tier === "regionals" || tier === "games_athlete") return true;
-  if (seasons >= 10) return true;
-  return false;
-}
-
-/**
  * Curate up to 5 recent results for prose grounding. v1 rule: take the
  * highest-percentile finishes (peaks). Future iteration can mix peaks with
  * the lowest finish for contrast — for now keep it simple.
@@ -822,7 +780,6 @@ export function deriveCompetitionFindings(
       points_per_year: summary?.trend?.percentile_points_per_year ?? null,
     },
     consistency: summary?.consistency ?? null,
-    competitor_bonus_active: computeCompetitorBonusActive(bundle),
     recent_evidence: curateRecentEvidence(bundle),
     movement_competency: curateMovementCompetency(bundle),
     closable_gaps: curateClosableGaps(bundle),
@@ -862,16 +819,10 @@ export function deriveAthleteDiagnostic(
   const syntheticLevels = deriveSyntheticLevels(bwLevels, liftFlags);
 
   // Step 6 — loading ceilings + scheme menus per lift.
-  // competitor_bonus_active priority:
-  //   1. explicit ctx.tier4.competitor_bonus_active override (test/dev escape hatch)
-  //   2. derived from the linked Tier 4 bundle if present
-  //   3. false (default for unlinked athletes)
   const competitionFindings = ctx.tier4?.bundle
     ? deriveCompetitionFindings(ctx.tier4.bundle)
     : null;
-  const competitorBonusActive = ctx.tier4?.competitor_bonus_active === true
-    || (competitionFindings?.competitor_bonus_active ?? false);
-  const loading = computeLoading(bwLevels, syntheticLevels, competitorBonusActive);
+  const loading = computeLoading(bwLevels, syntheticLevels);
 
   // Step 7 — accessory pool merger.
   const accessoryPool = mergeAccessoryPools(
@@ -909,7 +860,6 @@ export function deriveAthleteDiagnostic(
         lifts: liftsComplete,
         skills: skillsComplete,
       },
-      competitor_bonus_active: competitorBonusActive,
     },
     lifts: {
       one_rms: oneRms,

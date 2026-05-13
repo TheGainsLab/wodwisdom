@@ -216,7 +216,6 @@ Deno.test("computeLoading: BW-classified lift gets full ceilings", () => {
   const result = computeLoading(
     { back_squat: "advanced" },
     {},
-    false,
   );
   assertEquals(result.back_squat.cycle_ceiling, 0.92);
   assertEquals(result.back_squat.deload_ceiling, 0.92 * 0.80);
@@ -226,29 +225,23 @@ Deno.test("computeLoading: ratio-only lift gets schemes only, null ceilings", ()
   const result = computeLoading(
     {},
     { snatch: "intermediate" },
-    false,
   );
   assertEquals(result.snatch.cycle_ceiling, null);
   assertEquals(result.snatch.deload_ceiling, null);
   assert(result.snatch.allowed_schemes.length > 0);
 });
 
-Deno.test("computeLoading: competitor bonus adds 3% to advanced cycle ceiling", () => {
-  const result = computeLoading({ back_squat: "advanced" }, {}, true);
-  assertEquals(result.back_squat.cycle_ceiling, 0.92 + 0.03);
-});
-
-Deno.test("computeLoading: 1RM attempt only when advanced + competitor bonus", () => {
-  const noBonus = computeLoading({ back_squat: "advanced" }, {}, false);
-  const withBonus = computeLoading({ back_squat: "advanced" }, {}, true);
-  const intWithBonus = computeLoading({ back_squat: "intermediate" }, {}, true);
-  assertEquals(noBonus.back_squat.allowed_schemes.includes("1rm_attempt"), false);
-  assertEquals(withBonus.back_squat.allowed_schemes.includes("1rm_attempt"), true);
-  assertEquals(intWithBonus.back_squat.allowed_schemes.includes("1rm_attempt"), false);
+Deno.test("computeLoading: 1rm_attempt is in advanced scheme menu only", () => {
+  const adv = computeLoading({ back_squat: "advanced" }, {});
+  const intMed = computeLoading({ back_squat: "intermediate" }, {});
+  const beg = computeLoading({ back_squat: "beginner" }, {});
+  assertEquals(adv.back_squat.allowed_schemes.includes("1rm_attempt"), true);
+  assertEquals(intMed.back_squat.allowed_schemes.includes("1rm_attempt"), false);
+  assertEquals(beg.back_squat.allowed_schemes.includes("1rm_attempt"), false);
 });
 
 Deno.test("computeLoading: omits lifts with null level", () => {
-  const result = computeLoading({ back_squat: null }, {}, false);
+  const result = computeLoading({ back_squat: null }, {});
   assertEquals(result.back_squat, undefined);
 });
 
@@ -454,7 +447,6 @@ Deno.test("deriveAthleteDiagnostic: full sample athlete produces complete output
 
   // Meta
   assertEquals(d.meta.schema_version, 1);
-  assertEquals(d.meta.competitor_bonus_active, false);
   assertEquals(d.meta.inputs_complete.lifts, true);
   assertEquals(d.meta.inputs_complete.skills, true);
 
@@ -500,12 +492,3 @@ Deno.test("deriveAthleteDiagnostic: empty profile produces well-formed output wi
   assertEquals(d.skills.active_focus.length, 3);
 });
 
-Deno.test("deriveAthleteDiagnostic: competitor bonus from ctx propagates", () => {
-  const d = deriveAthleteDiagnostic(
-    { age: 30, gender: "male", bodyweight: 200, lifts: { back_squat: 400 } },
-    { tier4: { competitor_bonus_active: true } },
-  );
-  assertEquals(d.meta.competitor_bonus_active, true);
-  // 400/200 = 2.0 → advanced. Cycle ceiling should be 0.92 + 0.03 = 0.95.
-  assertEquals(d.lifts.loading.back_squat.cycle_ceiling, 0.92 + 0.03);
-});

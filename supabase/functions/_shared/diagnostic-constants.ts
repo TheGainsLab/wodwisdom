@@ -98,10 +98,6 @@ export const LOADING_CEILINGS: Record<string, Record<PerLiftLevel, number>> = {
 // Week 4 deload ceiling = cycle ceiling × DELOAD_MODIFIER.
 export const DELOAD_MODIFIER = 0.80;
 
-// +0.03 (3%) added to cycle ceiling when Tier 4 confirms competitor status
-// (overall_competitive_tier in {regionals, games_athlete} OR seasons_competed >= 10).
-export const COMPETITOR_BONUS = 0.03;
-
 // Permissible schemes by per-lift level. AI picks among these — no scheme
 // outside the level's list may appear for that lift.
 export const ALLOWED_SCHEMES: Record<PerLiftLevel, string[]> = {
@@ -136,14 +132,9 @@ export const ALLOWED_SCHEMES: Record<PerLiftLevel, string[]> = {
     "wave_3_2_1",
     "heavy_double",
     "heavy_single",
+    "1rm_attempt",
   ],
 };
-
-// Schemes that require the competitor bonus to be active (Tier 4 confirmed).
-// Added on top of the advanced scheme menu when applicable.
-export const SCHEMES_REQUIRING_COMPETITOR_BONUS: string[] = [
-  "1rm_attempt",
-];
 
 // ============================================================
 // LIFT DIAGNOSTIC — movement metadata + accessory pools

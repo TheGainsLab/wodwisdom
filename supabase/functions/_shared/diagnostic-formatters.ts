@@ -342,10 +342,6 @@ export function formatCompetitionProfile(d: AthleteDiagnostic): string {
     lines.push(`Consistency: ${c.consistency.toFixed(2)} stddev (${desc})`);
   }
 
-  if (c.competitor_bonus_active) {
-    lines.push("Competitor bonus active (loading ceilings +3%).");
-  }
-
   // Interpretive directive — anchors the rest of the profile, names the
   // cohort caveat as a calibration cue rather than a discount, and licenses
   // the model to surface tension when current data and history disagree.
