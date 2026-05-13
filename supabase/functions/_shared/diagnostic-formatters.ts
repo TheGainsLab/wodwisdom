@@ -131,10 +131,31 @@ export function formatLiftFindings(d: AthleteDiagnostic): string {
   out.push(...levelLine(d.lifts.per_lift_levels, d.lifts.synthetic_levels));
   out.push("");
 
-  // Active flags
+  // Active flags — surface the ratio that fired each one (lift values,
+  // computed ratio, threshold direction) so the model can weigh the magnitude
+  // of the imbalance, not just the label. Falls back to the bare flag name
+  // when the evidence ratio can't be resolved.
   if (d.lifts.flags.length > 0) {
+    const ratioByName = new Map(d.lifts.ratios.map((r) => [r.name, r]));
     out.push("Active flags:");
-    out.push("  " + d.lifts.flags.map((f) => f.name).join(" · "));
+    for (const f of d.lifts.flags) {
+      const r = ratioByName.get(f.evidence_ratio);
+      if (!r) {
+        out.push(`  ${f.name}`);
+        continue;
+      }
+      const lhs = d.lifts.one_rms[r.lift_a];
+      const rhs = d.lifts.one_rms[r.lift_b];
+      const numerics =
+        lhs != null && rhs != null
+          ? `${r.lift_a} ${lhs} / ${r.lift_b} ${rhs} = ${r.ratio.toFixed(2)}`
+          : `${r.lift_a} / ${r.lift_b} = ${r.ratio.toFixed(2)}`;
+      const thresholdStr =
+        r.direction === "below"
+          ? `threshold ≥${r.threshold.toFixed(2)}`
+          : `threshold ≤${r.threshold.toFixed(2)}`;
+      out.push(`  ${f.name} — ${numerics} (${thresholdStr})`);
+    }
     out.push("");
   }
 
