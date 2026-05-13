@@ -39,6 +39,21 @@ export interface Filter {
 
 const TIME_DOMAINS: TimeDomain[] = ['short', 'mid', 'long'];
 
+// Small × button shown next to a filter dropdown when it has a value — resets
+// just that field, without touching the others.
+const fieldClearBtnStyle = {
+  flexShrink: 0,
+  padding: '0 10px',
+  fontSize: 16,
+  lineHeight: 1,
+  borderRadius: 6,
+  border: '1px solid var(--border)',
+  background: 'none',
+  color: 'var(--text-dim)',
+  cursor: 'pointer',
+  fontFamily: 'inherit' as const,
+};
+
 export default function CompetitionExplorer({
   history,
   userId,
@@ -212,32 +227,58 @@ export default function CompetitionExplorer({
           time-domain buttons + clear + count below. */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <select
-            className="lift-input"
-            value={filter.movement ?? ''}
-            onChange={(e) => setFilter((f) => ({ ...f, movement: e.target.value || undefined }))}
-            style={{ flex: '1 1 150px', minWidth: 0 }}
-          >
-            <option value="">All movements</option>
-            {movementsByName.map((m) => (
-              <option key={m.name} value={m.name}>{m.name} ({m.workoutCount})</option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', gap: 4, flex: '1 1 150px', minWidth: 0 }}>
+            <select
+              className="lift-input"
+              value={filter.movement ?? ''}
+              onChange={(e) => setFilter((f) => ({ ...f, movement: e.target.value || undefined }))}
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              <option value="">All movements</option>
+              {movementsByName.map((m) => (
+                <option key={m.name} value={m.name}>{m.name} ({m.workoutCount})</option>
+              ))}
+            </select>
+            {filter.movement && (
+              <button
+                type="button"
+                aria-label="Clear movement filter"
+                title="Clear movement filter"
+                onClick={() => setFilter((f) => ({ ...f, movement: undefined }))}
+                style={fieldClearBtnStyle}
+              >
+                ×
+              </button>
+            )}
+          </div>
 
-          <select
-            className="lift-input"
-            value={filter.year ?? ''}
-            onChange={(e) => setFilter((f) => ({ ...f, year: e.target.value ? Number(e.target.value) : undefined }))}
-            style={{ flex: '1 1 110px', minWidth: 0 }}
-          >
-            <option value="">All years</option>
-            {(scope === 'all' && catalog
-              ? catalog.seasons.map((s) => s.season)
-              : history.yearsCompeted
-            ).map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', gap: 4, flex: '1 1 110px', minWidth: 0 }}>
+            <select
+              className="lift-input"
+              value={filter.year ?? ''}
+              onChange={(e) => setFilter((f) => ({ ...f, year: e.target.value ? Number(e.target.value) : undefined }))}
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              <option value="">All years</option>
+              {(scope === 'all' && catalog
+                ? catalog.seasons.map((s) => s.season)
+                : history.yearsCompeted
+              ).map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            {filter.year != null && (
+              <button
+                type="button"
+                aria-label="Clear year filter"
+                title="Clear year filter"
+                onClick={() => setFilter((f) => ({ ...f, year: undefined }))}
+                style={fieldClearBtnStyle}
+              >
+                ×
+              </button>
+            )}
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
