@@ -112,6 +112,19 @@ function stageRank(stage: string): number {
   return STAGE_ORDER[stage] ?? 99;
 }
 
+/** Competition stages in order — used to pick the "deepest field" (= earliest)
+ *  stage when summarising per-stage stats. */
+export const STAGE_ORDER_LIST: CompetitionStage[] = ['open', 'quarterfinals', 'semifinals', 'regional', 'games'];
+
+/** Short stage labels for tight summary lines (`Open · QF · Semis · …`). */
+export const STAGE_ABBR: Record<string, string> = {
+  open: 'Open',
+  quarterfinals: 'QF',
+  semifinals: 'Semis',
+  regional: 'Regionals',
+  games: 'Games',
+};
+
 function decorate(entry: AllResultsEntry): CompetitionWorkoutEntry {
   const finished_under_cap = entry.workout.is_dual_scoring && entry.result.scoring_unit === 'time';
   return {
@@ -367,4 +380,64 @@ export function movementExposure(history: NormalizedCompetitionHistory): Array<{
   return Array.from(map.values())
     .map((r) => ({ name: r.name, family: r.family, workoutCount: r.workoutIds.length, workoutIds: r.workoutIds }))
     .sort((a, b) => b.workoutCount - a.workoutCount || a.name.localeCompare(b.name));
+}
+
+/** Per-stage rollup for one movement: how many of the athlete's workouts in
+ *  that stage included it, and the mean cohort percentile of those workouts. */
+export interface MovementStageStat {
+  stage: CompetitionStage;
+  n: number;
+  /** Mean cohort percentile of the workouts in this stage that include the movement; null if none have a usable percentile. */
+  avgPct: number | null;
+}
+
+export interface MovementPerformance {
+  name: string;
+  family: string;
+  totalWorkouts: number;          // distinct workouts including the movement, all stages
+  byStage: MovementStageStat[];   // only stages with >=1 such workout, in competition order (deepest field first)
+  /** byStage[0] — the deepest-field stage the athlete faced the movement in (usually the Open). null only if totalWorkouts is 0. */
+  headline: MovementStageStat | null;
+}
+
+/**
+ * For every movement the athlete has competed with, the per-stage performance
+ * proxy: each workout containing the movement contributes its cohort percentile
+ * to that movement's stage bucket. Noisy per-workout (a snatch + five other
+ * things still counts toward "snatch") but it evens out over enough workouts —
+ * label it "on workouts including X", not "your snatch percentile".
+ * Percentiles are NOT pooled across stages: an Open workout's field is ~300k, a
+ * Games event's is ~40, so each stage keeps its own number.
+ * Returned sorted by totalWorkouts desc (callers re-sort as needed).
+ */
+export function movementPerformance(history: NormalizedCompetitionHistory): MovementPerformance[] {
+  return movementExposure(history).map((m) => {
+    const byStageIds = new Map<CompetitionStage, string[]>();
+    for (const id of m.workoutIds) {
+      const e = history.byId[id];
+      if (!e) continue;
+      const list = byStageIds.get(e.stage) ?? [];
+      list.push(id);
+      byStageIds.set(e.stage, list);
+    }
+    const orderedStages = [
+      ...STAGE_ORDER_LIST.filter((s) => byStageIds.has(s)),
+      ...Array.from(byStageIds.keys()).filter((s) => !STAGE_ORDER_LIST.includes(s)),
+    ];
+    const byStage: MovementStageStat[] = orderedStages.map((stage) => {
+      const ids = byStageIds.get(stage)!;
+      return {
+        stage,
+        n: ids.length,
+        avgPct: avgCohortPercentile(ids.map((id) => history.byId[id])),
+      };
+    });
+    return {
+      name: m.name,
+      family: m.family,
+      totalWorkouts: m.workoutCount,
+      byStage,
+      headline: byStage[0] ?? null,
+    };
+  });
 }

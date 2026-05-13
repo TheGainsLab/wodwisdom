@@ -25,21 +25,12 @@ import type {
   CompetitionWorkoutEntry,
   SeasonGroup,
 } from '../../lib/competitionHistory';
-import { avgCohortPercentile, initialCollapsedSeasons } from '../../lib/competitionHistory';
+import { avgCohortPercentile, initialCollapsedSeasons, STAGE_ABBR } from '../../lib/competitionHistory';
 
 const STAGE_LABEL: Record<string, string> = {
   open: 'Open',
   quarterfinals: 'Quarterfinals',
   semifinals: 'Semifinals',
-  regional: 'Regionals',
-  games: 'Games',
-};
-
-// Shorter labels for the collapsed-season summary line.
-const STAGE_ABBR: Record<string, string> = {
-  open: 'Open',
-  quarterfinals: 'QF',
-  semifinals: 'Semis',
   regional: 'Regionals',
   games: 'Games',
 };

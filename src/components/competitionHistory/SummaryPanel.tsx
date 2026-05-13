@@ -5,9 +5,10 @@
  *     avg age-cohort percentile in that bucket
  *   - Across modalities (Gymnastics / Weightlifting / Monostructural / Mixed /
  *     Odd-object): same treatment
- *   - Strongest movements (top 3 by avg age-cohort percentile across the
- *     workouts that include them; ≥2 workouts to qualify — a rough proxy, so
- *     it's labelled "on N workouts")
+ *   - Strongest movements (top 3 by the headline-stage percentile — the deepest
+ *     stage with ≥2 workouts including the movement — shown per stage, e.g.
+ *     "Snatch — Open 92 · 5 wkts · QF 88 · 2"; a rough proxy, never pooled
+ *     across stages. The Movements tab has the full list + red/yellow/green.)
  *   - Best results (top 3 finishes by age-cohort percentile; tap → workout
  *     detail)
  *
@@ -17,8 +18,8 @@
  */
 
 import { useMemo, useState } from 'react';
-import type { NormalizedCompetitionHistory, CompetitionWorkoutEntry } from '../../lib/competitionHistory';
-import { movementExposure } from '../../lib/competitionHistory';
+import type { NormalizedCompetitionHistory, CompetitionWorkoutEntry, MovementStageStat } from '../../lib/competitionHistory';
+import { movementPerformance, STAGE_ABBR } from '../../lib/competitionHistory';
 import WorkoutDetail from './WorkoutDetail';
 
 interface SignatureBucket {
@@ -152,20 +153,16 @@ export default function SummaryPanel({
   const timeRows = bucketRows(TIME_DOMAIN_ROWS, sb?.time_domain);
   const modalityRows = bucketRows(MODALITY_ROWS, sb?.modality);
 
+  // Top 3 by their headline-stage percentile (deepest stage with >=2 workouts).
+  // Per-stage, never pooled across stages — same reasoning as the map summaries.
   const strongest = useMemo(() => {
-    return movementExposure(history)
-      .filter((m) => m.workoutCount >= 2)
+    return movementPerformance(history)
       .map((m) => {
-        const pcts: number[] = [];
-        for (const id of m.workoutIds) {
-          const p = history.byId[id]?.result.cohort_percentile;
-          if (typeof p === 'number' && Number.isFinite(p)) pcts.push(p);
-        }
-        const avg = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : null;
-        return { name: m.name, count: m.workoutCount, avg };
+        const headline = m.byStage.find((s) => s.n >= 2 && s.avgPct != null) ?? null;
+        return headline ? { name: m.name, headline, rest: m.byStage.filter((s) => s.stage !== headline.stage) } : null;
       })
-      .filter((m): m is { name: string; count: number; avg: number } => m.avg != null)
-      .sort((a, b) => b.avg - a.avg || b.count - a.count || a.name.localeCompare(b.name))
+      .filter((x): x is { name: string; headline: MovementStageStat; rest: MovementStageStat[] } => x != null)
+      .sort((a, b) => (b.headline.avgPct ?? 0) - (a.headline.avgPct ?? 0) || a.name.localeCompare(b.name))
       .slice(0, 3);
   }, [history]);
 
@@ -199,10 +196,12 @@ export default function SummaryPanel({
           <SectionLabel>Strongest movements</SectionLabel>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {strongest.map((m) => {
+              const stageStr = (s: MovementStageStat) => `${STAGE_ABBR[s.stage] ?? s.stage} ${s.avgPct != null ? Math.round(s.avgPct) : '—'} · ${s.n} wkt${s.n === 1 ? '' : 's'}`;
+              const detail = [stageStr(m.headline), ...m.rest.map(stageStr)].join(' · ');
               const inner = (
                 <>
                   <span style={{ fontWeight: 600 }}>{m.name}</span>
-                  <span style={{ color: 'var(--text-dim)' }}> — {ordinal(Math.round(m.avg))} pct · on {m.count} workout{m.count === 1 ? '' : 's'}</span>
+                  <span style={{ color: 'var(--text-dim)' }}> — {detail}</span>
                   {onPickMovement && <span style={{ color: 'var(--text-dim)' }}> →</span>}
                 </>
               );
