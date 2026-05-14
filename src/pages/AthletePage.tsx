@@ -431,6 +431,22 @@ export default function AthletePage({ session }: { session: Session }) {
   const [isNewUser, setIsNewUser] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<{ kind: 'profile'; text: string; evaluationId?: string | null } | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState<'profile' | null>(null);
+  // Admin · Phase 1 v2 evaluation testing
+  const [generatingEvalV2, setGeneratingEvalV2] = useState(false);
+  const [v2Eval, setV2Eval] = useState<{
+    headline_takeaway: string;
+    strengths: string[];
+    weaknesses_and_priorities: string[];
+    detailed_analysis: string;
+    recommendations: string[];
+  } | null>(null);
+  const [v2EvalError, setV2EvalError] = useState('');
+  const [v2EvalElapsed, setV2EvalElapsed] = useState<number | null>(null);
+  const [v2EvalId, setV2EvalId] = useState<string | null>(null);
+  const [comparingEval, setComparingEval] = useState(false);
+  const [compareEvalV1Text, setCompareEvalV1Text] = useState<string | null>(null);
+  const [compareEvalV1Status, setCompareEvalV1Status] = useState<'idle' | 'running' | 'ready' | 'failed'>('idle');
+  const [compareEvalV1Error, setCompareEvalV1Error] = useState('');
   const [generateLoading, setGenerateLoading] = useState(false);
   const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
   const [tdeeOverride, setTdeeOverride] = useState<string>('');
@@ -646,6 +662,95 @@ export default function AthletePage({ session }: { session: Session }) {
     } finally {
       setAnalysisLoading(null);
     }
+  };
+
+  // Admin Phase 1 — run profile-analysis v2 (synchronous edge fn,
+  // returns structured EvaluationOutput).
+  const handleGenerateEvalV2 = async () => {
+    setGeneratingEvalV2(true);
+    setV2Eval(null);
+    setV2EvalError('');
+    setV2EvalElapsed(null);
+    setV2EvalId(null);
+    try {
+      const { data, error: invErr } = await supabase.functions.invoke('profile-analysis-v2', { body: {} });
+      if (invErr) throw new Error(invErr.message || 'v2 eval failed');
+      if (data?.error) throw new Error(data.message || data.error);
+      if (!data?.ok || !data?.evaluation) throw new Error('v2 eval: unexpected response');
+      setV2Eval(data.evaluation);
+      setV2EvalId(data.evaluation_id ?? null);
+      setV2EvalElapsed(data.elapsed_ms ?? null);
+    } catch (err) {
+      setV2EvalError(err instanceof Error ? err.message : 'v2 eval failed');
+    } finally {
+      setGeneratingEvalV2(false);
+    }
+  };
+
+  // Admin Phase 1 — Compare v1 vs v2 evaluation. Triggers both in
+  // parallel; v1 polls without mutating the page's analysisResult so
+  // the existing eval flow isn't disturbed; v2 returns synchronously.
+  // Both results render inline in the admin block.
+  const handleCompareEval = async () => {
+    setComparingEval(true);
+    setCompareEvalV1Text(null);
+    setCompareEvalV1Error('');
+    setCompareEvalV1Status('idle');
+    setV2Eval(null);
+    setV2EvalError('');
+    setV2EvalElapsed(null);
+    setV2EvalId(null);
+
+    const v1Promise = (async () => {
+      setCompareEvalV1Status('running');
+      try {
+        const { data: kickoff, error: kickoffErr } = await supabase.functions.invoke('profile-analysis', { body: {} });
+        if (kickoffErr) throw new Error(kickoffErr.message || 'v1 eval kickoff failed');
+        if (kickoff?.error) throw new Error(kickoff.message || kickoff.error);
+        const evaluationId: string | null = kickoff?.evaluation_id ?? null;
+        if (!evaluationId) throw new Error('v1: no evaluation_id');
+        let delay = 3000;
+        for (let i = 0; i < 80; i++) {
+          await new Promise((r) => setTimeout(r, delay));
+          const { data: status, error: statusErr } = await supabase.functions.invoke('profile-analysis-status', {
+            body: { evaluation_id: evaluationId },
+          });
+          if (statusErr) throw new Error(statusErr.message || 'v1: status check failed');
+          if (status?.error && status?.status !== 'failed') throw new Error(status.error);
+          if (status?.status === 'complete') {
+            setCompareEvalV1Text(status.analysis ?? '');
+            setCompareEvalV1Status('ready');
+            return;
+          }
+          if (status?.status === 'failed') throw new Error(status.error || 'v1: failed');
+          delay = Math.min(delay + 1000, 8000);
+        }
+        throw new Error('v1: timed out');
+      } catch (err) {
+        setCompareEvalV1Error(err instanceof Error ? err.message : 'v1 eval failed');
+        setCompareEvalV1Status('failed');
+      }
+    })();
+
+    const v2Promise = (async () => {
+      setGeneratingEvalV2(true);
+      try {
+        const { data, error: invErr } = await supabase.functions.invoke('profile-analysis-v2', { body: {} });
+        if (invErr) throw new Error(invErr.message || 'v2 eval failed');
+        if (data?.error) throw new Error(data.message || data.error);
+        if (!data?.ok || !data?.evaluation) throw new Error('v2 eval: unexpected response');
+        setV2Eval(data.evaluation);
+        setV2EvalId(data.evaluation_id ?? null);
+        setV2EvalElapsed(data.elapsed_ms ?? null);
+      } catch (err) {
+        setV2EvalError(err instanceof Error ? err.message : 'v2 eval failed');
+      } finally {
+        setGeneratingEvalV2(false);
+      }
+    })();
+
+    await Promise.allSettled([v1Promise, v2Promise]);
+    setComparingEval(false);
   };
 
   const handleGenerateProgram = async () => {
@@ -1386,6 +1491,99 @@ export default function AthletePage({ session }: { session: Session }) {
                     >
                       {competitionAthleteId ? 'View your competition history →' : 'Link your competition profile →'}
                     </button>
+                  </div>
+                )}
+
+                {/* Admin · Phase 1 v2 evaluation testing */}
+                {isAdmin && (
+                  <div className="settings-card" style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--text-muted)', marginBottom: 4 }}>
+                      Admin · Phase 1 v2 evaluation testing
+                    </div>
+                    <h2 className="settings-card-title" style={{ marginBottom: 8 }}>v2 Profile Evaluation</h2>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
+                      Run the v2 evaluator directly or compare it against v1. v2 uses the rewritten shared payload + structured output. Phase 1 admins-only.
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="auth-btn"
+                        style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface2)', border: '1px solid var(--border)', flex: '1 1 auto' }}
+                        onClick={handleGenerateEvalV2}
+                        disabled={generatingEvalV2 || comparingEval}
+                      >
+                        {generatingEvalV2 && !comparingEval ? 'Running v2…' : 'Run Eval (v2)'}
+                      </button>
+                      <button
+                        type="button"
+                        className="auth-btn"
+                        style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface2)', border: '1px solid var(--border)', flex: '1 1 auto' }}
+                        onClick={handleCompareEval}
+                        disabled={comparingEval || generatingEvalV2}
+                      >
+                        {comparingEval ? 'Comparing…' : 'Compare v1 vs v2'}
+                      </button>
+                    </div>
+                    {v2EvalError && <div className="error-msg" style={{ marginTop: 12 }}>{v2EvalError}</div>}
+                    {(compareEvalV1Status !== 'idle' || compareEvalV1Error) && (
+                      <div style={{ marginTop: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--text-muted)', marginBottom: 6 }}>
+                          v1 result {compareEvalV1Status === 'running' && '(generating…)'} {compareEvalV1Status === 'failed' && '(failed)'}
+                        </div>
+                        {compareEvalV1Status === 'running' && (
+                          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>v1 polling its async job…</div>
+                        )}
+                        {compareEvalV1Status === 'failed' && (
+                          <div className="error-msg">{compareEvalV1Error}</div>
+                        )}
+                        {compareEvalV1Status === 'ready' && compareEvalV1Text && (
+                          <div
+                            className="workout-review-content"
+                            style={{ fontSize: 13, padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}
+                            dangerouslySetInnerHTML={{ __html: formatMarkdown(compareEvalV1Text) }}
+                          />
+                        )}
+                      </div>
+                    )}
+                    {v2Eval && (
+                      <div style={{ marginTop: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--text-muted)', marginBottom: 6 }}>
+                          v2 result
+                          {v2EvalElapsed != null && <> · {(v2EvalElapsed / 1000).toFixed(1)}s</>}
+                          {v2EvalId && <> · id {v2EvalId.slice(0, 8)}…</>}
+                        </div>
+                        <div style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13 }}>
+                          <div style={{ fontWeight: 700, marginBottom: 8 }}>{v2Eval.headline_takeaway}</div>
+                          {v2Eval.strengths.length > 0 && (
+                            <div style={{ marginBottom: 10 }}>
+                              <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4, color: '#2ec486' }}>Strengths</div>
+                              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
+                                {v2Eval.strengths.map((s, i) => <li key={i}>{s}</li>)}
+                              </ul>
+                            </div>
+                          )}
+                          {v2Eval.weaknesses_and_priorities.length > 0 && (
+                            <div style={{ marginBottom: 10 }}>
+                              <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4, color: 'var(--accent)' }}>Weaknesses & Priorities</div>
+                              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
+                                {v2Eval.weaknesses_and_priorities.map((w, i) => <li key={i}>{w}</li>)}
+                              </ol>
+                            </div>
+                          )}
+                          <div style={{ marginBottom: 10, fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                            {v2Eval.detailed_analysis}
+                          </div>
+                          {v2Eval.recommendations.length > 0 && (
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4 }}>Recommendations</div>
+                              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
+                                {v2Eval.recommendations.map((r, i) => <li key={i}>{r}</li>)}
+                              </ol>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -34,6 +34,13 @@ export interface Tier4MovementAffinityEntry {
   avg_percentile: number | null;
   trend: Tier4TrendBlock;
   by_movement: Record<string, { exposures: number; avg_percentile: number }>;
+  /**
+   * Per-stage breakdown at the category aggregate level (NOT inside
+   * by_movement). Stage keys mirror Tier4AllResultsEntry.stage. Empty stages
+   * carry exposures=0, avg_percentile=null. Shipped in bundle v1.4/v1.5
+   * (verified 2026-05-14).
+   */
+  by_stage?: Record<string, { exposures: number; avg_percentile: number | null }>;
 }
 
 export interface Tier4CharacterAffinityEntry {
@@ -117,6 +124,14 @@ export interface Tier4AllResultsEntry {
     worldwide_percentile: number;
     cohort_n: number;
     worldwide_n: number;
+    // Added in profile bundle 1.6.0 (additive). Score at p99 of the workout's
+    // general cohort + the unit that threshold is in. The unit can differ from
+    // scoring_unit on dual-scoring workouts where fewer than 1% of the field
+    // finished under the cap — in that case the threshold lives in reps even
+    // though a finisher's raw_score is a time. Null when the workout isn't
+    // cataloged or the segment is too thin to compute a p99.
+    cohort_p99_threshold?: number | null;
+    cohort_p99_threshold_unit?: "time" | "reps" | "load_lbs" | "distance" | null;
   };
 }
 

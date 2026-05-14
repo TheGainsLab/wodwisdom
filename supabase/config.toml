@@ -37,6 +37,9 @@ verify_jwt = false
 [functions.profile-analysis]
 verify_jwt = false
 
+[functions.profile-analysis-v2]
+verify_jwt = false
+
 [functions.profile-analysis-status]
 verify_jwt = false
 
@@ -59,6 +62,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.generate-program]
+verify_jwt = false
+
+[functions.generate-program-v2]
 verify_jwt = false
 
 [functions.generate-next-month]

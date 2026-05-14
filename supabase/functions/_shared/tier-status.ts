@@ -27,6 +27,52 @@ export const REQUIRED_LIFTS = [
   'clean_and_jerk',
 ] as const;
 
+/** All 14 canonical lift keys the intake form collects (LIFT_GROUPS in
+ *  AthletePage.tsx). REQUIRED_LIFTS is a subset (5 of 14). */
+export const ALL_LIFT_KEYS = [
+  'back_squat',
+  'front_squat',
+  'overhead_squat',
+  'deadlift',
+  'snatch',
+  'power_snatch',
+  'clean',
+  'clean_and_jerk',
+  'jerk',
+  'power_clean',
+  'push_jerk',
+  'press',
+  'push_press',
+  'bench_press',
+] as const;
+
+/** All canonical equipment keys the intake form collects
+ *  (EQUIPMENT_GROUPS in AthletePage.tsx). */
+export const ALL_EQUIPMENT_KEYS = [
+  // Cardio
+  'rower',
+  'assault_bike',
+  'ski_erg',
+  'treadmill',
+  // Barbell & Weights
+  'barbell',
+  'dumbbells',
+  'kettlebells',
+  // Gymnastics
+  'pull_up_bar',
+  'rings',
+  'rope',
+  'ghd',
+  'parallettes',
+  'pegboard',
+  // Other
+  'box',
+  'wall_ball',
+  'sled',
+  'blocks',
+  'bands',
+] as const;
+
 export const ALL_SKILL_KEYS = [
   'muscle_ups',
   'bar_muscle_ups',
