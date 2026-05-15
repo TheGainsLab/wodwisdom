@@ -141,9 +141,28 @@ function movementHasAnyPrescription(m: MovementPrescription): boolean {
 }
 
 /**
- * Every block must contain at least one movement; every movement must
- * have at least one of {sets, reps, weight, time_seconds, distance}
- * with a positive value. Catches empty / null programming.
+ * Block types that carry a structured prescription (sets/reps/weight
+ * etc.). For these, each movement must have at least one of {sets,
+ * reps, weight, time_seconds, distance} > 0 so the program has a real
+ * working dose, not just a movement name.
+ *
+ * Warm-up / mobility / cool-down / active-recovery are intentionally
+ * descriptive ("Cat-cow, slow" / "Foam roll quads") and skipped — the
+ * per-movement-prescription check matched v2's structured-output bias
+ * but didn't match how those blocks naturally read.
+ */
+const PRESCRIPTION_REQUIRED_BLOCK_TYPES = new Set([
+  "strength",
+  "accessory",
+  "metcon",
+  "skills",
+]);
+
+/**
+ * Every block must contain at least one movement (regardless of type).
+ * For the prescription-bearing block types above, every movement must
+ * also have at least one of {sets, reps, weight, time_seconds, distance}
+ * with a positive value.
  *
  * Locked nuance: NOT every block type must exist on every day — a
  * valid day might be warm-up + strength + cool-down alone. Per-day
@@ -162,6 +181,7 @@ export function auditRequiredFields(output: WriterOutput): AuditResult {
           );
           continue;
         }
+        if (!PRESCRIPTION_REQUIRED_BLOCK_TYPES.has(b.block_type)) continue;
         for (let j = 0; j < b.movements.length; j++) {
           const m = b.movements[j];
           if (!movementHasAnyPrescription(m)) {
