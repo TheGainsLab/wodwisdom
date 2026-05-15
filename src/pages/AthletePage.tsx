@@ -945,6 +945,18 @@ export default function AthletePage({ session }: { session: Session }) {
     // flow by unmounting the component mid-click.
     if (isNewUser) setIsNewUser(false);
     setIsDirty(false);
+
+    // Fire-and-forget: parse the (possibly updated) injuries text into a
+    // structured form so the v2 writer + safety review can consult a
+    // canonical do-not-program list instead of re-parsing prose every
+    // retry. The edge fn hash-checks internally; if the text hasn't
+    // changed since the last parse it returns quickly.
+    void supabase.functions
+      .invoke('parse-injuries-constraints', { body: {} })
+      .catch((err) => {
+        console.warn('[parse-injuries-constraints] async parse failed:', err);
+      });
+
     return true;
   };
 

@@ -40,6 +40,9 @@ verify_jwt = false
 [functions.profile-analysis-v2]
 verify_jwt = false
 
+[functions.parse-injuries-constraints]
+verify_jwt = false
+
 [functions.profile-analysis-status]
 verify_jwt = false
 

@@ -56,6 +56,12 @@ export interface BasicsPayload {
   units: "lbs" | "kg" | null;
 }
 
+export interface InjuryConstraints {
+  summary: string;
+  do_not_program: string[];
+  suggested_subs: { instead_of: string; use: string }[];
+}
+
 export interface TrainingContextPayload {
   /** User-specified or default 5; clamped to [3, 6]. */
   days_per_week: 3 | 4 | 5 | 6;
@@ -64,6 +70,13 @@ export interface TrainingContextPayload {
   goal_text: string | null;
   /** Raw user free-text — NOT parsed. */
   injuries_constraints_text: string | null;
+  /**
+   * Structured form of injuries_constraints_text, produced asynchronously
+   * by the parse-injuries-constraints edge function. Null when never
+   * parsed (or text is empty). When present, it's the canonical
+   * banned-movement list the writer + safety review should consult.
+   */
+  injuries_structured: InjuryConstraints | null;
   self_perception_level: string | null;
 }
 
@@ -232,6 +245,7 @@ interface AthleteProfileRow {
   session_length_minutes: number | null;
   goal: string | null;
   injuries_constraints: string | null;
+  injuries_structured: InjuryConstraints | null;
   self_perception_level: string | null;
   competition_athlete_id: string | null;
 }
@@ -240,7 +254,7 @@ const PROFILE_COLS =
   "age, height, bodyweight, gender, units, " +
   "lifts, skills, conditioning, equipment, " +
   "days_per_week, session_length_minutes, " +
-  "goal, injuries_constraints, self_perception_level, " +
+  "goal, injuries_constraints, injuries_structured, self_perception_level, " +
   "competition_athlete_id";
 
 // ============================================================
@@ -354,6 +368,7 @@ export async function buildWriterPayload(
       session_length_minutes: asNumber(profile.session_length_minutes),
       goal_text: asString(profile.goal),
       injuries_constraints_text: asString(profile.injuries_constraints),
+      injuries_structured: profile.injuries_structured ?? null,
       self_perception_level: asString(profile.self_perception_level),
     },
     competition,
