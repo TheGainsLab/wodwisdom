@@ -173,6 +173,9 @@ Deno.serve(async (req) => {
         elapsed_ms: elapsedMs,
         evaluation_id: evaluationId,
         evaluation,
+        // Admin-only response; safe to echo what the writer saw so the
+        // admin can verify Tier 4 data + canonical-key hydration.
+        payload,
       }),
       { status: 200, headers: { ...cors, "Content-Type": "application/json" } },
     );

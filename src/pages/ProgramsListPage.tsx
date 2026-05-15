@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 import { Plus, Zap, Brain, ClipboardList } from 'lucide-react';
+import { WriterPayloadDetails } from '../components/admin/WriterPayloadDetails';
 
 interface Program {
   id: string;
@@ -31,6 +32,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
   const [v2ProgramId, setV2ProgramId] = useState<string | null>(null);
   const [v2Elapsed, setV2Elapsed] = useState<number | null>(null);
   const [v2Safety, setV2Safety] = useState<{ safe: boolean; reasoning: string; errored: boolean } | null>(null);
+  const [v2Payload, setV2Payload] = useState<unknown>(null);
   // Compare-mode state: triggers both v1 + v2 in parallel; v2 renders
   // inline (above), v1 surfaces a link to its dedicated program page
   // when complete so admin can read both side-by-side across tabs.
@@ -145,6 +147,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
     setV2ProgramId(null);
     setV2Elapsed(null);
     setV2Safety(null);
+    setV2Payload(null);
     try {
       const { data, error } = await supabase.functions.invoke('generate-program-v2', {
         body: {},
@@ -156,6 +159,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
       setV2ProgramId(data.program_id ?? null);
       setV2Elapsed(data.elapsed_ms ?? null);
       setV2Safety(data.safety ?? null);
+      setV2Payload(data.payload ?? null);
     } catch (err) {
       setV2Error(err instanceof Error ? err.message : 'Failed to generate v2 program');
     } finally {
@@ -177,6 +181,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
     setV2ProgramId(null);
     setV2Elapsed(null);
     setV2Safety(null);
+    setV2Payload(null);
 
     // v1 path — same logic as handleGenerate but doesn't navigate.
     const v1Promise = (async () => {
@@ -225,6 +230,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
         setV2ProgramId(data.program_id ?? null);
         setV2Elapsed(data.elapsed_ms ?? null);
         setV2Safety(data.safety ?? null);
+        setV2Payload(data.payload ?? null);
       } catch (err) {
         setV2Error(err instanceof Error ? err.message : 'v2 failed');
       } finally {
@@ -527,6 +533,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                             programId={v2ProgramId}
                             elapsedMs={v2Elapsed}
                             safety={v2Safety}
+                            payload={v2Payload}
                           />
                         )}
                       </div>
@@ -624,6 +631,7 @@ interface V2OutputPanelProps {
   programId: string | null;
   elapsedMs: number | null;
   safety: { safe: boolean; reasoning: string; errored: boolean } | null;
+  payload: unknown;
 }
 
 interface V2Movement {
@@ -682,7 +690,7 @@ function formatMovementLine(m: V2Movement): string {
   return `${m.movement}${scheme}${scaling}`;
 }
 
-function V2OutputPanel({ output, programId, elapsedMs, safety }: V2OutputPanelProps) {
+function V2OutputPanel({ output, programId, elapsedMs, safety, payload }: V2OutputPanelProps) {
   const out = output as V2Output;
   const headerStyle: React.CSSProperties = { fontWeight: 700, fontSize: 13, color: 'var(--text)', marginTop: 12 };
   const subHeaderStyle: React.CSSProperties = { fontWeight: 600, fontSize: 12, color: 'var(--text-dim)', marginTop: 8 };
@@ -727,6 +735,8 @@ function V2OutputPanel({ output, programId, elapsedMs, safety }: V2OutputPanelPr
           </>
         )}
       </div>
+
+      {payload != null && <WriterPayloadDetails payload={payload} />}
 
       {out.weeks.map((week) => (
         <div key={week.week_num}>
