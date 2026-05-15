@@ -106,6 +106,73 @@ Then write the daily program. Use the plan to keep the month coherent.
 OUTPUT FORMAT
 Emit the program via the provided tool — structured JSON with weeks → days → blocks → movements. Each movement uses fields the workout-logging side already understands: sets, reps, weight, weight_unit ('lbs' or 'kg'), rpe (1–10 when applicable), scaling_note. Free movement naming is allowed; the payload includes a vocabulary list of canonical competition-movement display names — prefer those names when a movement matches one of them, but warm-up / accessory / cool-down movements that aren't in the list (air squat, banded mob, dynamic stretching, etc.) are fine.
 
+EXAMPLE OUTPUT (one day of one week — actual output emits all 4 weeks × days_per_week days):
+{
+  "month_plan": {
+    "weekly_intent": ["build", "build", "build", "deload"],
+    "strength_progression": "Back Squat 5x5@75% → 5x4@80% → 5x3@85% → 3x3@70% (week 4 deload).",
+    "deload_placement": "Week 4 — reduce primary-lift volume, maintain skill exposure."
+  },
+  "weeks": [
+    {
+      "week_num": 1,
+      "days": [
+        {
+          "day_num": 1,
+          "blocks": [
+            {
+              "block_type": "warm-up",
+              "block_label": "General prep",
+              "movements": [
+                { "movement": "Air Squat", "reps": 15 },
+                { "movement": "World's Greatest Stretch", "reps": 5 },
+                { "movement": "Banded Pull-aparts", "reps": 15 }
+              ]
+            },
+            {
+              "block_type": "strength",
+              "block_label": "Primary Strength",
+              "block_scheme": "5x5 @75%",
+              "movements": [
+                { "movement": "Back Squat", "sets": 5, "reps": 5, "weight": 240, "weight_unit": "lbs", "rpe": 7 }
+              ]
+            },
+            {
+              "block_type": "accessory",
+              "block_scheme": "3 rounds, slow tempo",
+              "movements": [
+                { "movement": "Romanian Deadlift", "sets": 3, "reps": 10, "weight": 185, "weight_unit": "lbs" },
+                { "movement": "Hollow Hold", "sets": 3, "time_seconds": 30 }
+              ]
+            },
+            {
+              "block_type": "metcon",
+              "block_scheme": "AMRAP 12",
+              "time_cap_seconds": 720,
+              "movements": [
+                { "movement": "Thruster", "reps": 10, "weight": 95, "weight_unit": "lbs" },
+                { "movement": "Pull-up", "reps": 12 }
+              ]
+            },
+            {
+              "block_type": "cool-down",
+              "movements": [
+                { "movement": "Easy Bike", "time_seconds": 300 },
+                { "movement": "Cat-cow, slow" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+Two patterns the example shows that the rules alone don't:
+  - Mixed prescription styles per block — Hollow Hold uses time_seconds, Romanian Deadlift uses sets/reps/weight. Same block, different units.
+  - Name-only is legal for descriptive blocks — Cat-cow has no numeric fields, doesn't trip the audit.
+Strength blocks may also be complexes — e.g., movements: [{movement: "Snatch"}, {movement: "Overhead Squat"}, {movement: "Snatch Balance"}] together as one block, with the scheme described in block_scheme.
+
 AUDIT RULES (echoed so you can self-check before output):
   - block_type values must be in the 8-type enum above. Anything else is rejected.
   - metcon block: exactly one main conditioning piece per day; multiple metcons → split into separate days or move secondary to accessory.
