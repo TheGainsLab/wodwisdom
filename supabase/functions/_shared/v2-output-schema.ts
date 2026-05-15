@@ -133,41 +133,50 @@ export interface WriterOutput {
 // Anthropic tool-use schema (JSON Schema dialect)
 // ============================================================
 
-const MOVEMENT_SCHEMA = {
-  type: "object",
-  properties: {
-    movement: { type: "string", description: "Display name from the vocabulary list provided in the user message." },
-    sets: { type: "integer", minimum: 1, maximum: 30 },
-    reps: { type: "integer", minimum: 1, maximum: 500 },
-    weight: { type: "number", minimum: 0 },
-    weight_unit: { type: "string", enum: ["lbs", "kg"] },
-    rpe: { type: "integer", minimum: 1, maximum: 10 },
-    time_seconds: { type: "integer", minimum: 1, maximum: 7200 },
-    distance: { type: "number", minimum: 0 },
-    distance_unit: { type: "string", enum: ["ft", "m"] },
-    scaling_note: { type: "string", maxLength: 500 },
-  },
-  required: ["movement"],
-  additionalProperties: false,
-};
-
-const BLOCK_SCHEMA = {
-  type: "object",
-  properties: {
-    block_type: { type: "string", enum: BLOCK_TYPES },
-    block_label: { type: "string", maxLength: 100 },
-    block_scheme: { type: "string", maxLength: 200 },
-    time_cap_seconds: { type: "integer", minimum: 60, maximum: 7200 },
-    block_notes: { type: "string", maxLength: 500 },
-    movements: {
-      type: "array",
-      minItems: 1,
-      items: MOVEMENT_SCHEMA,
+/**
+ * Build the per-movement schema with weight_unit.enum locked to the
+ * athlete's chosen units. Without this the writer can mix lbs and kg
+ * mid-program; intake collected one system, the schema should honor it.
+ */
+function buildMovementSchema(units: "lbs" | "kg") {
+  return {
+    type: "object",
+    properties: {
+      movement: { type: "string", description: "Display name from the vocabulary list provided in the user message." },
+      sets: { type: "integer", minimum: 1, maximum: 30 },
+      reps: { type: "integer", minimum: 1, maximum: 500 },
+      weight: { type: "number", minimum: 0 },
+      weight_unit: { type: "string", enum: [units] },
+      rpe: { type: "integer", minimum: 1, maximum: 10 },
+      time_seconds: { type: "integer", minimum: 1, maximum: 7200 },
+      distance: { type: "number", minimum: 0 },
+      distance_unit: { type: "string", enum: ["ft", "m"] },
+      scaling_note: { type: "string", maxLength: 500 },
     },
-  },
-  required: ["block_type", "movements"],
-  additionalProperties: false,
-};
+    required: ["movement"],
+    additionalProperties: false,
+  };
+}
+
+function buildBlockSchema(units: "lbs" | "kg") {
+  return {
+    type: "object",
+    properties: {
+      block_type: { type: "string", enum: BLOCK_TYPES },
+      block_label: { type: "string", maxLength: 100 },
+      block_scheme: { type: "string", maxLength: 200 },
+      time_cap_seconds: { type: "integer", minimum: 60, maximum: 7200 },
+      block_notes: { type: "string", maxLength: 500 },
+      movements: {
+        type: "array",
+        minItems: 1,
+        items: buildMovementSchema(units),
+      },
+    },
+    required: ["block_type", "movements"],
+    additionalProperties: false,
+  };
+}
 
 /**
  * Build the per-day schema with day_num.maximum locked to the
@@ -175,7 +184,7 @@ const BLOCK_SCHEMA = {
  * schema lets the writer emit day_num up to 7, and the day_count
  * audit (which requires 1..daysPerWeek) rejects the mismatch.
  */
-function buildDaySchema(daysPerWeek: number) {
+function buildDaySchema(daysPerWeek: number, units: "lbs" | "kg") {
   return {
     type: "object",
     properties: {
@@ -184,7 +193,7 @@ function buildDaySchema(daysPerWeek: number) {
         type: "array",
         minItems: 1,
         maxItems: 8,
-        items: BLOCK_SCHEMA,
+        items: buildBlockSchema(units),
       },
     },
     required: ["day_num", "blocks"],
@@ -198,7 +207,7 @@ function buildDaySchema(daysPerWeek: number) {
  * schema lets the writer emit 3–6 days regardless of intake, and the
  * day_count audit rejects the mismatch.
  */
-function buildWeekSchema(daysPerWeek: number) {
+function buildWeekSchema(daysPerWeek: number, units: "lbs" | "kg") {
   return {
     type: "object",
     properties: {
@@ -207,7 +216,7 @@ function buildWeekSchema(daysPerWeek: number) {
         type: "array",
         minItems: daysPerWeek,
         maxItems: daysPerWeek,
-        items: buildDaySchema(daysPerWeek),
+        items: buildDaySchema(daysPerWeek, units),
       },
     },
     required: ["week_num", "days"],
@@ -252,7 +261,7 @@ const MONTH_PLAN_SCHEMA = {
  * structure. The `days` array bounds are locked per-call to the
  * athlete's days_per_week so the schema and the day_count audit agree.
  */
-export function buildEmitProgramTool(daysPerWeek: number) {
+export function buildEmitProgramTool(daysPerWeek: number, units: "lbs" | "kg") {
   return {
     name: "emit_program",
     description:
@@ -265,7 +274,7 @@ export function buildEmitProgramTool(daysPerWeek: number) {
           type: "array",
           minItems: 4,
           maxItems: 4,
-          items: buildWeekSchema(daysPerWeek),
+          items: buildWeekSchema(daysPerWeek, units),
         },
       },
       required: ["month_plan", "weeks"],
