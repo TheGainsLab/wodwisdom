@@ -169,20 +169,28 @@ const BLOCK_SCHEMA = {
   additionalProperties: false,
 };
 
-const DAY_SCHEMA = {
-  type: "object",
-  properties: {
-    day_num: { type: "integer", minimum: 1, maximum: 7 },
-    blocks: {
-      type: "array",
-      minItems: 1,
-      maxItems: 8,
-      items: BLOCK_SCHEMA,
+/**
+ * Build the per-day schema with day_num.maximum locked to the
+ * athlete's chosen days_per_week. Without this parameterization the
+ * schema lets the writer emit day_num up to 7, and the day_count
+ * audit (which requires 1..daysPerWeek) rejects the mismatch.
+ */
+function buildDaySchema(daysPerWeek: number) {
+  return {
+    type: "object",
+    properties: {
+      day_num: { type: "integer", minimum: 1, maximum: daysPerWeek },
+      blocks: {
+        type: "array",
+        minItems: 1,
+        maxItems: 8,
+        items: BLOCK_SCHEMA,
+      },
     },
-  },
-  required: ["day_num", "blocks"],
-  additionalProperties: false,
-};
+    required: ["day_num", "blocks"],
+    additionalProperties: false,
+  };
+}
 
 /**
  * Build the per-week schema with `days` array bounds locked to the
@@ -199,7 +207,7 @@ function buildWeekSchema(daysPerWeek: number) {
         type: "array",
         minItems: daysPerWeek,
         maxItems: daysPerWeek,
-        items: DAY_SCHEMA,
+        items: buildDaySchema(daysPerWeek),
       },
     },
     required: ["week_num", "days"],
