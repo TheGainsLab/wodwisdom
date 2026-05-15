@@ -80,7 +80,11 @@ async function callWriter(
       max_tokens: 32000,
       stream: false,
       system: V2_GENERATE_PROGRAM_SYSTEM_PROMPT,
-      tools: [buildEmitProgramTool(payload.training_context.days_per_week, payload.basics.units ?? "lbs")],
+      tools: [buildEmitProgramTool(
+        payload.training_context.days_per_week,
+        payload.basics.units ?? "lbs",
+        payload.training_context.session_length_minutes,
+      )],
       tool_choice: { type: "tool", name: "emit_program" },
       messages: [{ role: "user", content: userMessage }],
     }),

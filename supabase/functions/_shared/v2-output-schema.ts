@@ -160,14 +160,27 @@ function buildMovementSchema(units: "lbs" | "kg") {
   };
 }
 
-function buildBlockSchema(units: "lbs" | "kg") {
+/**
+ * Cap a block's time_cap_seconds at 60% of the athlete's session length.
+ * Prevents a single block (typically the metcon) from blowing the whole
+ * session. When session_length_minutes is null we fall back to the static
+ * 7200s ceiling.
+ */
+function blockTimeCapMax(sessionLengthMinutes: number | null): number {
+  if (sessionLengthMinutes == null || sessionLengthMinutes <= 0) return 7200;
+  const cap = Math.round(sessionLengthMinutes * 60 * 0.6);
+  // Keep above the schema minimum (60s) so we never produce an empty interval.
+  return Math.max(60, cap);
+}
+
+function buildBlockSchema(units: "lbs" | "kg", sessionLengthMinutes: number | null) {
   return {
     type: "object",
     properties: {
       block_type: { type: "string", enum: BLOCK_TYPES },
       block_label: { type: "string", maxLength: 100 },
       block_scheme: { type: "string", maxLength: 200 },
-      time_cap_seconds: { type: "integer", minimum: 60, maximum: 7200 },
+      time_cap_seconds: { type: "integer", minimum: 60, maximum: blockTimeCapMax(sessionLengthMinutes) },
       block_notes: { type: "string", maxLength: 500 },
       movements: {
         type: "array",
@@ -186,7 +199,7 @@ function buildBlockSchema(units: "lbs" | "kg") {
  * schema lets the writer emit day_num up to 7, and the day_count
  * audit (which requires 1..daysPerWeek) rejects the mismatch.
  */
-function buildDaySchema(daysPerWeek: number, units: "lbs" | "kg") {
+function buildDaySchema(daysPerWeek: number, units: "lbs" | "kg", sessionLengthMinutes: number | null) {
   return {
     type: "object",
     properties: {
@@ -195,7 +208,7 @@ function buildDaySchema(daysPerWeek: number, units: "lbs" | "kg") {
         type: "array",
         minItems: 1,
         maxItems: 8,
-        items: buildBlockSchema(units),
+        items: buildBlockSchema(units, sessionLengthMinutes),
       },
     },
     required: ["day_num", "blocks"],
@@ -209,7 +222,7 @@ function buildDaySchema(daysPerWeek: number, units: "lbs" | "kg") {
  * schema lets the writer emit 3–6 days regardless of intake, and the
  * day_count audit rejects the mismatch.
  */
-function buildWeekSchema(daysPerWeek: number, units: "lbs" | "kg") {
+function buildWeekSchema(daysPerWeek: number, units: "lbs" | "kg", sessionLengthMinutes: number | null) {
   return {
     type: "object",
     properties: {
@@ -218,7 +231,7 @@ function buildWeekSchema(daysPerWeek: number, units: "lbs" | "kg") {
         type: "array",
         minItems: daysPerWeek,
         maxItems: daysPerWeek,
-        items: buildDaySchema(daysPerWeek, units),
+        items: buildDaySchema(daysPerWeek, units, sessionLengthMinutes),
       },
     },
     required: ["week_num", "days"],
@@ -263,7 +276,7 @@ const MONTH_PLAN_SCHEMA = {
  * structure. The `days` array bounds are locked per-call to the
  * athlete's days_per_week so the schema and the day_count audit agree.
  */
-export function buildEmitProgramTool(daysPerWeek: number, units: "lbs" | "kg") {
+export function buildEmitProgramTool(daysPerWeek: number, units: "lbs" | "kg", sessionLengthMinutes: number | null) {
   return {
     name: "emit_program",
     description:
@@ -276,7 +289,7 @@ export function buildEmitProgramTool(daysPerWeek: number, units: "lbs" | "kg") {
           type: "array",
           minItems: 4,
           maxItems: 4,
-          items: buildWeekSchema(daysPerWeek, units),
+          items: buildWeekSchema(daysPerWeek, units, sessionLengthMinutes),
         },
       },
       required: ["month_plan", "weeks"],
