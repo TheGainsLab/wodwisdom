@@ -134,18 +134,38 @@ type SetStage = (stage: string) => Promise<void> | void;
 const NO_STAGE: SetStage = () => {};
 
 /**
+ * Thrown when the audit loop runs through MAX_AUDIT_ATTEMPTS and never
+ * passes. Carries the last attempt's output + failures so the caller
+ * can persist them for admin inspection instead of discarding.
+ */
+class AuditLoopExhausted extends Error {
+  constructor(
+    public readonly lastOutput: WriterOutput,
+    public readonly lastFailures: ReturnType<typeof runAudits>["failures"],
+  ) {
+    super(
+      `Audit failures persisted after ${MAX_AUDIT_ATTEMPTS} attempts. Last failures: ${lastFailures.map((f) => f.rule).join(", ")}`,
+    );
+    this.name = "AuditLoopExhausted";
+  }
+}
+
+/**
  * Generate + audit loop. Calls the writer, runs deterministic audits,
  * retries up to MAX_AUDIT_ATTEMPTS times with violation feedback.
- * Throws if all attempts fail audits.
+ * Throws AuditLoopExhausted (carrying the last attempt's output) if all
+ * attempts fail audits.
  */
 async function generateWithAudits(payload: WriterPayload, setStage: SetStage = NO_STAGE): Promise<WriterOutput> {
   let retryViolations = "";
+  let lastOutput: WriterOutput | null = null;
   let lastFailures: ReturnType<typeof runAudits>["failures"] = [];
 
   for (let attempt = 1; attempt <= MAX_AUDIT_ATTEMPTS; attempt++) {
     console.log(`[generate-program-v2] writer attempt ${attempt}/${MAX_AUDIT_ATTEMPTS}`);
     await setStage(`writer_attempt_${attempt}`);
     const output = await callWriter(payload, retryViolations);
+    lastOutput = output;
     await setStage("auditing");
     const auditResult = runAudits({
       output,
@@ -164,9 +184,11 @@ async function generateWithAudits(payload: WriterPayload, setStage: SetStage = N
     retryViolations = formatViolationsForRetry(auditResult.failures);
   }
 
-  throw new Error(
-    `Audit failures persisted after ${MAX_AUDIT_ATTEMPTS} attempts. Last failures: ${lastFailures.map((f) => f.rule).join(", ")}`,
-  );
+  if (!lastOutput) {
+    // Defensive — should never happen unless callWriter threw on every attempt.
+    throw new Error("Audit loop exhausted but no writer output was produced.");
+  }
+  throw new AuditLoopExhausted(lastOutput, lastFailures);
 }
 
 /**
@@ -459,6 +481,29 @@ async function processJob(jobId: string, userId: string) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown error";
     console.error("[generate-program-v2 worker] failed:", err);
+
+    if (err instanceof AuditLoopExhausted) {
+      // Preserve the last attempt's output + violations so the admin can
+      // inspect what the writer produced even though it didn't pass.
+      await supa
+        .from("program_jobs")
+        .update({
+          status: "failed",
+          stage: null,
+          error: message.slice(0, 1000),
+          result_json: {
+            output: err.lastOutput,
+            audit_failures: err.lastFailures,
+            elapsed_ms: Date.now() - t0,
+            rejected: true,
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", jobId)
+        .then(() => {}, () => {});
+      return;
+    }
+
     await markFailed(message);
   }
 }

@@ -737,6 +737,16 @@ export default function AthletePage({ session }: { session: Session }) {
           return;
         }
         if (status?.status === 'failed') {
+          // If the worker stashed the rejected output (audit-loop exhaustion
+          // path), surface it inline alongside the error so admin can
+          // inspect what the writer produced.
+          const rj = status.result_json ?? {};
+          if (rj.output) {
+            setV2ProgramOutput(rj.output);
+            setV2ProgramId(status.program_id ?? null);
+            setV2ProgramElapsed(rj.elapsed_ms ?? null);
+            setV2ProgramSafety(rj.safety ?? null);
+          }
           throw new Error(status.error || 'v2 generation failed');
         }
         delay = Math.min(delay + 1000, 8000);
