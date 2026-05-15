@@ -451,6 +451,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const [v2ProgramElapsed, setV2ProgramElapsed] = useState<number | null>(null);
   const [v2ProgramId, setV2ProgramId] = useState<string | null>(null);
   const [v2ProgramSafety, setV2ProgramSafety] = useState<{ safe: boolean; reasoning: string; errored: boolean } | null>(null);
+  const [v2ProgramStage, setV2ProgramStage] = useState<string | null>(null);
   const [comparingEval, setComparingEval] = useState(false);
   const [compareEvalV1Text, setCompareEvalV1Text] = useState<string | null>(null);
   const [compareEvalV1Status, setCompareEvalV1Status] = useState<'idle' | 'running' | 'ready' | 'failed'>('idle');
@@ -706,12 +707,14 @@ export default function AthletePage({ session }: { session: Session }) {
     setV2ProgramElapsed(null);
     setV2ProgramId(null);
     setV2ProgramSafety(null);
+    setV2ProgramStage(null);
     try {
       const { data: kickoff, error: kickErr } = await supabase.functions.invoke('generate-program-v2', { body: {} });
       if (kickErr) throw new Error(kickErr.message || 'v2 kickoff failed');
       if (kickoff?.error) throw new Error(kickoff.message || kickoff.error);
       const jobId: string | null = kickoff?.job_id ?? null;
       if (!jobId) throw new Error('v2 kickoff: no job_id returned');
+      setV2ProgramStage('pending');
 
       let delay = 3000;
       const maxAttempts = 80;
@@ -722,6 +725,7 @@ export default function AthletePage({ session }: { session: Session }) {
         });
         if (statusErr) throw new Error(statusErr.message || 'v2 status check failed');
         if (status?.error && status?.status !== 'failed') throw new Error(status.error);
+        setV2ProgramStage(status?.stage ?? status?.status ?? null);
         if (status?.status === 'complete') {
           const rj = status.result_json ?? {};
           if (!rj.output) throw new Error('v2 complete but result_json missing');
@@ -729,6 +733,7 @@ export default function AthletePage({ session }: { session: Session }) {
           setV2ProgramId(status.program_id ?? null);
           setV2ProgramElapsed(rj.elapsed_ms ?? null);
           setV2ProgramSafety(rj.safety ?? null);
+          setV2ProgramStage(null);
           return;
         }
         if (status?.status === 'failed') {
@@ -741,6 +746,7 @@ export default function AthletePage({ session }: { session: Session }) {
       setV2ProgramError(err instanceof Error ? err.message : 'v2 program failed');
     } finally {
       setGeneratingProgramV2(false);
+      setV2ProgramStage(null);
     }
   };
 
@@ -1675,6 +1681,29 @@ export default function AthletePage({ session }: { session: Session }) {
                     >
                       {generatingProgramV2 ? 'Generating v2…' : 'Generate (v2 — experimental)'}
                     </button>
+                    {generatingProgramV2 && v2ProgramStage && (
+                      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-dim)' }}>
+                        {(() => {
+                          const labels: Record<string, string> = {
+                            pending: 'Queued…',
+                            starting: 'Starting…',
+                            payload_building: 'Reading your profile…',
+                            payload_built: 'Profile ready, drafting…',
+                            writer_attempt_1: 'Drafting your program…',
+                            writer_attempt_2: 'Revising (attempt 2)…',
+                            writer_attempt_3: 'Revising (attempt 3)…',
+                            auditing: 'Checking program structure…',
+                            safety_review: 'Safety review…',
+                            safety_regen_1: 'Adjusting for safety (1)…',
+                            safety_regen_2: 'Adjusting for safety (2)…',
+                            safety_regen_3: 'Adjusting for safety (3)…',
+                            saving: 'Saving…',
+                            processing: 'Working…',
+                          };
+                          return labels[v2ProgramStage] ?? `Stage: ${v2ProgramStage}`;
+                        })()}
+                      </div>
+                    )}
                     {v2ProgramError && <div className="error-msg" style={{ marginTop: 12 }}>{v2ProgramError}</div>}
                     {v2ProgramOutput != null && (
                       <V2OutputPanel

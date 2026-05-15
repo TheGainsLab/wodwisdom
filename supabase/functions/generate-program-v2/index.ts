@@ -130,18 +130,23 @@ async function callWriter(
   return toolUse.input as WriterOutput;
 }
 
+type SetStage = (stage: string) => Promise<void> | void;
+const NO_STAGE: SetStage = () => {};
+
 /**
  * Generate + audit loop. Calls the writer, runs deterministic audits,
  * retries up to MAX_AUDIT_ATTEMPTS times with violation feedback.
  * Throws if all attempts fail audits.
  */
-async function generateWithAudits(payload: WriterPayload): Promise<WriterOutput> {
+async function generateWithAudits(payload: WriterPayload, setStage: SetStage = NO_STAGE): Promise<WriterOutput> {
   let retryViolations = "";
   let lastFailures: ReturnType<typeof runAudits>["failures"] = [];
 
   for (let attempt = 1; attempt <= MAX_AUDIT_ATTEMPTS; attempt++) {
     console.log(`[generate-program-v2] writer attempt ${attempt}/${MAX_AUDIT_ATTEMPTS}`);
+    await setStage(`writer_attempt_${attempt}`);
     const output = await callWriter(payload, retryViolations);
+    await setStage("auditing");
     const auditResult = runAudits({
       output,
       daysPerWeek: payload.training_context.days_per_week,
@@ -171,8 +176,10 @@ async function generateWithAudits(payload: WriterPayload): Promise<WriterOutput>
 async function runSafetyLoop(
   initialOutput: WriterOutput,
   payload: WriterPayload,
+  setStage: SetStage = NO_STAGE,
 ): Promise<{ output: WriterOutput; safety: SafetyReviewResult }> {
   let output = initialOutput;
+  await setStage("safety_review");
   let safety = await reviewSafety(
     output,
     payload.training_context.goal_text,
@@ -186,6 +193,7 @@ async function runSafetyLoop(
 
   for (let attempt = 1; attempt <= MAX_SAFETY_ATTEMPTS && !safety.safe; attempt++) {
     console.log(`[generate-program-v2] safety regen ${attempt}/${MAX_SAFETY_ATTEMPTS}; violations: ${safety.violations.length}`);
+    await setStage(`safety_regen_${attempt}`);
     const safetyContext = [
       "Your previous program failed the safety review against the athlete's stated injuries / constraints. Regenerate, addressing these violations:",
       "",
@@ -195,6 +203,7 @@ async function runSafetyLoop(
     ].join("\n");
 
     output = await callWriter(payload, safetyContext);
+    await setStage("safety_review");
 
     // Re-run deterministic audits on the regen — the safety fix
     // shouldn't have broken anything, but defense-in-depth.
@@ -387,6 +396,14 @@ async function processJob(jobId: string, userId: string) {
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   const t0 = Date.now();
 
+  const setStage: SetStage = async (stage: string) => {
+    await supa
+      .from("program_jobs")
+      .update({ stage, updated_at: new Date().toISOString() })
+      .eq("id", jobId)
+      .then(() => {}, () => {});
+  };
+
   const markFailed = async (message: string) => {
     await supa
       .from("program_jobs")
@@ -398,20 +415,23 @@ async function processJob(jobId: string, userId: string) {
   try {
     await supa
       .from("program_jobs")
-      .update({ status: "processing", updated_at: new Date().toISOString() })
+      .update({ status: "processing", stage: "starting", updated_at: new Date().toISOString() })
       .eq("id", jobId);
 
     console.log(`[generate-program-v2 worker] building payload for user ${userId}`);
+    await setStage("payload_building");
     const payload = await buildWriterPayload(supa, userId, { includeAllResults: false });
     console.log(
       `[generate-program-v2 worker] payload built (days_per_week=${payload.training_context.days_per_week} competition_linked=${payload.competition != null} vocabulary_size=${payload.vocabulary.length} rag_chars=${payload.rag.length})`,
     );
+    await setStage("payload_built");
 
-    const auditedOutput = await generateWithAudits(payload);
-    const { output, safety } = await runSafetyLoop(auditedOutput, payload);
+    const auditedOutput = await generateWithAudits(payload, setStage);
+    const { output, safety } = await runSafetyLoop(auditedOutput, payload, setStage);
 
     let programId: string | null = null;
     try {
+      await setStage("saving");
       programId = await saveProgramV2(supa, userId, output);
       console.log(`[generate-program-v2 worker] persisted program ${programId}`);
     } catch (saveErr) {
@@ -426,6 +446,7 @@ async function processJob(jobId: string, userId: string) {
       .from("program_jobs")
       .update({
         status: "complete",
+        stage: null,
         program_id: programId,
         result_json: {
           output,
