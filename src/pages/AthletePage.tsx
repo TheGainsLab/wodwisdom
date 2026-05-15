@@ -6,6 +6,7 @@ import { classifyAthlete } from '../utils/classify-athlete';
 import { calculateTDEE } from '../utils/tdee';
 import { getTierStatus, type AthleteProfileInput, type TierSection } from '../utils/tier-status';
 import { useEntitlements } from '../hooks/useEntitlements';
+import { V2OutputPanel } from '../components/admin/V2OutputPanel';
 import Nav from '../components/Nav';
 import { formatMarkdown } from '../lib/formatMarkdown';
 
@@ -443,6 +444,13 @@ export default function AthletePage({ session }: { session: Session }) {
   const [v2EvalError, setV2EvalError] = useState('');
   const [v2EvalElapsed, setV2EvalElapsed] = useState<number | null>(null);
   const [v2EvalId, setV2EvalId] = useState<string | null>(null);
+  // v2 program-generator admin testing state (Phase 1, /athlete only).
+  const [generatingProgramV2, setGeneratingProgramV2] = useState(false);
+  const [v2ProgramOutput, setV2ProgramOutput] = useState<unknown>(null);
+  const [v2ProgramError, setV2ProgramError] = useState('');
+  const [v2ProgramElapsed, setV2ProgramElapsed] = useState<number | null>(null);
+  const [v2ProgramId, setV2ProgramId] = useState<string | null>(null);
+  const [v2ProgramSafety, setV2ProgramSafety] = useState<{ safe: boolean; reasoning: string; errored: boolean } | null>(null);
   const [comparingEval, setComparingEval] = useState(false);
   const [compareEvalV1Text, setCompareEvalV1Text] = useState<string | null>(null);
   const [compareEvalV1Status, setCompareEvalV1Status] = useState<'idle' | 'running' | 'ready' | 'failed'>('idle');
@@ -684,6 +692,31 @@ export default function AthletePage({ session }: { session: Session }) {
       setV2EvalError(err instanceof Error ? err.message : 'v2 eval failed');
     } finally {
       setGeneratingEvalV2(false);
+    }
+  };
+
+  // Admin Phase 1 — run generate-program v2 (synchronous edge fn,
+  // returns structured WriterOutput). Renders inline via V2OutputPanel.
+  const handleGenerateProgramV2 = async () => {
+    setGeneratingProgramV2(true);
+    setV2ProgramOutput(null);
+    setV2ProgramError('');
+    setV2ProgramElapsed(null);
+    setV2ProgramId(null);
+    setV2ProgramSafety(null);
+    try {
+      const { data, error: invErr } = await supabase.functions.invoke('generate-program-v2', { body: {} });
+      if (invErr) throw new Error(invErr.message || 'v2 program failed');
+      if (data?.error) throw new Error(data.message || data.error);
+      if (!data?.ok || !data?.output) throw new Error('v2 program: unexpected response');
+      setV2ProgramOutput(data.output);
+      setV2ProgramId(data.program_id ?? null);
+      setV2ProgramElapsed(data.elapsed_ms ?? null);
+      setV2ProgramSafety(data.safety ?? null);
+    } catch (err) {
+      setV2ProgramError(err instanceof Error ? err.message : 'v2 program failed');
+    } finally {
+      setGeneratingProgramV2(false);
     }
   };
 
@@ -1583,6 +1616,37 @@ export default function AthletePage({ session }: { session: Session }) {
                           )}
                         </div>
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Admin · Phase 1 v2 program-generator testing */}
+                {isAdmin && (
+                  <div className="settings-card" style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--text-muted)', marginBottom: 4 }}>
+                      Admin · Phase 1 v2 program testing
+                    </div>
+                    <h2 className="settings-card-title" style={{ marginBottom: 8 }}>v2 Program Generator</h2>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
+                      Run the v2 generator directly. v2 uses the rewritten shared payload + structured output. Phase 1 admins-only.
+                    </div>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface2)', border: '1px solid var(--border)' }}
+                      onClick={handleGenerateProgramV2}
+                      disabled={generatingProgramV2}
+                    >
+                      {generatingProgramV2 ? 'Generating v2…' : 'Generate (v2 — experimental)'}
+                    </button>
+                    {v2ProgramError && <div className="error-msg" style={{ marginTop: 12 }}>{v2ProgramError}</div>}
+                    {v2ProgramOutput != null && (
+                      <V2OutputPanel
+                        output={v2ProgramOutput}
+                        programId={v2ProgramId}
+                        elapsedMs={v2ProgramElapsed}
+                        safety={v2ProgramSafety}
+                      />
                     )}
                   </div>
                 )}
