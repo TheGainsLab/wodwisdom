@@ -164,6 +164,8 @@ Then write the daily program. Use the plan to keep the month coherent.
 OUTPUT FORMAT
 Emit the program via the provided tool — structured JSON with weeks → days → blocks → movements. Each movement uses fields the workout-logging side already understands: sets, reps, weight, weight_unit ('lbs' or 'kg'), rpe (1–10 when applicable), scaling_note. Free movement naming is allowed; the payload includes a vocabulary list of canonical competition-movement display names — prefer those names when a movement matches one of them, but warm-up / accessory / cool-down movements that aren't in the list (air squat, banded mob, dynamic stretching, etc.) are fine.
 
+Every movement in a strength / accessory / metcon / skills block must populate at least one of sets, reps, weight, time_seconds, or distance — even when block_scheme already conveys the work pattern. The block_scheme is the human-readable structure ("21-15-9 for time", "AMRAP 12", "EMOM 10"); the per-movement fields carry the actual prescription that the audit reads. For "21-15-9" metcons, every movement gets reps: 21 (the first round's count). For AMRAP/EMOM, every movement gets its per-round reps. For chippers, every movement gets its total reps. Treat block_scheme as descriptive; treat reps / sets / weight / time_seconds / distance as the contract.
+
 EXAMPLE OUTPUT (one day of one week — actual output emits all 4 weeks × days_per_week days):
 {
   "month_plan": {
