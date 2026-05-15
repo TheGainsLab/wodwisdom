@@ -160,17 +160,12 @@ const SKILL_GROUPS = [
     ],
   },
   {
-    title: 'Midline',
-    skills: [
-      { key: 'ghd_sit_ups', label: 'GHD Sit-Ups' },
-    ],
-  },
-  {
     title: 'Other',
     skills: [
       { key: 'handstand_walk', label: 'Handstand Walk' },
       { key: 'double_unders', label: 'Double-Unders' },
       { key: 'pistols', label: 'Pistols' },
+      { key: 'ghd_sit_ups', label: 'GHD Sit-Ups' },
     ],
   },
 ];
