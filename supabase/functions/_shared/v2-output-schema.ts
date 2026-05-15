@@ -240,7 +240,7 @@ function buildWeekSchema(daysPerWeek: number, units: "lbs" | "kg", sessionLength
   };
 }
 
-const MONTH_PLAN_SCHEMA = {
+export const MONTH_PLAN_SCHEMA = {
   type: "object",
   properties: {
     weekly_intent: {
