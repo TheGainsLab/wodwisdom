@@ -40,6 +40,36 @@ export interface AuditResult {
 }
 
 // ============================================================
+// Defensive shape helpers — Anthropic's tool_use schema enforcement
+// is meant to guarantee output.weeks / week.days / day.blocks /
+// block.movements are all arrays, but in practice the writer
+// occasionally emits a malformed response (especially under heavy
+// prompt load). Treat missing arrays as empty so audits report
+// clean violations instead of throwing TypeErrors.
+// ============================================================
+
+function safeWeeks(output: WriterOutput): WriterOutput["weeks"] {
+  return Array.isArray((output as { weeks?: unknown }).weeks)
+    ? (output.weeks as WriterOutput["weeks"])
+    : [];
+}
+function safeDays(week: WriterOutput["weeks"][number]): WriterOutput["weeks"][number]["days"] {
+  return Array.isArray((week as { days?: unknown }).days)
+    ? week.days
+    : [];
+}
+function safeBlocks(day: WriterOutput["weeks"][number]["days"][number]): BlockPrescription[] {
+  return Array.isArray((day as { blocks?: unknown }).blocks)
+    ? day.blocks
+    : [];
+}
+function safeMovements(block: BlockPrescription): MovementPrescription[] {
+  return Array.isArray((block as { movements?: unknown }).movements)
+    ? block.movements
+    : [];
+}
+
+// ============================================================
 // Rule 1 — block_type enum existence
 // ============================================================
 
@@ -52,10 +82,11 @@ export interface AuditResult {
 export function auditBlockTypeEnum(output: WriterOutput): AuditResult {
   const allowed = new Set<string>(BLOCK_TYPES);
   const violations: string[] = [];
-  for (const week of output.weeks) {
-    for (const day of week.days) {
-      for (let i = 0; i < day.blocks.length; i++) {
-        const b = day.blocks[i];
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
         if (!allowed.has(b.block_type)) {
           violations.push(
             `Week ${week.week_num} Day ${day.day_num} block[${i}]: block_type "${b.block_type}" is not in the canonical 8-enum (${BLOCK_TYPES.join(", ")}).`,
@@ -79,14 +110,16 @@ export function auditBlockTypeEnum(output: WriterOutput): AuditResult {
  */
 export function auditStrengthOneLift(output: WriterOutput): AuditResult {
   const violations: string[] = [];
-  for (const week of output.weeks) {
-    for (const day of week.days) {
-      for (let i = 0; i < day.blocks.length; i++) {
-        const b = day.blocks[i];
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
         if (b.block_type !== "strength") continue;
-        if (b.movements.length !== 1) {
+        const movements = safeMovements(b);
+        if (movements.length !== 1) {
           violations.push(
-            `Week ${week.week_num} Day ${day.day_num} block[${i}] (strength): contains ${b.movements.length} movements (must be exactly 1; supplementary work belongs in an accessory block).`,
+            `Week ${week.week_num} Day ${day.day_num} block[${i}] (strength): contains ${movements.length} movements (must be exactly 1; supplementary work belongs in an accessory block).`,
           );
         }
       }
@@ -111,11 +144,12 @@ export function auditStrengthOneLift(output: WriterOutput): AuditResult {
  */
 export function auditMetconOnePiece(output: WriterOutput): AuditResult {
   const violations: string[] = [];
-  for (const week of output.weeks) {
-    for (const day of week.days) {
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
       let metconCount = 0;
-      for (let i = 0; i < day.blocks.length; i++) {
-        const b = day.blocks[i];
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
         if (b.block_type !== "metcon") continue;
         metconCount++;
         const scheme = (b.block_scheme ?? "").trim();
@@ -180,19 +214,21 @@ const PRESCRIPTION_REQUIRED_BLOCK_TYPES = new Set([
  */
 export function auditRequiredFields(output: WriterOutput): AuditResult {
   const violations: string[] = [];
-  for (const week of output.weeks) {
-    for (const day of week.days) {
-      for (let i = 0; i < day.blocks.length; i++) {
-        const b = day.blocks[i];
-        if (b.movements.length === 0) {
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        const movements = safeMovements(b);
+        if (movements.length === 0) {
           violations.push(
             `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type}): no movements.`,
           );
           continue;
         }
         if (!PRESCRIPTION_REQUIRED_BLOCK_TYPES.has(b.block_type)) continue;
-        for (let j = 0; j < b.movements.length; j++) {
-          const m = b.movements[j];
+        for (let j = 0; j < movements.length; j++) {
+          const m = movements[j];
           if (!movementHasAnyPrescription(m)) {
             violations.push(
               `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type}) movement[${j}] "${m.movement}": has none of {sets, reps, weight, time_seconds, distance} populated.`,
@@ -220,13 +256,14 @@ export function auditDayCount(
   daysPerWeek: number,
 ): AuditResult {
   const violations: string[] = [];
+  const weeks = safeWeeks(output);
 
-  if (output.weeks.length !== 4) {
-    violations.push(`Output has ${output.weeks.length} weeks; expected exactly 4.`);
+  if (weeks.length !== 4) {
+    violations.push(`Output has ${weeks.length} weeks; expected exactly 4.`);
   }
 
   const seenWeekNums = new Set<number>();
-  for (const week of output.weeks) {
+  for (const week of weeks) {
     if (week.week_num < 1 || week.week_num > 4) {
       violations.push(`Week_num ${week.week_num} is out of range (expected 1..4).`);
     }
@@ -235,14 +272,15 @@ export function auditDayCount(
     }
     seenWeekNums.add(week.week_num);
 
-    if (week.days.length !== daysPerWeek) {
+    const days = safeDays(week);
+    if (days.length !== daysPerWeek) {
       violations.push(
-        `Week ${week.week_num} has ${week.days.length} days; expected exactly ${daysPerWeek}.`,
+        `Week ${week.week_num} has ${days.length} days; expected exactly ${daysPerWeek}.`,
       );
     }
 
     const seenDayNums = new Set<number>();
-    for (const day of week.days) {
+    for (const day of days) {
       if (day.day_num < 1 || day.day_num > daysPerWeek) {
         violations.push(
           `Week ${week.week_num} day_num ${day.day_num} is out of range (expected 1..${daysPerWeek}).`,
@@ -315,17 +353,19 @@ export function auditLoadSanity(
   );
   const maxOneRm = liftValues.length > 0 ? Math.max(...liftValues) : null;
 
-  for (const week of output.weeks) {
-    for (const day of week.days) {
-      for (let i = 0; i < day.blocks.length; i++) {
-        const b = day.blocks[i];
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
         const schemeStr = `${b.block_scheme ?? ""} ${b.block_notes ?? ""}`.toLowerCase();
         const isAttempt = schemeStr.includes("1rm attempt") ||
           schemeStr.includes("1rm_attempt") ||
           schemeStr.includes("max attempt") ||
           schemeStr.includes("new 1rm");
-        for (let j = 0; j < b.movements.length; j++) {
-          const m = b.movements[j];
+        const movements = safeMovements(b);
+        for (let j = 0; j < movements.length; j++) {
+          const m = movements[j];
           if (m.weight == null || m.weight <= 0) continue;
           if (isAttempt) continue; // intentional max attempt
 
@@ -373,12 +413,14 @@ export function auditVocabularyCompliance(
   const allowed = new Set(vocabulary);
   const violations: string[] = [];
   const seenUnknown = new Set<string>();
-  for (const week of output.weeks) {
-    for (const day of week.days) {
-      for (let i = 0; i < day.blocks.length; i++) {
-        const b = day.blocks[i];
-        for (let j = 0; j < b.movements.length; j++) {
-          const name = b.movements[j].movement;
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        const movements = safeMovements(b);
+        for (let j = 0; j < movements.length; j++) {
+          const name = movements[j].movement;
           if (!allowed.has(name)) {
             // Deduplicate by name in the violations list — same
             // unknown movement across many days otherwise spams.

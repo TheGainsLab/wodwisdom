@@ -394,3 +394,116 @@ Deno.test("auditVocabularyCompliance: exact-string match is required (case sensi
   const result = auditVocabularyCompliance(out, ["Back Squat"]);
   assert(!result.passed);
 });
+
+
+// ============================================================
+// Defensive shape guards — Anthropic's tool_use occasionally emits
+// outputs missing nested arrays. Audits must not crash on those;
+// they should report a clean violation or short-circuit gracefully.
+// ============================================================
+
+Deno.test('auditBlockTypeEnum: day with no blocks array → no crash, no violation', () => {
+  const out = baselineOutput();
+  // deno-lint-ignore no-explicit-any
+  delete (out.weeks[0].days[0] as any).blocks;
+  const result = auditBlockTypeEnum(out);
+  assert(result.passed);
+});
+
+Deno.test('auditStrengthOneLift: block with no movements array → no crash', () => {
+  const out = baselineOutput();
+  // deno-lint-ignore no-explicit-any
+  delete (out.weeks[0].days[0].blocks[0] as any).movements;
+  const result = auditStrengthOneLift(out);
+  assert(!result.passed);
+  assert(result.violations[0].includes('contains 0 movements'));
+});
+
+Deno.test('auditDayCount: week with no days array → reports zero days', () => {
+  const out = baselineOutput();
+  // deno-lint-ignore no-explicit-any
+  delete (out.weeks[0] as any).days;
+  const result = auditDayCount(out, 3);
+  assert(!result.passed);
+  assert(result.violations.some((v) => v.includes('0 days')));
+});
+
+Deno.test('auditDayCount: output with no weeks property → reports 0 weeks', () => {
+  // deno-lint-ignore no-explicit-any
+  const out = { month_plan: baselineOutput().month_plan } as any;
+  const result = auditDayCount(out, 3);
+  assert(!result.passed);
+  assert(result.violations.some((v) => v.includes('0 weeks')));
+});
+
+Deno.test('auditRequiredFields: block with no movements array → reports no movements', () => {
+  const out = baselineOutput();
+  // deno-lint-ignore no-explicit-any
+  delete (out.weeks[0].days[0].blocks[0] as any).movements;
+  const result = auditRequiredFields(out);
+  assert(!result.passed);
+  assert(result.violations[0].includes('no movements'));
+});
+
+Deno.test('auditLoadSanity: day with no blocks array → no crash, no violation', () => {
+  const out = baselineOutput();
+  // deno-lint-ignore no-explicit-any
+  delete (out.weeks[0].days[0] as any).blocks;
+  const result = auditLoadSanity(out, { back_squat: 405 });
+  assert(result.passed);
+});
+
+Deno.test('auditVocabularyCompliance: day with no blocks array → no crash, no violation', () => {
+  const out = baselineOutput();
+  // deno-lint-ignore no-explicit-any
+  delete (out.weeks[0].days[0] as any).blocks;
+  const result = auditVocabularyCompliance(out, ['Back Squat']);
+  assert(result.passed);
+});
+
+
+// ============================================================
+// runAudits — structural pre-check
+// ============================================================
+
+import { runAudits } from "./audit-runner.ts";
+
+Deno.test("runAudits: missing weeks → short-circuits with structural_integrity violation", () => {
+  // deno-lint-ignore no-explicit-any
+  const out = { month_plan: baselineOutput().month_plan } as any;
+  const result = runAudits({
+    output: out,
+    daysPerWeek: 3,
+    lifts: {},
+    vocabulary: [],
+  });
+  assert(!result.passed);
+  assertEquals(result.failures.length, 1);
+  assertEquals(result.failures[0].rule, "structural_integrity");
+  assert(result.failures[0].violations[0].includes("weeks"));
+});
+
+Deno.test("runAudits: missing month_plan → structural_integrity violation", () => {
+  // deno-lint-ignore no-explicit-any
+  const out = { weeks: baselineOutput().weeks } as any;
+  const result = runAudits({
+    output: out,
+    daysPerWeek: 3,
+    lifts: {},
+    vocabulary: [],
+  });
+  assert(!result.passed);
+  assert(result.failures[0].violations.some((v) => v.includes("month_plan")));
+});
+
+Deno.test("runAudits: well-formed baseline output passes structural pre-check, runs normal audits", () => {
+  const out = baselineOutput();
+  const result = runAudits({
+    output: out,
+    daysPerWeek: 3,
+    lifts: { back_squat: 405 },
+    vocabulary: ["Back Squat"],
+  });
+  // structural is fine; baseline may or may not pass full audits, but should NOT trip structural.
+  assert(!result.failures.some((f) => f.rule === "structural_integrity"));
+});
