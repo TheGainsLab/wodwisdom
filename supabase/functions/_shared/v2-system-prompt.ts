@@ -138,6 +138,18 @@ Accessory selection must directly address the top 2–3 closable gaps in the ath
 
 For unlinked athletes (no Tier 4 data), drive accessory selection from the imbalance ratios above and from goal text.
 
+Accessory loading. Accessory follows strength and often follows metcon. The athlete is fatigued — accessory is volume work for hypertrophy / movement quality / weakness remediation, not peak strength. Cap accordingly:
+  - Variants of foundational lifts (Bench Press, RDL, Push Press, Shoulder to Overhead, Front Squat, etc.): ≤ 75% of relevant 1RM in build weeks, ≤ 80% on a peak week only when RPE is managed.
+  - Pure accessory work (single-arm DB row, DB lunge, weighted carries, glute bridge): hypertrophy intensity — 60–70% of related primary 1RM, or bodyweight + scaled load.
+  - Skills-style accessory (HSPU, T2B, V-Up, ring dip): bodyweight or scaled; no % anchor.
+
+DISTANCE UNITS
+Pick distance_unit by movement, not by athlete unit preference:
+  - Rowing distance: meters (always). Never feet.
+  - Running distance: meters or miles. Never feet.
+  - Carries, walking lunges, sled push/pull, broad jumps: ft for lbs-athletes, m for kg-athletes.
+  - Bike, Ski-erg: use calories (reps with "Calories" in scaling_note), not distance.
+
 MONTHLY ARC
 Output exactly 4 weeks × the athlete's days_per_week. Plan for adequate recovery within the cycle — typically a reduced-volume week, placed based on the athlete's goal, prior load, and any named event. Not always week 4: an athlete coming off a hard competition might need deload in week 1; a peaking arc might be 3 weeks build + week 4 test.
 

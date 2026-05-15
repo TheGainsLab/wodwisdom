@@ -134,13 +134,14 @@ export interface WriterOutput {
 // ============================================================
 
 /**
- * Build the per-movement schema with weight_unit and distance_unit
- * locked to the athlete's measurement system. There's no intake field
- * for distance preference, so we infer from units: lbs → ft, kg → m.
- * Without this the writer can mix systems mid-program.
+ * Build the per-movement schema with weight_unit locked to the
+ * athlete's measurement system. distance_unit is intentionally left
+ * open (ft or m) — CrossFit convention picks by movement, not by
+ * athlete unit preference (rowing is always meters; running is meters
+ * or miles; carries/lunges follow the athlete's units). The system
+ * prompt enforces the convention.
  */
 function buildMovementSchema(units: "lbs" | "kg") {
-  const distanceUnit = units === "lbs" ? "ft" : "m";
   return {
     type: "object",
     properties: {
@@ -152,7 +153,7 @@ function buildMovementSchema(units: "lbs" | "kg") {
       rpe: { type: "integer", minimum: 1, maximum: 10 },
       time_seconds: { type: "integer", minimum: 1, maximum: 7200 },
       distance: { type: "number", minimum: 0 },
-      distance_unit: { type: "string", enum: [distanceUnit] },
+      distance_unit: { type: "string", enum: ["ft", "m"] },
       scaling_note: { type: "string", maxLength: 500 },
     },
     required: ["movement"],
