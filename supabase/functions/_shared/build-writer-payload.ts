@@ -39,6 +39,7 @@ import {
   ALL_EQUIPMENT_KEYS,
   SKILL_DISPLAY_NAMES,
 } from "./tier-status.ts";
+import { computeEquipmentBlockedMovements } from "./equipment-movements.ts";
 import { fetchTier4Bundle, type Tier4Bundle } from "./fetch-tier4-bundle.ts";
 import { buildRagContext } from "./build-rag-context.ts";
 
@@ -351,6 +352,24 @@ export async function buildWriterPayload(
     equipment[k] = asEquipmentValue((profile.equipment ?? {})[k]);
   }
 
+  // Merge equipment-blocked movements into injuries_structured.do_not_program
+  // so the writer sees one canonical filter regardless of source. The
+  // equipment list is purely static (boolean → static movement list); the
+  // injury list (if present) was parsed by the parse-injuries-constraints
+  // edge function.
+  const equipmentBlocked = computeEquipmentBlockedMovements(equipment);
+  const baseInjuriesStructured: InjuryConstraints = profile.injuries_structured ?? {
+    summary: "No injury constraints.",
+    do_not_program: [],
+    suggested_subs: [],
+  };
+  const mergedInjuriesStructured: InjuryConstraints = {
+    ...baseInjuriesStructured,
+    do_not_program: Array.from(
+      new Set([...baseInjuriesStructured.do_not_program, ...equipmentBlocked]),
+    ).sort(),
+  };
+
   return {
     basics: {
       age: asNumber(profile.age),
@@ -368,7 +387,7 @@ export async function buildWriterPayload(
       session_length_minutes: asNumber(profile.session_length_minutes),
       goal_text: asString(profile.goal),
       injuries_constraints_text: asString(profile.injuries_constraints),
-      injuries_structured: profile.injuries_structured ?? null,
+      injuries_structured: mergedInjuriesStructured,
       self_perception_level: asString(profile.self_perception_level),
     },
     competition,
