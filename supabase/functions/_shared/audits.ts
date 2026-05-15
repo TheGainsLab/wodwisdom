@@ -361,5 +361,8 @@ export const ALL_AUDITS = [
   (ctx: AuditContext): AuditResult => auditRequiredFields(ctx.output),
   (ctx: AuditContext): AuditResult => auditDayCount(ctx.output, ctx.daysPerWeek),
   (ctx: AuditContext): AuditResult => auditLoadSanity(ctx.output, ctx.lifts),
-  (ctx: AuditContext): AuditResult => auditVocabularyCompliance(ctx.output, ctx.vocabulary),
+  // vocabulary_compliance dropped 2026-05-14 — see chat log. v1 had no
+  // vocabulary enforcement; v2 reverted to free movement naming with
+  // RAG grounding. auditVocabularyCompliance() retained as a callable
+  // but no longer wired into the audit run.
 ] as const;
