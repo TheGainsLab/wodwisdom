@@ -43,6 +43,9 @@ verify_jwt = false
 [functions.parse-injuries-constraints]
 verify_jwt = false
 
+[functions.generate-program-v3]
+verify_jwt = false
+
 [functions.profile-analysis-status]
 verify_jwt = false
 
