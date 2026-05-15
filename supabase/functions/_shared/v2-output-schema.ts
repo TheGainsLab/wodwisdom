@@ -134,11 +134,13 @@ export interface WriterOutput {
 // ============================================================
 
 /**
- * Build the per-movement schema with weight_unit.enum locked to the
- * athlete's chosen units. Without this the writer can mix lbs and kg
- * mid-program; intake collected one system, the schema should honor it.
+ * Build the per-movement schema with weight_unit and distance_unit
+ * locked to the athlete's measurement system. There's no intake field
+ * for distance preference, so we infer from units: lbs → ft, kg → m.
+ * Without this the writer can mix systems mid-program.
  */
 function buildMovementSchema(units: "lbs" | "kg") {
+  const distanceUnit = units === "lbs" ? "ft" : "m";
   return {
     type: "object",
     properties: {
@@ -150,7 +152,7 @@ function buildMovementSchema(units: "lbs" | "kg") {
       rpe: { type: "integer", minimum: 1, maximum: 10 },
       time_seconds: { type: "integer", minimum: 1, maximum: 7200 },
       distance: { type: "number", minimum: 0 },
-      distance_unit: { type: "string", enum: ["ft", "m"] },
+      distance_unit: { type: "string", enum: [distanceUnit] },
       scaling_note: { type: "string", maxLength: 500 },
     },
     required: ["movement"],
