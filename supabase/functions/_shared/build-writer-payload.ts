@@ -37,6 +37,7 @@ import {
   ALL_CONDITIONING_KEYS,
   ALL_LIFT_KEYS,
   ALL_EQUIPMENT_KEYS,
+  SKILL_DISPLAY_NAMES,
 } from "./tier-status.ts";
 import { fetchTier4Bundle, type Tier4Bundle } from "./fetch-tier4-bundle.ts";
 import { buildRagContext } from "./build-rag-context.ts";
@@ -306,13 +307,24 @@ export async function buildWriterPayload(
     lifts[k] = asLiftValue((profile.lifts ?? {})[k]);
   }
 
+  // Snake_case-keyed map for the RAG builder (which expects to walk
+  // canonical keys and apply its own name transforms).
+  const skillsBySnakeKey: Record<string, SkillLevel | null> = {};
+  for (const k of ALL_SKILL_KEYS) {
+    skillsBySnakeKey[k] = asSkillLevel((profile.skills ?? {})[k]);
+  }
+
+  // Display-name-keyed map for the writer payload — the LLM reads
+  // "Strict Pull-Ups" / "HSPU" / "L-Sit" directly instead of having
+  // to translate from snake_case.
   const skills: Record<string, SkillLevel | null> = {};
   for (const k of ALL_SKILL_KEYS) {
-    skills[k] = asSkillLevel((profile.skills ?? {})[k]);
+    const displayName = SKILL_DISPLAY_NAMES[k] ?? k;
+    skills[displayName] = skillsBySnakeKey[k];
   }
 
   // 5. RAG — same v1 chain, hydrated maps in.
-  const rag = await buildRagContext(supa, lifts, skills);
+  const rag = await buildRagContext(supa, lifts, skillsBySnakeKey);
 
   // 6. Hydrate the remaining JSONB blobs (after RAG kicked off).
   const conditioning: Record<string, string | number | null> = {};

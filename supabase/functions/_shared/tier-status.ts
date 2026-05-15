@@ -73,6 +73,33 @@ export const ALL_EQUIPMENT_KEYS = [
   'bands',
 ] as const;
 
+/**
+ * Canonical display names for each skill key. Used by the v2 writer
+ * payload so the LLM reads "Muscle-Ups" / "Toes-to-Bar" / "HSPU" /
+ * "L-Sit" directly instead of having to translate from snake_case.
+ */
+export const SKILL_DISPLAY_NAMES: Record<string, string> = {
+  muscle_ups: 'Muscle-Ups',
+  bar_muscle_ups: 'Bar Muscle-Ups',
+  strict_ring_muscle_ups: 'Strict Ring Muscle-Ups',
+  toes_to_bar: 'Toes-to-Bar',
+  strict_pull_ups: 'Strict Pull-Ups',
+  kipping_pull_ups: 'Kipping Pull-Ups',
+  butterfly_pull_ups: 'Butterfly Pull-Ups',
+  chest_to_bar_pull_ups: 'Chest-to-Bar Pull-Ups',
+  rope_climbs: 'Rope Climbs',
+  legless_rope_climbs: 'Legless Rope Climbs',
+  wall_facing_hspu: 'Wall-Facing HSPU',
+  hspu: 'HSPU',
+  strict_hspu: 'Strict HSPU',
+  deficit_hspu: 'Deficit HSPU',
+  ring_dips: 'Ring Dips',
+  l_sit: 'L-Sit',
+  handstand_walk: 'Handstand Walk',
+  double_unders: 'Double-Unders',
+  pistols: 'Pistols',
+};
+
 export const ALL_SKILL_KEYS = [
   'muscle_ups',
   'bar_muscle_ups',

@@ -33,6 +33,7 @@ import {
   ALL_EQUIPMENT_KEYS,
   ALL_LIFT_KEYS,
   ALL_SKILL_KEYS,
+  SKILL_DISPLAY_NAMES,
 } from "./tier-status.ts";
 import type { Tier4Bundle } from "./fetch-tier4-bundle.ts";
 
@@ -139,7 +140,10 @@ function assertCanonicalShape(payload: {
   equipment: Record<string, boolean>;
 }) {
   assertEquals(Object.keys(payload.lifts).sort(), [...ALL_LIFT_KEYS].sort());
-  assertEquals(Object.keys(payload.skills).sort(), [...ALL_SKILL_KEYS].sort());
+  assertEquals(
+    Object.keys(payload.skills).sort(),
+    ALL_SKILL_KEYS.map((k) => SKILL_DISPLAY_NAMES[k]).sort(),
+  );
   assertEquals(
     Object.keys(payload.conditioning).sort(),
     [...ALL_CONDITIONING_KEYS].sort(),
@@ -458,10 +462,10 @@ Deno.test("buildWriterPayload: skill level lowercases + validates against allowe
       },
     });
     const payload = await buildWriterPayload(supa, "u");
-    assertEquals(payload.skills.strict_pull_ups, "advanced");
-    assertEquals(payload.skills.kipping_pull_ups, null);
-    assertEquals(payload.skills.muscle_ups, "none");
-    assertEquals(payload.skills.toes_to_bar, null);
+    assertEquals(payload.skills["Strict Pull-Ups"], "advanced");
+    assertEquals(payload.skills["Kipping Pull-Ups"], null);
+    assertEquals(payload.skills["Muscle-Ups"], "none");
+    assertEquals(payload.skills["Toes-to-Bar"], null);
   } finally {
     restoreFetch();
   }
