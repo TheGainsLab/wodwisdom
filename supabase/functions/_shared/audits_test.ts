@@ -311,12 +311,22 @@ Deno.test("auditLoadSanity: 1rm_attempt scheme is an intentional exception", () 
   assert(result.passed);
 });
 
-Deno.test("auditLoadSanity: unmapped movement is skipped (no 1RM column)", () => {
+Deno.test("auditLoadSanity: unmapped movement at reasonable weight passes the fallback", () => {
   const out = baselineOutput();
-  // Replace Back Squat (mapped) with KB Swing (unmapped) prescribing absurd weight.
-  out.weeks[0].days[0].blocks[0].movements[0] = mv("Kettlebell Swing", { weight: 9999 });
+  // KB Swing is unmapped; 50 lbs is well under the athlete's max 1RM of 405.
+  out.weeks[0].days[0].blocks[0].movements[0] = mv("Kettlebell Swing", { weight: 50 });
   const result = auditLoadSanity(out, { back_squat: 405 });
   assert(result.passed);
+});
+
+Deno.test("auditLoadSanity: unmapped movement above max 1RM trips the fallback", () => {
+  const out = baselineOutput();
+  // Snatch Pull is unmapped and 9999 lbs is wildly above max(lifts).
+  out.weeks[0].days[0].blocks[0].movements[0] = mv("Snatch Pull", { weight: 9999 });
+  const result = auditLoadSanity(out, { back_squat: 405 });
+  assert(!result.passed);
+  assert(result.violations[0].includes("Snatch Pull"));
+  assert(result.violations[0].includes("fallback cap"));
 });
 
 Deno.test("auditLoadSanity: missing 1RM in lifts map is skipped (nothing to compare)", () => {

@@ -280,20 +280,32 @@ const DISPLAY_TO_LIFT_KEY: Record<string, string> = {
 };
 
 /**
- * For any prescribed barbell movement matching a known 1RM, the
- * prescribed weight must be ≤ 100% of the athlete's 1RM. Catches
- * "prescribed 285 when their 1RM is 245" bugs (writer hallucinating
- * heavier loads than the athlete has). 1rm_attempt schemes are an
+ * Two-layer weight check:
+ *
+ *  - Specific: any prescribed weight on a movement that maps to a known
+ *    canonical lift must be ≤ that lift's 1RM.
+ *  - Fallback: any prescribed weight on an UNMAPPED movement (e.g.,
+ *    "Snatch Pull", "Push Press complex", "1¼ Back Squat") must be
+ *    ≤ max(all athlete's 1RMs). Catches wild hallucinations on barbell
+ *    variants that the canonical lookup misses. Permissive enough not
+ *    to flag DB/KB/wall ball movements which are typically well below
+ *    any 1RM.
+ *
+ * 1rm_attempt schemes (block_scheme/block_notes containing
+ * "1rm attempt", "1rm_attempt", "max attempt", or "new 1rm") are an
  * intentional exception — those days the prescribed weight IS the
- * goal-attempt and may exceed current 1RM (writer should phrase it
- * "attempt new 1RM"; we detect by block_scheme/notes mentioning
- * "1rm_attempt" or "1RM attempt").
+ * goal-attempt and may exceed current 1RMs.
  */
 export function auditLoadSanity(
   output: WriterOutput,
   lifts: Record<string, number | null>,
 ): AuditResult {
   const violations: string[] = [];
+  const liftValues = Object.values(lifts).filter(
+    (v): v is number => typeof v === "number" && v > 0,
+  );
+  const maxOneRm = liftValues.length > 0 ? Math.max(...liftValues) : null;
+
   for (const week of output.weeks) {
     for (const day of week.days) {
       for (let i = 0; i < day.blocks.length; i++) {
@@ -306,14 +318,26 @@ export function auditLoadSanity(
         for (let j = 0; j < b.movements.length; j++) {
           const m = b.movements[j];
           if (m.weight == null || m.weight <= 0) continue;
-          const liftKey = DISPLAY_TO_LIFT_KEY[m.movement];
-          if (!liftKey) continue; // non-barbell or unmapped — skip
-          const oneRM = lifts[liftKey];
-          if (oneRM == null || oneRM <= 0) continue; // no 1RM to compare
           if (isAttempt) continue; // intentional max attempt
-          if (m.weight > oneRM) {
+
+          const liftKey = DISPLAY_TO_LIFT_KEY[m.movement];
+          if (liftKey) {
+            const oneRM = lifts[liftKey];
+            if (oneRM == null || oneRM <= 0) continue; // no 1RM to compare
+            if (m.weight > oneRM) {
+              violations.push(
+                `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type}) movement[${j}] "${m.movement}": prescribed weight ${m.weight} exceeds athlete's 1RM of ${oneRM}.`,
+              );
+            }
+            continue;
+          }
+
+          // Fallback for unmapped movements (barbell variants, accessory
+          // lifts, etc.). Only flag if the prescribed weight exceeds the
+          // athlete's strongest 1RM — generous floor, catches the wild ones.
+          if (maxOneRm != null && m.weight > maxOneRm) {
             violations.push(
-              `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type}) movement[${j}] "${m.movement}": prescribed weight ${m.weight} exceeds athlete's 1RM of ${oneRM}.`,
+              `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type}) movement[${j}] "${m.movement}": prescribed weight ${m.weight} exceeds athlete's strongest 1RM of ${maxOneRm} (movement not in canonical-lift table; fallback cap).`,
             );
           }
         }
