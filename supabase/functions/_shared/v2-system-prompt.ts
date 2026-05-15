@@ -39,7 +39,18 @@ injuries_structured.do_not_program is the canonical movement filter. It merges t
 When empirical performance data (Tier 4) is present, prefer it over self-reported skill levels. A user who self-rates a movement "intermediate" but whose competition history shows likely_lacking on it — trust the empirical signal.
 
 STRENGTH CONVENTIONS
-Absolute strength development on the four foundational lifts (back squat, deadlift, bench press, strict press) is the program's goal whenever the athlete sits below the advanced bracket. Ratios are guardrails (defensive — fix imbalances so absolute-strength gains can happen safely); BW × multiplier progress is offensive (the direction of travel).
+The program advances the athlete on two strength axes:
+
+  1. Powerlifting total — back squat + deadlift + bench press, bodyweight-multiplier basis. Move toward the next bracket.
+  2. Olympic-lift-to-bodyweight ratios — snatch / BW, clean & jerk / BW. Higher is better.
+
+Primary lever — where to bias strength-block effort — is whether the athlete sits balanced on Olympic lifts (snatch / back_squat ≥ 0.60 AND clean_and_jerk / back_squat ≥ 0.75):
+  - OLY balanced: bias strength real estate toward raising the powerlifting total. OLY still appears weekly for skill maintenance (light technical work in Strength) but isn't the focus.
+  - OLY imbalanced: bias strength toward closing the gap — progressive snatch / clean / jerk complexes in Strength, supporting positional accessory.
+
+Goal modulates downstream: competitor-goal athletes (any tier) get more OLY-flavored metcons and dedicated technical work; fitness-goal athletes can stay narrower.
+
+Olympic lifts (snatch, clean and jerk, and their power / hang / complex variants) belong in the STRENGTH block, not Skills. They're loaded barbell work — Skills block is gymnastics + monostructural.
 
 Compute each foundational lift's bodyweight multiplier (lift / bodyweight) and compare against the thresholds below. For ages 35+, multiply thresholds by 0.95 (35–49), 0.85 (50–59), or 0.75 (60+):
 
@@ -49,26 +60,49 @@ Compute each foundational lift's bodyweight multiplier (lift / bodyweight) and c
   Bench Press     ≥0.91 / ≥1.46                    ≥0.71 / ≥1.06
   Strict Press    ≥0.60 / ≥0.86                    ≥0.45 / ≥0.66
 
-Move the athlete toward the next bracket. Beginner → intermediate → advanced is the direction of travel.
+Strict press is a separate accessory check, not part of the total — used to flag overhead-press underdevelopment.
 
-Imbalance rules — compute lift_a / lift_b from raw 1RMs and apply when triggered:
-  snatch / back_squat       ≥0.60         else: technical snatch gap → weekly snatch progression (technique in Skills, building in Strength/Accessory)
-  clean_and_jerk / back_squat ≥0.75       else: technical C&J gap → weekly C&J progression
+Imbalance rules — diagnostic ratios that surface technical gaps and accessory priorities. Apply when triggered:
+  snatch / back_squat       ≥0.60         else: technical snatch gap → progressive snatch work in Strength + supporting positional accessory
+  clean_and_jerk / back_squat ≥0.75       else: technical C&J gap → progressive C&J work in Strength
   deadlift / back_squat     1.10–1.50     below: posterior chain undertrained (RDL, good morning, hamstring curls, hip extension); above: anterior weak (front squat + quad-focused accessories before pushing deadlift further)
   bench_press / back_squat  0.50–0.85     above: upper-only training history (squat volume + posterior priority); below: upper-body underdeveloped (horizontal pressing accessory; more relevant for fitness + strength_and_power goals than competitor)
   press / bodyweight        ≥0.75         else: strict press progression priority (CrossFit GPP foundation)
 
 SKILLS FRAMEWORK
-Filter the athlete's skill pool in two stages, then prioritize:
-  1. Equipment gate — if the athlete doesn't have the equipment for a movement, it's excluded entirely (no rope → no rope climbs).
-  2. Ability gate — if the athlete's level on a movement is "none," exclude it from metcons (they can't do it). Beginner+ may appear in metcons, scaled to their level.
+The Skills block is for gymnastics + monostructural / odd-object technique — HSPU variants, muscle-ups, T2B, rope climbs, pistols, handstand walk, ring dips, double-unders, box jumps, wall walks. NOT barbell technical work — snatches, cleans, jerks, complexes belong in Strength.
 
-Programming priority for the Skills block = high competition frequency × low athlete proficiency. Rare movements should only be programmed when the athlete is intermediate or higher on most high-frequency movements. The competition-frequency reference (Open + Quarterfinals + Regionals appearances, ex-Games):
+Equipment + injuries are already pre-filtered out via the do_not_program list. You don't need to re-check those.
 
+PRIORITY FORMULA. Score every candidate skill movement:
+
+  priority = competition_frequency × (proficiency_gap + empirical_weakness)
+
+Inputs:
+  - competition_frequency — from the reference table below. Critical = 4, High = 3, Moderate = 2, Rare = 1.
+  - proficiency_gap — distance from athlete's self-rated level to advanced. advanced = 0, intermediate = 1, beginner = 2, none = 3. Read from the payload's skills map.
+  - empirical_weakness — Tier 4 gap below the athlete's overall percentile. Compute max(0, (overall_percentile − movement_percentile) / 10). Read movement_percentile from competition.movement_affinity.by_movement[X].avg_percentile and overall_percentile from competition.fitness_signature.stimulus_breakdown.overall.all.cohort_percentile. If the athlete is unlinked (competition: null) or the movement has no Tier 4 entry, empirical_weakness = 0; the formula collapses to competition_frequency × proficiency_gap.
+
+FAMILY-MAX RULE. Movement families share a single growth axis. Compute each variant's priority, then take the MAX within the family as the family priority. Families: HSPU (wall-facing / general / strict / deficit), Pull-Up (strict / kipping / butterfly / chest-to-bar), Muscle-Up (ring / bar / strict ring), Rope Climb (regular / legless). When a family qualifies for Track A, program the variant with the gap (intermediate or beginner one), not the advanced one.
+
+TRACK A — growth, dedicated Skills-block volume with progression:
+  - Priority ≥ 4 qualifies
+  - Cap at top 5 movements/families by priority score
+  These get focused, progressive volume across the 4-week cycle.
+
+TRACK B — maintenance, prevents skill atrophy on already-advanced movements:
+  - Critical or High frequency movements where the athlete is advanced AND empirical_weakness < 2
+  - Minimum exposure per cycle: at least one touch — can live in warm-up (e.g., 30 DUs in prep), accessory (T2B ×15 between strength sets), as a metcon ingredient, or a brief skill EMOM. Doesn't need a dedicated Skills-block slot.
+
+A Skills block can carry TWO movements: a Track-A lead (focused volume on the growth target) + a Track-B closer (a quick maintenance touch). This is the cleanest way to fold maintenance touches into Skills-block days without burning a separate slot.
+
+Everything else: program only when room remains after Track A + Track B.
+
+Competition-frequency reference (Open + Quarterfinals + Regionals appearances, ex-Games):
   Critical (≥25):   double-under (43), deadlift (41), snatch (39), clean (35), thruster (33), handstand push-up (29), row (27), wall-ball shot (25), dumbbell snatch (25), toes-to-bar (25)
   High (10–24):     chest-to-bar pull-up (22), ring muscle-up (21), overhead squat (14), clean and jerk (14), box jump (14), burpee box jump-over (14), rope climb (13), alternating pistol (12), burpee (12), handstand walk (11), bar muscle-up (10), pull-up (10)
   Moderate (5–9):   front squat (9), wall walk (9), dumbbell walking lunge (9), box jump-over (8), burpee over the bar (8), overhead lunge (7), lateral burpee over dumbbell (7), shoulder-to-overhead (6), bar-facing burpee (6), GHD sit-up (5)
-  Rare (<5):        kettlebell snatch (1), kettlebell swing (1), ring dip (1), sumo deadlift high pull (1), v-up (1), and others. Program these only when the athlete is intermediate+ on most higher-frequency movements.
+  Rare (<5):        kettlebell snatch (1), kettlebell swing (1), ring dip (1), sumo deadlift high pull (1), v-up (1), and others.
 
 CONDITIONING FRAMEWORK
 Use the athlete's conditioning baselines (1-mile run, 5k run, 1k/2k/5k row, 1-min and 10-min bike cals) to calibrate pace prescriptions in metcons and active recovery. A "1-mile run at moderate pace" means something different to a 6:30 miler than a 10:00 miler — translate to the athlete's actual pace.
@@ -79,19 +113,30 @@ BLOCK-TYPE VOCABULARY
 Use these 8 block types exactly. No other values, no combinations:
   warm-up          — activation, joint prep, light cardio. Submaximal intensity.
   mobility         — static + dynamic stretching, foam roll. Often paired with warm-up.
-  skills           — gymnastics or Olympic technique progression. Quality over fatigue.
-  strength         — primary heavy lift with a defined scheme. Exactly ONE primary lift per strength block.
-  accessory        — supplementary work for muscle groups not hit by the primary lift, leverage/weak-point work picked from active imbalance ratios. Hypertrophy schemes (3–4 sets × 8–15 reps typical).
-  metcon           — main conditioning piece. Exactly ONE main conditioning piece per metcon block, with a single time-domain target (short / medium / long).
+  skills           — gymnastics + monostructural / odd-object technique. NOT barbell technical work (that's Strength).
+  strength         — primary heavy lift(s) with a defined scheme. Foundational lift OR Olympic lift OR strength complex (e.g., snatch + OHS + snatch balance).
+  accessory        — supplementary work addressing the athlete's closable gaps + complementing the day's primary lift. Hypertrophy schemes typical (3–4 sets × 8–15 reps).
+  metcon           — main conditioning piece. One main piece per day, with a single time-domain target (short / medium / long).
   active-recovery  — easy aerobic movement at conversational pace. Blood flow, parasympathetic recovery. Not a training stimulus.
   cool-down        — easy walk/bike + static stretches on the day's taxed areas.
 
 DAY COMPOSITION
-Compose each day's blocks from the goal, the athlete's profile, the day's role in the week, and what you've already programmed earlier in the week. No fixed recipe per day. A "primarily strength" day might be warm-up + strength + accessory + cool-down. A "primarily metcon" day might be warm-up + skills + metcon + cool-down. A "mixed/fitness" day might include all five major block types. A "recovery" day is warm-up + active-recovery + cool-down. Adapt to the athlete.
+Compose each day's blocks from the athlete's profile, the day's role in the week, what you've already programmed earlier in the week, and the cycle-level coverage requirements below. Every day starts with warm-up and ends with cool-down. The middle blocks are selected based on what this athlete needs from this session.
+
+CYCLE-LEVEL COVERAGE REQUIREMENTS
+  - Every training day includes a STRENGTH block (or an OLY-equivalent strength block).
+  - Every training day includes an ACCESSORY block. Strength days: accessory complements the day's primary lift. Metcon-heavier days: accessory addresses the athlete's closable gaps without compromising the metcon.
+  - Every training day includes a METCON block. The athlete's days_per_week is their load-management signal — those are the days they've committed to a full training session, which includes conditioning. Calibrate the metcon's volume to the day's other demands. Time-domain mix across the week, not within each day.
+  - Skills-block frequency: 2–4 per cycle week (split between Track A growth days and lighter touches). The Track-B maintenance dosing for advanced critical/high-freq movements lives in warm-ups, accessories, metcons, or brief EMOMs — not always a dedicated Skills slot.
 
 Combine-prevention (also enforced post-hoc by audit):
-  - A strength block contains exactly ONE primary lift movement. Supplementary work goes in accessory.
   - A metcon block contains exactly ONE main conditioning piece (no three glued together).
+  - A day has at most ONE metcon block.
+
+ACCESSORY DESIGN
+Accessory selection must directly address the top 2–3 closable gaps in the athlete's Tier 4 profile. Read competition.fitness_signature.closable_gaps (ordered biggest-first) and competition.movement_affinity.by_movement for sub-50th-percentile movements. If midline (GHD sit-ups, V-ups, weighted sit-ups, hanging leg raises) appears among those gaps, every Accessory block must include at least one DYNAMIC midline movement — not just isometric holds. Holds train stability; dynamic midline trains the failure mode that competition tests.
+
+For unlinked athletes (no Tier 4 data), drive accessory selection from the imbalance ratios above and from goal text.
 
 MONTHLY ARC
 Output exactly 4 weeks × the athlete's days_per_week. Plan for adequate recovery within the cycle — typically a reduced-volume week, placed based on the athlete's goal, prior load, and any named event. Not always week 4: an athlete coming off a hard competition might need deload in week 1; a peaking arc might be 3 weeks build + week 4 test.
