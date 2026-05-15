@@ -695,8 +695,10 @@ export default function AthletePage({ session }: { session: Session }) {
     }
   };
 
-  // Admin Phase 1 — run generate-program v2 (synchronous edge fn,
-  // returns structured WriterOutput). Renders inline via V2OutputPanel.
+  // Admin Phase 1 — kick off generate-program v2 (async job) and poll
+  // program-job-status until complete. Renders inline via V2OutputPanel.
+  // The kickoff returns immediately with a job_id; the heavy
+  // writer/audits/safety/save work runs in the background.
   const handleGenerateProgramV2 = async () => {
     setGeneratingProgramV2(true);
     setV2ProgramOutput(null);
@@ -705,14 +707,36 @@ export default function AthletePage({ session }: { session: Session }) {
     setV2ProgramId(null);
     setV2ProgramSafety(null);
     try {
-      const { data, error: invErr } = await supabase.functions.invoke('generate-program-v2', { body: {} });
-      if (invErr) throw new Error(invErr.message || 'v2 program failed');
-      if (data?.error) throw new Error(data.message || data.error);
-      if (!data?.ok || !data?.output) throw new Error('v2 program: unexpected response');
-      setV2ProgramOutput(data.output);
-      setV2ProgramId(data.program_id ?? null);
-      setV2ProgramElapsed(data.elapsed_ms ?? null);
-      setV2ProgramSafety(data.safety ?? null);
+      const { data: kickoff, error: kickErr } = await supabase.functions.invoke('generate-program-v2', { body: {} });
+      if (kickErr) throw new Error(kickErr.message || 'v2 kickoff failed');
+      if (kickoff?.error) throw new Error(kickoff.message || kickoff.error);
+      const jobId: string | null = kickoff?.job_id ?? null;
+      if (!jobId) throw new Error('v2 kickoff: no job_id returned');
+
+      let delay = 3000;
+      const maxAttempts = 80;
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise((r) => setTimeout(r, delay));
+        const { data: status, error: statusErr } = await supabase.functions.invoke('program-job-status', {
+          body: { job_id: jobId },
+        });
+        if (statusErr) throw new Error(statusErr.message || 'v2 status check failed');
+        if (status?.error && status?.status !== 'failed') throw new Error(status.error);
+        if (status?.status === 'complete') {
+          const rj = status.result_json ?? {};
+          if (!rj.output) throw new Error('v2 complete but result_json missing');
+          setV2ProgramOutput(rj.output);
+          setV2ProgramId(status.program_id ?? null);
+          setV2ProgramElapsed(rj.elapsed_ms ?? null);
+          setV2ProgramSafety(rj.safety ?? null);
+          return;
+        }
+        if (status?.status === 'failed') {
+          throw new Error(status.error || 'v2 generation failed');
+        }
+        delay = Math.min(delay + 1000, 8000);
+      }
+      throw new Error('v2 generation timed out');
     } catch (err) {
       setV2ProgramError(err instanceof Error ? err.message : 'v2 program failed');
     } finally {

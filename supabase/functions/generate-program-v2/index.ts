@@ -378,6 +378,70 @@ async function saveProgramV2(
   }
 }
 
+/**
+ * Background worker — runs the heavy v2 generation pipeline. Updates
+ * the program_jobs row as it progresses; on success writes result_json
+ * + program_id, on failure writes error.
+ */
+async function processJob(jobId: string, userId: string) {
+  const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const t0 = Date.now();
+
+  const markFailed = async (message: string) => {
+    await supa
+      .from("program_jobs")
+      .update({ status: "failed", error: message.slice(0, 1000), updated_at: new Date().toISOString() })
+      .eq("id", jobId)
+      .then(() => {}, () => {});
+  };
+
+  try {
+    await supa
+      .from("program_jobs")
+      .update({ status: "processing", updated_at: new Date().toISOString() })
+      .eq("id", jobId);
+
+    console.log(`[generate-program-v2 worker] building payload for user ${userId}`);
+    const payload = await buildWriterPayload(supa, userId, { includeAllResults: false });
+    console.log(
+      `[generate-program-v2 worker] payload built (days_per_week=${payload.training_context.days_per_week} competition_linked=${payload.competition != null} vocabulary_size=${payload.vocabulary.length} rag_chars=${payload.rag.length})`,
+    );
+
+    const auditedOutput = await generateWithAudits(payload);
+    const { output, safety } = await runSafetyLoop(auditedOutput, payload);
+
+    let programId: string | null = null;
+    try {
+      programId = await saveProgramV2(supa, userId, output);
+      console.log(`[generate-program-v2 worker] persisted program ${programId}`);
+    } catch (saveErr) {
+      console.error("[generate-program-v2 worker] save failed:", saveErr);
+      // Don't fail the job — admin can still inspect the output JSON.
+    }
+
+    const elapsedMs = Date.now() - t0;
+    console.log(`[generate-program-v2 worker] success in ${elapsedMs}ms safe=${safety.safe} errored=${!!safety.errored}`);
+
+    await supa
+      .from("program_jobs")
+      .update({
+        status: "complete",
+        program_id: programId,
+        result_json: {
+          output,
+          safety: { safe: safety.safe, reasoning: safety.reasoning, errored: !!safety.errored },
+          elapsed_ms: elapsedMs,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", jobId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown error";
+    console.error("[generate-program-v2 worker] failed:", err);
+    await markFailed(message);
+  }
+}
+
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -414,45 +478,29 @@ Deno.serve(async (req) => {
       );
     }
 
-    const t0 = Date.now();
-
-    // 3. Build the writer payload.
-    console.log(`[generate-program-v2] building payload for user ${user.id}`);
-    const payload = await buildWriterPayload(supa, user.id, { includeAllResults: false });
-    console.log(
-      `[generate-program-v2] payload built (days_per_week=${payload.training_context.days_per_week} competition_linked=${payload.competition != null} vocabulary_size=${payload.vocabulary.length} rag_chars=${payload.rag.length})`,
-    );
-
-    // 4. Generate + audit loop.
-    const auditedOutput = await generateWithAudits(payload);
-
-    // 5. Safety review + regen loop.
-    const { output, safety } = await runSafetyLoop(auditedOutput, payload);
-
-    // 6. Persist to Option-2 storage (programs + program_workouts +
-    //    program_blocks_v2 + program_movements_v2).
-    let programId: string | null = null;
-    try {
-      programId = await saveProgramV2(supa, user.id, output);
-      console.log(`[generate-program-v2] persisted program ${programId}`);
-    } catch (saveErr) {
-      console.error("[generate-program-v2] save failed:", saveErr);
-      // Don't fail the response — admin can still inspect the output JSON
-      // for Phase 1 testing even if persistence had an issue.
+    // 3. Create the job row.
+    const { data: job, error: jobErr } = await supa
+      .from("program_jobs")
+      .insert({ user_id: user.id, status: "pending" })
+      .select("id")
+      .single();
+    if (jobErr || !job) {
+      console.error("[generate-program-v2] failed to create job:", jobErr);
+      return new Response(
+        JSON.stringify({ error: "Failed to start v2 program generation" }),
+        { status: 500, headers: { ...cors, "Content-Type": "application/json" } },
+      );
     }
 
-    const elapsedMs = Date.now() - t0;
-    console.log(`[generate-program-v2] success in ${elapsedMs}ms safe=${safety.safe} errored=${!!safety.errored}`);
+    // 4. Fire background work via EdgeRuntime.waitUntil so the function
+    //    can return immediately while the writer/audits/safety/save loop
+    //    runs out-of-band. Mirrors v1's pattern.
+    // deno-lint-ignore no-explicit-any
+    (globalThis as any).EdgeRuntime?.waitUntil?.(processJob(job.id, user.id));
 
     return new Response(
-      JSON.stringify({
-        ok: true,
-        elapsed_ms: elapsedMs,
-        program_id: programId,
-        output,
-        safety: { safe: safety.safe, reasoning: safety.reasoning, errored: !!safety.errored },
-      }),
-      { status: 200, headers: { ...cors, "Content-Type": "application/json" } },
+      JSON.stringify({ ok: true, job_id: job.id }),
+      { status: 202, headers: { ...cors, "Content-Type": "application/json" } },
     );
   } catch (err) {
     console.error("[generate-program-v2] unhandled:", err);
