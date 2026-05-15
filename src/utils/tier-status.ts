@@ -93,6 +93,7 @@ export const ALL_SKILL_KEYS = [
   'handstand_walk',
   'double_unders',
   'pistols',
+  'ghd_sit_ups',
 ] as const;
 
 export const MIN_CONDITIONING_BENCHMARKS = 2; // retained for external callers; T2 now requires every key filled

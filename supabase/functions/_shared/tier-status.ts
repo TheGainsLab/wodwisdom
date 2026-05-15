@@ -98,6 +98,7 @@ export const SKILL_DISPLAY_NAMES: Record<string, string> = {
   handstand_walk: 'Handstand Walk',
   double_unders: 'Double-Unders',
   pistols: 'Pistols',
+  ghd_sit_ups: 'GHD Sit-Ups',
 };
 
 export const ALL_SKILL_KEYS = [
@@ -120,6 +121,7 @@ export const ALL_SKILL_KEYS = [
   'handstand_walk',
   'double_unders',
   'pistols',
+  'ghd_sit_ups',
 ] as const;
 
 export const MIN_CONDITIONING_BENCHMARKS = 2; // retained for external callers; T2 now requires every key filled
