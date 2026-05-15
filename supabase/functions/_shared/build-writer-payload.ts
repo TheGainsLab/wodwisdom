@@ -75,7 +75,9 @@ export interface CompetitionPayload {
   movement_affinity: Tier4Bundle["movement_affinity"];
   time_domain_modality_breakdown: Tier4Bundle["time_domain_modality_breakdown"];
   recent_raw_results: Tier4Bundle["recent_raw_results"];
-  all_results: NonNullable<Tier4Bundle["all_results"]>;
+  /** Per-workout career history. Optional — dropped from the program-generator
+   *  payload (the aggregates carry enough signal) but kept for the evaluator. */
+  all_results?: NonNullable<Tier4Bundle["all_results"]>;
   movement_competency: NonNullable<Tier4Bundle["movement_competency"]>;
   fitness_signature: NonNullable<Tier4Bundle["fitness_signature"]>;
 }
@@ -154,13 +156,12 @@ function asUnits(v: unknown): "lbs" | "kg" | null {
 // `?include=` flags the upstream returned data for.
 // ============================================================
 
-function sliceTier4Bundle(bundle: Tier4Bundle): CompetitionPayload {
-  return {
+function sliceTier4Bundle(bundle: Tier4Bundle, includeAllResults: boolean): CompetitionPayload {
+  const sliced: CompetitionPayload = {
     competition_summary: bundle.competition_summary,
     movement_affinity: bundle.movement_affinity,
     time_domain_modality_breakdown: bundle.time_domain_modality_breakdown,
     recent_raw_results: bundle.recent_raw_results,
-    all_results: bundle.all_results ?? [],
     movement_competency: bundle.movement_competency ?? [],
     fitness_signature: bundle.fitness_signature ?? {
       closable_gaps: [],
@@ -174,6 +175,10 @@ function sliceTier4Bundle(bundle: Tier4Bundle): CompetitionPayload {
       },
     },
   };
+  if (includeAllResults) {
+    sliced.all_results = bundle.all_results ?? [];
+  }
+  return sliced;
 }
 
 // ============================================================
@@ -241,10 +246,24 @@ const PROFILE_COLS =
 // Main entry point.
 // ============================================================
 
+export interface BuildWriterPayloadOptions {
+  /**
+   * Include the per-workout `all_results` career array in the competition
+   * slice. Defaults to true (preserves eval behavior). The program-generator
+   * sets this to false — the aggregates (movement_affinity, fitness_signature,
+   * movement_competency, closable_gaps) carry enough signal and the raw
+   * career array adds ~50–100k tokens of noise.
+   */
+  includeAllResults?: boolean;
+}
+
 export async function buildWriterPayload(
   supa: SupabaseClient,
   userId: string,
+  options: BuildWriterPayloadOptions = {},
 ): Promise<WriterPayload> {
+  const includeAllResults = options.includeAllResults ?? true;
+
   // 1. Athlete profile row — hard requirement.
   const { data: profile, error: profileErr } = await supa
     .from("athlete_profiles")
@@ -267,11 +286,13 @@ export async function buildWriterPayload(
   // upstream error (matches fetchTier4Bundle's existing contract).
   let competition: CompetitionPayload | null = null;
   if (profile.competition_athlete_id) {
+    const tier4Include = ["competency", "signature"];
+    if (includeAllResults) tier4Include.unshift("all_results");
     const bundle = await fetchTier4Bundle(profile.competition_athlete_id, {
-      include: ["all_results", "competency", "signature"],
+      include: tier4Include,
     });
     if (bundle) {
-      competition = sliceTier4Bundle(bundle);
+      competition = sliceTier4Bundle(bundle, includeAllResults);
     }
   }
 

@@ -418,7 +418,7 @@ Deno.serve(async (req) => {
 
     // 3. Build the writer payload.
     console.log(`[generate-program-v2] building payload for user ${user.id}`);
-    const payload = await buildWriterPayload(supa, user.id);
+    const payload = await buildWriterPayload(supa, user.id, { includeAllResults: false });
     console.log(
       `[generate-program-v2] payload built (days_per_week=${payload.training_context.days_per_week} competition_linked=${payload.competition != null} vocabulary_size=${payload.vocabulary.length} rag_chars=${payload.rag.length})`,
     );
