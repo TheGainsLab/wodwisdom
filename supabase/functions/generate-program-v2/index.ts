@@ -64,9 +64,28 @@ async function callWriter(
     throw new Error("ANTHROPIC_API_KEY not configured");
   }
 
+  // Trailing rule recap. Long-context attention favors the start and end
+  // of input; the ~90k payload pushes the system prompt out of the model's
+  // strongest attention window. Echoing the critical rules at the very
+  // end of the user message gives them fresh weight at decode time.
+  const daysPerWeek = payload.training_context.days_per_week;
+  const units = payload.basics.units ?? "lbs";
+  const distanceUnit = units === "lbs" ? "ft" : "m";
+  const ruleRecap = [
+    "=== KEY RULES (re-check before emit) ===",
+    `- Output exactly 4 weeks × ${daysPerWeek} days. day_num is 1..${daysPerWeek}.`,
+    `- All weights in ${units}. All distances in ${distanceUnit}.`,
+    "- Prescribed barbell weight ≤ athlete's 1RM for that lift, unless block_scheme/notes mention a 1RM attempt.",
+    "- At most one metcon block per day. Every metcon block must declare a block_scheme.",
+    "- Movements in strength / accessory / metcon / skills blocks must carry at least one of {sets, reps, weight, time_seconds, distance} > 0. Warm-up / mobility / cool-down / active-recovery may be descriptive (name only is OK).",
+    "- Prefer movement names from the payload's vocabulary list when one matches; otherwise pick the natural name (air squat, banded mob, dynamic stretching, etc.).",
+    "- Read injuries_constraints_text carefully. Substitute or scale any contraindicated movement.",
+  ].join("\n");
+
+  const payloadBlock = `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(payload, null, 2)}`;
   const userMessage = retryViolations
-    ? `${retryViolations}\n\n---\n\nATHLETE PAYLOAD (JSON):\n${JSON.stringify(payload, null, 2)}`
-    : `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(payload, null, 2)}`;
+    ? `${retryViolations}\n\n---\n\n${payloadBlock}\n\n${ruleRecap}`
+    : `${payloadBlock}\n\n${ruleRecap}`;
 
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
