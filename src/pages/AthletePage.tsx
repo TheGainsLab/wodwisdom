@@ -8,7 +8,6 @@ import { getTierStatus, type AthleteProfileInput, type TierSection } from '../ut
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 import { formatMarkdown } from '../lib/formatMarkdown';
-import { WriterPayloadDetails } from '../components/admin/WriterPayloadDetails';
 
 const LIFT_GROUPS = [
   {
@@ -444,7 +443,6 @@ export default function AthletePage({ session }: { session: Session }) {
   const [v2EvalError, setV2EvalError] = useState('');
   const [v2EvalElapsed, setV2EvalElapsed] = useState<number | null>(null);
   const [v2EvalId, setV2EvalId] = useState<string | null>(null);
-  const [v2EvalPayload, setV2EvalPayload] = useState<unknown>(null);
   const [comparingEval, setComparingEval] = useState(false);
   const [compareEvalV1Text, setCompareEvalV1Text] = useState<string | null>(null);
   const [compareEvalV1Status, setCompareEvalV1Status] = useState<'idle' | 'running' | 'ready' | 'failed'>('idle');
@@ -674,7 +672,6 @@ export default function AthletePage({ session }: { session: Session }) {
     setV2EvalError('');
     setV2EvalElapsed(null);
     setV2EvalId(null);
-    setV2EvalPayload(null);
     try {
       const { data, error: invErr } = await supabase.functions.invoke('profile-analysis-v2', { body: {} });
       if (invErr) throw new Error(invErr.message || 'v2 eval failed');
@@ -683,7 +680,6 @@ export default function AthletePage({ session }: { session: Session }) {
       setV2Eval(data.evaluation);
       setV2EvalId(data.evaluation_id ?? null);
       setV2EvalElapsed(data.elapsed_ms ?? null);
-      setV2EvalPayload(data.payload ?? null);
     } catch (err) {
       setV2EvalError(err instanceof Error ? err.message : 'v2 eval failed');
     } finally {
@@ -704,7 +700,6 @@ export default function AthletePage({ session }: { session: Session }) {
     setV2EvalError('');
     setV2EvalElapsed(null);
     setV2EvalId(null);
-    setV2EvalPayload(null);
 
     const v1Promise = (async () => {
       setCompareEvalV1Status('running');
@@ -747,7 +742,6 @@ export default function AthletePage({ session }: { session: Session }) {
         setV2Eval(data.evaluation);
         setV2EvalId(data.evaluation_id ?? null);
         setV2EvalElapsed(data.elapsed_ms ?? null);
-        setV2EvalPayload(data.payload ?? null);
       } catch (err) {
         setV2EvalError(err instanceof Error ? err.message : 'v2 eval failed');
       } finally {
@@ -1587,7 +1581,6 @@ export default function AthletePage({ session }: { session: Session }) {
                               </ol>
                             </div>
                           )}
-                          {v2EvalPayload != null && <WriterPayloadDetails payload={v2EvalPayload} />}
                         </div>
                       </div>
                     )}
