@@ -101,25 +101,34 @@ export function auditStrengthOneLift(output: WriterOutput): AuditResult {
 
 /**
  * A metcon block represents a single conditioning workout (possibly
- * with multiple movements, like Fran = thrusters + pull-ups). The
- * audit-able proxy: every metcon block must declare a `block_scheme`
- * (the workout's structure — "21-15-9 for time", "AMRAP 12", etc.).
- * A block without a scheme is either a non-metcon mislabeled or
- * multiple metcons glued together (writer should split).
+ * with multiple movements, like Fran = thrusters + pull-ups). Two checks:
+ *
+ *   1. Every metcon block must declare a `block_scheme` (the workout's
+ *      structure — "21-15-9 for time", "AMRAP 12", "EMOM 10", etc.).
+ *   2. A day must have at most one metcon block. Multiple metcon blocks
+ *      per day means the writer stitched several conditioning pieces
+ *      together — should be split across days or moved to accessory.
  */
 export function auditMetconOnePiece(output: WriterOutput): AuditResult {
   const violations: string[] = [];
   for (const week of output.weeks) {
     for (const day of week.days) {
+      let metconCount = 0;
       for (let i = 0; i < day.blocks.length; i++) {
         const b = day.blocks[i];
         if (b.block_type !== "metcon") continue;
+        metconCount++;
         const scheme = (b.block_scheme ?? "").trim();
         if (scheme === "") {
           violations.push(
-            `Week ${week.week_num} Day ${day.day_num} block[${i}] (metcon): block_scheme is missing. Every metcon block must declare its scheme (e.g., "21-15-9 for time", "AMRAP 12", "EMOM 10"). If multiple metcons are intended, split into separate metcon blocks.`,
+            `Week ${week.week_num} Day ${day.day_num} block[${i}] (metcon): block_scheme is missing. Every metcon block must declare its scheme (e.g., "21-15-9 for time", "AMRAP 12", "EMOM 10").`,
           );
         }
+      }
+      if (metconCount > 1) {
+        violations.push(
+          `Week ${week.week_num} Day ${day.day_num}: ${metconCount} metcon blocks on one day. Each day should have at most one conditioning piece — split across days or move secondary to accessory.`,
+        );
       }
     }
   }

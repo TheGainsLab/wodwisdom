@@ -188,6 +188,17 @@ Deno.test("auditMetconOnePiece: non-metcon block without scheme → does NOT tri
   assert(result.passed);
 });
 
+Deno.test("auditMetconOnePiece: two metcon blocks on one day → fails", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks.push(
+    block("metcon", [mv("Burpee", { reps: 10 })], { block_scheme: "AMRAP 10" }),
+    block("metcon", [mv("Row", { time_seconds: 300 })], { block_scheme: "21-15-9 for time" }),
+  );
+  const result = auditMetconOnePiece(out);
+  assert(!result.passed);
+  assert(result.violations.some((v) => v.includes("2 metcon blocks")));
+});
+
 // ============================================================
 // Rule 4 — required fields
 // ============================================================
