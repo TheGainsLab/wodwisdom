@@ -400,7 +400,9 @@ export interface AuditContext {
 
 export const ALL_AUDITS = [
   (ctx: AuditContext): AuditResult => auditBlockTypeEnum(ctx.output),
-  (ctx: AuditContext): AuditResult => auditStrengthOneLift(ctx.output),
+  // strength_one_lift dropped 2026-05-15 — rule banned legitimate strength
+  // complexes (snatch + OHS + snatch balance as one block). auditStrengthOneLift()
+  // retained as a callable but no longer wired.
   (ctx: AuditContext): AuditResult => auditMetconOnePiece(ctx.output),
   (ctx: AuditContext): AuditResult => auditRequiredFields(ctx.output),
   (ctx: AuditContext): AuditResult => auditDayCount(ctx.output, ctx.daysPerWeek),
