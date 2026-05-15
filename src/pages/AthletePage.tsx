@@ -10,6 +10,78 @@ import { V2OutputPanel } from '../components/admin/V2OutputPanel';
 import Nav from '../components/Nav';
 import { formatMarkdown } from '../lib/formatMarkdown';
 
+// ============================================================
+// Defensive shape normalizers for LLM-emitted v2 output.
+//
+// TypeScript types are compile-time only. At runtime the LLM response
+// (or a partial-transport blip) can hand us a non-array where the
+// schema promised one. These helpers coerce to safe shapes so the
+// render layer's `.map` / `.length` can't crash the page.
+// ============================================================
+
+type AnyRec = Record<string, unknown>;
+const isRec = (v: unknown): v is AnyRec =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+const safeArr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+const safeStr = (v: unknown): string => (typeof v === 'string' ? v : '');
+const safeStrArr = (v: unknown): string[] =>
+  safeArr(v).filter((x): x is string => typeof x === 'string');
+
+interface SafeEvaluation {
+  headline_takeaway: string;
+  strengths: string[];
+  weaknesses_and_priorities: string[];
+  detailed_analysis: string;
+  recommendations: string[];
+}
+
+function normalizeEvaluation(raw: unknown): SafeEvaluation {
+  const r = isRec(raw) ? raw : {};
+  return {
+    headline_takeaway: safeStr(r.headline_takeaway),
+    strengths: safeStrArr(r.strengths),
+    weaknesses_and_priorities: safeStrArr(r.weaknesses_and_priorities),
+    detailed_analysis: safeStr(r.detailed_analysis),
+    recommendations: safeStrArr(r.recommendations),
+  };
+}
+
+function normalizeWriterOutput(raw: unknown): unknown {
+  if (!isRec(raw)) return { month_plan: { weekly_intent: [], strength_progression: '', deload_placement: '' }, weeks: [] };
+  const mp = isRec(raw.month_plan) ? raw.month_plan : {};
+  return {
+    month_plan: {
+      weekly_intent: safeStrArr(mp.weekly_intent),
+      strength_progression: safeStr(mp.strength_progression),
+      deload_placement: safeStr(mp.deload_placement),
+      programming_priorities: typeof mp.programming_priorities === 'string' ? mp.programming_priorities : undefined,
+    },
+    weeks: safeArr(raw.weeks).map((week) => {
+      const w = isRec(week) ? week : {};
+      return {
+        week_num: typeof w.week_num === 'number' ? w.week_num : 0,
+        days: safeArr(w.days).map((day) => {
+          const d = isRec(day) ? day : {};
+          return {
+            day_num: typeof d.day_num === 'number' ? d.day_num : 0,
+            blocks: safeArr(d.blocks).map((block) => {
+              const b = isRec(block) ? block : {};
+              return {
+                block_type: safeStr(b.block_type),
+                block_label: typeof b.block_label === 'string' ? b.block_label : undefined,
+                block_scheme: typeof b.block_scheme === 'string' ? b.block_scheme : undefined,
+                time_cap_seconds: typeof b.time_cap_seconds === 'number' ? b.time_cap_seconds : undefined,
+                block_notes: typeof b.block_notes === 'string' ? b.block_notes : undefined,
+                movements: safeArr(b.movements).map((m) => (isRec(m) ? m : {})),
+              };
+            }),
+          };
+        }),
+      };
+    }),
+  };
+}
+
 const LIFT_GROUPS = [
   {
     title: 'Squats',
@@ -686,7 +758,7 @@ export default function AthletePage({ session }: { session: Session }) {
       if (invErr) throw new Error(invErr.message || 'v2 eval failed');
       if (data?.error) throw new Error(data.message || data.error);
       if (!data?.ok || !data?.evaluation) throw new Error('v2 eval: unexpected response');
-      setV2Eval(data.evaluation);
+      setV2Eval(normalizeEvaluation(data.evaluation));
       setV2EvalId(data.evaluation_id ?? null);
       setV2EvalElapsed(data.elapsed_ms ?? null);
     } catch (err) {
@@ -729,7 +801,7 @@ export default function AthletePage({ session }: { session: Session }) {
         if (status?.status === 'complete') {
           const rj = status.result_json ?? {};
           if (!rj.output) throw new Error('v2 complete but result_json missing');
-          setV2ProgramOutput(rj.output);
+          setV2ProgramOutput(normalizeWriterOutput(rj.output));
           setV2ProgramId(status.program_id ?? null);
           setV2ProgramElapsed(rj.elapsed_ms ?? null);
           setV2ProgramSafety(rj.safety ?? null);
@@ -742,7 +814,7 @@ export default function AthletePage({ session }: { session: Session }) {
           // inspect what the writer produced.
           const rj = status.result_json ?? {};
           if (rj.output) {
-            setV2ProgramOutput(rj.output);
+            setV2ProgramOutput(normalizeWriterOutput(rj.output));
             setV2ProgramId(status.program_id ?? null);
             setV2ProgramElapsed(rj.elapsed_ms ?? null);
             setV2ProgramSafety(rj.safety ?? null);
@@ -812,7 +884,7 @@ export default function AthletePage({ session }: { session: Session }) {
         if (invErr) throw new Error(invErr.message || 'v2 eval failed');
         if (data?.error) throw new Error(data.message || data.error);
         if (!data?.ok || !data?.evaluation) throw new Error('v2 eval: unexpected response');
-        setV2Eval(data.evaluation);
+        setV2Eval(normalizeEvaluation(data.evaluation));
         setV2EvalId(data.evaluation_id ?? null);
         setV2EvalElapsed(data.elapsed_ms ?? null);
       } catch (err) {
