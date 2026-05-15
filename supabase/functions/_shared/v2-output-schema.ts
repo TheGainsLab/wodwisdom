@@ -184,20 +184,28 @@ const DAY_SCHEMA = {
   additionalProperties: false,
 };
 
-const WEEK_SCHEMA = {
-  type: "object",
-  properties: {
-    week_num: { type: "integer", minimum: 1, maximum: 4 },
-    days: {
-      type: "array",
-      minItems: 3,
-      maxItems: 6,
-      items: DAY_SCHEMA,
+/**
+ * Build the per-week schema with `days` array bounds locked to the
+ * athlete's chosen days_per_week. Without this parameterization the
+ * schema lets the writer emit 3–6 days regardless of intake, and the
+ * day_count audit rejects the mismatch.
+ */
+function buildWeekSchema(daysPerWeek: number) {
+  return {
+    type: "object",
+    properties: {
+      week_num: { type: "integer", minimum: 1, maximum: 4 },
+      days: {
+        type: "array",
+        minItems: daysPerWeek,
+        maxItems: daysPerWeek,
+        items: DAY_SCHEMA,
+      },
     },
-  },
-  required: ["week_num", "days"],
-  additionalProperties: false,
-};
+    required: ["week_num", "days"],
+    additionalProperties: false,
+  };
+}
 
 const MONTH_PLAN_SCHEMA = {
   type: "object",
@@ -230,29 +238,33 @@ const MONTH_PLAN_SCHEMA = {
 };
 
 /**
- * The tool definition we pass to Anthropic via the `tools` parameter
- * on `messages.create`. Pair with `tool_choice: { type: "tool", name:
- * "emit_program" }` to force the writer to produce this structure.
+ * Build the tool definition we pass to Anthropic via the `tools`
+ * parameter on `messages.create`. Pair with `tool_choice: { type:
+ * "tool", name: "emit_program" }` to force the writer to produce this
+ * structure. The `days` array bounds are locked per-call to the
+ * athlete's days_per_week so the schema and the day_count audit agree.
  */
-export const EMIT_PROGRAM_TOOL = {
-  name: "emit_program",
-  description:
-    "Emit the structured 4-week training program for this athlete. Begin with the month_plan outline (4-week arc, strength progression, deload placement). Then weeks[] with one entry per week (week_num 1..4), each containing days[] (one entry per training day, day_num 1..N). Each day has blocks[] using the canonical block_type enum. Each block has movements[] using display_name strings from the vocabulary provided in the user message.",
-  input_schema: {
-    type: "object",
-    properties: {
-      month_plan: MONTH_PLAN_SCHEMA,
-      weeks: {
-        type: "array",
-        minItems: 4,
-        maxItems: 4,
-        items: WEEK_SCHEMA,
+export function buildEmitProgramTool(daysPerWeek: number) {
+  return {
+    name: "emit_program",
+    description:
+      "Emit the structured 4-week training program for this athlete. Begin with the month_plan outline (4-week arc, strength progression, deload placement). Then weeks[] with one entry per week (week_num 1..4), each containing days[] (one entry per training day, day_num 1..N). Each day has blocks[] using the canonical block_type enum. Each block has movements[] using display_name strings from the vocabulary provided in the user message.",
+    input_schema: {
+      type: "object",
+      properties: {
+        month_plan: MONTH_PLAN_SCHEMA,
+        weeks: {
+          type: "array",
+          minItems: 4,
+          maxItems: 4,
+          items: buildWeekSchema(daysPerWeek),
+        },
       },
+      required: ["month_plan", "weeks"],
+      additionalProperties: false,
     },
-    required: ["month_plan", "weeks"],
-    additionalProperties: false,
-  },
-};
+  };
+}
 
 // ============================================================
 // profile-analysis v2 — structured evaluation output

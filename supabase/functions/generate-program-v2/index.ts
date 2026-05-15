@@ -28,7 +28,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { buildWriterPayload, type WriterPayload } from "../_shared/build-writer-payload.ts";
 import { V2_GENERATE_PROGRAM_SYSTEM_PROMPT } from "../_shared/v2-system-prompt.ts";
-import { EMIT_PROGRAM_TOOL, type WriterOutput } from "../_shared/v2-output-schema.ts";
+import { buildEmitProgramTool, type WriterOutput } from "../_shared/v2-output-schema.ts";
 import { runAudits, formatViolationsForRetry, summarizeAuditRun } from "../_shared/audit-runner.ts";
 import { reviewSafety, type SafetyReviewResult } from "../_shared/safety-review.ts";
 
@@ -80,7 +80,7 @@ async function callWriter(
       max_tokens: 32000,
       stream: false,
       system: V2_GENERATE_PROGRAM_SYSTEM_PROMPT,
-      tools: [EMIT_PROGRAM_TOOL],
+      tools: [buildEmitProgramTool(payload.training_context.days_per_week)],
       tool_choice: { type: "tool", name: "emit_program" },
       messages: [{ role: "user", content: userMessage }],
     }),
