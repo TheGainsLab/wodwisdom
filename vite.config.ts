@@ -4,6 +4,14 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    // Emit .map files alongside bundled JS so production stack traces
+    // can be deminified. Adds ~50% to total build artifact size but
+    // costs nothing at runtime (browsers fetch maps only when DevTools
+    // is open). Previously off: an ErrorBoundary catch surfaced
+    // "Jt (AthletePage-DUg1cPqZ.js:1:37479)" with no way to localize.
+    sourcemap: true,
+  },
   plugins: [
     react(),
     VitePWA({
