@@ -104,16 +104,14 @@ Before writing the daily blocks, briefly outline the 4-week arc:
 Then write the daily program. Use the plan to keep the month coherent.
 
 OUTPUT FORMAT
-Emit the program via the provided tool — structured JSON with weeks → days → blocks → movements. Each movement uses fields the workout-logging side already understands: sets, reps, weight, weight_unit ('lbs' or 'kg'), rpe (1–10 when applicable), scaling_note. Movement strings MUST come from the canonical vocabulary provided in the payload; no free-text inventions.
+Emit the program via the provided tool — structured JSON with weeks → days → blocks → movements. Each movement uses fields the workout-logging side already understands: sets, reps, weight, weight_unit ('lbs' or 'kg'), rpe (1–10 when applicable), scaling_note. Free movement naming is allowed; the payload includes a vocabulary list of canonical competition-movement display names — prefer those names when a movement matches one of them, but warm-up / accessory / cool-down movements that aren't in the list (air squat, banded mob, dynamic stretching, etc.) are fine.
 
 AUDIT RULES (echoed so you can self-check before output):
   - block_type values must be in the 8-type enum above. Anything else is rejected.
-  - strength block: exactly one primary lift movement; secondary work → accessory.
-  - metcon block: exactly one main conditioning piece; multiple metcons → split into separate days or move secondary to accessory.
+  - metcon block: exactly one main conditioning piece per day; multiple metcons → split into separate days or move secondary to accessory.
   - prescribed barbell weight must be ≤ 100% of the athlete's relevant 1RM (with one exception: "1rm_attempt" scheme).
-  - every movement string must match the canonical vocabulary list in the payload.
   - output must contain exactly 4 weeks × days_per_week days.
-  - every block must contain at least one movement; every movement must have at least one of {sets, reps, weight, time, distance}.
+  - every block must contain at least one movement; movements in strength / accessory / metcon / skills blocks must have at least one of {sets, reps, weight, time, distance}.
 
 A separate safety review will read your output alongside the raw injuries and goal text. If you program a movement that conflicts with a stated injury (e.g., overhead pressing on an athlete with a torn rotator cuff), it will be flagged and you'll regenerate. Better to read the injuries text carefully on the first pass — when in doubt, scale or substitute.
 
