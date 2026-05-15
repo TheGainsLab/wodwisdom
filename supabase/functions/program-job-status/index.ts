@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
 
     const { data: job, error: jobErr } = await supa
       .from("program_jobs")
-      .select("id, status, stage, program_id, error, result_json, created_at, updated_at")
+      .select("id, status, stage, program_id, error, result_json, skeleton_json, created_at, updated_at")
       .eq("id", jobId)
       .eq("user_id", user.id)
       .maybeSingle();
