@@ -66,6 +66,67 @@ function AdherenceRowCard({ row }: { row: AdherenceRow }) {
   );
 }
 
+function LiftSparkline({ points, width = 180, height = 36 }: { points: LiftPoint[]; width?: number; height?: number }) {
+  if (points.length === 0) return null;
+  if (points.length === 1) {
+    return (
+      <svg width={width} height={height}>
+        <circle cx={width / 2} cy={height / 2} r={3} fill="var(--accent)" />
+      </svg>
+    );
+  }
+  const weights = points.map(p => Number(p.max_weight));
+  const minW = Math.min(...weights);
+  const maxW = Math.max(...weights);
+  const range = Math.max(maxW - minW, 1);
+  const pad = 4;
+  const innerH = height - pad * 2;
+  const innerW = width - pad * 2;
+  const coords = points.map((p, i) => {
+    const x = pad + (i / Math.max(points.length - 1, 1)) * innerW;
+    const y = pad + (1 - (Number(p.max_weight) - minW) / range) * innerH;
+    return [x, y] as const;
+  });
+  const path = coords.map((c, i) => (i === 0 ? `M ${c[0]} ${c[1]}` : `L ${c[0]} ${c[1]}`)).join(' ');
+  const lastCoord = coords[coords.length - 1];
+  return (
+    <svg width={width} height={height} style={{ overflow: 'visible' }}>
+      <path d={path} stroke="var(--accent)" strokeWidth={1.5} fill="none" />
+      <circle cx={lastCoord[0]} cy={lastCoord[1]} r={3} fill="var(--accent)" />
+    </svg>
+  );
+}
+
+function LiftProgressCard({ lift }: { lift: LiftProgress }) {
+  const latest = lift.points[lift.points.length - 1];
+  const unit = lift.current_1rm_unit || 'lbs';
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{lift.display_name}</div>
+        {lift.current_1rm != null && (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            1RM: {Number(lift.current_1rm)}{unit}
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <LiftSparkline points={lift.points} />
+        {latest && (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
+              {Number(latest.max_weight)}{latest.weight_unit || unit}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+              {new Date(latest.date).toLocaleDateString()} · {lift.points.length} day{lift.points.length === 1 ? '' : 's'}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
     <div className="admin-stat-card">
@@ -496,6 +557,20 @@ interface AdherenceRow {
   skipped_entries: number;
 }
 
+interface LiftPoint {
+  date: string;
+  max_weight: number;
+  weight_unit: string | null;
+}
+
+interface LiftProgress {
+  lift_key: string;
+  display_name: string;
+  current_1rm: number | null;
+  current_1rm_unit: string | null;
+  points: LiftPoint[];
+}
+
 export default function AdminUserDetailPage({ session: _session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -503,6 +578,7 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [adherence, setAdherence] = useState<AdherenceRow[] | null>(null);
+  const [liftProgress, setLiftProgress] = useState<LiftProgress[] | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -510,13 +586,15 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
     (async () => {
       setLoading(true);
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-      const [{ data: result, error: err }, { data: adh }] = await Promise.all([
+      const [{ data: result, error: err }, { data: adh }, { data: lifts }] = await Promise.all([
         supabase.rpc('admin_user_detail', { target_user_id: id, tz }),
         supabase.rpc('admin_user_adherence', { target_user_id: id }),
+        supabase.rpc('admin_user_lift_progress', { target_user_id: id }),
       ]);
       if (err) { setError(err.message); setLoading(false); return; }
       setData(result);
       setAdherence((adh as AdherenceRow[]) ?? []);
+      setLiftProgress((lifts as LiftProgress[]) ?? []);
       setLoading(false);
     })();
   }, [id]);
@@ -781,6 +859,21 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {adherence.map(a => <AdherenceRowCard key={a.id} row={a} />)}
+                    </div>
+                  </>
+                )}
+
+                {/* Lift Progress */}
+                {liftProgress && liftProgress.length > 0 && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 32, marginBottom: 12 }}>
+                      <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', margin: 0 }}>
+                        Lift Progress
+                      </h3>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Last 90 days</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {liftProgress.map(l => <LiftProgressCard key={l.lift_key} lift={l} />)}
                     </div>
                   </>
                 )}
