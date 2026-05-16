@@ -23,6 +23,36 @@ interface ProgramWorkout {
   day_type?: string | null;
 }
 
+// v3 structured data shapes — fetched from program_blocks_v2 +
+// program_movements_v2 when programs.program_version === 'v3'.
+interface ProgramMovementV2 {
+  id: string;
+  block_id: string;
+  movement: string;
+  sets: number | null;
+  reps: number | null;
+  weight: number | null;
+  weight_unit: string | null;
+  rpe: number | null;
+  time_seconds: number | null;
+  distance: number | null;
+  distance_unit: string | null;
+  scaling_note: string | null;
+  sort_order: number;
+}
+
+interface ProgramBlockV2 {
+  id: string;
+  program_workout_id: string;
+  block_type: string;
+  block_label: string | null;
+  block_scheme: string | null;
+  time_cap_seconds: number | null;
+  block_notes: string | null;
+  sort_order: number;
+  movements: ProgramMovementV2[];
+}
+
 const DAY_TYPE_LABELS: Record<string, string> = {
   strength: 'Strength Day',
   metcon: 'Metcon Day',
@@ -79,11 +109,20 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [searchParams] = useSearchParams();
   const monthFilter = searchParams.get('month') ? parseInt(searchParams.get('month')!, 10) : null;
   const { isAdmin } = useEntitlements(session.user.id);
-  const [program, setProgram] = useState<{ id: string; name: string; source?: string; generated_months?: number } | null>(null);
+  const [program, setProgram] = useState<{
+    id: string;
+    name: string;
+    source?: string;
+    generated_months?: number;
+    program_version?: string;
+    month_plan?: unknown;
+  } | null>(null);
   const [allWorkouts, setAllWorkouts] = useState<ProgramWorkout[]>([]);
   const [completedWorkoutIds, setCompletedWorkoutIds] = useState<Set<string>>(new Set());
   const [inProgressWorkouts, setInProgressWorkouts] = useState<Map<string, { logId: string; savedCount: number; totalBlocks: number }>>(new Map());
   const [workoutBlocks, setWorkoutBlocks] = useState<Map<string, ProgramBlock[]>>(new Map());
+  // v3-only: structured blocks + movements per program_workout_id.
+  const [v3BlocksByWorkout, setV3BlocksByWorkout] = useState<Map<string, ProgramBlockV2[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [navOpen, setNavOpen] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
@@ -108,7 +147,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     setLoading(true);
     const { data: prog, error: progErr } = await supabase
       .from('programs')
-      .select('id, name, source, generated_months')
+      .select('id, name, source, generated_months, program_version, month_plan')
       .eq('id', id)
       .eq('user_id', session.user.id)
       .single();
@@ -126,8 +165,11 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       .order('sort_order');
     setAllWorkouts(wk || []);
 
-    // Fetch blocks for all workouts
-    if (wk?.length) {
+    const isV3 = prog.program_version === 'v3';
+
+    // v1 path: fetch prose blocks from program_workout_blocks.
+    // v3 path: fetch structured blocks + movements from program_blocks_v2 + program_movements_v2.
+    if (wk?.length && !isV3) {
       const ids = wk.map((w) => w.id);
       const blockMap = new Map<string, ProgramBlock[]>();
       for (let i = 0; i < ids.length; i += 100) {
@@ -144,6 +186,50 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
         }
       }
       setWorkoutBlocks(blockMap);
+    }
+
+    if (wk?.length && isV3) {
+      const workoutIds = wk.map((w) => w.id);
+      const blocksByWorkout = new Map<string, ProgramBlockV2[]>();
+      // 1. Fetch all blocks for these workouts (batched).
+      const allBlocks: Array<ProgramBlockV2 & { program_workout_id: string }> = [];
+      for (let i = 0; i < workoutIds.length; i += 100) {
+        const batch = workoutIds.slice(i, i + 100);
+        const { data: blocks } = await supabase
+          .from('program_blocks_v2')
+          .select('id, program_workout_id, block_type, block_label, block_scheme, time_cap_seconds, block_notes, sort_order')
+          .in('program_workout_id', batch)
+          .order('sort_order');
+        for (const b of blocks || []) {
+          allBlocks.push({ ...(b as ProgramBlockV2), movements: [] });
+        }
+      }
+      // 2. Fetch all movements for those blocks (batched).
+      const movementsByBlock = new Map<string, ProgramMovementV2[]>();
+      if (allBlocks.length) {
+        const blockIds = allBlocks.map((b) => b.id);
+        for (let i = 0; i < blockIds.length; i += 100) {
+          const batch = blockIds.slice(i, i + 100);
+          const { data: movements } = await supabase
+            .from('program_movements_v2')
+            .select('id, block_id, movement, sets, reps, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, sort_order')
+            .in('block_id', batch)
+            .order('sort_order');
+          for (const m of movements || []) {
+            const arr = movementsByBlock.get((m as ProgramMovementV2).block_id) ?? [];
+            arr.push(m as ProgramMovementV2);
+            movementsByBlock.set((m as ProgramMovementV2).block_id, arr);
+          }
+        }
+      }
+      // 3. Group blocks-with-movements by program_workout_id.
+      for (const b of allBlocks) {
+        b.movements = movementsByBlock.get(b.id) ?? [];
+        const arr = blocksByWorkout.get(b.program_workout_id) ?? [];
+        arr.push(b);
+        blocksByWorkout.set(b.program_workout_id, arr);
+      }
+      setV3BlocksByWorkout(blocksByWorkout);
     }
 
     if (wk?.length) {
@@ -393,7 +479,9 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                               {isExpanded && (
                                 <div className="program-day-body">
                                   <div className="program-day-blocks">
-                                    {workoutBlocks.has(w.id) && workoutBlocks.get(w.id)!.length > 0 ? (
+                                    {program?.program_version === 'v3' ? (
+                                      <V3DayPlaceholder blocks={v3BlocksByWorkout.get(w.id) ?? []} />
+                                    ) : workoutBlocks.has(w.id) && workoutBlocks.get(w.id)!.length > 0 ? (
                                       <div className="workout-blocks">
                                         {workoutBlocks.get(w.id)!.map((b, bi) => (
                                           <div key={bi} className="workout-block">
@@ -474,6 +562,69 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// V3 placeholder — step 5 of the v3 UX roadmap. Renders the
+// structured day in a compact, readable form so admin can verify
+// the data is reaching the page. The real day-expand UI lands in
+// step 7 with mobile-first block cards, prominent block_scheme +
+// time_cap headers, per-movement completion checkboxes, etc.
+// ============================================================
+interface V3DayPlaceholderProps {
+  blocks: ProgramBlockV2[];
+}
+
+function V3DayPlaceholder({ blocks }: V3DayPlaceholderProps) {
+  if (!blocks.length) {
+    return (
+      <div style={{ padding: 12, fontSize: 13, color: 'var(--text-dim)', fontStyle: 'italic' }}>
+        v3 program — no blocks found for this day.
+      </div>
+    );
+  }
+  const headerStyle: React.CSSProperties = { fontWeight: 700, fontSize: 13, color: 'var(--accent)', marginTop: 12 };
+  const subStyle: React.CSSProperties = { fontSize: 12, color: 'var(--text-dim)', marginTop: 2, marginBottom: 6 };
+  const rowStyle: React.CSSProperties = { fontSize: 13, color: 'var(--text)', marginLeft: 12, marginBottom: 2 };
+
+  const fmt = (m: ProgramMovementV2) => {
+    const parts: string[] = [];
+    if (m.sets != null && m.reps != null) parts.push(`${m.sets}×${m.reps}`);
+    else if (m.sets != null) parts.push(`${m.sets} sets`);
+    else if (m.reps != null) parts.push(`${m.reps} reps`);
+    if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? ''}`);
+    if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
+    if (m.time_seconds != null) parts.push(`${m.time_seconds}s`);
+    if (m.distance != null) parts.push(`${m.distance}${m.distance_unit ?? ''}`);
+    const scheme = parts.length > 0 ? ` — ${parts.join(' · ')}` : '';
+    const scaling = m.scaling_note ? ` (${m.scaling_note})` : '';
+    return `${m.movement}${scheme}${scaling}`;
+  };
+
+  return (
+    <div className="workout-blocks">
+      {blocks.map((b) => (
+        <div key={b.id} className="workout-block">
+          <div className="workout-block-label" data-block={b.block_type}>
+            {b.block_type === 'warm-up' ? 'Warm-up' :
+              b.block_type === 'cool-down' ? 'Cool down' :
+                b.block_type.charAt(0).toUpperCase() + b.block_type.slice(1)}
+          </div>
+          <div className="workout-block-content">
+            <div style={headerStyle}>
+              {b.block_label && <>{b.block_label}</>}
+              {b.block_scheme && <> — {b.block_scheme}</>}
+              {b.time_cap_seconds && <> — cap {Math.round(b.time_cap_seconds / 60)} min</>}
+            </div>
+            {b.block_notes && <div style={subStyle}>{b.block_notes}</div>}
+            {b.movements.map((m) => (
+              <div key={m.id} style={rowStyle}>{fmt(m)}</div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
