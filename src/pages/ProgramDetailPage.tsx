@@ -258,7 +258,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
               .not('block_type', 'in', '("warm-up","mobility","cool-down")');
             // Count total blocks for this workout (exclude warm-up/cool-down)
             const { count: totalCount } = await supabase
-              .from('program_workout_blocks')
+              .from(isV3 ? 'program_blocks_v2' : 'program_workout_blocks')
               .select('id', { count: 'exact', head: true })
               .eq('program_workout_id', l.source_id)
               .not('block_type', 'in', '("warm-up","mobility","cool-down")');
