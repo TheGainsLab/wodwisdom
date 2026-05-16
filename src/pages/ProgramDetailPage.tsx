@@ -620,7 +620,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
 // existing /workout-review (Coach) and /workout/start (logging)
 // pages. Lets v3 days use those flows immediately; future iteration
 // (step 8b) builds a v3-native log form that pre-fills typed fields.
-// ============================================================
 function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
   if (!blocks.length) return '';
   const fmt = (m: ProgramMovementV2) => {
@@ -665,15 +664,20 @@ interface V3DayViewProps {
   blocks: ProgramBlockV2[];
 }
 
+// Block display labels — aligned with v1 prose conventions so the
+// same labels work in the V3DayView UI chip + the v3BlocksToProse
+// output. v1's workout-review parser keys off these substrings to
+// generate per-block coaching cards, so "Metcon" and "Cool down"
+// must match exactly (not "Conditioning" / "Cool-down").
 const BLOCK_DISPLAY: Record<string, string> = {
   'warm-up': 'Warm-up',
   'mobility': 'Mobility',
   'skills': 'Skills',
   'strength': 'Strength',
   'accessory': 'Accessory',
-  'metcon': 'Conditioning',
+  'metcon': 'Metcon',
   'active-recovery': 'Recovery',
-  'cool-down': 'Cool-down',
+  'cool-down': 'Cool down',
 };
 
 function V3DayView({ blocks }: V3DayViewProps) {
