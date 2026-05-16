@@ -448,7 +448,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                         (v3BlocksByWorkout.get(w.id) ?? [])
                                           .filter((b) => ['strength', 'metcon', 'skills', 'accessory'].includes(b.block_type))
                                           .map((b) => {
-                                            const label = b.block_type === 'metcon' ? 'Conditioning' : b.block_type.charAt(0).toUpperCase() + b.block_type.slice(1);
+                                            const label = BLOCK_DISPLAY[b.block_type] ?? b.block_type.charAt(0).toUpperCase() + b.block_type.slice(1);
                                             // Prefer block_label, then block_scheme, then first movement name.
                                             const text =
                                               (b.block_label && b.block_label.trim()) ||
