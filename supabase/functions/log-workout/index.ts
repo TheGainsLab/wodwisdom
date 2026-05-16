@@ -38,6 +38,11 @@ interface LogEntry {
   // Per-movement skip tracking (Step 10 of v3 UX roadmap)
   completed?: boolean | null;
   skip_reason?: string | null;
+  // Prescription snapshot (Step 18 of v3 UX roadmap)
+  prescribed_weight?: number | null;
+  prescribed_reps?: number | null;
+  prescribed_hold_seconds?: number | null;
+  prescribed_rpe?: number | null;
 }
 
 interface LogBlock {
@@ -261,6 +266,10 @@ Deno.serve(async (req) => {
       faults_observed: string[] | null;
       completed: boolean;
       skip_reason: string | null;
+      prescribed_weight: number | null;
+      prescribed_reps: number | null;
+      prescribed_hold_seconds: number | null;
+      prescribed_rpe: number | null;
     }[] = [];
     let sortOrder = 0;
     for (let bi = 0; bi < blocks.length; bi++) {
@@ -306,6 +315,10 @@ Deno.serve(async (req) => {
             : null,
           completed: entry.completed === false ? false : true,
           skip_reason: entry.completed === false ? (entry.skip_reason?.trim() || null) : null,
+          prescribed_weight: typeof entry.prescribed_weight === "number" ? entry.prescribed_weight : null,
+          prescribed_reps: typeof entry.prescribed_reps === "number" ? entry.prescribed_reps : null,
+          prescribed_hold_seconds: typeof entry.prescribed_hold_seconds === "number" ? entry.prescribed_hold_seconds : null,
+          prescribed_rpe: typeof entry.prescribed_rpe === "number" ? entry.prescribed_rpe : null,
         });
       }
     }

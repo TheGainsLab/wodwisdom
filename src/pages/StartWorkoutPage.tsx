@@ -468,6 +468,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             weight: m.weight ?? null,
             weight_unit: m.weight_unit ?? null,
             hold_seconds: m.time_seconds ?? null,
+            rpe: m.rpe ?? null,
             distance: m.distance ?? null,
             distance_unit: m.distance_unit ?? null,
           }));
@@ -1065,6 +1066,39 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     let score: string | null = null;
     let rx = false;
 
+    // Step 18: snapshot the prescription from b.parsed_tasks (populated by the
+    // v3 fallback from program_movements_v2, or by parse-* fns for v1) into
+    // each entry so adherence math has both prescribed and actual. NULL for
+    // any field/movement the prescription didn't specify.
+    const rxTasks = (b.parsed_tasks as Array<{
+      movement?: string | null;
+      reps?: number | null;
+      weight?: number | null;
+      hold_seconds?: number | null;
+      rpe?: number | null;
+    }> | null) ?? [];
+    const getPrescription = (movementName: string) => {
+      const target = movementName.trim().toLowerCase();
+      const matches = rxTasks.filter(t => (t.movement ?? '').trim().toLowerCase() === target);
+      if (matches.length === 0) {
+        return {
+          prescribed_weight: null as number | null,
+          prescribed_reps: null as number | null,
+          prescribed_hold_seconds: null as number | null,
+          prescribed_rpe: null as number | null,
+        };
+      }
+      // Metcons sometimes have duplicate rows (e.g., 21-15-9 expanded across
+      // rounds); sum reps across them. Load + hold + rpe don't accumulate.
+      const repsSum = matches.reduce((s, t) => s + (t.reps ?? 0), 0);
+      return {
+        prescribed_weight: matches[0].weight ?? null,
+        prescribed_reps: repsSum > 0 ? repsSum : null,
+        prescribed_hold_seconds: matches[0].hold_seconds ?? null,
+        prescribed_rpe: matches[0].rpe ?? null,
+      };
+    };
+
     if (b.type === 'strength') {
       const movementName = extractMovementName(b.text);
       const setKeys = Object.keys(entryValues)
@@ -1074,6 +1108,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
       const blockSkipKey = `${bi}-strength`;
       const blockSkipped = isSkipped(blockSkipKey);
       const blockSkipReason = skipReasons[blockSkipKey]?.trim() || null;
+      const strengthRx = getPrescription(movementName);
       entries = setKeys.map(key => {
         const ev = entryValues[key] || {};
         return {
@@ -1094,6 +1129,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           faults_observed: strFaults?.length ? strFaults : null,
           completed: !blockSkipped,
           skip_reason: blockSkipped ? blockSkipReason : null,
+          ...strengthRx,
         };
       });
     } else if (b.type === 'metcon') {
@@ -1125,6 +1161,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             faults_observed: f?.length ? f : null,
             completed: !rowSkipped,
             skip_reason: rowSkipped ? reason : null,
+            ...getPrescription(mv.movement),
           };
         });
       score = blockScores[bi]?.trim() || null;
@@ -1158,6 +1195,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             faults_observed: f?.length ? f : null,
             completed: !rowSkipped,
             skip_reason: rowSkipped ? reason : null,
+            ...getPrescription(sk.movement),
           };
         });
     } else if (b.type === 'accessory') {
@@ -1188,6 +1226,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             faults_observed: null,
             completed: !rowSkipped,
             skip_reason: rowSkipped ? reason : null,
+            ...getPrescription(ac.movement),
           };
         });
     }
