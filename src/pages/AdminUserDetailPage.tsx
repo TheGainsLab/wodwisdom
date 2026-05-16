@@ -66,25 +66,24 @@ function AdherenceRowCard({ row }: { row: AdherenceRow }) {
   );
 }
 
-function LiftSparkline({ points, width = 180, height = 36 }: { points: LiftPoint[]; width?: number; height?: number }) {
-  if (points.length === 0) return null;
-  if (points.length === 1) {
+function Sparkline({ values, width = 180, height = 36 }: { values: number[]; width?: number; height?: number }) {
+  if (values.length === 0) return null;
+  if (values.length === 1) {
     return (
       <svg width={width} height={height}>
         <circle cx={width / 2} cy={height / 2} r={3} fill="var(--accent)" />
       </svg>
     );
   }
-  const weights = points.map(p => Number(p.max_weight));
-  const minW = Math.min(...weights);
-  const maxW = Math.max(...weights);
-  const range = Math.max(maxW - minW, 1);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(max - min, 1);
   const pad = 4;
   const innerH = height - pad * 2;
   const innerW = width - pad * 2;
-  const coords = points.map((p, i) => {
-    const x = pad + (i / Math.max(points.length - 1, 1)) * innerW;
-    const y = pad + (1 - (Number(p.max_weight) - minW) / range) * innerH;
+  const coords = values.map((v, i) => {
+    const x = pad + (i / Math.max(values.length - 1, 1)) * innerW;
+    const y = pad + (1 - (v - min) / range) * innerH;
     return [x, y] as const;
   });
   const path = coords.map((c, i) => (i === 0 ? `M ${c[0]} ${c[1]}` : `L ${c[0]} ${c[1]}`)).join(' ');
@@ -111,7 +110,7 @@ function LiftProgressCard({ lift }: { lift: LiftProgress }) {
         )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <LiftSparkline points={lift.points} />
+        <Sparkline values={lift.points.map(p => Number(p.max_weight))} />
         {latest && (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
@@ -119,6 +118,36 @@ function LiftProgressCard({ lift }: { lift: LiftProgress }) {
             </div>
             <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
               {new Date(latest.date).toLocaleDateString()} · {lift.points.length} day{lift.points.length === 1 ? '' : 's'}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SkillVolumeCard({ skill }: { skill: SkillVolume }) {
+  const values = skill.points.map(p => skill.metric === 'reps' ? Number(p.total_reps) : Number(p.total_hold_seconds));
+  const latest = skill.points[skill.points.length - 1];
+  const latestVal = latest ? (skill.metric === 'reps' ? Number(latest.total_reps) : Number(latest.total_hold_seconds)) : 0;
+  const unitLabel = skill.metric === 'reps' ? 'reps' : 's';
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{skill.display_name}</div>
+        {skill.self_rating && (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Self-rating: {skill.self_rating}</div>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <Sparkline values={values} />
+        {latest && (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
+              {latestVal}<span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', marginLeft: 4 }}>{unitLabel}</span>
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+              {new Date(latest.date).toLocaleDateString()} · {skill.points.length} day{skill.points.length === 1 ? '' : 's'}
             </div>
           </div>
         )}
@@ -571,6 +600,20 @@ interface LiftProgress {
   points: LiftPoint[];
 }
 
+interface SkillPoint {
+  date: string;
+  total_reps: number;
+  total_hold_seconds: number;
+}
+
+interface SkillVolume {
+  skill_key: string;
+  display_name: string;
+  self_rating: string | null;
+  metric: 'reps' | 'hold_seconds';
+  points: SkillPoint[];
+}
+
 export default function AdminUserDetailPage({ session: _session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -579,6 +622,7 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
   const [data, setData] = useState<any>(null);
   const [adherence, setAdherence] = useState<AdherenceRow[] | null>(null);
   const [liftProgress, setLiftProgress] = useState<LiftProgress[] | null>(null);
+  const [skillVolume, setSkillVolume] = useState<SkillVolume[] | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -586,15 +630,17 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
     (async () => {
       setLoading(true);
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-      const [{ data: result, error: err }, { data: adh }, { data: lifts }] = await Promise.all([
+      const [{ data: result, error: err }, { data: adh }, { data: lifts }, { data: skills }] = await Promise.all([
         supabase.rpc('admin_user_detail', { target_user_id: id, tz }),
         supabase.rpc('admin_user_adherence', { target_user_id: id }),
         supabase.rpc('admin_user_lift_progress', { target_user_id: id }),
+        supabase.rpc('admin_user_skill_volume', { target_user_id: id }),
       ]);
       if (err) { setError(err.message); setLoading(false); return; }
       setData(result);
       setAdherence((adh as AdherenceRow[]) ?? []);
       setLiftProgress((lifts as LiftProgress[]) ?? []);
+      setSkillVolume((skills as SkillVolume[]) ?? []);
       setLoading(false);
     })();
   }, [id]);
@@ -874,6 +920,21 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {liftProgress.map(l => <LiftProgressCard key={l.lift_key} lift={l} />)}
+                    </div>
+                  </>
+                )}
+
+                {/* Skill Volume */}
+                {skillVolume && skillVolume.length > 0 && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 32, marginBottom: 12 }}>
+                      <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', margin: 0 }}>
+                        Skill Volume
+                      </h3>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Last 90 days</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {skillVolume.map(s => <SkillVolumeCard key={s.skill_key} skill={s} />)}
                     </div>
                   </>
                 )}
