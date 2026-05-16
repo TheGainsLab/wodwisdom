@@ -442,7 +442,27 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                   </div>
                                   {!isExpanded && (
                                     <div className="program-day-summary-lines">
-                                      {workoutBlocks.has(w.id) && workoutBlocks.get(w.id)!.length > 0 ? (
+                                      {program?.program_version === 'v3' ? (
+                                        // v3: read from program_blocks_v2 (in v3BlocksByWorkout).
+                                        // Show strength, metcon, skills, accessory preview lines.
+                                        (v3BlocksByWorkout.get(w.id) ?? [])
+                                          .filter((b) => ['strength', 'metcon', 'skills', 'accessory'].includes(b.block_type))
+                                          .map((b) => {
+                                            const label = b.block_type === 'metcon' ? 'Conditioning' : b.block_type.charAt(0).toUpperCase() + b.block_type.slice(1);
+                                            // Prefer block_label, then block_scheme, then first movement name.
+                                            const text =
+                                              (b.block_label && b.block_label.trim()) ||
+                                              (b.block_scheme && b.block_scheme.trim()) ||
+                                              (b.movements[0]?.movement ?? '');
+                                            const trimmed = text.length > 40 ? text.slice(0, 38) + '…' : text;
+                                            return (
+                                              <div key={b.id} className="program-day-summary-line">
+                                                <span className="program-day-summary-label">{label}:</span>
+                                                <span className="program-day-summary-text">{trimmed}</span>
+                                              </div>
+                                            );
+                                          })
+                                      ) : workoutBlocks.has(w.id) && workoutBlocks.get(w.id)!.length > 0 ? (
                                         workoutBlocks.get(w.id)!
                                           .filter((b) => ['skills', 'strength', 'metcon', 'accessory'].includes(b.block_type))
                                           .map((b) => {
