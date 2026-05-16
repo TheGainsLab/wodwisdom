@@ -500,7 +500,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                 <div className="program-day-body">
                                   <div className="program-day-blocks">
                                     {program?.program_version === 'v3' ? (
-                                      <V3DayPlaceholder blocks={v3BlocksByWorkout.get(w.id) ?? []} />
+                                      <V3DayView blocks={v3BlocksByWorkout.get(w.id) ?? []} />
                                     ) : workoutBlocks.has(w.id) && workoutBlocks.get(w.id)!.length > 0 ? (
                                       <div className="workout-blocks">
                                         {workoutBlocks.get(w.id)!.map((b, bi) => (
@@ -587,64 +587,147 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
 }
 
 // ============================================================
-// V3 placeholder — step 5 of the v3 UX roadmap. Renders the
-// structured day in a compact, readable form so admin can verify
-// the data is reaching the page. The real day-expand UI lands in
-// step 7 with mobile-first block cards, prominent block_scheme +
-// time_cap headers, per-movement completion checkboxes, etc.
+// V3DayView — production day-expand UI for v3 programs.
+// Mobile-first block cards: block-type chip + block_label header,
+// prominent block_scheme line, time-cap pill, per-movement rows
+// with clean prescription typography (sets × reps · weight · RPE),
+// scaling notes inline in dim text.
 // ============================================================
-interface V3DayPlaceholderProps {
+
+interface V3DayViewProps {
   blocks: ProgramBlockV2[];
 }
 
-function V3DayPlaceholder({ blocks }: V3DayPlaceholderProps) {
+const BLOCK_DISPLAY: Record<string, string> = {
+  'warm-up': 'Warm-up',
+  'mobility': 'Mobility',
+  'skills': 'Skills',
+  'strength': 'Strength',
+  'accessory': 'Accessory',
+  'metcon': 'Conditioning',
+  'active-recovery': 'Recovery',
+  'cool-down': 'Cool-down',
+};
+
+function V3DayView({ blocks }: V3DayViewProps) {
   if (!blocks.length) {
     return (
       <div style={{ padding: 12, fontSize: 13, color: 'var(--text-dim)', fontStyle: 'italic' }}>
-        v3 program — no blocks found for this day.
+        No blocks for this day.
       </div>
     );
   }
-  const headerStyle: React.CSSProperties = { fontWeight: 700, fontSize: 13, color: 'var(--accent)', marginTop: 12 };
-  const subStyle: React.CSSProperties = { fontSize: 12, color: 'var(--text-dim)', marginTop: 2, marginBottom: 6 };
-  const rowStyle: React.CSSProperties = { fontSize: 13, color: 'var(--text)', marginLeft: 12, marginBottom: 2 };
+  return (
+    <div className="workout-blocks">
+      {blocks.map((b) => <V3BlockCard key={b.id} block={b} />)}
+    </div>
+  );
+}
 
-  const fmt = (m: ProgramMovementV2) => {
-    const parts: string[] = [];
-    if (m.sets != null && m.reps != null) parts.push(`${m.sets}×${m.reps}`);
-    else if (m.sets != null) parts.push(`${m.sets} sets`);
-    else if (m.reps != null) parts.push(`${m.reps} reps`);
-    if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? ''}`);
-    if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
-    if (m.time_seconds != null) parts.push(`${m.time_seconds}s`);
-    if (m.distance != null) parts.push(`${m.distance}${m.distance_unit ?? ''}`);
-    const scheme = parts.length > 0 ? ` — ${parts.join(' · ')}` : '';
-    const scaling = m.scaling_note ? ` (${m.scaling_note})` : '';
-    return `${m.movement}${scheme}${scaling}`;
+function V3BlockCard({ block }: { block: ProgramBlockV2 }) {
+  const displayLabel = BLOCK_DISPLAY[block.block_type] ?? block.block_type;
+  const timeCapMin = block.time_cap_seconds ? Math.round(block.time_cap_seconds / 60) : null;
+
+  const chipStyle: React.CSSProperties = {
+    display: 'inline-block',
+    fontSize: 11,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '.5px',
+    padding: '2px 8px',
+    borderRadius: 4,
+    background: 'var(--surface2)',
+    color: 'var(--text)',
+    marginRight: 8,
+  };
+  const labelStyle: React.CSSProperties = {
+    fontSize: 13,
+    fontWeight: 600,
+    color: 'var(--text)',
+  };
+  const capPillStyle: React.CSSProperties = {
+    display: 'inline-block',
+    fontSize: 11,
+    padding: '2px 8px',
+    borderRadius: 999,
+    background: 'var(--surface2)',
+    color: 'var(--text-dim)',
+    marginLeft: 'auto',
+  };
+  const schemeStyle: React.CSSProperties = {
+    fontSize: 14,
+    fontWeight: 700,
+    color: 'var(--accent)',
+    marginTop: 6,
+    marginBottom: 4,
+  };
+  const notesStyle: React.CSSProperties = {
+    fontSize: 12,
+    color: 'var(--text-dim)',
+    marginBottom: 8,
+    fontStyle: 'italic',
   };
 
   return (
-    <div className="workout-blocks">
-      {blocks.map((b) => (
-        <div key={b.id} className="workout-block">
-          <div className="workout-block-label" data-block={b.block_type}>
-            {b.block_type === 'warm-up' ? 'Warm-up' :
-              b.block_type === 'cool-down' ? 'Cool down' :
-                b.block_type.charAt(0).toUpperCase() + b.block_type.slice(1)}
-          </div>
-          <div className="workout-block-content">
-            <div style={headerStyle}>
-              {b.block_label && <>{b.block_label}</>}
-              {b.block_scheme && <> — {b.block_scheme}</>}
-              {b.time_cap_seconds && <> — cap {Math.round(b.time_cap_seconds / 60)} min</>}
-            </div>
-            {b.block_notes && <div style={subStyle}>{b.block_notes}</div>}
-            {b.movements.map((m) => (
-              <div key={m.id} style={rowStyle}>{fmt(m)}</div>
-            ))}
-          </div>
-        </div>
-      ))}
+    <div className="workout-block" data-block={block.block_type}>
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+        <span style={chipStyle}>{displayLabel}</span>
+        {block.block_label && <span style={labelStyle}>{block.block_label}</span>}
+        {timeCapMin != null && <span style={capPillStyle}>cap {timeCapMin} min</span>}
+      </div>
+      {block.block_scheme && <div style={schemeStyle}>{block.block_scheme}</div>}
+      {block.block_notes && <div style={notesStyle}>{block.block_notes}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {block.movements.map((m) => <V3MovementRow key={m.id} movement={m} />)}
+      </div>
+    </div>
+  );
+}
+
+function V3MovementRow({ movement }: { movement: ProgramMovementV2 }) {
+  const parts: string[] = [];
+  if (movement.sets != null && movement.reps != null) parts.push(`${movement.sets}×${movement.reps}`);
+  else if (movement.sets != null) parts.push(`${movement.sets} sets`);
+  else if (movement.reps != null) parts.push(`${movement.reps} reps`);
+  if (movement.weight != null) parts.push(`${movement.weight}${movement.weight_unit ?? 'lbs'}`);
+  if (movement.rpe != null) parts.push(`RPE ${movement.rpe}`);
+  if (movement.time_seconds != null) parts.push(`${movement.time_seconds}s`);
+  if (movement.distance != null) parts.push(`${movement.distance}${movement.distance_unit ?? ''}`);
+  const prescription = parts.join(' · ');
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'baseline',
+      flexWrap: 'wrap',
+      gap: 8,
+      padding: '4px 0',
+      borderBottom: '1px dashed var(--border)',
+    }}>
+      <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', flex: '0 0 auto' }}>
+        {movement.movement}
+      </span>
+      {prescription && (
+        <span style={{
+          fontSize: 13,
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+          color: 'var(--text)',
+          marginLeft: 'auto',
+        }}>
+          {prescription}
+        </span>
+      )}
+      {movement.scaling_note && (
+        <span style={{
+          flex: '0 0 100%',
+          fontSize: 12,
+          color: 'var(--text-dim)',
+          fontStyle: 'italic',
+          marginTop: 2,
+        }}>
+          {movement.scaling_note}
+        </span>
+      )}
     </div>
   );
 }
