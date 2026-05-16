@@ -1100,7 +1100,12 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     };
 
     if (b.type === 'strength') {
-      const movementName = extractMovementName(b.text);
+      // v3 strength has a clean canonical movement in parsed_tasks; use it
+      // directly so getPrescription can match and per-lift analytics group
+      // cleanly. extractMovementName remains only as the v1 prose fallback.
+      const movementName =
+        (b.parsed_tasks as Array<{ movement?: string | null }> | null)?.[0]?.movement?.trim()
+        || extractMovementName(b.text);
       const setKeys = Object.keys(entryValues)
         .filter(k => k.startsWith(`${bi}-s`))
         .sort((a, b2) => parseInt(a.split('-s')[1], 10) - parseInt(b2.split('-s')[1], 10));
