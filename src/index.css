@@ -437,6 +437,9 @@ body.landing-body{overflow:auto;height:auto}
 .workout-block-label[data-block="strength"]{color:#e86b8b;background:rgba(232,107,139,.15)}
 .workout-block-label[data-block="metcon"]{color:#34d399;background:rgba(52,211,153,.15)}
 .workout-block-label[data-block="cool-down"]{color:#2dd4bf;background:rgba(45,212,191,.15)}
+.workout-block-label[data-block="accessory"]{color:#3b82f6;background:rgba(59,130,246,.15)}
+.workout-block-label[data-block="mobility"]{color:#06b6d4;background:rgba(6,182,212,.15)}
+.workout-block-label[data-block="active-recovery"]{color:#10b981;background:rgba(16,185,129,.15)}
 .workout-block-content{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text);line-height:1.5;white-space:pre-wrap}
 .workout-block-lines{list-style:none;margin:0;padding:0}
 .workout-blocks-fallback{font-family:'JetBrains Mono',monospace;font-size:12px;white-space:pre-wrap;line-height:1.5;color:var(--text)}

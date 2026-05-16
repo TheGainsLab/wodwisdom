@@ -628,18 +628,9 @@ function V3BlockCard({ block }: { block: ProgramBlockV2 }) {
   const displayLabel = BLOCK_DISPLAY[block.block_type] ?? block.block_type;
   const timeCapMin = block.time_cap_seconds ? Math.round(block.time_cap_seconds / 60) : null;
 
-  const chipStyle: React.CSSProperties = {
-    display: 'inline-block',
-    fontSize: 11,
-    fontWeight: 700,
-    textTransform: 'uppercase',
-    letterSpacing: '.5px',
-    padding: '2px 8px',
-    borderRadius: 4,
-    background: 'var(--surface2)',
-    color: 'var(--text)',
-    marginRight: 8,
-  };
+  // Reuse the existing .workout-block-label[data-block="…"] CSS for
+  // per-block-type colors (warm-up amber, skills purple, strength pink,
+  // metcon green, cool-down teal — see src/index.css).
   const labelStyle: React.CSSProperties = {
     fontSize: 13,
     fontWeight: 600,
@@ -670,8 +661,8 @@ function V3BlockCard({ block }: { block: ProgramBlockV2 }) {
 
   return (
     <div className="workout-block" data-block={block.block_type}>
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-        <span style={chipStyle}>{displayLabel}</span>
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <span className="workout-block-label" data-block={block.block_type}>{displayLabel}</span>
         {block.block_label && <span style={labelStyle}>{block.block_label}</span>}
         {timeCapMin != null && <span style={capPillStyle}>cap {timeCapMin} min</span>}
       </div>
