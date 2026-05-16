@@ -75,14 +75,21 @@ Use these 8 block_type values exactly:
   cool-down        — easy walk / bike + static stretches
 
 DAY COMPOSITION
-Compose each day's block_types from the athlete's profile + day intent + cycle coverage. Every day starts with warm-up and ends with cool-down. Middle blocks decided per session needs.
+Every training day includes these 6 block_types, in this order:
+  warm-up → strength → skills → accessory → metcon → cool-down
 
-CYCLE-LEVEL COVERAGE REQUIREMENTS
-- Every training day includes a strength block.
-- Every training day includes an accessory block.
-- Every training day includes a metcon block.
-- Skills-block frequency: 2–4 per cycle week (split between Track A growth days and lighter touches). Track-B maintenance for advanced Critical/High-freq movements doesn't require a dedicated Skills slot.
-- A day has at most ONE metcon block.
+Blocks are not optional. The CONTENT of each block varies based on the athlete's profile + that day's role in the week + cycle coverage — that's your job. Block presence is fixed.
+
+Mobility may be inserted on deload weeks or recovery-focused days (between strength and accessory). Active-recovery is rare — only for dedicated recovery days, where it replaces strength + metcon.
+
+A day has at most ONE metcon block.
+
+SKILLS BLOCK CONTENT (Track A vs Track B)
+The skills block exists every day. Its content varies:
+  - Track A (growth focus): 2–3 days per week, dedicated progression on the highest-priority skill from the priority formula. Higher volume, formal scheme (EMOM, sets, ladder).
+  - Track B (maintenance): remaining days, brief touches on advanced Critical/High-frequency movements — 5-min EMOM, low-volume technique reps, or warm-up integration. Keeps skill exposure alive without burning recovery.
+
+The block exists every day; the intensity is what shifts.
 
 MONTHLY ARC
 Output exactly 4 weeks × the athlete's days_per_week. Plan for adequate recovery within the cycle — typically a reduced-volume week, placed based on the athlete's goal, prior load, and any named event. Not always week 4: an athlete coming off a hard competition might need deload in week 1; a peaking arc might be 3 weeks build + week 4 test.
@@ -103,40 +110,7 @@ Do NOT include sets, reps, weight, scaling_notes, or any per-movement field. Tho
 OUTPUT FORMAT
 Emit via the emit_skeleton tool. Required top-level fields: month_plan + weeks[]. month_plan has weekly_intent (array of 4 strings), strength_progression (per-lift progression schemes across the 4 weeks), deload_placement, programming_priorities. weeks[] has 4 entries, each with week_num + weekly_intent + days[].
 
-EXAMPLE (one week of one cycle — actual output emits all 4 weeks × days_per_week days):
-{
-  "month_plan": {
-    "weekly_intent": ["build", "build", "build", "deload"],
-    "strength_progression": "Back Squat 5x5@75% → 5x4@80% → 5x3@85% → 3x3@70%. Deadlift 5x3@80% → 4x2@85% → 3x1@90% → 3x2@65%. Snatch and C&J progress through complex → singles → opener simulation → technical deload.",
-    "deload_placement": "Week 4 — reduce primary-lift volume + intensity, maintain skill exposure with lighter technical work.",
-    "programming_priorities": "Address biggest competitive weaknesses: GHD sit-ups (16.99 percentile), V-ups (24.26 percentile), long time-domain conditioning. Maintain advanced gymnastics skills while pushing OLY frequency."
-  },
-  "weeks": [
-    {
-      "week_num": 1,
-      "weekly_intent": "build",
-      "days": [
-        {
-          "day_num": 1,
-          "day_intent": "heavy back squat focus + posterior + midline accessory + medium mixed-modal metcon",
-          "block_types": ["warm-up", "strength", "accessory", "metcon", "cool-down"],
-          "primary_lift": "Back Squat",
-          "strength_scheme": "5x5 @75%",
-          "metcon_focus": "medium mixed-modal (10-12 min), mixed barbell + gymnastics"
-        },
-        {
-          "day_num": 2,
-          "day_intent": "snatch complex + HSPU progression + snatch positional accessory + short power metcon",
-          "block_types": ["warm-up", "strength", "skills", "accessory", "metcon", "cool-down"],
-          "primary_lift": "Hang Power Snatch + Snatch complex",
-          "strength_scheme": "5x (1 Hang Power Snatch + 1 Snatch) @70-75%",
-          "skill_focus": "Deficit HSPU progression (athlete intermediate)",
-          "metcon_focus": "short power couplet (6-8 min)"
-        }
-      ]
-    }
-  ]
-}
+Per-day shape: { day_num, day_intent, block_types, primary_lift, strength_scheme, metcon_focus, skill_focus }. Required: day_num, day_intent, block_types. The skill_focus is required (skills block exists every day). primary_lift + strength_scheme + metcon_focus are required when those blocks are present (and they always are — except on rare active-recovery days).
 
 WRITE THE SKELETON.
 `;
