@@ -331,8 +331,39 @@ async function runReview(
       .update({ status: "processing" })
       .eq("id", reviewId);
 
-    const buildUserContent = (workoutSection: string): string =>
-      `ATHLETE PROFILE:\n${profileStr}\n\nRECENT TRAINING (last 14 days):\n${recentStr}\n\nWORKOUT:\n${workoutSection}`;
+    // v3 typed structure per block, used by per-block Coach calls so the
+    // LLM consumes canonical sets/reps/weight/etc. instead of re-parsing
+    // prose. Populated only on the v3 fallback path; v1 path leaves this
+    // empty and falls back to prose-only user content.
+    type V3StructuredMovement = {
+      movement: string;
+      sets: number | null;
+      reps: number | null;
+      weight: number | null;
+      weight_unit: string | null;
+      rpe: number | null;
+      time_seconds: number | null;
+      distance: number | null;
+      distance_unit: string | null;
+      scaling_note: string | null;
+    };
+    type V3StructuredBlock = {
+      block_label: string | null;
+      block_scheme: string | null;
+      time_cap_seconds: number | null;
+      block_notes: string | null;
+      movements: V3StructuredMovement[];
+    };
+    const blockStructuredByType: Record<string, V3StructuredBlock> = {};
+
+    const buildUserContent = (
+      workoutSection: string,
+      structured?: V3StructuredBlock,
+    ): string => {
+      const base = `ATHLETE PROFILE:\n${profileStr}\n\nRECENT TRAINING (last 14 days):\n${recentStr}\n\nWORKOUT:\n${workoutSection}`;
+      if (!structured) return base;
+      return `${base}\n\nSTRUCTURED PRESCRIPTION (canonical typed prescription — treat these fields as authoritative over any numbers parsed from the prose above):\n${JSON.stringify(structured, null, 2)}`;
+    };
 
     const sources: { title: string; author: string; source: string }[] = [];
 
@@ -395,7 +426,28 @@ async function runReview(
           const lines: string[] = [];
           if (header.length) lines.push(header.join(" — "));
           if (b.block_notes) lines.push(b.block_notes);
-          for (const m of movsByBlock.get(b.id) ?? []) lines.push(fmtMv(m));
+          const blockMovs = movsByBlock.get(b.id) ?? [];
+          for (const m of blockMovs) lines.push(fmtMv(m));
+          // Capture typed structure for the Coach per-block calls (Step 9).
+          blockStructuredByType[b.block_type] = {
+            block_label: b.block_label ?? null,
+            block_scheme: b.block_scheme ?? null,
+            time_cap_seconds: b.time_cap_seconds ?? null,
+            block_notes: b.block_notes ?? null,
+            // deno-lint-ignore no-explicit-any
+            movements: blockMovs.map((m: any) => ({
+              movement: m.movement,
+              sets: m.sets ?? null,
+              reps: m.reps ?? null,
+              weight: m.weight ?? null,
+              weight_unit: m.weight_unit ?? null,
+              rpe: m.rpe ?? null,
+              time_seconds: m.time_seconds ?? null,
+              distance: m.distance ?? null,
+              distance_unit: m.distance_unit ?? null,
+              scaling_note: m.scaling_note ?? null,
+            })),
+          };
           return {
             block_type: b.block_type,
             block_text: lines.join("\n"),
@@ -451,21 +503,21 @@ async function runReview(
     if (blockTextByType["metcon"]) {
       const metconIntent = detectSessionIntent(blockTextByType["metcon"], "metcon", athleteProfile);
       calls.push(
-        stagger(500).then(() => callClaude(claudeOpts(applyIntentModifier(METCON_PROMPT, metconIntent) + journalContext, buildUserContent(blockTextByType["metcon"]), 1024)))
+        stagger(500).then(() => callClaude(claudeOpts(applyIntentModifier(METCON_PROMPT, metconIntent) + journalContext, buildUserContent(blockTextByType["metcon"], blockStructuredByType["metcon"]), 1024)))
           .then((r): [string, string] => ["metcon", r])
       );
     }
     if (blockTextByType["strength"]) {
       const strengthIntent = detectSessionIntent(blockTextByType["strength"], "strength", athleteProfile);
       calls.push(
-        stagger(1000).then(() => callClaude(claudeOpts(applyIntentModifier(STRENGTH_PROMPT, strengthIntent) + strengthContext, buildUserContent(blockTextByType["strength"]), 1024)))
+        stagger(1000).then(() => callClaude(claudeOpts(applyIntentModifier(STRENGTH_PROMPT, strengthIntent) + strengthContext, buildUserContent(blockTextByType["strength"], blockStructuredByType["strength"]), 1024)))
           .then((r): [string, string] => ["strength", r])
       );
     }
     if (blockTextByType["skills"]) {
       const skillsIntent = detectSessionIntent(blockTextByType["skills"], "skills", athleteProfile);
       calls.push(
-        stagger(1500).then(() => callClaude(claudeOpts(applyIntentModifier(SKILLS_PROMPT, skillsIntent) + journalContext, buildUserContent(blockTextByType["skills"]), 1024)))
+        stagger(1500).then(() => callClaude(claudeOpts(applyIntentModifier(SKILLS_PROMPT, skillsIntent) + journalContext, buildUserContent(blockTextByType["skills"], blockStructuredByType["skills"]), 1024)))
           .then((r): [string, string] => ["skills", r])
       );
     }
