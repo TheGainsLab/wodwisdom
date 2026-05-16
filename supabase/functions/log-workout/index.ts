@@ -35,6 +35,9 @@ interface LogEntry {
   quality?: "A" | "B" | "C" | "D" | null;
   variation?: string | null;
   faults_observed?: string[] | null;
+  // Per-movement skip tracking (Step 10 of v3 UX roadmap)
+  completed?: boolean | null;
+  skip_reason?: string | null;
 }
 
 interface LogBlock {
@@ -256,6 +259,8 @@ Deno.serve(async (req) => {
       quality: string | null;
       variation: string | null;
       faults_observed: string[] | null;
+      completed: boolean;
+      skip_reason: string | null;
     }[] = [];
     let sortOrder = 0;
     for (let bi = 0; bi < blocks.length; bi++) {
@@ -299,6 +304,8 @@ Deno.serve(async (req) => {
           faults_observed: Array.isArray(entry.faults_observed) && entry.faults_observed.length > 0
             ? entry.faults_observed.map((f) => String(f).trim()).filter(Boolean)
             : null,
+          completed: entry.completed === false ? false : true,
+          skip_reason: entry.completed === false ? (entry.skip_reason?.trim() || null) : null,
         });
       }
     }

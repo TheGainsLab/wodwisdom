@@ -303,6 +303,13 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   const [inProgressLogId, setInProgressLogId] = useState<string | null>(null);
   const [savedBlocks, setSavedBlocks] = useState<Set<number>>(new Set());
   const [savingBlock, setSavingBlock] = useState<number | null>(null);
+  // Per-movement skip tracking. Key conventions match the existing entry maps:
+  //   strength  → `${bi}-strength`   (one toggle per block; covers all sets)
+  //   skills    → `${bi}-sk${i}`
+  //   accessory → `${bi}-ac${i}`
+  //   metcon    → `${bi}-m${i}`
+  const [skippedKeys, setSkippedKeys] = useState<Record<string, boolean>>({});
+  const [skipReasons, setSkipReasons] = useState<Record<string, string>>({});
   // In edit mode the source_id is resolved from the log being edited rather
   // than passed via location.state. Cached so save paths can read it later.
   const [resolvedSourceId, setResolvedSourceId] = useState<string | null>(null);
@@ -865,6 +872,122 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     });
   };
 
+  const isSkipped = (key: string) => !!skippedKeys[key];
+  const setSkippedFlag = (key: string, val: boolean) => {
+    setSkippedKeys(prev => {
+      const next = { ...prev, [key]: val };
+      if (!val) delete next[key];
+      return next;
+    });
+    if (!val) {
+      setSkipReasons(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+  };
+  const setSkipReasonFor = (key: string, reason: string) => {
+    setSkipReasons(prev => ({ ...prev, [key]: reason }));
+  };
+
+  /**
+   * Renders the skip toggle for a single movement. Two states:
+   *   not skipped: small text-link "Skip"
+   *   skipped:     "Skipped — reason ▾ · undo"
+   * The reason picker is a select with canned options + free-text via "Other…".
+   */
+  const renderSkipControl = (key: string) => {
+    if (!isSkipped(key)) {
+      return (
+        <button
+          type="button"
+          onClick={() => setSkippedFlag(key, true)}
+          style={{
+            background: 'none',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            padding: '4px 10px',
+            fontSize: 11,
+            color: 'var(--text-dim)',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+          aria-label="Skip this movement"
+        >
+          Skip
+        </button>
+      );
+    }
+    const reason = skipReasons[key] || '';
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>Skipped</span>
+        <select
+          value={reason}
+          onChange={e => setSkipReasonFor(key, e.target.value)}
+          style={{
+            background: 'var(--surface2)',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            padding: '4px 6px',
+            fontSize: 11,
+            color: 'var(--text)',
+            fontFamily: 'inherit',
+          }}
+        >
+          <option value="">reason…</option>
+          <option value="time">Time</option>
+          <option value="crowded gym">Crowded gym</option>
+          <option value="injury">Injury / pain</option>
+          <option value="felt off">Felt off</option>
+          <option value="substituted">Substituted</option>
+          <option value="equipment">No equipment</option>
+        </select>
+        <button
+          type="button"
+          onClick={() => setSkippedFlag(key, false)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--accent)',
+            fontSize: 11,
+            cursor: 'pointer',
+            padding: 0,
+            textDecoration: 'underline',
+            fontFamily: 'inherit',
+          }}
+          aria-label="Undo skip"
+        >
+          undo
+        </button>
+      </div>
+    );
+  };
+
+  /** Block-level "Skip Block" — marks every movement in the block as skipped */
+  const skipBlock = (bi: number) => {
+    const block = blocks[bi];
+    if (!block) return;
+    if (block.type === 'strength') {
+      setSkippedFlag(`${bi}-strength`, true);
+      return;
+    }
+    let keys: string[] = [];
+    if (block.type === 'metcon') {
+      keys = Object.keys(metconEntries).filter(k => k.startsWith(`${bi}-m`));
+    } else if (block.type === 'skills') {
+      keys = Object.keys(skillsEntries).filter(k => k.startsWith(`${bi}-sk`));
+    } else if (block.type === 'accessory') {
+      keys = Object.keys(accessoryEntries).filter(k => k.startsWith(`${bi}-ac`));
+    }
+    setSkippedKeys(prev => {
+      const next = { ...prev };
+      for (const k of keys) next[k] = true;
+      return next;
+    });
+  };
+
   // Reactively compute benchmarks per metcon block
   const blockBenchmarks = useMemo<Record<number, BenchmarkResult>>(() => {
     const result: Record<number, BenchmarkResult> = {};
@@ -896,6 +1019,9 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         .filter(k => k.startsWith(`${bi}-s`))
         .sort((a, b2) => parseInt(a.split('-s')[1], 10) - parseInt(b2.split('-s')[1], 10));
       const strFaults = checkedFaults[`${bi}-str`];
+      const blockSkipKey = `${bi}-strength`;
+      const blockSkipped = isSkipped(blockSkipKey);
+      const blockSkipReason = skipReasons[blockSkipKey]?.trim() || null;
       entries = setKeys.map(key => {
         const ev = entryValues[key] || {};
         return {
@@ -914,6 +1040,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           quality: ev.quality ?? null,
           variation: null,
           faults_observed: strFaults?.length ? strFaults : null,
+          completed: !blockSkipped,
+          skip_reason: blockSkipped ? blockSkipReason : null,
         };
       });
     } else if (b.type === 'metcon') {
@@ -925,6 +1053,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         .map(key => {
           const mv = metconEntries[key];
           const f = checkedFaults[key];
+          const rowSkipped = isSkipped(key);
+          const reason = skipReasons[key]?.trim() || null;
           return {
             movement: mv.movement.trim(),
             sets: null,
@@ -941,6 +1071,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             quality: mv.quality ?? null,
             variation: null,
             faults_observed: f?.length ? f : null,
+            completed: !rowSkipped,
+            skip_reason: rowSkipped ? reason : null,
           };
         });
       score = blockScores[bi]?.trim() || null;
@@ -954,6 +1086,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         .map(key => {
           const sk = skillsEntries[key];
           const f = checkedFaults[key];
+          const rowSkipped = isSkipped(key);
+          const reason = skipReasons[key]?.trim() || null;
           return {
             movement: sk.movement.trim(),
             sets: sk.sets ?? null,
@@ -970,6 +1104,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             quality: sk.quality ?? null,
             variation: sk.variation?.trim() || null,
             faults_observed: f?.length ? f : null,
+            completed: !rowSkipped,
+            skip_reason: rowSkipped ? reason : null,
           };
         });
     } else if (b.type === 'accessory') {
@@ -980,6 +1116,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         .filter(key => accessoryEntries[key]?.movement?.trim())
         .map(key => {
           const ac = accessoryEntries[key];
+          const rowSkipped = isSkipped(key);
+          const reason = skipReasons[key]?.trim() || null;
           return {
             movement: ac.movement.trim(),
             sets: ac.sets ?? null,
@@ -996,6 +1134,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             quality: null,
             variation: null,
             faults_observed: null,
+            completed: !rowSkipped,
+            skip_reason: rowSkipped ? reason : null,
           };
         });
     }
@@ -1116,192 +1256,14 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     setError('');
     setSaving(true);
     try {
-      const logBlocks = blocks.map((b, bi) => {
-        if (b.type === 'strength') {
-          const movementName = extractMovementName(b.text);
-          const setKeys = Object.keys(entryValues)
-            .filter(k => k.startsWith(`${bi}-s`))
-            .sort((a, b2) => {
-              const aNum = parseInt(a.split('-s')[1], 10);
-              const bNum = parseInt(b2.split('-s')[1], 10);
-              return aNum - bNum;
-            });
-          const strFaults = checkedFaults[`${bi}-str`];
-          const entries = setKeys.map(key => {
-            const ev = entryValues[key] || {};
-            return {
-              movement: movementName,
-              sets: 1,
-              reps: ev.reps ?? null,
-              weight: ev.weight ?? null,
-              weight_unit: ev.weight_unit || userUnits,
-              rpe: ev.rpe ?? null,
-              scaling_note: null,
-              set_number: ev.set_number ?? null,
-              reps_completed: null,
-              hold_seconds: null,
-              distance: null,
-              distance_unit: null,
-              quality: ev.quality ?? null,
-              variation: null,
-              faults_observed: strFaults?.length ? strFaults : null,
-            };
-          });
-          return {
-            label: b.label,
-            type: b.type,
-            text: b.text,
-            score: blockScores[bi]?.trim() || null,
-            rx: false,
-            notes: blockNotes[bi]?.trim() || null,
-            entries,
-          };
-        }
-
-        if (b.type === 'metcon') {
-          const mvKeys = Object.keys(metconEntries)
-            .filter(k => k.startsWith(`${bi}-m`))
-            .sort((a, b2) => parseInt(a.split('-m')[1], 10) - parseInt(b2.split('-m')[1], 10));
-          const entries = mvKeys
-            .filter(key => metconEntries[key]?.movement?.trim())
-            .map(key => {
-              const mv = metconEntries[key];
-              const f = checkedFaults[key];
-              return {
-                movement: mv.movement.trim(),
-                sets: null,
-                reps: mv.reps ?? null,
-                weight: mv.weight ?? null,
-                weight_unit: mv.weight_unit || userUnits,
-                rpe: mv.rpe ?? null,
-                scaling_note: mv.scaling_note?.trim() || null,
-                set_number: null,
-                reps_completed: null,
-                hold_seconds: null,
-                distance: mv.distance ?? null,
-                distance_unit: mv.distance_unit || null,
-                quality: mv.quality ?? null,
-                variation: null,
-                faults_observed: f?.length ? f : null,
-              };
-            });
-
-          // Compute percentile if benchmarks and score are available.
-          // Skip when capped — there's no meaningful percentile without a finish time.
-          const benchmarks = blockBenchmarks[bi];
-          const scoreStr = blockScores[bi]?.trim() || '';
-          const wType = inferWorkoutType([b]);
-          const isCapped = blockCapped[bi] ?? false;
-          const scoring = benchmarks && scoreStr && !isCapped
-            ? scoreMetcon(scoreStr, wType, benchmarks)
-            : null;
-          const cappedRepsRaw = blockCappedReps[bi]?.trim();
-          const cappedRepsNum = isCapped && cappedRepsRaw ? parseInt(cappedRepsRaw, 10) : null;
-
-          return {
-            label: b.label,
-            type: b.type,
-            text: b.text,
-            score: isCapped ? null : (scoreStr || null),
-            rx: blockRx[bi] ?? true,
-            notes: blockNotes[bi]?.trim() || null,
-            entries,
-            capped: isCapped,
-            capped_reps: Number.isFinite(cappedRepsNum) ? cappedRepsNum : null,
-            percentile: scoring?.percentile ?? null,
-            performance_tier: scoring?.performanceTier ?? null,
-            median_benchmark: benchmarks?.medianScore !== '--' ? benchmarks?.medianScore : null,
-            excellent_benchmark: benchmarks?.excellentScore !== '--' ? benchmarks?.excellentScore : null,
-            time_domain: deriveTimeDomain(wType, b.text, benchmarks?.medianScore ?? null),
-          };
-        }
-
-        if (b.type === 'skills') {
-          const skKeys = Object.keys(skillsEntries)
-            .filter(k => k.startsWith(`${bi}-sk`))
-            .sort((a, b2) => parseInt(a.split('-sk')[1], 10) - parseInt(b2.split('-sk')[1], 10));
-          const entries = skKeys
-            .filter(key => skillsEntries[key]?.movement?.trim())
-            .map(key => {
-              const sk = skillsEntries[key];
-              const f = checkedFaults[key];
-              return {
-                movement: sk.movement.trim(),
-                sets: sk.sets ?? null,
-                reps: null,
-                weight: null,
-                weight_unit: 'lbs' as const,
-                rpe: sk.rpe ?? null,
-                scaling_note: sk.variation?.trim() || null,
-                set_number: null,
-                reps_completed: sk.reps_completed ?? null,
-                hold_seconds: sk.hold_seconds ?? null,
-                distance: null,
-                distance_unit: null,
-                quality: sk.quality ?? null,
-                variation: sk.variation?.trim() || null,
-                faults_observed: f?.length ? f : null,
-              };
-            });
-          return {
-            label: b.label,
-            type: b.type,
-            text: b.text,
-            score: null,
-            rx: false,
-            notes: blockNotes[bi]?.trim() || null,
-            entries,
-          };
-        }
-
-        if (b.type === 'accessory') {
-          const acKeys = Object.keys(accessoryEntries)
-            .filter(k => k.startsWith(`${bi}-ac`))
-            .sort((a, b2) => parseInt(a.split('-ac')[1], 10) - parseInt(b2.split('-ac')[1], 10));
-          const entries = acKeys
-            .filter(key => accessoryEntries[key]?.movement?.trim())
-            .map(key => {
-              const ac = accessoryEntries[key];
-              return {
-                movement: ac.movement.trim(),
-                sets: ac.sets ?? null,
-                reps: null,
-                weight: ac.weight ?? null,
-                weight_unit: ac.weight_unit || userUnits,
-                rpe: ac.rpe ?? null,
-                scaling_note: ac.notes?.trim() || null,
-                set_number: null,
-                reps_completed: ac.reps_completed ?? null,
-                hold_seconds: ac.hold_seconds ?? null,
-                distance: ac.distance ?? null,
-                distance_unit: ac.distance_unit ?? null,
-                quality: null,
-                variation: null,
-                faults_observed: null,
-              };
-            });
-          return {
-            label: b.label,
-            type: b.type,
-            text: b.text,
-            score: null,
-            rx: false,
-            notes: blockNotes[bi]?.trim() || null,
-            entries,
-          };
-        }
-
-        // All other block types (warm-up, cool-down, etc.): no per-movement entries
-        return {
-          label: b.label,
-          type: b.type,
-          text: b.text,
-          score: null,
-          rx: blockRx[bi] ?? true,
-          notes: blockNotes[bi]?.trim() || null,
-          entries: [],
-        };
-      });
+      // buildBlockPayload returns the full per-block shape for every block
+      // type (loggable + non-loggable). Non-loggable types get an empty
+      // entries[] which is the same shape the previous duplicated branch
+      // produced. Using one builder also routes Step 10's completed +
+      // skip_reason fields through cleanly.
+      const logBlocks = blocks
+        .map((_, bi) => buildBlockPayload(bi))
+        .filter((b): b is NonNullable<typeof b> => b != null);
 
       const workoutText = sourceState?.workout_text?.trim() ||
         blocks.map(b => `${b.label}: ${b.text}`).join('\n');
@@ -1393,8 +1355,20 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                         .filter(k => k.startsWith(`${bi}-s`))
                         .sort((a, b) => parseInt(a.split('-s')[1], 10) - parseInt(b.split('-s')[1], 10));
 
+                      const skipKey = `${bi}-strength`;
+                      const blockSkipped = isSkipped(skipKey);
+
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+                            {renderSkipControl(skipKey)}
+                          </div>
+                          {blockSkipped ? (
+                            <div style={{ fontSize: 13, color: 'var(--text-dim)', fontStyle: 'italic', padding: '8px 0' }}>
+                              Strength block skipped.
+                            </div>
+                          ) : (
+                          <>
                           <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)', paddingLeft: 40 }}>
                             <span style={{ width: 60 }}>Reps</span>
                             <span style={{ width: 64 }}>Wt</span>
@@ -1434,6 +1408,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                                 </label>
                               ))}
                             </div>
+                          )}
+                          </>
                           )}
                           <div className="field" style={{ marginTop: 8 }}>
                             <label>Notes</label>
@@ -1523,14 +1499,20 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                                   const hasDistance = isMonostructural && (mv.distance != null && mv.distance > 0);
                                   const hasCalories = isMonostructural && mv.distance_unit === 'cal';
                                   const hasAnyWeighted = mvKeys.some(k => metconEntries[k] && (metconEntries[k].category || 'bodyweight') === 'weighted');
+                                  const rowSkipped = isSkipped(key);
                                   return (
                                     <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                      <input
-                                        type="text"
-                                        value={mv.movement}
-                                        onChange={e => setMetconEntry(key, 'movement', e.target.value)}
-                                        style={{ ...compactInputStyle, width: '100%' }}
-                                      />
+                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                        <input
+                                          type="text"
+                                          value={mv.movement}
+                                          onChange={e => setMetconEntry(key, 'movement', e.target.value)}
+                                          style={{ ...compactInputStyle, flex: 1, textDecoration: rowSkipped ? 'line-through' : 'none', color: rowSkipped ? 'var(--text-dim)' : 'var(--text)' }}
+                                        />
+                                        {renderSkipControl(key)}
+                                      </div>
+                                      {rowSkipped ? null : (
+                                      <>
                                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                         {hasDistance && !hasCalories ? (
                                           <>
@@ -1605,6 +1587,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                                           ))}
                                         </div>
                                       )}
+                                      </>
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -1656,14 +1640,20 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                                 {skKeys.map(key => {
                                   const sk = skillsEntries[key];
                                   if (!sk) return null;
+                                  const rowSkipped = isSkipped(key);
                                   return (
                                     <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                      <input
-                                        type="text"
-                                        value={sk.movement}
-                                        onChange={e => setSkillEntry(key, 'movement', e.target.value)}
-                                        style={{ ...compactInputStyle, width: '100%' }}
-                                      />
+                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                        <input
+                                          type="text"
+                                          value={sk.movement}
+                                          onChange={e => setSkillEntry(key, 'movement', e.target.value)}
+                                          style={{ ...compactInputStyle, flex: 1, textDecoration: rowSkipped ? 'line-through' : 'none', color: rowSkipped ? 'var(--text-dim)' : 'var(--text)' }}
+                                        />
+                                        {renderSkipControl(key)}
+                                      </div>
+                                      {rowSkipped ? null : (
+                                      <>
                                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)' }}>
                                         <span style={{ width: 48 }}>Sets</span>
                                         <span style={{ width: 48 }}>Reps</span>
@@ -1724,6 +1714,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                                           ))}
                                         </div>
                                       )}
+                                      </>
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -1762,14 +1754,20 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                                 {acKeys.map(key => {
                                   const ac = accessoryEntries[key];
                                   if (!ac) return null;
+                                  const rowSkipped = isSkipped(key);
                                   return (
                                     <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                      <input
-                                        type="text"
-                                        value={ac.movement}
-                                        onChange={e => setAccessoryEntry(key, 'movement', e.target.value)}
-                                        style={{ ...compactInputStyle, width: '100%' }}
-                                      />
+                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                        <input
+                                          type="text"
+                                          value={ac.movement}
+                                          onChange={e => setAccessoryEntry(key, 'movement', e.target.value)}
+                                          style={{ ...compactInputStyle, flex: 1, textDecoration: rowSkipped ? 'line-through' : 'none', color: rowSkipped ? 'var(--text-dim)' : 'var(--text)' }}
+                                        />
+                                        {renderSkipControl(key)}
+                                      </div>
+                                      {rowSkipped ? null : (
+                                      <>
                                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)' }}>
                                         <span style={{ width: 44 }}>Sets</span>
                                         <span style={{ width: 44 }}>Reps</span>
@@ -1823,6 +1821,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                                           {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
                                         </select>
                                       </div>
+                                      </>
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -1856,7 +1856,25 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
 
                     {/* Per-block save button (not for warm-up/cool-down) */}
                     {block.type !== 'warm-up' && block.type !== 'mobility' && block.type !== 'cool-down' && (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+                      <button
+                        type="button"
+                        onClick={() => skipBlock(bi)}
+                        disabled={savedBlocks.has(bi)}
+                        style={{
+                          background: 'none',
+                          border: '1px solid var(--border)',
+                          borderRadius: 6,
+                          padding: '6px 12px',
+                          fontSize: 12,
+                          color: 'var(--text-dim)',
+                          cursor: savedBlocks.has(bi) ? 'default' : 'pointer',
+                          opacity: savedBlocks.has(bi) ? 0.5 : 1,
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        Skip Block
+                      </button>
                       <button
                         className="auth-btn"
                         style={{
