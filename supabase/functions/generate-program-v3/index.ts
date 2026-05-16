@@ -397,17 +397,15 @@ async function saveProgramV3(
   userId: string,
   output: WriterOutput,
 ): Promise<string> {
-  // 1. programs row
+  // 1. programs row — mirror v2's saveProgramV2 exactly (only the
+  // fields v2 uses), differ only in program_version and name.
   const { data: program, error: progErr } = await supa
     .from("programs")
     .insert({
       user_id: userId,
-      name: `v3 Program ${new Date().toISOString().slice(0, 10)}`,
-      source: "ai_v3",
+      name: "AI Programmer (v3)",
       program_version: "v3",
       month_plan: output.month_plan,
-      generated_months: 1,
-      committed: true,
     })
     .select("id")
     .single();
@@ -417,19 +415,16 @@ async function saveProgramV3(
   const programId = program.id as string;
 
   try {
-    // 2. program_workouts — one row per day
+    // 2. program_workouts — one row per day. Mirror v2's field set.
     const workoutInserts: Array<Record<string, unknown>> = [];
     for (const week of output.weeks) {
-      for (let dIdx = 0; dIdx < week.days.length; dIdx++) {
-        const day = week.days[dIdx];
+      for (const day of week.days) {
         workoutInserts.push({
           program_id: programId,
-          user_id: userId,
           week_num: week.week_num,
           day_num: day.day_num,
-          month_number: 1,
-          sort_order: (week.week_num - 1) * 7 + dIdx,
           workout_text: null,
+          sort_order: (week.week_num - 1) * 10 + day.day_num,
         });
       }
     }
