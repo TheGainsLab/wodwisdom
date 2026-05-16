@@ -76,8 +76,9 @@ Use these 8 block_type values exactly:
 
 DAY COMPOSITION
 Every training day includes these 6 block_types, in this order:
-  warm-up → strength → skills → accessory → metcon → cool-down
+  warm-up → skills → strength → accessory → metcon → cool-down
 
+Skills before strength: technical work belongs before CNS fatigue from heavy lifting.
 Blocks are not optional. The CONTENT of each block varies based on the athlete's profile + that day's role in the week + cycle coverage — that's your job. Block presence is fixed.
 
 Mobility may be inserted on deload weeks or recovery-focused days (between strength and accessory). Active-recovery is rare — only for dedicated recovery days, where it replaces strength + metcon.
