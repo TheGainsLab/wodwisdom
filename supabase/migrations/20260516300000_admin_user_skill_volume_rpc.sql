@@ -53,20 +53,37 @@ BEGIN
   FROM athlete_profiles
   WHERE user_id = target_user_id;
 
-  WITH skill_entries AS (
+  WITH matched_entries AS (
     SELECT
-      LOWER(REGEXP_REPLACE(TRIM(wle.movement), '[-\s]+', '_', 'g')) AS skill_key,
+      -- Match canonical key with a +s fallback for singular movement names
+      -- (DB stores "Bar Muscle-Up" → bar_muscle_up; canonical is bar_muscle_ups).
+      CASE
+        WHEN LOWER(REGEXP_REPLACE(TRIM(wle.movement), '[-\s]+', '_', 'g')) = ANY(v_skill_keys)
+          THEN LOWER(REGEXP_REPLACE(TRIM(wle.movement), '[-\s]+', '_', 'g'))
+        WHEN (LOWER(REGEXP_REPLACE(TRIM(wle.movement), '[-\s]+', '_', 'g')) || 's') = ANY(v_skill_keys)
+          THEN LOWER(REGEXP_REPLACE(TRIM(wle.movement), '[-\s]+', '_', 'g')) || 's'
+        ELSE NULL
+      END AS skill_key,
       wl.workout_date AS day,
-      SUM(COALESCE(wle.reps_completed, wle.reps, 0)) AS total_reps,
-      SUM(COALESCE(wle.hold_seconds, 0)) AS total_hold_seconds
+      wle.reps_completed,
+      wle.reps,
+      wle.hold_seconds
     FROM workout_log_entries wle
     JOIN workout_logs wl ON wl.id = wle.log_id
     WHERE wl.user_id = target_user_id
       AND wl.workout_date >= (CURRENT_DATE - (days_back || ' days')::interval)::date
-      AND LOWER(REGEXP_REPLACE(TRIM(wle.movement), '[-\s]+', '_', 'g')) = ANY(v_skill_keys)
+  ),
+  skill_entries AS (
+    SELECT
+      skill_key,
+      day,
+      SUM(COALESCE(reps_completed, reps, 0)) AS total_reps,
+      SUM(COALESCE(hold_seconds, 0)) AS total_hold_seconds
+    FROM matched_entries
+    WHERE skill_key IS NOT NULL
     GROUP BY 1, 2
-    HAVING SUM(COALESCE(wle.reps_completed, wle.reps, 0)) > 0
-        OR SUM(COALESCE(wle.hold_seconds, 0)) > 0
+    HAVING SUM(COALESCE(reps_completed, reps, 0)) > 0
+        OR SUM(COALESCE(hold_seconds, 0)) > 0
   ),
   per_skill AS (
     SELECT
