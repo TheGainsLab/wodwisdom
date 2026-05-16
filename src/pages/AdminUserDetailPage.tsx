@@ -29,6 +29,43 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+function AdherenceMetric({ label, num, den }: { label: string; num: number; den: number }) {
+  const pct = den > 0 ? Math.round((num / den) * 100) : null;
+  const color =
+    pct == null ? 'var(--text-muted)' :
+    pct >= 80 ? 'var(--accent)' :
+    pct >= 50 ? 'var(--text)' :
+    'var(--text-dim)';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 88 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--text-muted)' }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", color }}>
+        {num}/{den}{pct != null && <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', marginLeft: 6 }}>{pct}%</span>}
+      </div>
+    </div>
+  );
+}
+
+function AdherenceRowCard({ row }: { row: AdherenceRow }) {
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{row.name || 'Untitled program'}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          {row.program_version || 'v1'} &middot; {new Date(row.created_at).toLocaleDateString()}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+        <AdherenceMetric label="Workouts" num={row.completed_workouts} den={row.prescribed_workouts} />
+        <AdherenceMetric label="Blocks" num={row.logged_blocks} den={row.prescribed_blocks} />
+        <AdherenceMetric label="Skipped" num={row.skipped_entries} den={row.total_entries} />
+      </div>
+    </div>
+  );
+}
+
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
     <div className="admin-stat-card">
@@ -446,12 +483,26 @@ function EmailSection({ userId, userEmail, userName }: { userId: string; userEma
   );
 }
 
+interface AdherenceRow {
+  id: string;
+  name: string | null;
+  created_at: string;
+  program_version: string | null;
+  prescribed_workouts: number;
+  completed_workouts: number;
+  prescribed_blocks: number;
+  logged_blocks: number;
+  total_entries: number;
+  skipped_entries: number;
+}
+
 export default function AdminUserDetailPage({ session: _session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
+  const [adherence, setAdherence] = useState<AdherenceRow[] | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -459,9 +510,13 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
     (async () => {
       setLoading(true);
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-      const { data: result, error: err } = await supabase.rpc('admin_user_detail', { target_user_id: id, tz });
+      const [{ data: result, error: err }, { data: adh }] = await Promise.all([
+        supabase.rpc('admin_user_detail', { target_user_id: id, tz }),
+        supabase.rpc('admin_user_adherence', { target_user_id: id }),
+      ]);
       if (err) { setError(err.message); setLoading(false); return; }
       setData(result);
+      setAdherence((adh as AdherenceRow[]) ?? []);
       setLoading(false);
     })();
   }, [id]);
@@ -711,6 +766,21 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                           </div>
                         </button>
                       ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Adherence */}
+                {adherence && adherence.length > 0 && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 32, marginBottom: 12 }}>
+                      <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', margin: 0 }}>
+                        Adherence
+                      </h3>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Last {adherence.length} program{adherence.length === 1 ? '' : 's'}</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {adherence.map(a => <AdherenceRowCard key={a.id} row={a} />)}
                     </div>
                   </>
                 )}
