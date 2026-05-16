@@ -20,6 +20,10 @@ interface Block {
   text: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parsed_tasks?: any[] | null;
+  // v3-only structured metadata. Surfaced as chips above the prescription.
+  // v1 blocks leave these null and fall back to prose-only rendering.
+  scheme?: string | null;
+  timeCapSeconds?: number | null;
 }
 
 interface EntryValues {
@@ -439,12 +443,14 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         };
         loaded = v3Blocks.map((b: any) => {
           const movements = movsByBlock.get(b.id) ?? [];
-          const header: string[] = [];
-          if (b.block_label) header.push(b.block_label);
-          if (b.block_scheme) header.push(b.block_scheme);
-          if (b.time_cap_seconds) header.push(`cap ${Math.round(b.time_cap_seconds / 60)} min`);
+          // Scheme + time_cap are rendered as chips at the card header
+          // (Step 12), not in the prose body. The reassembled text only
+          // carries the block_label (when distinct) + notes + movements,
+          // so the chip + the body don't duplicate info.
           const lines: string[] = [];
-          if (header.length) lines.push(header.join(' — '));
+          if (b.block_label && b.block_label !== (BLOCK_TYPE_LABELS[b.block_type] || b.block_type)) {
+            lines.push(b.block_label);
+          }
           if (b.block_notes) lines.push(b.block_notes);
           for (const m of movements) lines.push(fmtMv(m));
           // Pre-populate parsed_tasks from the structured movements so the
@@ -464,6 +470,8 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             type: b.block_type,
             text: lines.join('\n'),
             parsed_tasks,
+            scheme: b.block_scheme ?? null,
+            timeCapSeconds: b.time_cap_seconds ?? null,
           };
         });
       }
@@ -1346,6 +1354,41 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                         </button>
                       )}
                     </div>
+                    {(block.scheme || block.timeCapSeconds) && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                        {block.scheme && (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            background: 'var(--surface2)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 999,
+                            padding: '4px 10px',
+                            fontSize: 12,
+                            color: 'var(--text)',
+                            lineHeight: 1.2,
+                          }}>{block.scheme}</span>
+                        )}
+                        {block.timeCapSeconds != null && block.timeCapSeconds > 0 && (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            background: 'var(--surface2)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 999,
+                            padding: '4px 10px',
+                            fontSize: 12,
+                            color: 'var(--text)',
+                            lineHeight: 1.2,
+                            fontVariantNumeric: 'tabular-nums',
+                          }}>
+                            <span aria-hidden>⏱</span>
+                            {Math.floor(block.timeCapSeconds / 60)}:{String(block.timeCapSeconds % 60).padStart(2, '0')} cap
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div className="workout-review-content" style={{ marginBottom: 16 }}>
                       <BlockContent label={block.label} content={block.text} />
                     </div>
