@@ -521,22 +521,50 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                     )}
                                   </div>
                                   <div className="program-day-actions">
-                                    <button
-                                      className="auth-btn"
-                                      onClick={() => navigate('/workout-review', { state: { workout_text: w.workout_text, source_id: w.id, program_id: id, week_num: week.weekNum, day_num: w.day_num } })}
-                                      style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: done ? 'var(--text-dim)' : 'var(--text)' }}
-                                    >
-                                      Coach
-                                    </button>
-                                    {!done && (
-                                      <button
-                                        className="auth-btn"
-                                        onClick={() => navigate('/workout/start', { state: { workout_text: w.workout_text, source_id: w.id } })}
-                                        style={{ padding: '8px 14px', fontSize: 13 }}
-                                      >
-                                        {ip ? 'Resume' : 'Start'}
-                                      </button>
-                                    )}
+                                    {(() => {
+                                      // For v3, generate a v1-style prose representation from the
+                                      // structured blocks so the existing Coach + Start flows work
+                                      // unchanged. Include v3_blocks in state for future v3-native
+                                      // log-form rendering (step 8b).
+                                      const isV3 = program?.program_version === 'v3';
+                                      const v3Blocks = isV3 ? (v3BlocksByWorkout.get(w.id) ?? []) : null;
+                                      const text = isV3
+                                        ? v3BlocksToProse(v3Blocks ?? [])
+                                        : w.workout_text;
+                                      const reviewState = {
+                                        workout_text: text,
+                                        source_id: w.id,
+                                        program_id: id,
+                                        week_num: week.weekNum,
+                                        day_num: w.day_num,
+                                        ...(isV3 ? { v3_blocks: v3Blocks, program_version: 'v3' as const } : {}),
+                                      };
+                                      const startState = {
+                                        workout_text: text,
+                                        source_id: w.id,
+                                        ...(isV3 ? { v3_blocks: v3Blocks, program_version: 'v3' as const } : {}),
+                                      };
+                                      return (
+                                        <>
+                                          <button
+                                            className="auth-btn"
+                                            onClick={() => navigate('/workout-review', { state: reviewState })}
+                                            style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: done ? 'var(--text-dim)' : 'var(--text)' }}
+                                          >
+                                            Coach
+                                          </button>
+                                          {!done && (
+                                            <button
+                                              className="auth-btn"
+                                              onClick={() => navigate('/workout/start', { state: startState })}
+                                              style={{ padding: '8px 14px', fontSize: 13 }}
+                                            >
+                                              {ip ? 'Resume' : 'Start'}
+                                            </button>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
                                   </div>
                                 </div>
                               )}
@@ -584,6 +612,45 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       </div>
     </div>
   );
+}
+
+// ============================================================
+// v3BlocksToProse — bridge helper that converts v3 structured
+// blocks + movements into a v1-style prose representation for the
+// existing /workout-review (Coach) and /workout/start (logging)
+// pages. Lets v3 days use those flows immediately; future iteration
+// (step 8b) builds a v3-native log form that pre-fills typed fields.
+// ============================================================
+function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
+  if (!blocks.length) return '';
+  const fmt = (m: ProgramMovementV2) => {
+    const parts: string[] = [];
+    if (m.sets != null && m.reps != null) parts.push(`${m.sets}×${m.reps}`);
+    else if (m.sets != null) parts.push(`${m.sets} sets`);
+    else if (m.reps != null) parts.push(`${m.reps} reps`);
+    if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? 'lbs'}`);
+    if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
+    if (m.time_seconds != null) parts.push(`${m.time_seconds}s`);
+    if (m.distance != null) parts.push(`${m.distance}${m.distance_unit ?? ''}`);
+    const scheme = parts.length > 0 ? ` — ${parts.join(' · ')}` : '';
+    const scaling = m.scaling_note ? ` (${m.scaling_note})` : '';
+    return `${m.movement}${scheme}${scaling}`;
+  };
+
+  const sections: string[] = [];
+  for (const b of blocks) {
+    const labelHeader = BLOCK_DISPLAY[b.block_type] ?? b.block_type;
+    const lines: string[] = [];
+    const headerSuffix: string[] = [];
+    if (b.block_label) headerSuffix.push(b.block_label);
+    if (b.block_scheme) headerSuffix.push(b.block_scheme);
+    if (b.time_cap_seconds) headerSuffix.push(`cap ${Math.round(b.time_cap_seconds / 60)} min`);
+    lines.push(`${labelHeader}:${headerSuffix.length ? ' ' + headerSuffix.join(' — ') : ''}`);
+    if (b.block_notes) lines.push(`  ${b.block_notes}`);
+    for (const m of b.movements) lines.push(`  ${fmt(m)}`);
+    sections.push(lines.join('\n'));
+  }
+  return sections.join('\n\n');
 }
 
 // ============================================================
