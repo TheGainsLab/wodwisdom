@@ -38,6 +38,7 @@ interface ProgramMovementV2 {
   distance: number | null;
   distance_unit: string | null;
   scaling_note: string | null;
+  target_pct_1rm: number | null;
   sort_order: number;
 }
 
@@ -212,7 +213,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
           const batch = blockIds.slice(i, i + 100);
           const { data: movements } = await supabase
             .from('program_movements_v2')
-            .select('id, block_id, movement, sets, reps, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, sort_order')
+            .select('id, block_id, movement, sets, reps, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order')
             .in('block_id', batch)
             .order('sort_order');
           for (const m of movements || []) {
@@ -751,7 +752,10 @@ function V3MovementRow({ movement }: { movement: ProgramMovementV2 }) {
   if (movement.sets != null && movement.reps != null) parts.push(`${movement.sets}×${movement.reps}`);
   else if (movement.sets != null) parts.push(`${movement.sets} sets`);
   else if (movement.reps != null) parts.push(`${movement.reps} reps`);
-  if (movement.weight != null) parts.push(`${movement.weight}${movement.weight_unit ?? 'lbs'}`);
+  if (movement.weight != null) {
+    const pct = movement.target_pct_1rm != null ? ` (${Math.round(movement.target_pct_1rm)}%)` : '';
+    parts.push(`${movement.weight}${movement.weight_unit ?? 'lbs'}${pct}`);
+  }
   if (movement.rpe != null) parts.push(`RPE ${movement.rpe}`);
   if (movement.time_seconds != null) parts.push(`${movement.time_seconds}s`);
   if (movement.distance != null) parts.push(`${movement.distance}${movement.distance_unit ?? ''}`);

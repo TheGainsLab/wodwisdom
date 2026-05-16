@@ -346,6 +346,7 @@ async function runReview(
       distance: number | null;
       distance_unit: string | null;
       scaling_note: string | null;
+      target_pct_1rm: number | null;
     };
     type V3StructuredBlock = {
       block_label: string | null;
@@ -392,7 +393,7 @@ async function runReview(
         const blockIds = (v3Blocks as { id: string }[]).map((b) => b.id);
         const { data: v3Movements } = await supa
           .from("program_movements_v2")
-          .select("block_id, movement, sets, reps, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, sort_order")
+          .select("block_id, movement, sets, reps, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order")
           .in("block_id", blockIds)
           .order("sort_order");
         const movsByBlock = new Map<string, typeof v3Movements>();
@@ -446,6 +447,7 @@ async function runReview(
               distance: m.distance ?? null,
               distance_unit: m.distance_unit ?? null,
               scaling_note: m.scaling_note ?? null,
+              target_pct_1rm: m.target_pct_1rm ?? null,
             })),
           };
           return {

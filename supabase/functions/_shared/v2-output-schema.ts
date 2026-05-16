@@ -67,6 +67,12 @@ export interface MovementPrescription {
   distance_unit?: "ft" | "m";
   /** Optional cue for scaling (e.g., "if HSPU unavailable, sub pike push-ups"). */
   scaling_note?: string;
+  /**
+   * % of 1RM the writer reasoned in (e.g. 72.5 for "@70-75%"). Only emit
+   * for strength / accessory prescriptions anchored to a 1RM. Skip for
+   * bodyweight, skills, and metcon movements.
+   */
+  target_pct_1rm?: number;
 }
 
 /**
@@ -155,6 +161,12 @@ function buildMovementSchema(units: "lbs" | "kg") {
       distance: { type: "number", minimum: 0 },
       distance_unit: { type: "string", enum: ["ft", "m"] },
       scaling_note: { type: "string", maxLength: 500 },
+      target_pct_1rm: {
+        type: "number",
+        minimum: 30,
+        maximum: 110,
+        description: "Optional % of 1RM for 1RM-anchored prescriptions (e.g. 72.5 for '@70-75%'). Strength + lift-variant accessory only.",
+      },
     },
     required: ["movement"],
     additionalProperties: false,

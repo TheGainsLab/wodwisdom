@@ -419,7 +419,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         const blockIds = v3Blocks.map((b: any) => b.id);
         const { data: v3Movs } = await supabase
           .from('program_movements_v2')
-          .select('block_id, movement, sets, reps, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, sort_order')
+          .select('block_id, movement, sets, reps, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order')
           .in('block_id', blockIds)
           .order('sort_order');
         const movsByBlock = new Map<string, any[]>();
@@ -433,7 +433,10 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           if (m.sets != null && m.reps != null) parts.push(`${m.sets}×${m.reps}`);
           else if (m.sets != null) parts.push(`${m.sets} sets`);
           else if (m.reps != null) parts.push(`${m.reps} reps`);
-          if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? 'lbs'}`);
+          if (m.weight != null) {
+            const pct = m.target_pct_1rm != null ? ` (${Math.round(m.target_pct_1rm)}% 1RM)` : '';
+            parts.push(`${m.weight}${m.weight_unit ?? 'lbs'}${pct}`);
+          }
           if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
           if (m.time_seconds != null) parts.push(`${m.time_seconds}s`);
           if (m.distance != null) parts.push(`${m.distance}${m.distance_unit ?? ''}`);

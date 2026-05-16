@@ -496,6 +496,7 @@ async function saveProgramV3(
               distance: mv.distance ?? null,
               distance_unit: mv.distance_unit ?? null,
               scaling_note: mv.scaling_note ?? null,
+              target_pct_1rm: mv.target_pct_1rm ?? null,
               sort_order: m,
             });
           }
