@@ -336,7 +336,10 @@ async function runReview(
 
     const sources: { title: string; author: string; source: string }[] = [];
 
-    // Fetch pre-extracted blocks from DB (written by preprocess-program)
+    // Fetch pre-extracted blocks from DB. v1 stored these in
+    // program_workout_blocks (one row per block, text-formatted).
+    // v3 stores structured data in program_blocks_v2 + program_movements_v2;
+    // fall back to that when v1 query returns empty.
     let blockRows: { block_type: string; block_text: string; block_order: number }[] = [];
     if (sourceId) {
       const { data } = await supa
@@ -345,6 +348,61 @@ async function runReview(
         .eq("program_workout_id", sourceId)
         .order("block_order");
       blockRows = (data || []) as typeof blockRows;
+    }
+
+    // v3 fallback — reconstruct block_text from structured rows.
+    if (blockRows.length === 0 && sourceId) {
+      const { data: v3Blocks } = await supa
+        .from("program_blocks_v2")
+        .select("id, block_type, block_label, block_scheme, time_cap_seconds, block_notes, sort_order")
+        .eq("program_workout_id", sourceId)
+        .order("sort_order");
+      if (v3Blocks && v3Blocks.length > 0) {
+        const blockIds = (v3Blocks as { id: string }[]).map((b) => b.id);
+        const { data: v3Movements } = await supa
+          .from("program_movements_v2")
+          .select("block_id, movement, sets, reps, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, sort_order")
+          .in("block_id", blockIds)
+          .order("sort_order");
+        const movsByBlock = new Map<string, typeof v3Movements>();
+        for (const m of v3Movements || []) {
+          // deno-lint-ignore no-explicit-any
+          const arr = movsByBlock.get((m as any).block_id) ?? [];
+          arr.push(m);
+          // deno-lint-ignore no-explicit-any
+          movsByBlock.set((m as any).block_id, arr);
+        }
+        // deno-lint-ignore no-explicit-any
+        const fmtMv = (m: any) => {
+          const parts: string[] = [];
+          if (m.sets != null && m.reps != null) parts.push(`${m.sets}×${m.reps}`);
+          else if (m.sets != null) parts.push(`${m.sets} sets`);
+          else if (m.reps != null) parts.push(`${m.reps} reps`);
+          if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? "lbs"}`);
+          if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
+          if (m.time_seconds != null) parts.push(`${m.time_seconds}s`);
+          if (m.distance != null) parts.push(`${m.distance}${m.distance_unit ?? ""}`);
+          const scheme = parts.length > 0 ? ` — ${parts.join(" · ")}` : "";
+          const scaling = m.scaling_note ? ` (${m.scaling_note})` : "";
+          return `${m.movement}${scheme}${scaling}`;
+        };
+        // deno-lint-ignore no-explicit-any
+        blockRows = (v3Blocks as any[]).map((b, idx) => {
+          const header: string[] = [];
+          if (b.block_label) header.push(b.block_label);
+          if (b.block_scheme) header.push(b.block_scheme);
+          if (b.time_cap_seconds) header.push(`cap ${Math.round(b.time_cap_seconds / 60)} min`);
+          const lines: string[] = [];
+          if (header.length) lines.push(header.join(" — "));
+          if (b.block_notes) lines.push(b.block_notes);
+          for (const m of movsByBlock.get(b.id) ?? []) lines.push(fmtMv(m));
+          return {
+            block_type: b.block_type,
+            block_text: lines.join("\n"),
+            block_order: b.sort_order ?? idx,
+          };
+        });
+      }
     }
 
     const blockTextByType: Record<string, string> = {};
