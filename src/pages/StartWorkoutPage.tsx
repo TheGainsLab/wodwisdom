@@ -379,20 +379,87 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
       }
 
       const { data, error: fetchErr } = blocksRes;
+      let loaded: Block[];
 
-      if (fetchErr || !data || data.length === 0) {
-        setError('Could not load workout blocks');
-        setLoading(false);
-        return;
+      if (!fetchErr && data && data.length > 0) {
+        // v1 path — block_text already prose in program_workout_blocks.
+        loaded = data.map(row => ({
+          id: row.id,
+          label: BLOCK_TYPE_LABELS[row.block_type] || row.block_type,
+          type: row.block_type,
+          text: row.block_text,
+          parsed_tasks: row.parsed_tasks as any[] | null,
+        }));
+      } else {
+        // v3 fallback — reconstruct block_text + parsed_tasks from
+        // program_blocks_v2 + program_movements_v2. v1 had a parse step
+        // (extract-movements-ai); v3 movements are already structured,
+        // so we can populate parsed_tasks directly from them.
+        const { data: v3Blocks } = await supabase
+          .from('program_blocks_v2')
+          .select('id, block_type, block_label, block_scheme, time_cap_seconds, block_notes, sort_order')
+          .eq('program_workout_id', localSourceId!)
+          .order('sort_order');
+        if (!v3Blocks || v3Blocks.length === 0) {
+          setError('Could not load workout blocks');
+          setLoading(false);
+          return;
+        }
+        const blockIds = v3Blocks.map((b: any) => b.id);
+        const { data: v3Movs } = await supabase
+          .from('program_movements_v2')
+          .select('block_id, movement, sets, reps, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, sort_order')
+          .in('block_id', blockIds)
+          .order('sort_order');
+        const movsByBlock = new Map<string, any[]>();
+        for (const m of v3Movs ?? []) {
+          const arr = movsByBlock.get((m as any).block_id) ?? [];
+          arr.push(m);
+          movsByBlock.set((m as any).block_id, arr);
+        }
+        const fmtMv = (m: any) => {
+          const parts: string[] = [];
+          if (m.sets != null && m.reps != null) parts.push(`${m.sets}×${m.reps}`);
+          else if (m.sets != null) parts.push(`${m.sets} sets`);
+          else if (m.reps != null) parts.push(`${m.reps} reps`);
+          if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? 'lbs'}`);
+          if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
+          if (m.time_seconds != null) parts.push(`${m.time_seconds}s`);
+          if (m.distance != null) parts.push(`${m.distance}${m.distance_unit ?? ''}`);
+          const scheme = parts.length > 0 ? ` — ${parts.join(' · ')}` : '';
+          const scaling = m.scaling_note ? ` (${m.scaling_note})` : '';
+          return `${m.movement}${scheme}${scaling}`;
+        };
+        loaded = v3Blocks.map((b: any) => {
+          const movements = movsByBlock.get(b.id) ?? [];
+          const header: string[] = [];
+          if (b.block_label) header.push(b.block_label);
+          if (b.block_scheme) header.push(b.block_scheme);
+          if (b.time_cap_seconds) header.push(`cap ${Math.round(b.time_cap_seconds / 60)} min`);
+          const lines: string[] = [];
+          if (header.length) lines.push(header.join(' — '));
+          if (b.block_notes) lines.push(b.block_notes);
+          for (const m of movements) lines.push(fmtMv(m));
+          // Pre-populate parsed_tasks from the structured movements so the
+          // log form doesn't need to re-parse the prose. v3 movements
+          // already carry the typed prescription.
+          const parsed_tasks = movements.map((m: any) => ({
+            movement: m.movement,
+            reps: m.reps ?? null,
+            weight: m.weight ?? null,
+            weight_unit: m.weight_unit ?? null,
+            distance: m.distance ?? null,
+            distance_unit: m.distance_unit ?? null,
+          }));
+          return {
+            id: b.id,
+            label: BLOCK_TYPE_LABELS[b.block_type] || b.block_type,
+            type: b.block_type,
+            text: lines.join('\n'),
+            parsed_tasks,
+          };
+        });
       }
-
-      const loaded: Block[] = data.map(row => ({
-        id: row.id,
-        label: BLOCK_TYPE_LABELS[row.block_type] || row.block_type,
-        type: row.block_type,
-        text: row.block_text,
-        parsed_tasks: row.parsed_tasks as any[] | null,
-      }));
 
       setBlocks(loaded);
       setWorkoutType(inferWorkoutType(loaded));
