@@ -392,10 +392,33 @@ interface InsertedWorkout {
   day_num: number;
 }
 
+/**
+ * Build a per-block intent object from the skeleton day's metadata.
+ * Each block type carries the slice of skeleton reasoning that shaped it.
+ * Used by Coach for sharper Training Intent + by future analytics.
+ */
+function buildBlockIntent(
+  daySkel: { day_intent: string; primary_lift?: string; strength_scheme?: string; metcon_focus?: string; skill_focus?: string } | undefined,
+  blockType: string,
+): Record<string, string> | null {
+  if (!daySkel) return null;
+  const base: Record<string, string> = { day_intent: daySkel.day_intent };
+  if (blockType === "strength") {
+    if (daySkel.primary_lift) base.focus = daySkel.primary_lift;
+    if (daySkel.strength_scheme) base.scheme = daySkel.strength_scheme;
+  } else if (blockType === "metcon") {
+    if (daySkel.metcon_focus) base.focus = daySkel.metcon_focus;
+  } else if (blockType === "skills") {
+    if (daySkel.skill_focus) base.focus = daySkel.skill_focus;
+  }
+  return base;
+}
+
 async function saveProgramV3(
   supa: SupabaseClient,
   userId: string,
   output: WriterOutput,
+  skeleton: SkeletonOutput | null,
 ): Promise<string> {
   // 1. programs row — mirror v2's saveProgramV2 exactly (only the
   // fields v2 uses), differ only in program_version and name.
@@ -440,6 +463,18 @@ async function saveProgramV3(
       workoutByDay.set(`${w.week_num}-${w.day_num}`, w);
     }
 
+    // Index skeleton days by (week, day) so each block can pick up the
+    // structural reasoning that shaped it. When the skeleton is missing
+    // (legacy callsite, future v3 variant), block_intent stays null.
+    const skelDayByKey = new Map<string, { day_intent: string; primary_lift?: string; strength_scheme?: string; metcon_focus?: string; skill_focus?: string }>();
+    if (skeleton) {
+      for (const skWeek of skeleton.weeks) {
+        for (const skDay of skWeek.days) {
+          skelDayByKey.set(`${skWeek.week_num}-${skDay.day_num}`, skDay);
+        }
+      }
+    }
+
     // 3. program_blocks_v2 — one row per block per day
     const blockInserts: Array<Record<string, unknown>> = [];
     const blockKeyToDay: Array<{ key: string; weekNum: number; dayNum: number; blockIdx: number }> = [];
@@ -447,6 +482,7 @@ async function saveProgramV3(
       for (const day of week.days) {
         const w = workoutByDay.get(`${week.week_num}-${day.day_num}`);
         if (!w) throw new Error(`[save-v3] missing program_workouts row for w${week.week_num}d${day.day_num}`);
+        const skDay = skelDayByKey.get(`${week.week_num}-${day.day_num}`);
         for (let bIdx = 0; bIdx < day.blocks.length; bIdx++) {
           const b = day.blocks[bIdx];
           blockInserts.push({
@@ -457,6 +493,7 @@ async function saveProgramV3(
             time_cap_seconds: b.time_cap_seconds ?? null,
             block_notes: b.block_notes ?? null,
             sort_order: bIdx,
+            block_intent: buildBlockIntent(skDay, b.block_type),
           });
           blockKeyToDay.push({ key: `${week.week_num}-${day.day_num}-${bIdx}`, weekNum: week.week_num, dayNum: day.day_num, blockIdx: bIdx });
         }
@@ -577,7 +614,7 @@ async function processJob(jobId: string, userId: string) {
     let programId: string | null = null;
     try {
       await setStage("saving");
-      programId = await saveProgramV3(supa, userId, output);
+      programId = await saveProgramV3(supa, userId, output, skeleton);
       console.log(`[generate-program-v3 worker] persisted program ${programId}`);
     } catch (saveErr) {
       console.error("[generate-program-v3 worker] save failed:", saveErr);

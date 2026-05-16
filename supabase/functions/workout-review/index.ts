@@ -353,9 +353,14 @@ async function runReview(
       block_scheme: string | null;
       time_cap_seconds: number | null;
       block_notes: string | null;
+      block_intent: { day_intent?: string; focus?: string; scheme?: string } | null;
       movements: V3StructuredMovement[];
     };
     const blockStructuredByType: Record<string, V3StructuredBlock> = {};
+    // day_intent comes off any block — denormalized across the day. Capture
+    // the first non-null one so the session-level INTENT prompt can ground
+    // its 2-3 sentence summary in the writer's actual day-level reasoning.
+    let v3DayIntent: string | null = null;
 
     const buildUserContent = (
       workoutSection: string,
@@ -386,7 +391,7 @@ async function runReview(
     if (blockRows.length === 0 && sourceId) {
       const { data: v3Blocks } = await supa
         .from("program_blocks_v2")
-        .select("id, block_type, block_label, block_scheme, time_cap_seconds, block_notes, sort_order")
+        .select("id, block_type, block_label, block_scheme, time_cap_seconds, block_notes, block_intent, sort_order")
         .eq("program_workout_id", sourceId)
         .order("sort_order");
       if (v3Blocks && v3Blocks.length > 0) {
@@ -430,11 +435,14 @@ async function runReview(
           const blockMovs = movsByBlock.get(b.id) ?? [];
           for (const m of blockMovs) lines.push(fmtMv(m));
           // Capture typed structure for the Coach per-block calls (Step 9).
+          const bi = (b.block_intent ?? null) as { day_intent?: string; focus?: string; scheme?: string } | null;
+          if (bi?.day_intent && !v3DayIntent) v3DayIntent = bi.day_intent;
           blockStructuredByType[b.block_type] = {
             block_label: b.block_label ?? null,
             block_scheme: b.block_scheme ?? null,
             time_cap_seconds: b.time_cap_seconds ?? null,
             block_notes: b.block_notes ?? null,
+            block_intent: bi,
             // deno-lint-ignore no-explicit-any
             movements: blockMovs.map((m: any) => ({
               movement: m.movement,
@@ -497,8 +505,15 @@ async function runReview(
     const stagger = (ms: number) => new Promise((r) => setTimeout(r, ms));
     const calls: Promise<[string, string]>[] = [];
 
+    // Step 17: ground Coach's Training Intent in the writer's actual
+    // day_intent rather than letting it re-derive from the prescription.
+    // The intent line is appended to the user content as a labeled hint
+    // — Coach treats it as the writer's authoritative framing.
+    const intentUserContent = v3DayIntent
+      ? `${buildUserContent(fullWorkoutText)}\n\nWRITER'S DAY INTENT (the structural reasoning behind this session — anchor your Training Intent to this framing rather than re-deriving from the prescription):\n${v3DayIntent}`
+      : buildUserContent(fullWorkoutText);
     calls.push(
-      callClaude(claudeOpts(INTENT_PROMPT + intentContext, buildUserContent(fullWorkoutText), 384))
+      callClaude(claudeOpts(INTENT_PROMPT + intentContext, intentUserContent, 384))
         .then((r): [string, string] => ["intent", r])
     );
 
