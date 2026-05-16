@@ -97,6 +97,30 @@ export interface CompetitionPayload {
   fitness_signature: NonNullable<Tier4Bundle["fitness_signature"]>;
 }
 
+export interface PreviousCycleSummary {
+  program_id: string;
+  program_name: string | null;
+  program_created_at: string | null;
+  last_completed_date: string | null;
+  workouts: {
+    prescribed: number;
+    completed: number;
+    completion_pct: number | null;
+  };
+  movement_skip: {
+    total_entries: number;
+    skipped_entries: number;
+    skip_pct: number | null;
+  };
+  /** Map keyed by canonical skill key (e.g. "bar_muscle_ups").
+   *  Empty object when athlete didn't log any canonical skills last cycle. */
+  skill_volume: Record<string, {
+    total_reps: number;
+    total_hold_seconds: number;
+    days: number;
+  }>;
+}
+
 export interface WriterPayload {
   basics: BasicsPayload;
   /** All 14 canonical lift keys; null when user hasn't entered. */
@@ -110,6 +134,10 @@ export interface WriterPayload {
   training_context: TrainingContextPayload;
   /** Tier 4 slice when linked + fetch succeeded; null otherwise. */
   competition: CompetitionPayload | null;
+  /** Step 27 carry-forward: most-recently-active completed cycle's
+   *  adherence + skip rate + per-skill volume. NULL for first-time athletes
+   *  or anyone without a completed log against any prior program. */
+  previous_cycle: PreviousCycleSummary | null;
   /** display_name strings — the writer's allowed-movement set. */
   vocabulary: string[];
   /** Concatenated RAG context (TODO: wire to v1's searchChunks chain). */
@@ -315,6 +343,23 @@ export async function buildWriterPayload(
   // 3. Vocabulary — display_name list.
   const vocabulary = await fetchVocabulary(supa);
 
+  // 3b. Previous-cycle summary (Step 27 carry-forward). NULL when the
+  // athlete has no completed logs against any prior program. Soft-fails
+  // to null on error — carry-forward is informational, not a hard
+  // requirement for program generation.
+  let previous_cycle: PreviousCycleSummary | null = null;
+  try {
+    const { data: prev } = await supa.rpc("user_previous_cycle_summary", {
+      target_user_id: userId,
+    });
+    if (prev) previous_cycle = prev as PreviousCycleSummary;
+  } catch (err) {
+    console.warn(
+      `[build-writer-payload] user_previous_cycle_summary failed for ${userId}:`,
+      err,
+    );
+  }
+
   // 4. Hydrate JSONB blobs to complete canonical-key maps. We need
   // these before the RAG call (it consumes lifts + skills directly).
   const lifts: Record<string, number | null> = {};
@@ -391,6 +436,7 @@ export async function buildWriterPayload(
       self_perception_level: asString(profile.self_perception_level),
     },
     competition,
+    previous_cycle,
     vocabulary,
     rag,
   };

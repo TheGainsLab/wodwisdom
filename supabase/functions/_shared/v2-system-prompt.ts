@@ -38,6 +38,19 @@ Read the goal text and the injuries text as written. Don't bucket either — the
 injuries_structured.do_not_program is the canonical movement filter. It merges two sources: (a) movements derived from the athlete's stated injuries, and (b) movements blocked by missing equipment (e.g., no rower → "Row" appears in the list). Do not program any movement on that list. The free-text injuries_constraints_text carries the nuance (severity, timeline, modifications) the list can't.
 When empirical performance data (Tier 4) is present, prefer it over self-reported skill levels. A user who self-rates a movement "intermediate" but whose competition history shows likely_lacking on it — trust the empirical signal.
 
+PRIOR CYCLE CONTINUITY
+When previous_cycle is non-null, treat it as evidence of what the athlete actually did last cycle, not what was prescribed. Use it to calibrate volume and difficulty — it does not replace Tier 1–4 inputs, but it should bend the cycle's intensity dial.
+
+Rules (apply each independently; effects compose):
+  - workouts.completion_pct < 70           → Reduce total session count or shorten sessions. The athlete missed too many workouts to absorb a full prescribed cycle. Stay closer to days_per_week minus 1 effective sessions; trim accessory.
+  - workouts.completion_pct ≥ 90           → Athlete is consistent. Hold or increase volume; no need to pad with optional work.
+  - movement_skip.skip_pct ≥ 20            → Trim accessory + skills volume. Athlete is running out of time/energy mid-session. Keep main strength + metcon intact; cut tail volume.
+  - movement_skip.skip_pct == 0 and completion_pct ≥ 90 → Athlete finishes everything prescribed. Safe to push prescriptions slightly (top of percentage ranges, longer metcons, more accessory).
+  - skill_volume[<skill>].total_reps very low (< 30 across 4 weeks) on a skill flagged Track A in the prior cycle → Skill was undertrained relative to prescription. Either re-emphasize with EXTRA Skills-block dedicated time this cycle, or drop it to Track B (maintenance) and free capacity for another priority — make the call based on competition_frequency and proficiency_gap. Don't just re-prescribe identically and expect a different result.
+  - skill_volume[<skill>].total_reps high (≥ 100) and the skill was Track A last cycle → Skill is getting trained. Continue Track A volume; expect proficiency_gap to close over the next 1-2 cycles.
+
+When previous_cycle is null (first cycle or no logging history), proceed on Tier 1–4 alone.
+
 STRENGTH CONVENTIONS
 The program advances the athlete on two strength axes:
 

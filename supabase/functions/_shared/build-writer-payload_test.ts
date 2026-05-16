@@ -58,6 +58,8 @@ interface StubOpts {
   profileRow: FixtureProfileRow | null;
   vocabulary?: string[];
   profileError?: { message: string } | null;
+  /** Step 27 carry-forward; tests default to null (no prior cycle). */
+  previousCycle?: unknown;
 }
 
 function makeStubSupa(opts: StubOpts) {
@@ -96,7 +98,13 @@ function makeStubSupa(opts: StubOpts) {
   }
 
   // deno-lint-ignore no-explicit-any
-  return { from: (table: string) => makeBuilder(table) } as any;
+  return {
+    from: (table: string) => makeBuilder(table),
+    // Step 27: user_previous_cycle_summary RPC. Tests default to "no prior
+    // cycle" (null result); override per test if a fixture needs one.
+    rpc: (_fn: string, _args: unknown) =>
+      Promise.resolve({ data: opts.previousCycle ?? null, error: null }),
+  } as any;
 }
 
 // ============================================================
@@ -165,7 +173,7 @@ for (const fixture of ALL_FIXTURES) {
       const supa = makeStubSupa({ profileRow: fixture.profileRow });
       const payload = await buildWriterPayload(supa, "test-user-id");
 
-      // 9 top-level keys per the locked contract.
+      // 10 top-level keys per the locked contract (Step 27 added previous_cycle).
       assertEquals(
         Object.keys(payload).sort(),
         [
@@ -174,6 +182,7 @@ for (const fixture of ALL_FIXTURES) {
           "conditioning",
           "equipment",
           "lifts",
+          "previous_cycle",
           "rag",
           "skills",
           "training_context",
