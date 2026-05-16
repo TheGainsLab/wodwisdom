@@ -458,12 +458,16 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           for (const m of movements) lines.push(fmtMv(m));
           // Pre-populate parsed_tasks from the structured movements so the
           // log form doesn't need to re-parse the prose. v3 movements
-          // already carry the typed prescription.
+          // already carry the typed prescription. Field names match what
+          // parse-skills / parse-accessory write back for v1, so the
+          // cached prefill consumers can stay version-agnostic.
           const parsed_tasks = movements.map((m: any) => ({
             movement: m.movement,
+            sets: m.sets ?? null,
             reps: m.reps ?? null,
             weight: m.weight ?? null,
             weight_unit: m.weight_unit ?? null,
+            hold_seconds: m.time_seconds ?? null,
             distance: m.distance ?? null,
             distance_unit: m.distance_unit ?? null,
           }));
@@ -488,11 +492,15 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         if (b.type === 'strength') {
           const { sets, reps, perSetReps } = parseSetsReps(b.text);
           const numSets = sets && sets > 0 ? sets : 1;
+          const primary = b.parsed_tasks?.[0] as { weight?: number | null; weight_unit?: string | null } | undefined;
+          const seededWeight = primary?.weight ?? undefined;
+          const seededWeightUnit: 'lbs' | 'kg' =
+            primary?.weight_unit === 'kg' ? 'kg' : 'lbs';
           for (let s = 0; s < numSets; s++) {
             initial[`${bi}-s${s}`] = {
               reps: perSetReps ? perSetReps[s] : reps,
-              weight: undefined,
-              weight_unit: 'lbs',
+              weight: seededWeight,
+              weight_unit: seededWeightUnit,
               rpe: undefined,
               set_number: s + 1,
             };
@@ -577,8 +585,20 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           let skills: SkillsEntryValues[];
 
           if (block.parsed_tasks && block.parsed_tasks.length > 0) {
-            // Already cached in DB — use directly
-            skills = block.parsed_tasks;
+            // Cached in DB (v1 via parse-skills, v3 inline from program_movements_v2).
+            // Field-name mapping is required: parsed_tasks carries `reps`, the form
+            // field is `reps_completed`. RPE/quality intentionally left blank.
+            skills = (block.parsed_tasks as Array<{
+              movement: string;
+              sets?: number | null;
+              reps?: number | null;
+              hold_seconds?: number | null;
+            }>).map(s => ({
+              movement: s.movement,
+              sets: s.sets ?? undefined,
+              reps_completed: s.reps ?? undefined,
+              hold_seconds: s.hold_seconds ?? undefined,
+            }));
           } else {
             // Call LLM to parse, write result back to DB
             try {
@@ -624,7 +644,28 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           let movements: AccessoryEntryValues[];
 
           if (block.parsed_tasks && block.parsed_tasks.length > 0) {
-            movements = block.parsed_tasks;
+            // Cached in DB (v1 via parse-accessory, v3 inline from program_movements_v2).
+            // Field-name mapping required: parsed_tasks carries `reps`, form uses `reps_completed`.
+            // RPE/notes intentionally left blank.
+            movements = (block.parsed_tasks as Array<{
+              movement: string;
+              sets?: number | null;
+              reps?: number | null;
+              weight?: number | null;
+              weight_unit?: string | null;
+              hold_seconds?: number | null;
+              distance?: number | null;
+              distance_unit?: string | null;
+            }>).map(m => ({
+              movement: m.movement,
+              sets: m.sets ?? undefined,
+              reps_completed: m.reps ?? undefined,
+              weight: m.weight ?? undefined,
+              weight_unit: m.weight_unit === 'kg' ? 'kg' : m.weight_unit === 'lbs' ? 'lbs' : undefined,
+              hold_seconds: m.hold_seconds ?? undefined,
+              distance: m.distance ?? undefined,
+              distance_unit: m.distance_unit === 'm' || m.distance_unit === 'ft' ? m.distance_unit : undefined,
+            }));
           } else {
             try {
               const { data: fnData, error: fnErr } = await supabase.functions.invoke('parse-accessory', {
