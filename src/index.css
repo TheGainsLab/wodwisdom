@@ -193,6 +193,11 @@ body.landing-body{overflow:auto;height:auto}
 .lift-input::placeholder{color:var(--text-muted)}
 .lift-input::-webkit-outer-spin-button,.lift-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .lift-input[type=number]{-moz-appearance:textfield}
+.acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.acc-field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.acc-field-label{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em}
+.acc-field>input,.acc-field>select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:16px;padding:10px 12px;min-width:0;box-sizing:border-box}
+@media(min-width:720px){.acc-grid{grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}.acc-field>input,.acc-field>select{font-size:14px;padding:8px 10px}}
 .skill-list{display:flex;flex-direction:column;gap:6px}
 .skill-row{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
 .skill-name{font-size:13px;font-weight:500;white-space:nowrap;flex-shrink:0}
