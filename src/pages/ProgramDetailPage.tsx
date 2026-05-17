@@ -121,6 +121,10 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [allWorkouts, setAllWorkouts] = useState<ProgramWorkout[]>([]);
   const [completedWorkoutIds, setCompletedWorkoutIds] = useState<Set<string>>(new Set());
   const [inProgressWorkouts, setInProgressWorkouts] = useState<Map<string, { logId: string; savedCount: number; totalBlocks: number }>>(new Map());
+  // Map<program_workout_id, Set<sort_order>> — which v3 blocks have been
+  // saved in workout_log_blocks for an in-progress log. Used to dim
+  // completed blocks in V3DayView.
+  const [savedBlockOrdersByWorkout, setSavedBlockOrdersByWorkout] = useState<Map<string, Set<number>>>(new Map());
   const [workoutBlocks, setWorkoutBlocks] = useState<Map<string, ProgramBlock[]>>(new Map());
   // v3-only: structured blocks + movements per program_workout_id.
   const [v3BlocksByWorkout, setV3BlocksByWorkout] = useState<Map<string, ProgramBlockV2[]>>(new Map());
@@ -238,6 +242,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       // Query in batches of 100 to avoid URL length limits
       const allCompleted = new Set<string>();
       const ipMap = new Map<string, { logId: string; savedCount: number; totalBlocks: number }>();
+      const savedOrdersMap = new Map<string, Set<number>>();
       for (let i = 0; i < ids.length; i += 100) {
         const batch = ids.slice(i, i + 100);
         const { data: logs } = await supabase
@@ -250,12 +255,20 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
           if (l.status === 'completed') {
             allCompleted.add(l.source_id);
           } else if (l.status === 'in_progress') {
-            // Count saved blocks for this in-progress log (exclude warm-up/cool-down)
-            const { count } = await supabase
+            // Fetch saved block rows so we know both the count and which
+            // sort_orders are done (used to dim completed blocks in the UI).
+            const { data: savedRows } = await supabase
               .from('workout_log_blocks')
-              .select('id', { count: 'exact', head: true })
-              .eq('log_id', l.id)
-              .not('block_type', 'in', '("warm-up","mobility","cool-down")');
+              .select('sort_order, block_type')
+              .eq('log_id', l.id);
+            const countedRows = (savedRows ?? []).filter(
+              (r) => !['warm-up', 'mobility', 'cool-down'].includes(r.block_type)
+            );
+            const savedOrders = new Set<number>();
+            for (const r of savedRows ?? []) {
+              if (typeof r.sort_order === 'number') savedOrders.add(r.sort_order);
+            }
+            savedOrdersMap.set(l.source_id, savedOrders);
             // Count total blocks for this workout (exclude warm-up/cool-down)
             const { count: totalCount } = await supabase
               .from(isV3 ? 'program_blocks_v2' : 'program_workout_blocks')
@@ -264,7 +277,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
               .not('block_type', 'in', '("warm-up","mobility","cool-down")');
             ipMap.set(l.source_id, {
               logId: l.id,
-              savedCount: count ?? 0,
+              savedCount: countedRows.length,
               totalBlocks: totalCount ?? 0,
             });
           }
@@ -272,9 +285,11 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       }
       setCompletedWorkoutIds(allCompleted);
       setInProgressWorkouts(ipMap);
+      setSavedBlockOrdersByWorkout(savedOrdersMap);
     } else {
       setCompletedWorkoutIds(new Set());
       setInProgressWorkouts(new Map());
+      setSavedBlockOrdersByWorkout(new Map());
     }
 
     setLoading(false);
@@ -501,7 +516,11 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                 <div className="program-day-body">
                                   <div className="program-day-blocks">
                                     {program?.program_version === 'v3' ? (
-                                      <V3DayView blocks={v3BlocksByWorkout.get(w.id) ?? []} />
+                                      <V3DayView
+                                        blocks={v3BlocksByWorkout.get(w.id) ?? []}
+                                        completedAll={done}
+                                        savedSortOrders={savedBlockOrdersByWorkout.get(w.id)}
+                                      />
                                     ) : workoutBlocks.has(w.id) && workoutBlocks.get(w.id)!.length > 0 ? (
                                       <div className="workout-blocks">
                                         {workoutBlocks.get(w.id)!.map((b, bi) => (
@@ -663,6 +682,12 @@ function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
 
 interface V3DayViewProps {
   blocks: ProgramBlockV2[];
+  // True when the entire workout has been logged (status='completed').
+  // Forces every block to render as done regardless of saved sort_orders.
+  completedAll?: boolean;
+  // For in-progress workouts: sort_orders of blocks already saved in
+  // workout_log_blocks. Matches against ProgramBlockV2.sort_order.
+  savedSortOrders?: Set<number>;
 }
 
 // Block display labels — aligned with v1 prose conventions so the
@@ -681,7 +706,7 @@ const BLOCK_DISPLAY: Record<string, string> = {
   'cool-down': 'Cool down',
 };
 
-function V3DayView({ blocks }: V3DayViewProps) {
+function V3DayView({ blocks, completedAll, savedSortOrders }: V3DayViewProps) {
   if (!blocks.length) {
     return (
       <div style={{ padding: 12, fontSize: 13, color: 'var(--text-dim)', fontStyle: 'italic' }}>
@@ -691,14 +716,29 @@ function V3DayView({ blocks }: V3DayViewProps) {
   }
   return (
     <div className="workout-blocks">
-      {blocks.map((b) => <V3BlockCard key={b.id} block={b} />)}
+      {blocks.map((b) => {
+        const done = !!completedAll || !!savedSortOrders?.has(b.sort_order);
+        return <V3BlockCard key={b.id} block={b} done={done} />;
+      })}
     </div>
   );
 }
 
-function V3BlockCard({ block }: { block: ProgramBlockV2 }) {
+function V3BlockCard({ block, done }: { block: ProgramBlockV2; done?: boolean }) {
   const displayLabel = BLOCK_DISPLAY[block.block_type] ?? block.block_type;
   const timeCapMin = block.time_cap_seconds ? Math.round(block.time_cap_seconds / 60) : null;
+  const donePillStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    fontSize: 11,
+    fontWeight: 600,
+    padding: '2px 8px',
+    borderRadius: 999,
+    background: 'rgba(46,196,134,0.15)',
+    color: '#2ec486',
+    marginLeft: 'auto',
+  };
 
   // Reuse the existing .workout-block-label[data-block="…"] CSS for
   // per-block-type colors (warm-up amber, skills purple, strength pink,
@@ -732,11 +772,18 @@ function V3BlockCard({ block }: { block: ProgramBlockV2 }) {
   };
 
   return (
-    <div className="workout-block" data-block={block.block_type}>
+    <div
+      className="workout-block"
+      data-block={block.block_type}
+      style={done ? { opacity: 0.55 } : undefined}
+    >
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <span className="workout-block-label" data-block={block.block_type}>{displayLabel}</span>
         {block.block_label && <span style={labelStyle}>{block.block_label}</span>}
-        {timeCapMin != null && <span style={capPillStyle}>cap {timeCapMin} min</span>}
+        {timeCapMin != null && (
+          <span style={done ? { ...capPillStyle, marginLeft: 0 } : capPillStyle}>cap {timeCapMin} min</span>
+        )}
+        {done && <span style={donePillStyle}>✓ Done</span>}
       </div>
       {block.block_scheme && <div style={schemeStyle}>{block.block_scheme}</div>}
       {block.block_notes && <div style={notesStyle}>{block.block_notes}</div>}
