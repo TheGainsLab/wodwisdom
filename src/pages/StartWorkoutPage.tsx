@@ -1899,58 +1899,57 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                                       </div>
                                       {rowSkipped ? null : (
                                       <>
-                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, color: 'var(--text-dim)' }}>
-                                        <span style={{ width: 44 }}>Sets</span>
-                                        <span style={{ width: 44 }}>Reps</span>
-                                        <span style={{ width: 56 }}>Wt</span>
-                                        <span style={{ width: 56 }}>Hold (s)</span>
-                                        <span style={{ width: 56 }}>Dist</span>
-                                        <span style={{ width: 40 }}>RPE</span>
-                                      </div>
-                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                        <input
-                                          type="number"
-                                          placeholder=""
-                                          value={ac.sets ?? ''}
-                                          onChange={e => setAccessoryEntry(key, 'sets', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, width: 44 }}
-                                        />
-                                        <input
-                                          type="number"
-                                          placeholder=""
-                                          value={ac.reps_completed ?? ''}
-                                          onChange={e => setAccessoryEntry(key, 'reps_completed', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, width: 44 }}
-                                        />
-                                        <input
-                                          type="number"
-                                          placeholder=""
-                                          value={ac.weight ?? ''}
-                                          onChange={e => setAccessoryEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
-                                          style={{ ...compactInputStyle, width: 56 }}
-                                        />
-                                        <input
-                                          type="number"
-                                          placeholder=""
-                                          value={ac.hold_seconds ?? ''}
-                                          onChange={e => setAccessoryEntry(key, 'hold_seconds', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, width: 56 }}
-                                        />
-                                        <input
-                                          type="number"
-                                          placeholder=""
-                                          value={ac.distance ?? ''}
-                                          onChange={e => setAccessoryEntry(key, 'distance', e.target.value ? parseFloat(e.target.value) : undefined)}
-                                          style={{ ...compactInputStyle, width: 56 }}
-                                        />
-                                        <select
-                                          value={ac.rpe ?? ''}
-                                          onChange={e => setAccessoryEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                                          style={{ ...compactInputStyle, width: 40, padding: '8px 4px', border: ac.rpe == null ? '1px solid var(--border)' : '1px solid var(--border)' }}
-                                        >
-                                          <option value=""></option>
-                                          {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
-                                        </select>
+                                      <div className="acc-grid">
+                                        <div className="acc-field">
+                                          <span className="acc-field-label">Sets</span>
+                                          <input
+                                            type="number"
+                                            value={ac.sets ?? ''}
+                                            onChange={e => setAccessoryEntry(key, 'sets', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                          />
+                                        </div>
+                                        <div className="acc-field">
+                                          <span className="acc-field-label">Reps</span>
+                                          <input
+                                            type="number"
+                                            value={ac.reps_completed ?? ''}
+                                            onChange={e => setAccessoryEntry(key, 'reps_completed', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                          />
+                                        </div>
+                                        <div className="acc-field">
+                                          <span className="acc-field-label">Wt</span>
+                                          <input
+                                            type="number"
+                                            value={ac.weight ?? ''}
+                                            onChange={e => setAccessoryEntry(key, 'weight', e.target.value ? parseFloat(e.target.value) : undefined)}
+                                          />
+                                        </div>
+                                        <div className="acc-field">
+                                          <span className="acc-field-label">Hold (s)</span>
+                                          <input
+                                            type="number"
+                                            value={ac.hold_seconds ?? ''}
+                                            onChange={e => setAccessoryEntry(key, 'hold_seconds', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                          />
+                                        </div>
+                                        <div className="acc-field">
+                                          <span className="acc-field-label">Dist</span>
+                                          <input
+                                            type="number"
+                                            value={ac.distance ?? ''}
+                                            onChange={e => setAccessoryEntry(key, 'distance', e.target.value ? parseFloat(e.target.value) : undefined)}
+                                          />
+                                        </div>
+                                        <div className="acc-field">
+                                          <span className="acc-field-label">RPE</span>
+                                          <select
+                                            value={ac.rpe ?? ''}
+                                            onChange={e => setAccessoryEntry(key, 'rpe', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                                          >
+                                            <option value=""></option>
+                                            {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
+                                          </select>
+                                        </div>
                                       </div>
                                       </>
                                       )}
