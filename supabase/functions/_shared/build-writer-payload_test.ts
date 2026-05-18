@@ -367,6 +367,44 @@ Deno.test("buildWriterPayload(qualifier_linked): all_results[].result work/power
   }
 });
 
+Deno.test("buildWriterPayload(qualifier_linked): power_profile passes through with cell null pattern", async () => {
+  installFetchStub(FIXTURE_QUALIFIER_LINKED.bundle);
+  try {
+    const supa = makeStubSupa({ profileRow: FIXTURE_QUALIFIER_LINKED.profileRow });
+    const payload = await buildWriterPayload(supa, "u");
+    assert(payload.competition !== null);
+    const pp = payload.competition!.power_profile;
+    assert(pp !== null, "power_profile should pass through from bundle");
+    assertEquals(pp!.body_mass_basis, "default_84m_64w");
+    assertEquals(pp!.overall.avg_power_watts, 245);
+    assertEquals(pp!.overall.cohort_percentile, 92.0);
+    // M cell has zero results — computed fields null, n_results 0.
+    assertEquals(pp!.by_modality.M.n_results, 0);
+    assertEquals(pp!.by_modality.M.avg_power_watts, null);
+    assertEquals(pp!.by_modality.M.cohort_percentile, null);
+    // mixed cell has data — computed fields populated.
+    assertEquals(pp!.by_modality.mixed.n_results, 9);
+    assertEquals(pp!.by_modality.mixed.avg_power_watts, 252);
+    // Trend + peak round-trip.
+    assertEquals(pp!.watts_trend.direction, "improving");
+    assertEquals(pp!.peak_power_result.workout_name, "23.1");
+  } finally {
+    restoreFetch();
+  }
+});
+
+Deno.test("buildWriterPayload(games_linked): bundle without power_profile → competition.power_profile is null", async () => {
+  installFetchStub(FIXTURE_GAMES_LINKED.bundle);
+  try {
+    const supa = makeStubSupa({ profileRow: FIXTURE_GAMES_LINKED.profileRow });
+    const payload = await buildWriterPayload(supa, "u");
+    assert(payload.competition !== null);
+    assertEquals(payload.competition!.power_profile, null);
+  } finally {
+    restoreFetch();
+  }
+});
+
 Deno.test("buildWriterPayload(games_linked): all_results[].result with null work/power (couldn't-compute branch)", async () => {
   installFetchStub(FIXTURE_GAMES_LINKED.bundle);
   try {

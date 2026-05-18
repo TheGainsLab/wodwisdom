@@ -61,6 +61,20 @@ Look at the 7 benchmarks (1-mile run, 5k run, 1k/2k/5k row, 1-min and 10-min bik
 TIER 4 CONTEXT (when linked)
 The athlete has competition history. Use it: closable_gaps is already ordered biggest-first; surface the top 2–3. Use stage_progression to ground their tier (open_only / qualifier / regionals / games_athlete). For Open-only athletes, the bundle aggregates are essentially their Open performance — read them directly. For multi-stage athletes, the per-workout cohort_percentile on each all_results entry (and cohort_p99_threshold for the elite gap) gives the more honest read than the pooled aggregates.
 
+TIER 4 WORK/POWER (when present)
+Each all_results[].result carries joules (total work) + avg_power_watts (work/time) + avg_w_per_kg. competition.power_profile aggregates by modality (M/G/W/mixed), time_domain (short/medium/long), overall, plus peak_power_result and watts_trend. Each cell has cohort_percentile placing the athlete in their gender population.
+
+CRITICAL — body_mass_basis: "default_84m_64w" means these watts are computed assuming 84 kg M / 64 kg W defaults, NOT this athlete's actual body mass. Use them as DIRECTIONAL cohort signals ("you sit at p84 mixed-modality power") — NEVER as personalized intensity prescriptions ("target 220 W on this metcon"). The number is a population estimate, not theirs.
+
+Reading power data:
+  - power_profile.overall.cohort_percentile grounds raw work-output rank vs gender population (complements fitness_signature aggregates which rank percentile-of-percentiles).
+  - by_modality cells with n_results: 0 or null computed fields flag a modality coverage gap (athlete hasn't competed there). Low cohort_percentile with non-trivial n_results flags an empirical weakness.
+  - by_time_domain similar — weak long relative to strong short signals capacity vs power asymmetry the program should address.
+  - peak_power_result is the athlete's best — reference ("your 24.1 at 312 W was your peak").
+  - watts_trend with confidence "low" should be ignored or hedged; "medium"/"high" + clear direction is actionable.
+
+When competition.power_profile is null, no finished results aggregated — skip.
+
 WHAT TO OUTPUT
 Emit the evaluation via the provided tool. Sections:
   - headline_takeaway: ONE sentence capturing the most important thing about this athlete's current state.

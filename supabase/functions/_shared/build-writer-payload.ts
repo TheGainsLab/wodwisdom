@@ -95,6 +95,10 @@ export interface CompetitionPayload {
   all_results?: NonNullable<Tier4Bundle["all_results"]>;
   movement_competency: NonNullable<Tier4Bundle["movement_competency"]>;
   fitness_signature: NonNullable<Tier4Bundle["fitness_signature"]>;
+  /** Server-side aggregations of athlete's per-result work/power (bundle 1.8.0,
+   *  upstream sql/134). null when the upstream couldn't compute (zero finished
+   *  results in the underlying pool, unlinked, or 1.8.0 not yet served). */
+  power_profile: NonNullable<Tier4Bundle["power_profile"]> | null;
 }
 
 export interface PreviousCycleSummary {
@@ -217,6 +221,7 @@ function sliceTier4Bundle(bundle: Tier4Bundle, includeAllResults: boolean): Comp
         time_domain: {},
       },
     },
+    power_profile: bundle.power_profile ?? null,
   };
   if (includeAllResults) {
     sliced.all_results = bundle.all_results ?? [];
@@ -330,7 +335,7 @@ export async function buildWriterPayload(
   // upstream error (matches fetchTier4Bundle's existing contract).
   let competition: CompetitionPayload | null = null;
   if (profile.competition_athlete_id) {
-    const tier4Include = ["competency", "signature"];
+    const tier4Include = ["competency", "signature", "power_profile"];
     if (includeAllResults) tier4Include.unshift("all_results");
     const bundle = await fetchTier4Bundle(profile.competition_athlete_id, {
       include: tier4Include,

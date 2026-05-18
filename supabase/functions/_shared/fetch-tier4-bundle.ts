@@ -164,17 +164,22 @@ export interface Tier4AllResultsEntry {
  * by_stage was deliberately omitted from v1 (by_modality + by_time_domain
  * carry the direct programming signal); on roadmap as ?include=power_profile.by_stage.
  */
+/**
+ * When `n_results: 0` (athlete has no finished results in this slice), the
+ * three computed fields are null — same couldn't-compute pattern as
+ * per-result joules/avg_power_watts. Cell key is always present.
+ */
 export interface Tier4PowerProfileCell {
-  avg_power_watts: number;
-  avg_w_per_kg: number;
+  avg_power_watts: number | null;
+  avg_w_per_kg: number | null;
   n_results: number;
-  cohort_percentile: number;
+  cohort_percentile: number | null;
 }
 
 export interface Tier4PowerProfileOverall {
-  avg_power_watts: number;
-  avg_w_per_kg: number;
-  cohort_percentile: number;
+  avg_power_watts: number | null;
+  avg_w_per_kg: number | null;
+  cohort_percentile: number | null;
   /** Equal-weighted basis for the overall avg; consumers wanting a different
    *  weighting (recent-only, comp-tier-only) roll up by_* cells themselves. */
   n_results: number;

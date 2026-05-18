@@ -527,6 +527,50 @@ export const FIXTURE_QUALIFIER_LINKED: ProfileFixture = {
       { movement: "ring muscle-up", gap_signal: "likely_has", n_workouts: 3 },
       { movement: "handstand walk", gap_signal: "likely_has", n_workouts: 2 },
     ],
+    // Illustrative power_profile (bundle 1.8.0 / sql/134). Shape mirrors the
+    // smoke-tested response from 2026-05-18 including the null-when-empty
+    // cell pattern. Numbers are not real-athlete data.
+    power_profile: {
+      body_mass_basis: "default_84m_64w",
+      computed_from_n_results: 50,
+      computed_from_n_finished: 16,
+      n_skipped_amrap_no_rounds: 13,
+      n_skipped_capped_no_finish: 0,
+      overall: {
+        avg_power_watts: 245,
+        avg_w_per_kg: 2.92,
+        cohort_percentile: 92.0,
+        n_results: 16,
+      },
+      by_modality: {
+        G: { avg_power_watts: 220, avg_w_per_kg: 2.62, n_results: 4, cohort_percentile: 90.5 },
+        M: { avg_power_watts: null, avg_w_per_kg: null, n_results: 0, cohort_percentile: null },
+        W: { avg_power_watts: 235, avg_w_per_kg: 2.80, n_results: 3, cohort_percentile: 88.0 },
+        mixed: { avg_power_watts: 252, avg_w_per_kg: 3.00, n_results: 9, cohort_percentile: 93.2 },
+      },
+      by_time_domain: {
+        short: { avg_power_watts: 295, avg_w_per_kg: 3.51, n_results: 6, cohort_percentile: 94.5 },
+        medium: { avg_power_watts: 230, avg_w_per_kg: 2.74, n_results: 8, cohort_percentile: 90.0 },
+        long: { avg_power_watts: 195, avg_w_per_kg: 2.32, n_results: 2, cohort_percentile: 82.0 },
+      },
+      peak_power_result: {
+        competition_workout_id: "fixture-23-1",
+        workout_name: "23.1",
+        stage: "open",
+        season: 2023,
+        avg_power_watts: 340,
+        avg_w_per_kg: 4.05,
+        cohort_percentile: 97.5,
+      },
+      watts_trend: {
+        direction: "improving",
+        slope_watts_per_year: 12.4,
+        from_year: 2020,
+        to_year: 2024,
+        n_results_basis: 14,
+        confidence: "medium",
+      },
+    },
     fitness_signature: {
       closable_gaps: [
         {

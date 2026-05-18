@@ -54,6 +54,19 @@ For the skill-focus field on Skills days, score every candidate movement:
 
 Family-max rule: HSPU / Pull-Up / Muscle-Up / Rope Climb families share one growth axis. Take the max priority across variants; program the variant with the gap.
 
+TIER 4 WORK/POWER (when present)
+competition.power_profile aggregates the athlete's per-result work output by modality (M/G/W/mixed) and time_domain (short/medium/long), plus overall and peak_power_result. Each cell has avg_power_watts + cohort_percentile.
+
+CRITICAL — body_mass_basis: "default_84m_64w" means watts are computed at default 84 kg M / 64 kg W, NOT this athlete's actual body mass. Use them as DIRECTIONAL cohort signals — NEVER as personalized intensity targets in metcon_focus or strength_scheme. Never write "target 220 W" or similar; the number is a population estimate, not theirs.
+
+Using power data for structural decisions:
+  - by_modality cell with n_results: 0 or low cohort_percentile → modality coverage/competence gap. Weight metcon_focus distribution across the 4-week arc to surface that modality.
+  - by_time_domain cell with low cohort_percentile relative to the others → time-domain weakness. Weight metcon time domains in skeleton accordingly.
+  - power_profile.overall.cohort_percentile augments fitness_signature for prioritization.
+  - watts_trend with confidence "medium"/"high" + clear direction informs deload placement and arc shape; ignore "low".
+
+When competition.power_profile is null, skip.
+
 Track A (priority ≥ 4, capped at top 5 across the cycle) → dedicated Skills-block focus.
 Track B (Critical/High freq + advanced + empirical_weakness < 2) → maintenance touches; these don't always need a dedicated Skills slot — they can be folded into warm-ups, accessory, or metcons in the fill call.
 
