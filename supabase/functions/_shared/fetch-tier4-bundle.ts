@@ -270,22 +270,27 @@ export interface StagePowerCurve {
 // ---- catalog (GET /workouts) cohort distributions (bundle 1.7.0) ----
 
 /**
- * Cohort distribution of work + power for a single catalog workout. Computed
- * upstream at default body mass (84 kg M / 64 kg W) — same caveat as
- * Tier4AllResultsEntry.result.body_mass_basis. Exposed on /workouts catalog
- * entries (upstream sql/132); lets consumers place an athlete's per-result
- * work/power against the field without a separate placement call.
+ * Cohort work + power for a single catalog workout. Computed upstream at
+ * default body mass (84 kg M / 64 kg W) — same caveat as
+ * Tier4AllResultsEntry.result.body_mass_basis. Exposed on /workouts/{id}
+ * catalog entries (upstream sql/132 + sql/137 endpoint wiring, shipped
+ * 2026-05-19).
  *
- * `n` is the count of athlete results underlying the distribution — surface
- * to users as "based on X athletes" trust signals.
+ * `joules` is a SCALAR: for a fixed catalog prescription (reps × loads) the
+ * total work done is the same for every athlete who completes the workout.
+ * The athlete-varying piece is TIME, which is why avg_power_watts and
+ * avg_w_per_kg ship as p50/p90/p99 distributions.
+ *
+ * `n` is the count of athlete results underlying the watts/w_per_kg
+ * distributions — surface to users as "based on X athletes" trust signals.
  *
  * Colocated with the bundle types for now; move to a dedicated
- * catalog-types module when Phase 2 wires the join in build-writer-payload.
+ * catalog-types module when benchmark-replacement wires the join.
  */
 export interface CatalogCohortWorkPower {
   body_mass_basis: "default_84m_64w";
   n: number;
-  joules: { p50: number; p90: number; p99: number };
+  joules: number;
   avg_power_watts: { p50: number; p90: number; p99: number };
   avg_w_per_kg: { p50: number; p90: number; p99: number };
 }
