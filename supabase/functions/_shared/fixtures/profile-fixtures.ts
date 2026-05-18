@@ -771,6 +771,13 @@ export const FIXTURE_GAMES_LINKED: ProfileFixture = {
           worldwide_n: 320000,
           cohort_p99_threshold: 252,
           cohort_p99_threshold_unit: "time",
+          // body_mass_basis is unconditional on bundle 1.7.0 results; this
+          // fixture leaves the computed values null to exercise the "couldn't
+          // compute" branch (capped / AMRAP-no-rounds / non-time scoring).
+          joules: null,
+          avg_power_watts: null,
+          avg_w_per_kg: null,
+          body_mass_basis: "default_84m_64w",
         },
       },
     ],

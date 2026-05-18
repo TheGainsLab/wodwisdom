@@ -367,18 +367,20 @@ Deno.test("buildWriterPayload(qualifier_linked): all_results[].result work/power
   }
 });
 
-Deno.test("buildWriterPayload(games_linked): all_results[].result without work/power → fields absent, no crash", async () => {
+Deno.test("buildWriterPayload(games_linked): all_results[].result with null work/power (couldn't-compute branch)", async () => {
   installFetchStub(FIXTURE_GAMES_LINKED.bundle);
   try {
     const supa = makeStubSupa({ profileRow: FIXTURE_GAMES_LINKED.profileRow });
     const payload = await buildWriterPayload(supa, "u");
     assert(payload.competition !== null);
     const first = payload.competition!.all_results![0].result;
-    assertEquals(first.joules, undefined);
-    assertEquals(first.avg_power_watts, undefined);
-    assertEquals(first.avg_w_per_kg, undefined);
-    assertEquals(first.body_mass_basis, undefined);
-    // Pre-existing 1.6.0 field still present — proves optionality is per-field.
+    // Computed fields null per upstream contract (capped / AMRAP-no-rounds /
+    // non-modeled). body_mass_basis is unconditional and always present.
+    assertEquals(first.joules, null);
+    assertEquals(first.avg_power_watts, null);
+    assertEquals(first.avg_w_per_kg, null);
+    assertEquals(first.body_mass_basis, "default_84m_64w");
+    // Pre-existing 1.6.0 field still present alongside the new ones.
     assertEquals(first.cohort_p99_threshold, 252);
   } finally {
     restoreFetch();

@@ -132,17 +132,20 @@ export interface Tier4AllResultsEntry {
     // cataloged or the segment is too thin to compute a p99.
     cohort_p99_threshold?: number | null;
     cohort_p99_threshold_unit?: "time" | "reps" | "load_lbs" | "distance" | null;
-    // Bundle 1.7.0 (designed 2026-05-17; shipping in upstream sql/133). Work
-    // + power are population estimates computed at default body mass
-    // (84 kg M / 64 kg W) for scraped competitors — NOT this specific
-    // athlete's actual output. `body_mass_basis` disambiguates so consumers
-    // don't treat them as personalized. Per-movement breakdown (by_movement)
-    // was deferred from v1 to keep bundle size down; will land as opt-in
-    // ?include=movements_in_results if demand emerges.
-    joules?: number;
-    avg_power_watts?: number;
-    avg_w_per_kg?: number;
-    body_mass_basis?: "default_84m_64w";
+    // Bundle 1.7.0 (upstream sql/133, deployed 2026-05-18). Work + power are
+    // population estimates computed at default body mass (84 kg M / 64 kg W)
+    // for scraped competitors — NOT this specific athlete's actual output.
+    // `body_mass_basis` disambiguates so consumers don't treat them as
+    // personalized; it's unconditional (hardcoded in the SQL function),
+    // safe to type as required. joules/watts/w_per_kg are nullable: null
+    // when the workout isn't fully_modeled, the result is AMRAP-without-
+    // rounds / capped / load / distance, or score_seconds is missing.
+    // Per-movement breakdown was deferred from v1 (payload bloat); will
+    // land as opt-in ?include=movements_in_results if demand emerges.
+    joules: number | null;
+    avg_power_watts: number | null;
+    avg_w_per_kg: number | null;
+    body_mass_basis: "default_84m_64w";
   };
 }
 
