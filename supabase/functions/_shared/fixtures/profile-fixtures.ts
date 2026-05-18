@@ -513,6 +513,12 @@ export const FIXTURE_QUALIFIER_LINKED: ProfileFixture = {
           worldwide_n: 320000,
           cohort_p99_threshold: 280,
           cohort_p99_threshold_unit: "reps",
+          // Illustrative work/power (bundle 1.7.0 fields, upstream sql/133).
+          // Numbers are not real-athlete data. avg_w_per_kg = 220 / 84 ≈ 2.62.
+          joules: 158000,
+          avg_power_watts: 220,
+          avg_w_per_kg: 2.62,
+          body_mass_basis: "default_84m_64w",
         },
       },
     ],

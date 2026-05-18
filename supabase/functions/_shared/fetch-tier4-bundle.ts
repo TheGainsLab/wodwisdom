@@ -132,7 +132,154 @@ export interface Tier4AllResultsEntry {
     // cataloged or the segment is too thin to compute a p99.
     cohort_p99_threshold?: number | null;
     cohort_p99_threshold_unit?: "time" | "reps" | "load_lbs" | "distance" | null;
+    // Bundle 1.7.0 (designed 2026-05-17; shipping in upstream sql/133). Work
+    // + power are population estimates computed at default body mass
+    // (84 kg M / 64 kg W) for scraped competitors — NOT this specific
+    // athlete's actual output. `body_mass_basis` disambiguates so consumers
+    // don't treat them as personalized. Per-movement breakdown (by_movement)
+    // was deferred from v1 to keep bundle size down; will land as opt-in
+    // ?include=movements_in_results if demand emerges.
+    joules?: number;
+    avg_power_watts?: number;
+    avg_w_per_kg?: number;
+    body_mass_basis?: "default_84m_64w";
   };
+}
+
+// ---- power_profile (opt-in via ?include=power_profile, sql/134) ----
+
+/**
+ * Athlete-level work/power aggregations across their result history. Computed
+ * server-side from the same per-result work data as all_results[]; rolled up
+ * by modality, time domain, and overall so consumers don't recompute with
+ * subtly-different weightings.
+ *
+ * Cohort percentiles in each cell answer "where does this athlete rank within
+ * the same gender/division on this slice?" — actionable for programming
+ * decisions.
+ *
+ * by_stage was deliberately omitted from v1 (by_modality + by_time_domain
+ * carry the direct programming signal); on roadmap as ?include=power_profile.by_stage.
+ */
+export interface Tier4PowerProfileCell {
+  avg_power_watts: number;
+  avg_w_per_kg: number;
+  n_results: number;
+  cohort_percentile: number;
+}
+
+export interface Tier4PowerProfileOverall {
+  avg_power_watts: number;
+  avg_w_per_kg: number;
+  cohort_percentile: number;
+  /** Equal-weighted basis for the overall avg; consumers wanting a different
+   *  weighting (recent-only, comp-tier-only) roll up by_* cells themselves. */
+  n_results: number;
+}
+
+export interface Tier4PowerProfilePeak {
+  competition_workout_id: string;
+  workout_name: string;
+  stage: "open" | "quarterfinals" | "semifinals" | "regional" | "games" | string;
+  season: number;
+  avg_power_watts: number;
+  avg_w_per_kg: number;
+  cohort_percentile: number;
+}
+
+export interface Tier4PowerProfileTrend {
+  direction: "improving" | "plateau" | "declining";
+  slope_watts_per_year: number;
+  from_year: number;
+  to_year: number;
+  n_results_basis: number;
+  /** Categorical (hides regression sketchiness from non-stats consumers).
+   *  Derived from n_results_basis + R² of the underlying regression. */
+  confidence: "low" | "medium" | "high";
+}
+
+export interface Tier4PowerProfile {
+  body_mass_basis: "default_84m_64w";
+  computed_from_n_results: number;
+  computed_from_n_finished: number;
+  n_skipped_amrap_no_rounds: number;
+  n_skipped_capped_no_finish: number;
+  overall: Tier4PowerProfileOverall;
+  by_modality: Record<"M" | "G" | "W" | "mixed", Tier4PowerProfileCell>;
+  by_time_domain: Record<"short" | "medium" | "long", Tier4PowerProfileCell>;
+  peak_power_result: Tier4PowerProfilePeak;
+  watts_trend: Tier4PowerProfileTrend;
+}
+
+// ---- stage_power_curve (separate endpoint, upstream sql/135) ----
+
+/**
+ * Population-level power distribution per (stage, gender, time_domain).
+ * Served by GET /v1/reference/stage_power_curve as cacheable reference data,
+ * not per-athlete. Refreshes nightly with the upstream materialized view.
+ *
+ * Used in concert with calc_athlete_work (for AI-generated workouts) to
+ * derive data-grounded median/excellent benchmarks — replaces the hardcoded
+ * PERFORMANCE_FACTORS multipliers in src/lib/metconScoring.ts.
+ *
+ * Six percentiles per cell (p10/p25/p50/p75/p90/p99) so consumers can pick
+ * the right "excellent" anchor for their user level (e.g. p75 for novice
+ * stretch, p90 for advanced).
+ *
+ * Colocated for now; will likely move to a dedicated reference-data module
+ * once additional reference endpoints land.
+ */
+export interface StagePowerCurveCell {
+  p10: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+  p99: number;
+  n: number;
+}
+
+export interface StagePowerCurveStage {
+  men: { short: StagePowerCurveCell; medium: StagePowerCurveCell; long: StagePowerCurveCell };
+  women: { short: StagePowerCurveCell; medium: StagePowerCurveCell; long: StagePowerCurveCell };
+}
+
+export interface StagePowerCurve {
+  /** ISO date stamp of the underlying materialized view refresh. */
+  version: string;
+  body_mass_basis: "default_84m_64w";
+  n_underlying_results: number;
+  cache_ttl_seconds: number;
+  stages: {
+    open: StagePowerCurveStage;
+    quarterfinals: StagePowerCurveStage;
+    regional: StagePowerCurveStage;
+    semifinals: StagePowerCurveStage;
+    games: StagePowerCurveStage;
+  };
+}
+
+// ---- catalog (GET /workouts) cohort distributions (bundle 1.7.0) ----
+
+/**
+ * Cohort distribution of work + power for a single catalog workout. Computed
+ * upstream at default body mass (84 kg M / 64 kg W) — same caveat as
+ * Tier4AllResultsEntry.result.body_mass_basis. Exposed on /workouts catalog
+ * entries (upstream sql/132); lets consumers place an athlete's per-result
+ * work/power against the field without a separate placement call.
+ *
+ * `n` is the count of athlete results underlying the distribution — surface
+ * to users as "based on X athletes" trust signals.
+ *
+ * Colocated with the bundle types for now; move to a dedicated
+ * catalog-types module when Phase 2 wires the join in build-writer-payload.
+ */
+export interface CatalogCohortWorkPower {
+  body_mass_basis: "default_84m_64w";
+  n: number;
+  joules: { p50: number; p90: number; p99: number };
+  avg_power_watts: { p50: number; p90: number; p99: number };
+  avg_w_per_kg: { p50: number; p90: number; p99: number };
 }
 
 // ---- movement_competency (opt-in via ?include=competency, bundle 1.4.0) ----
@@ -196,6 +343,8 @@ export interface Tier4Bundle {
   movement_competency?: Tier4MovementCompetency[];
   // Present only when requested via ?include=signature.
   fitness_signature?: Tier4FitnessSignature;
+  // Present only when requested via ?include=power_profile (upstream sql/134).
+  power_profile?: Tier4PowerProfile;
 }
 
 /**

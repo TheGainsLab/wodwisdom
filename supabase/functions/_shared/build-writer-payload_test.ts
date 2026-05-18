@@ -348,6 +348,44 @@ Deno.test("buildWriterPayload(qualifier_linked): tier4 fetch 404 → competition
 });
 
 // ============================================================
+// Tier 4 slice: work/power fields (bundle 1.7.0, designed not yet shipped)
+// ============================================================
+
+Deno.test("buildWriterPayload(qualifier_linked): all_results[].result work/power round-trips when present", async () => {
+  installFetchStub(FIXTURE_QUALIFIER_LINKED.bundle);
+  try {
+    const supa = makeStubSupa({ profileRow: FIXTURE_QUALIFIER_LINKED.profileRow });
+    const payload = await buildWriterPayload(supa, "u");
+    assert(payload.competition !== null);
+    const first = payload.competition!.all_results![0].result;
+    assertEquals(first.joules, 158000);
+    assertEquals(first.avg_power_watts, 220);
+    assertEquals(first.avg_w_per_kg, 2.62);
+    assertEquals(first.body_mass_basis, "default_84m_64w");
+  } finally {
+    restoreFetch();
+  }
+});
+
+Deno.test("buildWriterPayload(games_linked): all_results[].result without work/power → fields absent, no crash", async () => {
+  installFetchStub(FIXTURE_GAMES_LINKED.bundle);
+  try {
+    const supa = makeStubSupa({ profileRow: FIXTURE_GAMES_LINKED.profileRow });
+    const payload = await buildWriterPayload(supa, "u");
+    assert(payload.competition !== null);
+    const first = payload.competition!.all_results![0].result;
+    assertEquals(first.joules, undefined);
+    assertEquals(first.avg_power_watts, undefined);
+    assertEquals(first.avg_w_per_kg, undefined);
+    assertEquals(first.body_mass_basis, undefined);
+    // Pre-existing 1.6.0 field still present — proves optionality is per-field.
+    assertEquals(first.cohort_p99_threshold, 252);
+  } finally {
+    restoreFetch();
+  }
+});
+
+// ============================================================
 // training_context: clamping + free-text passthrough
 // ============================================================
 
