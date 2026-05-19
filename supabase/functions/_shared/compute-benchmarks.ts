@@ -28,8 +28,6 @@
 
 import type { StagePowerCurve, StagePowerCurveCell } from "./fetch-tier4-bundle.ts";
 import { getStagePowerCurve } from "./stage-power-curve-cache.ts";
-import { getWorkCalcMovements } from "./work-calc-movements-cache.ts";
-import { resolveMovementName } from "./movement-resolver.ts";
 
 const WORK_CALC_TIMEOUT_MS = 8_000;
 
@@ -120,35 +118,12 @@ export async function computeBenchmarks(
     );
   }
 
-  // 2a. Resolve free-text movement names → upstream canonical names.
-  // Writer emits creative names ("Power Snatch", "Pushup"); upstream catalog
-  // uses specific canonical strings ("Snatch", "Push-up"). Three-stage cascade:
-  // exact → Olympic alias → trigram fuzzy. Any unresolvable movement kills the
-  // call (caller falls back to PERFORMANCE_FACTORS for that block).
-  const movementsCatalog = await getWorkCalcMovements();
-  if (movementsCatalog === null) {
-    console.warn(`[compute-benchmarks] returning null: getWorkCalcMovements unavailable`);
-    return null;
-  }
-  const resolvedMovements: WorkCalcMovement[] = [];
-  for (const m of input.movements) {
-    const resolution = resolveMovementName(m.movement_name, movementsCatalog.movements);
-    if (resolution === null) {
-      console.warn(
-        `[compute-benchmarks] returning null: movement "${m.movement_name}" couldn't be resolved to a modeled canonical (< 0.85 trigram similarity)`,
-      );
-      return null;
-    }
-    resolvedMovements.push({ ...m, movement_name: resolution.canonical });
-    if (resolution.via !== "exact") {
-      console.log(
-        `[compute-benchmarks] resolved "${m.movement_name}" → "${resolution.canonical}" via ${resolution.via} (similarity=${resolution.similarity.toFixed(2)})`,
-      );
-    }
-  }
-
-  // 2b. Fetch joules from upstream work-calc using resolved canonical names.
-  const joules = await fetchWorkCalcJoules(resolvedMovements, gender);
+  // 2. Fetch joules from upstream work-calc. Upstream's AI resolver (2026-05-19)
+  // handles free-text → canonical name mapping server-side, so we pass the
+  // writer's movement names through unchanged. If a movement can't be resolved
+  // upstream, work-calc returns 404 with suggested_matches and our fetch
+  // helper logs the failure + we fall back to PERFORMANCE_FACTORS.
+  const joules = await fetchWorkCalcJoules(input.movements, gender);
   if (joules === null || joules <= 0) {
     console.warn(`[compute-benchmarks] returning null: fetchWorkCalcJoules failed (specific reason logged above by that fn)`);
     return null;
