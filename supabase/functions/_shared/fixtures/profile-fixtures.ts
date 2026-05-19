@@ -519,6 +519,8 @@ export const FIXTURE_QUALIFIER_LINKED: ProfileFixture = {
           avg_power_watts: 220,
           avg_w_per_kg: 2.62,
           body_mass_basis: "default_84m_64w",
+          // Bundle 1.9.0 — every result carries compute_status now.
+          compute_status: "computed",
         },
       },
     ],
@@ -532,10 +534,12 @@ export const FIXTURE_QUALIFIER_LINKED: ProfileFixture = {
     // cell pattern. Numbers are not real-athlete data.
     power_profile: {
       body_mass_basis: "default_84m_64w",
+      calc_version: "1.9.0",
       computed_from_n_results: 50,
       computed_from_n_finished: 16,
       n_skipped_amrap_no_rounds: 13,
       n_skipped_capped_no_finish: 0,
+      n_skipped_unmodeled: 8,
       overall: {
         avg_power_watts: 245,
         avg_w_per_kg: 2.92,
@@ -817,11 +821,12 @@ export const FIXTURE_GAMES_LINKED: ProfileFixture = {
           cohort_p99_threshold_unit: "time",
           // body_mass_basis is unconditional on bundle 1.7.0 results; this
           // fixture leaves the computed values null to exercise the "couldn't
-          // compute" branch (capped / AMRAP-no-rounds / non-time scoring).
+          // compute" branch. compute_status (bundle 1.9.0) explains why.
           joules: null,
           avg_power_watts: null,
           avg_w_per_kg: null,
           body_mass_basis: "default_84m_64w",
+          compute_status: "skipped_capped_no_finish",
         },
       },
     ],

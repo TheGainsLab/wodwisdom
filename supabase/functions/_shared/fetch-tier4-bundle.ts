@@ -101,7 +101,11 @@ export interface Tier4WorkoutSpec {
   is_dual_scoring: boolean;          // true => finishers scored by time, capped by reps
   time_cap_seconds: number | null;
   rep_target: number | null;
-  time_domain: { bucket: "short" | "mid" | "long" | string; seconds: number | null };
+  // Bundle 1.9.0 (upstream 2026-05-19) normalized the bucket vocabulary to
+  // 3 values matching our `_shared/time-domain.ts` boundaries (8/15 min).
+  // The legacy "mid" literal no longer reaches us — kept the `string` fallback
+  // for forward-compat defensiveness only.
+  time_domain: { bucket: "short" | "medium" | "long" | string; seconds: number | null };
   movements: Tier4WorkoutMovement[];
 }
 
@@ -138,15 +142,55 @@ export interface Tier4AllResultsEntry {
     // `body_mass_basis` disambiguates so consumers don't treat them as
     // personalized; it's unconditional (hardcoded in the SQL function),
     // safe to type as required. joules/watts/w_per_kg are nullable: null
-    // when the workout isn't fully_modeled, the result is AMRAP-without-
-    // rounds / capped / load / distance, or score_seconds is missing.
-    // Per-movement breakdown was deferred from v1 (payload bloat); will
-    // land as opt-in ?include=movements_in_results if demand emerges.
+    // when compute_status != "computed".
     joules: number | null;
     avg_power_watts: number | null;
     avg_w_per_kg: number | null;
     body_mass_basis: "default_84m_64w";
+    // Bundle 1.9.0 (upstream 2026-05-19, sql/140-144). `compute_status`
+    // tells the consumer why the row is computed/skipped — keys are stable
+    // enum members documented at GET /v1/reference/compute_statuses.
+    compute_status: ComputeStatus;
+    // AMRAP-only fields (present when the row decomposed an AMRAP score).
+    amrap_rounds_completed?: number;
+    amrap_partial_reps?: number;
   };
+}
+
+// ---- compute_status (bundle 1.9.0 + /v1/reference/compute_statuses) ----
+
+/**
+ * Why each per-result row produced (or skipped) work/power numbers.
+ * Documented at GET /v1/reference/compute_statuses (cacheable 24h).
+ * Strict union: every value here is enumerated upstream and known to us
+ * at integration time. Add new values via prompt-driven type update when
+ * upstream extends the enum.
+ */
+export type ComputeStatus =
+  | "computed"
+  | "computed_joules_only"
+  | "skipped_unmodeled_movement"
+  | "skipped_variable_rounds"
+  | "skipped_capped_no_finish"
+  | "skipped_invalid_score"
+  | "missing_load";
+
+/**
+ * Reference-dictionary shape from GET /v1/reference/compute_statuses.
+ * Useful for keying UI strings against the enum (each value has a
+ * description + severity + actionable_by hint).
+ */
+export interface ComputeStatusInfo {
+  value: ComputeStatus;
+  description: string;
+  severity: "ok" | "skip";
+  actionable_by: "consumer" | "us";
+}
+
+export interface ComputeStatusesResponse {
+  statuses: ComputeStatusInfo[];
+  calc_version: string;
+  cache_ttl_seconds: number;
 }
 
 // ---- power_profile (opt-in via ?include=power_profile, sql/134) ----
@@ -208,10 +252,17 @@ export interface Tier4PowerProfileTrend {
 
 export interface Tier4PowerProfile {
   body_mass_basis: "default_84m_64w";
+  /** Bundle 1.9.0+ — pins the work-calc + cohort math version. Lets us
+   *  detect when upstream's underlying formulas have changed (cache bust). */
+  calc_version: string;
   computed_from_n_results: number;
   computed_from_n_finished: number;
   n_skipped_amrap_no_rounds: number;
   n_skipped_capped_no_finish: number;
+  /** Bundle 1.9.0+ — count of results skipped because the upstream catalog
+   *  hasn't published a work formula for one of the movements in the result.
+   *  ~30% of catalog movements are still deferred as of v1.9.0. */
+  n_skipped_unmodeled: number;
   overall: Tier4PowerProfileOverall;
   by_modality: Record<"M" | "G" | "W" | "mixed", Tier4PowerProfileCell>;
   by_time_domain: Record<"short" | "medium" | "long", Tier4PowerProfileCell>;
@@ -225,14 +276,20 @@ export interface Tier4PowerProfile {
  * Population-level power distribution per (stage, gender, time_domain).
  * Served by GET /v1/reference/stage_power_curve as cacheable reference data,
  * not per-athlete. Refreshes nightly with the upstream materialized view.
+ * Filtered to Rx only (wr.scaled = 0) and pooled across all years.
  *
- * Used in concert with calc_athlete_work (for AI-generated workouts) to
- * derive data-grounded median/excellent benchmarks — replaces the hardcoded
+ * Used in concert with POST /v1/work/calculate (for AI-generated workouts)
+ * to derive data-grounded median/excellent benchmarks — replaces the hardcoded
  * PERFORMANCE_FACTORS multipliers in src/lib/metconScoring.ts.
  *
  * Six percentiles per cell (p10/p25/p50/p75/p90/p99) so consumers can pick
- * the right "excellent" anchor for their user level (e.g. p75 for novice
- * stretch, p90 for advanced).
+ * the right "excellent" anchor for their user level. Our locked choice
+ * (2026-05-19): Open p50 = median, QF p50 = excellent. Open p90 fallback
+ * when QF cell missing (see below).
+ *
+ * NOTE: cells with n<30 are OMITTED entirely (not nulled — the key just
+ * isn't there). Most likely for women's long-domain QF and some Games
+ * cells. Consumers must handle optional cells with a fallback cascade.
  *
  * Colocated for now; will likely move to a dedicated reference-data module
  * once additional reference endpoints land.
@@ -248,8 +305,16 @@ export interface StagePowerCurveCell {
 }
 
 export interface StagePowerCurveStage {
-  men: { short: StagePowerCurveCell; medium: StagePowerCurveCell; long: StagePowerCurveCell };
-  women: { short: StagePowerCurveCell; medium: StagePowerCurveCell; long: StagePowerCurveCell };
+  men: {
+    short?: StagePowerCurveCell;
+    medium?: StagePowerCurveCell;
+    long?: StagePowerCurveCell;
+  };
+  women: {
+    short?: StagePowerCurveCell;
+    medium?: StagePowerCurveCell;
+    long?: StagePowerCurveCell;
+  };
 }
 
 export interface StagePowerCurve {

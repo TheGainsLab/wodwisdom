@@ -177,3 +177,6 @@ verify_jwt = false
 
 [functions.competition-placement]
 verify_jwt = false
+
+[functions.compute-benchmarks]
+verify_jwt = false

@@ -362,6 +362,8 @@ Deno.test("buildWriterPayload(qualifier_linked): all_results[].result work/power
     assertEquals(first.avg_power_watts, 220);
     assertEquals(first.avg_w_per_kg, 2.62);
     assertEquals(first.body_mass_basis, "default_84m_64w");
+    // Bundle 1.9.0 — every result carries compute_status.
+    assertEquals(first.compute_status, "computed");
   } finally {
     restoreFetch();
   }
@@ -376,6 +378,9 @@ Deno.test("buildWriterPayload(qualifier_linked): power_profile passes through wi
     const pp = payload.competition!.power_profile;
     assert(pp !== null, "power_profile should pass through from bundle");
     assertEquals(pp!.body_mass_basis, "default_84m_64w");
+    // Bundle 1.9.0 — calc_version + n_skipped_unmodeled.
+    assertEquals(pp!.calc_version, "1.9.0");
+    assertEquals(pp!.n_skipped_unmodeled, 8);
     assertEquals(pp!.overall.avg_power_watts, 245);
     assertEquals(pp!.overall.cohort_percentile, 92.0);
     // M cell has zero results — computed fields null, n_results 0.
@@ -418,6 +423,8 @@ Deno.test("buildWriterPayload(games_linked): all_results[].result with null work
     assertEquals(first.avg_power_watts, null);
     assertEquals(first.avg_w_per_kg, null);
     assertEquals(first.body_mass_basis, "default_84m_64w");
+    // Bundle 1.9.0 — compute_status explains why the work fields are null.
+    assertEquals(first.compute_status, "skipped_capped_no_finish");
     // Pre-existing 1.6.0 field still present alongside the new ones.
     assertEquals(first.cohort_p99_threshold, 252);
   } finally {
