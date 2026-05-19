@@ -252,9 +252,11 @@ function capitalizeWords(s: string): string {
 function inferWorkoutType(blocks: Block[]): string {
   const metcon = blocks.find(b => b.type === 'metcon');
   if (metcon) {
-    const t = metcon.text.toUpperCase();
-    if (/AMRAP|AS MANY ROUNDS/.test(t)) return 'amrap';
-    if (/EMOM|E\d+MOM/.test(t)) return 'emom';
+    // v3 blocks put structural metadata ("EMOM 15", "AMRAP 12", "4 rounds for
+    // time") in b.scheme rather than b.text. Combine both so the regexes catch.
+    const combined = [metcon.scheme, metcon.text].filter(Boolean).join('\n').toUpperCase();
+    if (/AMRAP|AS MANY ROUNDS/.test(combined)) return 'amrap';
+    if (/EMOM|E\d+MOM/.test(combined)) return 'emom';
     return 'for_time';
   }
   if (blocks.some(b => b.type === 'strength')) return 'strength';
