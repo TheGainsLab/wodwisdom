@@ -335,19 +335,32 @@ Deno.serve(async (req) => {
     let autoCompleted = false;
     const sourceId = body.source_id ?? null;
     if (sourceId && preExistingStatus !== "completed") {
-      // Count saved blocks for this log (exclude warm-up/cool-down)
+      // Count saved blocks for this log (exclude warm-up/mobility/cool-down)
       const { count: savedCount } = await supa
         .from("workout_log_blocks")
         .select("id", { count: "exact", head: true })
         .eq("log_id", logId)
-        .not("block_type", "in", '("warm-up","cool-down")');
+        .not("block_type", "in", '("warm-up","mobility","cool-down")');
 
-      // Count total program blocks for this workout (exclude warm-up/cool-down)
+      // Resolve program version so we count totals from the right table.
+      // v3 programs store blocks in program_blocks_v2; v1 in program_workout_blocks.
+      const { data: workoutRow } = await supa
+        .from("program_workouts")
+        .select("program_id, programs:programs!inner(program_version)")
+        .eq("id", sourceId)
+        .maybeSingle();
+      const programVersion =
+        (workoutRow as { programs?: { program_version?: string } } | null)
+          ?.programs?.program_version ?? null;
+      const totalsTable =
+        programVersion === "v3" ? "program_blocks_v2" : "program_workout_blocks";
+
+      // Count total program blocks for this workout (exclude warm-up/mobility/cool-down)
       const { count: totalCount } = await supa
-        .from("program_workout_blocks")
+        .from(totalsTable)
         .select("id", { count: "exact", head: true })
         .eq("program_workout_id", sourceId)
-        .not("block_type", "in", '("warm-up","cool-down")');
+        .not("block_type", "in", '("warm-up","mobility","cool-down")');
 
       if (
         savedCount != null &&

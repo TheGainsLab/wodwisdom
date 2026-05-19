@@ -410,8 +410,14 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                       <div key={wi} className="program-week-group">
                         <div className="program-week-label">Week {week.weekNum}</div>
                         {week.days.map((w) => {
-                          const done = completedWorkoutIds.has(w.id);
-                          const ip = inProgressWorkouts.get(w.id);
+                          const rawIp = inProgressWorkouts.get(w.id);
+                          // Treat an in-progress log whose savedCount has reached
+                          // totalBlocks as completed in the UI, even if the server
+                          // hasn't flipped status yet (covers existing logs from
+                          // before the save-workout-block auto-complete fix).
+                          const allBlocksSaved = !!rawIp && rawIp.totalBlocks > 0 && rawIp.savedCount >= rawIp.totalBlocks;
+                          const done = completedWorkoutIds.has(w.id) || allBlocksSaved;
+                          const ip = done ? undefined : rawIp;
                           const isExpanded = expandedDays.has(w.id);
                           return (
                             <div key={w.id} className={`program-day-row${done ? ' program-day-completed' : ip ? ' program-day-in-progress' : ''}`}>
