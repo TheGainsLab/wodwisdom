@@ -258,14 +258,16 @@ function calculateForTimeBenchmarks(
 }
 
 /**
- * Calculate benchmarks for a metcon block.
+ * Local-only benchmark calculation using the hardcoded PERFORMANCE_FACTORS
+ * multipliers and the work_rate table. The FALLBACK path — primary scoring
+ * runs through `calculateBenchmarks` (async), which tries the cohort-derived
+ * compute-benchmarks edge function first and only falls back to this local
+ * math on network/upstream failures.
  *
- * @param entries  - Structured movement entries for the metcon
- * @param workoutType - 'amrap', 'for_time', or 'emom'
- * @param blockText - Raw block text (used to extract AMRAP time cap)
- * @param workRates - Movement work rate data from the movements table
+ * Kept exported so synchronous initial renders can display a value while
+ * the async cohort calculation is in flight.
  */
-export function calculateBenchmarks(
+export function calculateBenchmarksLocal(
   entries: MetconEntry[],
   workoutType: string,
   blockText: string,
@@ -286,6 +288,29 @@ export function calculateBenchmarks(
 
   // EMOM and other formats: no scoring for now
   return { medianScore: '--', excellentScore: '--' };
+}
+
+/**
+ * Primary entry point — async. Tries the cohort-derived compute-benchmarks
+ * edge function first; on any failure (network, upstream unavailable,
+ * unknown movement, validation error), falls back to `calculateBenchmarksLocal`.
+ *
+ * @param entries  - Structured movement entries for the metcon
+ * @param workoutType - 'amrap', 'for_time', or 'emom'
+ * @param blockText - Raw block text (used to extract AMRAP time cap)
+ * @param workRates - Movement work rate data — used only by the local fallback
+ */
+export async function calculateBenchmarks(
+  entries: MetconEntry[],
+  workoutType: string,
+  blockText: string,
+  workRates: MovementWorkRate[]
+): Promise<BenchmarkResult> {
+  // Lazy-import to avoid a circular dependency at module-init time.
+  const { computeBenchmarksClient } = await import('./computeBenchmarksClient');
+  const fromEdge = await computeBenchmarksClient(entries, workoutType, blockText);
+  if (fromEdge !== null) return fromEdge;
+  return calculateBenchmarksLocal(entries, workoutType, blockText, workRates);
 }
 
 // ─── Percentile calculation ───────────────────────────────────────────

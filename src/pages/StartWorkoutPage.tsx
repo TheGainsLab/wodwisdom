@@ -7,6 +7,7 @@ import Nav from '../components/Nav';
 import { BlockContent } from '../components/WorkoutBlocksDisplay';
 import {
   calculateBenchmarks,
+  calculateBenchmarksLocal,
   scoreMetcon,
   deriveTimeDomain,
   type MovementWorkRate,
@@ -1041,8 +1042,15 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     });
   };
 
-  // Reactively compute benchmarks per metcon block
-  const blockBenchmarks = useMemo<Record<number, BenchmarkResult>>(() => {
+  // Reactively compute benchmarks per metcon block.
+  // Two-pass for smooth UX:
+  //   1. Synchronous initial render uses calculateBenchmarksLocal (the
+  //      PERFORMANCE_FACTORS fallback) so block cards show numbers immediately.
+  //   2. Async useEffect calls calculateBenchmarks (cohort-derived via
+  //      compute-benchmarks edge fn) and swaps the values in when they
+  //      resolve. On edge-fn failure, calculateBenchmarks itself falls back
+  //      to the local math, so the swap is a no-op.
+  const localBenchmarks = useMemo<Record<number, BenchmarkResult>>(() => {
     const result: Record<number, BenchmarkResult> = {};
     if (workRates.length === 0) return result;
     blocks.forEach((b, bi) => {
@@ -1052,10 +1060,43 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
       if (mvKeys.length === 0) return;
       const entries = mvKeys.map(k => metconEntries[k]).filter(Boolean);
       const wType = inferWorkoutType([b]);
-      result[bi] = calculateBenchmarks(entries, wType, b.text, workRates);
+      result[bi] = calculateBenchmarksLocal(entries, wType, b.text, workRates);
     });
     return result;
   }, [blocks, metconEntries, workRates]);
+
+  const [cohortBenchmarks, setCohortBenchmarks] = useState<Record<number, BenchmarkResult>>({});
+
+  useEffect(() => {
+    if (workRates.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const next: Record<number, BenchmarkResult> = {};
+      for (let bi = 0; bi < blocks.length; bi++) {
+        const b = blocks[bi];
+        if (b.type !== 'metcon') continue;
+        const mvKeys = Object.keys(metconEntries)
+          .filter(k => k.startsWith(`${bi}-m`));
+        if (mvKeys.length === 0) continue;
+        const entries = mvKeys.map(k => metconEntries[k]).filter(Boolean);
+        const wType = inferWorkoutType([b]);
+        const result = await calculateBenchmarks(entries, wType, b.text, workRates);
+        if (cancelled) return;
+        next[bi] = result;
+        // Stream updates as each block resolves so the first metcon shows
+        // its cohort number before the later ones finish.
+        setCohortBenchmarks((prev) => ({ ...prev, [bi]: result }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [blocks, metconEntries, workRates]);
+
+  // Cohort values win where available; local fallback fills the gaps during
+  // the brief async window or on edge-fn failure paths.
+  const blockBenchmarks = useMemo<Record<number, BenchmarkResult>>(
+    () => ({ ...localBenchmarks, ...cohortBenchmarks }),
+    [localBenchmarks, cohortBenchmarks],
+  );
 
   /** Build a single block's log payload from current form state */
   const buildBlockPayload = (bi: number) => {
