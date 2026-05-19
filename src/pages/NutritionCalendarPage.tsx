@@ -92,17 +92,6 @@ export default function NutritionCalendarPage({ session }: { session: Session })
     ? Math.round(Object.values(daySummaries).reduce((s, d) => s + d.total_calories, 0) / daysLogged)
     : 0;
 
-  // Streak
-  let streak = 0;
-  if (isCurrentMonth) {
-    for (let d = today.getDate(); d >= 1; d--) {
-      const key = toKey(year, month, d);
-      if (daySummaries[key]) streak++;
-      else if (d < today.getDate()) break;
-      else break;
-    }
-  }
-
   const selected = selectedDate ? daySummaries[selectedDate] : null;
 
   if (!entLoading && !hasFeature('nutrition')) {
@@ -188,12 +177,6 @@ export default function NutritionCalendarPage({ session }: { session: Session })
                     <span className="wc-stat-value">{avgCalories}</span>
                     <span className="wc-stat-label">avg cal</span>
                   </div>
-                  {isCurrentMonth && streak > 0 && (
-                    <div className="wc-stat">
-                      <span className="wc-stat-value">{streak}</span>
-                      <span className="wc-stat-label">day streak</span>
-                    </div>
-                  )}
                 </div>
 
                 {/* Day detail */}

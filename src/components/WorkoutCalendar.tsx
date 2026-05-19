@@ -53,17 +53,6 @@ export default function WorkoutCalendar({ workoutCounts, selectedDate, onDayClic
   const totalThisMonth = monthWorkouts.reduce((s, n) => s + n, 0);
   const activeDays = monthWorkouts.filter(n => n > 0).length;
 
-  // Calculate streak (consecutive days ending at today or most recent workout day)
-  let streak = 0;
-  if (isCurrentMonth) {
-    for (let d = today.getDate(); d >= 1; d--) {
-      const key = toKey(year, month, d);
-      if (workoutCounts[key]) streak++;
-      else if (d < today.getDate()) break; // allow today to be missing (day not over yet)
-      else break;
-    }
-  }
-
   return (
     <div className="wc-container">
       <div className="wc-header">
@@ -113,12 +102,6 @@ export default function WorkoutCalendar({ workoutCounts, selectedDate, onDayClic
           <span className="wc-stat-value">{activeDays}</span>
           <span className="wc-stat-label">active days</span>
         </div>
-        {isCurrentMonth && streak > 0 && (
-          <div className="wc-stat">
-            <span className="wc-stat-value">{streak}</span>
-            <span className="wc-stat-label">day streak</span>
-          </div>
-        )}
       </div>
     </div>
   );
