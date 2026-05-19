@@ -393,6 +393,17 @@ interface InsertedWorkout {
 }
 
 /**
+ * Round a prescribed weight to plate math so the writer's odd numbers
+ * (e.g. 208 lb) snap to a liftable bar. lbs → nearest 5, kg → nearest 2.5.
+ * Null weights (bodyweight, distance/time-only) pass through.
+ */
+function roundToPlateMath(w: number | null, unit: string | null): number | null {
+  if (w == null) return null;
+  const step = unit === 'kg' ? 2.5 : 5;
+  return Math.round(w / step) * step;
+}
+
+/**
  * Build a per-block intent object from the skeleton day's metadata.
  * Each block type carries the slice of skeleton reasoning that shaped it.
  * Used by Coach for sharper Training Intent + by future analytics.
@@ -526,7 +537,7 @@ async function saveProgramV3(
               movement: mv.movement,
               sets: mv.sets ?? null,
               reps: mv.reps ?? null,
-              weight: mv.weight ?? null,
+              weight: roundToPlateMath(mv.weight ?? null, mv.weight_unit ?? null),
               weight_unit: mv.weight_unit ?? null,
               rpe: mv.rpe ?? null,
               time_seconds: mv.time_seconds ?? null,
