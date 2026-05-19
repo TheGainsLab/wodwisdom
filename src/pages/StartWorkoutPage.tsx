@@ -1060,7 +1060,11 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
       if (mvKeys.length === 0) return;
       const entries = mvKeys.map(k => metconEntries[k]).filter(Boolean);
       const wType = inferWorkoutType([b]);
-      result[bi] = calculateBenchmarksLocal(entries, wType, b.text, workRates);
+      // v3 blocks split the scheme ("4 rounds for time, 8:00 cap") into b.scheme
+      // and the prescription body into b.text. The extractors (rounds, cap)
+      // need both. Combine for benchmark parsing.
+      const combinedText = [b.scheme, b.text].filter(Boolean).join('\n');
+      result[bi] = calculateBenchmarksLocal(entries, wType, combinedText, workRates);
     });
     return result;
   }, [blocks, metconEntries, workRates]);
@@ -1071,7 +1075,6 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     if (workRates.length === 0) return;
     let cancelled = false;
     (async () => {
-      const next: Record<number, BenchmarkResult> = {};
       for (let bi = 0; bi < blocks.length; bi++) {
         const b = blocks[bi];
         if (b.type !== 'metcon') continue;
@@ -1080,9 +1083,11 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         if (mvKeys.length === 0) continue;
         const entries = mvKeys.map(k => metconEntries[k]).filter(Boolean);
         const wType = inferWorkoutType([b]);
-        const result = await calculateBenchmarks(entries, wType, b.text, workRates);
+        // Same as the sync path — combine scheme + text so rounds/cap reach
+        // the client's extractRoundCount + extractTimeCapSeconds.
+        const combinedText = [b.scheme, b.text].filter(Boolean).join('\n');
+        const result = await calculateBenchmarks(entries, wType, combinedText, workRates);
         if (cancelled) return;
-        next[bi] = result;
         // Stream updates as each block resolves so the first metcon shows
         // its cohort number before the later ones finish.
         setCohortBenchmarks((prev) => ({ ...prev, [bi]: result }));

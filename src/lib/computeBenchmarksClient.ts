@@ -108,16 +108,33 @@ function entryToWorkCalcMovement(
 
 /** Extract time-cap minutes from block text. Mirrors the parser used in
  *  metconScoring.ts:extractTimeCap but inline-defined to avoid a dependency
- *  cycle. AMRAP/EMOM patterns are most common. */
+ *  cycle. Handles AMRAP, EMOM, "M:SS cap", and "N min" patterns. */
 function extractTimeCapSeconds(blockText: string): number | null {
   const t = blockText.toLowerCase();
   const amrap = t.match(/amrap\s*-?\s*(\d+)/);
   if (amrap) return parseInt(amrap[1], 10) * 60;
   const emom = t.match(/emom\s*-?\s*(\d+)/);
   if (emom) return parseInt(emom[1], 10) * 60;
+  // "M:SS cap" — v3 chips render the cap in this format ("8:00 cap")
+  const mmss = t.match(/(\d+):(\d{2})\s*cap/);
+  if (mmss) return parseInt(mmss[1], 10) * 60 + parseInt(mmss[2], 10);
   const cap = t.match(/(\d+)\s*min\b/);
   if (cap) return parseInt(cap[1], 10) * 60;
   return null;
+}
+
+/** Extract rounds count from block text. Mirrors extractRoundCount in
+ *  metconScoring.ts. Returns 1 when no explicit rounds pattern is found
+ *  (chipper / single-round / AMRAP). */
+function extractRoundCount(blockText: string): number {
+  const m = blockText.match(
+    /(\d+)\s+(?:RFT|rounds?\s+for\s+time|rounds?\s+of\b|rounds?\s*[:\n])/i,
+  );
+  if (m) {
+    const n = parseInt(m[1], 10);
+    if (n > 0 && n < 50) return n;
+  }
+  return 1;
 }
 
 /** Primary entry point. Returns BenchmarkResult-compatible shape on success,
@@ -140,11 +157,17 @@ export async function computeBenchmarksClient(
     movements.push(m);
   }
 
-  const timeCapSeconds = workoutType === "amrap" ? extractTimeCapSeconds(blockText) : null;
+  // Extract time cap for both AMRAP and For-Time. AMRAPs REQUIRE the cap
+  // (it's the workout duration). For-Time can have a cap (max completion);
+  // useful for time-domain bucketing on the server side.
+  const timeCapSeconds = extractTimeCapSeconds(blockText);
   if (workoutType === "amrap" && !timeCapSeconds) {
-    // AMRAP without an extractable cap — upstream will reject. Bail.
-    return null;
+    return null; // AMRAP without an extractable cap — upstream will reject. Bail.
   }
+  // Rounds — multi-round For-Time workouts ("4 rounds for time: ...") emit
+  // per-round reps in entries, so we MUST pass rounds for correct work calc.
+  // For AMRAPs the per-round reps are correct as-is; rounds is ignored.
+  const rounds = workoutType === "for_time" ? extractRoundCount(blockText) : 1;
 
   try {
     const { data, error } = await supabase.functions.invoke<ComputeBenchmarksResponseEnvelope>(
@@ -154,6 +177,7 @@ export async function computeBenchmarksClient(
           movements,
           workout_type: workoutType,
           ...(timeCapSeconds ? { time_cap_seconds: timeCapSeconds } : {}),
+          ...(rounds > 1 ? { rounds } : {}),
           block_scheme_hint: blockText.slice(0, 300),
         },
       },

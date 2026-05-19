@@ -28,6 +28,8 @@
 
 import type { StagePowerCurve, StagePowerCurveCell } from "./fetch-tier4-bundle.ts";
 import { getStagePowerCurve } from "./stage-power-curve-cache.ts";
+import { getWorkCalcMovements } from "./work-calc-movements-cache.ts";
+import { resolveMovementName } from "./movement-resolver.ts";
 
 const WORK_CALC_TIMEOUT_MS = 8_000;
 
@@ -106,6 +108,10 @@ export interface ComputeBenchmarksResult {
 export async function computeBenchmarks(
   input: ComputeBenchmarksInput,
 ): Promise<ComputeBenchmarksResult | null> {
+  console.log(
+    `[compute-benchmarks] called: workout_type=${input.workout_type} n_movements=${input.movements.length} time_cap=${input.time_cap_seconds ?? "none"} user_id=${input.user_id ?? "unknown"}`,
+  );
+
   // 1. Gender default + warning.
   const gender: Gender = input.gender ?? "men";
   if (input.gender === null) {
@@ -114,15 +120,45 @@ export async function computeBenchmarks(
     );
   }
 
-  // 2. Fetch joules from upstream work-calc.
-  const joules = await fetchWorkCalcJoules(input.movements, gender);
-  if (joules === null || joules <= 0) {
-    return null; // caller falls back to PERFORMANCE_FACTORS
+  // 2a. Resolve free-text movement names → upstream canonical names.
+  // Writer emits creative names ("Power Snatch", "Pushup"); upstream catalog
+  // uses specific canonical strings ("Snatch", "Push-up"). Three-stage cascade:
+  // exact → Olympic alias → trigram fuzzy. Any unresolvable movement kills the
+  // call (caller falls back to PERFORMANCE_FACTORS for that block).
+  const movementsCatalog = await getWorkCalcMovements();
+  if (movementsCatalog === null) {
+    console.warn(`[compute-benchmarks] returning null: getWorkCalcMovements unavailable`);
+    return null;
   }
+  const resolvedMovements: WorkCalcMovement[] = [];
+  for (const m of input.movements) {
+    const resolution = resolveMovementName(m.movement_name, movementsCatalog.movements);
+    if (resolution === null) {
+      console.warn(
+        `[compute-benchmarks] returning null: movement "${m.movement_name}" couldn't be resolved to a modeled canonical (< 0.85 trigram similarity)`,
+      );
+      return null;
+    }
+    resolvedMovements.push({ ...m, movement_name: resolution.canonical });
+    if (resolution.via !== "exact") {
+      console.log(
+        `[compute-benchmarks] resolved "${m.movement_name}" → "${resolution.canonical}" via ${resolution.via} (similarity=${resolution.similarity.toFixed(2)})`,
+      );
+    }
+  }
+
+  // 2b. Fetch joules from upstream work-calc using resolved canonical names.
+  const joules = await fetchWorkCalcJoules(resolvedMovements, gender);
+  if (joules === null || joules <= 0) {
+    console.warn(`[compute-benchmarks] returning null: fetchWorkCalcJoules failed (specific reason logged above by that fn)`);
+    return null;
+  }
+  console.log(`[compute-benchmarks] joules=${joules}`);
 
   // 3. Fetch the stage power curve (cached).
   const curve = await getStagePowerCurve();
   if (curve === null) {
+    console.warn(`[compute-benchmarks] returning null: getStagePowerCurve unavailable`);
     return null;
   }
 
@@ -134,11 +170,16 @@ export async function computeBenchmarks(
     curve,
     gender,
   );
+  console.log(`[compute-benchmarks] gender=${gender} time_domain=${timeDomain}`);
 
   // 5. Anchor selection.
   const median = pickMedianWatts(curve, gender, timeDomain);
   if (median === null) {
-    // Open p50 missing — extremely unlikely. Fall back to caller.
+    const openGender = curve.stages.open[gender];
+    console.warn(
+      `[compute-benchmarks] returning null: Open ${gender} ${timeDomain} cell missing in stage_power_curve. ` +
+        `available_open_${gender}_keys=${JSON.stringify(Object.keys(openGender))}`,
+    );
     return null;
   }
   const excellent = pickExcellentWatts(curve, gender, timeDomain, median.watts);
@@ -149,7 +190,9 @@ export async function computeBenchmarks(
   let excellentScore: string | null;
   if (input.workout_type === "amrap") {
     if (!input.time_cap_seconds || input.time_cap_seconds <= 0) {
-      // AMRAP with no time cap is malformed.
+      console.warn(
+        `[compute-benchmarks] returning null: AMRAP requires time_cap_seconds but got ${input.time_cap_seconds}`,
+      );
       return null;
     }
     medianScore = formatAMRAP(joules, median.watts, input.time_cap_seconds, input.movements);

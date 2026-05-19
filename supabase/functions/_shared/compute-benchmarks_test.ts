@@ -11,7 +11,9 @@
 
 import { assert, assertEquals, assertAlmostEquals } from "jsr:@std/assert";
 import { _resetCacheForTests } from "./stage-power-curve-cache.ts";
+import { _resetCacheForTests as _resetMovementsCacheForTests } from "./work-calc-movements-cache.ts";
 import type { StagePowerCurve } from "./fetch-tier4-bundle.ts";
+import type { MovementsResponse } from "./work-calc-movements-cache.ts";
 import {
   _deriveTimeDomain,
   _formatAMRAP,
@@ -85,11 +87,39 @@ interface StubOpts {
   workCalcJoules: number | null;
   /** Curve to return (or null to fail with 500). */
   curve: StagePowerCurve | null;
+  /** Movements catalog (defaults to a small mocked list covering test movements). */
+  movementsCatalog?: MovementsResponse | null;
   workCalcStatus?: number;
   curveStatus?: number;
+  movementsStatus?: number;
+}
+
+/** Default movements catalog for tests — covers every movement_name used
+ *  across the test suite. All marked modeled. Exact-match path resolves
+ *  these unchanged. */
+function defaultMovementsCatalog(): MovementsResponse {
+  return {
+    version: "2026-05-19",
+    total: 10,
+    modeled_count: 10,
+    cache_ttl_seconds: 86400,
+    movements: [
+      { display_name: "Thruster", canonical_name: "thruster", modeled: true },
+      { display_name: "Pull-up", canonical_name: "pull-up", modeled: true },
+      { display_name: "Push-up", canonical_name: "push-up", modeled: true },
+      { display_name: "Air Squat", canonical_name: "air-squat", modeled: true },
+      { display_name: "Burpee", canonical_name: "burpee", modeled: true },
+      { display_name: "Row", canonical_name: "row", modeled: true },
+      { display_name: "Snatch", canonical_name: "snatch", modeled: true },
+      { display_name: "Clean", canonical_name: "clean", modeled: true },
+      { display_name: "Jerk", canonical_name: "jerk", modeled: true },
+      { display_name: "Back Squat", canonical_name: "back-squat", modeled: true },
+    ],
+  };
 }
 
 function installFetchStub(opts: StubOpts) {
+  const catalog = opts.movementsCatalog === undefined ? defaultMovementsCatalog() : opts.movementsCatalog;
   globalThis.fetch = ((url: string | URL | Request) => {
     const u = typeof url === "string" ? url : (url as URL).toString();
     if (u.includes("/reference/stage_power_curve")) {
@@ -98,6 +128,17 @@ function installFetchStub(opts: StubOpts) {
       }
       return Promise.resolve(
         new Response(JSON.stringify(opts.curve), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    }
+    if (u.includes("/work-calc/v1/movements")) {
+      if (catalog === null) {
+        return Promise.resolve(new Response("err", { status: opts.movementsStatus ?? 500 }));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify(catalog), {
           status: 200,
           headers: { "content-type": "application/json" },
         }),
@@ -130,12 +171,14 @@ function setEnv() {
 
 async function withClean<T>(fn: () => Promise<T>): Promise<T> {
   _resetCacheForTests();
+  _resetMovementsCacheForTests();
   setEnv();
   try {
     return await fn();
   } finally {
     restoreFetch();
     _resetCacheForTests();
+    _resetMovementsCacheForTests();
   }
 }
 
