@@ -228,19 +228,40 @@ serve(async (req) => {
         // truth for Engine content access.
         console.log(`[webhook] Subscription payment: customer=${customerId}, subscription=${subscriptionId}, billing_reason=${invoice.billing_reason}`);
 
-        // Find user
+        // Resolve the user. checkout.session.completed writes
+        // profiles.stripe_customer_id, but Stripe does not guarantee that
+        // event is delivered before this one. If the id is not on file yet,
+        // fall back to the Stripe customer's email and backfill the id so
+        // this handler never silently no-ops when it wins the race.
+        let payUserId: string | null = null;
         const { data: payProfiles } = await supa.from("profiles").select("id").eq("stripe_customer_id", customerId).limit(1);
-        if (!payProfiles || payProfiles.length === 0) break;
-        const payUserId = payProfiles[0].id;
+        if (payProfiles && payProfiles.length > 0) {
+          payUserId = payProfiles[0].id;
+        } else {
+          const custResp = await fetchWithTimeout(`https://api.stripe.com/v1/customers/${customerId}`, {
+            headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+          }, 15_000);
+          if (custResp.ok) {
+            const customer = await custResp.json();
+            if (customer.email) {
+              const { data: emailProfiles } = await supa.from("profiles").select("id").eq("email", customer.email).limit(1);
+              if (emailProfiles && emailProfiles.length > 0) {
+                payUserId = emailProfiles[0].id;
+                await supa.from("profiles").update({ stripe_customer_id: customerId }).eq("id", payUserId);
+              }
+            }
+          }
+        }
+        if (!payUserId) {
+          console.error(`[webhook] invoice.payment_succeeded: could not resolve user for customer ${customerId}`);
+          break;
+        }
 
-        // Check what entitlements the user has
-        const { data: payEntitlements } = await supa
-          .from("user_entitlements")
-          .select("feature")
-          .eq("user_id", payUserId)
-          .or("expires_at.is.null,expires_at.gt." + new Date().toISOString());
-
-        const payFeatures = new Set((payEntitlements || []).map(e => e.feature));
+        // Resolve entitlements from the subscription's price metadata in
+        // Stripe rather than the user_entitlements table — that table is
+        // populated by checkout.session.completed, which may not have run yet.
+        const { features: payFeatureList } = await getSubscriptionEntitlements(subscriptionId);
+        const payFeatures = new Set(payFeatureList);
 
         // Programming users: trigger next month generation
         if (payFeatures.has("programming")) {
