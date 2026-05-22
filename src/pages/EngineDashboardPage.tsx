@@ -188,7 +188,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
   const completedCount = completedDays.size;
   const pct = totalDays > 0 ? Math.round((completedCount / totalDays) * 100) : 0;
   const monthMap = groupByMonth(workouts);
-  const months = Array.from(monthMap.keys()).sort((a, b) => a - b).filter(m => m <= monthsUnlocked);
+  const months = Array.from(monthMap.keys()).sort((a, b) => a - b);
 
   // Month-level data (when drilled in)
   const monthDays = selectedMonth != null ? (monthMap.get(selectedMonth) ?? []) : [];
