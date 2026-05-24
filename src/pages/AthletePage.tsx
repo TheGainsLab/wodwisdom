@@ -6,8 +6,6 @@ import { classifyAthlete } from '../utils/classify-athlete';
 import { calculateTDEE } from '../utils/tdee';
 import { getTierStatus, type AthleteProfileInput, type TierSection } from '../utils/tier-status';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { V2OutputPanel } from '../components/admin/V2OutputPanel';
-import { SkeletonPanel } from '../components/admin/SkeletonPanel';
 import Nav from '../components/Nav';
 import { formatMarkdown } from '../lib/formatMarkdown';
 
@@ -44,42 +42,6 @@ function normalizeEvaluation(raw: unknown): SafeEvaluation {
     weaknesses_and_priorities: safeStrArr(r.weaknesses_and_priorities),
     detailed_analysis: safeStr(r.detailed_analysis),
     recommendations: safeStrArr(r.recommendations),
-  };
-}
-
-function normalizeWriterOutput(raw: unknown): unknown {
-  if (!isRec(raw)) return { month_plan: { weekly_intent: [], strength_progression: '', deload_placement: '' }, weeks: [] };
-  const mp = isRec(raw.month_plan) ? raw.month_plan : {};
-  return {
-    month_plan: {
-      weekly_intent: safeStrArr(mp.weekly_intent),
-      strength_progression: safeStr(mp.strength_progression),
-      deload_placement: safeStr(mp.deload_placement),
-      programming_priorities: typeof mp.programming_priorities === 'string' ? mp.programming_priorities : undefined,
-    },
-    weeks: safeArr(raw.weeks).map((week) => {
-      const w = isRec(week) ? week : {};
-      return {
-        week_num: typeof w.week_num === 'number' ? w.week_num : 0,
-        days: safeArr(w.days).map((day) => {
-          const d = isRec(day) ? day : {};
-          return {
-            day_num: typeof d.day_num === 'number' ? d.day_num : 0,
-            blocks: safeArr(d.blocks).map((block) => {
-              const b = isRec(block) ? block : {};
-              return {
-                block_type: safeStr(b.block_type),
-                block_label: typeof b.block_label === 'string' ? b.block_label : undefined,
-                block_scheme: typeof b.block_scheme === 'string' ? b.block_scheme : undefined,
-                time_cap_seconds: typeof b.time_cap_seconds === 'number' ? b.time_cap_seconds : undefined,
-                block_notes: typeof b.block_notes === 'string' ? b.block_notes : undefined,
-                movements: safeArr(b.movements).map((m) => (isRec(m) ? m : {})),
-              };
-            }),
-          };
-        }),
-      };
-    }),
   };
 }
 
@@ -518,27 +480,11 @@ export default function AthletePage({ session }: { session: Session }) {
   const [v2EvalError, setV2EvalError] = useState('');
   const [v2EvalElapsed, setV2EvalElapsed] = useState<number | null>(null);
   const [v2EvalId, setV2EvalId] = useState<string | null>(null);
-  // v2 program-generator admin testing state (Phase 1, /athlete only).
-  const [generatingProgramV2, setGeneratingProgramV2] = useState(false);
-  const [v2ProgramOutput, setV2ProgramOutput] = useState<unknown>(null);
-  const [v2ProgramError, setV2ProgramError] = useState('');
-  const [v2ProgramElapsed, setV2ProgramElapsed] = useState<number | null>(null);
-  const [v2ProgramId, setV2ProgramId] = useState<string | null>(null);
-  const [v2ProgramSafety, setV2ProgramSafety] = useState<{ safe: boolean; reasoning: string; errored: boolean } | null>(null);
-  const [v2ProgramStage, setV2ProgramStage] = useState<string | null>(null);
-  // v3 chained-generation admin testing state.
+  // v3 chained-generation admin state. Skeleton + raw program output were
+  // dropped at GA — admins navigate straight to the saved program on success.
   const [generatingProgramV3, setGeneratingProgramV3] = useState(false);
-  const [v3ProgramOutput, setV3ProgramOutput] = useState<unknown>(null);
   const [v3ProgramError, setV3ProgramError] = useState('');
-  const [v3ProgramElapsed, setV3ProgramElapsed] = useState<number | null>(null);
-  const [v3ProgramId, setV3ProgramId] = useState<string | null>(null);
-  const [v3ProgramSafety, setV3ProgramSafety] = useState<{ safe: boolean; reasoning: string; errored: boolean } | null>(null);
   const [v3ProgramStage, setV3ProgramStage] = useState<string | null>(null);
-  const [v3Skeleton, setV3Skeleton] = useState<unknown>(null);
-  const [comparingEval, setComparingEval] = useState(false);
-  const [compareEvalV1Text, setCompareEvalV1Text] = useState<string | null>(null);
-  const [compareEvalV1Status, setCompareEvalV1Status] = useState<'idle' | 'running' | 'ready' | 'failed'>('idle');
-  const [compareEvalV1Error, setCompareEvalV1Error] = useState('');
   const [generateLoading, setGenerateLoading] = useState(false);
   const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
   const [tdeeOverride, setTdeeOverride] = useState<string>('');
@@ -779,84 +725,14 @@ export default function AthletePage({ session }: { session: Session }) {
     }
   };
 
-  // Admin Phase 1 — kick off generate-program v2 (async job) and poll
-  // program-job-status until complete. Renders inline via V2OutputPanel.
-  // The kickoff returns immediately with a job_id; the heavy
-  // writer/audits/safety/save work runs in the background.
-  const handleGenerateProgramV2 = async () => {
-    setGeneratingProgramV2(true);
-    setV2ProgramOutput(null);
-    setV2ProgramError('');
-    setV2ProgramElapsed(null);
-    setV2ProgramId(null);
-    setV2ProgramSafety(null);
-    setV2ProgramStage(null);
-    try {
-      const { data: kickoff, error: kickErr } = await supabase.functions.invoke('generate-program-v2', { body: {} });
-      if (kickErr) throw new Error(kickErr.message || 'v2 kickoff failed');
-      if (kickoff?.error) throw new Error(kickoff.message || kickoff.error);
-      const jobId: string | null = kickoff?.job_id ?? null;
-      if (!jobId) throw new Error('v2 kickoff: no job_id returned');
-      setV2ProgramStage('pending');
-
-      let delay = 3000;
-      const maxAttempts = 80;
-      for (let i = 0; i < maxAttempts; i++) {
-        await new Promise((r) => setTimeout(r, delay));
-        const { data: status, error: statusErr } = await supabase.functions.invoke('program-job-status', {
-          body: { job_id: jobId },
-        });
-        if (statusErr) throw new Error(statusErr.message || 'v2 status check failed');
-        if (status?.error && status?.status !== 'failed') throw new Error(status.error);
-        setV2ProgramStage(status?.stage ?? status?.status ?? null);
-        if (status?.status === 'complete') {
-          const rj = status.result_json ?? {};
-          if (!rj.output) throw new Error('v2 complete but result_json missing');
-          setV2ProgramOutput(normalizeWriterOutput(rj.output));
-          setV2ProgramId(status.program_id ?? null);
-          setV2ProgramElapsed(rj.elapsed_ms ?? null);
-          setV2ProgramSafety(rj.safety ?? null);
-          setV2ProgramStage(null);
-          return;
-        }
-        if (status?.status === 'failed') {
-          // If the worker stashed the rejected output (audit-loop exhaustion
-          // path), surface it inline alongside the error so admin can
-          // inspect what the writer produced.
-          const rj = status.result_json ?? {};
-          if (rj.output) {
-            setV2ProgramOutput(normalizeWriterOutput(rj.output));
-            setV2ProgramId(status.program_id ?? null);
-            setV2ProgramElapsed(rj.elapsed_ms ?? null);
-            setV2ProgramSafety(rj.safety ?? null);
-          }
-          throw new Error(status.error || 'v2 generation failed');
-        }
-        delay = Math.min(delay + 1000, 8000);
-      }
-      throw new Error('v2 generation timed out');
-    } catch (err) {
-      setV2ProgramError(err instanceof Error ? err.message : 'v2 program failed');
-    } finally {
-      setGeneratingProgramV2(false);
-      setV2ProgramStage(null);
-    }
-  };
-
-  // Admin Phase 1 — kick off generate-program v3 (chained generation):
-  // skeleton -> fill (with skeleton as context) -> safety -> save. Same
-  // background-job polling pattern as v2; status response carries both
-  // skeleton_json (populated as soon as the skeleton call passes audits)
-  // and result_json (final program).
+  // Kick off generate-program v3 (chained: skeleton -> audits -> fill ->
+  // safety -> save). Background job + poll; on completion, navigate to the
+  // saved program. Skeleton + raw program output are no longer surfaced
+  // inline — admins inspect the result via the program detail page.
   const handleGenerateProgramV3 = async () => {
     setGeneratingProgramV3(true);
-    setV3ProgramOutput(null);
     setV3ProgramError('');
-    setV3ProgramElapsed(null);
-    setV3ProgramId(null);
-    setV3ProgramSafety(null);
     setV3ProgramStage(null);
-    setV3Skeleton(null);
     try {
       const { data: kickoff, error: kickErr } = await supabase.functions.invoke('generate-program-v3', { body: {} });
       if (kickErr) throw new Error(kickErr.message || 'v3 kickoff failed');
@@ -875,25 +751,14 @@ export default function AthletePage({ session }: { session: Session }) {
         if (statusErr) throw new Error(statusErr.message || 'v3 status check failed');
         if (status?.error && status?.status !== 'failed') throw new Error(status.error);
         setV3ProgramStage(status?.stage ?? status?.status ?? null);
-        if (status?.skeleton_json) setV3Skeleton(status.skeleton_json);
         if (status?.status === 'complete') {
-          const rj = status.result_json ?? {};
-          if (!rj.output) throw new Error('v3 complete but result_json missing');
-          setV3ProgramOutput(normalizeWriterOutput(rj.output));
-          setV3ProgramId(status.program_id ?? null);
-          setV3ProgramElapsed(rj.elapsed_ms ?? null);
-          setV3ProgramSafety(rj.safety ?? null);
-          setV3ProgramStage(null);
-          return;
+          if (status.program_id) {
+            navigate(`/programs/${status.program_id}`);
+            return;
+          }
+          throw new Error('v3 completed but no program_id returned');
         }
         if (status?.status === 'failed') {
-          // Preserve any partial output (rejected at skeleton or writer stage).
-          const rj = status.result_json ?? {};
-          if (rj.skeleton) setV3Skeleton(rj.skeleton);
-          if (rj.output) {
-            setV3ProgramOutput(normalizeWriterOutput(rj.output));
-            setV3ProgramElapsed(rj.elapsed_ms ?? null);
-          }
           throw new Error(status.error || 'v3 generation failed');
         }
         delay = Math.min(delay + 1000, 8000);
@@ -905,72 +770,6 @@ export default function AthletePage({ session }: { session: Session }) {
       setGeneratingProgramV3(false);
       setV3ProgramStage(null);
     }
-  };
-
-  // Admin Phase 1 — Compare v1 vs v2 evaluation. Triggers both in
-  // parallel; v1 polls without mutating the page's analysisResult so
-  // the existing eval flow isn't disturbed; v2 returns synchronously.
-  // Both results render inline in the admin block.
-  const handleCompareEval = async () => {
-    setComparingEval(true);
-    setCompareEvalV1Text(null);
-    setCompareEvalV1Error('');
-    setCompareEvalV1Status('idle');
-    setV2Eval(null);
-    setV2EvalError('');
-    setV2EvalElapsed(null);
-    setV2EvalId(null);
-
-    const v1Promise = (async () => {
-      setCompareEvalV1Status('running');
-      try {
-        const { data: kickoff, error: kickoffErr } = await supabase.functions.invoke('profile-analysis', { body: {} });
-        if (kickoffErr) throw new Error(kickoffErr.message || 'v1 eval kickoff failed');
-        if (kickoff?.error) throw new Error(kickoff.message || kickoff.error);
-        const evaluationId: string | null = kickoff?.evaluation_id ?? null;
-        if (!evaluationId) throw new Error('v1: no evaluation_id');
-        let delay = 3000;
-        for (let i = 0; i < 80; i++) {
-          await new Promise((r) => setTimeout(r, delay));
-          const { data: status, error: statusErr } = await supabase.functions.invoke('profile-analysis-status', {
-            body: { evaluation_id: evaluationId },
-          });
-          if (statusErr) throw new Error(statusErr.message || 'v1: status check failed');
-          if (status?.error && status?.status !== 'failed') throw new Error(status.error);
-          if (status?.status === 'complete') {
-            setCompareEvalV1Text(status.analysis ?? '');
-            setCompareEvalV1Status('ready');
-            return;
-          }
-          if (status?.status === 'failed') throw new Error(status.error || 'v1: failed');
-          delay = Math.min(delay + 1000, 8000);
-        }
-        throw new Error('v1: timed out');
-      } catch (err) {
-        setCompareEvalV1Error(err instanceof Error ? err.message : 'v1 eval failed');
-        setCompareEvalV1Status('failed');
-      }
-    })();
-
-    const v2Promise = (async () => {
-      setGeneratingEvalV2(true);
-      try {
-        const { data, error: invErr } = await supabase.functions.invoke('profile-analysis-v2', { body: {} });
-        if (invErr) throw new Error(invErr.message || 'v2 eval failed');
-        if (data?.error) throw new Error(data.message || data.error);
-        if (!data?.ok || !data?.evaluation) throw new Error('v2 eval: unexpected response');
-        setV2Eval(normalizeEvaluation(data.evaluation));
-        setV2EvalId(data.evaluation_id ?? null);
-        setV2EvalElapsed(data.elapsed_ms ?? null);
-      } catch (err) {
-        setV2EvalError(err instanceof Error ? err.message : 'v2 eval failed');
-      } finally {
-        setGeneratingEvalV2(false);
-      }
-    })();
-
-    await Promise.allSettled([v1Promise, v2Promise]);
-    setComparingEval(false);
   };
 
   const handleGenerateProgram = async () => {
@@ -1700,8 +1499,8 @@ export default function AthletePage({ session }: { session: Session }) {
                 </TierCard>
 
                 {/* Tier 4 — competition history. Sits directly under the intake
-                    tiers (1–3); the feature itself is the /competition-history
-                    route. Phase B v1: admin only. */}
+                    tiers (1–3); the feature itself is the /athletedata route.
+                    Phase B v1: admin only. */}
                 {isAdmin && (
                   <div className="settings-card" style={{ borderColor: competitionAthleteId ? '#2ec486' : undefined }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -1719,7 +1518,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       type="button"
                       className="auth-btn"
                       style={{ padding: '8px 16px', fontSize: 13 }}
-                      onClick={() => navigate('/competition-history')}
+                      onClick={() => navigate('/athletedata')}
                     >
                       {competitionAthleteId ? 'View your competition history →' : 'Link your competition profile →'}
                     </button>
@@ -1734,49 +1533,18 @@ export default function AthletePage({ session }: { session: Session }) {
                     </div>
                     <h2 className="settings-card-title" style={{ marginBottom: 8 }}>v2 Profile Evaluation</h2>
                     <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
-                      Run the v2 evaluator directly or compare it against v1. v2 uses the rewritten shared payload + structured output. Phase 1 admins-only.
+                      Run the v2 evaluator (structured output via the shared payload). Phase 1 admins-only.
                     </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        className="auth-btn"
-                        style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface2)', border: '1px solid var(--border)', flex: '1 1 auto' }}
-                        onClick={handleGenerateEvalV2}
-                        disabled={generatingEvalV2 || comparingEval}
-                      >
-                        {generatingEvalV2 && !comparingEval ? 'Running v2…' : 'Run Eval (v2)'}
-                      </button>
-                      <button
-                        type="button"
-                        className="auth-btn"
-                        style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface2)', border: '1px solid var(--border)', flex: '1 1 auto' }}
-                        onClick={handleCompareEval}
-                        disabled={comparingEval || generatingEvalV2}
-                      >
-                        {comparingEval ? 'Comparing…' : 'Compare v1 vs v2'}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface2)', border: '1px solid var(--border)' }}
+                      onClick={handleGenerateEvalV2}
+                      disabled={generatingEvalV2}
+                    >
+                      {generatingEvalV2 ? 'Running v2…' : 'Run Eval (v2)'}
+                    </button>
                     {v2EvalError && <div className="error-msg" style={{ marginTop: 12 }}>{v2EvalError}</div>}
-                    {(compareEvalV1Status !== 'idle' || compareEvalV1Error) && (
-                      <div style={{ marginTop: 12 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--text-muted)', marginBottom: 6 }}>
-                          v1 result {compareEvalV1Status === 'running' && '(generating…)'} {compareEvalV1Status === 'failed' && '(failed)'}
-                        </div>
-                        {compareEvalV1Status === 'running' && (
-                          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>v1 polling its async job…</div>
-                        )}
-                        {compareEvalV1Status === 'failed' && (
-                          <div className="error-msg">{compareEvalV1Error}</div>
-                        )}
-                        {compareEvalV1Status === 'ready' && compareEvalV1Text && (
-                          <div
-                            className="workout-review-content"
-                            style={{ fontSize: 13, padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}
-                            dangerouslySetInnerHTML={{ __html: formatMarkdown(compareEvalV1Text) }}
-                          />
-                        )}
-                      </div>
-                    )}
                     {v2Eval && (
                       <div style={{ marginTop: 12 }}>
                         <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--text-muted)', marginBottom: 6 }}>
@@ -1819,60 +1587,6 @@ export default function AthletePage({ session }: { session: Session }) {
                   </div>
                 )}
 
-                {/* Admin · Phase 1 v2 program-generator testing */}
-                {isAdmin && (
-                  <div className="settings-card" style={{ marginTop: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--text-muted)', marginBottom: 4 }}>
-                      Admin · Phase 1 v2 program testing
-                    </div>
-                    <h2 className="settings-card-title" style={{ marginBottom: 8 }}>v2 Program Generator</h2>
-                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
-                      Run the v2 generator directly. v2 uses the rewritten shared payload + structured output. Phase 1 admins-only.
-                    </div>
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface2)', border: '1px solid var(--border)' }}
-                      onClick={handleGenerateProgramV2}
-                      disabled={generatingProgramV2}
-                    >
-                      {generatingProgramV2 ? 'Generating v2…' : 'Generate (v2 — experimental)'}
-                    </button>
-                    {generatingProgramV2 && v2ProgramStage && (
-                      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-dim)' }}>
-                        {(() => {
-                          const labels: Record<string, string> = {
-                            pending: 'Queued…',
-                            starting: 'Starting…',
-                            payload_building: 'Reading your profile…',
-                            payload_built: 'Profile ready, drafting…',
-                            writer_attempt_1: 'Drafting your program…',
-                            writer_attempt_2: 'Revising (attempt 2)…',
-                            writer_attempt_3: 'Revising (attempt 3)…',
-                            auditing: 'Checking program structure…',
-                            safety_review: 'Safety review…',
-                            safety_regen_1: 'Adjusting for safety (1)…',
-                            safety_regen_2: 'Adjusting for safety (2)…',
-                            safety_regen_3: 'Adjusting for safety (3)…',
-                            saving: 'Saving…',
-                            processing: 'Working…',
-                          };
-                          return labels[v2ProgramStage] ?? `Stage: ${v2ProgramStage}`;
-                        })()}
-                      </div>
-                    )}
-                    {v2ProgramError && <div className="error-msg" style={{ marginTop: 12 }}>{v2ProgramError}</div>}
-                    {v2ProgramOutput != null && (
-                      <V2OutputPanel
-                        output={v2ProgramOutput}
-                        programId={v2ProgramId}
-                        elapsedMs={v2ProgramElapsed}
-                        safety={v2ProgramSafety}
-                      />
-                    )}
-                  </div>
-                )}
-
                 {/* Admin · Phase 1 v3 chained-generation testing */}
                 {isAdmin && (
                   <div className="settings-card" style={{ marginTop: 12 }}>
@@ -1883,18 +1597,35 @@ export default function AthletePage({ session }: { session: Session }) {
                     <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
                       Chained pipeline: skeleton call → audits → fill call (with skeleton as planning context) → safety review → save. Phase 1 admins-only.
                     </div>
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface2)', border: '1px solid var(--border)' }}
-                      onClick={handleGenerateProgramV3}
-                      disabled={generatingProgramV3}
-                    >
-                      {generatingProgramV3 ? 'Generating v3…' : 'Generate (v3 — chained)'}
-                    </button>
-                    {generatingProgramV3 && v3ProgramStage && (
-                      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-dim)' }}>
-                        {(() => {
+                    {!generatingProgramV3 ? (
+                      <button
+                        type="button"
+                        className="auth-btn"
+                        style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface2)', border: '1px solid var(--border)' }}
+                        onClick={handleGenerateProgramV3}
+                      >
+                        Generate (v3 — chained)
+                      </button>
+                    ) : (
+                      <div style={{
+                        padding: 14,
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div className="loading-pulse" style={{ width: 14, height: 14, flexShrink: 0 }} />
+                          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+                            Generating your personalized program with AI
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                          This usually takes around 5 minutes. You can leave this page open — we'll take you to your program as soon as it's ready.
+                        </div>
+                        {v3ProgramStage && (() => {
                           const labels: Record<string, string> = {
                             pending: 'Queued…',
                             starting: 'Starting…',
@@ -1915,20 +1646,16 @@ export default function AthletePage({ session }: { session: Session }) {
                             saving: 'Saving…',
                             processing: 'Working…',
                           };
-                          return labels[v3ProgramStage] ?? `Stage: ${v3ProgramStage}`;
+                          const label = labels[v3ProgramStage] ?? `Stage: ${v3ProgramStage}`;
+                          return (
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                              {label}
+                            </div>
+                          );
                         })()}
                       </div>
                     )}
                     {v3ProgramError && <div className="error-msg" style={{ marginTop: 12 }}>{v3ProgramError}</div>}
-                    {v3Skeleton != null && <SkeletonPanel skeleton={v3Skeleton} />}
-                    {v3ProgramOutput != null && (
-                      <V2OutputPanel
-                        output={v3ProgramOutput}
-                        programId={v3ProgramId}
-                        elapsedMs={v3ProgramElapsed}
-                        safety={v3ProgramSafety}
-                      />
-                    )}
                   </div>
                 )}
 
