@@ -1713,8 +1713,12 @@ export default function AthletePage({ session }: { session: Session }) {
                   );
                 })()}
 
-                {/* Generate Program — hidden once a program exists (auto-generated monthly) */}
-                {(!hasGeneratedProgram || isAdmin) && (() => {
+                {/* Generate Program — first-time generation only. Hidden once a
+                    program exists; admins no longer get a regenerate button here
+                    (use the v3 admin section below for testing). handleGenerateProgram
+                    + generateLoading state are kept intact in case the v1 path
+                    needs to be exposed again. */}
+                {!hasGeneratedProgram && (() => {
                   const canGenerate = isAdmin || hasFeature('programming');
                   const isFreeUser = !hasFeature('ai_chat') && !hasFeature('engine') && !hasFeature('programming') && !hasFeature('nutrition') && !isAdmin;
                   const upgradeRoute = isFreeUser ? '/checkout' : '/settings';
@@ -1739,7 +1743,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         title={genTitle}
                       >
                         {canGenerate ? (
-                          generateLoading ? 'Generating...' : isAdmin && hasGeneratedProgram ? 'Generate Program (Admin)' : 'Generate Program'
+                          generateLoading ? 'Generating...' : 'Generate Program'
                         ) : (
                           <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
