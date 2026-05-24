@@ -18,20 +18,8 @@ interface DrillDownItem {
   workout_date: string;
 }
 
-type Layer = 'frequency' | 'performance';
-
 const TIME_DOMAINS = ['short', 'medium', 'long'] as const;
 const TD_LABELS: Record<string, string> = { short: 'Short', medium: 'Medium', long: 'Long' };
-
-function ordinal(n: number): string {
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
-  const mod10 = n % 10;
-  if (mod10 === 1) return `${n}st`;
-  if (mod10 === 2) return `${n}nd`;
-  if (mod10 === 3) return `${n}rd`;
-  return `${n}th`;
-}
 
 function percentileColor(p: number): string {
   if (p >= 80) return 'rgba(34,197,94,.7)';
@@ -49,23 +37,12 @@ function percentileTextColor(p: number): string {
   return '#f87171';
 }
 
-function countColor(count: number): string {
-  if (count >= 10) return 'rgba(99,102,241,.6)';
-  if (count >= 5) return 'rgba(99,102,241,.35)';
-  if (count >= 3) return 'rgba(99,102,241,.2)';
-  return 'rgba(99,102,241,.1)';
-}
-
-function countTextColor(count: number): string {
-  if (count >= 10) return '#a5b4fc';
-  if (count >= 5) return '#818cf8';
-  return '#6366f1';
-}
-
 export default function MetconHeatmap({ userId }: { userId: string }) {
-  const [layer, setLayer] = useState<Layer>('frequency');
-  const [freqCells, setFreqCells] = useState<HeatmapCell[]>([]);
-  const [perfCells, setPerfCells] = useState<HeatmapCell[]>([]);
+  // `get_metcon_frequency` returns every (movement × time-domain) cell with at
+  // least one logged workout. `avg_percentile` is null on cells whose workouts
+  // all lack a percentile (edge fn failed / EMOM / etc.) — those cells render
+  // as "did the work, no benchmark" instead of being dropped.
+  const [cells, setCells] = useState<HeatmapCell[]>([]);
   const [loading, setLoading] = useState(true);
   const [drillDown, setDrillDown] = useState<{ movement: string; td: string } | null>(null);
   const [drillItems, setDrillItems] = useState<DrillDownItem[]>([]);
@@ -74,19 +51,12 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
 
   useEffect(() => {
     (async () => {
-      const [freqResult, perfResult] = await Promise.all([
-        supabase.rpc('get_metcon_frequency', { p_user_id: userId }),
-        supabase.rpc('get_metcon_heatmap', { p_user_id: userId }),
-      ]);
-      if (freqResult.error) console.error('get_metcon_frequency error:', freqResult.error);
-      if (!freqResult.error && freqResult.data) setFreqCells(freqResult.data as HeatmapCell[]);
-      if (perfResult.error) console.error('get_metcon_heatmap error:', perfResult.error);
-      if (!perfResult.error && perfResult.data) setPerfCells(perfResult.data as HeatmapCell[]);
+      const result = await supabase.rpc('get_metcon_frequency', { p_user_id: userId });
+      if (result.error) console.error('get_metcon_frequency error:', result.error);
+      if (!result.error && result.data) setCells(result.data as HeatmapCell[]);
       setLoading(false);
     })();
   }, [userId]);
-
-  const cells = layer === 'frequency' ? freqCells : perfCells;
 
   // Build grid: unique movements as rows
   const movements = [...new Set(cells.map(c => c.movement))].sort();
@@ -126,7 +96,7 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
     return <div className="page-loading"><div className="loading-pulse" /></div>;
   }
 
-  if (freqCells.length === 0 && perfCells.length === 0) {
+  if (cells.length === 0) {
     return (
       <div className="engine-empty">
         <div className="engine-empty-title">No Metcon Data Yet</div>
@@ -249,27 +219,9 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
   // Heat map grid
   return (
     <div className="engine-section">
-      {/* Layer toggle */}
-      <div className="source-toggle" style={{ marginBottom: 12 }}>
-        <button
-          className={'source-btn' + (layer === 'frequency' ? ' active' : '')}
-          onClick={() => setLayer('frequency')}
-        >
-          Frequency
-        </button>
-        <button
-          className={'source-btn' + (layer === 'performance' ? ' active' : '')}
-          onClick={() => setLayer('performance')}
-        >
-          Performance
-        </button>
-      </div>
-
       {movements.length === 0 ? (
         <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: 24 }}>
-          {layer === 'performance'
-            ? 'No scored metcon data yet. Switch to Frequency to see all logged metcons.'
-            : 'No metcon data for this view.'}
+          No metcon data yet.
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -323,7 +275,11 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
                   </td>
                   {TIME_DOMAINS.map(td => {
                     const cell = cellMap.get(`${movement}|${td}`);
-                    if (!cell) {
+                    // Three states, single layout:
+                    //  1. no cell / N=0 → muted "—", no count
+                    //  2. N>0, percentile null → muted "—" + count (did the work, no benchmark)
+                    //  3. N>0, percentile set → colored bg, percentile big, count small
+                    if (!cell || cell.workout_count <= 0) {
                       return (
                         <td key={td} style={{
                           textAlign: 'center',
@@ -335,53 +291,17 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
                         </td>
                       );
                     }
-
-                    if (layer === 'frequency') {
-                      return (
-                        <td
-                          key={td}
-                          onClick={() => cell.avg_percentile != null ? openDrillDown(movement, td) : undefined}
-                          style={{
-                            textAlign: 'center',
-                            padding: '10px 8px',
-                            borderRadius: 6,
-                            background: countColor(cell.workout_count),
-                            cursor: cell.avg_percentile != null ? 'pointer' : 'default',
-                            transition: 'opacity .15s',
-                          }}
-                        >
-                          <div style={{
-                            fontFamily: "'JetBrains Mono', monospace",
-                            fontSize: 15,
-                            fontWeight: 700,
-                            color: countTextColor(cell.workout_count),
-                          }}>
-                            {cell.workout_count}
-                          </div>
-                          {cell.avg_percentile != null && (
-                            <div style={{
-                              fontSize: 11,
-                              color: percentileTextColor(cell.avg_percentile),
-                              marginTop: 2,
-                            }}>
-                              {ordinal(cell.avg_percentile!)} %ile
-                            </div>
-                          )}
-                        </td>
-                      );
-                    }
-
-                    // Performance layer
+                    const hasPercentile = cell.avg_percentile != null;
                     return (
                       <td
                         key={td}
-                        onClick={() => openDrillDown(movement, td)}
+                        onClick={hasPercentile ? () => openDrillDown(movement, td) : undefined}
                         style={{
                           textAlign: 'center',
                           padding: '10px 8px',
                           borderRadius: 6,
-                          background: cell.avg_percentile != null ? percentileColor(cell.avg_percentile) : 'var(--surface2)',
-                          cursor: 'pointer',
+                          background: hasPercentile ? percentileColor(cell.avg_percentile!) : 'var(--surface2)',
+                          cursor: hasPercentile ? 'pointer' : 'default',
                           transition: 'opacity .15s',
                         }}
                       >
@@ -389,9 +309,9 @@ export default function MetconHeatmap({ userId }: { userId: string }) {
                           fontFamily: "'JetBrains Mono', monospace",
                           fontSize: 15,
                           fontWeight: 700,
-                          color: cell.avg_percentile != null ? percentileTextColor(cell.avg_percentile) : 'var(--text-muted)',
+                          color: hasPercentile ? percentileTextColor(cell.avg_percentile!) : 'var(--text-muted)',
                         }}>
-                          {cell.avg_percentile ?? '—'}
+                          {hasPercentile ? cell.avg_percentile : '—'}
                         </div>
                         <div style={{
                           fontSize: 11,

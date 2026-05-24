@@ -26,9 +26,23 @@ export interface MetconEntry {
   distance_unit?: string | null;
 }
 
+/** One percentile anchor in the cohort distribution. Six of these — p10/p25/
+ *  p50/p75/p90/p99 of the Open field — replace the earlier two-anchor (median,
+ *  excellent) normalCDF estimate as the basis for percentile derivation. */
+export interface CohortAnchor {
+  p: number;        // 10, 25, 50, 75, 90, or 99
+  watts: number;
+  score: string;    // formatted MM:SS or "rounds+reps"
+}
+
 export interface BenchmarkResult {
   medianScore: string;
   excellentScore: string;
+  /** Present only when compute-benchmarks edge fn produced them. Missing on
+   *  the local PERFORMANCE_FACTORS fallback path — which means scoreMetcon
+   *  intentionally returns no percentile there (no real cohort = no percentile;
+   *  the earlier normalCDF-on-2-points trick was a model, not a measurement). */
+  cohortAnchors?: CohortAnchor[];
 }
 
 export interface ScoringResult {
@@ -316,38 +330,60 @@ export async function calculateBenchmarks(
 // ─── Percentile calculation ───────────────────────────────────────────
 
 /**
- * Normal CDF approximation (Abramowitz & Stegun).
- */
-function normalCDF(z: number): number {
-  const t = 1.0 / (1.0 + 0.2316419 * Math.abs(z));
-  const d = 0.3989423 * Math.exp(-z * z / 2.0);
-  let prob = d * t * (0.3193815 + t * (-0.3565638 + t * (1.7814779 + t * (-1.8212560 + t * 1.3302744))));
-  if (z > 0) prob = 1.0 - prob;
-  return prob;
-}
-
-/**
- * Calculate percentile from user score vs. benchmarks.
+ * Piecewise-linear interpolation of the user's percentile within the cohort
+ * distribution. Replaces the earlier normalCDF-on-2-anchors estimate.
  *
- * @param userScore   - Parsed numeric score
- * @param medianScore - Parsed p50 numeric score
- * @param excellentScore - Parsed p90 numeric score
- * @param lowerIsBetter - true for For Time (lower = faster = better)
+ * The anchors come from the Open stage's per-cell distribution
+ * (p10/p25/p50/p75/p90/p99) so the result is interpretable as "your rank
+ * within the Open field." Linear interpolation within each adjacent
+ * percentile bracket; clamped to the extremes outside the [p10, p99] range.
+ *
+ * Returns null when fewer than 2 usable anchors are provided — the caller
+ * treats that as "no percentile available" rather than substituting a
+ * model-derived estimate.
  */
-function calculatePercentileFromScores(
+function interpolatePercentile(
   userScore: number,
-  medianScore: number,
-  excellentScore: number,
-  lowerIsBetter: boolean
-): number {
-  const stdDev = Math.abs(excellentScore - medianScore) / 1.28;
-  if (stdDev === 0) return 50;
+  anchors: CohortAnchor[],
+  workoutType: string
+): number | null {
+  const lowerIsBetter = workoutType === 'for_time';
 
-  const zScore = (userScore - medianScore) / stdDev;
-  const adjustedZ = lowerIsBetter ? -zScore : zScore;
-  const pct = normalCDF(adjustedZ) * 100;
+  // Parse each anchor's formatted score to numeric. Drop unparseable / zero.
+  const points = anchors
+    .map(a => ({ p: a.p, score: parseScore(a.score, workoutType) }))
+    .filter(pt => pt.score > 0);
+  if (points.length < 2) return null;
 
-  return Math.max(1, Math.min(99, Math.round(pct)));
+  // Sort so index 0 = worst performer, last = best. For For-Time that means
+  // score DESC (high time = slow = worse); for AMRAP, score ASC.
+  points.sort((a, b) => lowerIsBetter ? b.score - a.score : a.score - b.score);
+
+  const worst = points[0];
+  const best = points[points.length - 1];
+
+  // Outside the cohort range — clamp at the nearest anchor's percentile.
+  const userBeatsBest = lowerIsBetter ? userScore <= best.score : userScore >= best.score;
+  const userBelowWorst = lowerIsBetter ? userScore >= worst.score : userScore <= worst.score;
+  if (userBeatsBest) return Math.max(1, Math.min(99, best.p));
+  if (userBelowWorst) return Math.max(1, Math.min(99, worst.p));
+
+  // Walk adjacent anchor pairs (worse→better). The bracket containing
+  // userScore is the first pair where user is between them.
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i];     // worse anchor
+    const b = points[i + 1]; // better anchor
+    const inBracket = lowerIsBetter
+      ? (userScore <= a.score && userScore >= b.score)
+      : (userScore >= a.score && userScore <= b.score);
+    if (!inBracket) continue;
+    if (a.score === b.score) return Math.round((a.p + b.p) / 2);
+    const t = (userScore - a.score) / (b.score - a.score);
+    const pct = a.p + t * (b.p - a.p);
+    return Math.max(1, Math.min(99, Math.round(pct)));
+  }
+
+  return null;
 }
 
 /**
@@ -364,24 +400,27 @@ export function getPerformanceTier(percentile: number): string {
 
 /**
  * Full scoring pipeline: user score string + benchmarks → percentile + tier.
+ *
+ * Real percentile only — requires the cohort anchor set from compute-benchmarks
+ * (the Open p10/p25/p50/p75/p90/p99 distribution). On the local PERFORMANCE_FACTORS
+ * fallback (no anchors), returns null — no fake percentile dressed up as real.
  */
 export function scoreMetcon(
   userScoreStr: string,
   workoutType: string,
   benchmarks: BenchmarkResult
 ): { percentile: number; performanceTier: string } | null {
-  if (benchmarks.medianScore === '--' || benchmarks.excellentScore === '--') return null;
   if (!userScoreStr.trim()) return null;
 
-  const lowerIsBetter = workoutType === 'for_time';
-
   const userScore = parseScore(userScoreStr, workoutType);
-  const medianScore = parseScore(benchmarks.medianScore, workoutType);
-  const excellentScore = parseScore(benchmarks.excellentScore, workoutType);
+  if (userScore === 0) return null;
 
-  if (userScore === 0 || medianScore === 0 || excellentScore === 0) return null;
+  const anchors = benchmarks.cohortAnchors ?? [];
+  if (anchors.length < 2) return null;
 
-  const percentile = calculatePercentileFromScores(userScore, medianScore, excellentScore, lowerIsBetter);
+  const percentile = interpolatePercentile(userScore, anchors, workoutType);
+  if (percentile === null) return null;
+
   return { percentile, performanceTier: getPerformanceTier(percentile) };
 }
 

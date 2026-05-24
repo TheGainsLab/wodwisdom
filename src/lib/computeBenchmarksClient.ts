@@ -39,6 +39,9 @@ interface ComputeBenchmarksResponseData {
   joules: number;
   basis: string;
   time_domain: "short" | "medium" | "long";
+  /** Open-cohort percentile anchors (p10/p25/p50/p75/p90/p99) converted
+   *  to workout scores. Empty when the Open cell is missing. */
+  cohort_anchors?: Array<{ p: number; watts: number; score: string }>;
 }
 
 interface ComputeBenchmarksResponseEnvelope {
@@ -193,6 +196,7 @@ export async function computeBenchmarksClient(
     return {
       medianScore: data.data.median_score,
       excellentScore: data.data.excellent_score ?? "--",
+      cohortAnchors: data.data.cohort_anchors ?? [],
     };
   } catch (e) {
     console.warn("[computeBenchmarksClient] unexpected error:", (e as Error).message);

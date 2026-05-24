@@ -53,7 +53,7 @@ export interface WorkCalcMovement {
   reps_total?: number;
   reps_per_round?: number;
   distance_value?: number;
-  distance_unit?: "meters" | "feet" | "miles" | "kilometers";
+  distance_unit?: "m" | "ft" | "meters" | "feet" | "miles" | "kilometers";
   calories?: number;
   rounds?: number;
   load_lbs_men?: number;
@@ -80,6 +80,16 @@ export interface ComputeBenchmarksInput {
   user_id?: string;
 }
 
+/** One anchor in the cohort distribution: percentile + the watts that
+ *  percentile of the Open field sustained, plus the workout score that
+ *  wattage produces (formatted MM:SS or "rounds+reps"). Used by the
+ *  client-side percentile interpolation. */
+export interface CohortAnchor {
+  p: number;    // 10, 25, 50, 75, 90, 99
+  watts: number;
+  score: string;
+}
+
 export interface ComputeBenchmarksResult {
   /** "7:38" for For-Time, "11+3" for AMRAP. */
   median_score: string;
@@ -97,6 +107,13 @@ export interface ComputeBenchmarksResult {
   basis: string;
   /** Derived (or defaulted) time domain used for the curve lookup. */
   time_domain: TimeDomain;
+  /** Full Open-stage cohort distribution for this workout: six anchors
+   *  (p10/p25/p50/p75/p90/p99) of sustained watts converted to workout
+   *  scores. Empty array when the Open cell is missing for the gender ×
+   *  time-domain combo. Consumed by the client's piecewise-linear
+   *  percentile interpolation — the real-data replacement for the
+   *  earlier 2-anchor normalCDF estimate. */
+  cohort_anchors: CohortAnchor[];
 }
 
 // ============================================================
@@ -180,6 +197,21 @@ export async function computeBenchmarks(
     excellentScore = excellent ? formatTimeSeconds(totalJoules / excellent.watts) : null;
   }
 
+  // 7. Build the full cohort distribution anchors for percentile interpolation.
+  // All six come from the Open cell so the percentile is interpretable as
+  // "your rank within the Open population." (median_/excellent_score above
+  // still use the cross-stage Open-p50 / QF-p50 anchoring for UI labels.)
+  const cohortAnchors = buildCohortAnchors(
+    curve,
+    gender,
+    timeDomain,
+    joules,
+    input.workout_type,
+    input.time_cap_seconds,
+    input.movements,
+    rounds,
+  );
+
   return {
     median_score: medianScore,
     excellent_score: excellentScore,
@@ -188,7 +220,44 @@ export async function computeBenchmarks(
     joules,
     basis: `open_p50_vs_${excellent?.label ?? "null_all_excellent_missing"}`,
     time_domain: timeDomain,
+    cohort_anchors: cohortAnchors,
   };
+}
+
+/** Compute (p, watts, score) for each Open percentile in the cell — same
+ *  joules ÷ watts math used for median/excellent, run six times. Returns
+ *  [] when the Open cell is absent (n<30 was dropped by upstream). */
+function buildCohortAnchors(
+  curve: StagePowerCurve,
+  gender: Gender,
+  timeDomain: TimeDomain,
+  joules: number,
+  workoutType: "for_time" | "amrap",
+  timeCapSeconds: number | undefined,
+  movements: WorkCalcMovement[],
+  rounds: number,
+): CohortAnchor[] {
+  const cell = curve.stages.open[gender][timeDomain];
+  if (!cell) return [];
+  const wattsByP: Array<{ p: number; watts: number }> = [
+    { p: 10, watts: cell.p10 },
+    { p: 25, watts: cell.p25 },
+    { p: 50, watts: cell.p50 },
+    { p: 75, watts: cell.p75 },
+    { p: 90, watts: cell.p90 },
+    { p: 99, watts: cell.p99 },
+  ];
+  return wattsByP.flatMap(({ p, watts }) => {
+    if (!Number.isFinite(watts) || watts <= 0) return [];
+    let score: string;
+    if (workoutType === "amrap") {
+      if (!timeCapSeconds || timeCapSeconds <= 0) return [];
+      score = formatAMRAP(joules, watts, timeCapSeconds, movements);
+    } else {
+      score = formatTimeSeconds((joules * rounds) / watts);
+    }
+    return [{ p, watts, score }];
+  });
 }
 
 // ============================================================
