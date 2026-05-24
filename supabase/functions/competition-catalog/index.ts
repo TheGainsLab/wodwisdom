@@ -1,16 +1,12 @@
 /**
- * competition-catalog — proxy for the competition-service's workout catalog.
+ * competition-catalog — admin-only proxy for the competition-service's
+ * GET /workouts catalog list (every competition workout, ~340 rows,
+ * near-static). The frontend can't hold the X-Service-Key, so it calls
+ * this; we forward and pass the response back. Mirrors
+ * search-competition-athletes / verify-competition-athlete.
  *
- * Two modes, both X-Service-Key proxies (the frontend can't hold the key):
- *   - no body / no workout_id → GET /workouts — the full catalog list
- *     (~340 rows, near-static); data behind the "All"-scope grid.
- *   - body { workout_id }     → GET /workouts/{id} — one workout's full spec
- *     (the workout{} block: description, scoring, movements with loads/reps/
- *     distances/mgw_category — same shape as the bundle's all_results[].workout).
- *     Used by Try-It to read a catalog workout's prescription.
- *
- * Access: admins + holders of an active athletedata/programming entitlement
- * (see _shared/athletedata-access.ts).
+ * The catalog is the data behind the "All"-scope grid (the collect-them-all
+ * map). Phase C / v1 is admin-only.
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -39,8 +35,12 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await supa.auth.getUser(token);
     if (authErr || !user) return json({ error: "UNAUTHORIZED" }, 401);
 
-    // Open to any authenticated user. The competition catalog is public
-    // reference data (~340 catalog workouts) with no per-user content.
+    const { data: profile } = await supa
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profile?.role !== "admin") return json({ error: "FORBIDDEN" }, 403);
 
     const baseUrl = Deno.env.get("COMPETITION_SERVICE_BASE_URL");
     const serviceKey = Deno.env.get("COMPETITION_SERVICE_KEY");
@@ -49,14 +49,7 @@ Deno.serve(async (req) => {
       return json({ error: "SERVICE_UNAVAILABLE" }, 503);
     }
 
-    // Optional { workout_id } in the body routes to the per-workout detail
-    // (GET /workouts/{id}); absent → the full catalog list (GET /workouts).
-    const body = await req.json().catch(() => ({}));
-    const workoutId = typeof body?.workout_id === "string" ? body.workout_id.trim() : "";
-    const base = baseUrl.replace(/\/$/, "");
-    const url = workoutId
-      ? `${base}/workouts/${encodeURIComponent(workoutId)}`
-      : `${base}/workouts`;
+    const url = `${baseUrl.replace(/\/$/, "")}/workouts`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), CATALOG_TIMEOUT_MS);
     try {
@@ -65,9 +58,6 @@ Deno.serve(async (req) => {
         headers: { "X-Service-Key": serviceKey },
         signal: controller.signal,
       });
-      console.log(
-        `[competition-catalog] ${workoutId ? `detail ${workoutId}` : "list"} → HTTP ${resp.status}, x-api-version=${resp.headers.get("x-api-version") ?? "none"}`,
-      );
       let payload: unknown;
       try {
         payload = await resp.json();

@@ -5,10 +5,9 @@
  * The frontend can't hold that key, so it calls this function instead; we
  * forward the query with the shared service key and pass the response back.
  *
- * Access: admins + holders of an active athletedata/programming entitlement
- * (see _shared/athletedata-access.ts). Mirrors verify-competition-athlete:
- * Bearer auth + access check, then a thin proxy with a hard timeout and
- * failure-soft error mapping.
+ * Phase C v1 is admin-only (the linking UI it feeds is admin-gated).
+ * Mirrors verify-competition-athlete: Bearer auth + admin role check, then
+ * a thin proxy with a hard timeout and failure-soft error mapping.
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -37,10 +36,12 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await supa.auth.getUser(token);
     if (authErr || !user) return json({ error: "UNAUTHORIZED" }, 401);
 
-    // Open to any authenticated user. Athlete search returns lightweight
-    // metadata only (name/affiliate/region/division/seasons/best_finish) —
-    // no scores or bundle data — so it's safe to expose at the auth tier.
-    // Bundle access is gated separately on verify-competition-athlete.
+    const { data: profile } = await supa
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profile?.role !== "admin") return json({ error: "FORBIDDEN" }, 403);
 
     const body = await req.json().catch(() => ({}));
     const q = typeof body?.q === "string" ? body.q.trim() : "";
