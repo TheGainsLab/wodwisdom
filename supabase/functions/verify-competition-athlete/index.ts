@@ -7,9 +7,9 @@
  * (b) reuse the same bundle to render the rich Linked-state view without a
  * second round-trip after the user confirms.
  *
- * Phase B v1 is admin-only. The same endpoint will be reused (or split)
- * when this opens to non-admins; for now, restricting at the function
- * boundary keeps the surface area zero for everyone else.
+ * Access: admins + holders of an active athletedata/programming entitlement
+ * (see _shared/athletedata-access.ts). Restricting at the function boundary
+ * is defense-in-depth alongside the frontend visibility gate.
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -43,20 +43,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Phase B v1: admin gate. Defense-in-depth alongside the frontend
-    // visibility check.
-    const { data: profile } = await supa
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (profile?.role !== "admin") {
-      return new Response(JSON.stringify({ error: "FORBIDDEN" }), {
-        status: 403,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
-    }
-
     const body = await req.json().catch(() => ({}));
     const competitionAthleteId = typeof body?.competition_athlete_id === "string"
       ? body.competition_athlete_id.trim()
@@ -66,6 +52,33 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: "MISSING_ID" }),
         { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
       );
+    }
+
+    // Bundle access rule: admins can fetch any athlete; everyone else can only
+    // fetch their own linked athlete, with one carve-out for the pre-link flow
+    // (unlinked users can verify a prospective athlete during "is this you?").
+    // Once linked, the user is locked to that one ID — admin unlink resets it.
+    const { data: profileRow } = await supa
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    const isAdmin = (profileRow as { role: string | null } | null)?.role === "admin";
+
+    if (!isAdmin) {
+      const { data: athleteProfile } = await supa
+        .from("athlete_profiles")
+        .select("competition_athlete_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const linkedId = (athleteProfile as { competition_athlete_id: string | null } | null)?.competition_athlete_id ?? null;
+      const allowed = linkedId === null || linkedId === competitionAthleteId;
+      if (!allowed) {
+        return new Response(
+          JSON.stringify({ error: "FORBIDDEN" }),
+          { status: 403, headers: { ...cors, "Content-Type": "application/json" } },
+        );
+      }
     }
 
     // Optional ?include= passthrough — e.g. body.include = ["all_results"] for

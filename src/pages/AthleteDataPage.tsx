@@ -1,16 +1,16 @@
 /**
- * CompetitionHistoryPage — the dedicated home for the Tier 4 competition-history
- * feature. Owns its own athlete_profiles fetch (the linkage + the user's age),
- * renders the full experience inside page chrome with the bottom tab bar still
- * visible (this is a child screen, not a takeover).
+ * AthleteDataPage — the dedicated home for the athlete-data surface (Tier 4
+ * competition history + analytics). Owns its own athlete_profiles fetch (the
+ * linkage + the user's age), renders the full experience inside page chrome
+ * with the bottom tab bar still visible (this is a child screen, not a
+ * takeover).
  *
- * Admin-gated for now (Phase B v1): non-admins are bounced to /profile. When
- * the feature goes GA this guard drops and the Tier 4 card on /profile becomes
- * the onboarding entry point.
+ * Gated on the `athletedata` entitlement (plus admins). During the beta the
+ * entitlement is hand-granted to a small allowlist; at GA a default-grant
+ * trigger opens it to everyone.
  */
 
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
@@ -22,9 +22,8 @@ interface Linkage {
   label: string | null;
 }
 
-export default function CompetitionHistoryPage({ session }: { session: Session }) {
-  const navigate = useNavigate();
-  const { isAdmin, loading: entLoading } = useEntitlements(session.user.id);
+export default function AthleteDataPage({ session }: { session: Session }) {
+  const { isAdmin, hasFeature, loading: entLoading } = useEntitlements(session.user.id);
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [linkage, setLinkage] = useState<Linkage>({ id: null, label: null });
@@ -53,10 +52,14 @@ export default function CompetitionHistoryPage({ session }: { session: Session }
     return () => { cancelled = true; };
   }, [session.user.id]);
 
-  // Admin-gate. Once entitlements have loaded, non-admins go back to /profile.
-  useEffect(() => {
-    if (!entLoading && !isAdmin) navigate('/profile', { replace: true });
-  }, [entLoading, isAdmin, navigate]);
+  // View tier is open to any authenticated user. The server-side gates on
+  // search-competition-athletes and competition-catalog were also dropped;
+  // verify-competition-athlete still enforces "linked athlete only (admins
+  // bypass)" so the bundle endpoint isn't a public mirror.
+  // Try-It (logging results against the cohort) is the paid action gate —
+  // AI Programming, All-Access (both grant `programming`), or standalone
+  // competition_log. Admins bypass for testing.
+  const canLog = isAdmin || hasFeature('competition_log') || hasFeature('programming');
 
   const ready = !loading && !entLoading;
 
@@ -68,16 +71,17 @@ export default function CompetitionHistoryPage({ session }: { session: Session }
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>Competition History</h1>
+          <h1>Athlete Data</h1>
         </header>
         <div className="page-body">
           {!ready ? (
             <div className="page-loading"><div className="loading-pulse" /></div>
-          ) : !isAdmin ? null : (
+          ) : (
             <CompetitionHistoryExperience
               userId={session.user.id}
               userAge={age}
               isAdmin={isAdmin}
+              canLog={canLog}
               initialLinkedId={linkage.id}
               initialLinkedLabel={linkage.label}
               onLinkageChange={setLinkage}
