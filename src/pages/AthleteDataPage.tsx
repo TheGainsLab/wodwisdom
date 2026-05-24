@@ -1,12 +1,16 @@
 /**
- * CompetitionHistoryPage — the dedicated home for the Tier 4 competition-history
- * feature. Owns its own athlete_profiles fetch (the linkage + the user's age),
- * renders the full experience inside page chrome with the bottom tab bar still
- * visible (this is a child screen, not a takeover).
+ * AthleteDataPage — the dedicated home for the athlete-data surface (Tier 4
+ * competition history + analytics). Owns its own athlete_profiles fetch (the
+ * linkage + the user's age), renders the full experience inside page chrome
+ * with the bottom tab bar still visible (this is a child screen, not a
+ * takeover).
  *
- * Admin-gated for now (Phase B v1): non-admins are bounced to /profile. When
- * the feature goes GA this guard drops and the Tier 4 card on /profile becomes
- * the onboarding entry point.
+ * Access shape (today): admin-only. The GA shape (public view tier + paid
+ * Try-It) is wired but gated behind ATHLETEDATA_PUBLIC_TIER. When that flag
+ * flips:
+ *   - Page opens to any authenticated user (view tier is free)
+ *   - canLog includes `programming` so AI Programming / All-Access subscribers
+ *     can do Try-It throwbacks alongside standalone competition_log holders
  */
 
 import { useEffect, useState } from 'react';
@@ -16,15 +20,16 @@ import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 import CompetitionHistoryExperience from '../components/competitionHistory/CompetitionHistoryExperience';
+import { ATHLETEDATA_PUBLIC_TIER } from '../lib/featureFlags';
 
 interface Linkage {
   id: string | null;
   label: string | null;
 }
 
-export default function CompetitionHistoryPage({ session }: { session: Session }) {
+export default function AthleteDataPage({ session }: { session: Session }) {
   const navigate = useNavigate();
-  const { isAdmin, loading: entLoading } = useEntitlements(session.user.id);
+  const { isAdmin, hasFeature, loading: entLoading } = useEntitlements(session.user.id);
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [linkage, setLinkage] = useState<Linkage>({ id: null, label: null });
@@ -53,10 +58,19 @@ export default function CompetitionHistoryPage({ session }: { session: Session }
     return () => { cancelled = true; };
   }, [session.user.id]);
 
-  // Admin-gate. Once entitlements have loaded, non-admins go back to /profile.
+  // Access gate: admin-only today, opens to all authenticated users when the
+  // ATHLETEDATA_PUBLIC_TIER flag flips. Server-side gates on the edge
+  // functions enforce the same boundary.
+  const hasAccess = isAdmin || ATHLETEDATA_PUBLIC_TIER;
+  // Try-It (logging results against the cohort): paid competition_log or
+  // bundled `programming` (AI Programming / All-Access). Admin bypass for
+  // testing. Only matters when the page is accessible — gate is harmless
+  // until ATHLETEDATA_PUBLIC_TIER opens the page to non-admins.
+  const canLog = isAdmin || hasFeature('competition_log') || hasFeature('programming');
+
   useEffect(() => {
-    if (!entLoading && !isAdmin) navigate('/profile', { replace: true });
-  }, [entLoading, isAdmin, navigate]);
+    if (!entLoading && !hasAccess) navigate('/profile', { replace: true });
+  }, [entLoading, hasAccess, navigate]);
 
   const ready = !loading && !entLoading;
 
@@ -68,16 +82,17 @@ export default function CompetitionHistoryPage({ session }: { session: Session }
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>Competition History</h1>
+          <h1>Athlete Data</h1>
         </header>
         <div className="page-body">
           {!ready ? (
             <div className="page-loading"><div className="loading-pulse" /></div>
-          ) : !isAdmin ? null : (
+          ) : !hasAccess ? null : (
             <CompetitionHistoryExperience
               userId={session.user.id}
               userAge={age}
               isAdmin={isAdmin}
+              canLog={canLog}
               initialLinkedId={linkage.id}
               initialLinkedLabel={linkage.label}
               onLinkageChange={setLinkage}

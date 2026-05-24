@@ -16,6 +16,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchTier4Bundle } from "../_shared/fetch-tier4-bundle.ts";
+import { ATHLETEDATA_PUBLIC_TIER } from "../_shared/feature-flags.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -43,19 +44,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Phase B v1: admin gate. Defense-in-depth alongside the frontend
-    // visibility check.
     const { data: profile } = await supa
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .maybeSingle();
-    if (profile?.role !== "admin") {
-      return new Response(JSON.stringify({ error: "FORBIDDEN" }), {
-        status: 403,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
-    }
+    const isAdmin = (profile as { role: string | null } | null)?.role === "admin";
 
     const body = await req.json().catch(() => ({}));
     const competitionAthleteId = typeof body?.competition_athlete_id === "string"
@@ -66,6 +60,34 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: "MISSING_ID" }),
         { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
       );
+    }
+
+    // Access gate. Two modes:
+    //   - Flag off (today): admin-only. Defense-in-depth alongside frontend.
+    //   - Flag on (GA shape): admins fetch any athlete; everyone else can
+    //     only fetch their linked athlete, with a pre-link verify carve-out
+    //     so unlinked users can preview a candidate during the linking flow.
+    if (!ATHLETEDATA_PUBLIC_TIER) {
+      if (!isAdmin) {
+        return new Response(JSON.stringify({ error: "FORBIDDEN" }), {
+          status: 403,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+    } else if (!isAdmin) {
+      const { data: athleteProfile } = await supa
+        .from("athlete_profiles")
+        .select("competition_athlete_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const linkedId = (athleteProfile as { competition_athlete_id: string | null } | null)?.competition_athlete_id ?? null;
+      const allowed = linkedId === null || linkedId === competitionAthleteId;
+      if (!allowed) {
+        return new Response(
+          JSON.stringify({ error: "FORBIDDEN" }),
+          { status: 403, headers: { ...cors, "Content-Type": "application/json" } },
+        );
+      }
     }
 
     // Optional ?include= passthrough — e.g. body.include = ["all_results"] for

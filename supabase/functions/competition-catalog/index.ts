@@ -12,6 +12,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { ATHLETEDATA_PUBLIC_TIER } from "../_shared/feature-flags.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -35,12 +36,16 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await supa.auth.getUser(token);
     if (authErr || !user) return json({ error: "UNAUTHORIZED" }, 401);
 
-    const { data: profile } = await supa
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (profile?.role !== "admin") return json({ error: "FORBIDDEN" }, 403);
+    // Admin-only today. When ATHLETEDATA_PUBLIC_TIER flips, this becomes
+    // any authenticated user (catalog is public reference data).
+    if (!ATHLETEDATA_PUBLIC_TIER) {
+      const { data: profile } = await supa
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profile?.role !== "admin") return json({ error: "FORBIDDEN" }, 403);
+    }
 
     const baseUrl = Deno.env.get("COMPETITION_SERVICE_BASE_URL");
     const serviceKey = Deno.env.get("COMPETITION_SERVICE_KEY");
