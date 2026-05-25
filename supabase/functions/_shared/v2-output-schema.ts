@@ -33,9 +33,12 @@ export type BlockType =
   | "strength"
   | "accessory"
   | "metcon"
+  | "cardio"
   | "active-recovery"
-  | "cool-down";
+  | "cool-down"
+  | "other";
 
+/** Generation block types — what generate-program emits (no cardio/other). */
 export const BLOCK_TYPES: BlockType[] = [
   "warm-up",
   "mobility",
@@ -45,6 +48,17 @@ export const BLOCK_TYPES: BlockType[] = [
   "metcon",
   "active-recovery",
   "cool-down",
+];
+
+/**
+ * Ingestion block types — the generation set plus 'cardio' (ingested cardio
+ * pieces) and 'other' (the escape hatch for rest days / unclassifiable
+ * blocks). preprocess-program classifies into this wider set.
+ */
+export const INGEST_BLOCK_TYPES: BlockType[] = [
+  ...BLOCK_TYPES,
+  "cardio",
+  "other",
 ];
 
 /**
@@ -73,6 +87,13 @@ export interface MovementPrescription {
    * bodyweight, skills, and metcon movements.
    */
   target_pct_1rm?: number;
+  /**
+   * Cardio machine for a monostructural movement (e.g. an erg inside a
+   * metcon). Ingestion only — generated programs leave this null.
+   */
+  cardio_modality?: string;
+  /** Calorie count for calorie-based cardio movements ("30 cal row"). Ingestion only. */
+  calories?: number;
 }
 
 /**
@@ -90,10 +111,20 @@ export interface BlockPrescription {
    * "Every 90s × 8"). Plain text; the writer phrases it naturally.
    */
   block_scheme?: string;
-  /** Optional time cap in seconds (metcon-style). */
+  /**
+   * The block's clock window in seconds — a stated time cap OR a fixed
+   * duration. Always set for AMRAP ("AMRAP 12" → 720) and EMOM
+   * ("EMOM 10" → 600); their duration IS the clock. For for-time / RFT
+   * metcons, set only when a cap is stated.
+   */
   time_cap_seconds?: number;
   /** Optional block-level notes for the athlete. */
   block_notes?: string;
+  /**
+   * Cardio machine for a `cardio` block. Ingestion only — null on
+   * generated blocks.
+   */
+  cardio_modality?: string;
   movements: MovementPrescription[];
 }
 
@@ -129,9 +160,13 @@ export interface MonthPlan {
   programming_priorities?: string;
 }
 
-/** Top-level structured program — what the writer emits. */
+/**
+ * Top-level structured program. Generation emits it with a `month_plan`
+ * (the 4-week-arc outline); ingestion (preprocess-program) emits it WITHOUT
+ * one — a coach's pasted program carries no structured arc rationale.
+ */
 export interface WriterOutput {
-  month_plan: MonthPlan;
+  month_plan?: MonthPlan;
   weeks: WeekPrescription[];
 }
 
@@ -289,6 +324,24 @@ export const MONTH_PLAN_SCHEMA = {
  * structure. The `days` array bounds are locked per-call to the
  * athlete's days_per_week so the schema and the day_count audit agree.
  */
+/**
+ * Tool definition for the SURGICAL block-rewrite path. Used when an audit
+ * trips a block-local violation and we want to rewrite that single block
+ * without regenerating the full program. Same BlockPrescription schema as
+ * the writer emits, just wrapped in a different tool.
+ *
+ * Pair with `tool_choice: { type: "tool", name: "emit_block" }` to force
+ * the model to produce a single block.
+ */
+export function buildEmitBlockTool(units: "lbs" | "kg", sessionLengthMinutes: number | null) {
+  return {
+    name: "emit_block",
+    description:
+      "Emit ONE corrected block to replace a block that failed an audit. Use the same schema as blocks in the writer's full program output — block_type from the canonical enum, optional block_label / block_scheme / time_cap_seconds / block_notes, and movements[] with display_name strings from the vocabulary.",
+    input_schema: buildBlockSchema(units, sessionLengthMinutes),
+  };
+}
+
 export function buildEmitProgramTool(daysPerWeek: number, units: "lbs" | "kg", sessionLengthMinutes: number | null) {
   return {
     name: "emit_program",
@@ -306,6 +359,91 @@ export function buildEmitProgramTool(daysPerWeek: number, units: "lbs" | "kg", s
         },
       },
       required: ["month_plan", "weeks"],
+      additionalProperties: false,
+    },
+  };
+}
+
+// ============================================================
+// Ingestion tool — preprocess-program parsing an external program
+// ============================================================
+
+/**
+ * Tool for INGESTING an externally-authored program (preprocess-program).
+ *
+ * Unlike buildEmitProgramTool (generation — locked to exactly 4 weeks ×
+ * N days, month_plan required, 8 block types), an ingested program is
+ * whatever the coach wrote: a variable number of weeks, irregular day
+ * counts, no month_plan, and block types that include 'cardio' and
+ * 'other'. The output still conforms to WriterOutput, so saveProgramV3
+ * persists it with no special-casing.
+ */
+export function buildIngestProgramTool() {
+  const movement = {
+    type: "object",
+    properties: {
+      movement: { type: "string", description: "Movement name (canonical/display name)." },
+      sets: { type: "integer", minimum: 1, maximum: 50 },
+      reps: { type: "integer", minimum: 1, maximum: 1000 },
+      weight: { type: "number", minimum: 0 },
+      weight_unit: { type: "string", enum: ["lbs", "kg"] },
+      rpe: { type: "integer", minimum: 1, maximum: 10 },
+      time_seconds: { type: "integer", minimum: 1, maximum: 14400 },
+      distance: { type: "number", minimum: 0 },
+      distance_unit: { type: "string", enum: ["ft", "m"] },
+      calories: { type: "number", minimum: 0, description: "For calorie-based cardio (e.g. '30 cal row')." },
+      cardio_modality: { type: "string", description: "Machine for a monostructural movement; from the modality list in the user message." },
+      scaling_note: { type: "string", maxLength: 500 },
+    },
+    required: ["movement"],
+    additionalProperties: false,
+  };
+  const block = {
+    type: "object",
+    properties: {
+      block_type: { type: "string", enum: INGEST_BLOCK_TYPES },
+      block_label: { type: "string", maxLength: 100 },
+      block_scheme: { type: "string", maxLength: 200 },
+      time_cap_seconds: { type: "integer", minimum: 1, maximum: 14400 },
+      block_notes: { type: "string", maxLength: 500 },
+      cardio_modality: { type: "string", description: "Machine for a 'cardio' block; from the modality list in the user message." },
+      movements: { type: "array", items: movement },
+    },
+    required: ["block_type", "movements"],
+    additionalProperties: false,
+  };
+  const day = {
+    type: "object",
+    properties: {
+      day_num: { type: "integer", minimum: 1, maximum: 7 },
+      blocks: { type: "array", minItems: 1, items: block },
+    },
+    required: ["day_num", "blocks"],
+    additionalProperties: false,
+  };
+  const week = {
+    type: "object",
+    properties: {
+      week_num: { type: "integer", minimum: 1, maximum: 52 },
+      days: { type: "array", minItems: 1, items: day },
+    },
+    required: ["week_num", "days"],
+    additionalProperties: false,
+  };
+  return {
+    name: "emit_ingested_program",
+    description:
+      "Emit the structured program parsed from the athlete's pasted or uploaded text. weeks[] holds one entry per week present in the source (use the week number as written, or 1 when the source is unlabelled); each week's days[] holds one entry per training day. Preserve the program exactly as written — do not invent, add, drop, or reorder days, blocks, or movements.",
+    input_schema: {
+      type: "object",
+      properties: {
+        weeks: {
+          type: "array",
+          minItems: 1,
+          items: week,
+        },
+      },
+      required: ["weeks"],
       additionalProperties: false,
     },
   };

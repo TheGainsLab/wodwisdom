@@ -12,8 +12,10 @@
 
 import {
   ALL_AUDITS,
+  AUDIT_KIND,
   SOFT_AUDITS,
   type AuditContext,
+  type AuditKind,
   type AuditResult,
 } from "./audits.ts";
 
@@ -99,6 +101,27 @@ export function formatViolationsForRetry(failures: AuditResult[]): string {
 export function summarizeAuditRun(result: AuditRunResult): string {
   const parts = result.all.map((r) => `${r.rule}=${r.passed ? "ok" : `FAIL(${r.violations.length})`}`);
   return parts.join(" ");
+}
+
+/**
+ * Group a list of failed audit results by their recovery `kind`.
+ * Unknown rules default to 'structural-writer' (safest fallback).
+ *
+ * Returned shape: { 'programmatic-fix': [...], 'block-local': [...], 'structural-writer': [...] }
+ * Used by the v3 audit-failure dispatcher to route each failure to the
+ * right recovery path.
+ */
+export function classifyFailuresByKind(failures: AuditResult[]): Record<AuditKind, AuditResult[]> {
+  const out: Record<AuditKind, AuditResult[]> = {
+    "programmatic-fix": [],
+    "block-local": [],
+    "structural-writer": [],
+  };
+  for (const f of failures) {
+    const kind: AuditKind = AUDIT_KIND[f.rule] ?? "structural-writer";
+    out[kind].push(f);
+  }
+  return out;
 }
 
 /**

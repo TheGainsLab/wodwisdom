@@ -613,6 +613,8 @@ export const ALL_AUDITS = [
   // complexes (snatch + OHS + snatch balance as one block). auditStrengthOneLift()
   // retained as a callable but no longer wired.
   (ctx: AuditContext): AuditResult => auditMetconOnePiece(ctx.output),
+  (ctx: AuditContext): AuditResult => auditMetconMonostructural(ctx.output),
+  (ctx: AuditContext): AuditResult => auditMetconBarbellLoads(ctx.output),
   (ctx: AuditContext): AuditResult => auditRequiredFields(ctx.output),
   (ctx: AuditContext): AuditResult => auditDayCount(ctx.output, ctx.daysPerWeek),
   (ctx: AuditContext): AuditResult => auditLoadSanity(ctx.output, ctx.lifts),
@@ -622,18 +624,35 @@ export const ALL_AUDITS = [
   // but no longer wired into the audit run.
 ] as const;
 
-// Soft audits — run after the program is saved, log violations only, never
-// trigger regen. Two reasons something goes here instead of ALL_AUDITS:
-//   1. An upstream fix is meant to catch it (e.g., roundToPlateMath at
-//      insert time handles plate-math); soft audit is a regression safety
-//      net.
-//   2. Failures are too common to justify a 3-attempt full-regen loop —
-//      the prompt-level prohibition handles prevention, the soft audit
-//      gives us visibility to measure how often it still slips through.
-//      If frequency is high enough to justify surgical block-regen, we'd
-//      build that and promote these to "block-local" ALL_AUDITS entries.
+/** Recovery strategy for each audit rule. The v3 audit-failure dispatcher
+ *  routes failures based on this:
+ *    - 'programmatic-fix' → patch the output in place, no LLM (cheapest)
+ *    - 'block-local'      → surgical LLM call to rewrite the affected block
+ *    - 'structural-writer' → fall through to writer-retry (last resort)
+ *  Skeleton-stage audits aren't here — they're handled by the skeleton-retry
+ *  loop in generate-program-v3.
+ */
+export type AuditKind = "programmatic-fix" | "block-local" | "structural-writer";
+
+export const AUDIT_KIND: Record<string, AuditKind> = {
+  // Programmatic — deterministic in-place patch
+  load_sanity: "programmatic-fix",
+  plate_math_safe: "programmatic-fix",
+  // Block-local — single block (or two) needs rewriting via surgical LLM call
+  metcon_one_piece: "block-local",
+  metcon_one_monostructural: "block-local",
+  metcon_barbell_one_load: "block-local",
+  required_fields: "block-local",
+  // Structural — whole-program issues; only writer-retry can fix
+  block_type_enum: "structural-writer",
+  day_count: "structural-writer",
+  structural_integrity: "structural-writer",
+};
+
+// Soft audits — run after save, log violations only, never trigger any
+// recovery. Use ONLY for safety-net checks where an upstream fix should
+// have caught the issue (e.g., roundToPlateMath at insert time handles
+// plate-math; the soft audit is a regression safety net).
 export const SOFT_AUDITS = [
-  (ctx: AuditContext): AuditResult => auditMetconMonostructural(ctx.output),
-  (ctx: AuditContext): AuditResult => auditMetconBarbellLoads(ctx.output),
   (ctx: AuditContext): AuditResult => auditPlateMath(ctx.output),
 ] as const;

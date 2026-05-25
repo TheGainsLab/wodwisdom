@@ -50,7 +50,10 @@ import {
   runSoftAudits,
   formatViolationsForRetry,
   summarizeAuditRun,
+  classifyFailuresByKind,
 } from "../_shared/audit-runner.ts";
+import { clampLoadSanity } from "../_shared/programmatic-fixes.ts";
+import { surgicallyRewriteBlock, spliceBlock } from "../_shared/surgical-block-fix.ts";
 import { reviewSafety, type SafetyReviewResult } from "../_shared/safety-review.ts";
 import { saveProgramV3 } from "../_shared/save-program-v3.ts";
 
@@ -293,6 +296,106 @@ async function generateSkeletonWithAudits(
   throw new SkeletonLoopExhausted(lastSkeleton, lastFailures);
 }
 
+/** Extract (week, day, blockIdx) tuples from a set of block-local audit
+ *  failures, grouping violation messages per block. One surgical call per
+ *  unique block — multiple audits flagging the same block get folded into
+ *  a single rewrite with all violation messages. */
+function groupBlockLocalFailures(
+  failures: ReturnType<typeof runAudits>["failures"],
+): Array<{ week: number; day: number; blockIdx: number; violations: string[] }> {
+  const map = new Map<string, { week: number; day: number; blockIdx: number; violations: string[] }>();
+  const pattern = /Week (\d+) Day (\d+) block\[(\d+)\]/;
+  for (const failure of failures) {
+    for (const v of failure.violations) {
+      const m = v.match(pattern);
+      if (!m) continue;
+      const week = parseInt(m[1], 10);
+      const day = parseInt(m[2], 10);
+      const blockIdx = parseInt(m[3], 10);
+      const key = `${week}-${day}-${blockIdx}`;
+      const entry = map.get(key) ?? { week, day, blockIdx, violations: [] };
+      entry.violations.push(v);
+      map.set(key, entry);
+    }
+  }
+  return [...map.values()];
+}
+
+/** Apply programmatic in-place patches for any 'programmatic-fix' audit
+ *  failures. Currently handles load_sanity. Returns the count of changes
+ *  for logging; output is mutated in place. */
+function applyProgrammaticFixes(
+  output: WriterOutput,
+  programmaticFailures: ReturnType<typeof runAudits>["failures"],
+  payload: WriterPayload,
+): { patched: number; log: string[] } {
+  let totalPatched = 0;
+  const log: string[] = [];
+  for (const failure of programmaticFailures) {
+    if (failure.rule === "load_sanity") {
+      const r = clampLoadSanity(output, payload.lifts);
+      totalPatched += r.patched;
+      log.push(...r.log);
+    }
+    // Future programmatic fixes go here.
+  }
+  return { patched: totalPatched, log };
+}
+
+/** Run one round of surgical block rewrites for the supplied block-local
+ *  failures. Each unique block gets ONE LLM call with all violation
+ *  messages for that block. Splices results back into output in place.
+ *  Returns the count of successful rewrites. */
+async function applySurgicalFixes(
+  output: WriterOutput,
+  blockLocalFailures: ReturnType<typeof runAudits>["failures"],
+  payload: WriterPayload,
+  skeleton: SkeletonOutput,
+  setStage: SetStage,
+): Promise<{ rewritten: number; failed: number }> {
+  const groups = groupBlockLocalFailures(blockLocalFailures);
+  if (groups.length === 0) return { rewritten: 0, failed: 0 };
+
+  await setStage("surgical_fix");
+  let rewritten = 0;
+  let failed = 0;
+  for (const g of groups) {
+    // Find the original block by location.
+    const week = (output.weeks ?? []).find((w) => w.week_num === g.week);
+    const day = week?.days?.find((d) => d.day_num === g.day);
+    const block = day?.blocks?.[g.blockIdx];
+    if (!block) { failed++; continue; }
+
+    const corrected = await surgicallyRewriteBlock(
+      payload, skeleton, g.week, g.day, g.blockIdx, block, g.violations,
+    );
+    if (!corrected) { failed++; continue; }
+
+    if (spliceBlock(output, g.week, g.day, g.blockIdx, corrected)) {
+      rewritten++;
+      console.log(`[generate-program-v3] surgical rewrote w${g.week}d${g.day}b${g.blockIdx} (${g.violations.length} violation${g.violations.length === 1 ? "" : "s"})`);
+    } else {
+      failed++;
+    }
+  }
+  return { rewritten, failed };
+}
+
+/**
+ * Generate the program with audit-failure recovery:
+ *   1. Writer call (attempt 1)
+ *   2. Run audits → pass: done
+ *   3. Classify failures by kind
+ *   4. Apply programmatic patches (load_sanity, etc.) — no LLM
+ *   5. Re-audit → pass: done
+ *   6. Apply surgical block rewrites for block-local failures (~30s/block)
+ *   7. Re-audit → pass: done
+ *   8. 1 surgical retry if remaining failures are still block-local
+ *   9. Writer-retry only when structural failures remain (or surgical exhausted)
+ *
+ * Writer-retry is the last resort — most failures recover via 4 / 6
+ * without ever burning another full writer call.
+ */
 async function generateProgramWithSkeleton(
   payload: WriterPayload,
   skeleton: SkeletonOutput,
@@ -301,6 +404,7 @@ async function generateProgramWithSkeleton(
   let retryViolations = "";
   let lastOutput: WriterOutput | null = null;
   let lastFailures: ReturnType<typeof runAudits>["failures"] = [];
+  const MAX_SURGICAL_PASSES = 2; // initial + 1 retry
 
   for (let attempt = 1; attempt <= MAX_AUDIT_ATTEMPTS; attempt++) {
     console.log(`[generate-program-v3] writer attempt ${attempt}/${MAX_AUDIT_ATTEMPTS}`);
@@ -308,7 +412,7 @@ async function generateProgramWithSkeleton(
     const output = await callFullProgramWriter(payload, skeleton, retryViolations);
     lastOutput = output;
     await setStage("auditing");
-    const auditResult = runAudits({
+    let auditResult = runAudits({
       output,
       daysPerWeek: payload.training_context.days_per_week,
       lifts: payload.lifts,
@@ -316,8 +420,77 @@ async function generateProgramWithSkeleton(
     });
     console.log(`[generate-program-v3] audits: ${summarizeAuditRun(auditResult)}`);
     if (auditResult.passed) return output;
+
+    // Classify and route to the cheapest recovery path that fits.
+    let byKind = classifyFailuresByKind(auditResult.failures);
+
+    // Step 1 — programmatic patches (no LLM call).
+    if (byKind["programmatic-fix"].length > 0) {
+      await setStage("patching");
+      const patch = applyProgrammaticFixes(output, byKind["programmatic-fix"], payload);
+      if (patch.patched > 0) {
+        console.log(`[generate-program-v3] programmatic patches applied: ${patch.patched}`);
+        for (const line of patch.log) console.log(`  - ${line}`);
+        auditResult = runAudits({
+          output,
+          daysPerWeek: payload.training_context.days_per_week,
+          lifts: payload.lifts,
+          vocabulary: payload.vocabulary,
+        });
+        console.log(`[generate-program-v3] audits after patch: ${summarizeAuditRun(auditResult)}`);
+        if (auditResult.passed) return output;
+        byKind = classifyFailuresByKind(auditResult.failures);
+      }
+    }
+
+    // Step 2 — surgical block rewrites for block-local failures.
+    if (byKind["block-local"].length > 0 && byKind["structural-writer"].length === 0) {
+      for (let surgicalPass = 1; surgicalPass <= MAX_SURGICAL_PASSES; surgicalPass++) {
+        if (surgicalPass > 1) await setStage("surgical_retry");
+        const sg = await applySurgicalFixes(output, byKind["block-local"], payload, skeleton, setStage);
+        console.log(`[generate-program-v3] surgical pass ${surgicalPass}: rewritten=${sg.rewritten} failed=${sg.failed}`);
+        if (sg.rewritten === 0) break; // surgical produced nothing; no point retrying
+
+        await setStage("surgical_reaudit");
+        auditResult = runAudits({
+          output,
+          daysPerWeek: payload.training_context.days_per_week,
+          lifts: payload.lifts,
+          vocabulary: payload.vocabulary,
+        });
+        console.log(`[generate-program-v3] audits after surgical pass ${surgicalPass}: ${summarizeAuditRun(auditResult)}`);
+        if (auditResult.passed) return output;
+
+        byKind = classifyFailuresByKind(auditResult.failures);
+        // If any structural failure surfaced, surgical can't fix it — break out
+        // and fall through to writer-retry below.
+        if (byKind["structural-writer"].length > 0) break;
+        // If no block-local failures remain (only programmatic), patch again.
+        if (byKind["block-local"].length === 0) {
+          if (byKind["programmatic-fix"].length > 0) {
+            const patch2 = applyProgrammaticFixes(output, byKind["programmatic-fix"], payload);
+            for (const line of patch2.log) console.log(`  - ${line}`);
+            auditResult = runAudits({
+              output,
+              daysPerWeek: payload.training_context.days_per_week,
+              lifts: payload.lifts,
+              vocabulary: payload.vocabulary,
+            });
+            if (auditResult.passed) return output;
+            byKind = classifyFailuresByKind(auditResult.failures);
+          }
+          break;
+        }
+      }
+    }
+
+    // Step 3 — fall through to writer-retry (next loop iteration) only if
+    // any failure remains. Structural failures get here directly; block-local
+    // failures arrive after surgical exhaustion.
+    if (auditResult.passed) return output;
     lastFailures = auditResult.failures;
     retryViolations = formatViolationsForRetry(auditResult.failures);
+    console.log(`[generate-program-v3] recovery exhausted at attempt ${attempt}, falling through to writer-retry`);
   }
 
   if (!lastOutput) {
