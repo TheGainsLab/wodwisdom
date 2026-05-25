@@ -613,8 +613,6 @@ export const ALL_AUDITS = [
   // complexes (snatch + OHS + snatch balance as one block). auditStrengthOneLift()
   // retained as a callable but no longer wired.
   (ctx: AuditContext): AuditResult => auditMetconOnePiece(ctx.output),
-  (ctx: AuditContext): AuditResult => auditMetconMonostructural(ctx.output),
-  (ctx: AuditContext): AuditResult => auditMetconBarbellLoads(ctx.output),
   (ctx: AuditContext): AuditResult => auditRequiredFields(ctx.output),
   (ctx: AuditContext): AuditResult => auditDayCount(ctx.output, ctx.daysPerWeek),
   (ctx: AuditContext): AuditResult => auditLoadSanity(ctx.output, ctx.lifts),
@@ -625,9 +623,17 @@ export const ALL_AUDITS = [
 ] as const;
 
 // Soft audits — run after the program is saved, log violations only, never
-// trigger regen. Use for safety-net checks where a fix elsewhere should have
-// caught the issue (e.g., plate-math rounding at insert time). If these
-// ever fire, that's a signal to investigate the upstream fix.
+// trigger regen. Two reasons something goes here instead of ALL_AUDITS:
+//   1. An upstream fix is meant to catch it (e.g., roundToPlateMath at
+//      insert time handles plate-math); soft audit is a regression safety
+//      net.
+//   2. Failures are too common to justify a 3-attempt full-regen loop —
+//      the prompt-level prohibition handles prevention, the soft audit
+//      gives us visibility to measure how often it still slips through.
+//      If frequency is high enough to justify surgical block-regen, we'd
+//      build that and promote these to "block-local" ALL_AUDITS entries.
 export const SOFT_AUDITS = [
+  (ctx: AuditContext): AuditResult => auditMetconMonostructural(ctx.output),
+  (ctx: AuditContext): AuditResult => auditMetconBarbellLoads(ctx.output),
   (ctx: AuditContext): AuditResult => auditPlateMath(ctx.output),
 ] as const;
