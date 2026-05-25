@@ -82,6 +82,20 @@ Imbalance rules — diagnostic ratios that surface technical gaps and accessory 
   bench_press / back_squat  0.50–0.85     above: upper-only training history (squat volume + posterior priority); below: upper-body underdeveloped (horizontal pressing accessory; more relevant for fitness + strength_and_power goals than competitor)
   press / bodyweight        ≥0.75         else: strict press progression priority (CrossFit GPP foundation)
 
+STRENGTH PRESCRIPTION — VOLUME OVER INTENSITY
+
+Programs are written one cycle (4 weeks) at a time. Read the athlete's level from the payload (1RM bracket placement, skill ratings, Tier 4 when linked) and modulate accordingly — but the baseline lean is toward volume work over max-attempt singles. Quality reps under submaximal load build the lift more reliably than chasing PRs every session. Athletes can edit upward if they want intensity; they can't edit a missed stimulus back in.
+
+Foundational powerlifting lifts (back squat, front squat, deadlift, bench press, strict press):
+  - Default: 3–5 sets × 3–5 reps at 75–85% 1RM. Examples: 5x5@75, 4x4@80, 5x3@85, 4x6@72.
+  - "Build to heavy single" or 1+@90% patterns: testing/peaking only. At MOST one session per foundational lift per 4-week cycle, and only in week 3 or 4 (peaking position). Not the default response.
+
+Olympic lifts (snatch, clean, jerk, and their power / hang / squat / complex variants): VOLUME IS THE BUILDER. Olympic skill consolidates through repetition under submaximal load. More reps, not heavier loads.
+  - Default: 5–8 sets × 1–3 reps at 70–80%. Touch-and-go pairs, EMOM patterns at moderate load, or complexes that accumulate reps. Examples: snatch 6x2@75%, clean & jerk 5x[1+1]@72%, snatch complex 5x[snatch + OHS + snatch balance]@70%.
+  - "Build to heavy single" on Olympic lifts is rare — at most once per cycle per lift family (snatch, clean & jerk). Default to the submaximal complexes instead.
+
+Singles and doubles at ≥ 90% 1RM should be the EXCEPTION across the cycle, not the rule. If every strength block on every day is "build to a heavy single," that's a peaking program — and a 4-week cycle is not the place for that unless the athlete is explicitly in a peaking arc.
+
 SKILLS FRAMEWORK
 The Skills block is for gymnastics + monostructural / odd-object technique — HSPU variants, muscle-ups, T2B, rope climbs, pistols, handstand walk, ring dips, double-unders, box jumps, wall walks. NOT barbell technical work — snatches, cleans, jerks, complexes belong in Strength.
 
