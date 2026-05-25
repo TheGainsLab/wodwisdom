@@ -179,7 +179,21 @@ Emit the program via the provided tool — structured JSON with weeks → days �
 
 For any strength / lift-variant accessory movement whose weight was reasoned from a % of 1RM (e.g. "@70-75%", "5x5 @75%", "Build to 90%"), also emit target_pct_1rm as the numeric midpoint of the range. Examples: "@70-75%" → 72.5, "@80%" → 80, "Build to a heavy single (~95%)" → 95. Skip target_pct_1rm for bodyweight work, skills movements, and metcon movements — those aren't 1RM-anchored. This field stores the writer's intent as data; it's read by Coach, the progress dashboards, and next cycle's writer to know what % zone the athlete trained.
 
-Every movement in a strength / accessory / metcon / skills block must populate at least one of sets, reps, weight, time_seconds, or distance — even when block_scheme already conveys the work pattern. The block_scheme is the human-readable structure ("21-15-9 for time", "AMRAP 12", "EMOM 10"); the per-movement fields carry the actual prescription that the audit reads. For "21-15-9" metcons, every movement gets reps: 21 (the first round's count). For AMRAP/EMOM, every movement gets its per-round reps. For chippers, every movement gets its total reps. Treat block_scheme as descriptive; treat reps / sets / weight / time_seconds / distance as the contract.
+Every movement in a strength / accessory / metcon / skills block must populate at least one of sets, reps, weight, time_seconds, or distance — even when block_scheme already conveys the work pattern. The block_scheme is the human-readable structure ("21-15-9 for time", "AMRAP 12", "EMOM 10"); the per-movement fields carry the actual prescription that the audit reads. Treat block_scheme as descriptive; treat reps / sets / weight / time_seconds / distance as the contract.
+
+WORK SPECIFIER — pick exactly ONE per movement, based on what counts the work for that movement. Never set both reps and distance, or both reps (as calories) and distance, on the same movement. The audit reads exactly one specifier.
+
+  - REP-counted (most barbell, gymnastics, dumbbell, kettlebell): set reps. Distance stays null. For "21-15-9" metcons, every rep-counted movement gets reps: 21 (the first round's count). For AMRAP/EMOM, per-round reps. For chippers, total reps.
+
+  - DISTANCE-counted (Row, Run, Swim, Ski-erg distance): set distance + distance_unit. Reps stays null — a 250m row is not "250 reps." For a "3 RFT: Row 250m, 12 Deadlift, 6 Bar MU" workout, the row movement gets distance: 250, distance_unit: 'm', reps: null. The deadlift and bar muscle-up get reps: 12 and reps: 6 respectively.
+
+  - CALORIE-counted (Bike, Ski-erg calories, Cal Row): set reps (the calorie count) + scaling_note: 'Calories'. Distance stays null. Reps here represents calories, signaled to downstream by the scaling_note.
+
+  - TIME-counted (a max-effort hold for X seconds, a tabata-style work interval): set time_seconds. Reps and distance stay null.
+
+These categories are mutually exclusive at the movement level. A single workout can mix categories across its movements (a metcon can pair a row with deadlifts), but each movement uses exactly one.
+
+For AMRAP and EMOM metcon blocks, ALWAYS emit time_cap_seconds as the block's fixed clock window in seconds — "AMRAP 12" → 720, "EMOM 10" → 600. Their duration IS the clock, not an optional cap. For for-time / RFT metcons, emit time_cap_seconds only when the workout states a cap.
 
 EXAMPLE OUTPUT (one day of one week — actual output emits all 4 weeks × days_per_week days):
 {

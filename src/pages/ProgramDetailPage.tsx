@@ -453,14 +453,16 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                         // v3: read from program_blocks_v2 (in v3BlocksByWorkout).
                                         // Show strength, metcon, skills, accessory preview lines.
                                         (v3BlocksByWorkout.get(w.id) ?? [])
-                                          .filter((b) => ['strength', 'metcon', 'skills', 'accessory'].includes(b.block_type))
+                                          .filter((b) => ['strength', 'metcon', 'cardio', 'skills', 'accessory', 'other'].includes(b.block_type))
                                           .map((b) => {
                                             const label = BLOCK_DISPLAY[b.block_type] ?? b.block_type.charAt(0).toUpperCase() + b.block_type.slice(1);
-                                            // Prefer block_label, then block_scheme, then first movement name.
+                                            // Prefer block_scheme (most informative — "5x5 @80%",
+                                            // "21-15-9 for time"), then block_label, then first movement.
                                             const text =
-                                              (b.block_label && b.block_label.trim()) ||
                                               (b.block_scheme && b.block_scheme.trim()) ||
-                                              (b.movements[0]?.movement ?? '');
+                                              (b.block_label && b.block_label.trim()) ||
+                                              (b.movements[0]?.movement ?? '') ||
+                                              (b.block_type === 'other' ? 'Rest day' : '');
                                             const trimmed = text.length > 40 ? text.slice(0, 38) + '…' : text;
                                             return (
                                               <div key={b.id} className="program-day-summary-line">
@@ -631,13 +633,19 @@ function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
   if (!blocks.length) return '';
   const fmt = (m: ProgramMovementV2) => {
     const parts: string[] = [];
-    if (m.sets != null && m.reps != null) parts.push(`${m.sets}×${m.reps}`);
-    else if (m.sets != null) parts.push(`${m.sets} sets`);
-    else if (m.reps != null) parts.push(`${m.reps} reps`);
+    // Distance-based movements (row/run/bike/etc.) use distance as the work
+    // spec; reps is meaningless there. Writer sometimes emits both — prefer
+    // distance and drop reps to avoid "Row 250 reps · 250m".
+    const hasDistance = m.distance != null;
+    if (!hasDistance) {
+      if (m.sets != null && m.reps != null) parts.push(`${m.sets}×${m.reps}`);
+      else if (m.sets != null) parts.push(`${m.sets} sets`);
+      else if (m.reps != null) parts.push(`${m.reps} reps`);
+    }
     if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? 'lbs'}`);
     if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
-    if (m.time_seconds != null) parts.push(`${m.time_seconds}s`);
-    if (m.distance != null) parts.push(`${m.distance}${m.distance_unit ?? ''}`);
+    if (m.time_seconds != null) parts.push(formatDuration(m.time_seconds));
+    if (hasDistance) parts.push(`${m.distance}${m.distance_unit ?? ''}`);
     const scheme = parts.length > 0 ? ` — ${parts.join(' · ')}` : '';
     const scaling = m.scaling_note ? ` (${m.scaling_note})` : '';
     return `${m.movement}${scheme}${scaling}`;
@@ -683,9 +691,18 @@ const BLOCK_DISPLAY: Record<string, string> = {
   'strength': 'Strength',
   'accessory': 'Accessory',
   'metcon': 'Metcon',
+  'cardio': 'Cardio',
   'active-recovery': 'Recovery',
   'cool-down': 'Cool down',
+  'other': 'Other',
 };
+
+/** Render a duration human-friendly: 2400 → "40 min", 90 → "1:30", 30 → "30s". */
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds % 60 === 0) return `${seconds / 60} min`;
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
 
 function V3DayView({ blocks }: V3DayViewProps) {
   if (!blocks.length) {
@@ -755,16 +772,22 @@ function V3BlockCard({ block }: { block: ProgramBlockV2 }) {
 
 function V3MovementRow({ movement }: { movement: ProgramMovementV2 }) {
   const parts: string[] = [];
-  if (movement.sets != null && movement.reps != null) parts.push(`${movement.sets}×${movement.reps}`);
-  else if (movement.sets != null) parts.push(`${movement.sets} sets`);
-  else if (movement.reps != null) parts.push(`${movement.reps} reps`);
+  // Distance-based movements (row/run/bike/etc.) use distance as the work
+  // spec; reps is meaningless there. Writer sometimes emits both — prefer
+  // distance and drop reps to avoid "Row 250 reps · 250m".
+  const hasDistance = movement.distance != null;
+  if (!hasDistance) {
+    if (movement.sets != null && movement.reps != null) parts.push(`${movement.sets}×${movement.reps}`);
+    else if (movement.sets != null) parts.push(`${movement.sets} sets`);
+    else if (movement.reps != null) parts.push(`${movement.reps} reps`);
+  }
   if (movement.weight != null) {
     const pct = movement.target_pct_1rm != null ? ` (${Math.round(movement.target_pct_1rm)}%)` : '';
     parts.push(`${movement.weight}${movement.weight_unit ?? 'lbs'}${pct}`);
   }
   if (movement.rpe != null) parts.push(`RPE ${movement.rpe}`);
-  if (movement.time_seconds != null) parts.push(`${movement.time_seconds}s`);
-  if (movement.distance != null) parts.push(`${movement.distance}${movement.distance_unit ?? ''}`);
+  if (movement.time_seconds != null) parts.push(formatDuration(movement.time_seconds));
+  if (hasDistance) parts.push(`${movement.distance}${movement.distance_unit ?? ''}`);
   const prescription = parts.join(' · ');
 
   return (
