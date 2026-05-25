@@ -12,6 +12,7 @@
 
 import {
   ALL_AUDITS,
+  SOFT_AUDITS,
   type AuditContext,
   type AuditResult,
 } from "./audits.ts";
@@ -98,4 +99,17 @@ export function formatViolationsForRetry(failures: AuditResult[]): string {
 export function summarizeAuditRun(result: AuditRunResult): string {
   const parts = result.all.map((r) => `${r.rule}=${r.passed ? "ok" : `FAIL(${r.violations.length})`}`);
   return parts.join(" ");
+}
+
+/**
+ * Run SOFT audits — log-only checks that never block save. Use when an
+ * upstream fix (e.g., roundToPlateMath at insert time) should have caught
+ * an issue but we want a safety-net check. Call this AFTER the program
+ * has been saved; surface violations to logs so we can spot regressions
+ * in the upstream fix.
+ */
+export function runSoftAudits(ctx: AuditContext): AuditRunResult {
+  const all = SOFT_AUDITS.map((fn) => fn(ctx));
+  const failures = all.filter((r) => !r.passed);
+  return { passed: failures.length === 0, failures, all };
 }

@@ -159,6 +159,8 @@ CYCLE-LEVEL COVERAGE REQUIREMENTS
 Combine-prevention (also enforced post-hoc by audit):
   - A metcon block contains exactly ONE main conditioning piece (no three glued together).
   - A day has at most ONE metcon block.
+  - At most ONE monostructural cardio modality per metcon block. Pick ONE of Row / Bike / Ski-erg / Run / Swim — never two in the same workout, even in a deload week. Athletes have one machine in front of them; mid-workout machine swaps are awkward and not standard programming. If you want multiple modalities, give them separate days, or use one as a warm-up / cool-down.
+  - Barbell movements within a single metcon block must share ONE load. Two different barbell exercises at two different weights (e.g., Deadlift @225 + Push Press @135) forces mid-workout plate swaps — bad metcon design. Either pick ONE barbell movement for the metcon, OR use a complex where all barbell movements share the same load (DT-style: Deadlift + Hang Power Clean + Push Jerk all at 155). Same load = same bar setup = a real workout.
 
 ACCESSORY DESIGN
 Accessory selection must directly address the top 2–3 closable gaps in the athlete's Tier 4 profile. Read competition.fitness_signature.closable_gaps (ordered biggest-first) and competition.movement_affinity.by_movement for sub-50th-percentile movements. If midline (GHD sit-ups, V-ups, weighted sit-ups, hanging leg raises) appears among those gaps, every Accessory block must include at least one DYNAMIC midline movement — not just isometric holds. Holds train stability; dynamic midline trains the failure mode that competition tests.

@@ -170,6 +170,164 @@ export function auditMetconOnePiece(output: WriterOutput): AuditResult {
 }
 
 // ============================================================
+// Rule — at most one monostructural cardio modality per metcon block
+// ============================================================
+//
+// Athletes typically have one machine in front of them. Mixing Row + Bike
+// (or any two of Row / Bike / Ski-erg / Run / Swim) in the same metcon
+// round forces equipment swaps mid-workout — almost always a writer error.
+
+const MONOSTRUCTURAL_KEYWORDS = [
+  "row", "rowing",
+  "bike", "biking", "assault bike", "echo bike", "schwinn", "bike erg",
+  "ski erg", "ski-erg", "ski",
+  "run", "running",
+  "swim", "swimming",
+];
+
+// Strength-row variants — name contains "row" but isn't the rowing machine.
+const ROW_NON_MACHINE_KEYWORDS = [
+  "dumbbell row", "db row", "barbell row", "bent over row", "bent-over row",
+  "ring row", "inverted row", "single arm row", "single-arm row",
+  "pendlay row", "kroc row", "seal row", "t-bar", "tbar",
+];
+
+function isMonostructural(movement: string): boolean {
+  const n = movement.toLowerCase();
+  if (n.includes("row") && ROW_NON_MACHINE_KEYWORDS.some((k) => n.includes(k))) return false;
+  return MONOSTRUCTURAL_KEYWORDS.some((k) => n.includes(k));
+}
+
+function monostructuralFamily(movement: string): string {
+  const n = movement.toLowerCase();
+  if (n.includes("row")) return "row";
+  if (n.includes("bike")) return "bike";
+  if (n.includes("ski")) return "ski";
+  if (n.includes("swim")) return "swim";
+  if (n.includes("run")) return "run";
+  return n;
+}
+
+export function auditMetconMonostructural(output: WriterOutput): AuditResult {
+  const violations: string[] = [];
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        if (b.block_type !== "metcon") continue;
+        const families = new Set<string>();
+        for (const m of safeMovements(b)) {
+          if (isMonostructural(m.movement)) families.add(monostructuralFamily(m.movement));
+        }
+        if (families.size > 1) {
+          violations.push(
+            `Week ${week.week_num} Day ${day.day_num} block[${i}] (metcon): contains ${families.size} monostructural cardio modalities (${[...families].join(", ")}). Pick one per metcon block — athletes typically have one machine available; mid-workout machine swaps are bad programming.`,
+          );
+        }
+      }
+    }
+  }
+  return { rule: "metcon_one_monostructural", passed: violations.length === 0, violations };
+}
+
+// ============================================================
+// Rule — barbell movements in a metcon share a single load
+// ============================================================
+//
+// Multiple distinct barbell movements in a metcon are fine ONLY when they
+// share the same load (DT, Bear Complex — all at one bar setup). Different
+// loads mid-workout means swapping plates, which is bad metcon design.
+// Flag when there are 2+ barbell movements AND 2+ distinct loads.
+
+const BARBELL_KEYWORDS = [
+  "snatch", "clean", "jerk", "thruster",
+  "deadlift", "rdl",
+  "back squat", "front squat", "overhead squat",
+  "push press", "strict press", "shoulder press", "overhead press", "bench press",
+  "shoulder to overhead", "ground to overhead",
+  "barbell row", "bent over row", "bent-over row", "pendlay row",
+];
+
+const NON_BARBELL_QUALIFIERS = [
+  "dumbbell", "kettlebell", " db ", " kb ", "single arm", "single-arm",
+  "sandbag", "medicine ball", "med ball", "wall ball", "odd object",
+];
+
+function isBarbellLoadedMovement(movement: string): boolean {
+  const n = ` ${movement.toLowerCase()} `;
+  if (NON_BARBELL_QUALIFIERS.some((k) => n.includes(k))) return false;
+  return BARBELL_KEYWORDS.some((k) => n.includes(k));
+}
+
+export function auditMetconBarbellLoads(output: WriterOutput): AuditResult {
+  const violations: string[] = [];
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        if (b.block_type !== "metcon") continue;
+        const barbell: Array<{ name: string; weight: number | null }> = [];
+        for (const m of safeMovements(b)) {
+          if (isBarbellLoadedMovement(m.movement)) {
+            barbell.push({ name: m.movement, weight: m.weight ?? null });
+          }
+        }
+        if (barbell.length < 2) continue;
+        const distinctLoads = new Set(barbell.map((x) => x.weight));
+        if (distinctLoads.size > 1) {
+          const summary = barbell.map((x) => `${x.name} @ ${x.weight ?? "?"}`).join(", ");
+          violations.push(
+            `Week ${week.week_num} Day ${day.day_num} block[${i}] (metcon): contains ${barbell.length} barbell movements at ${distinctLoads.size} different loads (${summary}). Pick one barbell movement, or use a complex where all barbells share a single load (DT-style). Mid-workout plate swaps are bad metcon programming.`,
+          );
+        }
+      }
+    }
+  }
+  return { rule: "metcon_barbell_one_load", passed: violations.length === 0, violations };
+}
+
+// ============================================================
+// SOFT AUDIT — plate-math sanity (log-only, NOT in ALL_AUDITS)
+// ============================================================
+//
+// roundToPlateMath in generate-program-v3/index.ts already rounds weights
+// to liftable plate increments (lbs → 5, kg → 2.5) at insert time. This
+// audit is a belt-and-suspenders safety net: if a non-plate-math weight
+// ever lands on a movement, we want to see it in the logs so we can
+// track down the regression. Run separately, never blocks save.
+
+function isPlateMathSafe(weight: number, unit: string | null): boolean {
+  const step = unit === "kg" ? 2.5 : 5;
+  const ratio = weight / step;
+  return Math.abs(ratio - Math.round(ratio)) < 0.01;
+}
+
+export function auditPlateMath(output: WriterOutput): AuditResult {
+  const violations: string[] = [];
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        for (let mi = 0; mi < safeMovements(b).length; mi++) {
+          const m = safeMovements(b)[mi];
+          if (m.weight == null || m.weight <= 0) continue;
+          if (!isPlateMathSafe(m.weight, m.weight_unit ?? null)) {
+            const step = m.weight_unit === "kg" ? "2.5kg" : "5lb";
+            violations.push(
+              `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type}) movement[${mi}] (${m.movement}): weight ${m.weight}${m.weight_unit ?? ""} is not divisible by ${step}. roundToPlateMath should have caught this — investigate.`,
+            );
+          }
+        }
+      }
+    }
+  }
+  return { rule: "plate_math_safe", passed: violations.length === 0, violations };
+}
+
+// ============================================================
 // Rule 4 — required-fields existence
 // ============================================================
 
@@ -455,6 +613,8 @@ export const ALL_AUDITS = [
   // complexes (snatch + OHS + snatch balance as one block). auditStrengthOneLift()
   // retained as a callable but no longer wired.
   (ctx: AuditContext): AuditResult => auditMetconOnePiece(ctx.output),
+  (ctx: AuditContext): AuditResult => auditMetconMonostructural(ctx.output),
+  (ctx: AuditContext): AuditResult => auditMetconBarbellLoads(ctx.output),
   (ctx: AuditContext): AuditResult => auditRequiredFields(ctx.output),
   (ctx: AuditContext): AuditResult => auditDayCount(ctx.output, ctx.daysPerWeek),
   (ctx: AuditContext): AuditResult => auditLoadSanity(ctx.output, ctx.lifts),
@@ -462,4 +622,12 @@ export const ALL_AUDITS = [
   // vocabulary enforcement; v2 reverted to free movement naming with
   // RAG grounding. auditVocabularyCompliance() retained as a callable
   // but no longer wired into the audit run.
+] as const;
+
+// Soft audits — run after the program is saved, log violations only, never
+// trigger regen. Use for safety-net checks where a fix elsewhere should have
+// caught the issue (e.g., plate-math rounding at insert time). If these
+// ever fire, that's a signal to investigate the upstream fix.
+export const SOFT_AUDITS = [
+  (ctx: AuditContext): AuditResult => auditPlateMath(ctx.output),
 ] as const;

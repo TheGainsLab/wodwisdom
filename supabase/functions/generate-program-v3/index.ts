@@ -47,10 +47,12 @@ import {
 } from "../_shared/v3-skeleton-audits.ts";
 import {
   runAudits,
+  runSoftAudits,
   formatViolationsForRetry,
   summarizeAuditRun,
 } from "../_shared/audit-runner.ts";
 import { reviewSafety, type SafetyReviewResult } from "../_shared/safety-review.ts";
+import { saveProgramV3 } from "../_shared/save-program-v3.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -383,9 +385,11 @@ async function runSafetyLoop(
 }
 
 // ============================================================
-// Save — clones v2's saveProgramV2 with program_version='v3'.
+// Save — saveProgramV3 lives in _shared/save-program-v3.ts, shared with
+// preprocess-program (freelance ingestion). Imported above.
 // ============================================================
 
+<<<<<<< Updated upstream
 interface InsertedWorkout {
   id: string;
   week_num: number;
@@ -563,6 +567,8 @@ async function saveProgramV3(
   }
 }
 
+=======
+>>>>>>> Stashed changes
 // ============================================================
 // processJob — full orchestration
 // ============================================================
@@ -625,10 +631,33 @@ async function processJob(jobId: string, userId: string) {
     let programId: string | null = null;
     try {
       await setStage("saving");
-      programId = await saveProgramV3(supa, userId, output, skeleton);
+      programId = await saveProgramV3(supa, userId, output, { name: "AI Programmer (v3)", skeleton });
       console.log(`[generate-program-v3 worker] persisted program ${programId}`);
     } catch (saveErr) {
       console.error("[generate-program-v3 worker] save failed:", saveErr);
+    }
+
+    // SOFT AUDITS — log-only safety-net checks. Run after save so a violation
+    // doesn't block the user's program; we surface it to logs for visibility.
+    // Plate-math sanity lives here: roundToPlateMath at insert time should have
+    // handled it; if this fires, that path regressed.
+    try {
+      const soft = runSoftAudits({
+        output,
+        daysPerWeek: payload.training_context.days_per_week,
+        lifts: payload.lifts,
+        vocabulary: payload.vocabulary,
+      });
+      if (!soft.passed) {
+        for (const failure of soft.failures) {
+          console.warn(`[generate-program-v3 worker] SOFT AUDIT FAIL [${failure.rule}]:`);
+          for (const v of failure.violations) console.warn(`  - ${v}`);
+        }
+      } else {
+        console.log(`[generate-program-v3 worker] soft audits: ${summarizeAuditRun(soft)}`);
+      }
+    } catch (softErr) {
+      console.warn("[generate-program-v3 worker] soft audit error (non-fatal):", softErr);
     }
 
     const elapsedMs = Date.now() - t0;
