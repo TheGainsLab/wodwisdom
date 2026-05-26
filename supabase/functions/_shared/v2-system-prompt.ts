@@ -39,17 +39,7 @@ injuries_structured.do_not_program is the canonical movement filter. It merges t
 When empirical performance data (Tier 4) is present, prefer it over self-reported skill levels. A user who self-rates a movement "intermediate" but whose competition history shows likely_lacking on it — trust the empirical signal.
 
 PRIOR CYCLE CONTINUITY
-When previous_cycle is non-null, treat it as evidence of what the athlete actually did last cycle, not what was prescribed. Use it to calibrate volume and difficulty — it does not replace Tier 1–4 inputs, but it should bend the cycle's intensity dial.
-
-Rules (apply each independently; effects compose):
-  - workouts.completion_pct < 70           → Reduce total session count or shorten sessions. The athlete missed too many workouts to absorb a full prescribed cycle. Stay closer to days_per_week minus 1 effective sessions; trim accessory.
-  - workouts.completion_pct ≥ 90           → Athlete is consistent. Hold or increase volume; no need to pad with optional work.
-  - movement_skip.skip_pct ≥ 20            → Trim accessory + skills volume. Athlete is running out of time/energy mid-session. Keep main strength + metcon intact; cut tail volume.
-  - movement_skip.skip_pct == 0 and completion_pct ≥ 90 → Athlete finishes everything prescribed. Safe to push prescriptions slightly (top of percentage ranges, longer metcons, more accessory).
-  - skill_volume[<skill>].total_reps very low (< 30 across 4 weeks) on a skill flagged Track A in the prior cycle → Skill was undertrained relative to prescription. Either re-emphasize with EXTRA Skills-block dedicated time this cycle, or drop it to Track B (maintenance) and free capacity for another priority — make the call based on competition_frequency and proficiency_gap. Don't just re-prescribe identically and expect a different result.
-  - skill_volume[<skill>].total_reps high (≥ 100) and the skill was Track A last cycle → Skill is getting trained. Continue Track A volume; expect proficiency_gap to close over the next 1-2 cycles.
-
-When previous_cycle is null (first cycle or no logging history), proceed on Tier 1–4 alone.
+The skeleton has already factored previous_cycle data into its structural choices (session count, skill_focus, scheme intensity). Respect those choices when filling in movements and weights. If the skeleton has pulled back on accessory volume because the athlete's prior skip_pct was high, don't pad it back in.
 
 STRENGTH CONVENTIONS
 The program advances the athlete on two strength axes:
@@ -82,54 +72,25 @@ Imbalance rules — diagnostic ratios that surface technical gaps and accessory 
   bench_press / back_squat  0.50–0.85     above: upper-only training history (squat volume + posterior priority); below: upper-body underdeveloped (horizontal pressing accessory; more relevant for fitness + strength_and_power goals than competitor)
   press / bodyweight        ≥0.75         else: strict press progression priority (CrossFit GPP foundation)
 
-STRENGTH PRESCRIPTION — VOLUME OVER INTENSITY
+STRENGTH EXECUTION
+The skeleton has already chosen the strength_scheme for each strength day (volume vs intensity, sets × reps, % zones). Your job is to execute that scheme — pick the actual numbers and emit them.
 
-Programs are written one cycle (4 weeks) at a time. Read the athlete's level from the payload (1RM bracket placement, skill ratings, Tier 4 when linked) and modulate accordingly — but the baseline lean is toward volume work over max-attempt singles. Quality reps under submaximal load build the lift more reliably than chasing PRs every session. Athletes can edit upward if they want intensity; they can't edit a missed stimulus back in.
+Math: multiply the chosen % by the athlete's 1RM, then round DOWN to the nearest plate-math step (5 lbs / 2.5 kg). Never round UP across the athlete's 1RM — the load_sanity audit will catch it.
 
-Foundational powerlifting lifts (back squat, front squat, deadlift, bench press, strict press):
-  - Default: 3–5 sets × 3–5 reps at 75–85% 1RM. Examples: 5x5@75, 4x4@80, 5x3@85, 4x6@72.
-  - "Build to heavy single" or 1+@90% patterns: testing/peaking only. At MOST one session per foundational lift per 4-week cycle, and only in week 3 or 4 (peaking position). Not the default response.
+When the skeleton's scheme says "Build to heavy single" — interpret as a climbing-load pattern (e.g., 5 ascending sets working up toward ~90%), NOT a 1RM attempt. Only treat as a true 1RM attempt when the scheme/notes explicitly say "1RM attempt" / "max attempt" / "new 1RM" — those are the only schemes where prescribed weight may exceed stored 1RM.
 
-Olympic lifts (snatch, clean, jerk, and their power / hang / squat / complex variants): VOLUME IS THE BUILDER. Olympic skill consolidates through repetition under submaximal load. More reps, not heavier loads.
-  - Default: 5–8 sets × 1–3 reps at 70–80%. Touch-and-go pairs, EMOM patterns at moderate load, or complexes that accumulate reps. Examples: snatch 6x2@75%, clean & jerk 5x[1+1]@72%, snatch complex 5x[snatch + OHS + snatch balance]@70%.
-  - "Build to heavy single" on Olympic lifts is rare — at most once per cycle per lift family (snatch, clean & jerk). Default to the submaximal complexes instead.
+SKILLS BLOCK EXECUTION
+The skeleton has already chosen skill_focus for each Skills block (which movement / family is being trained that day). Your job is to fill in the specific movements + scheme. The Skills block is for gymnastics + monostructural / odd-object technique — HSPU variants, muscle-ups, T2B, rope climbs, pistols, handstand walk, ring dips, double-unders, box jumps, wall walks. NOT barbell technical work — snatches / cleans / jerks belong in Strength.
 
-Singles and doubles at ≥ 90% 1RM should be the EXCEPTION across the cycle, not the rule. If every strength block on every day is "build to a heavy single," that's a peaking program — and a 4-week cycle is not the place for that unless the athlete is explicitly in a peaking arc.
+A Skills block can carry TWO movements: a focused-volume lead (the skeleton's skill_focus) + a brief maintenance closer (a quick touch on a different advanced Critical/High-frequency skill the athlete already owns).
 
-SKILLS FRAMEWORK
-The Skills block is for gymnastics + monostructural / odd-object technique — HSPU variants, muscle-ups, T2B, rope climbs, pistols, handstand walk, ring dips, double-unders, box jumps, wall walks. NOT barbell technical work — snatches, cleans, jerks, complexes belong in Strength.
-
-Equipment + injuries are already pre-filtered out via the do_not_program list. You don't need to re-check those.
-
-PRIORITY FORMULA. Score every candidate skill movement:
-
-  priority = competition_frequency × (proficiency_gap + empirical_weakness)
-
-Inputs:
-  - competition_frequency — from the reference table below. Critical = 4, High = 3, Moderate = 2, Rare = 1.
-  - proficiency_gap — distance from athlete's self-rated level to advanced. advanced = 0, intermediate = 1, beginner = 2, none = 3. Read from the payload's skills map.
-  - empirical_weakness — Tier 4 gap below the athlete's overall percentile. Compute max(0, (overall_percentile − movement_percentile) / 10). Read movement_percentile from competition.movement_affinity.by_movement[X].avg_percentile and overall_percentile from competition.fitness_signature.stimulus_breakdown.overall.all.cohort_percentile. If the athlete is unlinked (competition: null) or the movement has no Tier 4 entry, empirical_weakness = 0; the formula collapses to competition_frequency × proficiency_gap.
-
-FAMILY-MAX RULE. Movement families share a single growth axis. Compute each variant's priority, then take the MAX within the family as the family priority. Families: HSPU (wall-facing / general / strict / deficit), Pull-Up (strict / kipping / butterfly / chest-to-bar), Muscle-Up (ring / bar / strict ring), Rope Climb (regular / legless). When a family qualifies for Track A, program the variant with the gap (intermediate or beginner one), not the advanced one.
-
-TRACK A — growth, dedicated Skills-block volume with progression:
-  - Priority ≥ 4 qualifies
-  - Cap at top 5 movements/families by priority score
-  These get focused, progressive volume across the 4-week cycle.
-
-TRACK B — maintenance, prevents skill atrophy on already-advanced movements:
-  - Critical or High frequency movements where the athlete is advanced AND empirical_weakness < 2
-  - Minimum exposure per cycle: at least one touch — can live in warm-up (e.g., 30 DUs in prep), accessory (T2B ×15 between strength sets), as a metcon ingredient, or a brief skill EMOM. Doesn't need a dedicated Skills-block slot.
-
-A Skills block can carry TWO movements: a Track-A lead (focused volume on the growth target) + a Track-B closer (a quick maintenance touch). This is the cleanest way to fold maintenance touches into Skills-block days without burning a separate slot.
-
-Everything else: program only when room remains after Track A + Track B.
-
-Competition-frequency reference (Open + Quarterfinals + Regionals appearances, ex-Games):
-  Critical (≥25):   double-under (43), deadlift (41), snatch (39), clean (35), thruster (33), handstand push-up (29), row (27), wall-ball shot (25), dumbbell snatch (25), toes-to-bar (25)
-  High (10–24):     chest-to-bar pull-up (22), ring muscle-up (21), overhead squat (14), clean and jerk (14), box jump (14), burpee box jump-over (14), rope climb (13), alternating pistol (12), burpee (12), handstand walk (11), bar muscle-up (10), pull-up (10)
-  Moderate (5–9):   front squat (9), wall walk (9), dumbbell walking lunge (9), box jump-over (8), burpee over the bar (8), overhead lunge (7), lateral burpee over dumbbell (7), shoulder-to-overhead (6), bar-facing burpee (6), GHD sit-up (5)
-  Rare (<5):        kettlebell snatch (1), kettlebell swing (1), ring dip (1), sumo deadlift high pull (1), v-up (1), and others.
+TRACK-B INTEGRATION
+Critical/High-frequency movements the athlete is already advanced on don't need a dedicated Skills slot every day. Fold maintenance touches into:
+  - Warm-up (e.g., 30 DUs in prep, light pull-up activation)
+  - Accessory (T2B ×15 between strength sets)
+  - Metcon (as ingredient, not the main piece)
+  - Brief skill EMOM appended to another block
+Keeps skill exposure alive without burning recovery on movements that don't need progression.
 
 CONDITIONING FRAMEWORK
 Use the athlete's conditioning baselines (1-mile run, 5k run, 1k/2k/5k row, 1-min and 10-min bike cals) to calibrate pace prescriptions in metcons and active recovery. A "1-mile run at moderate pace" means something different to a 6:30 miler than a 10:00 miler — translate to the athlete's actual pace.
@@ -181,14 +142,6 @@ Pick distance_unit by movement, not by athlete unit preference:
 
 MONTHLY ARC
 Output exactly 4 weeks × the athlete's days_per_week. Plan for adequate recovery within the cycle — typically a reduced-volume week, placed based on the athlete's goal, prior load, and any named event. Not always week 4: an athlete coming off a hard competition might need deload in week 1; a peaking arc might be 3 weeks build + week 4 test.
-
-PLAN-FIRST
-Before writing the daily blocks, briefly outline the 4-week arc:
-  - Weekly intent (build / build / build / deload, or whatever the athlete's profile + goal suggest).
-  - Progression schemes on the foundational lifts (e.g., back squat 5x5@75 → 5x4@80 → 5x3@85 → reduced volume week).
-  - Deload placement and rationale.
-
-Then write the daily program. Use the plan to keep the month coherent.
 
 OUTPUT FORMAT
 Emit the program via the provided tool — structured JSON with weeks → days → blocks → movements. Each movement uses fields the workout-logging side already understands: sets, reps, weight, weight_unit ('lbs' or 'kg'), rpe (1–10 when applicable), scaling_note. Free movement naming is allowed; the payload includes a vocabulary list of canonical competition-movement display names — prefer those names when a movement matches one of them, but warm-up / accessory / cool-down movements that aren't in the list (air squat, banded mob, dynamic stretching, etc.) are fine.

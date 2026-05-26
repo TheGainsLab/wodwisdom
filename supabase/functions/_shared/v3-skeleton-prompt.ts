@@ -25,6 +25,17 @@ Read the goal text and the injuries text as written. Don't bucket either — the
 injuries_structured.do_not_program is the canonical filter. Honor it when picking primary lifts and metcon / skill focus.
 When empirical performance data (Tier 4) is present, prefer it over self-reported skill levels.
 
+PRIOR CYCLE CONTINUITY (when previous_cycle is non-null)
+Treat previous_cycle as evidence of what the athlete actually completed, not what was prescribed. It should bend the cycle's structural choices:
+  - workouts.completion_pct < 70 → Reduce session count or shorten sessions. The athlete missed too many workouts to absorb a full prescribed cycle.
+  - workouts.completion_pct ≥ 90 → Athlete is consistent. Hold or increase volume.
+  - movement_skip.skip_pct ≥ 20 → Trim accessory + skills volume across the cycle. Athlete is running out of time/energy mid-session — keep main strength + metcon intact.
+  - movement_skip.skip_pct == 0 AND completion_pct ≥ 90 → Athlete finishes everything. Push schemes slightly (top of percentage ranges, longer metcons, more accessory).
+  - skill_volume[<skill>].total_reps very low (< 30) on a Track-A skill from prior cycle → Either re-emphasize with extra Skills-block time, or drop to Track B and free capacity. Decide based on competition_frequency + proficiency_gap.
+  - skill_volume[<skill>].total_reps high (≥ 100) and the skill was Track A last cycle → Skill is getting trained. Continue Track A; expect proficiency_gap to close.
+
+When previous_cycle is null, proceed on Tier 1–4 alone.
+
 STRENGTH AXES + OLY BALANCE LEVER
 The program advances the athlete on two strength axes:
   1. Powerlifting total — back squat + deadlift + bench press, BW-multiplier basis. Move toward the next bracket.
@@ -44,6 +55,19 @@ For ages 35+, multiply BW thresholds by 0.95 (35–49), 0.85 (50–59), or 0.75 
   Deadlift        ≥1.41 / ≥2.21                    ≥1.00 / ≥1.76
   Bench Press     ≥0.91 / ≥1.46                    ≥0.71 / ≥1.06
   Strict Press    ≥0.60 / ≥0.86                    ≥0.45 / ≥0.66
+
+STRENGTH PRESCRIPTION — VOLUME OVER INTENSITY
+Programs are 4-week cycles. Read the athlete's level (1RM brackets, skill ratings, Tier 4) and modulate — but the baseline lean is toward volume work, NOT max-attempt singles. Quality reps under submaximal load build the lift more reliably than chasing PRs every session. The strength_scheme field you emit drives this — once it's set, the writer can't override.
+
+Foundational powerlifting lifts (back squat, front squat, overhead squat, deadlift, bench press, strict press):
+  - Default strength_scheme: a volume pattern — 3–5 sets × 3–5 reps at 75–85% 1RM. Example schemes: "5x5 @75%", "4x4 @80%", "5x3 @85%", "4x6 @72%".
+  - "Build to heavy single" or 1+@90% patterns: testing/peaking ONLY. At MOST one session per foundational lift per 4-week cycle, and only in week 3 or 4 (peaking position). Not the default response.
+
+Olympic lifts (snatch, clean, jerk, and their power / hang / squat / complex variants): VOLUME IS THE BUILDER. Olympic skill consolidates through repetition under submaximal load — more reps, not heavier loads. Most athletes are intermediate-level and need reps, not max attempts.
+  - Default strength_scheme: a submaximal volume pattern — 5–8 sets × 1–3 reps at 70–80%. Example schemes: "6x2 @75%", "5x[1+1] @72%", "5x[Snatch + OHS + Snatch Balance] @70%", "EMOM 10 alternating Hang Power Snatch + Snatch @65%".
+  - "Build to heavy single" on Olympic lifts is rare — at most once per cycle per lift family (snatch, clean & jerk). Default to the submaximal complexes instead.
+
+Singles and doubles at ≥ 90% 1RM should be the EXCEPTION across the cycle, not the rule. If every day's strength_scheme is "build to heavy single," that's a peaking program — and a 4-week build cycle isn't the place for that unless the athlete is explicitly peaking.
 
 SKILLS PRIORITY FORMULA
 For the skill-focus field on Skills days, score every candidate movement:
@@ -114,7 +138,7 @@ For each of 4 weeks × days_per_week days:
   - day_intent: one-line summary of the day's stimulus (the fill call will read this when picking movements)
   - block_types: which of the 8 block types exist this day, in the order they'll be programmed
   - primary_lift: when strength block is present, the lift's display name (Back Squat, Snatch, Clean and Jerk, Hang Power Snatch + Snatch complex, etc.)
-  - strength_scheme: when strength block is present, the scheme as a string ("5x5 @75%", "Build to 90% single, then 3x1", "5x (Hang Power Snatch + Snatch)")
+  - strength_scheme: when strength block is present, the scheme as a string. Default to volume patterns — see STRENGTH PRESCRIPTION above. Examples: "5x5 @75%", "4x4 @80%", "5x3 @85%" (powerlifting), "6x2 @75%", "5x[Hang Power Snatch + Snatch] @72%", "EMOM 10 alt HPC + Front Squat @60%" (Olympic). Heavy singles are exceptions, not defaults.
   - metcon_focus: when metcon block is present, one-line description (time domain + modality, e.g., "short power couplet (6-8 min)", "long aerobic chipper (20-25 min)", "competition simulation (ascending C&J ladder)")
   - skill_focus: when skills block is present, the skill or family being trained ("Deficit HSPU progression", "Ring MU + Strict Pull-Up support", "Skill maintenance EMOM")
 
