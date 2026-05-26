@@ -150,6 +150,22 @@ For any strength / lift-variant accessory movement whose weight was reasoned fro
 
 Every movement in a strength / accessory / metcon / skills block must populate at least one of sets, reps, weight, time_seconds, or distance — even when block_scheme already conveys the work pattern. The block_scheme is the human-readable structure ("21-15-9 for time", "AMRAP 12", "EMOM 10"); the per-movement fields carry the actual prescription that the audit reads. Treat block_scheme as descriptive; treat reps / sets / weight / time_seconds / distance as the contract.
 
+FIELD-USE BY MOVEMENT TYPE — when to use weight vs scaling_note
+
+The weight field is for ACTUAL LOADED IMPLEMENTS only — a numeric value representing weight in lbs or kg the athlete is lifting/carrying/holding:
+  - Barbell movements (Back Squat, Snatch, Thruster, Deadlift, etc.) → weight in lbs/kg
+  - Dumbbell movements (DB Snatch, DB Lunge, DB Bench Press) → weight per hand
+  - Kettlebell movements (KB Swing, KB Snatch, Goblet Squat) → weight
+  - Wall Ball, Med Ball → ball's weight in lbs/kg
+  - Sled push / drag → load on the sled
+
+Box height, equipment dimensions, or any spec that ISN'T a load → use scaling_note, NEVER weight:
+  - Box Jump, Box Jump Over, Burpee Box Jump Over → scaling_note: "24/20-inch box" (or "24-inch box" / "20-inch box" if gender-specific). The 24 is a HEIGHT, not a weight.
+  - Step Up / Step-Up — same: scaling_note for the box height. Add weight only if also loaded with DBs.
+  - Wall walks, handstand walks → scaling_note for distance / wall vs free if relevant.
+
+Pure bodyweight movements (Push-Up, Air Squat, Burpee, Sit-Up, Pull-Up, Toes-to-Bar, HSPU, Ring Dip, etc.): leave weight null. Use scaling_note for modifiers (band, partial range, etc.).
+
 WORK SPECIFIER — pick exactly ONE per movement, based on what counts the work for that movement. Never set both reps and distance, or both reps (as calories) and distance, on the same movement. The audit reads exactly one specifier.
 
   - REP-counted (most barbell, gymnastics, dumbbell, kettlebell): set reps. Distance stays null. For "21-15-9" metcons, every rep-counted movement gets reps: 21 (the first round's count). For AMRAP/EMOM, per-round reps. For chippers, total reps.

@@ -304,6 +304,16 @@ function isPlateMathSafe(weight: number, unit: string | null): boolean {
   return Math.abs(ratio - Math.round(ratio)) < 0.01;
 }
 
+/** Movements where the `weight` field, if populated, is NOT plate-math
+ *  relevant — typically because the writer mis-used `weight` for box
+ *  height instead of `scaling_note`. The fix lives in the writer prompt;
+ *  this audit just stops false-alarming on the residual. Skip on any
+ *  match. */
+function isNonPlateMathWeightMovement(name: string): boolean {
+  const n = name.toLowerCase();
+  return n.includes("box jump") || n.includes("step up") || n.includes("step-up");
+}
+
 export function auditPlateMath(output: WriterOutput): AuditResult {
   const violations: string[] = [];
   for (const week of safeWeeks(output)) {
@@ -314,6 +324,7 @@ export function auditPlateMath(output: WriterOutput): AuditResult {
         for (let mi = 0; mi < safeMovements(b).length; mi++) {
           const m = safeMovements(b)[mi];
           if (m.weight == null || m.weight <= 0) continue;
+          if (isNonPlateMathWeightMovement(m.movement)) continue;
           if (!isPlateMathSafe(m.weight, m.weight_unit ?? null)) {
             const step = m.weight_unit === "kg" ? "2.5kg" : "5lb";
             violations.push(
