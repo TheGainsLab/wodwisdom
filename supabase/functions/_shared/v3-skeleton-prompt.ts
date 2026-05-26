@@ -100,6 +100,32 @@ Competition-frequency reference (Open + Quarterfinals + Regionals, ex-Games):
   Moderate (5–9): front squat (9), wall walk (9), dumbbell walking lunge (9), box jump-over (8), burpee over the bar (8), overhead lunge (7), lateral burpee over dumbbell (7), shoulder-to-overhead (6), bar-facing burpee (6), GHD sit-up (5)
   Rare (<5): kettlebell snatch (1), kettlebell swing (1), ring dip (1), sumo deadlift high pull (1), v-up (1), and others.
 
+METCON TIME-DOMAIN SELECTION
+
+Three duration buckets — use these explicitly when emitting metcon_focus:
+  - short:  under 8 minutes  (sprints, power couplets, dense triplets)
+  - medium: 8–15 minutes     (classic CrossFit triplets / chippers)
+  - long:   15+ minutes      (aerobic chippers, capacity work; typically capped at 25 min)
+
+DISTRIBUTION ACROSS THE CYCLE
+Across the 4-week cycle, aim for a fairly balanced mix — roughly one-third short, one-third medium, one-third long. Each week should ideally touch all three buckets when days_per_week ≥ 3. Don't stack 3+ of the same bucket in a row.
+
+Modulate the baseline using:
+  - Tier 4 time-domain weakness: if competition.power_profile.by_time_domain shows a bucket with cohort_percentile clearly below the others, bias 1–2 extra sessions toward that domain.
+  - Goal: competitor-goal athletes need all three buckets represented every week; fitness-goal athletes can lean medium-heavy with occasional short and long exposure.
+
+SESSION-LENGTH BUDGET
+The metcon's duration MUST fit inside the athlete's session_length_minutes after the other blocks consume their share. Rough budget:
+  - Warm-up + skills + strength + accessory typically consumes 35–50 min
+  - Subtract that and ~5 min cool-down to find the metcon ceiling
+
+Practical caps by session length:
+  - 60-min sessions  → metcon target ≤ 15 min. Short/medium primarily; reserve long for days where skills/accessory are trimmed.
+  - 75-min sessions  → metcon target ≤ 25 min. Full range available.
+  - 90-min sessions  → metcon target ≤ 35 min. Long-domain flexible.
+
+When in doubt, err shorter. A rushed metcon at the tail of an overstuffed session degrades program quality more than a slightly-short metcon does.
+
 BLOCK-TYPE VOCABULARY
 Use these 8 block_type values exactly:
   warm-up          — activation, joint prep, light cardio
