@@ -3,16 +3,20 @@
  * Called by Start Workout page when user taps "Finish Workout".
  */
 
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferTimeDomain } from "../_shared/time-domain.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { computeMetconPower, type MetconBlockInput } from "../_shared/metcon-workcalc.ts";
+import { computeCardioPower } from "../_shared/cardio-power.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
 const WORKOUT_TYPES = ["for_time", "amrap", "emom", "strength", "other"] as const;
 const WEIGHT_UNITS = ["lbs", "kg"] as const;
-const BLOCK_TYPES = ["warm-up", "skills", "strength", "metcon", "cool-down", "accessory", "other"] as const;
+const BLOCK_TYPES = ["warm-up", "mobility", "skills", "strength", "metcon", "cardio", "accessory", "active-recovery", "cool-down", "other"] as const;
 
 const QUALITY_GRADES = ["A", "B", "C", "D"] as const;
 const DISTANCE_UNITS = ["ft", "m"] as const;
@@ -60,6 +64,12 @@ interface LogBlock {
   performance_tier?: string | null;
   median_benchmark?: string | null;
   excellent_benchmark?: string | null;
+  block_scheme?: string | null;
+  time_cap_seconds?: number | null;
+  // Cardio blocks only — machine-displayed average watts + work time.
+  cardio_avg_watts?: number | null;
+  cardio_work_seconds?: number | null;
+  cardio_modality?: string | null;
 }
 
 interface LogWorkoutBody {
@@ -199,6 +209,20 @@ Deno.serve(async (req) => {
       log = newLog;
     }
 
+    // Athlete profile — body mass for cardio power, and reused by the metcon
+    // power pass below. One fetch serves both.
+    const { data: apRow } = await supa
+      .from("athlete_profiles")
+      .select("bodyweight, units, gender")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const apr = apRow as { bodyweight?: number; units?: string; gender?: string } | null;
+    const athlete = {
+      bodyweight: apr?.bodyweight ?? null,
+      units: apr?.units ?? null,
+      gender: apr?.gender ?? null,
+    };
+
     // 2. Insert workout_log_blocks rows and get back their IDs
     let insertedBlocks: { id: string }[] = [];
     if (blocks.length > 0) {
@@ -211,6 +235,12 @@ Deno.serve(async (req) => {
         const cappedReps =
           isCapped && typeof b.capped_reps === "number" && Number.isFinite(b.capped_reps)
             ? Math.max(0, Math.floor(b.capped_reps))
+            : null;
+        // Cardio power is pure arithmetic (machine watts × time) — computed
+        // inline here, not via the async metcon pass. Null for non-cardio.
+        const cardioPower =
+          blockType === "cardio"
+            ? computeCardioPower(b.cardio_avg_watts, b.cardio_work_seconds, athlete.bodyweight, athlete.units)
             : null;
         return {
           log_id: log.id,
@@ -230,6 +260,17 @@ Deno.serve(async (req) => {
           median_benchmark: b.median_benchmark?.trim() || null,
           excellent_benchmark: b.excellent_benchmark?.trim() || null,
           time_domain: blockType === "metcon" && blockText ? inferTimeDomain(blockText) : null,
+          block_scheme: b.block_scheme?.trim() || null,
+          time_cap_seconds:
+            typeof b.time_cap_seconds === "number" && b.time_cap_seconds > 0 ? b.time_cap_seconds : null,
+          // Cardio power columns — populated inline for cardio blocks; null
+          // otherwise. (Metcon power is filled by the async pass below.)
+          cardio_modality: blockType === "cardio" ? (b.cardio_modality?.trim() || null) : null,
+          work_seconds: cardioPower?.work_seconds ?? null,
+          joules: cardioPower?.joules ?? null,
+          avg_power_watts: cardioPower?.avg_power_watts ?? null,
+          avg_w_per_kg: cardioPower?.avg_w_per_kg ?? null,
+          body_mass_kg: cardioPower?.body_mass_kg ?? null,
         };
       });
 
@@ -328,6 +369,63 @@ Deno.serve(async (req) => {
       if (entriesErr) {
         console.error("log-workout entries insert error:", entriesErr);
       }
+    }
+
+    // Background: compute metcon power (joules/watts) per metcon block and
+    // write it onto the block row. Best-effort — never affects the response.
+    if (ANTHROPIC_API_KEY && insertedBlocks.length > 0) {
+      const apiKey = ANTHROPIC_API_KEY;
+      const task = (async () => {
+        for (let bi = 0; bi < blocks.length; bi++) {
+          const block = blocks[bi];
+          const blockId = insertedBlocks[bi]?.id;
+          if (!blockId || block.type !== "metcon") continue;
+          const metconInput: MetconBlockInput = {
+            block_scheme: block.block_scheme ?? null,
+            block_text: block.text ?? null,
+            score: block.score ?? null,
+            capped: block.capped ?? null,
+            capped_reps: block.capped_reps ?? null,
+            time_cap_seconds: block.time_cap_seconds ?? null,
+            movements: (block.entries ?? [])
+              .filter((e) => e.movement?.trim())
+              .map((e) => {
+                // A calorie movement logs its count in `reps` with
+                // distance_unit='cal' as the only flag. Route it to
+                // `calories` — work-calc's monostructural path needs the
+                // calorie key; reps_total on a monostructural movement
+                // computes nothing.
+                const isCal = (e.distance_unit as string | null) === "cal";
+                return {
+                  movement: e.movement.trim(),
+                  reps: isCal ? null : (e.reps ?? null),
+                  weight: e.weight ?? null,
+                  weight_unit: e.weight_unit ?? null,
+                  distance: isCal ? null : (e.distance ?? null),
+                  distance_unit: isCal ? null : (e.distance_unit ?? null),
+                  calories: isCal ? (e.reps ?? e.distance ?? null) : null,
+                };
+              }),
+          };
+          try {
+            const power = await computeMetconPower(metconInput, athlete, apiKey);
+            if (power) {
+              await supa
+                .from("workout_log_blocks")
+                .update({
+                  joules: power.joules,
+                  avg_power_watts: power.avg_power_watts,
+                  avg_w_per_kg: power.avg_w_per_kg,
+                  body_mass_kg: power.body_mass_kg,
+                })
+                .eq("id", blockId);
+            }
+          } catch (e) {
+            console.error(`[log-workout] metcon power failed for block ${blockId}:`, e);
+          }
+        }
+      })();
+      EdgeRuntime.waitUntil(task);
     }
 
     return new Response(

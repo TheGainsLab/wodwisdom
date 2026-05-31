@@ -234,7 +234,7 @@ function sliceTier4Bundle(bundle: Tier4Bundle, includeAllResults: boolean): Comp
 // competition_count > 0. The writer's allowed-movement set.
 // ============================================================
 
-async function fetchVocabulary(supa: SupabaseClient): Promise<string[]> {
+export async function fetchVocabulary(supa: SupabaseClient): Promise<string[]> {
   const { data, error } = await supa
     .from("movements")
     .select("display_name")

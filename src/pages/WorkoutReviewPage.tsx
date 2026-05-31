@@ -301,10 +301,21 @@ export default function WorkoutReviewPage({ session }: { session: Session }) {
   // Restore cached review: check localStorage by source_id first, then sessionStorage (only for freestyle)
   const savedReview = (() => {
     try {
-      const sid = (location.state as { source_id?: string } | null)?.source_id;
+      const st = location.state as { source_id?: string; workout_text?: string } | null;
+      const sid = st?.source_id;
       if (sid) {
         const raw = localStorage.getItem(`wr_review_${sid}`);
-        if (raw) return JSON.parse(raw) as { workoutText: string; review: WorkoutReview };
+        if (raw) {
+          const parsed = JSON.parse(raw) as { workoutText: string; review: WorkoutReview };
+          // Content-aware: the Coach button rebuilds prose from the live
+          // (possibly edited) blocks. If the incoming prose no longer matches
+          // what this review was generated from, the day was edited — treat it
+          // as a cache miss so we regenerate instead of showing a stale review.
+          // (Reverting an edit restores the original prose → cache hits again.)
+          const incoming = st?.workout_text?.trim();
+          if (incoming && parsed.workoutText?.trim() !== incoming) return null;
+          return parsed;
+        }
         return null; // has source_id but no cached review — don't fall back to sessionStorage
       }
       const raw = sessionStorage.getItem('wr_last_review');

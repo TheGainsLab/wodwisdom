@@ -42,6 +42,7 @@
         "npm:react-dom@^19.2.0",
         "npm:react-router-dom@^7.13.0",
         "npm:react@^19.2.0",
+        "npm:recharts@^3.8.1",
         "npm:tsx@^4.19.0",
         "npm:typescript-eslint@^8.48.0",
         "npm:typescript@~5.9.3",

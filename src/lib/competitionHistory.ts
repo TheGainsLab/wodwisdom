@@ -46,7 +46,7 @@ export interface CompetitionWorkoutSpec {
   is_dual_scoring: boolean;
   time_cap_seconds: number | null;
   rep_target: number | null;
-  time_domain: { bucket: 'short' | 'mid' | 'long' | string; seconds: number | null };
+  time_domain: { bucket: 'short' | 'medium' | 'long' | string; seconds: number | null };
   movements: CompetitionWorkoutMovement[];
 }
 
@@ -241,6 +241,13 @@ export interface CatalogWorkoutSummary {
     time_cap_seconds: number | null;
   } | null;
   field_size: number | null;
+  /**
+   * Prose prescription (e.g. "AMRAP 20: ..."). UPSTREAM ASK (Option 1): add
+   * `description` to GET /workouts so not-done workouts show instructions, same
+   * as done workouts (which get it from the results bundle). Optional/renders
+   * only when present, so this is safe before the catalog exposes it.
+   */
+  description?: string | null;
   /** Not yet returned by GET /workouts; here for when the catalog exposes it. */
   division?: number;          // 1 = Men, 2 = Women (crossfit.competitions.division code)
   division_name?: string;     // "Men" | "Women"
@@ -349,6 +356,34 @@ export function avgCohortPercentile(
     if (typeof p === 'number' && Number.isFinite(p)) ps.push(p);
   }
   return ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : null;
+}
+
+export interface DurationBucketStat {
+  bucket: 'short' | 'medium' | 'long';
+  /** Workouts in this bucket. */
+  n: number;
+  /** Mean cohort percentile across those workouts; null if none have one. */
+  avgPct: number | null;
+}
+
+/**
+ * Per-time-domain rollup of the athlete's results, bucketed by each workout's
+ * `time_domain.bucket` — the SAME per-workout field the Map's time filter uses,
+ * so the Summary's "Across durations" counts and the Map's filtered counts
+ * agree by construction. The bundle's fitness_signature.stimulus_breakdown.
+ * time_domain is a separate upstream aggregation that buckets differently —
+ * don't source a count from one surface and a count from the other.
+ */
+export function timeDomainBreakdown(
+  history: NormalizedCompetitionHistory,
+): DurationBucketStat[] {
+  const buckets: Array<'short' | 'medium' | 'long'> = ['short', 'medium', 'long'];
+  return buckets.map((bucket) => {
+    const entries = Object.values(history.byId).filter(
+      (e) => e.workout.time_domain?.bucket === bucket,
+    );
+    return { bucket, n: entries.length, avgPct: avgCohortPercentile(entries) };
+  });
 }
 
 /**

@@ -31,6 +31,7 @@ const tabs = [
     path: '/programs',
     match: (p: string) =>
       p.startsWith('/programs') ||
+      p.startsWith('/athletedata') ||
       p === '/training-log' ||
       p.startsWith('/ailog') ||
       p === '/workout-review' ||
@@ -58,7 +59,7 @@ const tabs = [
     key: 'settings',
     label: 'Settings',
     path: '/settings',
-    match: (p: string) => p === '/settings' || p === '/profile' || p === '/checkout' || p === '/competition-history',
+    match: (p: string) => p === '/settings' || p === '/profile' || p === '/checkout',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="12" cy="12" r="3" />

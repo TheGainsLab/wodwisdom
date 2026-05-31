@@ -28,7 +28,7 @@ const AdminWorkoutLogDetailPage = lazy(() => import('./pages/AdminWorkoutLogDeta
 const AdminProgramsPage = lazy(() => import('./pages/AdminProgramsPage'));
 const AdminNutritionPage = lazy(() => import('./pages/AdminNutritionPage'));
 const AthletePage = lazy(() => import('./pages/AthletePage'));
-const CompetitionHistoryPage = lazy(() => import('./pages/CompetitionHistoryPage'));
+const AthleteDataPage = lazy(() => import('./pages/AthleteDataPage'));
 const WorkoutReviewPage = lazy(() => import('./pages/WorkoutReviewPage'));
 const StartWorkoutPage = lazy(() => import('./pages/StartWorkoutPage'));
 const TrainingLogPage = lazy(() => import('./pages/TrainingLogPage'));
@@ -40,7 +40,6 @@ const CheckoutCompletePage = lazy(() => import('./pages/CheckoutCompletePage'));
 const ProgramsListPage = lazy(() => import('./pages/ProgramsListPage'));
 const AddProgramPage = lazy(() => import('./pages/AddProgramPage'));
 const ProgramDetailPage = lazy(() => import('./pages/ProgramDetailPage'));
-const ProgramEditPage = lazy(() => import('./pages/ProgramEditPage'));
 const ProgramAnalysisPage = lazy(() => import('./pages/ProgramAnalysisPage'));
 const ProgramComparePage = lazy(() => import('./pages/ProgramComparePage'));
 const ProgramReviewPage = lazy(() => import('./pages/ProgramReviewPage'));
@@ -154,7 +153,6 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/training-log" element={<TrainingLogPage session={session} />} />
             <Route path="/programs" element={<ProgramsListPage session={session} />} />
             <Route path="/programs/new" element={<AddProgramPage session={session} />} />
-            <Route path="/programs/:id/edit" element={<ProgramEditPage session={session} />} />
             <Route path="/programs/:id/analyze" element={<ProgramAnalysisPage session={session} />} />
             <Route path="/programs/:id/modify/:modificationId/compare" element={<ProgramComparePage session={session} />} />
             <Route path="/programs/:id/modify/:modificationId/review" element={<ProgramReviewPage session={session} />} />
@@ -165,7 +163,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/bookmarks" element={<BookmarksPage session={session} />} />
             <Route path="/settings" element={<SettingsPage session={session} />} />
             <Route path="/profile" element={<AthletePage session={session} />} />
-            <Route path="/competition-history" element={<CompetitionHistoryPage session={session} />} />
+            <Route path="/athletedata" element={<AthleteDataPage session={session} />} />
             <Route path="/admin" element={<AdminPage session={session} />} />
             <Route path="/admin/ratings" element={<AdminRatingsPage session={session} />} />
             <Route path="/admin/users/:id" element={<AdminUserDetailPage session={session} />} />

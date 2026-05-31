@@ -28,7 +28,7 @@ const STAGE_LABEL: Record<string, string> = {
   open: 'Open', quarterfinals: 'Quarterfinals', semifinals: 'Semifinals', regional: 'Regionals', games: 'Games',
 };
 
-export type TimeDomain = 'short' | 'mid' | 'long';
+export type TimeDomain = 'short' | 'medium' | 'long';
 export type Scope = 'mine' | 'all';
 
 export interface Filter {
@@ -37,7 +37,16 @@ export interface Filter {
   year?: number;
 }
 
-const TIME_DOMAINS: TimeDomain[] = ['short', 'mid', 'long'];
+const TIME_DOMAINS: TimeDomain[] = ['short', 'medium', 'long'];
+
+// Bundle time_domain.bucket values are short/medium/long — upstream normalized
+// away the legacy 'mid' literal in bundle 1.9.0. The filter chips show a
+// compact label ('mid') while filtering on the real value ('medium').
+const TIME_DOMAIN_LABEL: Record<TimeDomain, string> = {
+  short: 'short',
+  medium: 'mid',
+  long: 'long',
+};
 
 // Small × button shown next to a filter dropdown when it has a value — resets
 // just that field, without touching the others.
@@ -56,16 +65,16 @@ const fieldClearBtnStyle = {
 
 export default function CompetitionExplorer({
   history,
-  userId,
   userAge,
+  canLog,
   scope,
   setScope,
   filter,
   setFilter,
 }: {
   history: NormalizedCompetitionHistory;
-  userId: string;
   userAge: number | null;
+  canLog: boolean;
   scope: Scope;
   setScope: Dispatch<SetStateAction<Scope>>;
   filter: Filter;
@@ -80,8 +89,14 @@ export default function CompetitionExplorer({
   // but not yet in the "Mine" grid).
   const [logTarget, setLogTarget] = useState<LogResultWorkout | null>(null);
   const [loggedIds, setLoggedIds] = useState<Set<string>>(new Set());
+  // Shown when a non-competition_log user taps Try-It.
+  const [paywall, setPaywall] = useState(false);
 
-  const openLogForEntry = (e: CompetitionWorkoutEntry) =>
+  // Try-It is competition_log-gated. Non-paid users get the paywall prompt
+  // instead of the log form (log-throwback would 403 them anyway — this turns
+  // a failing button into a clean upgrade prompt).
+  const openLogForEntry = (e: CompetitionWorkoutEntry) => {
+    if (!canLog) { setPaywall(true); return; }
     setLogTarget({
       competition_workout_id: e.competition_workout_id,
       label: `${e.year} ${STAGE_LABEL[e.stage] ?? e.stage} ${e.workout_name}`,
@@ -89,7 +104,9 @@ export default function CompetitionExplorer({
       is_dual_scoring: e.workout.is_dual_scoring,
       time_cap_seconds: e.workout.time_cap_seconds,
     });
-  const openLogForCatalog = (w: CatalogWorkoutSummary) =>
+  };
+  const openLogForCatalog = (w: CatalogWorkoutSummary) => {
+    if (!canLog) { setPaywall(true); return; }
     setLogTarget({
       competition_workout_id: w.competition_workout_id,
       label: `${w.season} ${STAGE_LABEL[w.stage] ?? w.stage} ${w.workout_name}`,
@@ -97,9 +114,13 @@ export default function CompetitionExplorer({
       is_dual_scoring: w.scoring?.is_dual_scoring ?? false,
       time_cap_seconds: w.scoring?.time_cap_seconds ?? null,
     });
+  };
   const onLogged = (id: string) => {
+    // Mark the grid filled — but do NOT close the log form here. LogResultForm
+    // stays mounted to show its post-submit panel (score · power · placement);
+    // it closes on its own "Done" button (onClose). Closing it here would
+    // unmount the form before that panel can render.
     setLoggedIds((s) => { const n = new Set(s); n.add(id); return n; });
-    setLogTarget(null);
     setSelectedCatalogWorkout(null);
     setSelectedWorkout(null);
   };
@@ -297,7 +318,7 @@ export default function CompetitionExplorer({
                     color: active ? '#fff' : 'var(--text)', cursor: 'pointer', fontFamily: 'inherit',
                   }}
                 >
-                  {td === '' ? 'Any time' : td}
+                  {td === '' ? 'Any time' : TIME_DOMAIN_LABEL[td]}
                 </button>
               );
             })}
@@ -362,7 +383,30 @@ export default function CompetitionExplorer({
         />
       )}
       {logTarget && (
-        <LogResultForm workout={logTarget} userId={userId} ageBand={ageBand} onLogged={onLogged} onClose={() => setLogTarget(null)} />
+        <LogResultForm workout={logTarget} ageBand={ageBand} onLogged={onLogged} onClose={() => setLogTarget(null)} />
+      )}
+      {paywall && (
+        <div
+          onClick={() => setPaywall(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '24px 16px', zIndex: 1100,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, maxWidth: 380, width: '100%', padding: 20 }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700 }}>Logging results is a paid feature</div>
+            <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-dim)' }}>
+              Recording your own attempts at competition workouts — with your power numbers and placement — is part of the Competition Log plan. Browsing and viewing stay free.
+            </div>
+            <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="button" className="auth-btn" style={{ padding: '8px 16px', fontSize: 13 }} onClick={() => setPaywall(false)}>Got it</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

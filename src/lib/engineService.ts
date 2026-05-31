@@ -571,7 +571,7 @@ export async function loadUserProgress(): Promise<EngineUserProgress | null> {
   return data;
 }
 
-/** Save the user's chosen program version (initial selection) and set months unlocked to 1. */
+/** Save the user's chosen program version (initial selection). engine_months_unlocked is owned by the payment path (stripe-webhook) — never set here. */
 export async function saveProgramVersion(version: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');

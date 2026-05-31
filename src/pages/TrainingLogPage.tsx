@@ -1,11 +1,15 @@
-import { useEffect, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
+import { Calendar, Plus, X, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
-import WorkoutCalendar from '../components/WorkoutCalendar';
 import MetconsTab from '../components/MetconsTab';
+import WorkoutCalendar from '../components/WorkoutCalendar';
 import { useEntitlements } from '../hooks/useEntitlements';
+import { loadUserProgress, getWorkoutsForProgram } from '../lib/engineService';
+import { scheduleProgramDay, scheduleEngineDay, unschedule } from '../lib/trainingSchedule';
+import { localDateString } from '../lib/localDate';
 
 interface WorkoutLog {
   id: string;
@@ -14,6 +18,129 @@ interface WorkoutLog {
   workout_type: string;
   created_at: string;
 }
+
+interface ScheduledEntry {
+  id: string;
+  scheduled_date: string;
+  program_id: string;
+  program_workout_id: string;
+  week_num: number;
+  day_num: number;
+  program_name: string;
+}
+
+// A completed Engine session, surfaced on the calendar as a completed day.
+interface EngineSession {
+  id: string;
+  date: string;
+  program_day_number: number | null;
+  day_type: string | null;
+  modality: string | null;
+  units: string | null;
+  actual_pace: number | null;
+  total_output: number | null;
+  performance_ratio: number | null;
+  average_heart_rate: number | null;
+  peak_heart_rate: number | null;
+  perceived_exertion: number | null;
+}
+
+// A scheduled (future) Engine day on the calendar. engine_workout_id points at
+// the catalog row; we surface it by character (day_type), never day number.
+interface EngineSchedEntry {
+  id: string;
+  scheduled_date: string;
+  engine_workout_id: string;
+  day_type: string | null;
+  day_number: number | null;
+}
+
+// PostgREST to-one embed for training_schedule → engine_workouts.
+interface EngineSchedJoinRow {
+  id: string;
+  scheduled_date: string;
+  engine_workout_id: string;
+  engine_workouts: { day_type: string | null; day_number: number | null } | null;
+}
+
+// Calendar-first add: a schedulable program day (once-and-done → completed +
+// already-scheduled days excluded from the pool).
+interface ProgramPoolDay {
+  id: string;
+  program_id: string;
+  program_name: string;
+  week_num: number;
+  day_num: number;
+}
+
+// Calendar-first add: a schedulable Engine day (repeatable pool → completed days
+// stay, tagged with doneCount).
+interface EnginePoolDay {
+  id: string;
+  day_number: number;
+  month: number;
+  day_type: string;
+  doneCount: number;
+}
+
+// A time-trial result. Time-trial sessions keep their metrics here, keyed by
+// date + modality, rather than on the engine_workout_sessions row.
+interface EngineTimeTrial {
+  id: string;
+  date: string;
+  modality: string;
+  total_output: number | null;
+  calculated_rpm: number | null;
+  units: string | null;
+}
+
+/** "rocket_races_a" → "Rocket Races A"; null/empty → "Engine". */
+function formatEngineDayType(dayType: string | null): string {
+  if (!dayType) return 'Engine';
+  return dayType
+    .split('_')
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(' ');
+}
+
+// PostgREST to-one embed shape for the training_schedule → program_workouts → programs join.
+interface SchedJoinRow {
+  id: string;
+  scheduled_date: string;
+  program_workout_id: string;
+  program_workouts: {
+    program_id: string;
+    week_num: number;
+    day_num: number;
+    programs: { name: string } | null;
+  } | null;
+}
+
+// Compact read-only preview shapes (a subset of program_blocks_v2/movements_v2).
+interface PreviewMovementRow {
+  block_id: string;
+  movement: string;
+  sets: number | null;
+  reps: number | null;
+  rep_scheme: number[] | null;
+  calories: number | null;
+  weight: number | null;
+  weight_unit: string | null;
+  time_seconds: number | null;
+  distance: number | null;
+  distance_unit: string | null;
+  sort_order: number;
+}
+interface PreviewBlockRow {
+  id: string;
+  block_type: string;
+  block_label: string | null;
+  block_scheme: string | null;
+  time_cap_seconds: number | null;
+  sort_order: number;
+}
+interface PreviewBlock extends PreviewBlockRow { movements: PreviewMovementRow[]; }
+interface PreviewData { blocks: PreviewBlock[]; prose: string | null; }
 
 interface WorkoutLogBlock {
   id: string;
@@ -229,10 +356,100 @@ function formatDuration(s: number): string {
   return `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 }
 
+// ── Level-3 day preview (read-only) ───────────────────────────────────
+// Lazy-loads a scheduled program day's blocks + movements and renders a
+// compact, non-editable summary inside the day sheet. Cached per workout so
+// reopening is free. v1 programs (no v2 blocks) fall back to prose.
+const previewCache = new Map<string, PreviewData>();
+
+function prettyBlockType(t: string): string {
+  return t.split('-').map(w => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(' ');
+}
+
+function formatPreviewMovement(m: PreviewMovementRow): string {
+  const parts: string[] = [];
+  const arr = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
+  if (m.calories != null && m.calories > 0) parts.push(`${m.calories} cal`);
+  else if (arr && arr.length > 1) parts.push(`${arr.join('-')} reps`);
+  else if (m.sets != null && m.reps != null) parts.push(`${m.sets}×${m.reps}`);
+  else if (m.sets != null) parts.push(`${m.sets} sets`);
+  else if (m.reps != null) parts.push(`${m.reps} reps`);
+  if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? 'lb'}`);
+  if (m.time_seconds != null) parts.push(`${m.time_seconds}s`);
+  if (m.distance != null) parts.push(`${m.distance}${m.distance_unit ?? 'm'}`);
+  return parts.length ? `${m.movement} — ${parts.join(' · ')}` : m.movement;
+}
+
+function SchedulePreview({ workoutId }: { workoutId: string }) {
+  const [data, setData] = useState<PreviewData | null>(previewCache.get(workoutId) ?? null);
+  const [loading, setLoading] = useState(!previewCache.has(workoutId));
+
+  useEffect(() => {
+    if (previewCache.has(workoutId)) return;
+    let active = true;
+    (async () => {
+      const { data: blocks } = await supabase
+        .from('program_blocks_v2')
+        .select('id, block_type, block_label, block_scheme, time_cap_seconds, sort_order')
+        .eq('program_workout_id', workoutId)
+        .order('sort_order');
+      const blockRows = (blocks as PreviewBlockRow[] | null) ?? [];
+      let result: PreviewData;
+      if (blockRows.length) {
+        const { data: movs } = await supabase
+          .from('program_movements_v2')
+          .select('block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, time_seconds, distance, distance_unit, sort_order')
+          .in('block_id', blockRows.map(b => b.id))
+          .order('sort_order');
+        const byBlock = new Map<string, PreviewMovementRow[]>();
+        for (const m of (movs as PreviewMovementRow[] | null) ?? []) {
+          const a = byBlock.get(m.block_id) ?? [];
+          a.push(m);
+          byBlock.set(m.block_id, a);
+        }
+        result = { blocks: blockRows.map(b => ({ ...b, movements: byBlock.get(b.id) ?? [] })), prose: null };
+      } else {
+        const { data: wk } = await supabase.from('program_workouts').select('workout_text').eq('id', workoutId).maybeSingle();
+        result = { blocks: [], prose: (wk as { workout_text: string | null } | null)?.workout_text ?? null };
+      }
+      previewCache.set(workoutId, result);
+      if (active) { setData(result); setLoading(false); }
+    })();
+    return () => { active = false; };
+  }, [workoutId]);
+
+  if (loading) return <div className="schedule-preview schedule-preview--muted">Loading…</div>;
+  if (!data) return null;
+  if (data.blocks.length === 0) {
+    return data.prose
+      ? <div className="schedule-preview"><div className="schedule-preview-prose">{data.prose}</div></div>
+      : <div className="schedule-preview schedule-preview--muted">No details for this day.</div>;
+  }
+  return (
+    <div className="schedule-preview">
+      {data.blocks.map(b => (
+        <div key={b.id} className="schedule-preview-block">
+          <div className="schedule-preview-block-head">
+            {b.block_label || prettyBlockType(b.block_type)}
+            {b.block_scheme ? <span className="schedule-preview-scheme"> · {b.block_scheme}</span> : null}
+            {b.time_cap_seconds ? <span className="schedule-preview-scheme"> · cap {Math.round(b.time_cap_seconds / 60)} min</span> : null}
+          </div>
+          {b.movements.map((m, i) => (
+            <div key={i} className="schedule-preview-mv">{formatPreviewMovement(m)}</div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function TrainingLogPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const { hasFeature, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
-  const hasAccess = isAdmin || hasFeature('programming');
+  // Calendar (Overview) is open to programming OR engine; the analytics tabs are
+  // AI-program-specific and stay gated to programming below.
+  const hasProgramming = isAdmin || hasFeature('programming');
+  const hasAccess = hasProgramming || hasFeature('engine');
 
   useEffect(() => {
     if (!entLoading && !hasAccess) {
@@ -242,13 +459,46 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
   const [navOpen, setNavOpen] = useState(false);
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
+  const [scheduled, setScheduled] = useState<ScheduledEntry[]>([]);
+  const [engineSessions, setEngineSessions] = useState<EngineSession[]>([]);
+  const [engineScheduled, setEngineScheduled] = useState<EngineSchedEntry[]>([]);
+  const [engineTimeTrials, setEngineTimeTrials] = useState<EngineTimeTrial[]>([]);
+  // ── Calendar-first add (tap a today-forward date → schedule a day) ──
+  const [addOpen, setAddOpen] = useState(false);
+  const [poolLoading, setPoolLoading] = useState(false);
+  const [poolLoaded, setPoolLoaded] = useState(false);
+  const [programPool, setProgramPool] = useState<ProgramPoolDay[]>([]);
+  const [enginePool, setEnginePool] = useState<EnginePoolDay[]>([]);
+  const [selProgramId, setSelProgramId] = useState<string | null>(null);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  // Which scheduled program entries have their Level-3 block preview expanded.
+  const [previewOpen, setPreviewOpen] = useState<Set<string>>(new Set());
+  const togglePreview = (id: string) => setPreviewOpen(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
   const [blocksByLog, setBlocksByLog] = useState<Record<string, WorkoutLogBlock[]>>({});
   const [entriesByLog, setEntriesByLog] = useState<Record<string, WorkoutLogEntry[]>>({});
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [blockFilter, setBlockFilter] = useState<string>('all');
-  const [tab, setTab] = useState<'overview' | 'strength' | 'skills' | 'accessory' | 'cardio' | 'metcons' | 'history'>('overview');
+  // Section is its own hub destination now (My Calendar vs Analytics) — driven
+  // by ?view=, not an in-page switch. Default calendar. The analytics sub-tab
+  // applies within the Analytics section.
+  const [searchParams] = useSearchParams();
+  const [view, setView] = useState<'calendar' | 'analytics'>(
+    searchParams.get('view') === 'analytics' ? 'analytics' : 'calendar',
+  );
+  const [tab, setTab] = useState<'strength' | 'skills' | 'accessory' | 'cardio' | 'metcons' | 'history'>('strength');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  // Engine-only users only have the Calendar section; never leave them stranded
+  // on the hidden Analytics section. Wait for entitlements to load first —
+  // otherwise hasProgramming is briefly false on mount and clobbers ?view=analytics.
+  useEffect(() => {
+    if (!entLoading && !hasProgramming && view !== 'calendar') setView('calendar');
+  }, [entLoading, hasProgramming, view]);
   const [strengthSearch, setStrengthSearch] = useState('');
   const [expandedLiftGroups, setExpandedLiftGroups] = useState<Set<string>>(new Set());
   const [oneRMs, setOneRMs] = useState<Record<string, number>>({});
@@ -349,6 +599,145 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     }
   };
 
+  // Forward-looking scheduled days (both sources) for the calendar overlay.
+  // Re-run after a calendar-first add/remove so the grid + day-detail update.
+  const fetchSchedules = useCallback(async () => {
+    const [{ data: sched }, { data: engSched }] = await Promise.all([
+      supabase
+        .from('training_schedule')
+        .select('id, scheduled_date, program_workout_id, program_workouts!inner(program_id, week_num, day_num, programs!inner(name))')
+        .eq('user_id', session.user.id)
+        .not('program_workout_id', 'is', null),
+      supabase
+        .from('training_schedule')
+        .select('id, scheduled_date, engine_workout_id, engine_workouts!inner(day_type, day_number)')
+        .eq('user_id', session.user.id)
+        .not('engine_workout_id', 'is', null),
+    ]);
+    const schedRows: ScheduledEntry[] = ((sched as unknown as SchedJoinRow[]) || [])
+      .map((s) => {
+        const pw = s.program_workouts;
+        if (!pw) return null;
+        return {
+          id: s.id,
+          scheduled_date: s.scheduled_date,
+          program_id: pw.program_id,
+          program_workout_id: s.program_workout_id,
+          week_num: pw.week_num,
+          day_num: pw.day_num,
+          program_name: pw.programs?.name ?? 'Program',
+        };
+      })
+      .filter((r): r is ScheduledEntry => r !== null);
+    setScheduled(schedRows);
+    const engSchedRows: EngineSchedEntry[] = ((engSched as unknown as EngineSchedJoinRow[]) || []).map((s) => ({
+      id: s.id,
+      scheduled_date: s.scheduled_date,
+      engine_workout_id: s.engine_workout_id,
+      day_type: s.engine_workouts?.day_type ?? null,
+      day_number: s.engine_workouts?.day_number ?? null,
+    }));
+    setEngineScheduled(engSchedRows);
+    return { schedRows, engSchedRows };
+  }, [session.user.id]);
+
+  // Lazy-load the schedulable pools the first time the Add panel opens.
+  //  - Program: once-and-done → drop completed + already-scheduled days.
+  //  - Engine: repeatable → keep all unlocked days, tag completed with a count.
+  const loadPools = useCallback(async () => {
+    setPoolLoading(true);
+    try {
+      if (hasProgramming) {
+        const { data: progs } = await supabase
+          .from('programs')
+          .select('id, name')
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: false });
+        const programList = ((progs as { id: string; name: string }[]) || []);
+        if (programList.length) {
+          const { data: wks } = await supabase
+            .from('program_workouts')
+            .select('id, program_id, week_num, day_num')
+            .in('program_id', programList.map((p) => p.id))
+            .order('sort_order');
+          const wkRows = ((wks as { id: string; program_id: string; week_num: number; day_num: number }[]) || []);
+          const ids = wkRows.map((w) => w.id);
+          // Completed (once-and-done) + already-scheduled program days drop out.
+          const completed = new Set<string>();
+          const scheduledWorkoutIds = new Set<string>();
+          for (let i = 0; i < ids.length; i += 100) {
+            const batch = ids.slice(i, i + 100);
+            const [{ data: ls }, { data: sc }] = await Promise.all([
+              supabase.from('workout_logs').select('source_id, status').eq('user_id', session.user.id).in('source_id', batch),
+              supabase.from('training_schedule').select('program_workout_id').eq('user_id', session.user.id).in('program_workout_id', batch),
+            ]);
+            for (const l of ((ls as { source_id: string | null; status: string }[]) || [])) {
+              if (l.source_id && l.status === 'completed') completed.add(l.source_id);
+            }
+            for (const s of ((sc as { program_workout_id: string | null }[]) || [])) {
+              if (s.program_workout_id) scheduledWorkoutIds.add(s.program_workout_id);
+            }
+          }
+          const nameById = new Map(programList.map((p) => [p.id, p.name]));
+          const pool: ProgramPoolDay[] = wkRows
+            .filter((w) => !completed.has(w.id) && !scheduledWorkoutIds.has(w.id))
+            .map((w) => ({ id: w.id, program_id: w.program_id, program_name: nameById.get(w.program_id) ?? 'Program', week_num: w.week_num, day_num: w.day_num }));
+          setProgramPool(pool);
+          setSelProgramId((prev) => prev ?? programList[0].id);
+        }
+      }
+      if (hasFeature('engine') || isAdmin) {
+        const p = await loadUserProgress();
+        if (p?.engine_program_version) {
+          const wk = await getWorkoutsForProgram(p.engine_program_version);
+          const unlocked = p.engine_months_unlocked ?? 1;
+          const doneCount = new Map<number, number>();
+          for (const s of engineSessions) {
+            if (s.program_day_number != null) doneCount.set(s.program_day_number, (doneCount.get(s.program_day_number) || 0) + 1);
+          }
+          const pool: EnginePoolDay[] = wk
+            .filter((w) => (w.month ?? 1) <= unlocked)
+            .map((w) => ({ id: w.id, day_number: w.day_number, month: w.month ?? 1, day_type: w.day_type, doneCount: doneCount.get(w.day_number) || 0 }));
+          setEnginePool(pool);
+        }
+      }
+    } finally {
+      setPoolLoading(false);
+      setPoolLoaded(true);
+    }
+  }, [hasProgramming, hasFeature, isAdmin, session.user.id, engineSessions]);
+
+  const openAddPanel = useCallback(() => {
+    setScheduleError(null);
+    setAddOpen(true);
+    if (!poolLoaded && !poolLoading) loadPools();
+  }, [poolLoaded, poolLoading, loadPools]);
+
+  const handleScheduleProgram = useCallback(async (workoutId: string, date: string) => {
+    setScheduleError(null);
+    const res = await scheduleProgramDay(session.user.id, workoutId, date);
+    if (res.error) { setScheduleError(res.error); return; }
+    setProgramPool((prev) => prev.filter((d) => d.id !== workoutId)); // once-and-done
+    await fetchSchedules();
+    setAddOpen(false);
+  }, [session.user.id, fetchSchedules]);
+
+  const handleScheduleEngine = useCallback(async (engineWorkoutId: string, date: string) => {
+    setScheduleError(null);
+    const res = await scheduleEngineDay(session.user.id, engineWorkoutId, date);
+    if (res.error) { setScheduleError(res.error); return; }
+    await fetchSchedules(); // repeats allowed → leave it in the pool
+    setAddOpen(false);
+  }, [session.user.id, fetchSchedules]);
+
+  const handleUnschedule = useCallback(async (rowId: string) => {
+    setScheduleError(null);
+    const res = await unschedule(rowId);
+    if (res.error) { setScheduleError(res.error); return; }
+    await fetchSchedules();
+    setPoolLoaded(false); // a freed program day should return to the pool next open
+  }, [fetchSchedules]);
+
   useEffect(() => {
     (async () => {
       const { data } = await supabase
@@ -359,6 +748,28 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         .limit(200);
       const logRows = (data as WorkoutLog[]) || [];
       setLogs(logRows);
+
+      await fetchSchedules();
+
+      // Completed Engine sessions → completed days on the same calendar.
+      const { data: engRows } = await supabase
+        .from('engine_workout_sessions')
+        .select('id, date, program_day_number, day_type, modality, units, actual_pace, total_output, performance_ratio, average_heart_rate, peak_heart_rate, perceived_exertion')
+        .eq('user_id', session.user.id)
+        .eq('completed', true)
+        .order('date', { ascending: false })
+        .limit(400);
+      setEngineSessions((engRows as EngineSession[]) || []);
+
+      // Time-trial results live in their own table; merged onto the matching
+      // (date, modality) session card since time-trial sessions store no
+      // top-level metrics.
+      const { data: ttRows } = await supabase
+        .from('engine_time_trials')
+        .select('id, date, modality, total_output, calculated_rpm, units')
+        .eq('user_id', session.user.id)
+        .limit(400);
+      setEngineTimeTrials((ttRows as EngineTimeTrial[]) || []);
 
       if (logRows.length > 0) {
         const logIds = logRows.map(l => l.id);
@@ -406,7 +817,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
       setLoading(false);
     })();
-  }, [session.user.id]);
+  }, [session.user.id, fetchSchedules]);
 
   // ── Athlete profile: 1RMs + unit preference for the Strength cards ──
   useEffect(() => {
@@ -453,15 +864,6 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
   // ── Derived data for overview tab ──
 
-  const workoutCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const log of logs) {
-      const key = log.workout_date; // already YYYY-MM-DD from supabase
-      counts[key] = (counts[key] || 0) + 1;
-    }
-    return counts;
-  }, [logs]);
-
   const logsByDate = useMemo(() => {
     const map: Record<string, WorkoutLog[]> = {};
     for (const log of logs) {
@@ -470,6 +872,72 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     }
     return map;
   }, [logs]);
+
+  const scheduledByDate = useMemo(() => {
+    const map: Record<string, ScheduledEntry[]> = {};
+    for (const s of scheduled) {
+      if (!map[s.scheduled_date]) map[s.scheduled_date] = [];
+      map[s.scheduled_date].push(s);
+    }
+    return map;
+  }, [scheduled]);
+
+  const engineByDate = useMemo(() => {
+    const map: Record<string, EngineSession[]> = {};
+    for (const e of engineSessions) {
+      if (!map[e.date]) map[e.date] = [];
+      map[e.date].push(e);
+    }
+    return map;
+  }, [engineSessions]);
+
+  const engineScheduledByDate = useMemo(() => {
+    const map: Record<string, EngineSchedEntry[]> = {};
+    for (const s of engineScheduled) {
+      if (!map[s.scheduled_date]) map[s.scheduled_date] = [];
+      map[s.scheduled_date].push(s);
+    }
+    return map;
+  }, [engineScheduled]);
+
+  // "YYYY-MM-DD__modality" → time trial, to backfill metrics on time-trial cards.
+  const timeTrialByKey = useMemo(() => {
+    const map: Record<string, EngineTimeTrial> = {};
+    for (const t of engineTimeTrials) map[`${t.date}__${t.modality}`] = t;
+    return map;
+  }, [engineTimeTrials]);
+
+  // Month-grid inputs: completed-day counts + per-date status (scheduled /
+  // completed / both) for distinct, non-heatmap styling. Completed merges
+  // manual/AI logs + Engine sessions; the grid stays source-agnostic.
+  const workoutCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const log of logs) map[log.workout_date] = (map[log.workout_date] || 0) + 1;
+    for (const e of engineSessions) map[e.date] = (map[e.date] || 0) + 1;
+    return map;
+  }, [logs, engineSessions]);
+  const dayStatus = useMemo(() => {
+    const map: Record<string, 'scheduled' | 'completed' | 'both'> = {};
+    for (const d of Object.keys(logsByDate)) map[d] = 'completed';
+    for (const d of Object.keys(engineByDate)) map[d] = 'completed';
+    for (const d of Object.keys(scheduledByDate)) map[d] = map[d] === 'completed' ? 'both' : 'scheduled';
+    for (const d of Object.keys(engineScheduledByDate)) map[d] = map[d] === 'completed' || map[d] === 'both' ? 'both' : 'scheduled';
+    return map;
+  }, [logsByDate, engineByDate, scheduledByDate, engineScheduledByDate]);
+
+  // Today (local) — calendar-first add is offered for today-forward dates only.
+  const todayStr = localDateString();
+  // Collapse the Add panel + any open previews whenever the selected date changes.
+  useEffect(() => { setAddOpen(false); setScheduleError(null); setPreviewOpen(new Set()); }, [selectedDate]);
+  // While the day sheet is open: lock background scroll + Escape closes it.
+  useEffect(() => {
+    if (view !== 'calendar' || !selectedDate) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedDate(null); };
+    document.addEventListener('keydown', onKey);
+    return () => { document.body.style.overflow = prevOverflow; document.removeEventListener('keydown', onKey); };
+  }, [view, selectedDate]);
 
   // ── Strength data: bucket entries into LIFT_GROUPS over the cycle window ──
   // PR-at-the-time is computed within each group (snatch PR across all snatch
@@ -860,45 +1328,61 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>Training Log</h1>
+          <h1>{view === 'analytics' ? 'Analytics' : 'My Calendar'}</h1>
         </header>
 
         <div className="page-body">
           <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 0' }}>
-            {/* Tab switcher */}
-            <div className="tl-tabs">
-              {([['overview', 'Overview'], ['strength', 'Strength'], ['skills', 'Skills'], ['accessory', 'Accessory'], ['cardio', 'Cardio'], ['metcons', 'Metcons'], ['history', 'History']] as const).map(([id, label]) => (
-                <button
-                  key={id}
-                  className={`tl-tab${tab === id ? ' active' : ''}`}
-                  onClick={() => setTab(id as typeof tab)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            {/* Calendar and Analytics are now separate hub destinations (reached
+                from the /programs cards via ?view=), so there's no in-page switch.
+                Analytics sub-tabs still live within the Analytics section. */}
+            {hasProgramming && view === 'analytics' && (
+              <div className="tl-tabs">
+                {([['strength', 'Strength'], ['skills', 'Skills'], ['accessory', 'Accessory'], ['cardio', 'Cardio'], ['metcons', 'Metcons'], ['history', 'History']] as const).map(([id, label]) => (
+                  <button
+                    key={id}
+                    className={`tl-tab${tab === id ? ' active' : ''}`}
+                    onClick={() => setTab(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {loading ? (
               <div className="page-loading"><div className="loading-pulse" /></div>
-            ) : logs.length === 0 ? (
+            ) : logs.length === 0 && scheduled.length === 0 && engineSessions.length === 0 ? (
               <div className="workout-review-section" style={{ textAlign: 'center', padding: 40 }}>
                 <p style={{ color: 'var(--text-dim)', marginBottom: 20 }}>No workouts logged yet.</p>
                 <button className="auth-btn" onClick={() => navigate('/workout/start')} style={{ maxWidth: 200 }}>
                   Log your first workout
                 </button>
               </div>
-            ) : tab === 'overview' ? (
-              /* ── Overview Tab ── */
+            ) : view === 'calendar' ? (
+              /* ── Calendar section ── */
               <div>
                 <WorkoutCalendar
                   workoutCounts={workoutCounts}
+                  dayStatus={dayStatus}
+                  allowFuture
                   selectedDate={selectedDate}
                   onDayClick={(key) => setSelectedDate(selectedDate === key ? null : key)}
                 />
+                <div className="wc-legend">
+                  <span className="wc-legend-item"><span className="wc-legend-swatch wc-legend-swatch--completed" />Completed</span>
+                  <span className="wc-legend-item"><span className="wc-legend-swatch wc-legend-swatch--scheduled" />Scheduled</span>
+                  <span className="wc-legend-item"><span className="wc-legend-swatch wc-legend-swatch--today" />Today</span>
+                </div>
 
-                {/* Day detail panel */}
-                {selectedDate && logsByDate[selectedDate] && (
-                  <div className="wc-day-detail" style={{ marginBottom: 16 }}>
+                {/* Day sheet — slides up over the calendar for any populated
+                    date, plus today-forward empty dates so they can be scheduled.
+                    Backdrop tap / Escape / ✕ dismiss it; clicks inside don't. */}
+                {selectedDate && (logsByDate[selectedDate] || scheduledByDate[selectedDate] || engineByDate[selectedDate] || engineScheduledByDate[selectedDate] || selectedDate >= todayStr) && (
+                  <div className="day-sheet-backdrop" onClick={() => setSelectedDate(null)}>
+                  <div className="day-sheet" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+                    <div className="day-sheet-handle" />
+                    <div className="wc-day-detail">
                     <div className="wc-day-detail-header">
                       <span className="wc-day-detail-date">
                         {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -907,7 +1391,96 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                       </button>
                     </div>
-                    {logsByDate[selectedDate].map(log => {
+                    {(scheduledByDate[selectedDate] || []).map(s => (
+                      <div key={s.id}>
+                        <div className="wc-day-scheduled">
+                          <div className="wc-day-scheduled-label">
+                            <Calendar size={13} />
+                            Scheduled · {s.program_name} · Wk {s.week_num} Day {s.day_num}
+                          </div>
+                          <button type="button" className="wc-day-ghost-btn wc-day-ghost-btn--icon" onClick={() => handleUnschedule(s.id)} aria-label="Remove from calendar"><X size={13} /></button>
+                        </div>
+                        <div className="wc-day-sched-actions">
+                          <button type="button" className={`wc-day-ghost-btn${previewOpen.has(s.id) ? ' wc-day-ghost-btn--active' : ''}`} onClick={() => togglePreview(s.id)} aria-expanded={previewOpen.has(s.id)}>
+                            <ChevronDown size={13} style={{ transform: previewOpen.has(s.id) ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} /> Preview
+                          </button>
+                          <button type="button" className="wc-day-scheduled-open" onClick={() => navigate(`/programs/${s.program_id}?day=${s.program_workout_id}`)}>Start</button>
+                        </div>
+                        {previewOpen.has(s.id) && <SchedulePreview workoutId={s.program_workout_id} />}
+                      </div>
+                    ))}
+                    {(engineScheduledByDate[selectedDate] || []).map(s => (
+                      <div key={s.id} className="wc-day-scheduled">
+                        <div className="wc-day-scheduled-label">
+                          <Calendar size={13} />
+                          Scheduled · Engine · {formatEngineDayType(s.day_type)}{s.day_number != null ? ` Day ${s.day_number}` : ''}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {s.day_number != null && (
+                            <button type="button" className="wc-day-scheduled-open" onClick={() => navigate(`/engine/training/${s.day_number}`)}>Open</button>
+                          )}
+                          <button type="button" className="wc-day-scheduled-open" onClick={() => handleUnschedule(s.id)} aria-label="Remove from calendar"><X size={13} /></button>
+                        </div>
+                      </div>
+                    ))}
+                    {(engineByDate[selectedDate] || []).map(e => {
+                      // Time-trial sessions store metrics in engine_time_trials; backfill from there.
+                      const tt = e.modality ? timeTrialByKey[`${e.date}__${e.modality}`] : undefined;
+                      const output = e.total_output ?? tt?.total_output ?? null;
+                      const pace = e.actual_pace ?? tt?.calculated_rpm ?? null;
+                      const units = e.units ?? tt?.units ?? null;
+                      const u = units ? ` ${units}` : '';
+                      const stats: { label: string; value: string }[] = [];
+                      if (units === 'watts') {
+                        // Rate unit: the value IS the pace (watts) — one stat, no "/min", no duplicate.
+                        const w = output ?? pace;
+                        if (w != null) stats.push({ label: 'Avg Power', value: `${Math.round(w).toLocaleString()}${u}` });
+                      } else {
+                        if (output != null) stats.push({ label: 'Output', value: `${Math.round(output).toLocaleString()}${u}` });
+                        if (pace != null) stats.push({ label: 'Pace', value: `${Math.round(pace).toLocaleString()}${u}/min` });
+                      }
+                      if (e.average_heart_rate != null) stats.push({ label: 'Avg HR', value: `${e.average_heart_rate} bpm` });
+                      if (e.peak_heart_rate != null) stats.push({ label: 'Peak HR', value: `${e.peak_heart_rate} bpm` });
+                      if (e.perceived_exertion != null) stats.push({ label: 'RPE', value: String(e.perceived_exertion) });
+                      return (
+                        <div key={e.id} className="wc-day-detail-block">
+                          <div className="wc-day-detail-block-header">
+                            <span className="wc-day-detail-type">
+                              Engine · {formatEngineDayType(e.day_type)}
+                              {e.modality ? ` — ${formatEngineDayType(e.modality)}` : ''}
+                              {e.program_day_number != null ? ` · Day ${e.program_day_number}` : ''}
+                            </span>
+                            {e.performance_ratio != null && e.performance_ratio > 0 && (
+                              <span className="wc-day-detail-score">{(e.performance_ratio * 100).toFixed(0)}%</span>
+                            )}
+                          </div>
+                          {stats.length > 0 ? (
+                            <div className="wc-engine-stats">
+                              {stats.map(s => (
+                                <div key={s.label} className="wc-engine-stat">
+                                  <span className="wc-engine-stat-label">{s.label}</span>
+                                  <span className="wc-engine-stat-value">{s.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="wc-day-detail-text">Completed — no metrics recorded.</div>
+                          )}
+                          {e.program_day_number != null && (
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                              <button
+                                type="button"
+                                className="wc-day-scheduled-open"
+                                onClick={() => navigate(`/engine/training/${e.program_day_number}`)}
+                              >
+                                Open
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {(logsByDate[selectedDate] || []).map(log => {
                       const logBlocks = blocksByLog[log.id] || [];
                       const logEntries = entriesByLog[log.id] || [];
                       return (
@@ -1004,6 +1577,92 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         </div>
                       );
                     })}
+
+                    {/* Calendar-first add — today-forward only. Program days
+                        are once-and-done; Engine days are a repeatable pool. */}
+                    {selectedDate >= todayStr && (() => {
+                      const programTaken = !!scheduledByDate[selectedDate];
+                      const engineTaken = !!engineScheduledByDate[selectedDate];
+                      const canEngine = isAdmin || hasFeature('engine');
+                      const programDays = programPool.filter(d => d.program_id === selProgramId);
+                      const programNames = Array.from(new Map(programPool.map(d => [d.program_id, d.program_name])).entries());
+                      return (
+                        <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                          {!addOpen ? (
+                            <button
+                              type="button"
+                              className="wc-day-scheduled-open"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                              onClick={openAddPanel}
+                            >
+                              <Plus size={14} /> Add training
+                            </button>
+                          ) : (
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Add training</span>
+                                <button type="button" className="wc-day-detail-close" onClick={() => setAddOpen(false)} aria-label="Cancel"><X size={14} /></button>
+                              </div>
+                              {scheduleError && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{scheduleError}</div>}
+                              {poolLoading ? (
+                                <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Loading…</div>
+                              ) : (
+                                <>
+                                  {hasProgramming && !programTaken && (
+                                    <div style={{ marginBottom: 12 }}>
+                                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Program</div>
+                                      {programNames.length > 1 && (
+                                        <select
+                                          value={selProgramId ?? ''}
+                                          onChange={e => setSelProgramId(e.target.value)}
+                                          className="tl-search"
+                                          style={{ marginBottom: 6 }}
+                                        >
+                                          {programNames.map(([pid, pname]) => <option key={pid} value={pid}>{pname}</option>)}
+                                        </select>
+                                      )}
+                                      {programDays.length === 0 ? (
+                                        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>No schedulable days left.</div>
+                                      ) : (
+                                        <div className="day-schedule-quickpick" style={{ position: 'static', maxHeight: 200, overflowY: 'auto' }}>
+                                          {programDays.map(d => (
+                                            <button key={d.id} type="button" className="day-schedule-qp-item" onClick={() => handleScheduleProgram(d.id, selectedDate)}>
+                                              <span>Wk {d.week_num} Day {d.day_num}</span>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                  {canEngine && !engineTaken && (
+                                    <div style={{ marginBottom: 4 }}>
+                                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Engine</div>
+                                      {enginePool.length === 0 ? (
+                                        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>No unlocked Engine days.</div>
+                                      ) : (
+                                        <div className="day-schedule-quickpick" style={{ position: 'static', maxHeight: 200, overflowY: 'auto' }}>
+                                          {enginePool.map(d => (
+                                            <button key={d.id} type="button" className="day-schedule-qp-item" onClick={() => handleScheduleEngine(d.id, selectedDate)}>
+                                              <span>{formatEngineDayType(d.day_type)} Day {d.day_number}</span>
+                                              {d.doneCount > 0 && <span className="day-schedule-qp-taken">done {d.doneCount}×</span>}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                  {(!hasProgramming || programTaken) && (!canEngine || engineTaken) && (
+                                    <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>This date is fully scheduled.</div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    </div>
+                  </div>
                   </div>
                 )}
 

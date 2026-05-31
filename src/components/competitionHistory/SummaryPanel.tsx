@@ -12,14 +12,16 @@
  *   - Best results (top 3 finishes by age-cohort percentile; tap → workout
  *     detail)
  *
- * Each block self-hides when its data isn't there. The duration / modality
- * blocks read `signature.stimulus_breakdown` (fetched via ?include=signature);
- * the rest comes from the normalized `all_results` history.
+ * Each block self-hides when its data isn't there. "Across durations" is
+ * bucketed from the normalized `all_results` history (so its counts match the
+ * Map's time filter exactly); "Across modalities" reads
+ * `signature.stimulus_breakdown` (fetched via ?include=signature); the rest
+ * comes from `all_results`.
  */
 
 import { useMemo, useState } from 'react';
 import type { NormalizedCompetitionHistory, CompetitionWorkoutEntry, MovementStageStat } from '../../lib/competitionHistory';
-import { movementPerformance, STAGE_ABBR } from '../../lib/competitionHistory';
+import { movementPerformance, timeDomainBreakdown, STAGE_ABBR } from '../../lib/competitionHistory';
 import WorkoutDetail from './WorkoutDetail';
 
 interface SignatureBucket {
@@ -39,12 +41,13 @@ const STAGE_LABEL: Record<string, string> = {
   open: 'Open', quarterfinals: 'Quarterfinals', semifinals: 'Semifinals', regional: 'Regionals', games: 'Games',
 };
 
-// stimulus_breakdown bucket key → display label, in display order.
-const TIME_DOMAIN_ROWS: Array<[string, string]> = [
-  ['short', 'Short'],
-  ['medium', 'Mid'],
-  ['long', 'Long'],
-];
+// "Across durations" bucket → display label, in display order.
+const TIME_DOMAIN_LABELS: Record<'short' | 'medium' | 'long', string> = {
+  short: 'Short',
+  medium: 'Mid',
+  long: 'Long',
+};
+// stimulus_breakdown modality bucket key → display label, in display order.
 const MODALITY_ROWS: Array<[string, string]> = [
   ['G_dominant', 'Gymnastics'],
   ['W_dominant', 'Weightlifting'],
@@ -150,7 +153,13 @@ export default function SummaryPanel({
   const [selectedWorkout, setSelectedWorkout] = useState<CompetitionWorkoutEntry | null>(null);
 
   const sb = signature?.stimulus_breakdown;
-  const timeRows = bucketRows(TIME_DOMAIN_ROWS, sb?.time_domain);
+  const timeRows: BreakdownRow[] = useMemo(
+    () =>
+      timeDomainBreakdown(history)
+        .filter((b) => b.n > 0)
+        .map((b) => ({ label: TIME_DOMAIN_LABELS[b.bucket], n: b.n, pct: b.avgPct ?? 0 })),
+    [history],
+  );
   const modalityRows = bucketRows(MODALITY_ROWS, sb?.modality);
 
   // Top 3 by their headline-stage percentile (deepest stage with >=2 workouts).

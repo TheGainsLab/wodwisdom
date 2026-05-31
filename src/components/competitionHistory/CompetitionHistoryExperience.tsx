@@ -100,6 +100,8 @@ interface Props {
   userAge: number | null;
   /** Gates the "clear linkage" override (and the admin note). */
   isAdmin: boolean;
+  /** Try-It (logging results) — the paid competition_log capability. */
+  canLog: boolean;
   initialLinkedId: string | null;
   initialLinkedLabel: string | null;
   /** Called after a successful link/unlink so the host page can refresh. */
@@ -154,6 +156,7 @@ export default function CompetitionHistoryExperience({
   userId,
   userAge,
   isAdmin,
+  canLog,
   initialLinkedId,
   initialLinkedLabel,
   onLinkageChange,
@@ -658,8 +661,8 @@ export default function CompetitionHistoryExperience({
                 <div style={{ display: tab === 'map' ? 'block' : 'none' }}>
                   <CompetitionExplorer
                     history={competitionHistory}
-                    userId={userId}
                     userAge={userAge}
+                    canLog={canLog}
                     scope={scope}
                     setScope={setScope}
                     filter={filter}

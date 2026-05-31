@@ -76,6 +76,7 @@ function entryToWorkCalcMovement(
   if (!name) return null;
 
   const reps = typeof entry.reps === "number" && entry.reps > 0 ? entry.reps : null;
+  const calories = typeof entry.calories === "number" && entry.calories > 0 ? entry.calories : null;
   const distance = typeof entry.distance === "number" && entry.distance > 0
     ? entry.distance
     : null;
@@ -84,7 +85,13 @@ function entryToWorkCalcMovement(
   const m: WorkCalcMovement = { movement_name: name };
 
   // Volume specifier — exactly one must be set for upstream to compute joules.
-  if (distance !== null && distUnit !== null) {
+  // Order matters: calories takes precedence over reps because the writer
+  // (and parse-metcon) may legitimately set both during a transition window
+  // (legacy rows still carrying calorie-counts in `reps`). When both are
+  // present, trust the typed `calories` field.
+  if (calories !== null) {
+    m.calories = calories;
+  } else if (distance !== null && distUnit !== null) {
     m.distance_value = distance;
     m.distance_unit = distUnit;
   } else if (reps !== null) {

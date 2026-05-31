@@ -293,7 +293,11 @@ serve(async (req) => {
             await supa
               .from("athlete_profiles")
               .upsert(
-                { user_id: payUserId, engine_months_unlocked: newUnlocked },
+                {
+                  user_id: payUserId,
+                  engine_months_unlocked: newUnlocked,
+                  engine_months_unlocked_last_at: new Date().toISOString(),
+                },
                 { onConflict: "user_id" }
               );
           } else {

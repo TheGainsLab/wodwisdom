@@ -25,6 +25,15 @@ interface Block {
   // v1 blocks leave these null and fall back to prose-only rendering.
   scheme?: string | null;
   timeCapSeconds?: number | null;
+  // Cardio blocks only — the prescribed machine (program_blocks_v2).
+  cardioModality?: string | null;
+  // v3 metcon blocks: cohort-derived benchmark precomputed at generation time
+  // and stored on program_blocks_v2.expected_benchmark. When present, the
+  // client reads from here instead of calling compute-benchmarks per load.
+  // Null on non-metcon blocks and on metcons where generation-time compute
+  // failed (client then falls through to the legacy local-math path).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  expectedBenchmark?: any | null;
 }
 
 interface EntryValues {
@@ -40,6 +49,7 @@ interface MetconEntryValues {
   movement: string;
   category?: 'weighted' | 'bodyweight' | 'monostructural';
   reps?: number;
+  calories?: number;
   weight?: number;
   weight_unit: 'lbs' | 'kg';
   distance?: number;
@@ -248,6 +258,32 @@ function capitalizeWords(s: string): string {
   return s.replace(/\b\w/g, c => c.toUpperCase());
 }
 
+/** "20:00" / "1:05:00" / "40" (bare number → minutes) → total seconds.
+ *  Null when unparseable. Used by the cardio block's time field. */
+function parseTimeToSeconds(raw: string): number | null {
+  const t = (raw ?? '').trim();
+  if (!t) return null;
+  if (t.includes(':')) {
+    const parts = t.split(':').map(p => parseInt(p, 10));
+    if (parts.some(n => Number.isNaN(n) || n < 0)) return null;
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return null;
+  }
+  const n = parseInt(t, 10);
+  if (Number.isNaN(n) || n < 0) return null;
+  return n * 60;
+}
+
+/** Total seconds → "M:SS" (or "H:MM:SS"). Used to restore the cardio time field. */
+function formatSecondsToClock(total: number): string {
+  const s = Math.max(0, Math.round(total));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
 
 function inferWorkoutType(blocks: Block[]): string {
   const metcon = blocks.find(b => b.type === 'metcon');
@@ -298,6 +334,9 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   const [blockRx, setBlockRx] = useState<Record<number, boolean>>({});
   const [blockCapped, setBlockCapped] = useState<Record<number, boolean>>({});
   const [blockCappedReps, setBlockCappedReps] = useState<Record<number, string>>({});
+  // Cardio blocks: machine-displayed average watts + work time (raw input).
+  const [blockCardioWatts, setBlockCardioWatts] = useState<Record<number, string>>({});
+  const [blockCardioTime, setBlockCardioTime] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
   const [parsingSkills, setParsingSkills] = useState(false);
   const [parsingAccessories, setParsingAccessories] = useState(false);
@@ -411,7 +450,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         // so we can populate parsed_tasks directly from them.
         const { data: v3Blocks } = await supabase
           .from('program_blocks_v2')
-          .select('id, block_type, block_label, block_scheme, time_cap_seconds, block_notes, sort_order')
+          .select('id, block_type, block_label, block_scheme, time_cap_seconds, cardio_modality, block_notes, sort_order, expected_benchmark')
           .eq('program_workout_id', localSourceId!)
           .order('sort_order');
         if (!v3Blocks || v3Blocks.length === 0) {
@@ -422,7 +461,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         const blockIds = v3Blocks.map((b: any) => b.id);
         const { data: v3Movs } = await supabase
           .from('program_movements_v2')
-          .select('block_id, movement, sets, reps, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order')
+          .select('block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order')
           .in('block_id', blockIds)
           .order('sort_order');
         const movsByBlock = new Map<string, any[]>();
@@ -433,9 +472,20 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         }
         const fmtMv = (m: any) => {
           const parts: string[] = [];
-          if (m.sets != null && m.reps != null) parts.push(`${m.sets}×${m.reps}`);
-          else if (m.sets != null) parts.push(`${m.sets} sets`);
-          else if (m.reps != null) parts.push(`${m.reps} reps`);
+          const arr: number[] | null = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
+          if (m.calories != null && m.calories > 0) {
+            parts.push(`${m.calories} cal`);
+          } else if (arr && arr.length > 1 && !arr.every((n) => n === arr[0])) {
+            parts.push(`${arr.join('-')} reps`);
+          } else if (arr && arr.length > 1) {
+            parts.push(`${arr.length}×${arr[0]}`);
+          } else if (m.sets != null && m.reps != null) {
+            parts.push(`${m.sets}×${m.reps}`);
+          } else if (m.sets != null) {
+            parts.push(`${m.sets} sets`);
+          } else if (m.reps != null) {
+            parts.push(`${m.reps} reps`);
+          }
           if (m.weight != null) {
             const pct = m.target_pct_1rm != null ? ` (${Math.round(m.target_pct_1rm)}% 1RM)` : '';
             parts.push(`${m.weight}${m.weight_unit ?? 'lbs'}${pct}`);
@@ -468,6 +518,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             movement: m.movement,
             sets: m.sets ?? null,
             reps: m.reps ?? null,
+            calories: m.calories ?? null,
             weight: m.weight ?? null,
             weight_unit: m.weight_unit ?? null,
             hold_seconds: m.time_seconds ?? null,
@@ -482,7 +533,9 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             text: lines.join('\n'),
             parsed_tasks,
             scheme: b.block_scheme ?? null,
+            expectedBenchmark: b.expected_benchmark ?? null,
             timeCapSeconds: b.time_cap_seconds ?? null,
+            cardioModality: b.cardio_modality ?? null,
           };
         });
       }
@@ -528,10 +581,11 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
 
           if (block.parsed_tasks && block.parsed_tasks.length > 0) {
             // Already cached in DB — use directly
-            movements = (block.parsed_tasks as { movement: string; category?: string; reps: number | null; weight: number | null; weight_unit: string | null; distance: number | null; distance_unit: string | null }[]).map(m => ({
+            movements = (block.parsed_tasks as { movement: string; category?: string; reps: number | null; calories: number | null; weight: number | null; weight_unit: string | null; distance: number | null; distance_unit: string | null }[]).map(m => ({
               movement: m.movement,
               category: (['weighted', 'bodyweight', 'monostructural'].includes(m.category || '') ? m.category : 'bodyweight') as MetconEntryValues['category'],
               reps: m.reps ?? undefined,
+              calories: m.calories ?? undefined,
               weight: m.weight ?? undefined,
               weight_unit: (m.weight_unit === 'kg' ? 'kg' : 'lbs') as 'lbs' | 'kg',
               distance: m.distance ?? undefined,
@@ -548,10 +602,11 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                 // Fallback to regex parser
                 movements = parseMetconMovements(block.text);
               } else {
-                movements = (fnData.movements as { movement: string; category?: string; reps: number | null; weight: number | null; weight_unit: string | null; distance: number | null; distance_unit: string | null }[]).map(m => ({
+                movements = (fnData.movements as { movement: string; category?: string; reps: number | null; calories: number | null; weight: number | null; weight_unit: string | null; distance: number | null; distance_unit: string | null }[]).map(m => ({
                   movement: m.movement,
                   category: (['weighted', 'bodyweight', 'monostructural'].includes(m.category || '') ? m.category : 'bodyweight') as MetconEntryValues['category'],
                   reps: m.reps ?? undefined,
+                  calories: m.calories ?? undefined,
                   weight: m.weight ?? undefined,
                   weight_unit: (m.weight_unit === 'kg' ? 'kg' : 'lbs') as 'lbs' | 'kg',
                   distance: m.distance ?? undefined,
@@ -730,7 +785,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           // Load previously saved blocks
           const { data: savedBlockRows } = await supabase
             .from('workout_log_blocks')
-            .select('sort_order, block_type, block_label, block_text, score, rx, notes, capped, capped_reps')
+            .select('sort_order, block_type, block_label, block_text, score, rx, notes, capped, capped_reps, avg_power_watts, work_seconds')
             .eq('log_id', ipLog.id)
             .order('sort_order');
 
@@ -751,6 +806,15 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                   if (sb.capped_reps != null) {
                     setBlockCappedReps(prev => ({ ...prev, [sb.sort_order]: String(sb.capped_reps) }));
                   }
+                }
+              }
+              // Restore watts/time for cardio blocks
+              if (sb.block_type === 'cardio') {
+                if (sb.avg_power_watts != null) {
+                  setBlockCardioWatts(prev => ({ ...prev, [sb.sort_order]: String(sb.avg_power_watts) }));
+                }
+                if (sb.work_seconds != null) {
+                  setBlockCardioTime(prev => ({ ...prev, [sb.sort_order]: formatSecondsToClock(sb.work_seconds) }));
                 }
               }
             }
@@ -1045,13 +1109,17 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   };
 
   // Reactively compute benchmarks per metcon block.
-  // Two-pass for smooth UX:
-  //   1. Synchronous initial render uses calculateBenchmarksLocal (the
-  //      PERFORMANCE_FACTORS fallback) so block cards show numbers immediately.
-  //   2. Async useEffect calls calculateBenchmarks (cohort-derived via
-  //      compute-benchmarks edge fn) and swaps the values in when they
-  //      resolve. On edge-fn failure, calculateBenchmarks itself falls back
-  //      to the local math, so the swap is a no-op.
+  //
+  // Precedence (highest first):
+  //   1. `block.expectedBenchmark` — cohort-derived, precomputed at GENERATION
+  //      time and stored on program_blocks_v2.expected_benchmark. Single
+  //      source of truth, no per-load computation. Available for every v3
+  //      program generated 2026-05-27+.
+  //   2. Async cohort fetch via calculateBenchmarks() — only runs for blocks
+  //      missing #1 (older v3 programs pre-generation-time-compute, or any
+  //      block where generation-time compute failed).
+  //   3. Local PERFORMANCE_FACTORS fallback via calculateBenchmarksLocal —
+  //      synchronous, instant render while #2 is in flight.
   const localBenchmarks = useMemo<Record<number, BenchmarkResult>>(() => {
     const result: Record<number, BenchmarkResult> = {};
     if (workRates.length === 0) return result;
@@ -1071,6 +1139,28 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     return result;
   }, [blocks, metconEntries, workRates]);
 
+  // Pull stored expected_benchmark off each block — synchronous, no compute.
+  // For blocks generated 2026-05-27+ this is the cohort number; no async
+  // fetch needed. Reshape from the stored jsonb into the BenchmarkResult
+  // shape the UI consumers expect.
+  const storedBenchmarks = useMemo<Record<number, BenchmarkResult>>(() => {
+    const result: Record<number, BenchmarkResult> = {};
+    blocks.forEach((b, bi) => {
+      if (b.type !== 'metcon') return;
+      const eb = b.expectedBenchmark as
+        | { median_score?: string; excellent_score?: string | null; cohort_anchors?: Array<{ p: number; watts: number; score: string }> }
+        | null
+        | undefined;
+      if (!eb || !eb.median_score) return;
+      result[bi] = {
+        medianScore: eb.median_score,
+        excellentScore: eb.excellent_score ?? '--',
+        cohortAnchors: eb.cohort_anchors ?? [],
+      };
+    });
+    return result;
+  }, [blocks]);
+
   const [cohortBenchmarks, setCohortBenchmarks] = useState<Record<number, BenchmarkResult>>({});
 
   useEffect(() => {
@@ -1080,6 +1170,9 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
       for (let bi = 0; bi < blocks.length; bi++) {
         const b = blocks[bi];
         if (b.type !== 'metcon') continue;
+        // Skip async compute for blocks that already have a stored cohort
+        // benchmark — that IS the cohort number, no point recomputing.
+        if (storedBenchmarks[bi]) continue;
         const mvKeys = Object.keys(metconEntries)
           .filter(k => k.startsWith(`${bi}-m`));
         if (mvKeys.length === 0) continue;
@@ -1096,13 +1189,14 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [blocks, metconEntries, workRates]);
+  }, [blocks, metconEntries, workRates, storedBenchmarks]);
 
-  // Cohort values win where available; local fallback fills the gaps during
-  // the brief async window or on edge-fn failure paths.
+  // Precedence: stored (generation-time cohort) > async cohort fetch >
+  // synchronous local fallback. Stored wins because it IS the authoritative
+  // cohort number — every consumer reads the same value end-to-end.
   const blockBenchmarks = useMemo<Record<number, BenchmarkResult>>(
-    () => ({ ...localBenchmarks, ...cohortBenchmarks }),
-    [localBenchmarks, cohortBenchmarks],
+    () => ({ ...localBenchmarks, ...cohortBenchmarks, ...storedBenchmarks }),
+    [localBenchmarks, cohortBenchmarks, storedBenchmarks],
   );
 
   /** Build a single block's log payload from current form state */
@@ -1296,6 +1390,14 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     const cappedRepsRaw = blockCappedReps[bi]?.trim();
     const cappedReps = isCapped && cappedRepsRaw ? parseInt(cappedRepsRaw, 10) : null;
 
+    // Cardio power inputs — the machine-displayed avg watts + the work time.
+    // The edge fn turns these into joules/watts/w-per-kg. Null for non-cardio.
+    const cardioWattsRaw = b.type === 'cardio' ? blockCardioWatts[bi]?.trim() : '';
+    const cardioWatts = cardioWattsRaw ? parseFloat(cardioWattsRaw) : null;
+    const cardioWorkSeconds = b.type === 'cardio'
+      ? parseTimeToSeconds(blockCardioTime[bi] ?? '')
+      : null;
+
     return {
       label: b.label,
       type: b.type,
@@ -1314,6 +1416,17 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
       time_domain: b.type === 'metcon'
         ? deriveTimeDomain(wType, b.text, benchmarks?.medianScore ?? null)
         : null,
+      // Snapshot the prescribed scheme onto the logged block (P5) — the
+      // converter needs it, and the log should be self-describing.
+      block_scheme: b.scheme ?? null,
+      time_cap_seconds: b.timeCapSeconds ?? null,
+      // Cardio power (P5b) — machine-logged watts + work time.
+      cardio_avg_watts:
+        cardioWatts != null && Number.isFinite(cardioWatts) && cardioWatts > 0
+          ? cardioWatts
+          : null,
+      cardio_work_seconds: cardioWorkSeconds,
+      cardio_modality: b.cardioModality ?? null,
     };
   };
 
@@ -2019,6 +2132,50 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                         </>
                       );
                     })()}
+
+                    {block.type === 'cardio' && (
+                      <>
+                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+                            Log from the machine display
+                          </div>
+                          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                            <div className="field" style={{ flex: '1 1 130px', margin: 0 }}>
+                              <label>Avg watts</label>
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                placeholder="e.g. 210"
+                                value={blockCardioWatts[bi] ?? ''}
+                                onChange={e => setBlockCardioWatts(prev => ({ ...prev, [bi]: e.target.value }))}
+                              />
+                            </div>
+                            <div className="field" style={{ flex: '1 1 130px', margin: 0 }}>
+                              <label>Time (min:sec)</label>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="e.g. 20:00"
+                                value={blockCardioTime[bi] ?? ''}
+                                onChange={e => setBlockCardioTime(prev => ({ ...prev, [bi]: e.target.value }))}
+                              />
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6 }}>
+                            Optional — leave blank if your machine doesn't show watts.
+                          </div>
+                        </div>
+                        <div className="field" style={{ marginTop: 12 }}>
+                          <label>Notes</label>
+                          <input
+                            type="text"
+                            placeholder=""
+                            value={blockNotes[bi] ?? ''}
+                            onChange={e => setBlockNotes(prev => ({ ...prev, [bi]: e.target.value }))}
+                          />
+                        </div>
+                      </>
+                    )}
 
                     {(block.type === 'warm-up' || block.type === 'mobility' || block.type === 'cool-down') && (
                       <div className="field" style={{ marginTop: 8 }}>

@@ -1,6 +1,7 @@
 /**
  * LogResultForm — log a result for a competition workout you did outside
- * competition (a "throwback"). Writes a row to competition_workout_results.
+ * competition (a "throwback"). Invokes the log-throwback edge function, which
+ * writes the competition_workout_results row and best-effort computes power.
  *
  * The form shows the field(s) the workout actually uses (no dynamic schema —
  * just conditional visibility):
@@ -14,7 +15,7 @@
  * percentile curve).
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { ScoringUnit, PlacementResult } from '../../lib/competitionHistory';
 
@@ -59,13 +60,11 @@ const AGE_BAND_LABEL: Record<string, string> = {
 
 export default function LogResultForm({
   workout,
-  userId,
   ageBand,
   onLogged,
   onClose,
 }: {
   workout: LogResultWorkout;
-  userId: string;
   ageBand?: string;
   onLogged: (competitionWorkoutId: string) => void;
   onClose: () => void;
@@ -92,10 +91,30 @@ export default function LogResultForm({
   const [error, setError] = useState<string | null>(null);
 
   // Post-submit: the logged score + the placement payoff.
-  const [logged, setLogged] = useState<{ type: ScoringUnit; value: number } | null>(null);
+  const [logged, setLogged] = useState<
+    { type: ScoringUnit; value: number; watts: number | null; wPerKg: number | null } | null
+  >(null);
   const [placement, setPlacement] = useState<PlacementResult | null>(null);
   const [placementLoading, setPlacementLoading] = useState(false);
   const [placementUnavailable, setPlacementUnavailable] = useState(false);
+  const [prescription, setPrescription] = useState<string | null>(null);
+
+  // Pull the workout's prescription (description) so the athlete sees what
+  // they're about to log — Try-It is, by definition, a workout they haven't
+  // done. Best-effort: the form works fine without it.
+  useEffect(() => {
+    let cancelled = false;
+    supabase.functions
+      .invoke<{ workout?: { description?: string } }>('competition-catalog', {
+        body: { workout_id: workout.competition_workout_id },
+      })
+      .then(({ data }) => {
+        if (cancelled) return;
+        const d = data?.workout?.description;
+        if (typeof d === 'string' && d.trim()) setPrescription(d.trim());
+      });
+    return () => { cancelled = true; };
+  }, [workout.competition_workout_id]);
 
   const buildRow = (): { score_type: ScoringUnit; score_value: number; finished: boolean | null } | string => {
     if (showTime) {
@@ -133,24 +152,33 @@ export default function LogResultForm({
     const built = buildRow();
     if (typeof built === 'string') { setError(built); return; }
     setSaving(true);
-    const { error: insErr } = await supabase.from('competition_workout_results').insert({
-      user_id: userId,
-      competition_workout_id: workout.competition_workout_id,
-      score_type: built.score_type,
-      score_value: built.score_value,
-      finished: built.finished,
-      performed_at: performedAt,
-      source: 'throwback',
-      scaling_level: 'rx',
-      standards_met: standardsMet,
-      notes: notes.trim() || null,
+    const { data: logData, error: logErr } = await supabase.functions.invoke<
+      { result?: { avg_power_watts: number | null; avg_w_per_kg: number | null }; error?: string }
+    >('log-throwback', {
+      body: {
+        competition_workout_id: workout.competition_workout_id,
+        score_type: built.score_type,
+        score_value: built.score_value,
+        finished: built.finished,
+        performed_at: performedAt,
+        standards_met: standardsMet,
+        notes: notes.trim() || null,
+      },
     });
     setSaving(false);
-    if (insErr) { setError(insErr.message || 'Failed to save.'); return; }
+    if (logErr || !logData?.result || logData.error) {
+      setError("Couldn't save your result. Try again.");
+      return;
+    }
 
-    // Row's saved — mark the cell filled, then fetch "where you'd have landed".
+    // Saved — mark the cell filled, then fetch "where you'd have landed".
     onLogged(workout.competition_workout_id);
-    setLogged({ type: built.score_type, value: built.score_value });
+    setLogged({
+      type: built.score_type,
+      value: built.score_value,
+      watts: logData.result.avg_power_watts ?? null,
+      wPerKg: logData.result.avg_w_per_kg ?? null,
+    });
     setPlacementLoading(true);
     const { data, error: plErr } = await supabase.functions.invoke<PlacementResult & { error?: string }>(
       'competition-placement',
@@ -194,6 +222,16 @@ export default function LogResultForm({
 
         {!logged ? (
           <>
+            {prescription && (
+              <div style={{
+                marginTop: 12, padding: '10px 12px',
+                background: 'var(--surface2)', border: '1px solid var(--border)',
+                borderRadius: 8, fontSize: 13, color: 'var(--text-dim)',
+                whiteSpace: 'pre-wrap',
+              }}>
+                {prescription}
+              </div>
+            )}
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
               {dual && (
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
@@ -261,6 +299,11 @@ export default function LogResultForm({
           <div style={{ marginTop: 16 }}>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Logged</div>
             <div style={{ fontSize: 24, fontWeight: 700, marginTop: 2 }}>{fmtScore(logged.type, logged.value)}</div>
+            {logged.watts != null && (
+              <div style={{ marginTop: 4, fontSize: 13, color: 'var(--text-dim)' }}>
+                {Math.round(logged.watts)} W{logged.wPerKg != null ? ` · ${logged.wPerKg.toFixed(2)} W/kg` : ''}
+              </div>
+            )}
 
             {placementLoading && (
               <div style={{ marginTop: 14, fontSize: 13, color: 'var(--text-dim)' }}>Working out where you'd have landed…</div>

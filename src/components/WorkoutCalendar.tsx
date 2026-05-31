@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+type DayStatus = 'scheduled' | 'completed' | 'both';
+
 interface WorkoutCalendarProps {
   /** Map of "YYYY-MM-DD" → number of workouts that day */
   workoutCounts: Record<string, number>;
@@ -7,6 +9,14 @@ interface WorkoutCalendarProps {
   selectedDate?: string | null;
   /** Called when a day with workouts is tapped */
   onDayClick?: (dateKey: string) => void;
+  /**
+   * Optional per-date status for distinct scheduled-vs-completed styling.
+   * When provided, a date is clickable/styled if it has a status OR a count.
+   * Omit for the original count-only behavior (existing callers unaffected).
+   */
+  dayStatus?: Record<string, DayStatus>;
+  /** Allow navigating into future months (scheduled days live in the future). */
+  allowFuture?: boolean;
 }
 
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -26,7 +36,7 @@ function getIntensity(count: number): number {
   return 3;
 }
 
-export default function WorkoutCalendar({ workoutCounts, selectedDate, onDayClick }: WorkoutCalendarProps) {
+export default function WorkoutCalendar({ workoutCounts, selectedDate, onDayClick, dayStatus, allowFuture }: WorkoutCalendarProps) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -44,6 +54,7 @@ export default function WorkoutCalendar({ workoutCounts, selectedDate, onDayClic
   };
 
   const isCurrentMonth = year === today.getFullYear() && month === today.getMonth();
+  const todayKey = toKey(today.getFullYear(), today.getMonth(), today.getDate());
 
   // Count workouts this month
   const monthWorkouts = Array.from({ length: daysInMonth }, (_, i) => {
@@ -60,7 +71,7 @@ export default function WorkoutCalendar({ workoutCounts, selectedDate, onDayClic
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
         <span className="wc-month-label">{MONTHS[month]} {year}</span>
-        <button className="wc-nav-btn" onClick={nextMonth} aria-label="Next month" disabled={isCurrentMonth}>
+        <button className="wc-nav-btn" onClick={nextMonth} aria-label="Next month" disabled={isCurrentMonth && !allowFuture}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
         </button>
       </div>
@@ -79,13 +90,22 @@ export default function WorkoutCalendar({ workoutCounts, selectedDate, onDayClic
           const intensity = getIntensity(count);
           const isToday = isCurrentMonth && day === today.getDate();
           const isSelected = selectedDate === key;
-          const hasWorkouts = count > 0;
+          const status = dayStatus?.[key];
+          const hasContent = count > 0 || !!status;
+          // With allowFuture (the calendar-first add flow), empty today-forward
+          // dates are also tappable so the parent can open an "Add" panel.
+          const addable = !!allowFuture && key >= todayKey;
+          const clickable = hasContent || addable;
+          const statusClass = status ? ` wc-cell--${status}` : '';
+          const title = status === 'scheduled' ? 'Scheduled'
+            : status === 'both' ? 'Scheduled + completed'
+            : count ? `${count} workout${count > 1 ? 's' : ''}` : addable ? 'Add training' : 'Rest day';
           return (
             <div
               key={day}
-              className={`wc-cell wc-cell--i${intensity}${isToday ? ' wc-cell--today' : ''}${isSelected ? ' wc-cell--selected' : ''}${hasWorkouts ? ' wc-cell--clickable' : ''}`}
-              title={count ? `${count} workout${count > 1 ? 's' : ''}` : 'Rest day'}
-              onClick={hasWorkouts && onDayClick ? () => onDayClick(key) : undefined}
+              className={`wc-cell wc-cell--i${intensity}${statusClass}${isToday ? ' wc-cell--today' : ''}${isSelected ? ' wc-cell--selected' : ''}${clickable ? ' wc-cell--clickable' : ''}`}
+              title={title}
+              onClick={clickable && onDayClick ? () => onDayClick(key) : undefined}
             >
               <span className="wc-cell-num">{day}</span>
             </div>

@@ -14,7 +14,7 @@
  *      4-week movement-level program using the skeleton as planning
  *      context. (Hybrid step: still uses the v2 writer prompt for the
  *      movement-level fill. Per-week fill is a later iteration.)
- *      Retried up to MAX_AUDIT_ATTEMPTS times with v2-audit violations
+ *      Recovery: programmatic patches first, then surgical block rewrites
  *      fed back.
  *   5. Safety review + regen loop (reuses v2's reviewSafety pipeline).
  *   6. Save to programs + program_workouts + program_blocks_v2 +
@@ -48,7 +48,6 @@ import {
 import {
   runAudits,
   runSoftAudits,
-  formatViolationsForRetry,
   summarizeAuditRun,
   classifyFailuresByKind,
 } from "../_shared/audit-runner.ts";
@@ -56,13 +55,14 @@ import { clampLoadSanity } from "../_shared/programmatic-fixes.ts";
 import { surgicallyRewriteBlock, spliceBlock } from "../_shared/surgical-block-fix.ts";
 import { reviewSafety, type SafetyReviewResult } from "../_shared/safety-review.ts";
 import { saveProgramV3 } from "../_shared/save-program-v3.ts";
+import { attachBenchmarksToWriterOutput, type BlockLocation } from "../_shared/compute-block-benchmark.ts";
+import type { Gender } from "../_shared/compute-benchmarks.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = "claude-sonnet-4-20250514";
 const MAX_SKELETON_ATTEMPTS = 3;
-const MAX_AUDIT_ATTEMPTS = 3;
 const MAX_SAFETY_ATTEMPTS = 3;
 
 interface ClaudeContentBlock {
@@ -99,18 +99,6 @@ class SkeletonLoopExhausted extends Error {
       `Skeleton audits persisted after ${MAX_SKELETON_ATTEMPTS} attempts. Last failures: ${lastFailures.map((f) => f.rule).join(", ")}`,
     );
     this.name = "SkeletonLoopExhausted";
-  }
-}
-
-class AuditLoopExhausted extends Error {
-  constructor(
-    public readonly lastOutput: WriterOutput,
-    public readonly lastFailures: ReturnType<typeof runAudits>["failures"],
-  ) {
-    super(
-      `Audit failures persisted after ${MAX_AUDIT_ATTEMPTS} attempts. Last failures: ${lastFailures.map((f) => f.rule).join(", ")}`,
-    );
-    this.name = "AuditLoopExhausted";
   }
 }
 
@@ -352,13 +340,14 @@ async function applySurgicalFixes(
   payload: WriterPayload,
   skeleton: SkeletonOutput,
   setStage: SetStage,
-): Promise<{ rewritten: number; failed: number }> {
+): Promise<{ rewritten: number; failed: number; locations: BlockLocation[] }> {
   const groups = groupBlockLocalFailures(blockLocalFailures);
-  if (groups.length === 0) return { rewritten: 0, failed: 0 };
+  if (groups.length === 0) return { rewritten: 0, failed: 0, locations: [] };
 
   await setStage("surgical_fix");
   let rewritten = 0;
   let failed = 0;
+  const locations: BlockLocation[] = [];
   for (const g of groups) {
     // Find the original block by location.
     const week = (output.weeks ?? []).find((w) => w.week_num === g.week);
@@ -373,12 +362,13 @@ async function applySurgicalFixes(
 
     if (spliceBlock(output, g.week, g.day, g.blockIdx, corrected)) {
       rewritten++;
+      locations.push({ week: g.week, day: g.day, blockIdx: g.blockIdx });
       console.log(`[generate-program-v3] surgical rewrote w${g.week}d${g.day}b${g.blockIdx} (${g.violations.length} violation${g.violations.length === 1 ? "" : "s"})`);
     } else {
       failed++;
     }
   }
-  return { rewritten, failed };
+  return { rewritten, failed, locations };
 }
 
 /**
@@ -396,107 +386,217 @@ async function applySurgicalFixes(
  * Writer-retry is the last resort — most failures recover via 4 / 6
  * without ever burning another full writer call.
  */
+interface ProgramWithAudits {
+  output: WriterOutput;
+  /** Audits that were still failing when generation halted (surgical stalled
+   *  or oscillated). Empty when everything passed cleanly. The worker attaches
+   *  these to the job's result_json so operators see what slipped through. */
+  residualFailures: ReturnType<typeof runAudits>["failures"];
+}
+
 async function generateProgramWithSkeleton(
   payload: WriterPayload,
   skeleton: SkeletonOutput,
   setStage: SetStage = NO_STAGE,
-): Promise<WriterOutput> {
-  let retryViolations = "";
-  let lastOutput: WriterOutput | null = null;
-  let lastFailures: ReturnType<typeof runAudits>["failures"] = [];
-  const MAX_SURGICAL_PASSES = 2; // initial + 1 retry
+): Promise<ProgramWithAudits> {
+  // Resolve gender for benchmark cohort lookups. Same defaulting as
+  // compute-benchmarks edge fn does for null gender (defaults to "men" with
+  // a log warning) — we apply it here so server-side compute matches.
+  const genderRaw = (payload.basics.gender ?? "").toLowerCase();
+  const gender: Gender | null =
+    genderRaw === "men" || genderRaw === "male" ? "men"
+      : genderRaw === "women" || genderRaw === "female" ? "women"
+      : null;
 
-  for (let attempt = 1; attempt <= MAX_AUDIT_ATTEMPTS; attempt++) {
-    console.log(`[generate-program-v3] writer attempt ${attempt}/${MAX_AUDIT_ATTEMPTS}`);
-    await setStage(`writer_attempt_${attempt}`);
-    const output = await callFullProgramWriter(payload, skeleton, retryViolations);
-    lastOutput = output;
-    await setStage("auditing");
-    let auditResult = runAudits({
+  /**
+   * Compute expected benchmarks for metcon blocks. Two modes:
+   *
+   *   1. Full pass — `recomputeBenchmarks(output)` with no locations.
+   *      Computes every metcon block. Used after the initial writer call
+   *      and after a fresh writer-retry where the whole program changed.
+   *
+   *   2. Targeted recompute — `recomputeBenchmarks(output, changedLocations)`.
+   *      Computes only the listed blocks PLUS any blocks that failed on a
+   *      previous pass (tracked across calls via `pendingFailures`).
+   *      Used after surgical block rewrites + after programmatic patches
+   *      that could change rep counts. Slashes upstream calls — only the
+   *      changed-or-still-broken blocks get retried — which is what stops
+   *      the rate-limit cascade.
+   *
+   * Concurrency capped inside attachBenchmarksToWriterOutput (3 concurrent
+   * at time of writing) so even a full pass doesn't burst past upstream's
+   * rate limiter.
+   */
+  let pendingFailures: BlockLocation[] = [];
+  async function recomputeBenchmarks(
+    o: WriterOutput,
+    changedLocations?: BlockLocation[],
+  ): Promise<void> {
+    let targetLocations: BlockLocation[] | undefined;
+    if (changedLocations !== undefined) {
+      // Targeted mode — union of newly-changed blocks + previously-failed blocks.
+      const seen = new Set<string>();
+      targetLocations = [];
+      for (const loc of [...pendingFailures, ...changedLocations]) {
+        const key = `${loc.week}-${loc.day}-${loc.blockIdx}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        targetLocations.push(loc);
+      }
+      if (targetLocations.length === 0) {
+        console.log(`[generate-program-v3] benchmarks: skipped — no blocks need recompute`);
+        return;
+      }
+    }
+    const stats = await attachBenchmarksToWriterOutput(o.weeks ?? [], gender, targetLocations);
+    pendingFailures = stats.failedLocations;
+    const mode = targetLocations ? `targeted(n=${targetLocations.length})` : "full";
+    console.log(
+      `[generate-program-v3] benchmarks ${mode}: computed=${stats.computed} skipped=${stats.skipped} failed=${stats.failed}`,
+    );
+  }
+
+  // Linear flow — single writer attempt, then recovery tiers run until they
+  // stop making progress. No writer-retry (the skeleton is the structural
+  // contract; regenerating the same program from the same prompts won't
+  // produce different results). No surgical-pass cap (surgical converges
+  // monotonically — failures only shrink — so capping it just stops fixes
+  // mid-stream). If any audit failures survive recovery, save the program
+  // anyway and log them so operators can see what shipped imperfect.
+  console.log(`[generate-program-v3] writer attempt 1/1`);
+  await setStage("writer_attempt_1");
+  const output = await callFullProgramWriter(payload, skeleton, "");
+  await setStage("benchmarking");
+  pendingFailures = [];
+  await recomputeBenchmarks(output);
+  await setStage("auditing");
+
+  // deno-lint-ignore prefer-const
+  let auditResult = runAudits({
+    output,
+    daysPerWeek: payload.training_context.days_per_week,
+    lifts: payload.lifts,
+    vocabulary: payload.vocabulary,
+    skeleton,
+  });
+  console.log(`[generate-program-v3] audits: ${summarizeAuditRun(auditResult)}`);
+  if (auditResult.passed) return { output, residualFailures: [] };
+
+  let byKind = classifyFailuresByKind(auditResult.failures);
+
+  // Step 1 — programmatic patches (no LLM call).
+  if (byKind["programmatic-fix"].length > 0) {
+    await setStage("patching");
+    const patch = applyProgrammaticFixes(output, byKind["programmatic-fix"], payload);
+    if (patch.patched > 0) {
+      console.log(`[generate-program-v3] programmatic patches applied: ${patch.patched}`);
+      for (const line of patch.log) console.log(`  - ${line}`);
+      await recomputeBenchmarks(output, []);
+      auditResult = runAudits({
+        output,
+        daysPerWeek: payload.training_context.days_per_week,
+        lifts: payload.lifts,
+        vocabulary: payload.vocabulary,
+        skeleton,
+      });
+      console.log(`[generate-program-v3] audits after patch: ${summarizeAuditRun(auditResult)}`);
+      if (auditResult.passed) return { output, residualFailures: [] };
+      byKind = classifyFailuresByKind(auditResult.failures);
+    }
+  }
+
+  // Step 2 — surgical block rewrites. Loops while it's making progress.
+  //
+  // Halt conditions (in priority order):
+  //   (a) Zero block-local failures remain   → success, return.
+  //   (b) Pass produced rewritten=0          → LLM call failed (timeout / refused).
+  //                                            Save with residual violations.
+  //   (c) Failing-block count stable for 3   → surgical is oscillating between
+  //       consecutive passes                   "fix A → introduce B → fix B →
+  //                                            re-introduce A" on the same set
+  //                                            of blocks. Save with residuals.
+  //
+  // Failing-block count is monotonically non-increasing (audits only re-flag
+  // blocks that still fail; rewrites don't add new blocks). So tracking the
+  // last few counts and halting when they plateau catches every non-converging
+  // case without an arbitrary pass cap.
+  const STALL_HALT_PASSES = 3; // count(N) == count(N-1) == count(N-2) → halt
+  const recentCounts: number[] = [];
+
+  let surgicalPass = 0;
+  while (byKind["block-local"].length > 0) {
+    surgicalPass++;
+    if (surgicalPass > 1) await setStage("surgical_retry");
+    const sg = await applySurgicalFixes(output, byKind["block-local"], payload, skeleton, setStage);
+    console.log(`[generate-program-v3] surgical pass ${surgicalPass}: rewritten=${sg.rewritten} failed=${sg.failed}`);
+    if (sg.rewritten === 0) {
+      console.log(`[generate-program-v3] surgical stalled at pass ${surgicalPass} (LLM call(s) failed); saving with residual violations`);
+      break;
+    }
+
+    await recomputeBenchmarks(output, sg.locations);
+    await setStage("surgical_reaudit");
+    auditResult = runAudits({
       output,
       daysPerWeek: payload.training_context.days_per_week,
       lifts: payload.lifts,
       vocabulary: payload.vocabulary,
+      skeleton,
     });
-    console.log(`[generate-program-v3] audits: ${summarizeAuditRun(auditResult)}`);
-    if (auditResult.passed) return output;
+    console.log(`[generate-program-v3] audits after surgical pass ${surgicalPass}: ${summarizeAuditRun(auditResult)}`);
+    if (auditResult.passed) return { output, residualFailures: [] };
+    byKind = classifyFailuresByKind(auditResult.failures);
 
-    // Classify and route to the cheapest recovery path that fits.
-    let byKind = classifyFailuresByKind(auditResult.failures);
-
-    // Step 1 — programmatic patches (no LLM call).
+    // Programmatic patches may surface again after surgical rewrites (e.g.,
+    // a fresh load needs clamping). Run them between surgical passes.
     if (byKind["programmatic-fix"].length > 0) {
-      await setStage("patching");
-      const patch = applyProgrammaticFixes(output, byKind["programmatic-fix"], payload);
-      if (patch.patched > 0) {
-        console.log(`[generate-program-v3] programmatic patches applied: ${patch.patched}`);
-        for (const line of patch.log) console.log(`  - ${line}`);
+      const patch2 = applyProgrammaticFixes(output, byKind["programmatic-fix"], payload);
+      if (patch2.patched > 0) {
+        for (const line of patch2.log) console.log(`  - ${line}`);
+        await recomputeBenchmarks(output, []);
         auditResult = runAudits({
           output,
           daysPerWeek: payload.training_context.days_per_week,
           lifts: payload.lifts,
           vocabulary: payload.vocabulary,
+          skeleton,
         });
-        console.log(`[generate-program-v3] audits after patch: ${summarizeAuditRun(auditResult)}`);
-        if (auditResult.passed) return output;
+        if (auditResult.passed) return { output, residualFailures: [] };
         byKind = classifyFailuresByKind(auditResult.failures);
       }
     }
 
-    // Step 2 — surgical block rewrites for block-local failures.
-    if (byKind["block-local"].length > 0 && byKind["structural-writer"].length === 0) {
-      for (let surgicalPass = 1; surgicalPass <= MAX_SURGICAL_PASSES; surgicalPass++) {
-        if (surgicalPass > 1) await setStage("surgical_retry");
-        const sg = await applySurgicalFixes(output, byKind["block-local"], payload, skeleton, setStage);
-        console.log(`[generate-program-v3] surgical pass ${surgicalPass}: rewritten=${sg.rewritten} failed=${sg.failed}`);
-        if (sg.rewritten === 0) break; // surgical produced nothing; no point retrying
-
-        await setStage("surgical_reaudit");
-        auditResult = runAudits({
-          output,
-          daysPerWeek: payload.training_context.days_per_week,
-          lifts: payload.lifts,
-          vocabulary: payload.vocabulary,
-        });
-        console.log(`[generate-program-v3] audits after surgical pass ${surgicalPass}: ${summarizeAuditRun(auditResult)}`);
-        if (auditResult.passed) return output;
-
-        byKind = classifyFailuresByKind(auditResult.failures);
-        // If any structural failure surfaced, surgical can't fix it — break out
-        // and fall through to writer-retry below.
-        if (byKind["structural-writer"].length > 0) break;
-        // If no block-local failures remain (only programmatic), patch again.
-        if (byKind["block-local"].length === 0) {
-          if (byKind["programmatic-fix"].length > 0) {
-            const patch2 = applyProgrammaticFixes(output, byKind["programmatic-fix"], payload);
-            for (const line of patch2.log) console.log(`  - ${line}`);
-            auditResult = runAudits({
-              output,
-              daysPerWeek: payload.training_context.days_per_week,
-              lifts: payload.lifts,
-              vocabulary: payload.vocabulary,
-            });
-            if (auditResult.passed) return output;
-            byKind = classifyFailuresByKind(auditResult.failures);
-          }
-          break;
-        }
+    // Track the failing-block count across passes. If it's stable for
+    // STALL_HALT_PASSES consecutive passes, surgical is oscillating between
+    // audits on the same blocks — stop, save with residuals logged.
+    const blockLocalCount = byKind["block-local"].length;
+    recentCounts.push(blockLocalCount);
+    if (recentCounts.length >= STALL_HALT_PASSES) {
+      const window = recentCounts.slice(-STALL_HALT_PASSES);
+      if (window.every((c) => c === window[0])) {
+        console.log(
+          `[generate-program-v3] surgical stalled at pass ${surgicalPass}: failing-block count stable at ${window[0]} for ${STALL_HALT_PASSES} passes; saving with residual violations`,
+        );
+        break;
       }
     }
-
-    // Step 3 — fall through to writer-retry (next loop iteration) only if
-    // any failure remains. Structural failures get here directly; block-local
-    // failures arrive after surgical exhaustion.
-    if (auditResult.passed) return output;
-    lastFailures = auditResult.failures;
-    retryViolations = formatViolationsForRetry(auditResult.failures);
-    console.log(`[generate-program-v3] recovery exhausted at attempt ${attempt}, falling through to writer-retry`);
   }
 
-  if (!lastOutput) {
-    throw new Error("Audit loop exhausted but no writer output was produced.");
+  // Save-anyway path: any failures still present (block-local that surgical
+  // couldn't fix, plus any structural-writer failures from the original
+  // writer call) get logged AND returned for the worker to attach to the
+  // job's result_json. The athlete gets a workout; operators see what
+  // slipped through in the admin panel.
+  const residualFailures = auditResult.failures;
+  if (residualFailures.length > 0) {
+    console.warn(
+      `[generate-program-v3] shipping with ${residualFailures.length} unresolved audit failure(s):`,
+    );
+    for (const f of residualFailures) {
+      for (const v of f.violations) console.warn(`  [${f.rule}] ${v}`);
+    }
   }
-  throw new AuditLoopExhausted(lastOutput, lastFailures);
+  return { output, residualFailures };
 }
 
 async function runSafetyLoop(
@@ -540,6 +640,7 @@ async function runSafetyLoop(
       daysPerWeek: payload.training_context.days_per_week,
       lifts: payload.lifts,
       vocabulary: payload.vocabulary,
+      skeleton,
     });
     if (!auditResult.passed) {
       console.warn(`[generate-program-v3] safety-regen failed audits: ${summarizeAuditRun(auditResult)}`);
@@ -615,7 +716,11 @@ async function processJob(jobId: string, userId: string) {
       .eq("id", jobId);
 
     // FILL (using skeleton as planning context)
-    const auditedOutput = await generateProgramWithSkeleton(payload, skeleton, setStage);
+    const { output: auditedOutput, residualFailures } = await generateProgramWithSkeleton(
+      payload,
+      skeleton,
+      setStage,
+    );
 
     // SAFETY
     const { output, safety } = await runSafetyLoop(auditedOutput, payload, skeleton, setStage);
@@ -666,6 +771,11 @@ async function processJob(jobId: string, userId: string) {
           output,
           safety: { safe: safety.safe, reasoning: safety.reasoning, errored: !!safety.errored },
           elapsed_ms: elapsedMs,
+          // residual_audit_failures: block-local audits that surgical couldn't
+          // resolve (oscillation halt or LLM-call failure). Empty when the
+          // program passed all hard audits cleanly. Surfaced here so admins
+          // can see what shipped imperfect.
+          residual_audit_failures: residualFailures,
         },
         updated_at: new Date().toISOString(),
       })
@@ -679,15 +789,6 @@ async function processJob(jobId: string, userId: string) {
         skeleton: err.lastSkeleton,
         skeleton_failures: err.lastFailures,
         rejected_at: "skeleton",
-        elapsed_ms: Date.now() - t0,
-      });
-      return;
-    }
-    if (err instanceof AuditLoopExhausted) {
-      await markFailed(message, {
-        output: err.lastOutput,
-        audit_failures: err.lastFailures,
-        rejected_at: "writer",
         elapsed_ms: Date.now() - t0,
       });
       return;

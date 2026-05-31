@@ -1,9 +1,13 @@
 /**
- * competition-placement — admin-only proxy for the competition-service's
+ * competition-placement — proxy for the competition-service's
  * POST /workouts/{id}/placement (interpolate an ad-hoc score against that
  * workout's percentile curve → {field_size, worldwide_percentile,
  * worldwide_rank, cohort?}). Used after a user logs a throwback to show
- * "where you'd have landed." Mirrors the other competition-* proxies.
+ * "where you'd have landed."
+ *
+ * Access: the paid Try-It gate (competition_log) — see
+ * _shared/athletedata-access.ts. Placement is part of the paid action;
+ * there is no free "test a score" preview.
  *
  * Request body: { competition_workout_id, score_value, score_type,
  *   finished?, age_band? }. We forward score_value/score_type/finished/
@@ -13,6 +17,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { hasCompetitionLogAccess } from "../_shared/athletedata-access.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -33,8 +38,9 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await supa.auth.getUser(token);
     if (authErr || !user) return json({ error: "UNAUTHORIZED" }, 401);
 
-    const { data: profile } = await supa.from("profiles").select("role").eq("id", user.id).maybeSingle();
-    if (profile?.role !== "admin") return json({ error: "FORBIDDEN" }, 403);
+    if (!(await hasCompetitionLogAccess(supa, user.id))) {
+      return json({ error: "FORBIDDEN" }, 403);
+    }
 
     const body = await req.json().catch(() => ({}));
     const id = typeof body?.competition_workout_id === "string" ? body.competition_workout_id.trim() : "";

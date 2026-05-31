@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, ADJUST_WORKOUT_ENDPOINT, getAuthHeaders } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
+import { useMovementVocab, matchMovements } from '../lib/movementVocab';
 import Nav from '../components/Nav';
 import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksDisplay';
 
@@ -31,6 +32,8 @@ interface ProgramMovementV2 {
   movement: string;
   sets: number | null;
   reps: number | null;
+  rep_scheme: number[] | null;
+  calories: number | null;
   weight: number | null;
   weight_unit: string | null;
   rpe: number | null;
@@ -51,7 +54,49 @@ interface ProgramBlockV2 {
   time_cap_seconds: number | null;
   block_notes: string | null;
   sort_order: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  expected_benchmark: any | null;
   movements: ProgramMovementV2[];
+}
+
+// AI Edit proposal shape (BlockPrescription from the adjust-workout edge fn).
+interface BlockProposalMovement {
+  movement: string;
+  sets?: number | null;
+  reps?: number | null;
+  rep_scheme?: number[] | null;
+  weight?: number | null;
+  weight_unit?: string | null;
+  rpe?: number | null;
+  time_seconds?: number | null;
+  distance?: number | null;
+  distance_unit?: string | null;
+  scaling_note?: string | null;
+  target_pct_1rm?: number | null;
+  cardio_modality?: string | null;
+  calories?: number | null;
+}
+interface BlockProposal {
+  block_type: string;
+  block_label?: string | null;
+  block_scheme?: string | null;
+  time_cap_seconds?: number | null;
+  block_notes?: string | null;
+  cardio_modality?: string | null;
+  movements: BlockProposalMovement[];
+}
+
+/** Mirror save-program-v3's reconcileReps: rep_scheme present → reps = sum. */
+function reconcileReps(
+  reps: number | null | undefined,
+  repScheme: number[] | null | undefined,
+): { reps: number | null; rep_scheme: number[] | null } {
+  if (!Array.isArray(repScheme) || repScheme.length === 0) {
+    return { reps: reps ?? null, rep_scheme: null };
+  }
+  const cleaned = repScheme.filter((n) => Number.isFinite(n) && n > 0 && n <= 1000);
+  if (cleaned.length === 0) return { reps: reps ?? null, rep_scheme: null };
+  return { reps: cleaned.reduce((a, b) => a + b, 0), rep_scheme: cleaned };
 }
 
 const DAY_TYPE_LABELS: Record<string, string> = {
@@ -124,6 +169,10 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [workoutBlocks, setWorkoutBlocks] = useState<Map<string, ProgramBlock[]>>(new Map());
   // v3-only: structured blocks + movements per program_workout_id.
   const [v3BlocksByWorkout, setV3BlocksByWorkout] = useState<Map<string, ProgramBlockV2[]>>(new Map());
+  const [aiEditedBlockIds, setAiEditedBlockIds] = useState<Set<string>>(new Set());
+  // workoutId → { id, scheduled_date } for days the user has put on the calendar.
+  const [scheduleByWorkout, setScheduleByWorkout] = useState<Map<string, { id: string; scheduled_date: string }>>(new Map());
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [navOpen, setNavOpen] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
@@ -138,10 +187,241 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     });
   }, []);
 
+  // v3 movement edit. Optimistic local update + UPDATE; revert on error.
+  const updateMovementField = useCallback(async (movementId: string, patch: Partial<ProgramMovementV2>) => {
+    let previous: ProgramMovementV2 | undefined;
+    setV3BlocksByWorkout(prev => {
+      const next = new Map(prev);
+      for (const [wid, blocks] of next) {
+        const updatedBlocks = blocks.map(b => {
+          const idx = b.movements.findIndex(m => m.id === movementId);
+          if (idx < 0) return b;
+          previous = b.movements[idx];
+          return { ...b, movements: b.movements.map((m, i) => i === idx ? { ...m, ...patch } : m) };
+        });
+        next.set(wid, updatedBlocks);
+      }
+      return next;
+    });
+    const { error } = await supabase.from('program_movements_v2').update(patch).eq('id', movementId);
+    if (error && previous) {
+      const restore = previous;
+      setV3BlocksByWorkout(prev => {
+        const next = new Map(prev);
+        for (const [wid, blocks] of next) {
+          next.set(wid, blocks.map(b => ({
+            ...b,
+            movements: b.movements.map(m => m.id === movementId ? restore : m),
+          })));
+        }
+        return next;
+      });
+      throw error;
+    }
+  }, []);
+
+  // v3 add a task to a block. Block structure stays locked; only the movement
+  // list grows. New row gets a placeholder name the user overwrites.
+  const MOVEMENT_SELECT = 'id, block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order';
+  const addMovementToBlock = useCallback(async (blockId: string) => {
+    let maxSort = -1;
+    for (const blocks of v3BlocksByWorkout.values()) {
+      const b = blocks.find(bl => bl.id === blockId);
+      if (b) { for (const m of b.movements) maxSort = Math.max(maxSort, m.sort_order); break; }
+    }
+    const { data, error } = await supabase
+      .from('program_movements_v2')
+      .insert({ block_id: blockId, movement: 'New movement', sort_order: maxSort + 1 })
+      .select(MOVEMENT_SELECT)
+      .single();
+    if (error || !data) return;
+    const newMovement = data as ProgramMovementV2;
+    setV3BlocksByWorkout(prev => {
+      const next = new Map(prev);
+      for (const [wid, blocks] of next) {
+        const idx = blocks.findIndex(b => b.id === blockId);
+        if (idx >= 0) {
+          next.set(wid, blocks.map((b, i) => i === idx ? { ...b, movements: [...b.movements, newMovement] } : b));
+          break;
+        }
+      }
+      return next;
+    });
+  }, [v3BlocksByWorkout]);
+
+  // v3 remove a task from a block. Empty blocks are allowed (the user may re-add).
+  const removeMovementFromBlock = useCallback(async (movementId: string) => {
+    const { error } = await supabase.from('program_movements_v2').delete().eq('id', movementId);
+    if (error) return;
+    setV3BlocksByWorkout(prev => {
+      const next = new Map(prev);
+      for (const [wid, blocks] of next) {
+        next.set(wid, blocks.map(b => ({ ...b, movements: b.movements.filter(m => m.id !== movementId) })));
+      }
+      return next;
+    });
+  }, []);
+
+  // AI Edit — propose (edge fn), then accept (apply) or refuse. One shot per
+  // block: the ai_edit_log row written on propose IS the lock.
+  const proposeAiEdit = useCallback(async (blockId: string, request: string): Promise<{
+    proposal: BlockProposal; original: BlockProposal; ai_edit_log_id: string;
+  }> => {
+    const resp = await fetch(ADJUST_WORKOUT_ENDPOINT, {
+      method: 'POST',
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ block_id: blockId, request }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data?.error || `AI Edit failed (${resp.status})`);
+    return data;
+  }, []);
+
+  const applyAiProposal = useCallback(async (blockId: string, proposal: BlockProposal, aiLogId: string) => {
+    const { error: bErr } = await supabase.from('program_blocks_v2').update({
+      block_type: proposal.block_type,
+      block_label: proposal.block_label ?? null,
+      block_scheme: proposal.block_scheme ?? null,
+      time_cap_seconds: proposal.time_cap_seconds ?? null,
+      block_notes: proposal.block_notes ?? null,
+      cardio_modality: proposal.cardio_modality ?? null,
+    }).eq('id', blockId);
+    if (bErr) throw bErr;
+
+    await supabase.from('program_movements_v2').delete().eq('block_id', blockId);
+    const inserts = proposal.movements.map((m, i) => {
+      const { reps, rep_scheme } = reconcileReps(m.reps, m.rep_scheme);
+      return {
+        block_id: blockId,
+        movement: m.movement,
+        sets: m.sets ?? null,
+        reps, rep_scheme,
+        weight: m.weight ?? null,
+        weight_unit: m.weight_unit ?? null,
+        rpe: m.rpe ?? null,
+        time_seconds: m.time_seconds ?? null,
+        distance: m.distance ?? null,
+        distance_unit: m.distance_unit ?? null,
+        calories: m.calories ?? null,
+        cardio_modality: m.cardio_modality ?? null,
+        scaling_note: m.scaling_note ?? null,
+        target_pct_1rm: m.target_pct_1rm ?? null,
+        sort_order: i,
+      };
+    });
+    let insertedRows: ProgramMovementV2[] = [];
+    if (inserts.length) {
+      const { data, error: insErr } = await supabase
+        .from('program_movements_v2')
+        .insert(inserts)
+        .select('id, block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order');
+      if (insErr) throw insErr;
+      insertedRows = (data ?? []) as ProgramMovementV2[];
+    }
+
+    await supabase.from('ai_edit_log')
+      .update({ outcome: 'accepted', resolved_at: new Date().toISOString() })
+      .eq('id', aiLogId);
+
+    setV3BlocksByWorkout(prev => {
+      const next = new Map(prev);
+      for (const [wid, blocks] of next) {
+        const idx = blocks.findIndex(b => b.id === blockId);
+        if (idx >= 0) {
+          const updated: ProgramBlockV2 = {
+            ...blocks[idx],
+            block_type: proposal.block_type,
+            block_label: proposal.block_label ?? null,
+            block_scheme: proposal.block_scheme ?? null,
+            time_cap_seconds: proposal.time_cap_seconds ?? null,
+            block_notes: proposal.block_notes ?? null,
+            movements: insertedRows,
+          };
+          next.set(wid, blocks.map((b, i2) => i2 === idx ? updated : b));
+        }
+      }
+      return next;
+    });
+    setAiEditedBlockIds(prev => new Set(prev).add(blockId));
+  }, []);
+
+  const refuseAiProposal = useCallback(async (blockId: string, aiLogId: string) => {
+    await supabase.from('ai_edit_log')
+      .update({ outcome: 'refused', resolved_at: new Date().toISOString() })
+      .eq('id', aiLogId);
+    setAiEditedBlockIds(prev => new Set(prev).add(blockId));
+  }, []);
+
+  // Calendar: assign / reschedule a program day to a date. One program day per
+  // date per user (DB partial unique index) — a collision surfaces as 23505.
+  const scheduleDay = useCallback(async (workoutId: string, dateStr: string) => {
+    setScheduleError(null);
+    const existing = scheduleByWorkout.get(workoutId);
+    if (existing) {
+      const { error } = await supabase
+        .from('training_schedule')
+        .update({ scheduled_date: dateStr })
+        .eq('id', existing.id);
+      if (error) {
+        setScheduleError(error.code === '23505'
+          ? 'That date already has a training day scheduled.'
+          : (error.message || 'Could not reschedule.'));
+        return;
+      }
+      setScheduleByWorkout(prev => new Map(prev).set(workoutId, { ...existing, scheduled_date: dateStr }));
+    } else {
+      const { data, error } = await supabase
+        .from('training_schedule')
+        .insert({ user_id: session.user.id, program_workout_id: workoutId, scheduled_date: dateStr })
+        .select('id, scheduled_date')
+        .single();
+      if (error || !data) {
+        setScheduleError(error?.code === '23505'
+          ? 'That date already has a training day scheduled.'
+          : (error?.message || 'Could not add to calendar.'));
+        return;
+      }
+      const row = data as { id: string; scheduled_date: string };
+      setScheduleByWorkout(prev => new Map(prev).set(workoutId, { id: row.id, scheduled_date: row.scheduled_date }));
+    }
+  }, [scheduleByWorkout, session.user.id]);
+
+  const unscheduleDay = useCallback(async (workoutId: string) => {
+    setScheduleError(null);
+    const existing = scheduleByWorkout.get(workoutId);
+    if (!existing) return;
+    const { error } = await supabase.from('training_schedule').delete().eq('id', existing.id);
+    if (error) { setScheduleError(error.message || 'Could not remove.'); return; }
+    setScheduleByWorkout(prev => {
+      const next = new Map(prev);
+      next.delete(workoutId);
+      return next;
+    });
+  }, [scheduleByWorkout]);
+
+  // Dates already taken by a program day (within this program) — the quick-pick
+  // greys these out so users don't hit the one-per-date collision.
+  const takenProgramDates = useMemo(
+    () => new Set(Array.from(scheduleByWorkout.values()).map(v => v.scheduled_date)),
+    [scheduleByWorkout],
+  );
+
   useEffect(() => {
     if (!id) return;
     loadProgram();
   }, [id, session.user.id]);
+
+  // Deep-link from the calendar's "View in program": ?day=<workoutId> expands
+  // that day and scrolls to it, so the user lands ON the day they tapped.
+  const dayParam = searchParams.get('day');
+  useEffect(() => {
+    if (!dayParam || !allWorkouts.some(w => w.id === dayParam)) return;
+    setExpandedDays(prev => new Set(prev).add(dayParam));
+    const t = setTimeout(() => {
+      document.getElementById(`day-${dayParam}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [dayParam, allWorkouts]);
 
   const loadProgram = async () => {
     if (!id) return;
@@ -165,6 +445,24 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       .eq('program_id', id)
       .order('sort_order');
     setAllWorkouts(wk || []);
+
+    // Calendar overlay: which of this program's days the user has scheduled.
+    if (wk?.length) {
+      const wkIds = wk.map((w) => w.id);
+      const schedMap = new Map<string, { id: string; scheduled_date: string }>();
+      for (let i = 0; i < wkIds.length; i += 100) {
+        const batch = wkIds.slice(i, i + 100);
+        const { data: sched } = await supabase
+          .from('training_schedule')
+          .select('id, program_workout_id, scheduled_date')
+          .in('program_workout_id', batch);
+        for (const s of sched || []) {
+          const row = s as { id: string; program_workout_id: string; scheduled_date: string };
+          schedMap.set(row.program_workout_id, { id: row.id, scheduled_date: row.scheduled_date });
+        }
+      }
+      setScheduleByWorkout(schedMap);
+    }
 
     const isV3 = prog.program_version === 'v3';
 
@@ -198,7 +496,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
         const batch = workoutIds.slice(i, i + 100);
         const { data: blocks } = await supabase
           .from('program_blocks_v2')
-          .select('id, program_workout_id, block_type, block_label, block_scheme, time_cap_seconds, block_notes, sort_order')
+          .select('id, program_workout_id, block_type, block_label, block_scheme, time_cap_seconds, block_notes, sort_order, expected_benchmark')
           .in('program_workout_id', batch)
           .order('sort_order');
         for (const b of blocks || []) {
@@ -213,7 +511,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
           const batch = blockIds.slice(i, i + 100);
           const { data: movements } = await supabase
             .from('program_movements_v2')
-            .select('id, block_id, movement, sets, reps, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order')
+            .select('id, block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order')
             .in('block_id', batch)
             .order('sort_order');
           for (const m of movements || []) {
@@ -231,6 +529,21 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
         blocksByWorkout.set(b.program_workout_id, arr);
       }
       setV3BlocksByWorkout(blocksByWorkout);
+
+      // 4. Which blocks have already used their one AI Edit (lock).
+      if (allBlocks.length) {
+        const locked = new Set<string>();
+        const blockIds = allBlocks.map((b) => b.id);
+        for (let i = 0; i < blockIds.length; i += 100) {
+          const batch = blockIds.slice(i, i + 100);
+          const { data: logs } = await supabase
+            .from('ai_edit_log')
+            .select('block_id')
+            .in('block_id', batch);
+          for (const l of logs || []) locked.add((l as { block_id: string }).block_id);
+        }
+        setAiEditedBlockIds(locked);
+      }
     }
 
     if (wk?.length) {
@@ -372,6 +685,11 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     </div>
                   </div>
                 )}
+                {scheduleError && (
+                  <div className="schedule-error-banner" onClick={() => setScheduleError(null)}>
+                    {scheduleError} <span className="schedule-error-dismiss">✕</span>
+                  </div>
+                )}
                 <div className="program-days-accordion">
                   {(() => {
                     // Group workouts by month, then into weeks of 5 within each month
@@ -420,7 +738,8 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           const ip = done ? undefined : rawIp;
                           const isExpanded = expandedDays.has(w.id);
                           return (
-                            <div key={w.id} className={`program-day-row${done ? ' program-day-completed' : ip ? ' program-day-in-progress' : ''}`}>
+                            <div key={w.id} id={`day-${w.id}`} className={`program-day-row${done ? ' program-day-completed' : ip ? ' program-day-in-progress' : ''}`}>
+                              <div className="program-day-headrow">
                               <button
                                 className="program-day-header"
                                 onClick={() => toggleDay(w.id)}
@@ -505,11 +824,27 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                   <polyline points="6 9 12 15 18 9" />
                                 </svg>
                               </button>
+                              <DayScheduleControl
+                                entry={scheduleByWorkout.get(w.id)}
+                                takenDates={takenProgramDates}
+                                onPick={(dateStr) => scheduleDay(w.id, dateStr)}
+                                onClear={() => unscheduleDay(w.id)}
+                              />
+                              </div>
                               {isExpanded && (
                                 <div className="program-day-body">
                                   <div className="program-day-blocks">
                                     {program?.program_version === 'v3' ? (
-                                      <V3DayView blocks={v3BlocksByWorkout.get(w.id) ?? []} />
+                                      <V3DayView
+                                        blocks={v3BlocksByWorkout.get(w.id) ?? []}
+                                        onUpdateMovement={updateMovementField}
+                                        onAddMovement={addMovementToBlock}
+                                        onRemoveMovement={removeMovementFromBlock}
+                                        aiEditedBlockIds={aiEditedBlockIds}
+                                        onProposeAiEdit={proposeAiEdit}
+                                        onApplyAiProposal={applyAiProposal}
+                                        onRefuseAiProposal={refuseAiProposal}
+                                      />
                                     ) : workoutBlocks.has(w.id) && workoutBlocks.get(w.id)!.length > 0 ? (
                                       <div className="workout-blocks">
                                         {workoutBlocks.get(w.id)!.map((b, bi) => (
@@ -629,6 +964,32 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
 // existing /workout-review (Coach) and /workout/start (logging)
 // pages. Lets v3 days use those flows immediately; future iteration
 // (step 8b) builds a v3-native log form that pre-fills typed fields.
+/**
+ * Render the rep prescription for a v3 movement. If rep_scheme has more
+ * than one varying iteration (chipper 21-15-9, ascending ladder), surface
+ * the structure as "21-15-9 reps". Otherwise fall back to the conventional
+ * sets×reps / total-reps form.
+ */
+function formatRepPrescription(m: ProgramMovementV2): string | null {
+  // Calorie-counted (Cal Row / Cal Bike / Cal Ski) takes precedence — when
+  // calories is populated the movement is monostructural cardio measured in
+  // calories, not reps.
+  if (m.calories != null && m.calories > 0) return `${m.calories} cal`;
+  const arr = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
+  if (arr && arr.length > 1) {
+    const allEqual = arr.every((n) => n === arr[0]);
+    if (!allEqual) return `${arr.join('-')} reps`;
+    // Uniform repeated rounds — sets×reps is clearer when sets is present
+    // and matches the scheme length (e.g. 5×5 instead of 5-5-5-5-5).
+    if (m.sets != null && m.sets === arr.length) return `${m.sets}×${arr[0]}`;
+    return `${arr.length}×${arr[0]}`;
+  }
+  if (m.sets != null && m.reps != null) return `${m.sets}×${m.reps}`;
+  if (m.sets != null) return `${m.sets} sets`;
+  if (m.reps != null) return `${m.reps} reps`;
+  return null;
+}
+
 function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
   if (!blocks.length) return '';
   const fmt = (m: ProgramMovementV2) => {
@@ -638,9 +999,8 @@ function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
     // distance and drop reps to avoid "Row 250 reps · 250m".
     const hasDistance = m.distance != null;
     if (!hasDistance) {
-      if (m.sets != null && m.reps != null) parts.push(`${m.sets}×${m.reps}`);
-      else if (m.sets != null) parts.push(`${m.sets} sets`);
-      else if (m.reps != null) parts.push(`${m.reps} reps`);
+      const repStr = formatRepPrescription(m);
+      if (repStr) parts.push(repStr);
     }
     if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? 'lbs'}`);
     if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
@@ -675,8 +1035,18 @@ function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
 // scaling notes inline in dim text.
 // ============================================================
 
-interface V3DayViewProps {
+interface AiEditHandlers {
+  aiEditedBlockIds?: Set<string>;
+  onProposeAiEdit?: (blockId: string, request: string) => Promise<{ proposal: BlockProposal; original: BlockProposal; ai_edit_log_id: string }>;
+  onApplyAiProposal?: (blockId: string, proposal: BlockProposal, aiLogId: string) => Promise<void>;
+  onRefuseAiProposal?: (blockId: string, aiLogId: string) => Promise<void>;
+}
+
+interface V3DayViewProps extends AiEditHandlers {
   blocks: ProgramBlockV2[];
+  onUpdateMovement?: (movementId: string, patch: Partial<ProgramMovementV2>) => Promise<void>;
+  onAddMovement?: (blockId: string) => Promise<void>;
+  onRemoveMovement?: (movementId: string) => Promise<void>;
 }
 
 // Block display labels — aligned with v1 prose conventions so the
@@ -704,7 +1074,117 @@ function formatDuration(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-function V3DayView({ blocks }: V3DayViewProps) {
+/** "YYYY-MM-DD" → "Fri Jun 5" (parse as local, not UTC, to avoid date shift). */
+function formatScheduleChip(dateStr: string): string {
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, (mo ?? 1) - 1, d ?? 1);
+  return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).replace(',', '');
+}
+
+/** Next N days as { key: "YYYY-MM-DD", label } for the quick-pick list. */
+function nextNDays(n: number): { key: string; label: string }[] {
+  const out: { key: string; label: string }[] = [];
+  const base = new Date();
+  for (let i = 0; i < n; i++) {
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const label = i === 0 ? 'Today'
+      : i === 1 ? 'Tomorrow'
+      : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    out.push({ key, label });
+  }
+  return out;
+}
+
+/** Per-day calendar affordance: add button → quick-pick day list → date chip. */
+function DayScheduleControl({ entry, takenDates, onPick, onClear }: {
+  entry?: { id: string; scheduled_date: string };
+  takenDates: Set<string>;
+  onPick: (dateStr: string) => void;
+  onClear: () => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [nativePicking, setNativePicking] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pickerOpen && !menuOpen) return;
+    const h = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) { setPickerOpen(false); setMenuOpen(false); }
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [pickerOpen, menuOpen]);
+
+  const pick = (dateStr: string) => { onPick(dateStr); setPickerOpen(false); setNativePicking(false); };
+
+  if (nativePicking) {
+    return (
+      <input
+        type="date"
+        className="day-schedule-date-input"
+        autoFocus
+        defaultValue={entry?.scheduled_date ?? ''}
+        onChange={(e) => { if (e.target.value) pick(e.target.value); else setNativePicking(false); }}
+        onBlur={() => setNativePicking(false)}
+      />
+    );
+  }
+
+  const days = nextNDays(14);
+
+  return (
+    <div className="day-schedule-wrap" ref={wrapRef}>
+      {entry ? (
+        <button type="button" className="day-schedule-chip" onClick={() => setMenuOpen(o => !o)}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+          {formatScheduleChip(entry.scheduled_date)}
+        </button>
+      ) : (
+        <button type="button" className="day-schedule-add" onClick={() => setPickerOpen(o => !o)} title="Add to calendar" aria-label="Add to calendar">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /><line x1="12" y1="14" x2="12" y2="18" /><line x1="10" y1="16" x2="14" y2="16" /></svg>
+        </button>
+      )}
+
+      {menuOpen && entry && (
+        <div className="day-schedule-menu">
+          <button type="button" onClick={() => { setMenuOpen(false); setPickerOpen(true); }}>Reschedule</button>
+          <button type="button" onClick={() => { setMenuOpen(false); onClear(); }}>Remove</button>
+        </div>
+      )}
+
+      {pickerOpen && (
+        <div className="day-schedule-quickpick">
+          {days.map(d => {
+            const taken = takenDates.has(d.key) && d.key !== entry?.scheduled_date;
+            return (
+              <button
+                key={d.key}
+                type="button"
+                className="day-schedule-qp-item"
+                disabled={taken}
+                onClick={() => pick(d.key)}
+              >
+                <span>{d.label}</span>
+                {taken && <span className="day-schedule-qp-taken">scheduled</span>}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            className="day-schedule-qp-item day-schedule-qp-more"
+            onClick={() => { setPickerOpen(false); setNativePicking(true); }}
+          >
+            Pick another date…
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function V3DayView({ blocks, onUpdateMovement, onAddMovement, onRemoveMovement, ...ai }: V3DayViewProps) {
   if (!blocks.length) {
     return (
       <div style={{ padding: 12, fontSize: 13, color: 'var(--text-dim)', fontStyle: 'italic' }}>
@@ -714,12 +1194,17 @@ function V3DayView({ blocks }: V3DayViewProps) {
   }
   return (
     <div className="workout-blocks">
-      {blocks.map((b) => <V3BlockCard key={b.id} block={b} />)}
+      {blocks.map((b) => <V3BlockCard key={b.id} block={b} onUpdateMovement={onUpdateMovement} onAddMovement={onAddMovement} onRemoveMovement={onRemoveMovement} {...ai} />)}
     </div>
   );
 }
 
-function V3BlockCard({ block }: { block: ProgramBlockV2 }) {
+function V3BlockCard({ block, onUpdateMovement, onAddMovement, onRemoveMovement, aiEditedBlockIds, onProposeAiEdit, onApplyAiProposal, onRefuseAiProposal }: AiEditHandlers & {
+  block: ProgramBlockV2;
+  onUpdateMovement?: (movementId: string, patch: Partial<ProgramMovementV2>) => Promise<void>;
+  onAddMovement?: (blockId: string) => Promise<void>;
+  onRemoveMovement?: (movementId: string) => Promise<void>;
+}) {
   const displayLabel = BLOCK_DISPLAY[block.block_type] ?? block.block_type;
   const timeCapMin = block.time_cap_seconds ? Math.round(block.time_cap_seconds / 60) : null;
 
@@ -754,18 +1239,202 @@ function V3BlockCard({ block }: { block: ProgramBlockV2 }) {
     fontStyle: 'italic',
   };
 
+  const [editing, setEditing] = useState(false);
+  const canEdit = !!onUpdateMovement;
+  // AI Edit is overkill for warm-up / cool-down — manual edit covers those.
+  const aiEditAllowedType = block.block_type !== 'warm-up' && block.block_type !== 'cool-down';
+  const canAiEdit = !!onProposeAiEdit && !!onApplyAiProposal && !!onRefuseAiProposal && aiEditAllowedType;
+  const locked = aiEditedBlockIds?.has(block.id) ?? false;
+
+  // AI Edit state machine (one-shot per block).
+  const [aiState, setAiState] = useState<'idle' | 'input' | 'loading' | 'review'>('idle');
+  const [aiRequest, setAiRequest] = useState('');
+  const [aiProposal, setAiProposal] = useState<BlockProposal | null>(null);
+  const [aiLogId, setAiLogId] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const runPropose = async () => {
+    if (!aiRequest.trim() || !onProposeAiEdit) return;
+    setAiState('loading');
+    setAiError(null);
+    try {
+      const { proposal, ai_edit_log_id } = await onProposeAiEdit(block.id, aiRequest.trim());
+      setAiProposal(proposal);
+      setAiLogId(ai_edit_log_id);
+      setAiState('review');
+    } catch (err) {
+      setAiError((err as Error).message || 'AI Edit failed');
+      setAiState('input');
+    }
+  };
+
+  const acceptProposal = async () => {
+    if (!aiProposal || !aiLogId || !onApplyAiProposal) return;
+    setAiState('loading');
+    try {
+      await onApplyAiProposal(block.id, aiProposal, aiLogId);
+      setAiState('idle');
+    } catch (err) {
+      setAiError((err as Error).message || 'Failed to apply');
+      setAiState('review');
+    }
+  };
+
+  const refuseProposal = async () => {
+    if (!aiLogId || !onRefuseAiProposal) return;
+    try { await onRefuseAiProposal(block.id, aiLogId); } catch { /* lock applies regardless */ }
+    setAiState('idle');
+    setAiProposal(null);
+  };
+
   return (
     <div className="workout-block" data-block={block.block_type}>
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <span className="workout-block-label" data-block={block.block_type}>{displayLabel}</span>
         {block.block_label && <span style={labelStyle}>{block.block_label}</span>}
         {timeCapMin != null && <span style={capPillStyle}>cap {timeCapMin} min</span>}
+        {(canEdit || canAiEdit) && (
+          <span style={{ display: 'inline-flex', gap: 6, marginLeft: 'auto' }}>
+            {canEdit && (
+              <button
+                type="button"
+                className="block-edit-toggle"
+                onClick={() => setEditing(e => !e)}
+                aria-label={editing ? 'Done editing block' : 'Edit block'}
+              >
+                {editing ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
+                    Done
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                    Edit
+                  </>
+                )}
+              </button>
+            )}
+            {canAiEdit && !editing && (
+              locked ? (
+                <span className="block-ai-edited-tag" title="AI Edit has been used on this block">AI edited</span>
+              ) : (
+                <button
+                  type="button"
+                  className="block-ai-edit-toggle"
+                  onClick={() => { setAiState(s => s === 'idle' ? 'input' : 'idle'); setAiError(null); }}
+                  disabled={aiState === 'loading'}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3z" /></svg>
+                  AI Edit
+                </button>
+              )
+            )}
+          </span>
+        )}
       </div>
       {block.block_scheme && <div style={schemeStyle}>{block.block_scheme}</div>}
       {block.block_notes && <div style={notesStyle}>{block.block_notes}</div>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {block.movements.map((m) => <V3MovementRow key={m.id} movement={m} />)}
+        {block.movements.map((m) => (
+          editing
+            ? <V3MovementEditRow key={m.id} movement={m} onUpdate={onUpdateMovement!} onRemove={onRemoveMovement} />
+            : <V3MovementRow key={m.id} movement={m} />
+        ))}
+        {editing && onAddMovement && (
+          <button type="button" className="movement-add-btn" onClick={() => onAddMovement(block.id)}>
+            + Add movement
+          </button>
+        )}
       </div>
+
+      {canAiEdit && !locked && aiState !== 'idle' && (
+        <V3AiEditPanel
+          state={aiState}
+          request={aiRequest}
+          setRequest={setAiRequest}
+          proposal={aiProposal}
+          error={aiError}
+          onSubmit={runPropose}
+          onAccept={acceptProposal}
+          onRefuse={refuseProposal}
+          onCancel={() => { setAiState('idle'); setAiError(null); setAiRequest(''); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Render a movement (live row or proposal) as a single readable line. */
+function movementToLine(m: BlockProposalMovement): string {
+  const parts: string[] = [];
+  const hasDistance = m.distance != null;
+  if (!hasDistance) {
+    const r = formatRepPrescription({
+      calories: m.calories ?? null, rep_scheme: m.rep_scheme ?? null,
+      sets: m.sets ?? null, reps: m.reps ?? null,
+    } as ProgramMovementV2);
+    if (r) parts.push(r);
+  }
+  if (m.weight != null) {
+    const pct = m.target_pct_1rm != null ? ` (${Math.round(m.target_pct_1rm)}%)` : '';
+    parts.push(`${m.weight}${m.weight_unit ?? 'lbs'}${pct}`);
+  }
+  if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
+  if (m.time_seconds != null) parts.push(formatDuration(m.time_seconds));
+  if (hasDistance) parts.push(`${m.distance}${m.distance_unit ?? ''}`);
+  const presc = parts.join(' · ');
+  const scaling = m.scaling_note ? ` — ${m.scaling_note}` : '';
+  return `${m.movement}${presc ? `  ${presc}` : ''}${scaling}`;
+}
+
+function V3AiEditPanel({ state, request, setRequest, proposal, error, onSubmit, onAccept, onRefuse, onCancel }: {
+  state: 'input' | 'loading' | 'review';
+  request: string;
+  setRequest: (v: string) => void;
+  proposal: BlockProposal | null;
+  error: string | null;
+  onSubmit: () => void;
+  onAccept: () => void;
+  onRefuse: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="ai-block-edit-panel">
+      {state !== 'review' && (
+        <div className="ai-block-edit-input-row">
+          <input
+            type="text"
+            className="ai-block-edit-input"
+            value={request}
+            onChange={e => setRequest(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && request.trim() && state !== 'loading') onSubmit(); }}
+            placeholder="What do you need to change? e.g. lighter, no barbell, add a third round"
+            disabled={state === 'loading'}
+            autoFocus
+          />
+          <button type="button" className="ai-block-edit-go" onClick={onSubmit} disabled={state === 'loading' || !request.trim()}>
+            {state === 'loading' ? 'Thinking…' : 'Propose'}
+          </button>
+          <button type="button" className="ai-block-edit-cancel" onClick={onCancel} disabled={state === 'loading'}>Cancel</button>
+        </div>
+      )}
+      {error && <div className="ai-block-edit-error">{error}</div>}
+      {state === 'review' && proposal && (
+        <div className="ai-block-edit-review">
+          <div className="ai-block-edit-note">One AI Edit per block — accept or refuse. For more, use Coach.</div>
+          <div className="ai-block-edit-proposal">
+            {(proposal.block_scheme) && <div className="ai-block-edit-scheme">{proposal.block_scheme}</div>}
+            {proposal.movements.map((m, i) => (
+              <div key={i} className="ai-block-edit-mvline">{movementToLine(m)}</div>
+            ))}
+          </div>
+          <div className="ai-block-edit-actions">
+            <button type="button" className="ai-block-edit-accept" onClick={onAccept}>Accept</button>
+            <button type="button" className="ai-block-edit-refuse" onClick={onRefuse}>Refuse</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -777,9 +1446,8 @@ function V3MovementRow({ movement }: { movement: ProgramMovementV2 }) {
   // distance and drop reps to avoid "Row 250 reps · 250m".
   const hasDistance = movement.distance != null;
   if (!hasDistance) {
-    if (movement.sets != null && movement.reps != null) parts.push(`${movement.sets}×${movement.reps}`);
-    else if (movement.sets != null) parts.push(`${movement.sets} sets`);
-    else if (movement.reps != null) parts.push(`${movement.reps} reps`);
+    const repStr = formatRepPrescription(movement);
+    if (repStr) parts.push(repStr);
   }
   if (movement.weight != null) {
     const pct = movement.target_pct_1rm != null ? ` (${Math.round(movement.target_pct_1rm)}%)` : '';
@@ -823,6 +1491,193 @@ function V3MovementRow({ movement }: { movement: ProgramMovementV2 }) {
           {movement.scaling_note}
         </span>
       )}
+    </div>
+  );
+}
+
+/**
+ * Compact 1-3 line edit row shown when a block is in edit mode.
+ * Per scope: only movement name, weight + unit, and scaling note are editable.
+ * Other prescription fields (sets/reps/RPE/%/time/distance/calories) stay
+ * read-only — those define the coaching stimulus and require regen / AI Edit.
+ */
+function repsToText(m: ProgramMovementV2): string {
+  if (Array.isArray(m.rep_scheme) && m.rep_scheme.length > 0) return m.rep_scheme.join('-');
+  return m.reps != null ? String(m.reps) : '';
+}
+
+function V3MovementEditRow({ movement, onUpdate, onRemove }: {
+  movement: ProgramMovementV2;
+  onUpdate: (movementId: string, patch: Partial<ProgramMovementV2>) => Promise<void>;
+  onRemove?: (movementId: string) => Promise<void>;
+}) {
+  const [name, setName] = useState(movement.movement);
+  const [sets, setSets] = useState<string>(movement.sets != null ? String(movement.sets) : '');
+  const [reps, setReps] = useState<string>(repsToText(movement));
+  const [weight, setWeight] = useState<string>(movement.weight != null ? String(movement.weight) : '');
+  const [unit, setUnit] = useState<'lbs' | 'kg'>((movement.weight_unit as 'lbs' | 'kg') ?? 'lbs');
+  const [scaling, setScaling] = useState(movement.scaling_note ?? '');
+
+  // Typeahead: suggest canonical movement names (matches display_name + aliases,
+  // so "T2B" → "Toes To Bar"). Suggests, never forces — a no-match name is kept.
+  const vocab = useMovementVocab();
+  const [nameFocused, setNameFocused] = useState(false);
+  const suggestions = useMemo(() => {
+    if (!nameFocused) return [];
+    const trimmed = name.trim();
+    if (!trimmed) return [];
+    return matchMovements(vocab, trimmed, 8).filter(dn => dn.toLowerCase() !== trimmed.toLowerCase());
+  }, [vocab, name, nameFocused]);
+
+  const commitName = async () => {
+    const next = name.trim();
+    if (!next || next === movement.movement) return;
+    try { await onUpdate(movement.id, { movement: next }); }
+    catch { setName(movement.movement); }
+  };
+
+  // Pick a canonical name from the typeahead. onMouseDown (not onClick) fires
+  // before the input's blur, so the partial text is never committed first.
+  const selectSuggestion = async (dn: string) => {
+    setName(dn);
+    setNameFocused(false);
+    if (dn === movement.movement) return;
+    try { await onUpdate(movement.id, { movement: dn }); }
+    catch { setName(movement.movement); }
+  };
+
+  const commitSets = async () => {
+    const trimmed = sets.trim();
+    const next = trimmed === '' ? null : Math.round(Number(trimmed));
+    if (next != null && (!Number.isFinite(next) || next < 0)) { setSets(movement.sets != null ? String(movement.sets) : ''); return; }
+    if (next === (movement.sets ?? null)) return;
+    try { await onUpdate(movement.id, { sets: next }); }
+    catch { setSets(movement.sets != null ? String(movement.sets) : ''); }
+  };
+
+  // Reps doubles as the rep-scheme field: a single number → plain reps (scheme
+  // cleared); multiple numbers ("21-15-9") → rep_scheme with reps = sum.
+  const commitReps = async () => {
+    const parts = reps.split(/[^0-9]+/).map(s => s.trim()).filter(Boolean).map(Number).filter(n => Number.isFinite(n) && n > 0);
+    const patch = parts.length === 0 ? reconcileReps(null, null)
+      : parts.length === 1 ? reconcileReps(parts[0], null)
+      : reconcileReps(null, parts);
+    const cur = reconcileReps(movement.reps, movement.rep_scheme);
+    if (patch.reps === cur.reps && JSON.stringify(patch.rep_scheme) === JSON.stringify(cur.rep_scheme)) return;
+    try { await onUpdate(movement.id, { reps: patch.reps, rep_scheme: patch.rep_scheme }); }
+    catch { setReps(repsToText(movement)); }
+  };
+
+  const commitWeight = async () => {
+    const trimmed = weight.trim();
+    const next = trimmed === '' ? null : Number(trimmed);
+    if (next != null && Number.isNaN(next)) { setWeight(movement.weight != null ? String(movement.weight) : ''); return; }
+    if (next === (movement.weight ?? null)) return;
+    try { await onUpdate(movement.id, { weight: next }); }
+    catch { setWeight(movement.weight != null ? String(movement.weight) : ''); }
+  };
+
+  const commitUnit = async (nextUnit: 'lbs' | 'kg') => {
+    setUnit(nextUnit);
+    if (nextUnit === (movement.weight_unit ?? 'lbs')) return;
+    try { await onUpdate(movement.id, { weight_unit: nextUnit }); }
+    catch { setUnit((movement.weight_unit as 'lbs' | 'kg') ?? 'lbs'); }
+  };
+
+  const commitScaling = async () => {
+    const trimmed = scaling.trim();
+    const next = trimmed === '' ? null : trimmed;
+    if (next === (movement.scaling_note ?? null)) return;
+    try { await onUpdate(movement.id, { scaling_note: next }); }
+    catch { setScaling(movement.scaling_note ?? ''); }
+  };
+
+  return (
+    <div className="movement-edit-row">
+      <div className="movement-edit-name-wrap">
+        <input
+          type="text"
+          className="movement-edit-input movement-edit-input--name"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onFocus={() => setNameFocused(true)}
+          onBlur={() => { setNameFocused(false); commitName(); }}
+          placeholder="Movement"
+          autoComplete="off"
+        />
+        {suggestions.length > 0 && (
+          <div className="movement-suggest">
+            {suggestions.map(dn => (
+              <button
+                key={dn}
+                type="button"
+                className="movement-suggest-item"
+                onMouseDown={e => { e.preventDefault(); selectSuggestion(dn); }}
+              >
+                {dn}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <input
+        type="number"
+        inputMode="numeric"
+        className="movement-edit-input movement-edit-input--num"
+        value={sets}
+        onChange={e => setSets(e.target.value)}
+        onBlur={commitSets}
+        placeholder="Sets"
+        aria-label="Sets"
+      />
+      <input
+        type="text"
+        inputMode="numeric"
+        className="movement-edit-input movement-edit-input--reps"
+        value={reps}
+        onChange={e => setReps(e.target.value)}
+        onBlur={commitReps}
+        placeholder="Reps"
+        aria-label="Reps or scheme (e.g. 21-15-9)"
+      />
+      <div className="movement-edit-weight">
+        <input
+          type="number"
+          inputMode="decimal"
+          className="movement-edit-input movement-edit-input--weight"
+          value={weight}
+          onChange={e => setWeight(e.target.value)}
+          onBlur={commitWeight}
+          placeholder="Wt"
+        />
+        <select
+          className="movement-edit-input movement-edit-input--unit"
+          value={unit}
+          onChange={e => commitUnit(e.target.value as 'lbs' | 'kg')}
+        >
+          <option value="lbs">lbs</option>
+          <option value="kg">kg</option>
+        </select>
+      </div>
+      {onRemove && (
+        <button
+          type="button"
+          className="movement-edit-remove"
+          onClick={() => onRemove(movement.id)}
+          aria-label="Remove movement"
+          title="Remove movement"
+        >
+          ×
+        </button>
+      )}
+      <input
+        type="text"
+        className="movement-edit-input movement-edit-input--scaling"
+        value={scaling}
+        onChange={e => setScaling(e.target.value)}
+        onBlur={commitScaling}
+        placeholder="Scaling note (optional)"
+      />
     </div>
   );
 }
