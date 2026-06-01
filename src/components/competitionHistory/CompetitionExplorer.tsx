@@ -16,7 +16,7 @@ import type {
   NormalizedCatalog,
   CatalogWorkoutSummary,
 } from '../../lib/competitionHistory';
-import { movementExposure, normalizeCatalog, ageBandFor } from '../../lib/competitionHistory';
+import { movementExposure, normalizeCatalog, ageBandFor, prettyMovementName } from '../../lib/competitionHistory';
 import CompetitionGrid from './CompetitionGrid';
 import CompetitionMap from './CompetitionMap';
 import WorkoutDetail from './WorkoutDetail';
@@ -43,30 +43,17 @@ const TIME_DOMAINS: TimeDomain[] = ['short', 'medium', 'long'];
 // away the legacy 'mid' literal in bundle 1.9.0. The filter chips show a
 // compact label ('mid') while filtering on the real value ('medium').
 const TIME_DOMAIN_LABEL: Record<TimeDomain, string> = {
-  short: 'short',
-  medium: 'mid',
-  long: 'long',
-};
-
-// Small × button shown next to a filter dropdown when it has a value — resets
-// just that field, without touching the others.
-const fieldClearBtnStyle = {
-  flexShrink: 0,
-  padding: '0 10px',
-  fontSize: 16,
-  lineHeight: 1,
-  borderRadius: 6,
-  border: '1px solid var(--border)',
-  background: 'none',
-  color: 'var(--text-dim)',
-  cursor: 'pointer',
-  fontFamily: 'inherit' as const,
+  short: 'Short',
+  medium: 'Medium',
+  long: 'Long',
 };
 
 export default function CompetitionExplorer({
   history,
   userAge,
+  userBodyMassKg,
   canLog,
+  onThrowbackLogged,
   scope,
   setScope,
   filter,
@@ -74,7 +61,11 @@ export default function CompetitionExplorer({
 }: {
   history: NormalizedCompetitionHistory;
   userAge: number | null;
+  userBodyMassKg: number | null;
   canLog: boolean;
+  /** Called after a throwback is logged + its form closed, so the parent can
+   *  refetch and merge it into "Your workouts". */
+  onThrowbackLogged?: () => void;
   scope: Scope;
   setScope: Dispatch<SetStateAction<Scope>>;
   filter: Filter;
@@ -83,10 +74,9 @@ export default function CompetitionExplorer({
   const ageBand = ageBandFor(userAge);
   const [selectedWorkout, setSelectedWorkout] = useState<CompetitionWorkoutEntry | null>(null);
   const [selectedCatalogWorkout, setSelectedCatalogWorkout] = useState<CatalogWorkoutSummary | null>(null);
-  // "Try it" — the workout being logged + ids logged this session (optimistic
-  // grid fill; full read-back of competition_workout_results on load is a
-  // follow-up, so for now a just-logged throwback shows green in the "All" map
-  // but not yet in the "Mine" grid).
+  // "Try it" — the workout being logged + ids logged this session. loggedIds
+  // gives the "All" map an optimistic green immediately; the "Mine" grid updates
+  // when the log form closes (onThrowbackLogged → parent refetch + merge).
   const [logTarget, setLogTarget] = useState<LogResultWorkout | null>(null);
   const [loggedIds, setLoggedIds] = useState<Set<string>>(new Set());
   // Shown when a non-competition_log user taps Try-It.
@@ -238,112 +228,68 @@ export default function CompetitionExplorer({
 
   return (
     <div>
-      {/* Scope toggle */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+      {/* Scope — which dataset (a mode, distinct from the filters below). */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-dim)', marginRight: 2 }}>Showing:</span>
         {scopeBtn('mine', 'Your workouts')}
         {scopeBtn('all', 'All competition workouts')}
       </div>
 
-      {/* Filter bar — on mobile the two dropdowns get their own row, then the
-          time-domain buttons + clear + count below. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 4, flex: '1 1 150px', minWidth: 0 }}>
-            <select
-              className="lift-input"
-              value={filter.movement ?? ''}
-              onChange={(e) => setFilter((f) => ({ ...f, movement: e.target.value || undefined }))}
-              style={{ flex: 1, minWidth: 0 }}
-            >
-              <option value="">All movements</option>
-              {movementsByName.map((m) => (
-                <option key={m.name} value={m.name}>{m.name} ({m.workoutCount})</option>
-              ))}
-            </select>
-            {filter.movement && (
-              <button
-                type="button"
-                aria-label="Clear movement filter"
-                title="Clear movement filter"
-                onClick={() => setFilter((f) => ({ ...f, movement: undefined }))}
-                style={fieldClearBtnStyle}
-              >
-                ×
-              </button>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', gap: 4, flex: '1 1 110px', minWidth: 0 }}>
-            <select
-              className="lift-input"
-              value={filter.year ?? ''}
-              onChange={(e) => setFilter((f) => ({ ...f, year: e.target.value ? Number(e.target.value) : undefined }))}
-              style={{ flex: 1, minWidth: 0 }}
-            >
-              <option value="">All years</option>
-              {(scope === 'all' && catalog
-                ? catalog.seasons.map((s) => s.season)
-                : history.yearsCompeted
-              ).map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-            {filter.year != null && (
-              <button
-                type="button"
-                aria-label="Clear year filter"
-                title="Clear year filter"
-                onClick={() => setFilter((f) => ({ ...f, year: undefined }))}
-                style={fieldClearBtnStyle}
-              >
-                ×
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {(['', ...TIME_DOMAINS] as Array<'' | TimeDomain>).map((td) => {
-              const active = (filter.timeDomain ?? '') === td;
-              return (
-                <button
-                  key={td || 'all'}
-                  type="button"
-                  onClick={() => setFilter((f) => ({ ...f, timeDomain: td || undefined }))}
-                  style={{
-                    padding: '6px 10px', fontSize: 12, borderRadius: 6,
-                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                    background: active ? 'var(--accent)' : 'var(--surface2)',
-                    color: active ? '#fff' : 'var(--text)', cursor: 'pointer', fontFamily: 'inherit',
-                  }}
-                >
-                  {td === '' ? 'Any time' : TIME_DOMAIN_LABEL[td]}
-                </button>
-              );
-            })}
-          </div>
-
-          {isFiltered && (
+      {/* Duration — tappable buttons (a small fixed set reads better as pills
+          than a dropdown). "Any" clears it. */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-dim)', marginRight: 2 }}>Duration:</span>
+        {([...TIME_DOMAINS, null] as Array<TimeDomain | null>).map((td) => {
+          const active = (filter.timeDomain ?? null) === td;
+          return (
             <button
+              key={td ?? 'any'}
               type="button"
-              onClick={() => setFilter({})}
+              onClick={() => setFilter((f) => ({ ...f, timeDomain: td ?? undefined }))}
               style={{
-                padding: '6px 10px', fontSize: 12, borderRadius: 6,
-                border: '1px solid var(--border)', background: 'none',
-                color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit',
+                padding: '6px 12px', fontSize: 12, borderRadius: 6,
+                border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                background: active ? 'var(--accent)' : 'var(--surface2)',
+                color: active ? '#fff' : 'var(--text)', cursor: 'pointer', fontFamily: 'inherit',
               }}
             >
-              Clear
+              {td ? TIME_DOMAIN_LABEL[td] : 'Any'}
             </button>
-          )}
+          );
+        })}
+      </div>
 
-          {scope === 'mine' && (
-            <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 'auto' }}>
-              {isFiltered ? `showing ${matchedCount} of ${history.total}` : `${history.total} workouts`}
-            </span>
-          )}
-        </div>
+      {/* Movement + year filters (dropdowns; each "All …" option is its own clear). */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        <select
+          className="cw-select"
+          value={filter.movement ?? ''}
+          onChange={(e) => setFilter((f) => ({ ...f, movement: e.target.value || undefined }))}
+          style={{ flex: '1 1 150px', minWidth: 0 }}
+        >
+          <option value="">All movements</option>
+          {movementsByName.map((m) => (
+            <option key={m.name} value={m.name}>{prettyMovementName(m.name)} ({m.workoutCount})</option>
+          ))}
+        </select>
+
+        <select
+          className="cw-select"
+          value={filter.year ?? ''}
+          onChange={(e) => setFilter((f) => ({ ...f, year: e.target.value ? Number(e.target.value) : undefined }))}
+          style={{ flex: '1 1 110px', minWidth: 0 }}
+        >
+          <option value="">All years</option>
+          {(scope === 'all' && catalog ? catalog.seasons.map((s) => s.season) : history.yearsCompeted).map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+
+        {scope === 'mine' && (
+          <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 'auto' }}>
+            {isFiltered ? `showing ${matchedCount} of ${history.total}` : `${history.total} workouts`}
+          </span>
+        )}
       </div>
 
       {/* The grid / map */}
@@ -371,6 +317,7 @@ export default function CompetitionExplorer({
       {selectedWorkout && (
         <WorkoutDetail
           entry={selectedWorkout}
+          userKg={userBodyMassKg}
           onClose={() => setSelectedWorkout(null)}
           onLogAgain={openLogForEntry}
         />
@@ -383,7 +330,18 @@ export default function CompetitionExplorer({
         />
       )}
       {logTarget && (
-        <LogResultForm workout={logTarget} ageBand={ageBand} onLogged={onLogged} onClose={() => setLogTarget(null)} />
+        <LogResultForm
+          workout={logTarget}
+          ageBand={ageBand}
+          onLogged={onLogged}
+          onClose={() => {
+            // If this workout was logged, its placement is now persisted —
+            // tell the parent to refetch so it merges into "Your workouts".
+            const loggedThis = loggedIds.has(logTarget.competition_workout_id);
+            setLogTarget(null);
+            if (loggedThis) onThrowbackLogged?.();
+          }}
+        />
       )}
       {paywall && (
         <div

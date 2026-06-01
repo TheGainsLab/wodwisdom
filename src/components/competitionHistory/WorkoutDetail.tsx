@@ -13,6 +13,7 @@
  */
 
 import type { CompetitionWorkoutEntry, ScoringUnit } from '../../lib/competitionHistory';
+import { personalizedPower } from '../../lib/competitionHistory';
 
 const STAGE_LABEL: Record<string, string> = {
   open: 'Open',
@@ -47,16 +48,22 @@ function nf(n: number): string {
 
 export default function WorkoutDetail({
   entry,
+  userKg,
   onClose,
   onLogAgain,
 }: {
   entry: CompetitionWorkoutEntry;
+  userKg?: number | null;
   onClose: () => void;
   onLogAgain?: (entry: CompetitionWorkoutEntry) => void;
 }) {
   const w = entry.workout;
   const r = entry.result;
   const stageLabel = STAGE_LABEL[entry.stage] ?? entry.stage;
+  const isLogged = entry.source === 'logged';
+  const hasCohort = Number.isFinite(r.cohort_percentile);
+  const hasWorldwide = Number.isFinite(r.worldwide_percentile);
+  const power = personalizedPower(entry, userKg);
   const scoreStr = formatScore(r.scoring_unit, r.raw_score, r.raw_score_text);
   const capStatus = w.is_dual_scoring
     ? entry.finished_under_cap
@@ -99,6 +106,9 @@ export default function WorkoutDetail({
               {entry.year} {stageLabel} {entry.workout_name}
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+              {isLogged && (
+                <span style={{ fontSize: 11, padding: '2px 7px', background: 'var(--accent-glow)', border: '1px solid var(--accent)', borderRadius: 4, color: 'var(--accent)', fontWeight: 700 }}>Logged</span>
+              )}
               {w.time_domain?.bucket && <Badge>{w.time_domain.bucket} time domain</Badge>}
               <Badge>{w.scoring_unit === 'load_lbs' ? 'for load' : `for ${w.scoring_unit}`}</Badge>
               {w.is_dual_scoring && <Badge>dual-scoring</Badge>}
@@ -149,29 +159,56 @@ export default function WorkoutDetail({
           </div>
           <div style={{ fontSize: 24, fontWeight: 700, marginTop: 2 }}>{scoreStr}</div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
-            Real competition · {entry.year}
+            {isLogged ? 'Logged' : 'Real competition'} · {entry.year}
             {capStatus ? ` · ${capStatus}` : ''}
           </div>
         </div>
 
-        {/* Where it puts you */}
+        {/* Power — personalized to the athlete's body mass (rescaled for
+            competed results; computed at real mass for logged throwbacks).
+            When the movements have no power model, show a placeholder note
+            rather than silently hiding the section. */}
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Power{power?.estimated ? ' (est.)' : ''}
+          </div>
+          {power ? (
+            <div style={{ fontSize: 13, marginTop: 2 }}>
+              {Math.round(power.watts).toLocaleString()} W
+              {power.wPerKg != null && <span style={{ color: 'var(--text-dim)' }}> · {power.wPerKg.toFixed(1)} W/kg</span>}
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, marginTop: 2, color: 'var(--text-dim)' }}>
+              Not yet available for these movements
+            </div>
+          )}
+        </div>
+
+        {/* Where it puts you — guarded: a logged throwback without a stored
+            placement has no percentile, so the section only shows real reads. */}
+        {(hasCohort || hasWorldwide) && (
         <div style={{ marginTop: 16 }}>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
             Where that puts you
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 14px', fontSize: 13 }}>
-            <div style={{ color: 'var(--text-dim)' }}>vs your age group</div>
-            <div>
-              {r.cohort_percentile.toFixed(1)}th pct
-              <span style={{ color: 'var(--text-dim)' }}> · beat ~{nf(beatCohort)} of {nf(r.cohort_n)}</span>
-            </div>
-            <div style={{ color: 'var(--text-dim)' }}>vs the whole field</div>
-            <div>
-              {r.worldwide_percentile.toFixed(1)}th pct
-              <span style={{ color: 'var(--text-dim)' }}> · rank {nf(r.workout_rank)} of {nf(r.worldwide_n)}</span>
-            </div>
+            {hasCohort && <>
+              <div style={{ color: 'var(--text-dim)' }}>vs your age group</div>
+              <div>
+                {r.cohort_percentile.toFixed(1)}th pct
+                <span style={{ color: 'var(--text-dim)' }}> · beat ~{nf(beatCohort)} of {nf(r.cohort_n)}</span>
+              </div>
+            </>}
+            {hasWorldwide && <>
+              <div style={{ color: 'var(--text-dim)' }}>vs the whole field</div>
+              <div>
+                {r.worldwide_percentile.toFixed(1)}th pct
+                <span style={{ color: 'var(--text-dim)' }}> · rank {nf(r.workout_rank)} of {nf(r.worldwide_n)}</span>
+              </div>
+            </>}
           </div>
         </div>
+        )}
 
         {onLogAgain && (
           <div style={{ marginTop: 16 }}>

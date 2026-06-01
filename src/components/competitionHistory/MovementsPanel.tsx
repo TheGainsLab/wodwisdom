@@ -1,26 +1,23 @@
 /**
- * MovementsPanel — the "Movements" tab of /competition-history. Every movement
- * the athlete has competed with, with a performance read: the avg cohort
- * percentile of the workouts that included it, broken out by stage (an Open
- * workout's field is ~300k, a Games event's ~40 — not comparable, so per-stage,
- * never pooled). The headline is the deepest stage the athlete faced it in with
- * enough data — usually the Open, the most discriminating field — with a
- * red / yellow / green dot (<50 / 50–80 / 80+).
+ * MovementsPanel — the "All Movements" tab of /competition-history. Every
+ * movement the athlete has competed with, GROUPED BY STAGE: a movement repeats
+ * under each level it appeared in (Open / QF / …) with that level's read — the
+ * avg cohort percentile of the workouts including it. Never pooled across stages
+ * (an Open workout's field is ~300k, a Games event's ~40 — not comparable); no
+ * dot/number for a stage with <2 such workouts (one bad day ≠ a weakness).
+ * Red / yellow / green dot (<50 / 50–80 / 80+).
  *
  * It's a proxy ("on workouts including X", not "your snatch percentile") — a
  * snatch + five other movements still counts toward "snatch" — noisy per-workout
- * but it evens out over enough workouts. We don't show a dot or number for a
- * stage with fewer than 2 such workouts, so one bad day doesn't read as a
- * weakness.
+ * but it evens out over enough workouts.
  *
- * Default sort = weakest first (floats the red dots up — the point is finding
- * weaknesses); toggle to by-frequency. Tap a row to reveal the higher-stage
- * numbers + a link to the Map filtered to that movement.
+ * Within each stage: weakest-first (floats red dots up — the point is finding
+ * weaknesses) or by-frequency. Tap a row → the Map filtered to that movement.
  */
 
 import { useMemo, useState } from 'react';
 import type { NormalizedCompetitionHistory, MovementStageStat } from '../../lib/competitionHistory';
-import { movementPerformance, STAGE_ABBR } from '../../lib/competitionHistory';
+import { movementPerformance, STAGE_ABBR, STAGE_ORDER_LIST, prettyMovementName } from '../../lib/competitionHistory';
 
 const MIN_WORKOUTS_FOR_READ = 2;
 
@@ -50,11 +47,16 @@ function readPct(s: MovementStageStat): number | null {
   return s.n >= MIN_WORKOUTS_FOR_READ && s.avgPct != null ? s.avgPct : null;
 }
 
-function stageText(s: MovementStageStat): string {
-  const label = STAGE_ABBR[s.stage] ?? s.stage;
-  const p = readPct(s);
-  const pctPart = p != null ? ` ${Math.round(p)}` : '';
-  return `${label}${pctPart} · ${s.n} workout${s.n === 1 ? '' : 's'}`;
+/** 96 → "96th", 1 → "1st", 83 → "83rd", 11 → "11th". */
+function ordinal(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1: return `${n}st`;
+    case 2: return `${n}nd`;
+    case 3: return `${n}rd`;
+    default: return `${n}th`;
+  }
 }
 
 function sortBtnStyle(active: boolean) {
@@ -78,50 +80,56 @@ export default function MovementsPanel({
   onPick: (movement: string) => void;
 }) {
   const [sortMode, setSortMode] = useState<'weakest' | 'frequency'>('weakest');
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  // Per movement: pick the deepest stage with a usable read as the headline;
-  // if none qualifies, fall back to the deepest stage (shown without a number).
-  const rows = useMemo(() => {
-    return movementPerformance(history).map((m) => {
-      const headline = m.byStage.find((s) => readPct(s) != null) ?? m.byStage[0] ?? null;
-      const headlinePct = headline ? readPct(headline) : null;
-      const rest = headline ? m.byStage.filter((s) => s.stage !== headline.stage) : [];
-      return { name: m.name, totalWorkouts: m.totalWorkouts, headline, headlinePct, rest };
-    });
-  }, [history]);
-
-  const sorted = useMemo(() => {
-    const copy = [...rows];
-    if (sortMode === 'frequency') {
-      copy.sort((a, b) => b.totalWorkouts - a.totalWorkouts || a.name.localeCompare(b.name));
-    } else {
-      copy.sort((a, b) => {
-        const ap = a.headlinePct ?? Number.POSITIVE_INFINITY;
-        const bp = b.headlinePct ?? Number.POSITIVE_INFINITY;
-        return ap - bp || b.totalWorkouts - a.totalWorkouts || a.name.localeCompare(b.name);
-      });
-    }
-    return copy;
-  }, [rows, sortMode]);
-
-  if (rows.length === 0) {
-    return <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>No movement data yet.</div>;
-  }
-
-  const toggle = (name: string) =>
-    setExpanded((prev) => {
+  // Levels collapse by default; tap a level header to open it.
+  const [openStages, setOpenStages] = useState<Set<string>>(new Set());
+  const toggleStage = (stage: string) =>
+    setOpenStages((prev) => {
       const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
+      if (next.has(stage)) next.delete(stage); else next.add(stage);
       return next;
     });
 
+  const movementCount = useMemo(() => movementPerformance(history).length, [history]);
+
+  // Group every movement under each STAGE it has data for — never pooled across
+  // stages (Open's ~300k field isn't comparable to a Games event's ~40). A
+  // movement repeats under each level it appeared in, with that level's read.
+  // Within a stage: weakest-first (floats red dots up) or by frequency.
+  const sections = useMemo(() => {
+    const byStage = new Map<string, Array<{ name: string; pct: number | null; n: number; logged: boolean }>>();
+    for (const m of movementPerformance(history)) {
+      for (const s of m.byStage) {
+        const arr = byStage.get(s.stage) ?? [];
+        arr.push({ name: m.name, pct: readPct(s), n: s.n, logged: s.logged });
+        byStage.set(s.stage, arr);
+      }
+    }
+    const ordered = [
+      ...STAGE_ORDER_LIST.filter((s) => byStage.has(s)),
+      ...Array.from(byStage.keys()).filter((s) => !(STAGE_ORDER_LIST as string[]).includes(s)),
+    ];
+    return ordered.map((stage) => {
+      const items = [...byStage.get(stage)!];
+      if (sortMode === 'frequency') {
+        items.sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+      } else {
+        items.sort((a, b) =>
+          (a.pct ?? Number.POSITIVE_INFINITY) - (b.pct ?? Number.POSITIVE_INFINITY) ||
+          b.n - a.n || a.name.localeCompare(b.name));
+      }
+      return { stage, items };
+    });
+  }, [history, sortMode]);
+
+  if (sections.length === 0) {
+    return <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>No movement data yet.</div>;
+  }
+
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-          {rows.length} movement{rows.length === 1 ? '' : 's'} — % is your avg cohort percentile on workouts that include it ({MIN_WORKOUTS_FOR_READ}+ for a read).
+          {movementCount} movement{movementCount === 1 ? '' : 's'} — % is your avg cohort percentile on workouts that include it ({MIN_WORKOUTS_FOR_READ}+ for a read), by level.
         </span>
         <span style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
           <button type="button" onClick={() => setSortMode('weakest')} style={sortBtnStyle(sortMode === 'weakest')}>Weakest first</button>
@@ -129,59 +137,53 @@ export default function MovementsPanel({
         </span>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {sorted.map((m) => {
-          const isOpen = expanded.has(m.name);
-          const h = m.headline;
-          const headlineText = h
-            ? `${STAGE_ABBR[h.stage] ?? h.stage}${m.headlinePct != null ? ` ${Math.round(m.headlinePct)}` : ''} · ${h.n} wkt${h.n === 1 ? '' : 's'}`
-            : `${m.totalWorkouts} workout${m.totalWorkouts === 1 ? '' : 's'}`;
-          return (
-            <div key={m.name} style={{ borderBottom: '1px solid var(--border)' }}>
+      {sections.map((sec) => {
+        const isOpen = openStages.has(sec.stage);
+        return (
+        <div key={sec.stage} style={{ marginBottom: 4 }}>
+          <button
+            type="button"
+            onClick={() => toggleStage(sec.stage)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+              padding: '8px 6px', background: 'none', border: 'none',
+              borderBottom: '1px solid var(--border)', cursor: 'pointer',
+              fontFamily: 'inherit', textAlign: 'left',
+            }}
+          >
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--text-muted)' }}>
+              {STAGE_ABBR[sec.stage] ?? sec.stage}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>({sec.items.length})</span>
+            <span style={{ marginLeft: 'auto', color: 'var(--text-dim)', fontSize: 12, width: 12, textAlign: 'center' }}>{isOpen ? '▾' : '▸'}</span>
+          </button>
+          {isOpen && (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {sec.items.map((it) => (
               <button
+                key={`${sec.stage}-${it.name}`}
                 type="button"
-                onClick={() => toggle(m.name)}
+                onClick={() => onPick(it.name)}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  width: '100%',
-                  padding: '8px 6px',
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text)',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  fontSize: 13,
-                  textAlign: 'left',
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                  padding: '7px 6px', background: 'none', border: 'none',
+                  borderBottom: '1px solid var(--border)', color: 'var(--text)',
+                  cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, textAlign: 'left',
                 }}
               >
-                <Dot pct={m.headlinePct} />
-                <span style={{ fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</span>
-                <span style={{ color: 'var(--text-dim)', flexShrink: 0, fontSize: 12 }}>{headlineText}</span>
-                <span style={{ color: 'var(--text-dim)', flexShrink: 0, fontSize: 12, width: 12, textAlign: 'center' }}>{isOpen ? '▾' : '▸'}</span>
+                <Dot pct={it.pct} />
+                <span style={{ fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{prettyMovementName(it.name)}</span>
+                <span style={{ color: 'var(--text-dim)', flexShrink: 0, fontSize: 12 }}>
+                  ({it.n}) {it.pct != null ? `${ordinal(Math.round(it.pct))} percentile` : '—'}
+                  {it.logged && <span style={{ marginLeft: 5, fontSize: 10, color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 3, padding: '0 4px', textTransform: 'uppercase', letterSpacing: '.3px' }}>logged</span>}
+                </span>
               </button>
-              {isOpen && (
-                <div style={{ padding: '0 6px 10px 24px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {m.rest.map((s) => (
-                    <div key={s.stage} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-dim)' }}>
-                      <Dot pct={readPct(s)} />
-                      <span>{stageText(s)}</span>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => onPick(m.name)}
-                    style={{ marginTop: 4, alignSelf: 'flex-start', fontSize: 12, color: 'var(--accent)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
-                  >
-                    View {m.name} workouts on the map →
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            ))}
+          </div>
+          )}
+        </div>
+        );
+      })}
     </div>
   );
 }

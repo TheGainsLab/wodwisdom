@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { CatalogWorkoutSummary } from '../../lib/competitionHistory';
+import { prettyMovementName } from '../../lib/competitionHistory';
 
 // Phase 1 of the /workouts/{id} detail consume — we only read `description`
 // here (byte-identical to the done-path source). field_size / cap_completion_rate
@@ -116,7 +117,7 @@ export default function CatalogWorkoutCard({
               <span key={`${i}-${m}`} style={{
                 fontSize: 12, padding: '3px 8px', background: 'var(--surface2)',
                 border: '1px solid var(--border)', borderRadius: 999, color: 'var(--text-dim)',
-              }}>{m}</span>
+              }}>{prettyMovementName(m)}</span>
             ))}
           </div>
         )}

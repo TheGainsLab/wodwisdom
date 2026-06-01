@@ -193,6 +193,11 @@ body.landing-body{overflow:auto;height:auto}
 .lift-input::placeholder{color:var(--text-muted)}
 .lift-input::-webkit-outer-spin-button,.lift-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .lift-input[type=number]{-moz-appearance:textfield}
+/* Competition-history filter dropdowns — styled to sit beside the pill buttons
+   (rounded, surface, UI font, custom chevron). Native select looks off here. */
+.cw-select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background-color:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Outfit',sans-serif;font-size:12px;padding:7px 30px 7px 12px;cursor:pointer;outline:none;transition:border-color .15s;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.cw-select:hover{border-color:var(--accent)}
+.cw-select:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow)}
 .acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .acc-field{display:flex;flex-direction:column;gap:4px;min-width:0}
 .acc-field-label{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em}

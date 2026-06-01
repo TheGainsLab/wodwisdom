@@ -23,8 +23,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import type { AllResultsEntry } from '../../lib/competitionHistory';
-import { normalizeCompetitionHistory } from '../../lib/competitionHistory';
+import type { AllResultsEntry, ThrowbackRow, CatalogWorkoutSummary } from '../../lib/competitionHistory';
+import { normalizeWithThrowbacks, throwbacksToEntries, normalizeCatalog } from '../../lib/competitionHistory';
 import CompetitionExplorer, { type Scope, type Filter } from './CompetitionExplorer';
 import MovementsPanel from './MovementsPanel';
 import SummaryPanel, { type SignatureLite } from './SummaryPanel';
@@ -98,6 +98,8 @@ const PLACEHOLDER_PHOTO_SUFFIX = '/athlete-avatar.jpg';
 interface Props {
   userId: string;
   userAge: number | null;
+  /** Athlete body mass (kg) — used to personalize competed-workout power. */
+  userBodyMassKg: number | null;
   /** Gates the "clear linkage" override (and the admin note). */
   isAdmin: boolean;
   /** Try-It (logging results) — the paid competition_log capability. */
@@ -155,6 +157,7 @@ function Avatar({ name, photoUrl }: { name: string; photoUrl: string | null }) {
 export default function CompetitionHistoryExperience({
   userId,
   userAge,
+  userBodyMassKg,
   isAdmin,
   canLog,
   initialLinkedId,
@@ -200,9 +203,17 @@ export default function CompetitionHistoryExperience({
     setTab('map');
   };
 
+  // Logged throwbacks (own competition_workout_results) + the catalog to resolve
+  // them, merged into "Your workouts" as flagged 'logged' entries.
+  const [throwbackRows, setThrowbackRows] = useState<ThrowbackRow[]>([]);
+  const [catalogById, setCatalogById] = useState<Record<string, CatalogWorkoutSummary>>({});
+  // Bumped when a throwback is logged → refetch the rows so a just-logged one
+  // (with its now-persisted placement) merges into "Your workouts".
+  const [throwbackToken, setThrowbackToken] = useState(0);
+
   const competitionHistory = useMemo(
-    () => normalizeCompetitionHistory(linkedBundle?.all_results),
-    [linkedBundle],
+    () => normalizeWithThrowbacks(linkedBundle?.all_results, throwbacksToEntries(throwbackRows, catalogById)),
+    [linkedBundle, throwbackRows, catalogById],
   );
 
   // Fetch the bundle on mount when already linked. Re-fetch when linkedId
@@ -232,6 +243,32 @@ export default function CompetitionHistoryExperience({
       cancelled = true;
     };
   }, [mode, linkedId]);
+
+  // Catalog (resolves a throwback's season/stage/movements) — once when linked.
+  useEffect(() => {
+    if (mode !== 'linked' || !linkedId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.functions.invoke<{ workouts?: CatalogWorkoutSummary[]; error?: string }>('competition-catalog', { body: {} });
+      if (!cancelled && data?.workouts) setCatalogById(normalizeCatalog(data.workouts).byId);
+    })();
+    return () => { cancelled = true; };
+  }, [mode, linkedId]);
+
+  // The athlete's logged throwbacks — refetched on link change AND after a log
+  // (throwbackToken), so a just-logged throwback merges into "Your workouts".
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (mode !== 'linked' || !linkedId) { if (!cancelled) setThrowbackRows([]); return; }
+      const { data } = await supabase
+        .from('competition_workout_results')
+        .select('competition_workout_id, score_type, score_value, finished, cohort_percentile, worldwide_percentile, worldwide_rank, field_size, cohort_size, joules, avg_power_watts, avg_w_per_kg')
+        .eq('source', 'throwback');
+      if (!cancelled && data) setThrowbackRows(data as ThrowbackRow[]);
+    })();
+    return () => { cancelled = true; };
+  }, [mode, linkedId, throwbackToken]);
 
   // Verify an athlete and move to the confirm step. `idOverride` is passed
   // when the user picked a search result; otherwise the paste-ID input drives.
@@ -650,8 +687,8 @@ export default function CompetitionHistoryExperience({
               <>
                 <div style={{ display: 'flex', gap: 16, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
                   {tabBtn('summary', 'Summary')}
-                  {tabBtn('map', 'Map')}
-                  {tabBtn('movements', 'Movements')}
+                  {tabBtn('map', 'Workouts')}
+                  {tabBtn('movements', 'All Movements')}
                 </div>
 
                 {tab === 'summary' && summaryPanel}
@@ -662,7 +699,9 @@ export default function CompetitionHistoryExperience({
                   <CompetitionExplorer
                     history={competitionHistory}
                     userAge={userAge}
+                    userBodyMassKg={userBodyMassKg}
                     canLog={canLog}
+                    onThrowbackLogged={() => setThrowbackToken((t) => t + 1)}
                     scope={scope}
                     setScope={setScope}
                     filter={filter}

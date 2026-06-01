@@ -153,7 +153,7 @@ export default function LogResultForm({
     if (typeof built === 'string') { setError(built); return; }
     setSaving(true);
     const { data: logData, error: logErr } = await supabase.functions.invoke<
-      { result?: { avg_power_watts: number | null; avg_w_per_kg: number | null }; error?: string }
+      { result?: { id: string; avg_power_watts: number | null; avg_w_per_kg: number | null }; error?: string }
     >('log-throwback', {
       body: {
         competition_workout_id: workout.competition_workout_id,
@@ -170,6 +170,7 @@ export default function LogResultForm({
       setError("Couldn't save your result. Try again.");
       return;
     }
+    const rowId = logData.result.id;
 
     // Saved — mark the cell filled, then fetch "where you'd have landed".
     onLogged(workout.competition_workout_id);
@@ -198,6 +199,21 @@ export default function LogResultForm({
       return;
     }
     setPlacement(data);
+
+    // Persist the placement onto the logged row so it survives reloads and
+    // feeds "Your workouts" + the movement list (throwbacks build out your
+    // history). Best-effort — RLS allows update-own; a failure (or columns not
+    // yet migrated) just leaves the percentile null, placement still shows.
+    await supabase
+      .from('competition_workout_results')
+      .update({
+        cohort_percentile: data.cohort?.cohort_percentile ?? null,
+        worldwide_percentile: data.worldwide_percentile,
+        worldwide_rank: data.worldwide_rank,
+        field_size: data.field_size,
+        cohort_size: data.cohort?.cohort_size ?? null,
+      })
+      .eq('id', rowId);
   };
 
   const inputStyle = { fontFamily: 'inherit' as const };

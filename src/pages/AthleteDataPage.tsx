@@ -34,12 +34,13 @@ export default function AthleteDataPage({ session }: { session: Session }) {
   const [loading, setLoading] = useState(true);
   const [linkage, setLinkage] = useState<Linkage>({ id: null, label: null });
   const [age, setAge] = useState<number | null>(null);
+  const [bodyMassKg, setBodyMassKg] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     supabase
       .from('athlete_profiles')
-      .select('competition_athlete_id, competition_athlete_label, age')
+      .select('competition_athlete_id, competition_athlete_label, age, bodyweight, units')
       .eq('user_id', session.user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -52,6 +53,12 @@ export default function AthleteDataPage({ session }: { session: Session }) {
           });
           const a = d.age == null ? NaN : Number(d.age);
           setAge(Number.isFinite(a) ? a : null);
+          // Body mass (kg) → personalizes competed-workout power. Profile stores
+          // it in the user's unit; lbs → kg.
+          const bwRaw = typeof d.bodyweight === 'number' ? d.bodyweight : parseFloat(String(d.bodyweight ?? ''));
+          if (Number.isFinite(bwRaw) && bwRaw > 0) {
+            setBodyMassKg(d.units === 'kg' ? bwRaw : bwRaw * 0.45359237);
+          }
         }
         setLoading(false);
       });
@@ -91,6 +98,7 @@ export default function AthleteDataPage({ session }: { session: Session }) {
             <CompetitionHistoryExperience
               userId={session.user.id}
               userAge={age}
+              userBodyMassKg={bodyMassKg}
               isAdmin={isAdmin}
               canLog={canLog}
               initialLinkedId={linkage.id}

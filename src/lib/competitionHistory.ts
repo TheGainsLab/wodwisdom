@@ -60,6 +60,15 @@ export interface CompetitionResult {
   worldwide_percentile: number;
   cohort_n: number;
   worldwide_n: number;
+  // Per-result work/power (bundle 1.7.0). For COMPETED results these are at a
+  // population-default mass (body_mass_basis "default_84m_64w"); rescale to the
+  // athlete via `joules_bodyweight_component` (see personalizedPower). For
+  // LOGGED throwbacks these are already at the athlete's real mass. All nullable.
+  joules?: number | null;
+  joules_bodyweight_component?: number | null;
+  avg_power_watts?: number | null;
+  avg_w_per_kg?: number | null;
+  body_mass_basis?: string;
 }
 
 export interface AllResultsEntry {
@@ -72,6 +81,9 @@ export interface AllResultsEntry {
   scaled_tier: string;                // "rx" | "scaled" | "foundations" | ...
   workout: CompetitionWorkoutSpec;
   result: CompetitionResult;
+  /** 'competed' = official result from the bundle (default); 'logged' = a Try-It
+   *  throwback the athlete logged. Bundle entries omit it → treated as competed. */
+  source?: 'competed' | 'logged';
 }
 
 /** A normalized entry = the raw AllResultsEntry plus a few derived flags. */
@@ -80,6 +92,8 @@ export interface CompetitionWorkoutEntry extends AllResultsEntry {
   finished_under_cap: boolean;
   /** The score that "ranks" for sorting: finishers above capped on dual-scoring; otherwise just the raw score with its direction. */
   is_finisher_score: boolean;
+  /** 'competed' | 'logged' — always set (defaults to 'competed'). */
+  source: 'competed' | 'logged';
 }
 
 export interface StageGroup {
@@ -131,6 +145,7 @@ function decorate(entry: AllResultsEntry): CompetitionWorkoutEntry {
     ...entry,
     finished_under_cap,
     is_finisher_score: !entry.workout.is_dual_scoring || finished_under_cap,
+    source: entry.source ?? 'competed',
   };
 }
 
@@ -185,6 +200,131 @@ export function normalizeCompetitionHistory(
     yearsCompeted: seasons.map((s) => s.year),
     stagesSeen,
   };
+}
+
+/** A logged-throwback row (competition_workout_results) with its persisted placement. */
+export interface ThrowbackRow {
+  competition_workout_id: string;
+  score_type: string;
+  score_value: number;
+  finished: boolean | null;
+  cohort_percentile: number | null;
+  worldwide_percentile: number | null;
+  worldwide_rank: number | null;
+  field_size: number | null;
+  cohort_size: number | null;
+  // Power computed at the athlete's REAL mass at log time (no rescale needed).
+  joules: number | null;
+  avg_power_watts: number | null;
+  avg_w_per_kg: number | null;
+}
+
+/**
+ * Turn logged throwbacks into `AllResultsEntry`s (source: 'logged') so they flow
+ * through the same grid / movement / detail pipelines as competed results. The
+ * workout shell comes from the catalog (movements are name-only — enough for the
+ * movement list); the result comes from the persisted placement. Throwbacks whose
+ * workout isn't in the catalog are skipped (can't place them on the grid).
+ */
+export function throwbacksToEntries(
+  throwbacks: ThrowbackRow[],
+  catalogById: Record<string, CatalogWorkoutSummary>,
+): AllResultsEntry[] {
+  const out: AllResultsEntry[] = [];
+  for (const t of throwbacks) {
+    const w = catalogById[t.competition_workout_id];
+    if (!w) continue;
+    const unit = (w.scoring?.scoring_unit ?? (t.score_type as ScoringUnit));
+    out.push({
+      competition_workout_id: t.competition_workout_id,
+      year: w.season,
+      stage: w.stage,
+      ordinal: w.ordinal,
+      workout_name: w.workout_name,
+      division: w.division ?? 0,
+      scaled_tier: w.scaled_tier,
+      source: 'logged',
+      workout: {
+        classification: '',
+        description: '',
+        scoring_unit: unit,
+        scoring_direction: w.scoring?.scoring_direction ?? 'higher_is_better',
+        is_dual_scoring: w.scoring?.is_dual_scoring ?? false,
+        time_cap_seconds: w.scoring?.time_cap_seconds ?? null,
+        rep_target: null,
+        time_domain: w.time_domain ?? { bucket: '', seconds: null },
+        movements: (w.movements ?? []).map((name, i) => ({
+          name, family: name, position: i, equipment: [], mgw_category: null,
+          rounds: null, reps_total: null, reps_per_round: null, reps_scheme: null,
+          calories: null, load_lbs: null, load_descriptor: null, load_progression: null,
+          distance_unit: null, distance_value: null, variant_tags: null,
+        })),
+      },
+      result: {
+        valid: true,
+        raw_score: t.score_value,
+        raw_score_text: null,
+        scoring_unit: t.score_type as ScoringUnit,
+        workout_rank: t.worldwide_rank ?? 0,
+        cohort_percentile: t.cohort_percentile ?? NaN,
+        worldwide_percentile: t.worldwide_percentile ?? NaN,
+        cohort_n: t.cohort_size ?? 0,
+        worldwide_n: t.field_size ?? 0,
+        // Throwback power is already at the athlete's real mass.
+        joules: t.joules,
+        avg_power_watts: t.avg_power_watts,
+        avg_w_per_kg: t.avg_w_per_kg,
+        body_mass_basis: 'athlete',
+      },
+    });
+  }
+  return out;
+}
+
+/**
+ * Normalize the bundle's competed results merged with logged throwbacks. A
+ * throwback for a workout the athlete also COMPETED in is dropped (the official
+ * result wins). Everything else flows through `normalizeCompetitionHistory`.
+ */
+export function normalizeWithThrowbacks(
+  allResults: AllResultsEntry[] | undefined | null,
+  throwbackEntries: AllResultsEntry[],
+): NormalizedCompetitionHistory {
+  const competed = allResults ?? [];
+  const competedIds = new Set(competed.map((e) => e.competition_workout_id));
+  const merged = [...competed, ...throwbackEntries.filter((t) => !competedIds.has(t.competition_workout_id))];
+  return normalizeCompetitionHistory(merged);
+}
+
+/**
+ * The watts / W·kg to display for an entry, personalized to the athlete's mass.
+ *  - logged throwback: power was computed at the athlete's real mass → as-is.
+ *  - competed: bundle power is at a population-default mass (84 M / 64 W by
+ *    division); rescale joules via `joules_bodyweight_component`, then watts
+ *    (workout duration is mass-invariant). Falls back to the default numbers if
+ *    body mass or the rescale component is missing.
+ * Returns null when there's no power to show. `estimated` = true for competed
+ * (modeled from the cohort), false for a logged throwback (the athlete's effort).
+ */
+export function personalizedPower(
+  entry: CompetitionWorkoutEntry,
+  userKg: number | null | undefined,
+): { watts: number; wPerKg: number | null; estimated: boolean } | null {
+  const r = entry.result;
+  if (r.avg_power_watts == null) return null;
+
+  if (entry.source === 'logged') {
+    return { watts: r.avg_power_watts, wPerKg: r.avg_w_per_kg ?? (userKg ? r.avg_power_watts / userKg : null), estimated: false };
+  }
+
+  if (userKg && userKg > 0 && r.joules != null && r.joules > 0 && r.joules_bodyweight_component != null) {
+    const defaultKg = entry.division === 2 ? 64 : 84;
+    const workSeconds = r.joules / r.avg_power_watts; // mass-invariant
+    const joulesPersonal = r.joules + r.joules_bodyweight_component * (userKg / defaultKg - 1);
+    const watts = workSeconds > 0 ? joulesPersonal / workSeconds : r.avg_power_watts;
+    return { watts, wPerKg: watts / userKg, estimated: true };
+  }
+  return { watts: r.avg_power_watts, wPerKg: r.avg_w_per_kg ?? null, estimated: true };
 }
 
 // ============================================================
@@ -391,6 +531,16 @@ export function timeDomainBreakdown(
  * many of their workouts each appeared in. Newest-first ordering is preserved
  * in `workoutIds` so a "workouts including X" drill-down can show recent first.
  */
+/**
+ * Catalog movement slug → display name. Handles hyphen- and underscore-
+ * separated slugs ("lateral-burpee-over-dumbbell" → "Lateral Burpee Over
+ * Dumbbell"). Title-casing matches the canonical `movements` table convention
+ * (e.g. "Ghd Sit Up", "Clean And Jerk"), so it reads consistently across the app.
+ */
+export function prettyMovementName(slug: string): string {
+  return slug.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function movementExposure(history: NormalizedCompetitionHistory): Array<{
   name: string;
   family: string;
@@ -424,6 +574,8 @@ export interface MovementStageStat {
   n: number;
   /** Mean cohort percentile of the workouts in this stage that include the movement; null if none have a usable percentile. */
   avgPct: number | null;
+  /** True when every workout behind this stat is a logged throwback (not competed) — drives the "logged" flag in the UI. */
+  logged: boolean;
 }
 
 export interface MovementPerformance {
@@ -465,6 +617,7 @@ export function movementPerformance(history: NormalizedCompetitionHistory): Move
         stage,
         n: ids.length,
         avgPct: avgCohortPercentile(ids.map((id) => history.byId[id])),
+        logged: ids.every((id) => history.byId[id]?.source === 'logged'),
       };
     });
     return {
