@@ -28,8 +28,9 @@ import { normalizeWithThrowbacks, throwbacksToEntries, normalizeCatalog } from '
 import CompetitionExplorer, { type Scope, type Filter } from './CompetitionExplorer';
 import MovementsPanel from './MovementsPanel';
 import SummaryPanel, { type SignatureLite } from './SummaryPanel';
+import PowerPanel from './PowerPanel';
 
-type ExperienceTab = 'summary' | 'map' | 'movements';
+type ExperienceTab = 'summary' | 'map' | 'movements' | 'power';
 
 interface BundleIdentity {
   name: string;
@@ -689,6 +690,7 @@ export default function CompetitionHistoryExperience({
                   {tabBtn('summary', 'Summary')}
                   {tabBtn('map', 'Workouts')}
                   {tabBtn('movements', 'All Movements')}
+                  {tabBtn('power', 'Power')}
                 </div>
 
                 {tab === 'summary' && summaryPanel}
@@ -711,6 +713,10 @@ export default function CompetitionHistoryExperience({
 
                 {tab === 'movements' && (
                   <MovementsPanel history={competitionHistory} onPick={goToMapForMovement} />
+                )}
+
+                {tab === 'power' && (
+                  <PowerPanel history={competitionHistory} userKg={userBodyMassKg} />
                 )}
               </>
             );

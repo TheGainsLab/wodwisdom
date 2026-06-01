@@ -231,7 +231,7 @@ export default function CompetitionExplorer({
       {/* Scope — which dataset (a mode, distinct from the filters below). */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
         <span style={{ fontSize: 12, color: 'var(--text-dim)', marginRight: 2 }}>Showing:</span>
-        {scopeBtn('mine', 'Your workouts')}
+        {scopeBtn('mine', 'My workouts')}
         {scopeBtn('all', 'All competition workouts')}
       </div>
 
@@ -291,6 +291,48 @@ export default function CompetitionExplorer({
           </span>
         )}
       </div>
+
+      {/* Discoverability nudge — a sparse history (0–2 workouts) gives no hint
+          that the full catalog is one toggle away and that any workout, at any
+          level, can be logged as a throwback. Surface that bridge here. */}
+      {scope === 'mine' && !isFiltered && history.total <= 2 && (
+        <div
+          style={{
+            marginBottom: 12,
+            padding: 12,
+            background: 'var(--surface2)',
+            border: '1px solid var(--border)',
+            borderRadius: 8,
+            fontSize: 13,
+            lineHeight: 1.5,
+          }}
+        >
+          <div style={{ color: 'var(--text)' }}>
+            {history.total === 0
+              ? "You haven't logged any competition workouts yet."
+              : 'Want to try more?'}{' '}
+            Browse every competition workout — Open through the Games, all the way back to 2011 — and log any one
+            as a throwback (even levels you've never competed at).
+          </div>
+          <button
+            type="button"
+            onClick={() => setScope('all')}
+            style={{
+              marginTop: 10,
+              padding: '6px 12px',
+              fontSize: 12,
+              borderRadius: 6,
+              border: '1px solid var(--accent)',
+              background: 'var(--accent)',
+              color: '#fff',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Browse all competition workouts →
+          </button>
+        </div>
+      )}
 
       {/* The grid / map */}
       {scope === 'mine' ? (
