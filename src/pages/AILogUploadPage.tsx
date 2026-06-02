@@ -5,12 +5,11 @@ import * as mammoth from 'mammoth';
 import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
-import { Camera, ClipboardList, Upload } from 'lucide-react';
+import { Camera, Upload } from 'lucide-react';
 import '../ailog.css';
 
 const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
 const PREPROCESS_ENDPOINT = SUPABASE_BASE + '/functions/v1/preprocess-program';
-const BULK_IMPORT_ENDPOINT = SUPABASE_BASE + '/functions/v1/ailog-bulk-import';
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -32,12 +31,10 @@ export default function AILogUploadPage({ session }: { session: Session }) {
   }
   const appendTo = searchParams.get('append'); // existing program id for "Add This Week"
 
-  const [mode, setMode] = useState<'programming' | 'results'>(appendTo ? 'programming' : 'programming');
   const [pasteText, setPasteText] = useState('');
   const [programName, setProgramName] = useState('');
   const [gymName, setGymName] = useState('');
   const isOngoing = false; // ongoing concept removed — each upload is a separate program
-  const [importResult, setImportResult] = useState<{ imported: number } | null>(null);
   const [pendingFile, setPendingFile] = useState<{ file: File; base64: string; fileType: string } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -53,33 +50,6 @@ export default function AILogUploadPage({ session }: { session: Session }) {
       Authorization: `Bearer ${token}`,
     };
   }, []);
-
-  const handleBulkImport = useCallback(async () => {
-    const text = pasteText.trim();
-    if (!text) {
-      setError('Paste your workout history');
-      return;
-    }
-    setSaving(true);
-    setError('');
-    setImportResult(null);
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch(BULK_IMPORT_ENDPOINT, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ text, program_id: appendTo || undefined }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Import failed');
-      setImportResult({ imported: data.imported });
-      setPasteText('');
-    } catch (err: any) {
-      setError(err?.message || 'Failed to import');
-    } finally {
-      setSaving(false);
-    }
-  }, [pasteText, appendTo, getAuthHeaders]);
 
   const handleUpload = useCallback(async () => {
     const text = pasteText.trim();
@@ -254,65 +224,6 @@ export default function AILogUploadPage({ session }: { session: Session }) {
         </header>
 
         <div className="ailog-page">
-          {/* Mode toggle */}
-          {!appendTo && (
-            <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: 'var(--surface)', borderRadius: 8, padding: 4, border: '1px solid var(--border-light)' }}>
-              <button
-                style={{ flex: 1, padding: '10px 16px', borderRadius: 6, border: 'none', fontSize: 14, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: mode === 'programming' ? 'var(--accent)' : 'transparent', color: mode === 'programming' ? 'white' : 'var(--text-dim)' }}
-                onClick={() => setMode('programming')}
-              >
-                <Upload size={14} /> Upload Programming
-              </button>
-              <button
-                style={{ flex: 1, padding: '10px 16px', borderRadius: 6, border: 'none', fontSize: 14, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: mode === 'results' ? 'var(--accent)' : 'transparent', color: mode === 'results' ? 'white' : 'var(--text-dim)' }}
-                onClick={() => setMode('results')}
-              >
-                <ClipboardList size={14} /> Import Results
-              </button>
-            </div>
-          )}
-
-          {/* Results import mode */}
-          {mode === 'results' && (
-            <div className="ailog-card">
-              <div className="ailog-section">
-                <h3 className="ailog-header">Import Workout Results</h3>
-                <p className="ailog-subheader">
-                  Paste your workout history with scores. AI will parse it into structured data, no matter the format.
-                </p>
-                <textarea
-                  className="ailog-input"
-                  placeholder={"Monday - Back Squat 5x5 @275, then Fran 3:45 Rx\nTuesday - rest\nWednesday - 15min AMRAP got 8+3, scaled muscle ups to pull-ups\nThursday - Open workout 24.1, 165 reps\n..."}
-                  value={pasteText}
-                  onChange={e => setPasteText(e.target.value)}
-                  rows={12}
-                  style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, resize: 'vertical' }}
-                />
-                {error && <div style={{ color: 'var(--error, #ef4444)', fontSize: 14 }}>{error}</div>}
-                {importResult && (
-                  <div style={{ padding: 12, background: 'rgba(34,197,94,.1)', borderRadius: 8, fontSize: 14, color: '#4ade80' }}>
-                    Successfully imported {importResult.imported} workout{importResult.imported !== 1 ? 's' : ''}.
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <button className="ailog-btn ailog-btn-secondary" onClick={() => navigate('/ailog')} style={{ flex: 1 }}>
-                    Cancel
-                  </button>
-                  <button
-                    className="ailog-btn ailog-btn-primary"
-                    onClick={handleBulkImport}
-                    disabled={!pasteText.trim() || saving}
-                    style={{ flex: 2 }}
-                  >
-                    {saving ? 'Importing...' : 'Import Results'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Programming upload mode */}
-          {mode === 'programming' && (
           <div className="ailog-card">
             <div className="ailog-section">
               {!appendTo && (
@@ -370,7 +281,7 @@ export default function AILogUploadPage({ session }: { session: Session }) {
               <textarea
                 className="ailog-input"
                 onPaste={handlePaste}
-                placeholder={"Monday\nBack Squat 5x5 @275\nThen: 21-15-9 Thrusters (95/65) & Pull-ups — 7:42 Rx\n\nTuesday\nRest\n\nWednesday\n5 RFT: 400m Run, 15 OHS (95/65)\n..."}
+                placeholder={"Monday\nBack Squat 5x5 @275\nThen: 21-15-9 Thrusters (95/65) & Pull-ups\n\nTuesday\nRest\n\nWednesday\n5 RFT: 400m Run, 15 OHS (95/65)\n..."}
                 value={pasteText}
                 onChange={e => setPasteText(e.target.value)}
                 rows={10}
@@ -408,7 +319,6 @@ export default function AILogUploadPage({ session }: { session: Session }) {
               </div>
             </div>
           </div>
-          )}
         </div>
       </div>
     </div>

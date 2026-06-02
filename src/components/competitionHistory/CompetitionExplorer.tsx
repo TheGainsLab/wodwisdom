@@ -16,7 +16,7 @@ import type {
   NormalizedCatalog,
   CatalogWorkoutSummary,
 } from '../../lib/competitionHistory';
-import { movementExposure, normalizeCatalog, ageBandFor } from '../../lib/competitionHistory';
+import { movementExposure, normalizeCatalog, ageBandFor, prettyMovementName } from '../../lib/competitionHistory';
 import CompetitionGrid from './CompetitionGrid';
 import CompetitionMap from './CompetitionMap';
 import WorkoutDetail from './WorkoutDetail';
@@ -28,7 +28,7 @@ const STAGE_LABEL: Record<string, string> = {
   open: 'Open', quarterfinals: 'Quarterfinals', semifinals: 'Semifinals', regional: 'Regionals', games: 'Games',
 };
 
-export type TimeDomain = 'short' | 'mid' | 'long';
+export type TimeDomain = 'short' | 'medium' | 'long';
 export type Scope = 'mine' | 'all';
 
 export interface Filter {
@@ -37,35 +37,35 @@ export interface Filter {
   year?: number;
 }
 
-const TIME_DOMAINS: TimeDomain[] = ['short', 'mid', 'long'];
+const TIME_DOMAINS: TimeDomain[] = ['short', 'medium', 'long'];
 
-// Small × button shown next to a filter dropdown when it has a value — resets
-// just that field, without touching the others.
-const fieldClearBtnStyle = {
-  flexShrink: 0,
-  padding: '0 10px',
-  fontSize: 16,
-  lineHeight: 1,
-  borderRadius: 6,
-  border: '1px solid var(--border)',
-  background: 'none',
-  color: 'var(--text-dim)',
-  cursor: 'pointer',
-  fontFamily: 'inherit' as const,
+// Bundle time_domain.bucket values are short/medium/long — upstream normalized
+// away the legacy 'mid' literal in bundle 1.9.0. The filter chips show a
+// compact label ('mid') while filtering on the real value ('medium').
+const TIME_DOMAIN_LABEL: Record<TimeDomain, string> = {
+  short: 'Short',
+  medium: 'Medium',
+  long: 'Long',
 };
 
 export default function CompetitionExplorer({
   history,
-  userId,
   userAge,
+  userBodyMassKg,
+  canLog,
+  onThrowbackLogged,
   scope,
   setScope,
   filter,
   setFilter,
 }: {
   history: NormalizedCompetitionHistory;
-  userId: string;
   userAge: number | null;
+  userBodyMassKg: number | null;
+  canLog: boolean;
+  /** Called after a throwback is logged + its form closed, so the parent can
+   *  refetch and merge it into "Your workouts". */
+  onThrowbackLogged?: () => void;
   scope: Scope;
   setScope: Dispatch<SetStateAction<Scope>>;
   filter: Filter;
@@ -74,14 +74,19 @@ export default function CompetitionExplorer({
   const ageBand = ageBandFor(userAge);
   const [selectedWorkout, setSelectedWorkout] = useState<CompetitionWorkoutEntry | null>(null);
   const [selectedCatalogWorkout, setSelectedCatalogWorkout] = useState<CatalogWorkoutSummary | null>(null);
-  // "Try it" — the workout being logged + ids logged this session (optimistic
-  // grid fill; full read-back of competition_workout_results on load is a
-  // follow-up, so for now a just-logged throwback shows green in the "All" map
-  // but not yet in the "Mine" grid).
+  // "Try it" — the workout being logged + ids logged this session. loggedIds
+  // gives the "All" map an optimistic green immediately; the "Mine" grid updates
+  // when the log form closes (onThrowbackLogged → parent refetch + merge).
   const [logTarget, setLogTarget] = useState<LogResultWorkout | null>(null);
   const [loggedIds, setLoggedIds] = useState<Set<string>>(new Set());
+  // Shown when a non-competition_log user taps Try-It.
+  const [paywall, setPaywall] = useState(false);
 
-  const openLogForEntry = (e: CompetitionWorkoutEntry) =>
+  // Try-It is competition_log-gated. Non-paid users get the paywall prompt
+  // instead of the log form (log-throwback would 403 them anyway — this turns
+  // a failing button into a clean upgrade prompt).
+  const openLogForEntry = (e: CompetitionWorkoutEntry) => {
+    if (!canLog) { setPaywall(true); return; }
     setLogTarget({
       competition_workout_id: e.competition_workout_id,
       label: `${e.year} ${STAGE_LABEL[e.stage] ?? e.stage} ${e.workout_name}`,
@@ -89,7 +94,9 @@ export default function CompetitionExplorer({
       is_dual_scoring: e.workout.is_dual_scoring,
       time_cap_seconds: e.workout.time_cap_seconds,
     });
-  const openLogForCatalog = (w: CatalogWorkoutSummary) =>
+  };
+  const openLogForCatalog = (w: CatalogWorkoutSummary) => {
+    if (!canLog) { setPaywall(true); return; }
     setLogTarget({
       competition_workout_id: w.competition_workout_id,
       label: `${w.season} ${STAGE_LABEL[w.stage] ?? w.stage} ${w.workout_name}`,
@@ -97,9 +104,13 @@ export default function CompetitionExplorer({
       is_dual_scoring: w.scoring?.is_dual_scoring ?? false,
       time_cap_seconds: w.scoring?.time_cap_seconds ?? null,
     });
+  };
   const onLogged = (id: string) => {
+    // Mark the grid filled — but do NOT close the log form here. LogResultForm
+    // stays mounted to show its post-submit panel (score · power · placement);
+    // it closes on its own "Done" button (onClose). Closing it here would
+    // unmount the form before that panel can render.
     setLoggedIds((s) => { const n = new Set(s); n.add(id); return n; });
-    setLogTarget(null);
     setSelectedCatalogWorkout(null);
     setSelectedWorkout(null);
   };
@@ -217,113 +228,111 @@ export default function CompetitionExplorer({
 
   return (
     <div>
-      {/* Scope toggle */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        {scopeBtn('mine', 'Your workouts')}
+      {/* Scope — which dataset (a mode, distinct from the filters below). */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-dim)', marginRight: 2 }}>Showing:</span>
+        {scopeBtn('mine', 'My workouts')}
         {scopeBtn('all', 'All competition workouts')}
       </div>
 
-      {/* Filter bar — on mobile the two dropdowns get their own row, then the
-          time-domain buttons + clear + count below. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 4, flex: '1 1 150px', minWidth: 0 }}>
-            <select
-              className="lift-input"
-              value={filter.movement ?? ''}
-              onChange={(e) => setFilter((f) => ({ ...f, movement: e.target.value || undefined }))}
-              style={{ flex: 1, minWidth: 0 }}
-            >
-              <option value="">All movements</option>
-              {movementsByName.map((m) => (
-                <option key={m.name} value={m.name}>{m.name} ({m.workoutCount})</option>
-              ))}
-            </select>
-            {filter.movement && (
-              <button
-                type="button"
-                aria-label="Clear movement filter"
-                title="Clear movement filter"
-                onClick={() => setFilter((f) => ({ ...f, movement: undefined }))}
-                style={fieldClearBtnStyle}
-              >
-                ×
-              </button>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', gap: 4, flex: '1 1 110px', minWidth: 0 }}>
-            <select
-              className="lift-input"
-              value={filter.year ?? ''}
-              onChange={(e) => setFilter((f) => ({ ...f, year: e.target.value ? Number(e.target.value) : undefined }))}
-              style={{ flex: 1, minWidth: 0 }}
-            >
-              <option value="">All years</option>
-              {(scope === 'all' && catalog
-                ? catalog.seasons.map((s) => s.season)
-                : history.yearsCompeted
-              ).map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-            {filter.year != null && (
-              <button
-                type="button"
-                aria-label="Clear year filter"
-                title="Clear year filter"
-                onClick={() => setFilter((f) => ({ ...f, year: undefined }))}
-                style={fieldClearBtnStyle}
-              >
-                ×
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {(['', ...TIME_DOMAINS] as Array<'' | TimeDomain>).map((td) => {
-              const active = (filter.timeDomain ?? '') === td;
-              return (
-                <button
-                  key={td || 'all'}
-                  type="button"
-                  onClick={() => setFilter((f) => ({ ...f, timeDomain: td || undefined }))}
-                  style={{
-                    padding: '6px 10px', fontSize: 12, borderRadius: 6,
-                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                    background: active ? 'var(--accent)' : 'var(--surface2)',
-                    color: active ? '#fff' : 'var(--text)', cursor: 'pointer', fontFamily: 'inherit',
-                  }}
-                >
-                  {td === '' ? 'Any time' : td}
-                </button>
-              );
-            })}
-          </div>
-
-          {isFiltered && (
+      {/* Duration — tappable buttons (a small fixed set reads better as pills
+          than a dropdown). "Any" clears it. */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-dim)', marginRight: 2 }}>Duration:</span>
+        {([...TIME_DOMAINS, null] as Array<TimeDomain | null>).map((td) => {
+          const active = (filter.timeDomain ?? null) === td;
+          return (
             <button
+              key={td ?? 'any'}
               type="button"
-              onClick={() => setFilter({})}
+              onClick={() => setFilter((f) => ({ ...f, timeDomain: td ?? undefined }))}
               style={{
-                padding: '6px 10px', fontSize: 12, borderRadius: 6,
-                border: '1px solid var(--border)', background: 'none',
-                color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit',
+                padding: '6px 12px', fontSize: 12, borderRadius: 6,
+                border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                background: active ? 'var(--accent)' : 'var(--surface2)',
+                color: active ? '#fff' : 'var(--text)', cursor: 'pointer', fontFamily: 'inherit',
               }}
             >
-              Clear
+              {td ? TIME_DOMAIN_LABEL[td] : 'Any'}
             </button>
-          )}
-
-          {scope === 'mine' && (
-            <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 'auto' }}>
-              {isFiltered ? `showing ${matchedCount} of ${history.total}` : `${history.total} workouts`}
-            </span>
-          )}
-        </div>
+          );
+        })}
       </div>
+
+      {/* Movement + year filters (dropdowns; each "All …" option is its own clear). */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        <select
+          className="cw-select"
+          value={filter.movement ?? ''}
+          onChange={(e) => setFilter((f) => ({ ...f, movement: e.target.value || undefined }))}
+          style={{ flex: '1 1 150px', minWidth: 0 }}
+        >
+          <option value="">All movements</option>
+          {movementsByName.map((m) => (
+            <option key={m.name} value={m.name}>{prettyMovementName(m.name)} ({m.workoutCount})</option>
+          ))}
+        </select>
+
+        <select
+          className="cw-select"
+          value={filter.year ?? ''}
+          onChange={(e) => setFilter((f) => ({ ...f, year: e.target.value ? Number(e.target.value) : undefined }))}
+          style={{ flex: '1 1 110px', minWidth: 0 }}
+        >
+          <option value="">All years</option>
+          {(scope === 'all' && catalog ? catalog.seasons.map((s) => s.season) : history.yearsCompeted).map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+
+        {scope === 'mine' && (
+          <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 'auto' }}>
+            {isFiltered ? `showing ${matchedCount} of ${history.total}` : `${history.total} workouts`}
+          </span>
+        )}
+      </div>
+
+      {/* Discoverability nudge — a sparse history (0–2 workouts) gives no hint
+          that the full catalog is one toggle away and that any workout, at any
+          level, can be logged as a throwback. Surface that bridge here. */}
+      {scope === 'mine' && !isFiltered && history.total <= 2 && (
+        <div
+          style={{
+            marginBottom: 12,
+            padding: 12,
+            background: 'var(--surface2)',
+            border: '1px solid var(--border)',
+            borderRadius: 8,
+            fontSize: 13,
+            lineHeight: 1.5,
+          }}
+        >
+          <div style={{ color: 'var(--text)' }}>
+            {history.total === 0
+              ? "You haven't logged any competition workouts yet."
+              : 'Want to try more?'}{' '}
+            Browse every competition workout — Open through the Games, all the way back to 2011 — and log any one
+            as a throwback (even levels you've never competed at).
+          </div>
+          <button
+            type="button"
+            onClick={() => setScope('all')}
+            style={{
+              marginTop: 10,
+              padding: '6px 12px',
+              fontSize: 12,
+              borderRadius: 6,
+              border: '1px solid var(--accent)',
+              background: 'var(--accent)',
+              color: '#fff',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Browse all competition workouts →
+          </button>
+        </div>
+      )}
 
       {/* The grid / map */}
       {scope === 'mine' ? (
@@ -350,6 +359,7 @@ export default function CompetitionExplorer({
       {selectedWorkout && (
         <WorkoutDetail
           entry={selectedWorkout}
+          userKg={userBodyMassKg}
           onClose={() => setSelectedWorkout(null)}
           onLogAgain={openLogForEntry}
         />
@@ -362,7 +372,41 @@ export default function CompetitionExplorer({
         />
       )}
       {logTarget && (
-        <LogResultForm workout={logTarget} userId={userId} ageBand={ageBand} onLogged={onLogged} onClose={() => setLogTarget(null)} />
+        <LogResultForm
+          workout={logTarget}
+          ageBand={ageBand}
+          onLogged={onLogged}
+          onClose={() => {
+            // If this workout was logged, its placement is now persisted —
+            // tell the parent to refetch so it merges into "Your workouts".
+            const loggedThis = loggedIds.has(logTarget.competition_workout_id);
+            setLogTarget(null);
+            if (loggedThis) onThrowbackLogged?.();
+          }}
+        />
+      )}
+      {paywall && (
+        <div
+          onClick={() => setPaywall(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '24px 16px', zIndex: 1100,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, maxWidth: 380, width: '100%', padding: 20 }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700 }}>Logging results is a paid feature</div>
+            <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-dim)' }}>
+              Recording your own attempts at competition workouts — with your power numbers and placement — is part of the Competition Log plan. Browsing and viewing stay free.
+            </div>
+            <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="button" className="auth-btn" style={{ padding: '8px 16px', fontSize: 13 }} onClick={() => setPaywall(false)}>Got it</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

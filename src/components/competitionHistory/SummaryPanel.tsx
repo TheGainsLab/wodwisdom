@@ -5,21 +5,24 @@
  *     avg age-cohort percentile in that bucket
  *   - Across modalities (Gymnastics / Weightlifting / Monostructural / Mixed /
  *     Odd-object): same treatment
- *   - Strongest movements (top 3 by the headline-stage percentile — the deepest
+ *   - Top Movements (top 3 by the headline-stage percentile — the deepest
  *     stage with ≥2 workouts including the movement — shown per stage, e.g.
- *     "Snatch — Open 92 · 5 wkts · QF 88 · 2"; a rough proxy, never pooled
- *     across stages. The Movements tab has the full list + red/yellow/green.)
+ *     "Snatch — Open 92 · 5 wkts · QF 88 · 2"; a rough proxy [avg cohort
+ *     percentile on workouts INCLUDING the movement, not the movement itself],
+ *     never pooled across stages. The Movements tab has the full list.)
  *   - Best results (top 3 finishes by age-cohort percentile; tap → workout
  *     detail)
  *
- * Each block self-hides when its data isn't there. The duration / modality
- * blocks read `signature.stimulus_breakdown` (fetched via ?include=signature);
- * the rest comes from the normalized `all_results` history.
+ * Each block self-hides when its data isn't there. "Across durations" is
+ * bucketed from the normalized `all_results` history (so its counts match the
+ * Map's time filter exactly); "Across modalities" reads
+ * `signature.stimulus_breakdown` (fetched via ?include=signature); the rest
+ * comes from `all_results`.
  */
 
 import { useMemo, useState } from 'react';
-import type { NormalizedCompetitionHistory, CompetitionWorkoutEntry, MovementStageStat } from '../../lib/competitionHistory';
-import { movementPerformance, STAGE_ABBR } from '../../lib/competitionHistory';
+import type { NormalizedCompetitionHistory, CompetitionWorkoutEntry } from '../../lib/competitionHistory';
+import { movementPerformance, timeDomainBreakdown, STAGE_ABBR, STAGE_ORDER_LIST, prettyMovementName } from '../../lib/competitionHistory';
 import WorkoutDetail from './WorkoutDetail';
 
 interface SignatureBucket {
@@ -39,12 +42,13 @@ const STAGE_LABEL: Record<string, string> = {
   open: 'Open', quarterfinals: 'Quarterfinals', semifinals: 'Semifinals', regional: 'Regionals', games: 'Games',
 };
 
-// stimulus_breakdown bucket key → display label, in display order.
-const TIME_DOMAIN_ROWS: Array<[string, string]> = [
-  ['short', 'Short'],
-  ['medium', 'Mid'],
-  ['long', 'Long'],
-];
+// "Across durations" bucket → display label, in display order.
+const TIME_DOMAIN_LABELS: Record<'short' | 'medium' | 'long', string> = {
+  short: 'Short',
+  medium: 'Mid',
+  long: 'Long',
+};
+// stimulus_breakdown modality bucket key → display label, in display order.
 const MODALITY_ROWS: Array<[string, string]> = [
   ['G_dominant', 'Gymnastics'],
   ['W_dominant', 'Weightlifting'],
@@ -150,20 +154,40 @@ export default function SummaryPanel({
   const [selectedWorkout, setSelectedWorkout] = useState<CompetitionWorkoutEntry | null>(null);
 
   const sb = signature?.stimulus_breakdown;
-  const timeRows = bucketRows(TIME_DOMAIN_ROWS, sb?.time_domain);
+  const timeRows: BreakdownRow[] = useMemo(
+    () =>
+      timeDomainBreakdown(history)
+        .filter((b) => b.n > 0)
+        .map((b) => ({ label: TIME_DOMAIN_LABELS[b.bucket], n: b.n, pct: b.avgPct ?? 0 })),
+    [history],
+  );
   const modalityRows = bucketRows(MODALITY_ROWS, sb?.modality);
 
-  // Top 3 by their headline-stage percentile (deepest stage with >=2 workouts).
-  // Per-stage, never pooled across stages — same reasoning as the map summaries.
-  const strongest = useMemo(() => {
-    return movementPerformance(history)
-      .map((m) => {
-        const headline = m.byStage.find((s) => s.n >= 2 && s.avgPct != null) ?? null;
-        return headline ? { name: m.name, headline, rest: m.byStage.filter((s) => s.stage !== headline.stage) } : null;
-      })
-      .filter((x): x is { name: string; headline: MovementStageStat; rest: MovementStageStat[] } => x != null)
-      .sort((a, b) => (b.headline.avgPct ?? 0) - (a.headline.avgPct ?? 0) || a.name.localeCompare(b.name))
-      .slice(0, 3);
+  // Top movements AT EACH LEVEL — never pooled across stages, because Open's
+  // ~300k field makes high percentiles structurally easier than QF/Games. So we
+  // group by stage and show the top 3 within each (avg cohort percentile, ≥2
+  // workouts for a read), in competition order.
+  const topByStage = useMemo(() => {
+    const byStage = new Map<string, { name: string; avgPct: number; n: number; logged: boolean }[]>();
+    for (const m of movementPerformance(history)) {
+      for (const s of m.byStage) {
+        if (s.n >= 2 && s.avgPct != null) {
+          const arr = byStage.get(s.stage) ?? [];
+          arr.push({ name: m.name, avgPct: s.avgPct, n: s.n, logged: s.logged });
+          byStage.set(s.stage, arr);
+        }
+      }
+    }
+    const ordered = [
+      ...STAGE_ORDER_LIST.filter((s) => byStage.has(s)),
+      ...Array.from(byStage.keys()).filter((s) => !(STAGE_ORDER_LIST as string[]).includes(s)),
+    ];
+    return ordered.map((stage) => ({
+      stage,
+      movements: byStage.get(stage)!
+        .sort((a, b) => b.avgPct - a.avgPct || a.name.localeCompare(b.name))
+        .slice(0, 3),
+    }));
   }, [history]);
 
   const bestResults = useMemo(() => {
@@ -191,33 +215,44 @@ export default function SummaryPanel({
       <BreakdownBlock title="Across durations" rows={timeRows} />
       <BreakdownBlock title="Across modalities" rows={modalityRows} />
 
-      {strongest.length > 0 && (
+      {topByStage.length > 0 && (
         <div style={{ marginTop: 20 }}>
-          <SectionLabel>Strongest movements</SectionLabel>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {strongest.map((m) => {
-              const stageStr = (s: MovementStageStat) => `${STAGE_ABBR[s.stage] ?? s.stage} ${s.avgPct != null ? Math.round(s.avgPct) : '—'} · ${s.n} wkt${s.n === 1 ? '' : 's'}`;
-              const detail = [stageStr(m.headline), ...m.rest.map(stageStr)].join(' · ');
-              const inner = (
-                <>
-                  <span style={{ fontWeight: 600 }}>{m.name}</span>
-                  <span style={{ color: 'var(--text-dim)' }}> — {detail}</span>
-                  {onPickMovement && <span style={{ color: 'var(--text-dim)' }}> →</span>}
-                </>
-              );
-              return onPickMovement ? (
-                <button
-                  key={m.name}
-                  type="button"
-                  onClick={() => onPickMovement(m.name)}
-                  style={{ textAlign: 'left', padding: '2px 0', background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}
-                >
-                  {inner}
-                </button>
-              ) : (
-                <div key={m.name} style={{ fontSize: 13, color: 'var(--text)' }}>{inner}</div>
-              );
-            })}
+          <SectionLabel>Top Movements</SectionLabel>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2, marginBottom: 8 }}>
+            avg percentile on workouts including each movement (2+ for a score)
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {topByStage.map((grp) => (
+              <div key={grp.stage}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--text-muted)', marginBottom: 3 }}>
+                  {STAGE_ABBR[grp.stage] ?? grp.stage}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {grp.movements.map((m) => {
+                    const inner = (
+                      <>
+                        <span style={{ fontWeight: 600 }}>{prettyMovementName(m.name)} ({m.n})</span>
+                        <span style={{ color: 'var(--text-dim)' }}> {ordinal(Math.round(m.avgPct))} percentile</span>
+                        {m.logged && <span style={{ marginLeft: 5, fontSize: 10, color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 3, padding: '0 4px', textTransform: 'uppercase', letterSpacing: '.3px' }}>logged</span>}
+                        {onPickMovement && <span style={{ color: 'var(--text-dim)' }}> →</span>}
+                      </>
+                    );
+                    return onPickMovement ? (
+                      <button
+                        key={`${grp.stage}-${m.name}`}
+                        type="button"
+                        onClick={() => onPickMovement(m.name)}
+                        style={{ textAlign: 'left', padding: '1px 0', background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}
+                      >
+                        {inner}
+                      </button>
+                    ) : (
+                      <div key={`${grp.stage}-${m.name}`} style={{ fontSize: 13, color: 'var(--text)' }}>{inner}</div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

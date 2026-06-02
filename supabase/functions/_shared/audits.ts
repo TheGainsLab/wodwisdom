@@ -346,6 +346,14 @@ function movementHasAnyPrescription(m: MovementPrescription): boolean {
   return (
     (m.sets != null && m.sets > 0) ||
     (m.reps != null && m.reps > 0) ||
+    // rep_scheme is the canonical rep specifier — writer prompt tells the
+    // LLM to emit this and leave reps null (the save layer derives reps as
+    // sum(rep_scheme)). Required-fields must accept it as a valid prescription.
+    (Array.isArray(m.rep_scheme)
+      && m.rep_scheme.length > 0
+      && m.rep_scheme.some((n) => typeof n === "number" && n > 0)) ||
+    // calories is the typed specifier for Cal Row / Cal Bike / Cal Ski.
+    (m.calories != null && m.calories > 0) ||
     (m.weight != null && m.weight > 0) ||
     (m.time_seconds != null && m.time_seconds > 0) ||
     (m.distance != null && m.distance > 0)
@@ -408,6 +416,104 @@ export function auditRequiredFields(output: WriterOutput): AuditResult {
     }
   }
   return { rule: "required_fields", passed: violations.length === 0, violations };
+}
+
+// ============================================================
+// Rule 4c — metcon duration matches the labeled time-domain bucket
+// ============================================================
+
+/**
+ * The skeleton labels each metcon day with a metcon_focus string that
+ * specifies a time-domain bucket — "short power couplet (6-8 min)",
+ * "long aerobic chipper (20-25 min)", etc. The writer is supposed to
+ * prescribe work that actually completes in that bucket. This audit closes
+ * the loop:
+ *   1. Read the bucket from the skeleton day's metcon_focus.
+ *   2. Read the computed median_seconds from the block's expected_benchmark
+ *      (populated server-side by compute-block-benchmark before runAudits).
+ *   3. Fail block-local if the prescribed work lands outside the bucket's
+ *      tolerance range — surgical retry then adjusts volume.
+ *
+ * Tolerance ranges (loose at boundaries so 5-10% rounding doesn't fire):
+ *   short:  ≤ 540s        (label: under 8 min; allow up to 9 min)
+ *   medium: 420s – 960s   (label: 8-15 min; allow 7-16 min)
+ *   long:   ≥ 840s        (label: 15+ min; allow as low as 14 min)
+ *
+ * Skips when:
+ *   - No skeleton context (ingestion path)
+ *   - No metcon_focus string on the day
+ *   - Bucket word not parseable from the focus string
+ *   - No expected_benchmark on the block (compute failed — already logged)
+ *   - expected_benchmark.median_seconds is null (AMRAP — "rounds+reps"
+ *     doesn't parse to a duration; AMRAP duration IS the time_cap, separate
+ *     check)
+ */
+
+type TimeDomainBucket = "short" | "medium" | "long";
+
+/** Parse the time-domain bucket out of a metcon_focus string. The skeleton
+ *  is taught to emit short/medium/long explicitly; also catch "aerobic"
+ *  (typically long) and "power" / "sprint" (typically short) as backups. */
+function parseMetconFocusBucket(focus: string | null | undefined): TimeDomainBucket | null {
+  if (!focus) return null;
+  const s = focus.toLowerCase();
+  if (/\blong\b/.test(s) || /\baerobic\b/.test(s)) return "long";
+  if (/\bshort\b/.test(s) || /\bsprint\b/.test(s) || /\bpower\b/.test(s)) return "short";
+  if (/\bmedium\b/.test(s)) return "medium";
+  return null;
+}
+
+interface BucketRange { min: number; max: number; label: string }
+const BUCKET_RANGES: Record<TimeDomainBucket, BucketRange> = {
+  short:  { min: 0,    max: 540,        label: "≤ 9 min" },
+  medium: { min: 420,  max: 960,        label: "7–16 min" },
+  long:   { min: 840,  max: Infinity,   label: "≥ 14 min" },
+};
+
+// deno-lint-ignore no-explicit-any
+function findSkeletonDay(skeleton: any, weekNum: number, dayNum: number): any | null {
+  for (const w of skeleton?.weeks ?? []) {
+    if (w.week_num !== weekNum) continue;
+    for (const d of w.days ?? []) {
+      if (d.day_num === dayNum) return d;
+    }
+  }
+  return null;
+}
+
+export function auditMetconDuration(
+  output: WriterOutput,
+  // deno-lint-ignore no-explicit-any
+  skeleton: any | undefined,
+): AuditResult {
+  if (!skeleton) return { rule: "metcon_duration_matches_focus", passed: true, violations: [] };
+  const violations: string[] = [];
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
+      const skDay = findSkeletonDay(skeleton, week.week_num, day.day_num);
+      const focus = skDay?.metcon_focus as string | undefined;
+      const bucket = parseMetconFocusBucket(focus);
+      if (!bucket) continue;
+      const range = BUCKET_RANGES[bucket];
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        if (b.block_type !== "metcon") continue;
+        const bench = (b as { expected_benchmark?: { median_seconds?: number | null } }).expected_benchmark;
+        if (!bench) continue;
+        const seconds = bench.median_seconds;
+        if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds <= 0) continue;
+        if (seconds < range.min || seconds > range.max) {
+          const mm = Math.floor(seconds / 60);
+          const ss = Math.round(seconds % 60).toString().padStart(2, "0");
+          violations.push(
+            `Week ${week.week_num} Day ${day.day_num} block[${i}] (metcon): skeleton labeled this "${focus}" (${bucket} bucket, expected ${range.label}) but prescribed work completes in ~${mm}:${ss}. Adjust volume — ${bucket === "long" ? "add more work (longer ladder, more rounds, longer row/run leg)" : bucket === "short" ? "trim volume (fewer reps or one less round)" : "tune volume up or down"} until the expected duration matches the labeled bucket.`,
+          );
+        }
+      }
+    }
+  }
+  return { rule: "metcon_duration_matches_focus", passed: violations.length === 0, violations };
 }
 
 // ============================================================
@@ -616,6 +722,11 @@ export interface AuditContext {
   daysPerWeek: number;
   lifts: Record<string, number | null>;
   vocabulary: string[];
+  /** Optional — when present, the duration audit reads each day's
+   *  metcon_focus to validate that prescribed work matches the labeled
+   *  time-domain bucket. Null on ingestion paths that have no skeleton. */
+  // deno-lint-ignore no-explicit-any
+  skeleton?: any;
 }
 
 export const ALL_AUDITS = [
@@ -627,6 +738,7 @@ export const ALL_AUDITS = [
   (ctx: AuditContext): AuditResult => auditMetconMonostructural(ctx.output),
   (ctx: AuditContext): AuditResult => auditMetconBarbellLoads(ctx.output),
   (ctx: AuditContext): AuditResult => auditRequiredFields(ctx.output),
+  (ctx: AuditContext): AuditResult => auditMetconDuration(ctx.output, ctx.skeleton),
   (ctx: AuditContext): AuditResult => auditDayCount(ctx.output, ctx.daysPerWeek),
   (ctx: AuditContext): AuditResult => auditLoadSanity(ctx.output, ctx.lifts),
   // vocabulary_compliance dropped 2026-05-14 — see chat log. v1 had no
@@ -653,6 +765,7 @@ export const AUDIT_KIND: Record<string, AuditKind> = {
   metcon_one_piece: "block-local",
   metcon_one_monostructural: "block-local",
   metcon_barbell_one_load: "block-local",
+  metcon_duration_matches_focus: "block-local",
   required_fields: "block-local",
   // Structural — whole-program issues; only writer-retry can fix
   block_type_enum: "structural-writer",

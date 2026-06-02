@@ -34,6 +34,31 @@ function roundToPlateMath(w: number | null, unit: string | null): number | null 
 }
 
 /**
+ * Reconcile `reps` with `rep_scheme` at save time. The writer emits the
+ * per-iteration breakdown as an array; code does the addition so the scalar
+ * `reps` is always accurate (no LLM arithmetic).
+ *
+ * Returns the [reps, rep_scheme] pair to persist:
+ *   - rep_scheme present + valid → reps = sum(rep_scheme), rep_scheme persisted
+ *   - rep_scheme missing → reps and rep_scheme pass through unchanged
+ *   - rep_scheme empty or malformed → drop it, keep the original reps
+ */
+function reconcileReps(
+  reps: number | null | undefined,
+  repScheme: number[] | null | undefined,
+): { reps: number | null; rep_scheme: number[] | null } {
+  if (!Array.isArray(repScheme) || repScheme.length === 0) {
+    return { reps: reps ?? null, rep_scheme: null };
+  }
+  const cleaned = repScheme.filter((n) => Number.isFinite(n) && n > 0 && n <= 1000);
+  if (cleaned.length === 0) {
+    return { reps: reps ?? null, rep_scheme: null };
+  }
+  const sum = cleaned.reduce((a, b) => a + b, 0);
+  return { reps: sum, rep_scheme: cleaned };
+}
+
+/**
  * Build a per-block intent object from the skeleton day's metadata.
  * Each block type carries the slice of skeleton reasoning that shaped it.
  * Returns null when there is no skeleton (e.g. an ingested program).
@@ -162,6 +187,7 @@ export async function saveProgramV3(
             cardio_modality: b.cardio_modality ?? null,
             sort_order: bIdx,
             block_intent: buildBlockIntent(skDay, b.block_type),
+            expected_benchmark: (b as { expected_benchmark?: unknown }).expected_benchmark ?? null,
           });
           blockKeys.push(`${week.week_num}-${day.day_num}-${bIdx}`);
         }
@@ -189,11 +215,13 @@ export async function saveProgramV3(
           if (!blockId) continue;
           for (let m = 0; m < b.movements.length; m++) {
             const mv = b.movements[m];
+            const { reps, rep_scheme } = reconcileReps(mv.reps, mv.rep_scheme);
             movementInserts.push({
               block_id: blockId,
               movement: mv.movement,
               sets: mv.sets ?? null,
-              reps: mv.reps ?? null,
+              reps,
+              rep_scheme,
               weight: roundToPlateMath(mv.weight ?? null, mv.weight_unit ?? null),
               weight_unit: mv.weight_unit ?? null,
               rpe: mv.rpe ?? null,

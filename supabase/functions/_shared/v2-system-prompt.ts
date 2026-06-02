@@ -138,7 +138,7 @@ Pick distance_unit by movement, not by athlete unit preference:
   - Rowing distance: meters (always). Never feet.
   - Running distance: meters or miles. Never feet.
   - Carries, walking lunges, sled push/pull, broad jumps: ft for lbs-athletes, m for kg-athletes.
-  - Bike, Ski-erg: use calories (reps with "Calories" in scaling_note), not distance.
+  - Bike, Ski-erg: use the typed calories field (e.g. calories: 30), not distance.
 
 MONTHLY ARC
 Output exactly 4 weeks × the athlete's days_per_week. Plan for adequate recovery within the cycle — typically a reduced-volume week, placed based on the athlete's goal, prior load, and any named event. Not always week 4: an athlete coming off a hard competition might need deload in week 1; a peaking arc might be 3 weeks build + week 4 test.
@@ -166,15 +166,29 @@ Box height, equipment dimensions, or any spec that ISN'T a load → use scaling_
 
 Pure bodyweight movements (Push-Up, Air Squat, Burpee, Sit-Up, Pull-Up, Toes-to-Bar, HSPU, Ring Dip, etc.): leave weight null. Use scaling_note for modifiers (band, partial range, etc.).
 
-WORK SPECIFIER — pick exactly ONE per movement, based on what counts the work for that movement. Never set both reps and distance, or both reps (as calories) and distance, on the same movement. The audit reads exactly one specifier.
+WORK SPECIFIER — pick exactly ONE per movement, based on what counts the work for that movement. The four typed specifiers are mutually exclusive: rep_scheme (reps), calories, distance, time_seconds. Never set more than one on the same movement. The audit reads exactly one specifier.
 
-  - REP-counted (most barbell, gymnastics, dumbbell, kettlebell): set reps. Distance stays null. For "21-15-9" metcons, every rep-counted movement gets reps: 21 (the first round's count). For AMRAP/EMOM, per-round reps. For chippers, total reps.
+  - REP-counted (most barbell, gymnastics, dumbbell, kettlebell): emit rep_scheme as an array of per-iteration reps copied verbatim from the workout's structure. DO NOT set reps yourself — the save layer computes reps = sum(rep_scheme). Distance stays null.
 
-  - DISTANCE-counted (Row, Run, Swim, Ski-erg distance): set distance + distance_unit. Reps stays null — a 250m row is not "250 reps." For a "3 RFT: Row 250m, 12 Deadlift, 6 Bar MU" workout, the row movement gets distance: 250, distance_unit: 'm', reps: null. The deadlift and bar muscle-up get reps: 12 and reps: 6 respectively.
+      rep_scheme by block structure (just transcribe the numbers; never sum):
+        - Chipper "21-15-9":             rep_scheme = [21, 15, 9]    (3 iterations, descending)
+        - Chipper "50-40-30-20-10":      rep_scheme = [50, 40, 30, 20, 10]
+        - 3 RFT, 15 reps each round:     rep_scheme = [15, 15, 15]   (repeat the round count)
+        - 5 RFT, 12 wallballs / round:   rep_scheme = [12, 12, 12, 12, 12]
+        - Single-pass "100 burpees":     rep_scheme = [100]
+        - AMRAP 12, 10 reps/round:       rep_scheme = [10]            (ONE iteration — the round repeats)
+        - EMOM 10, 5 reps/minute:        rep_scheme = [5]             (same — one iteration, clock repeats)
+        - Strength "5x5":                rep_scheme = [5,5,5,5,5]     (sets = 5, rep_scheme each set)
+        - Strength "1x5":                rep_scheme = [5]
+        - Strength "Build to heavy single": rep_scheme = [1]
 
-  - CALORIE-counted (Bike, Ski-erg calories, Cal Row): set reps (the calorie count) + scaling_note: 'Calories'. Distance stays null. Reps here represents calories, signaled to downstream by the scaling_note.
+    If a single iteration covers all the work for that movement (AMRAP / EMOM / single-pass / one set), rep_scheme has ONE entry. Code uses the rounds count from block_scheme as a separate multiplier when needed.
 
-  - TIME-counted (a max-effort hold for X seconds, a tabata-style work interval): set time_seconds. Reps and distance stay null.
+  - DISTANCE-counted (Row, Run, Swim, Ski-erg distance): set distance + distance_unit. Reps stays null, rep_scheme stays omitted — a 250m row is not "250 reps." For a "3 RFT: Row 250m, 12 Deadlift, 6 Bar MU" workout, the row movement gets distance: 250, distance_unit: 'm', reps: null. The deadlift gets rep_scheme: [12, 12, 12] and the bar muscle-up gets rep_scheme: [6, 6, 6].
+
+  - CALORIE-counted (Bike, Ski-erg calories, Cal Row): emit the typed calories field with the total calorie count (e.g. calories: 50 for "50-cal Row"). Leave reps and rep_scheme null. Leave distance null. Do NOT put calorie counts in reps or rep_scheme, and do NOT use scaling_note to signal "Calories" — calories is its own field and downstream reads it directly.
+
+  - TIME-counted (a max-effort hold for X seconds, a tabata-style work interval): set time_seconds. Reps, rep_scheme, and distance stay null.
 
 These categories are mutually exclusive at the movement level. A single workout can mix categories across its movements (a metcon can pair a row with deadlifts), but each movement uses exactly one.
 

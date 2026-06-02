@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
-import { Plus, Zap, Brain, ClipboardList } from 'lucide-react';
+import { Plus, Zap, Brain, Calendar, BarChart3 } from 'lucide-react';
 
 interface Program {
   id: string;
@@ -169,32 +169,34 @@ export default function ProgramsListPage({ session }: { session: Session }) {
         </header>
         <div className="page-body">
           <div className="programs-list-wrap">
-            {/* View Training Log button — for paid users who have programs */}
+            {/* My Calendar — schedule + log + launch (anyone with training access) */}
             {(hasProgramming || hasEngine || isAdmin) && (
-              <button
-                type="button"
+              <div
+                className="history-item"
+                style={{ marginBottom: 16, cursor: 'pointer', borderLeft: '3px solid var(--accent)' }}
                 onClick={() => navigate('/training-log')}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  padding: '12px 16px',
-                  marginBottom: 16,
-                  background: 'var(--surface2)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 10,
-                  color: 'var(--text)',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                }}
               >
-                <ClipboardList size={16} style={{ color: 'var(--accent)' }} />
-                View Training Log
-              </button>
+                <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Calendar size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <span className="history-question">My Calendar</span>
+                  <span className="history-time" style={{ marginLeft: 'auto' }}>Schedule &amp; log your training</span>
+                </div>
+              </div>
+            )}
+
+            {/* Analytics — progress dashboards (AI Programming only) */}
+            {(hasProgramming || isAdmin) && (
+              <div
+                className="history-item"
+                style={{ marginBottom: 16, cursor: 'pointer', borderLeft: '3px solid var(--accent)' }}
+                onClick={() => navigate('/training-log?view=analytics')}
+              >
+                <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <BarChart3 size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <span className="history-question">Analytics</span>
+                  <span className="history-time" style={{ marginLeft: 'auto' }}>Strength, metcons &amp; progress</span>
+                </div>
+              </div>
             )}
 
             {/* Engine card */}
@@ -385,9 +387,6 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                           <span className="history-question">{label}</span>
                           <span className="history-time">{workoutLabel}</span>
                           <div className="program-list-actions" onClick={e => e.stopPropagation()}>
-                            <button type="button" className="program-list-btn" onClick={() => navigate(isMonthCard ? `/programs/${p.id}/edit?month=${month}` : `/programs/${p.id}/edit`)} title="Edit">
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                            </button>
                             {(!isMonthCard || isAdmin) && (
                               <button
                                 type="button"

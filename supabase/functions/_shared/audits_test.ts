@@ -507,3 +507,4 @@ Deno.test("runAudits: well-formed baseline output passes structural pre-check, r
   // structural is fine; baseline may or may not pass full audits, but should NOT trip structural.
   assert(!result.failures.some((f) => f.rule === "structural_integrity"));
 });
+

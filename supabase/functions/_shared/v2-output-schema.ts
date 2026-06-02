@@ -72,6 +72,17 @@ export interface MovementPrescription {
   movement: string;
   sets?: number;
   reps?: number;
+  /**
+   * Per-iteration reps breakdown. Each entry is one round / pass through
+   * the workout's structure. Examples:
+   *   - Chipper "21-15-9":       [21, 15, 9]
+   *   - 3 RFT, 15 reps/round:    [15, 15, 15]
+   *   - Single-pass "100 burpees": [100]
+   *   - AMRAP 10 reps/round:     [10]   (one structural unit; rounds open)
+   * Required for any movement that has a reps prescription. Code computes
+   * `reps = sum(rep_scheme)` at save time — the LLM never does arithmetic.
+   */
+  rep_scheme?: number[];
   weight?: number;
   weight_unit?: "lbs" | "kg";
   rpe?: number;
@@ -188,7 +199,14 @@ function buildMovementSchema(units: "lbs" | "kg") {
     properties: {
       movement: { type: "string", description: "Display name from the vocabulary list provided in the user message." },
       sets: { type: "integer", minimum: 1, maximum: 30 },
-      reps: { type: "integer", minimum: 1, maximum: 500 },
+      reps: { type: "integer", minimum: 1, maximum: 500, description: "DO NOT compute manually. Code derives this from sum(rep_scheme) at save time." },
+      rep_scheme: {
+        type: "array",
+        items: { type: "integer", minimum: 1, maximum: 200 },
+        minItems: 1,
+        maxItems: 20,
+        description: "Per-iteration reps breakdown. Required for every rep-counted movement. Chipper '21-15-9' → [21,15,9]. 3 RFT 15 reps/round → [15,15,15]. Single-pass '100 burpees' → [100]. AMRAP 10 reps/round → [10] (one structural unit). Just copy the numbers from block_scheme — DO NOT do arithmetic.",
+      },
       weight: { type: "number", minimum: 0 },
       weight_unit: { type: "string", enum: [units] },
       rpe: { type: "integer", minimum: 1, maximum: 10 },

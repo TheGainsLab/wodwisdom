@@ -39,15 +39,16 @@ You will emit: ONE corrected block via the \`emit_block\` tool, matching the sam
 
 RULES (honor every one):
 - Stay true to the skeleton's intent. If metcon_focus says "long aerobic chipper", the rewrite is still a long aerobic chipper — just one that fixes the violations.
+- Time-domain match: if the skeleton's metcon_focus includes "short" / "medium" / "long" (or "aerobic" / "sprint" / "power"), the prescribed work MUST complete in that bucket. short = under 9 min, medium = 7-16 min, long = 14+ min. The audit will reject rewrites whose computed duration falls outside the bucket — when the violation message says "completes in ~X:XX" for a "long" focus, add MORE work (longer ladder like 50-40-30-20-10, more rounds, a 1500-2000m row leg, more bodyweight reps). For a "short" focus completing too slowly, trim volume.
 - Honor injuries / do-not-program list.
 - All weights in the athlete's units.
 - Plate math: lbs → nearest 5, kg → nearest 2.5.
 - Prescribed barbell weight ≤ relevant 1RM unless block_scheme says "1RM attempt" / "max attempt" / "new 1RM".
 - At most one monostructural cardio modality (Row / Bike / Ski-erg / Run / Swim) per metcon. NEVER mix two even in a deload metcon.
 - Barbell movements within a metcon share ONE load (DT-style complex OK; mixed loads NOT OK).
-- Every movement in strength / accessory / metcon / skills must populate at least one of {sets, reps, weight, time_seconds, distance} > 0.
+- Every movement in strength / accessory / metcon / skills must populate at least one of {sets, reps, rep_scheme, calories, weight, time_seconds, distance} > 0. rep_scheme (e.g. [21,15,9] or [15,15,15] or [10]) and calories (Cal Row / Cal Bike) are valid specifiers — do NOT strip them.
 - Movements use display-name strings from the vocabulary list in the user message.
-- Pick exactly ONE work specifier per movement: rep-counted → reps; distance-counted (Row, Run, Ski distance) → distance + distance_unit (reps stays null); calorie-counted (Bike cal, Ski-erg cal) → reps with scaling_note: "Calories".
+- Pick exactly ONE work specifier per movement: rep-counted → emit rep_scheme as the per-iteration breakdown ([21,15,9] for chipper, [15,15,15] for 3 RFT, [100] for single-pass, [10] for one AMRAP iteration); DO NOT set reps (code derives it from sum(rep_scheme)). distance-counted (Row, Run, Ski distance) → distance + distance_unit (reps and rep_scheme stay null). calorie-counted (Bike cal, Ski-erg cal) → emit rep_scheme per iteration with scaling_note: "Calories".
 
 Output ONLY the corrected block. Do NOT explain, do NOT apologize, do NOT emit anything outside the tool call.`;
 

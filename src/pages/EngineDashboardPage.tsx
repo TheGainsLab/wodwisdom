@@ -13,7 +13,7 @@ import {
   calculateWorkDurationMinutes,
 } from '../lib/engineService';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, Lock, Check, Play, Settings, BarChart3 } from 'lucide-react';
+import { ChevronLeft, Lock, Check, Play, Settings, BarChart3, Calendar } from 'lucide-react';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -343,7 +343,16 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                 onClick={() => navigate('/engine/analytics')}
                 style={{ width: '100%' }}
               >
-                <BarChart3 size={18} /> Analytics
+                <BarChart3 size={18} /> Engine Analytics
+              </button>
+
+              {/* Training Log button */}
+              <button
+                className="engine-btn engine-btn-primary"
+                onClick={() => navigate('/training-log')}
+                style={{ width: '100%' }}
+              >
+                <Calendar size={18} /> Training Log
               </button>
 
               <hr className="engine-divider" />

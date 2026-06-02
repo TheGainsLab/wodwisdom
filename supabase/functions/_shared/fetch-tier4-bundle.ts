@@ -144,6 +144,14 @@ export interface Tier4AllResultsEntry {
     // safe to type as required. joules/watts/w_per_kg are nullable: null
     // when compute_status != "computed".
     joules: number | null;
+    // Bundle 1.10.0 (upstream sql/151). The body-mass-dependent share of
+    // `joules`, computed at the same default mass. Lets a consumer rescale
+    // power to a viewer's actual body weight:
+    //   joules_personal = joules + joules_bodyweight_component * (user_kg/default_kg - 1)
+    // Null in lockstep with `joules` (server-guaranteed — verified across the
+    // full catalog); 0 is valid and meaningful (pure barbell / erg work).
+    // Optional — absent on bundles older than 1.10.0.
+    joules_bodyweight_component?: number | null;
     avg_power_watts: number | null;
     avg_w_per_kg: number | null;
     body_mass_basis: "default_84m_64w";

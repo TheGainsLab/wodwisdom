@@ -22,10 +22,11 @@ Return ONLY a JSON array. Each element:
   "movement": "Clean, canonical movement name",
   "category": "weighted" | "bodyweight" | "monostructural",
   "reps": <number or null>,
+  "calories": <number or null>,
   "weight": <number or null>,
   "weight_unit": "lbs" | "kg" | null,
   "distance": <number or null>,
-  "distance_unit": "m" | "ft" | "cal" | null
+  "distance_unit": "m" | "ft" | null
 }
 
 Rules:
@@ -45,7 +46,7 @@ Rules:
   - "bodyweight": movements using only bodyweight (Pull-Up, Toes-to-Bar, Muscle-Up, Burpee, Air Squat, Pistol, HSPU, etc.)
   - "monostructural": cardio/engine movements (Row, Bike, Run, Ski, Swim, Jump Rope, Double-Under, etc.)
 - For monostructural movements with distance (500m Row, 400m Run), set distance + distance_unit, reps = null.
-- For calorie-based cardio (30 Cal Row), set reps = 30, distance = null, distance_unit = "cal".
+- For calorie-based cardio (30 Cal Row, 20 Cal Bike, 15 Cal Ski), set calories = 30 (or 20, or 15). Reps, distance, and distance_unit all stay null. The typed "calories" field is the work specifier — do NOT put calorie counts in "reps".
 - For weighted movements, extract the Rx weight (first number in slash notation like 95/65 → 95).
 - Return ONE entry per unique movement, not one per round.
 - Always report reps PER ROUND, never totaled across rounds.
@@ -60,15 +61,16 @@ interface ParsedMetconMovement {
   movement: string;
   category: "weighted" | "bodyweight" | "monostructural";
   reps: number | null;
+  calories: number | null;
   weight: number | null;
   weight_unit: "lbs" | "kg" | null;
   distance: number | null;
-  distance_unit: "m" | "ft" | "cal" | null;
+  distance_unit: "m" | "ft" | null;
 }
 
 const VALID_CATEGORIES = ["weighted", "bodyweight", "monostructural"];
 const VALID_WEIGHT_UNITS = ["lbs", "kg"];
-const VALID_DISTANCE_UNITS = ["m", "ft", "cal"];
+const VALID_DISTANCE_UNITS = ["m", "ft"];
 
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -145,6 +147,7 @@ Deno.serve(async (req) => {
         movement: m.movement.trim(),
         category: VALID_CATEGORIES.includes(m.category) ? m.category : "bodyweight",
         reps: typeof m.reps === "number" ? m.reps : null,
+        calories: typeof m.calories === "number" ? m.calories : null,
         weight: typeof m.weight === "number" ? m.weight : null,
         weight_unit: typeof m.weight_unit === "string" && VALID_WEIGHT_UNITS.includes(m.weight_unit) ? m.weight_unit : null,
         distance: typeof m.distance === "number" ? m.distance : null,

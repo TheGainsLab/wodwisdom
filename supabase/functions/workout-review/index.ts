@@ -398,7 +398,7 @@ async function runReview(
         const blockIds = (v3Blocks as { id: string }[]).map((b) => b.id);
         const { data: v3Movements } = await supa
           .from("program_movements_v2")
-          .select("block_id, movement, sets, reps, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order")
+          .select("block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order")
           .in("block_id", blockIds)
           .order("sort_order");
         const movsByBlock = new Map<string, typeof v3Movements>();
@@ -412,9 +412,20 @@ async function runReview(
         // deno-lint-ignore no-explicit-any
         const fmtMv = (m: any) => {
           const parts: string[] = [];
-          if (m.sets != null && m.reps != null) parts.push(`${m.sets}×${m.reps}`);
-          else if (m.sets != null) parts.push(`${m.sets} sets`);
-          else if (m.reps != null) parts.push(`${m.reps} reps`);
+          const arr: number[] | null = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
+          if (m.calories != null && m.calories > 0) {
+            parts.push(`${m.calories} cal`);
+          } else if (arr && arr.length > 1 && !arr.every((n: number) => n === arr[0])) {
+            parts.push(`${arr.join("-")} reps`);
+          } else if (arr && arr.length > 1) {
+            parts.push(`${arr.length}×${arr[0]}`);
+          } else if (m.sets != null && m.reps != null) {
+            parts.push(`${m.sets}×${m.reps}`);
+          } else if (m.sets != null) {
+            parts.push(`${m.sets} sets`);
+          } else if (m.reps != null) {
+            parts.push(`${m.reps} reps`);
+          }
           if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? "lbs"}`);
           if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
           if (m.time_seconds != null) parts.push(`${m.time_seconds}s`);
@@ -653,11 +664,17 @@ Deno.serve(async (req) => {
     // Cache check: return existing review before any heavy data fetching
     // -----------------------------------------------------------------------
     if (source_id) {
+      // Content-address the cache: match source_id AND the exact workout text.
+      // v3 days are editable, and the client sends the live reassembled text
+      // (v3BlocksToProse of current blocks). An edited day produces different
+      // text → cache miss → fresh review. Without the workout_text match the
+      // cache key is just the day and edits would serve a stale review.
       const { data: cached } = await supa
         .from("workout_reviews")
         .select("review")
         .eq("user_id", user.id)
         .eq("source_id", source_id)
+        .eq("workout_text", trimmed)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();

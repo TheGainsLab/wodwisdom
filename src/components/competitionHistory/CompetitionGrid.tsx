@@ -37,14 +37,18 @@ const STAGE_LABEL: Record<string, string> = {
 
 function Cell({ entry, onClick }: { entry: CompetitionWorkoutEntry; onClick: () => void }) {
   const isGames = entry.stage === 'games';
+  const isLogged = entry.source === 'logged';
   const numbered = entry.ordinal != null;
   const label = numbered ? String(entry.ordinal) : entry.workout_name;
   const movementSummary = entry.workout.movements.map((m) => m.name).join(', ');
+  // Logged throwbacks read as "yours, but logged not competed": dashed accent
+  // border + faint accent fill, vs the solid fill of official results.
+  const borderColor = isLogged ? 'var(--accent)' : isGames ? 'rgba(212,175,55,0.5)' : 'var(--border)';
   return (
     <button
       type="button"
       onClick={onClick}
-      title={`${entry.workout_name}${movementSummary ? ` — ${movementSummary}` : ''}`}
+      title={`${entry.workout_name}${isLogged ? ' (logged)' : ''}${movementSummary ? ` — ${movementSummary}` : ''}`}
       style={{
         height: 38,
         ...(numbered ? { width: 38, padding: 0 } : { padding: '0 10px', maxWidth: 180 }),
@@ -53,8 +57,8 @@ function Cell({ entry, onClick }: { entry: CompetitionWorkoutEntry; onClick: () 
         justifyContent: 'center',
         fontSize: numbered ? 14 : 12,
         fontWeight: 600,
-        background: 'var(--surface2)',
-        border: `1px solid ${isGames ? 'rgba(212,175,55,0.5)' : 'var(--border)'}`,
+        background: isLogged ? 'var(--accent-glow)' : 'var(--surface2)',
+        border: `1px ${isLogged ? 'dashed' : 'solid'} ${borderColor}`,
         borderRadius: 6,
         color: 'var(--text)',
         cursor: 'pointer',

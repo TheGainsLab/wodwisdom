@@ -3,6 +3,7 @@ import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { fetchAndFormatProgramContext } from "../_shared/training-program.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
+import { reassembleV3WorkoutText } from "../_shared/v3-workout-prose.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -436,7 +437,17 @@ Deno.serve(async (req) => {
       if (workout) {
         contextType = "workout";
         contextId = workout.id;
-        workoutContext = `\n\nTODAY'S TRAINING (Week ${workout.week_num}, Day ${workout.day_num}):\n${workout.workout_text}`;
+        // v3 programs leave workout_text NULL — the prescription lives in
+        // program_blocks_v2 + program_movements_v2. Reassemble from the
+        // structured rows so the Coach sees the real (and edit-current)
+        // workout. Fall back to workout_text for v1/v2.
+        let workoutText = workout.workout_text as string | null;
+        if (!workoutText) {
+          workoutText = await reassembleV3WorkoutText(supa, workout.id);
+        }
+        if (workoutText) {
+          workoutContext = `\n\nTODAY'S TRAINING (Week ${workout.week_num}, Day ${workout.day_num}):\n${workoutText}`;
+        }
       }
     }
 

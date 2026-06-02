@@ -20,6 +20,10 @@ export interface MovementWorkRate {
 export interface MetconEntry {
   movement: string;
   reps?: number | null;
+  /** Calorie-counted cardio (Cal Row, Cal Bike, Cal Ski). Mutually
+   *  exclusive with reps / distance. Routes to upstream's typed
+   *  `calories` work specifier in entryToWorkCalcMovement. */
+  calories?: number | null;
   weight?: number | null;
   weight_unit?: string;
   distance?: number | null;

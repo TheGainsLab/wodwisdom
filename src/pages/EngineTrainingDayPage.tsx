@@ -25,7 +25,9 @@ import {
 import { localDateString } from '../lib/localDate';
 import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertTriangle, Calendar, X } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { scheduleEngineDay, unschedule } from '../lib/trainingSchedule';
 
 // ── Types & Constants ────────────────────────────────────────────────
 
@@ -117,6 +119,15 @@ const SCORE_UNITS = [
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
+/**
+ * Watts is a RATE (average power), not a cumulative total. The logged score
+ * (e.g. 222W) is already the pace, so it must NOT be divided by duration the
+ * way cal / meters / km / miles are. All other units accumulate over time.
+ */
+function isRateUnit(unit: string): boolean {
+  return unit === 'watts';
+}
+
 function formatTime(seconds: number): string {
   if (seconds < 0) seconds = 0;
   if (seconds >= 3600) {
@@ -137,6 +148,8 @@ function formatDuration(seconds: number): string {
 }
 
 function formatGoalWithPace(goal: number, durationSeconds: number, unit: string): string {
+  // Rate units (watts): the goal IS the pace — show it directly, no "/min".
+  if (isRateUnit(unit)) return `~${Math.round(goal)} ${unit}`;
   const durationMinutes = durationSeconds / 60;
   const perMin = durationMinutes > 0 ? Math.round(goal / durationMinutes) : null;
   const goalStr = Math.round(goal);
@@ -160,6 +173,7 @@ function calculateIntervalGoal(
   segLabel: string,
   baselineRpm: number,
   rollingAdj: number,
+  isRate: boolean,
   roundPaceOverride?: number,
 ): number | null {
   if (baselineRpm <= 0) return null;
@@ -179,8 +193,12 @@ function calculateIntervalGoal(
   const centerPace = roundPaceOverride ?? (paceRange[0] + paceRange[1]) / 2;
   const adjustedPace = centerPace * rollingAdj;
   const targetRpm = baselineRpm * adjustedPace;
-  const durationMinutes = segDuration / 60;
 
+  // Rate units (watts): the goal is the target rate itself; do NOT multiply by
+  // duration (that would yield a meaningless cumulative "watt-minutes").
+  if (isRate) return Math.round(targetRpm * 10) / 10;
+
+  const durationMinutes = segDuration / 60;
   return Math.round(targetRpm * durationMinutes * 10) / 10;
 }
 
@@ -563,7 +581,10 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
     try {
       const output = parseFloat(logOutput) || 0;
       const durationMin = calculateWorkDurationMinutes(workout) || Math.round(totalElapsed / 60);
-      const rpm = durationMin > 0 ? output / durationMin : 0;
+      // Rate units (watts): the logged score IS the pace — don't divide by time.
+      const rpm = isRateUnit(selectedUnit)
+        ? output
+        : (durationMin > 0 ? output / durationMin : 0);
       const baselineRpm = baseline?.calculated_rpm ?? 0;
 
       // Weighted target pace across all work segments (matches mobile app)
@@ -732,6 +753,12 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 )}
               </div>
 
+              {workout && (
+                <div style={{ marginTop: 10 }}>
+                  <EngineDayScheduleControl engineWorkoutId={workout.id} userId={session.user.id} />
+                </div>
+              )}
+
               <hr className="engine-divider" />
 
               {/* Category buttons */}
@@ -802,7 +829,8 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                     {baseline.total_output} {baseline.units ?? 'cal'}
                   </div>
                   <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
-                    {baseline.calculated_rpm ? `${baseline.calculated_rpm.toFixed(1)} ${baseline.units ?? 'cal'}/min` : ''}
+                    {/* Rate units (watts): total_output above already IS the pace; no "/min" line. */}
+                    {!isRateUnit(baseline.units ?? '') && baseline.calculated_rpm ? `${baseline.calculated_rpm.toFixed(1)} ${baseline.units ?? 'cal'}/min` : ''}
                   </div>
                 </div>
               )}
@@ -935,7 +963,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
                           while (remaining > 0) {
                             const bSeg = Math.min(baseDur, remaining);
-                            const baseGoal = calculateIntervalGoal(bp, bSeg, 'Base', baselineRpm, rollingAdj);
+                            const baseGoal = calculateIntervalGoal(bp, bSeg, 'Base', baselineRpm, rollingAdj, isRateUnit(selectedUnit));
                             rows.push(
                               <div key={`b-${segIdx}`} className="engine-breakdown-row">
                                 <span className="engine-breakdown-label">WORK</span>
@@ -949,7 +977,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                             if (remaining <= 0) break;
 
                             const fSeg = Math.min(fluxDur, remaining);
-                            const fluxGoal = calculateIntervalGoal(bp, fSeg, 'Flux', baselineRpm, rollingAdj);
+                            const fluxGoal = calculateIntervalGoal(bp, fSeg, 'Flux', baselineRpm, rollingAdj, isRateUnit(selectedUnit));
                             rows.push(
                               <div key={`f-${segIdx}`} className="engine-breakdown-row engine-breakdown-row--flux">
                                 <span className="engine-breakdown-label engine-breakdown-label--flux">FLUX</span>
@@ -985,7 +1013,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
                           while (remaining > 0) {
                             const baseSeg = Math.min(burstInterval, remaining);
-                            const baseGoal = calculateIntervalGoal(bp, baseSeg, 'Base', baselineRpm, rollingAdj);
+                            const baseGoal = calculateIntervalGoal(bp, baseSeg, 'Base', baselineRpm, rollingAdj, isRateUnit(selectedUnit));
                             rows.push(
                               <div key={`base-${segIdx}`} className="engine-breakdown-row">
                                 <span className="engine-breakdown-label">BASE</span>
@@ -1034,7 +1062,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
                           while (remaining > 0) {
                             const bSeg = Math.min(baseDur, remaining);
-                            const baseGoal = calculateIntervalGoal(bp, bSeg, 'Base', baselineRpm, rollingAdj);
+                            const baseGoal = calculateIntervalGoal(bp, bSeg, 'Base', baselineRpm, rollingAdj, isRateUnit(selectedUnit));
                             rows.push(
                               <div key={`b-${segIdx}`} className="engine-breakdown-row">
                                 <span className="engine-breakdown-label">WORK</span>
@@ -1078,7 +1106,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                               <span className="engine-breakdown-goal">
                                 {(() => {
                                   const totalDur = workDur * rounds;
-                                  const goal = calculateIntervalGoal(bp, totalDur, 'Work', baselineRpm, rollingAdj);
+                                  const goal = calculateIntervalGoal(bp, totalDur, 'Work', baselineRpm, rollingAdj, isRateUnit(selectedUnit));
                                   const isMax = bp.paceRange === 'max_effort';
                                   return isMax ? 'Max Effort' : goal != null ? formatGoalWithPace(goal, totalDur, selectedUnit) : pace || '—';
                                 })()}
@@ -1102,7 +1130,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                               const roundPace = bp.paceProgression === 'increasing' && Array.isArray(bp.paceRange) && effectivePaceInc
                                 ? bp.paceRange[0] + r * effectivePaceInc
                                 : undefined;
-                              const intervalGoal = calculateIntervalGoal(bp, roundWorkDur, 'Work', baselineRpm, rollingAdj, roundPace);
+                              const intervalGoal = calculateIntervalGoal(bp, roundWorkDur, 'Work', baselineRpm, rollingAdj, isRateUnit(selectedUnit), roundPace);
                               const isMax = bp.paceRange === 'max_effort';
                               return (
                                 <div key={r}>
@@ -1329,7 +1357,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
       const bp = raw as unknown as BlockParams | null;
       const rollingAdj = performanceMetrics?.rolling_avg_ratio ?? 1;
       if (bp) {
-        currentGoal = calculateIntervalGoal(bp, seg.duration, seg.label, baseline?.calculated_rpm ?? 0, rollingAdj);
+        currentGoal = calculateIntervalGoal(bp, seg.duration, seg.label, baseline?.calculated_rpm ?? 0, rollingAdj, isRateUnit(selectedUnit));
       }
     }
 
@@ -1450,7 +1478,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
             {/* Output */}
             <div>
-              <span className="engine-label">Total Output ({SCORE_UNITS.find(u => u.value === selectedUnit)?.label ?? selectedUnit})</span>
+              <span className="engine-label">{isRateUnit(selectedUnit) ? 'Average' : 'Total Output'} ({SCORE_UNITS.find(u => u.value === selectedUnit)?.label ?? selectedUnit})</span>
               <input
                 className="engine-input"
                 type="number"
@@ -1522,7 +1550,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
               <span>Duration: {formatTime(totalElapsed)}</span>
               {logOutput && (
                 <span>
-                  Pace: {(parseFloat(logOutput) / Math.max(totalElapsed / 60, 1)).toFixed(1)} {selectedUnit}/min
+                  {isRateUnit(selectedUnit)
+                    ? `Pace: ${Math.round(parseFloat(logOutput))} ${selectedUnit}`
+                    : `Pace: ${(parseFloat(logOutput) / Math.max(totalElapsed / 60, 1)).toFixed(1)} ${selectedUnit}/min`}
                 </span>
               )}
             </div>
@@ -1650,6 +1680,121 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         {hasAccess && stage === 'logging' && renderLogging()}
         {hasAccess && stage === 'complete' && renderComplete()}
       </div>
+    </div>
+  );
+}
+
+// ── Add-to-calendar affordance for an Engine day ──────────────────────
+// Engine days are a repeatable pool, so the same day can be scheduled to
+// multiple dates. Shows existing scheduled dates as removable chips + a
+// quick-pick of the next 14 days. Writes training_schedule.engine_workout_id.
+
+function nextNScheduleDays(n: number): { key: string; label: string }[] {
+  const out: { key: string; label: string }[] = [];
+  const base = new Date();
+  for (let i = 0; i < n; i++) {
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+    const label = i === 0 ? 'Today'
+      : i === 1 ? 'Tomorrow'
+      : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    out.push({ key: localDateString(d), label });
+  }
+  return out;
+}
+
+function formatScheduleChip(dateStr: string): string {
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function EngineDayScheduleControl({ engineWorkoutId, userId }: { engineWorkoutId: string; userId: string }) {
+  const [rows, setRows] = useState<{ id: string; scheduled_date: string }[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    supabase
+      .from('training_schedule')
+      .select('id, scheduled_date')
+      .eq('engine_workout_id', engineWorkoutId)
+      .eq('user_id', userId)
+      .order('scheduled_date')
+      .then(({ data }) => { if (active && data) setRows(data as { id: string; scheduled_date: string }[]); });
+    return () => { active = false; };
+  }, [engineWorkoutId, userId]);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const h = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setPickerOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [pickerOpen]);
+
+  const add = async (date: string) => {
+    setError(null);
+    setPickerOpen(false);
+    const res = await scheduleEngineDay(userId, engineWorkoutId, date);
+    if (res.error) { setError(res.error); return; }
+    setRows(prev => [...prev, { id: res.id!, scheduled_date: res.scheduled_date! }].sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date)));
+  };
+
+  const remove = async (rowId: string) => {
+    setError(null);
+    const res = await unschedule(rowId);
+    if (res.error) { setError(res.error); return; }
+    setRows(prev => prev.filter(r => r.id !== rowId));
+  };
+
+  const takenDates = new Set(rows.map(r => r.scheduled_date));
+  const days = nextNScheduleDays(14);
+
+  return (
+    <div className="engine-schedule" ref={wrapRef} style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+        {rows.map(r => (
+          <span key={r.id} className="engine-badge engine-badge--endurance" style={{ gap: 6 }}>
+            <Calendar size={11} /> {formatScheduleChip(r.scheduled_date)}
+            <button
+              type="button"
+              onClick={() => remove(r.id)}
+              aria-label="Remove from calendar"
+              style={{ background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer', color: 'inherit', display: 'inline-flex' }}
+            >
+              <X size={11} />
+            </button>
+          </span>
+        ))}
+        <button
+          type="button"
+          className="engine-btn engine-btn-secondary engine-btn-sm"
+          onClick={() => setPickerOpen(o => !o)}
+        >
+          <Calendar size={14} /> Add to calendar
+        </button>
+      </div>
+      {error && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>{error}</div>}
+      {pickerOpen && (
+        <div className="day-schedule-quickpick" style={{ position: 'absolute', zIndex: 20, marginTop: 4 }}>
+          {days.map(d => {
+            const taken = takenDates.has(d.key);
+            return (
+              <button
+                key={d.key}
+                type="button"
+                className="day-schedule-qp-item"
+                disabled={taken}
+                onClick={() => add(d.key)}
+              >
+                <span>{d.label}</span>
+                {taken && <span className="day-schedule-qp-taken">scheduled</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
