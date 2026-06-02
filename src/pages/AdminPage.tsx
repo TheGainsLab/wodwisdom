@@ -6,6 +6,7 @@ import Nav from '../components/Nav';
 
 type Tab = 'overview' | 'engagement' | 'users';
 type SubscriberFilter = 'all' | 'subscribers' | 'non_subscribers';
+type CompetitionFilter = 'all' | 'linked' | 'not_linked';
 
 // ── Shared Components ──
 
@@ -71,6 +72,8 @@ export default function AdminPage({ session }: { session: Session }) {
   const [users, setUsers] = useState<any[]>([]);
   const [userSearch, setUserSearch] = useState('');
   const [subscriberFilter, setSubscriberFilter] = useState<SubscriberFilter>('all');
+  const [competitionFilter, setCompetitionFilter] = useState<CompetitionFilter>('all');
+  const [dupNamesOnly, setDupNamesOnly] = useState(false);
 
   useEffect(() => {
     supabase.from('profiles').select('role').eq('id', session.user.id).single()
@@ -138,10 +141,28 @@ export default function AdminPage({ session }: { session: Session }) {
     );
   }
 
+  // How many accounts share each display name (normalized) — the fingerprint of
+  // spam signups (one name across many emails). Only names held by 2+ accounts
+  // land in the map; a lookup miss means "unique name".
+  const nameCounts = new Map<string, number>();
+  for (const u of users) {
+    const key = (u.full_name || '').trim().toLowerCase();
+    if (!key) continue;
+    nameCounts.set(key, (nameCounts.get(key) ?? 0) + 1);
+  }
+  const dupCountFor = (u: any): number => {
+    const key = (u.full_name || '').trim().toLowerCase();
+    if (!key) return 0;
+    return nameCounts.get(key) ?? 0;
+  };
+
   // Filtered users
   const filteredUsers = users.filter(u => {
     if (subscriberFilter === 'subscribers' && !u.is_paid_subscriber) return false;
     if (subscriberFilter === 'non_subscribers' && u.is_paid_subscriber) return false;
+    if (competitionFilter === 'linked' && !u.competition_linked) return false;
+    if (competitionFilter === 'not_linked' && u.competition_linked) return false;
+    if (dupNamesOnly && dupCountFor(u) < 2) return false;
     if (userSearch) {
       const q = userSearch.toLowerCase();
       if (
@@ -331,9 +352,46 @@ export default function AdminPage({ session }: { session: Session }) {
                   ))}
                 </div>
 
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
-                  {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}
+                {/* Competition linkage filter */}
+                <div className="source-toggle" style={{ marginBottom: 12 }}>
+                  {([
+                    ['all', 'All'],
+                    ['linked', 'Competition linked'],
+                    ['not_linked', 'Not linked'],
+                  ] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      className={'source-btn ' + (competitionFilter === key ? 'active' : '')}
+                      onClick={() => setCompetitionFilter(key)}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
+
+                {/* Abuse signal: isolate accounts sharing a display name. */}
+                <div className="source-toggle" style={{ marginBottom: 12 }}>
+                  <button
+                    className={'source-btn ' + (dupNamesOnly ? 'active' : '')}
+                    onClick={() => setDupNamesOnly(v => !v)}
+                  >
+                    {dupNamesOnly ? '✓ ' : ''}Duplicate names only
+                  </button>
+                </div>
+
+                {(() => {
+                  const confirmed = filteredUsers.filter(u => u.email_confirmed).length;
+                  const unconfirmed = filteredUsers.length - confirmed;
+                  return (
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+                      {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}
+                      {' · '}
+                      {confirmed} confirmed, {unconfirmed} unconfirmed
+                      {' · '}
+                      {users.filter(u => u.competition_linked).length} of {users.length} competition-linked
+                    </div>
+                  );
+                })()}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {filteredUsers.map(u => (
@@ -380,6 +438,30 @@ export default function AdminPage({ session }: { session: Session }) {
                             />
                           );
                         })()}
+                        {dupCountFor(u) >= 2 && (
+                          <span
+                            title={`${dupCountFor(u)} accounts share the name "${u.full_name}"`}
+                            style={{ fontSize: 10, fontWeight: 700, color: '#e74c3c', background: '#e74c3c20', padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap' }}
+                          >
+                            ⚠ {dupCountFor(u)}× name
+                          </span>
+                        )}
+                        {!u.email_confirmed && (
+                          <span
+                            title="Email never confirmed"
+                            style={{ fontSize: 10, fontWeight: 600, color: '#f1c40f', background: '#f1c40f20', padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap' }}
+                          >
+                            unconfirmed
+                          </span>
+                        )}
+                        {u.competition_linked && (
+                          <span
+                            title={u.competition_athlete_label ? `Competition linked: ${u.competition_athlete_label}` : 'Competition linked'}
+                            style={{ fontSize: 10, fontWeight: 600, color: '#2ec486', background: '#2ec48620', padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}
+                          >
+                            🔗 {u.competition_athlete_label || 'Linked'}
+                          </span>
+                        )}
                         {u.role === 'admin' && (
                           <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: 'var(--accent)', background: 'var(--accent-glow)', padding: '2px 8px', borderRadius: 4 }}>Admin</span>
                         )}
