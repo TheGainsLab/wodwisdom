@@ -74,6 +74,7 @@ export default function AdminPage({ session }: { session: Session }) {
   const [subscriberFilter, setSubscriberFilter] = useState<SubscriberFilter>('all');
   const [competitionFilter, setCompetitionFilter] = useState<CompetitionFilter>('all');
   const [dupNamesOnly, setDupNamesOnly] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     supabase.from('profiles').select('role').eq('id', session.user.id).single()
@@ -154,6 +155,57 @@ export default function AdminPage({ session }: { session: Session }) {
     const key = (u.full_name || '').trim().toLowerCase();
     if (!key) return 0;
     return nameCounts.get(key) ?? 0;
+  };
+
+  // Bulk-delete is reserved for unmistakable spam clusters: a display name
+  // shared by this many+ zero-activity accounts. Small name collisions (e.g.
+  // two real new users both named "Mike Johnson") never qualify — handle those
+  // individually if ever needed.
+  const SPAM_CLUSTER_MIN = 10;
+
+  // Client-side preview of what the server will accept for deletion: a large
+  // name cluster AND zero activity, never active, not paid, not admin. The edge
+  // function re-checks the activity/paid/admin rails authoritatively — this is
+  // just to size the button + confirm dialog (the cluster-size gate is
+  // client-side, since the server gets only the ids the UI chooses to send).
+  const isEligibleForDelete = (u: any): boolean =>
+    dupCountFor(u) >= SPAM_CLUSTER_MIN &&
+    u.role !== 'admin' &&
+    !u.is_paid_subscriber &&
+    !u.last_active &&
+    Number(u.question_count ?? 0) === 0 &&
+    Number(u.engine_sessions_count ?? 0) === 0 &&
+    Number(u.nutrition_days_logged ?? 0) === 0 &&
+    Number(u.workouts_logged ?? 0) === 0 &&
+    Number(u.programs_count ?? 0) === 0;
+
+  const deleteEligibleInView = async () => {
+    const targets = filteredUsers.filter(isEligibleForDelete).map(u => u.id);
+    if (targets.length === 0) return;
+    const ok = window.confirm(
+      `Permanently delete ${targets.length} zero-activity account${targets.length === 1 ? '' : 's'} in the current view?\n\n` +
+      `Only accounts with NO activity, no paid subscription, and not admins will be removed (the server re-checks). This cannot be undone.`,
+    );
+    if (!ok) return;
+    setDeleting(true);
+    setError('');
+    let deleted = 0, skipped = 0, failed = 0;
+    try {
+      for (let i = 0; i < targets.length; i += 100) {
+        const chunk = targets.slice(i, i + 100);
+        const { data, error } = await supabase.functions.invoke('admin-delete-users', { body: { ids: chunk } });
+        if (error) throw new Error(error.message);
+        if (data?.error) throw new Error(data.error);
+        deleted += (data?.deleted?.length ?? 0);
+        skipped += (data?.skipped?.length ?? 0);
+        failed += (data?.failed?.length ?? 0);
+      }
+      await loadTab('users');
+      alert(`Done. Deleted ${deleted}, skipped ${skipped}, failed ${failed}.`);
+    } catch (e: any) {
+      setError(`Delete failed: ${e.message}`);
+    }
+    setDeleting(false);
   };
 
   // Filtered users
@@ -389,6 +441,34 @@ export default function AdminPage({ session }: { session: Session }) {
                       {confirmed} confirmed, {unconfirmed} unconfirmed
                       {' · '}
                       {users.filter(u => u.competition_linked).length} of {users.length} competition-linked
+                    </div>
+                  );
+                })()}
+
+                {/* Danger zone — only when the duplicate-names filter is on, so
+                    bulk-delete is never one click away during normal browsing. */}
+                {dupNamesOnly && (() => {
+                  const eligible = filteredUsers.filter(isEligibleForDelete).length;
+                  return (
+                    <div style={{ marginBottom: 12, padding: 12, border: '1px solid #e74c3c', background: '#e74c3c14', borderRadius: 8 }}>
+                      <div style={{ fontSize: 12, color: 'var(--text)', marginBottom: 8 }}>
+                        {eligible} of {filteredUsers.length} in view are eligible to delete
+                        {' '}(name shared by {SPAM_CLUSTER_MIN}+ accounts · zero activity · not paid · not admin).
+                        {' '}Other accounts are protected.
+                      </div>
+                      <button
+                        onClick={deleteEligibleInView}
+                        disabled={deleting || eligible === 0}
+                        style={{
+                          fontSize: 13, fontWeight: 600, padding: '8px 16px', borderRadius: 6,
+                          border: 'none', cursor: deleting || eligible === 0 ? 'default' : 'pointer',
+                          background: eligible === 0 ? 'var(--surface)' : '#e74c3c',
+                          color: eligible === 0 ? 'var(--text-muted)' : '#fff',
+                          opacity: deleting ? 0.6 : 1,
+                        }}
+                      >
+                        {deleting ? 'Deleting…' : `Delete ${eligible} zero-activity account${eligible === 1 ? '' : 's'}`}
+                      </button>
                     </div>
                   );
                 })()}

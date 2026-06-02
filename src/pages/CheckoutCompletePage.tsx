@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import GainsLogo from '../components/GainsLogo';
+import TurnstileWidget, { TURNSTILE_ENABLED } from '../components/TurnstileWidget';
 
 const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
 const SESSION_INFO_ENDPOINT = SUPABASE_BASE + '/functions/v1/checkout-session-info';
@@ -23,6 +24,8 @@ export default function CheckoutCompletePage() {
   const [signupError, setSignupError] = useState('');
   const [signupLoading, setSignupLoading] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -64,13 +67,14 @@ export default function CheckoutCompletePage() {
     if (!password) { setSignupError('Password is required'); return; }
     if (password.length < 6) { setSignupError('Password must be at least 6 characters'); return; }
     if (password !== confirmPassword) { setSignupError('Passwords do not match'); return; }
+    if (TURNSTILE_ENABLED && !captchaToken) { setSignupError('Please complete the verification below.'); return; }
 
     setSignupLoading(true);
     try {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: fullName } },
+        options: { data: { full_name: fullName }, captchaToken },
       });
       if (error) throw error;
       setSignupSuccess(true);
@@ -78,6 +82,8 @@ export default function CheckoutCompletePage() {
       setSignupError(err.message || 'Failed to create account');
     } finally {
       setSignupLoading(false);
+      setCaptchaToken('');
+      setCaptchaResetKey(k => k + 1);
     }
   };
 
@@ -159,6 +165,8 @@ export default function CheckoutCompletePage() {
           </div>
 
           {signupError && <div className="auth-error" style={{ display: 'block' }}>{signupError}</div>}
+
+          <TurnstileWidget onToken={setCaptchaToken} onExpire={() => setCaptchaToken('')} resetKey={captchaResetKey} />
 
           <button className="auth-btn" onClick={handleSignup} disabled={signupLoading} style={{ marginTop: 4 }}>
             {signupLoading ? 'Creating account...' : 'Create Account'}

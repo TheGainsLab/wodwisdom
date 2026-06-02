@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import TurnstileWidget, { TURNSTILE_ENABLED } from '../components/TurnstileWidget';
 
 export default function AuthPage() {
   const [searchParams] = useSearchParams();
@@ -17,12 +18,23 @@ export default function AuthPage() {
   const [resetSent, setResetSent] = useState(false);
   const [confirmSent, setConfirmSent] = useState(false);
   const [showResend, setShowResend] = useState(false);
+  // Turnstile CAPTCHA token (single-use). Cleared + the widget reset after each
+  // auth call. captchaResetKey bumps to force a fresh challenge.
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
+  const resetCaptcha = () => { setCaptchaToken(''); setCaptchaResetKey(k => k + 1); };
+  const captchaMissing = () => {
+    if (TURNSTILE_ENABLED && !captchaToken) { setError('Please complete the verification below.'); setLoading(false); return true; }
+    return false;
+  };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) { setError('Enter your email'); return; }
     setLoading(true); setError('');
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    if (captchaMissing()) return;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin, captchaToken });
+    resetCaptcha();
     if (error) setError(error.message);
     else setResetSent(true);
     setLoading(false);
@@ -34,13 +46,14 @@ export default function AuthPage() {
     if (isSignUp && password !== confirmPassword) { setError('Passwords do not match'); return; }
     if (isSignUp && password.length < 6) { setError('Password must be at least 6 characters'); return; }
     setLoading(true); setError('');
+    if (captchaMissing()) return;
     try {
       if (isSignUp) {
         const redirectTo = window.location.origin + (nextUrl.startsWith('/') ? nextUrl : '/');
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: name }, emailRedirectTo: redirectTo },
+          options: { data: { full_name: name }, emailRedirectTo: redirectTo, captchaToken },
         });
         if (error) throw error;
         if (!data.session) {
@@ -50,7 +63,7 @@ export default function AuthPage() {
         }
         window.location.href = nextUrl;
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } });
         if (error) throw error;
         window.location.href = nextUrl;
       }
@@ -59,6 +72,8 @@ export default function AuthPage() {
       if (err.message?.toLowerCase().includes('email not confirmed')) {
         setShowResend(true);
       }
+    } finally {
+      resetCaptcha();
     }
     setLoading(false);
   };
@@ -80,7 +95,9 @@ export default function AuthPage() {
             onClick={async () => {
               setLoading(true);
               setError('');
-              const { error: resendErr } = await supabase.auth.resend({ type: 'signup', email });
+              if (captchaMissing()) return;
+              const { error: resendErr } = await supabase.auth.resend({ type: 'signup', email, options: { captchaToken } });
+              resetCaptcha();
               if (resendErr) setError(resendErr.message);
               else { setError('Confirmation email resent. Check your inbox and spam folder.'); setShowResend(false); }
               setLoading(false);
@@ -88,6 +105,9 @@ export default function AuthPage() {
           >
             {loading ? 'Sending...' : 'Resend confirmation email'}
           </button>
+        )}
+        {!resetSent && (
+          <TurnstileWidget onToken={setCaptchaToken} onExpire={() => setCaptchaToken('')} resetKey={captchaResetKey} />
         )}
         {forgotPassword ? (
           resetSent ? (
@@ -114,7 +134,9 @@ export default function AuthPage() {
               onClick={async () => {
                 setLoading(true);
                 setError('');
-                const { error } = await supabase.auth.resend({ type: 'signup', email });
+                if (captchaMissing()) return;
+                const { error } = await supabase.auth.resend({ type: 'signup', email, options: { captchaToken } });
+                resetCaptcha();
                 if (error) setError(error.message);
                 else setError('Confirmation email resent. Check your inbox and spam folder.');
                 setLoading(false);
