@@ -10,12 +10,13 @@
  *      Retried up to MAX_SKELETON_ATTEMPTS times with skeleton-audit
  *      violations fed back. Skeleton stored to program_jobs.skeleton_json
  *      as soon as it passes audits.
- *   4. callFullProgramWriter(payload, skeleton) — emit the full
- *      4-week movement-level program using the skeleton as planning
- *      context. (Hybrid step: still uses the v2 writer prompt for the
- *      movement-level fill. Per-week fill is a later iteration.)
- *      Recovery: programmatic patches first, then surgical block rewrites
- *      fed back.
+ *   4. fillAllWeeks(payload, skeleton) — fill the movement-level program
+ *      ONE WEEK PER CALL (4 calls), each given the full skeleton + that
+ *      week's structure + the already-generated prior weeks (so loads
+ *      progress across the cycle). Small/fast vs. a monolithic 4-week call
+ *      and individually auto-retried on transient failures, then assembled
+ *      into a WriterOutput (month_plan from the skeleton). Recovery:
+ *      programmatic patches first, then surgical block rewrites fed back.
  *   5. Safety review + regen loop (reuses v2's reviewSafety pipeline).
  *   6. Save to programs + program_workouts + program_blocks_v2 +
  *      program_movements_v2 with program_version='v3'.
@@ -36,8 +37,9 @@ import {
   type SkeletonOutput,
 } from "../_shared/v3-output-schema.ts";
 import {
-  buildEmitProgramTool,
+  buildEmitWeekTool,
   type WriterOutput,
+  type WeekPrescription,
 } from "../_shared/v2-output-schema.ts";
 import {
   runSkeletonAudits,
@@ -172,82 +174,134 @@ export async function callSkeletonWriter(
   return toolUse.input as SkeletonOutput;
 }
 
+const MAX_WEEK_FILL_ATTEMPTS = 3;
+
 /**
- * Call the full-program writer with the skeleton as planning context.
- * Hybrid step — reuses the v2 writer prompt + tool but injects the
- * skeleton into the user message so movement-level decisions are
- * constrained by the structural decisions already made.
- *
- * Per-week fill is a later iteration; for now one call fills the whole
- * cycle using the skeleton as a strong-suggestion overlay.
+ * Fill ONE week of the program. Reuses the v2 writer prompt + an emit_week
+ * tool, with the full skeleton as context, the specific week to fill, and the
+ * already-generated prior weeks (so loads/volume progress across the cycle
+ * instead of repeating). Small + fast vs. the old monolithic 4-week call, and
+ * auto-retries transient failures (timeout / 5xx / 429) so a single slow call
+ * doesn't fail the whole job.
  */
-async function callFullProgramWriter(
+async function callWeekFill(
   payload: WriterPayload,
   skeleton: SkeletonOutput,
-  retryViolations: string,
-): Promise<WriterOutput> {
+  weekNum: number,
+  priorWeeks: WeekPrescription[],
+  extraContext: string,
+): Promise<WeekPrescription> {
   if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
   const daysPerWeek = payload.training_context.days_per_week;
   const units = payload.basics.units ?? "lbs";
+  const weekSkeleton = skeleton.weeks.find((w) => w.week_num === weekNum) ?? null;
 
   const ruleRecap = [
     "=== KEY RULES (re-check before emit) ===",
-    `- Output exactly 4 weeks × ${daysPerWeek} days. day_num is 1..${daysPerWeek}.`,
+    `- Emit EXACTLY week ${weekNum}: week_num=${weekNum} with ${daysPerWeek} days (day_num 1..${daysPerWeek}).`,
     `- All weights in ${units}.`,
-    "- Honor the STRUCTURAL SKELETON below: each day's block_types, primary_lift, strength_scheme, metcon_focus, skill_focus are already decided. Your job is to fill in the movement-level prescriptions.",
+    "- Honor THIS WEEK's skeleton: each day's block_types, primary_lift, strength_scheme, metcon_focus, skill_focus are already decided. Fill in movement-level prescriptions only.",
     "- Prescribed barbell weight ≤ athlete's 1RM for that lift, unless block_scheme/notes mention a 1RM attempt.",
     "- At most one metcon block per day. Every metcon block must declare a block_scheme.",
-    "- Every movement in strength / accessory / metcon / skills blocks must populate at least one of {sets, reps, weight, time_seconds, distance} > 0 — even when block_scheme already conveys the work pattern.",
+    "- Every movement in strength / accessory / metcon / skills blocks must populate at least one of {sets, reps, weight, time_seconds, distance} > 0.",
     "- Read injuries_constraints_text + injuries_structured.do_not_program. Substitute or scale any contraindicated movement.",
+    priorWeeks.length > 0
+      ? `- PROGRESS from the prior weeks below per the month_plan's arc (add load/volume, advance schemes) — do NOT copy them verbatim.`
+      : `- This is week 1 — set the cycle's opening baseline.`,
   ].join("\n");
 
-  const skeletonBlock = `STRUCTURAL SKELETON (already decided — use as planning constraint):\n${JSON.stringify(skeleton, null, 2)}`;
+  const thisWeekBlock = `THIS WEEK TO FILL (week ${weekNum} skeleton):\n${JSON.stringify(weekSkeleton, null, 2)}`;
+  const arcBlock = `FULL 4-WEEK SKELETON (context — the whole arc + month_plan was already decided):\n${JSON.stringify(skeleton, null, 2)}`;
+  const priorBlock = priorWeeks.length > 0
+    ? `ALREADY-GENERATED PRIOR WEEKS (progress from these):\n${JSON.stringify(priorWeeks, null, 2)}`
+    : "No prior weeks (this is week 1).";
   const payloadBlock = `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(payload, null, 2)}`;
-  const baseMessage = `${skeletonBlock}\n\n${payloadBlock}\n\n${ruleRecap}`;
-  const userMessage = retryViolations ? `${retryViolations}\n\n---\n\n${baseMessage}` : baseMessage;
+  const baseMessage = `${thisWeekBlock}\n\n${priorBlock}\n\n${arcBlock}\n\n${payloadBlock}\n\n${ruleRecap}`;
+  const userMessage = extraContext ? `${extraContext}\n\n---\n\n${baseMessage}` : baseMessage;
 
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 32000,
-      stream: false,
-      system: V2_GENERATE_PROGRAM_SYSTEM_PROMPT,
-      tools: [buildEmitProgramTool(
-        daysPerWeek,
-        units,
-        payload.training_context.session_length_minutes,
-      )],
-      tool_choice: { type: "tool", name: "emit_program" },
-      messages: [{ role: "user", content: userMessage }],
-    }),
-    signal: AbortSignal.timeout(180_000),
-  });
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= MAX_WEEK_FILL_ATTEMPTS; attempt++) {
+    try {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 16000,
+          stream: false,
+          system: V2_GENERATE_PROGRAM_SYSTEM_PROMPT,
+          tools: [buildEmitWeekTool(daysPerWeek, units, payload.training_context.session_length_minutes)],
+          tool_choice: { type: "tool", name: "emit_week" },
+          messages: [{ role: "user", content: userMessage }],
+        }),
+        signal: AbortSignal.timeout(100_000),
+      });
 
-  if (!resp.ok) {
-    const body = await resp.text().catch(() => "");
-    throw new Error(`Claude HTTP ${resp.status}: ${body.slice(0, 500)}`);
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => "");
+        // Retry transient server-side / rate-limit failures.
+        if ((resp.status >= 500 || resp.status === 429) && attempt < MAX_WEEK_FILL_ATTEMPTS) {
+          lastErr = new Error(`Claude HTTP ${resp.status}`);
+          console.warn(`[generate-program-v3 fill week ${weekNum}] HTTP ${resp.status}; retry ${attempt}/${MAX_WEEK_FILL_ATTEMPTS}`);
+          continue;
+        }
+        throw new Error(`Claude HTTP ${resp.status}: ${body.slice(0, 500)}`);
+      }
+
+      const data = (await resp.json()) as ClaudeResponse;
+      const toolUse = (data.content ?? []).find(
+        (b) => b.type === "tool_use" && b.name === "emit_week",
+      );
+      if (!toolUse || typeof toolUse.input !== "object" || toolUse.input == null) {
+        throw new Error(
+          `week ${weekNum}: missing emit_week tool_use. stop_reason=${data.stop_reason} content=${JSON.stringify(data.content).slice(0, 300)}`,
+        );
+      }
+      console.log(
+        `[generate-program-v3 fill week ${weekNum}] usage: input=${data.usage?.input_tokens} output=${data.usage?.output_tokens} stop_reason=${data.stop_reason}`,
+      );
+      const week = toolUse.input as WeekPrescription;
+      week.week_num = weekNum; // enforce regardless of what the model emitted
+      return week;
+    } catch (err) {
+      lastErr = err;
+      const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      const isTransient = err instanceof Error &&
+        (err.name === "TimeoutError" || /timed out|timeout|aborted/i.test(err.message));
+      if (isTransient && attempt < MAX_WEEK_FILL_ATTEMPTS) {
+        console.warn(`[generate-program-v3 fill week ${weekNum}] transient (${msg}); retry ${attempt}/${MAX_WEEK_FILL_ATTEMPTS}`);
+        continue;
+      }
+      throw err;
+    }
   }
+  throw lastErr ?? new Error(`week ${weekNum} fill failed`);
+}
 
-  const data = (await resp.json()) as ClaudeResponse;
-  const toolUse = (data.content ?? []).find(
-    (b) => b.type === "tool_use" && b.name === "emit_program",
-  );
-  if (!toolUse || typeof toolUse.input !== "object" || toolUse.input == null) {
-    throw new Error(
-      `Claude response missing emit_program tool_use. stop_reason=${data.stop_reason} content=${JSON.stringify(data.content).slice(0, 500)}`,
-    );
+/**
+ * Fill all 4 weeks sequentially (each progressing from the prior) and assemble
+ * into a WriterOutput. month_plan comes from the skeleton (it already decided
+ * the arc). extraContext is prepended to each week call (used by the safety
+ * loop to pass violation feedback).
+ */
+async function fillAllWeeks(
+  payload: WriterPayload,
+  skeleton: SkeletonOutput,
+  setStage: SetStage = NO_STAGE,
+  extraContext = "",
+): Promise<WriterOutput> {
+  const weeks: WeekPrescription[] = [];
+  for (let wn = 1; wn <= 4; wn++) {
+    await setStage(`fill_week_${wn}`);
+    const wk = await callWeekFill(payload, skeleton, wn, weeks, extraContext);
+    weeks.push(wk);
   }
-  console.log(
-    `[generate-program-v3 fill] Claude usage: input=${data.usage?.input_tokens} output=${data.usage?.output_tokens} stop_reason=${data.stop_reason}`,
-  );
-  return toolUse.input as WriterOutput;
+  return { month_plan: skeleton.month_plan, weeks };
 }
 
 // ============================================================
@@ -463,9 +517,8 @@ async function generateProgramWithSkeleton(
   // monotonically — failures only shrink — so capping it just stops fixes
   // mid-stream). If any audit failures survive recovery, save the program
   // anyway and log them so operators can see what shipped imperfect.
-  console.log(`[generate-program-v3] writer attempt 1/1`);
-  await setStage("writer_attempt_1");
-  const output = await callFullProgramWriter(payload, skeleton, "");
+  console.log(`[generate-program-v3] filling 4 weeks (one call per week)`);
+  const output = await fillAllWeeks(payload, skeleton, setStage);
   await setStage("benchmarking");
   pendingFailures = [];
   await recomputeBenchmarks(output);
@@ -629,10 +682,10 @@ async function runSafetyLoop(
       "Read the injuries text carefully and substitute or scale any contraindicated movements.",
     ].join("\n");
 
-    // Re-call the writer with the original skeleton + safety violations as
-    // retry context. Skeleton's structural decisions are preserved; the
-    // writer only adjusts movement-level content to honor the constraint.
-    output = await callFullProgramWriter(payload, skeleton, safetyContext);
+    // Re-fill all weeks with the original skeleton + safety violations as
+    // context. Skeleton's structural decisions are preserved; the writer only
+    // adjusts movement-level content to honor the constraint.
+    output = await fillAllWeeks(payload, skeleton, setStage, safetyContext);
 
     // Re-run deterministic audits on the regen.
     const auditResult = runAudits({

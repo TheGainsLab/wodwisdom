@@ -360,6 +360,22 @@ export function buildEmitBlockTool(units: "lbs" | "kg", sessionLengthMinutes: nu
   };
 }
 
+/**
+ * Tool for the v3 PER-WEEK fill — emit a single week (week_num + days[]).
+ * Splitting the monolithic 4-week fill into one call per week keeps each call
+ * small + fast (well under the timeout) and individually retryable. Pair with
+ * `tool_choice: { type: "tool", name: "emit_week" }`. The assembled weeks become
+ * a WriterOutput (month_plan supplied from the skeleton).
+ */
+export function buildEmitWeekTool(daysPerWeek: number, units: "lbs" | "kg", sessionLengthMinutes: number | null) {
+  return {
+    name: "emit_week",
+    description:
+      "Emit ONE week of the structured program: week_num plus days[] (one entry per training day, day_num 1..N), each day with blocks[] from the canonical block_type enum and movements[] using display_name strings from the vocabulary. Fill ONLY the requested week, honoring that week's skeleton structure.",
+    input_schema: buildWeekSchema(daysPerWeek, units, sessionLengthMinutes),
+  };
+}
+
 export function buildEmitProgramTool(daysPerWeek: number, units: "lbs" | "kg", sessionLengthMinutes: number | null) {
   return {
     name: "emit_program",
