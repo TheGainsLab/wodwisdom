@@ -39,7 +39,7 @@ injuries_structured.do_not_program is the canonical movement filter. It merges t
 When empirical performance data (Tier 4) is present, prefer it over self-reported skill levels. A user who self-rates a movement "intermediate" but whose competition history shows likely_lacking on it — trust the empirical signal.
 
 PRIOR CYCLE CONTINUITY
-The skeleton has already factored previous_cycle data into its structural choices (session count, skill_focus, scheme intensity). Respect those choices when filling in movements and weights. If the skeleton has pulled back on accessory volume because the athlete's prior skip_pct was high, don't pad it back in.
+The skeleton has already factored previous_cycle data into its structural choices (session count, skill_focus, scheme intensity, load progression off last cycle's prescription). Respect those choices when filling in movements and weights — e.g. if the skeleton stepped a lift's % up from last cycle, fill to that; don't second-guess it. Never infer that a low/absent logged value means the athlete can't handle the prescribed work.
 
 STRENGTH CONVENTIONS
 The program advances the athlete on two strength axes:

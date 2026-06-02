@@ -104,20 +104,31 @@ export interface CompetitionPayload {
 export interface PreviousCycleSummary {
   program_id: string;
   program_name: string | null;
-  program_created_at: string | null;
   last_completed_date: string | null;
-  workouts: {
-    prescribed: number;
-    completed: number;
-    completion_pct: number | null;
+  /** Whether the prior cycle had any completed logs to lean on. Informational
+   *  only — absence of logging is NEVER a penalty (a busy week / light logger
+   *  is not low capacity); we just progress off the prescription instead. */
+  logged: boolean;
+  /** Per-lift PRESCRIPTION from last cycle (the backbone — always present for a
+   *  v3 prior cycle; empty for a v1 prior program). logged_* are additive: null
+   *  when unlogged → progress normally, never cut. */
+  strength: Array<{
+    lift: string;                    // canonical key, e.g. "back_squat"
+    top_pct_1rm: number | null;      // heaviest % prescribed last cycle
+    top_weight: number | null;       // heaviest prescribed weight (lb)
+    sessions: number;                // # strength/accessory blocks it appeared in
+    logged_avg_rpe: number | null;   // null = unlogged
+    logged_hit_rate: number | null;  // % sets actual ≥ prescribed; null = unlogged
+  }>;
+  /** Metcon coverage from last cycle's prescribed time caps — to rebalance
+   *  time-domain spread this cycle. */
+  conditioning: {
+    metcons: number;
+    time_domains: { short: number; medium: number; long: number; untimed: number };
   };
-  movement_skip: {
-    total_entries: number;
-    skipped_entries: number;
-    skip_pct: number | null;
-  };
-  /** Map keyed by canonical skill key (e.g. "bar_muscle_ups").
-   *  Empty object when athlete didn't log any canonical skills last cycle. */
+  /** Map keyed by canonical skill key (e.g. "bar_muscle_ups"). Reps/holds the
+   *  athlete ACTUALLY logged — positive signal only; never used to regress a
+   *  skill (low/absent volume may just mean it wasn't logged). */
   skill_volume: Record<string, {
     total_reps: number;
     total_hold_seconds: number;
