@@ -127,6 +127,12 @@ export async function saveProgramV3(
       name: opts.name,
       program_version: "v3",
       month_plan: output.month_plan ?? null,
+      // AI-generated programs must be source='generated' so the programs list
+      // renders month expansion AND the auto-continuation paths (stripe-webhook
+      // + monthly-generation-cron both filter .eq("source","generated")) can
+      // find this program to drip the next month. Freelance ingestion overrides
+      // to 'external' below.
+      source: "generated",
     };
     if (opts.source === "external") {
       programRow.source = "external";
