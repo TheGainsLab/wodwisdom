@@ -667,9 +667,17 @@ async function runSafetyLoop(
 // processJob — full orchestration
 // ============================================================
 
-async function processJob(jobId: string, userId: string) {
+async function processJob(
+  jobId: string,
+  userId: string,
+  continuation: { programId: string | null; monthNumber: number },
+) {
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   const t0 = Date.now();
+  const isContinuation = continuation.programId != null;
+  if (isContinuation) {
+    console.log(`[generate-program-v3 worker] CONTINUATION month ${continuation.monthNumber} of program ${continuation.programId}`);
+  }
 
   const setStage: SetStage = async (stage: string) => {
     await supa
@@ -729,8 +737,14 @@ async function processJob(jobId: string, userId: string) {
     let programId: string | null = null;
     try {
       await setStage("saving");
-      programId = await saveProgramV3(supa, userId, output, { name: "AI Programmer (v3)", skeleton });
-      console.log(`[generate-program-v3 worker] persisted program ${programId}`);
+      programId = await saveProgramV3(supa, userId, output, {
+        name: "AI Programmer (v3)",
+        skeleton,
+        // Append to the existing program when continuing; new program otherwise.
+        programId: continuation.programId ?? undefined,
+        monthNumber: continuation.monthNumber,
+      });
+      console.log(`[generate-program-v3 worker] persisted program ${programId} (month ${continuation.monthNumber})`);
     } catch (saveErr) {
       console.error("[generate-program-v3 worker] save failed:", saveErr);
     }
@@ -815,42 +829,73 @@ Deno.serve(async (req) => {
     }
     const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authErr } = await supa.auth.getUser(token);
-    if (authErr || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
+
+    const jsonErr = (status: number, error: string, message?: string) =>
+      new Response(JSON.stringify({ error, ...(message ? { message } : {}) }), {
+        status,
         headers: { ...cors, "Content-Type": "application/json" },
       });
+
+    const body = await req.json().catch(() => ({}));
+    const reqProgramId: string | null = body?.program_id ?? null;
+    const reqMonthNumber: number | null =
+      typeof body?.month_number === "number" ? body.month_number : null;
+
+    // Auth: internal server-to-server (generate-next-month / webhook / cron pass
+    // x-webhook-user-id + the service-role key) OR a user JWT.
+    const webhookUserId = req.headers.get("x-webhook-user-id");
+    let userId: string;
+    if (webhookUserId && token === SUPABASE_SERVICE_KEY) {
+      userId = webhookUserId;
+    } else {
+      const { data: { user }, error: authErr } = await supa.auth.getUser(token);
+      if (authErr || !user) return jsonErr(401, "Unauthorized");
+      userId = user.id;
+      // Admin gate applies ONLY to first-cycle generation (Phase 1 admins-only).
+      // Continuation of an already-owned program is allowed for its owner.
+      if (!reqProgramId) {
+        const { data: adminProfile } = await supa
+          .from("profiles").select("role").eq("id", userId).maybeSingle();
+        if (adminProfile?.role !== "admin") {
+          return jsonErr(403, "Forbidden", "v3 is admin-only during Phase 1 testing.");
+        }
+      }
     }
 
-    // Admin gate — Phase 1 admins-only.
-    const { data: adminProfile } = await supa
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (adminProfile?.role !== "admin") {
-      return new Response(
-        JSON.stringify({ error: "Forbidden", message: "v3 is admin-only during Phase 1 testing." }),
-        { status: 403, headers: { ...cors, "Content-Type": "application/json" } },
-      );
+    // Continuation: validate ownership + that it's a v3 program; derive the
+    // month number from generated_months when the caller didn't specify one.
+    let monthNumber = reqMonthNumber ?? 1;
+    if (reqProgramId) {
+      const { data: prog } = await supa
+        .from("programs")
+        .select("id, generated_months, program_version")
+        .eq("id", reqProgramId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!prog) return jsonErr(404, "Program not found");
+      if (prog.program_version !== "v3") {
+        return jsonErr(400, "Bad Request", "Continuation requires a v3 program.");
+      }
+      if (reqMonthNumber == null) monthNumber = (prog.generated_months || 1) + 1;
+      if (monthNumber < 2) {
+        return jsonErr(400, "Bad Request", "Continuation month must be ≥ 2.");
+      }
     }
 
     const { data: job, error: jobErr } = await supa
       .from("program_jobs")
-      .insert({ user_id: user.id, status: "pending" })
+      .insert({ user_id: userId, status: "pending" })
       .select("id")
       .single();
     if (jobErr || !job) {
       console.error("[generate-program-v3] failed to create job:", jobErr);
-      return new Response(
-        JSON.stringify({ error: "Failed to start v3 program generation" }),
-        { status: 500, headers: { ...cors, "Content-Type": "application/json" } },
-      );
+      return jsonErr(500, "Failed to start v3 program generation");
     }
 
     // deno-lint-ignore no-explicit-any
-    (globalThis as any).EdgeRuntime?.waitUntil?.(processJob(job.id, user.id));
+    (globalThis as any).EdgeRuntime?.waitUntil?.(
+      processJob(job.id, userId, { programId: reqProgramId, monthNumber }),
+    );
 
     return new Response(
       JSON.stringify({ ok: true, job_id: job.id }),
