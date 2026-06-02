@@ -637,6 +637,39 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     }
   };
 
+  // TEMP (admin/v3 testing): invoke generate-program-v3 continuation directly
+  // (program_id only → the function derives month from generated_months) to
+  // verify the month-append path before generate-next-month is repointed at v3.
+  const handleGenerateNextMonthV3 = async () => {
+    if (!program || generatingNextMonth) return;
+    setGeneratingNextMonth(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-program-v3', {
+        body: { program_id: program.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.message || data.error);
+      const pollInterval = setInterval(async () => {
+        const { data: jobData } = await supabase.functions.invoke('program-job-status', {
+          body: { job_id: data.job_id },
+        });
+        if (jobData?.status === 'complete') {
+          clearInterval(pollInterval);
+          setGeneratingNextMonth(false);
+          loadProgram();
+        } else if (jobData?.status === 'failed') {
+          clearInterval(pollInterval);
+          setGeneratingNextMonth(false);
+          alert('v3 next month failed: ' + (jobData?.error || 'Unknown error'));
+        }
+      }, 5000);
+    } catch (err: any) {
+      console.error('Generate next month (v3) failed:', err);
+      setGeneratingNextMonth(false);
+      alert('Failed to start v3 generation: ' + (err?.message || 'unknown'));
+    }
+  };
+
   if (!id) return null;
 
   return (
@@ -934,14 +967,27 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           : 'Generate the next month to continue your program.'}
                       </div>
                     </div>
-                    <button
-                      className="auth-btn"
-                      disabled={generatingNextMonth}
-                      onClick={handleGenerateNextMonth}
-                      style={{ whiteSpace: 'nowrap', opacity: generatingNextMonth ? 0.6 : 1 }}
-                    >
-                      {generatingNextMonth ? 'Generating...' : `Generate Month ${(program.generated_months || 1) + 1}`}
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <button
+                        className="auth-btn"
+                        disabled={generatingNextMonth}
+                        onClick={handleGenerateNextMonth}
+                        style={{ whiteSpace: 'nowrap', opacity: generatingNextMonth ? 0.6 : 1 }}
+                      >
+                        {generatingNextMonth ? 'Generating...' : `Generate Month ${(program.generated_months || 1) + 1}`}
+                      </button>
+                      {program.program_version === 'v3' && (
+                        <button
+                          className="auth-btn"
+                          disabled={generatingNextMonth}
+                          onClick={handleGenerateNextMonthV3}
+                          title="TEMP admin test: append next month via generate-program-v3 (continuation)"
+                          style={{ whiteSpace: 'nowrap', opacity: generatingNextMonth ? 0.6 : 1, background: 'var(--surface)', border: '1px solid var(--accent)', color: 'var(--accent)' }}
+                        >
+                          {generatingNextMonth ? '…' : `v3 Month ${(program.generated_months || 1) + 1} (test)`}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
                 <div className="program-detail-actions" style={{ marginTop: 24 }}>
