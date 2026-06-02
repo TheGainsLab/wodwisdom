@@ -733,21 +733,18 @@ async function processJob(
     // SAFETY
     const { output, safety } = await runSafetyLoop(auditedOutput, payload, skeleton, setStage);
 
-    // SAVE
-    let programId: string | null = null;
-    try {
-      await setStage("saving");
-      programId = await saveProgramV3(supa, userId, output, {
-        name: "AI Programmer (v3)",
-        skeleton,
-        // Append to the existing program when continuing; new program otherwise.
-        programId: continuation.programId ?? undefined,
-        monthNumber: continuation.monthNumber,
-      });
-      console.log(`[generate-program-v3 worker] persisted program ${programId} (month ${continuation.monthNumber})`);
-    } catch (saveErr) {
-      console.error("[generate-program-v3 worker] save failed:", saveErr);
-    }
+    // SAVE — a save failure must FAIL the job (propagates to the outer catch →
+    // markFailed). Swallowing it would report "complete" with no program (the
+    // null-program_id bug that hid a broken continuation append).
+    await setStage("saving");
+    const programId = await saveProgramV3(supa, userId, output, {
+      name: "AI Programmer (v3)",
+      skeleton,
+      // Append to the existing program when continuing; new program otherwise.
+      programId: continuation.programId ?? undefined,
+      monthNumber: continuation.monthNumber,
+    });
+    console.log(`[generate-program-v3 worker] persisted program ${programId} (month ${continuation.monthNumber})`);
 
     // SOFT AUDITS — log-only safety-net checks. Run after save so a violation
     // doesn't block the user's program; we surface it to logs for visibility.

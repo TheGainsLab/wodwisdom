@@ -269,7 +269,7 @@ export async function saveProgramV3(
     // append → the new month number. Only ever raises.
     const { error: bumpErr } = await supa
       .from("programs")
-      .update({ generated_months: monthNumber, updated_at: new Date().toISOString() })
+      .update({ generated_months: monthNumber }) // NB: programs has no updated_at column
       .eq("id", programId)
       .lt("generated_months", monthNumber); // no-op if already at/ahead of this month
     if (bumpErr) {
