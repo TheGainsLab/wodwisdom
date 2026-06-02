@@ -19,17 +19,16 @@ let inflight: Promise<MovementVocabEntry[]> | null = null;
 function load(): Promise<MovementVocabEntry[]> {
   if (cache) return Promise.resolve(cache);
   if (!inflight) {
-    inflight = supabase
-      .from('movements')
-      .select('display_name, aliases')
-      .then(({ data }) => {
-        const rows = (data ?? []) as { display_name: string; aliases: string[] | null }[];
-        cache = rows.map((r) => ({
-          display_name: r.display_name,
-          search: [r.display_name, ...(r.aliases ?? [])].map((s) => s.toLowerCase()),
-        }));
-        return cache;
-      });
+    inflight = (async () => {
+      const { data } = await supabase.from('movements').select('display_name, aliases');
+      const rows = (data ?? []) as { display_name: string; aliases: string[] | null }[];
+      const entries = rows.map((r) => ({
+        display_name: r.display_name,
+        search: [r.display_name, ...(r.aliases ?? [])].map((s) => s.toLowerCase()),
+      }));
+      cache = entries;
+      return entries;
+    })();
   }
   return inflight;
 }

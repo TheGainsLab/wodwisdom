@@ -168,7 +168,7 @@ export default function SummaryPanel({
   // group by stage and show the top 3 within each (avg cohort percentile, ≥2
   // workouts for a read), in competition order.
   const topByStage = useMemo(() => {
-    const byStage = new Map<string, { name: string; avgPct: number; n: number }[]>();
+    const byStage = new Map<string, { name: string; avgPct: number; n: number; logged: boolean }[]>();
     for (const m of movementPerformance(history)) {
       for (const s of m.byStage) {
         if (s.n >= 2 && s.avgPct != null) {
