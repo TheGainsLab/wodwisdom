@@ -14,4 +14,4 @@
  *
  * After flipping, redeploy the three affected functions.
  */
-export const ATHLETEDATA_PUBLIC_TIER = false;
+export const ATHLETEDATA_PUBLIC_TIER = true;

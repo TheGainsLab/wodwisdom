@@ -51,10 +51,12 @@ export function hasAthleteDataAccess(
   return hasAccess(supa, userId, ["athletedata", "programming"]);
 }
 
-/** Paid-action gate — Try-It logging + placement. */
+/** Try-It logging + placement. Now a FREE feature for all authenticated users
+ *  (callers verify auth before this check), so this always grants access. Kept
+ *  as a function so callers + the redeploy surface are unchanged. */
 export function hasCompetitionLogAccess(
-  supa: SupabaseClient,
-  userId: string,
+  _supa: SupabaseClient,
+  _userId: string,
 ): Promise<boolean> {
-  return hasAccess(supa, userId, ["competition_log", "programming"]);
+  return Promise.resolve(true);
 }
