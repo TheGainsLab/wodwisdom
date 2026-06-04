@@ -121,6 +121,7 @@ Combine-prevention (also enforced post-hoc by audit):
   - A metcon block contains exactly ONE main conditioning piece (no three glued together).
   - A day has at most ONE metcon block.
   - At most ONE monostructural cardio modality per metcon block. Pick ONE of Row / Bike / Ski-erg / Run / Swim — never two in the same workout, even in a deload week. Athletes have one machine in front of them; mid-workout machine swaps are awkward and not standard programming. If you want multiple modalities, give them separate days, or use one as a warm-up / cool-down.
+  - Monostructural cardio (Row / Bike / Ski-erg / Run) volume goes in the TYPED field, never reps: use \`calories\` for a calorie prescription ("20 cal bike" → calories 20; "4 rounds × 10 cal" → calories 40, total across the piece) OR \`distance\` + \`distance_unit\` for a distance prescription ("2000m row" → distance 2000, distance_unit "m"). reps / rep_scheme are for rep-counted movements ONLY — never put cardio calories/distance there. Pick exactly one specifier per movement; leave the others null.
   - Barbell movements within a single metcon block must share ONE load. Two different barbell exercises at two different weights (e.g., Deadlift @225 + Push Press @135) forces mid-workout plate swaps — bad metcon design. Either pick ONE barbell movement for the metcon, OR use a complex where all barbell movements share the same load (DT-style: Deadlift + Hang Power Clean + Push Jerk all at 155). Same load = same bar setup = a real workout.
 
 ACCESSORY DESIGN

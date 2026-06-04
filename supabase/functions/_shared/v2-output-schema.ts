@@ -213,6 +213,8 @@ function buildMovementSchema(units: "lbs" | "kg") {
       time_seconds: { type: "integer", minimum: 1, maximum: 7200 },
       distance: { type: "number", minimum: 0 },
       distance_unit: { type: "string", enum: ["ft", "m"] },
+      calories: { type: "number", minimum: 0, description: "For calorie-based cardio (e.g. '30 cal row', '20 cal bike'). Use THIS field — never reps/rep_scheme — for Cal Row / Cal Bike / Cal Ski-erg. Total calories across the prescription (e.g. 4 rounds of 10 cal → 40)." },
+      cardio_modality: { type: "string", description: "Machine for a monostructural movement (e.g. an erg inside a metcon)." },
       scaling_note: { type: "string", maxLength: 500 },
       target_pct_1rm: {
         type: "number",

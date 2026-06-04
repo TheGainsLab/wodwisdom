@@ -48,7 +48,7 @@ RULES (honor every one):
 - Barbell movements within a metcon share ONE load (DT-style complex OK; mixed loads NOT OK).
 - Every movement in strength / accessory / metcon / skills must populate at least one of {sets, reps, rep_scheme, calories, weight, time_seconds, distance} > 0. rep_scheme (e.g. [21,15,9] or [15,15,15] or [10]) and calories (Cal Row / Cal Bike) are valid specifiers — do NOT strip them.
 - Movements use display-name strings from the vocabulary list in the user message.
-- Pick exactly ONE work specifier per movement: rep-counted → emit rep_scheme as the per-iteration breakdown ([21,15,9] for chipper, [15,15,15] for 3 RFT, [100] for single-pass, [10] for one AMRAP iteration); DO NOT set reps (code derives it from sum(rep_scheme)). distance-counted (Row, Run, Ski distance) → distance + distance_unit (reps and rep_scheme stay null). calorie-counted (Bike cal, Ski-erg cal) → emit rep_scheme per iteration with scaling_note: "Calories".
+- Pick exactly ONE work specifier per movement: rep-counted → emit rep_scheme as the per-iteration breakdown ([21,15,9] for chipper, [15,15,15] for 3 RFT, [100] for single-pass, [10] for one AMRAP iteration); DO NOT set reps (code derives it from sum(rep_scheme)). distance-counted (Row, Run, Ski distance) → distance + distance_unit (reps and rep_scheme stay null). calorie-counted (Cal Row, Cal Bike, Cal Ski-erg) → emit the calories field (total calories across the prescription, e.g. 4 rounds of 10 cal → 40) with reps AND rep_scheme null. NEVER encode calories as rep_scheme or scaling_note.
 
 Output ONLY the corrected block. Do NOT explain, do NOT apologize, do NOT emit anything outside the tool call.`;
 

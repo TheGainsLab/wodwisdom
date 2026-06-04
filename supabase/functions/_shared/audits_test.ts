@@ -13,6 +13,7 @@ import {
   auditStrengthOneLift,
   auditMetconOnePiece,
   auditRequiredFields,
+  auditDoNotProgram,
   auditDayCount,
   auditLoadSanity,
   auditVocabularyCompliance,
@@ -81,6 +82,38 @@ function baselineOutput(daysPerWeek = 3): WriterOutput {
     weeks,
   };
 }
+
+// ============================================================
+// Rule — do_not_program (injury safety)
+// ============================================================
+
+Deno.test("auditDoNotProgram: empty list → passes", () => {
+  const out = baselineOutput();
+  const r = auditDoNotProgram(out, []);
+  assert(r.passed);
+  assertEquals(r.violations.length, 0);
+});
+
+Deno.test("auditDoNotProgram: no banned movement present → passes", () => {
+  const out = baselineOutput(); // strength blocks of Back Squat
+  const r = auditDoNotProgram(out, ["Overhead Squat", "Snatch"]);
+  assert(r.passed);
+});
+
+Deno.test("auditDoNotProgram: banned movement programmed → fails with locator", () => {
+  const out = baselineOutput(); // contains Back Squat on every day
+  const r = auditDoNotProgram(out, ["Back Squat"]);
+  assert(!r.passed);
+  assert(r.violations.length > 0);
+  assert(r.violations[0].includes("Back Squat"));
+  assert(r.violations[0].includes("do-not-program"));
+});
+
+Deno.test("auditDoNotProgram: match is case/whitespace-insensitive", () => {
+  const out = baselineOutput();
+  const r = auditDoNotProgram(out, ["  back squat  "]);
+  assert(!r.passed, "normalized name should still match");
+});
 
 // ============================================================
 // Rule 1 — block_type enum

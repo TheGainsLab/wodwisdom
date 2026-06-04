@@ -60,6 +60,10 @@ interface StubOpts {
   profileError?: { message: string } | null;
   /** Step 27 carry-forward; tests default to null (no prior cycle). */
   previousCycle?: unknown;
+  /** Latest profile_evaluations.analysis; defaults to null (no evaluation). */
+  profileEval?: string | null;
+  /** Latest training_evaluations.analysis; defaults to null. */
+  trainingEval?: string | null;
 }
 
 function makeStubSupa(opts: StubOpts) {
@@ -77,18 +81,40 @@ function makeStubSupa(opts: StubOpts) {
       gt(_col: string, _val: unknown) {
         return builder;
       },
+      not(_col: string, _op: string, _val: unknown) {
+        return builder;
+      },
+      limit(_n: number) {
+        return builder;
+      },
       order(_col: string, _orderOpts?: unknown) {
-        // Movements terminal — thenable.
-        return Promise.resolve({
-          data: vocab.map((display_name) => ({ display_name })),
-          error: null,
-        });
+        // Movements terminal — thenable. Other tables keep chaining (their
+        // queries end in .limit(1).maybeSingle()).
+        if (table === "movements") {
+          return Promise.resolve({
+            data: vocab.map((display_name) => ({ display_name })),
+            error: null,
+          });
+        }
+        return builder;
       },
       maybeSingle() {
         if (table === "athlete_profiles") {
           return Promise.resolve({
             data: opts.profileRow,
             error: opts.profileError ?? null,
+          });
+        }
+        if (table === "profile_evaluations") {
+          return Promise.resolve({
+            data: opts.profileEval != null ? { analysis: opts.profileEval } : null,
+            error: null,
+          });
+        }
+        if (table === "training_evaluations") {
+          return Promise.resolve({
+            data: opts.trainingEval != null ? { analysis: opts.trainingEval } : null,
+            error: null,
           });
         }
         return Promise.resolve({ data: null, error: null });
@@ -173,7 +199,8 @@ for (const fixture of ALL_FIXTURES) {
       const supa = makeStubSupa({ profileRow: fixture.profileRow });
       const payload = await buildWriterPayload(supa, "test-user-id");
 
-      // 10 top-level keys per the locked contract (Step 27 added previous_cycle).
+      // 12 top-level keys per the locked contract (Step 27 added previous_cycle;
+      // eval-consumption added profile_evaluation + training_evaluation).
       assertEquals(
         Object.keys(payload).sort(),
         [
@@ -183,9 +210,11 @@ for (const fixture of ALL_FIXTURES) {
           "equipment",
           "lifts",
           "previous_cycle",
+          "profile_evaluation",
           "rag",
           "skills",
           "training_context",
+          "training_evaluation",
           "vocabulary",
         ],
       );
@@ -560,6 +589,73 @@ Deno.test("buildWriterPayload: skill level lowercases + validates against allowe
     assertEquals(payload.skills["Kipping Pull-Ups"], null);
     assertEquals(payload.skills["Muscle-Ups"], "none");
     assertEquals(payload.skills["Toes-to-Bar"], null);
+  } finally {
+    restoreFetch();
+  }
+});
+
+// ============================================================
+// Coaching evaluation consumption
+// ============================================================
+
+Deno.test("buildWriterPayload: no evaluations → profile_evaluation + training_evaluation null", async () => {
+  installFetchStub(null);
+  try {
+    const supa = makeStubSupa({ profileRow: FIXTURE_BEGINNER_FITNESS.profileRow });
+    const payload = await buildWriterPayload(supa, "u");
+    assertEquals(payload.profile_evaluation, null);
+    assertEquals(payload.training_evaluation, null);
+  } finally {
+    restoreFetch();
+  }
+});
+
+Deno.test("buildWriterPayload: without includeEvaluations, evals are NOT read (evaluator isolation)", async () => {
+  installFetchStub(null);
+  try {
+    const supa = makeStubSupa({
+      profileRow: FIXTURE_BEGINNER_FITNESS.profileRow,
+      profileEval: "PROFILE NARRATIVE",
+      trainingEval: "TRAINING NARRATIVE",
+    });
+    // Default opts (the profile-analysis-v2 evaluator path) must not ingest the
+    // latest evaluation — that would be circular. Even at month 2.
+    const payload = await buildWriterPayload(supa, "u", { monthNumber: 2 });
+    assertEquals(payload.profile_evaluation, null);
+    assertEquals(payload.training_evaluation, null);
+  } finally {
+    restoreFetch();
+  }
+});
+
+Deno.test("buildWriterPayload: month 1 reads profile eval but NOT training eval", async () => {
+  installFetchStub(null);
+  try {
+    const supa = makeStubSupa({
+      profileRow: FIXTURE_BEGINNER_FITNESS.profileRow,
+      profileEval: "PROFILE NARRATIVE",
+      trainingEval: "TRAINING NARRATIVE",
+    });
+    const payload = await buildWriterPayload(supa, "u", { includeEvaluations: true, monthNumber: 1 });
+    assertEquals(payload.profile_evaluation, "PROFILE NARRATIVE");
+    // Month 1 has no training history — training eval is never read.
+    assertEquals(payload.training_evaluation, null);
+  } finally {
+    restoreFetch();
+  }
+});
+
+Deno.test("buildWriterPayload: month 2 reads both profile + training evals", async () => {
+  installFetchStub(null);
+  try {
+    const supa = makeStubSupa({
+      profileRow: FIXTURE_BEGINNER_FITNESS.profileRow,
+      profileEval: "PROFILE NARRATIVE",
+      trainingEval: "TRAINING NARRATIVE",
+    });
+    const payload = await buildWriterPayload(supa, "u", { includeEvaluations: true, monthNumber: 2 });
+    assertEquals(payload.profile_evaluation, "PROFILE NARRATIVE");
+    assertEquals(payload.training_evaluation, "TRAINING NARRATIVE");
   } finally {
     restoreFetch();
   }

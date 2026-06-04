@@ -155,16 +155,22 @@ Deno.serve(async (req) => {
 
     const supa = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
     const token = authHeader.replace("Bearer ", "");
-    const {
-      data: { user },
-      error: authErr,
-    } = await supa.auth.getUser(token);
 
-    if (authErr || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+    // Auth: internal server-to-server (generate-next-month passes
+    // x-webhook-user-id + service key for continuation/migration) OR a user JWT.
+    const webhookUserId = req.headers.get("x-webhook-user-id");
+    let userId: string;
+    if (webhookUserId && token === SUPABASE_SERVICE_KEY) {
+      userId = webhookUserId;
+    } else {
+      const { data: { user }, error: authErr } = await supa.auth.getUser(token);
+      if (authErr || !user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+      userId = user.id;
     }
 
     // Parse optional month context from request body
@@ -184,19 +190,19 @@ Deno.serve(async (req) => {
       supa
         .from("athlete_profiles")
         .select("lifts, skills, conditioning, bodyweight, units, age, height, gender, tdee_override")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .maybeSingle(),
       supa
         .from("food_entries")
         .select("food_name, calories, protein, carbohydrate, fat, fiber, meal_type, number_of_units, serving_description, logged_at")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .gte("logged_at", sevenDaysAgo)
         .order("logged_at", { ascending: true }),
-      fetchAndFormatRecentHistory(supa, user.id, { days: 7, maxLines: 30 }),
+      fetchAndFormatRecentHistory(supa, userId, { days: 7, maxLines: 30 }),
       supa
         .from("profiles")
         .select("timezone")
-        .eq("id", user.id)
+        .eq("id", userId)
         .maybeSingle(),
     ]);
 
@@ -254,7 +260,7 @@ Deno.serve(async (req) => {
 
     // Save nutrition evaluation
     const evalRow: Record<string, unknown> = {
-      user_id: user.id,
+      user_id: userId,
       analysis,
       nutrition_snapshot: nutritionSnapshot,
       month_number: monthNumber,

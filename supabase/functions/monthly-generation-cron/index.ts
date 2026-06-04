@@ -88,11 +88,46 @@ Deno.serve(async (_req) => {
 
       if (!isQuarterly) continue; // Only process quarterly users; monthly handled by webhook
 
-      // Programming: check if due for next month
+      // Subscription-anchored entitlement math (shared by both branches).
+      // current_period_start + paid-invoice count is the source of truth — no
+      // reliance on any local timestamp (the programs table has no updated_at,
+      // which is exactly why the old `programs.updated_at` query silently
+      // errored and this branch never fired). Same model the Engine branch uses.
+      //   months_into_current_quarter = min(floor(days_since_period_start / 30) + 1, 3)
+      //   entitled_months = (paid_invoice_count - 1) * 3 + months_into_current_quarter
+      const periodStartSec = sub.current_period_start as number | undefined;
+      if (typeof periodStartSec !== "number") continue;
+
+      let paidInvoiceCount = 0;
+      try {
+        const invResp = await fetchWithTimeout(
+          `https://api.stripe.com/v1/invoices?customer=${profile.stripe_customer_id}&subscription=${sub.id}&status=paid&limit=100`,
+          { headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") } },
+          15_000
+        );
+        if (invResp.ok) {
+          const invData = await invResp.json();
+          paidInvoiceCount = (invData.data ?? []).length;
+        }
+      } catch {
+        continue; // skip on error
+      }
+      if (paidInvoiceCount === 0) continue;
+
+      const daysIntoPeriod = (Date.now() - periodStartSec * 1000) / (1000 * 60 * 60 * 24);
+      const monthsIntoCurrentQuarter = Math.min(Math.floor(daysIntoPeriod / 30) + 1, 3);
+      const entitledMonths = (paidInvoiceCount - 1) * 3 + monthsIntoCurrentQuarter;
+
+      // Programming: drip the next month when the program is behind entitlement.
+      // Only ONE month per run (drip, don't catch up in a burst) — the next
+      // daily run advances again if still behind. NB: no program_version filter —
+      // generate-next-month routes by version (v3 → append, v1/v2 → migrate to a
+      // new v3 program at the next month). So a not-yet-due v1 user is migrated
+      // to v3 exactly when they come due, with no early month.
       if (features.has("programming")) {
         const { data: programs } = await supa
           .from("programs")
-          .select("id, generated_months, updated_at")
+          .select("id, generated_months, program_version")
           .eq("user_id", userId)
           .eq("source", "generated")
           .order("created_at", { ascending: false })
@@ -100,16 +135,11 @@ Deno.serve(async (_req) => {
 
         if (programs && programs.length > 0) {
           const program = programs[0];
-          const lastUpdated = new Date(program.updated_at || program.created_at);
-          const daysSinceLastMonth = (Date.now() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
+          const generatedMonths = program.generated_months || 1;
 
-          // Check we haven't exceeded 3 months per quarter
-          // generated_months mod 3: if 0, we're at a quarter boundary (wait for payment)
-          const monthsInCurrentQuarter = ((program.generated_months || 1) - 1) % 3 + 1;
-
-          if (daysSinceLastMonth >= 30 && monthsInCurrentQuarter < 3) {
-            const nextMonth = (program.generated_months || 1) + 1;
-            results.push(`Programming: triggering month ${nextMonth} for user ${userId}`);
+          if (generatedMonths < entitledMonths) {
+            const nextMonth = generatedMonths + 1;
+            results.push(`Programming: triggering month ${nextMonth} for user ${userId} (entitled=${entitledMonths}, inv=${paidInvoiceCount}, into_quarter=${monthsIntoCurrentQuarter})`);
 
             try {
               await fetchWithTimeout(`${SUPABASE_URL}/functions/v1/generate-next-month`, {
@@ -128,19 +158,10 @@ Deno.serve(async (_req) => {
         }
       }
 
-      // Engine: compute entitled months from Stripe (current_period_start +
-      // paid-invoice count) and raise engine_months_unlocked if behind.
-      //
-      // Previous "30 days since last_at" trigger was fragile: any artificial
-      // last_at value (migration backfill, reconciler write, manual fix) could
-      // drift from the true subscription anchor and cause premature or missed
-      // unlocks. Stripe's period_start is the source of truth — fresh every run.
-      //
-      // Math: months_into_current_quarter = min(floor(days_since_period_start / 30) + 1, 3)
-      //       entitled = (paid_invoice_count - 1) * 3 + months_into_current_quarter
-      //       (capped at 36 to match the webhook ceiling)
-      //
-      // Only ever raises; never lowers — won't clobber an admin override.
+      // Engine: raise engine_months_unlocked from the shared entitlement math
+      // above (same current_period_start + paid-invoice anchor). Capped at 36 to
+      // match the webhook ceiling. Only ever raises; never lowers — won't
+      // clobber an admin override.
       if (features.has("engine")) {
         const { data: athleteProfile } = await supa
           .from("athlete_profiles")
@@ -149,30 +170,7 @@ Deno.serve(async (_req) => {
           .maybeSingle();
         const currentUnlocked = athleteProfile?.engine_months_unlocked ?? 0;
 
-        const periodStartSec = sub.current_period_start as number | undefined;
-        if (typeof periodStartSec !== "number") continue;
-
-        // Count paid invoices on this subscription. Each represents one
-        // quarterly purchase (3 months of access).
-        let paidInvoiceCount = 0;
-        try {
-          const invResp = await fetchWithTimeout(
-            `https://api.stripe.com/v1/invoices?customer=${profile.stripe_customer_id}&subscription=${sub.id}&status=paid&limit=100`,
-            { headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") } },
-            15_000
-          );
-          if (invResp.ok) {
-            const invData = await invResp.json();
-            paidInvoiceCount = (invData.data ?? []).length;
-          }
-        } catch {
-          continue; // skip on error
-        }
-        if (paidInvoiceCount === 0) continue;
-
-        const daysIntoPeriod = (Date.now() - periodStartSec * 1000) / (1000 * 60 * 60 * 24);
-        const monthsIntoCurrentQuarter = Math.min(Math.floor(daysIntoPeriod / 30) + 1, 3);
-        const entitled = Math.min((paidInvoiceCount - 1) * 3 + monthsIntoCurrentQuarter, 36);
+        const entitled = Math.min(entitledMonths, 36);
 
         if (entitled > currentUnlocked) {
           // Anchor last_at to when the most recent unlock SHOULD have happened

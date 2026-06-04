@@ -38,6 +38,12 @@ previous_cycle is the athlete's last completed cycle. Use it to PROGRESS from wh
 
 When previous_cycle is null, proceed on Tier 1–4 alone.
 
+COACH'S EVALUATIONS (when present)
+Two narrative evaluations may accompany the payload. They are a coach's synthesized judgment — weight them heavily; they interpret the raw Tier data and the athlete's trajectory in ways the numbers alone don't.
+  - profile_evaluation: the coach's fitness evaluation of this athlete (strengths, the biggest measurable weaknesses, what to prioritize). Present on every cycle. Let it steer which weaknesses you attack and how you bias the strength axes / skill priorities this cycle. When it conflicts with a self-reported field, trust the evaluation.
+  - training_evaluation: the coach's read of the athlete's RECENT training (continuation cycles only). Use it together with previous_cycle: previous_cycle is the structured prescription + logged actuals, training_evaluation is the narrative interpretation (fatigue, adherence quality, what's working). Same non-penalty rule as previous_cycle — a quiet log is never a reason to cut. Let it inform deload placement and where to push vs. ease.
+When an evaluation is absent (null), simply proceed on the structured data.
+
 STRENGTH AXES + OLY BALANCE LEVER
 The program advances the athlete on two strength axes:
   1. Powerlifting total — back squat + deadlift + bench press, BW-multiplier basis. Move toward the next bracket.
