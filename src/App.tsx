@@ -10,6 +10,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import AuthPage from './pages/AuthPage';
 import LandingPage from './pages/LandingPage';
 import ChatPage from './pages/ChatPage';
+import HomePage from './pages/HomePage';
 
 // Lazy-loaded — feature modules loaded on demand
 const HistoryPage = lazy(() => import('./pages/HistoryPage'));
@@ -146,7 +147,8 @@ function AuthenticatedApp({ session }: { session: Session }) {
       <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            <Route path="/" element={<ChatPage session={session} />} />
+            <Route path="/" element={<HomePage session={session} />} />
+            <Route path="/chat" element={<ChatPage session={session} />} />
             <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
             <Route path="/workout/start" element={<StartWorkoutPage session={session} />} />
             <Route path="/workout-analysis" element={<WorkoutAnalysisPage session={session} />} />

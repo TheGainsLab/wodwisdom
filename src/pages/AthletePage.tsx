@@ -8,6 +8,7 @@ import { getTierStatus, type AthleteProfileInput, type TierSection } from '../ut
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 import { formatMarkdown } from '../lib/formatMarkdown';
+import { ATHLETEDATA_PUBLIC_TIER } from '../lib/featureFlags';
 
 // ============================================================
 // Defensive shape normalizers for LLM-emitted v2 output.
@@ -43,6 +44,54 @@ function normalizeEvaluation(raw: unknown): SafeEvaluation {
     detailed_analysis: safeStr(r.detailed_analysis),
     recommendations: safeStrArr(r.recommendations),
   };
+}
+
+const EVAL_SECTION_LABEL: React.CSSProperties = {
+  fontWeight: 700,
+  fontSize: 12,
+  textTransform: 'uppercase',
+  letterSpacing: '.5px',
+  marginBottom: 6,
+};
+
+/** Shared structured-evaluation renderer (admin v2 panel + user eval history):
+ *  green strengths (bulleted), red weaknesses (numbered), synthesizing prose,
+ *  numbered recommendations. */
+function StructuredEvalView({ e }: { e: SafeEvaluation }) {
+  return (
+    <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+      {e.headline_takeaway && (
+        <div style={{ fontWeight: 700, marginBottom: 12 }}>{e.headline_takeaway}</div>
+      )}
+      {e.strengths.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ ...EVAL_SECTION_LABEL, color: '#2ec486' }}>Strengths</div>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {e.strengths.map((s, i) => <li key={i} style={{ marginBottom: 4 }}>{s}</li>)}
+          </ul>
+        </div>
+      )}
+      {e.weaknesses_and_priorities.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ ...EVAL_SECTION_LABEL, color: '#e5484d' }}>Weaknesses &amp; Priorities</div>
+          <ol style={{ margin: 0, paddingLeft: 18 }}>
+            {e.weaknesses_and_priorities.map((w, i) => <li key={i} style={{ marginBottom: 4 }}>{w}</li>)}
+          </ol>
+        </div>
+      )}
+      {e.detailed_analysis && (
+        <div style={{ marginBottom: 12, whiteSpace: 'pre-wrap' }}>{e.detailed_analysis}</div>
+      )}
+      {e.recommendations.length > 0 && (
+        <div>
+          <div style={{ ...EVAL_SECTION_LABEL, color: 'var(--accent)' }}>Recommendations</div>
+          <ol style={{ margin: 0, paddingLeft: 18 }}>
+            {e.recommendations.map((r, i) => <li key={i} style={{ marginBottom: 4 }}>{r}</li>)}
+          </ol>
+        </div>
+      )}
+    </div>
+  );
 }
 
 const LIFT_GROUPS = [
@@ -234,6 +283,9 @@ interface Evaluation {
   id: string;
   profile_snapshot: ProfileSnapshot;
   analysis: string | null;
+  /** v2 evals carry the structured 5-section object; v1 rows are null. When
+   *  present we render the structured UX instead of the flat markdown. */
+  structured_evaluation?: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -466,25 +518,10 @@ export default function AthletePage({ session }: { session: Session }) {
   const [error, setError] = useState('');
   const [isDirty, setIsDirty] = useState(true);
   const [isNewUser, setIsNewUser] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<{ kind: 'profile'; text: string; evaluationId?: string | null } | null>(null);
+  // Eval result is no longer read (v3 generation reads the eval from the DB; it
+  // used to feed v1's evaluation_id). Setter kept for the eval-complete flow.
+  const [, setAnalysisResult] = useState<{ kind: 'profile'; text: string; evaluationId?: string | null } | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState<'profile' | null>(null);
-  // Admin · Phase 1 v2 evaluation testing
-  const [generatingEvalV2, setGeneratingEvalV2] = useState(false);
-  const [v2Eval, setV2Eval] = useState<{
-    headline_takeaway: string;
-    strengths: string[];
-    weaknesses_and_priorities: string[];
-    detailed_analysis: string;
-    recommendations: string[];
-  } | null>(null);
-  const [v2EvalError, setV2EvalError] = useState('');
-  const [v2EvalElapsed, setV2EvalElapsed] = useState<number | null>(null);
-  const [v2EvalId, setV2EvalId] = useState<string | null>(null);
-  // v3 chained-generation admin state. Skeleton + raw program output were
-  // dropped at GA — admins navigate straight to the saved program on success.
-  const [generatingProgramV3, setGeneratingProgramV3] = useState(false);
-  const [v3ProgramError, setV3ProgramError] = useState('');
-  const [v3ProgramStage, setV3ProgramStage] = useState<string | null>(null);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
   const [tdeeOverride, setTdeeOverride] = useState<string>('');
@@ -521,7 +558,7 @@ export default function AthletePage({ session }: { session: Session }) {
       // must not appear as "ready" in the status card.
       supabase
         .from('profile_evaluations')
-        .select('id, profile_snapshot, analysis, created_at, month_number, visible')
+        .select('id, profile_snapshot, analysis, structured_evaluation, created_at, month_number, visible')
         .eq('user_id', session.user.id)
         .eq('visible', true)
         .eq('status', 'complete')
@@ -560,7 +597,7 @@ export default function AthletePage({ session }: { session: Session }) {
         .maybeSingle(),
       supabase
         .from('profile_evaluations')
-        .select('id, profile_snapshot, analysis, created_at, month_number, visible')
+        .select('id, profile_snapshot, analysis, structured_evaluation, created_at, month_number, visible')
         .eq('user_id', session.user.id)
         .eq('visible', true)
         .eq('status', 'complete')
@@ -702,83 +739,13 @@ export default function AthletePage({ session }: { session: Session }) {
     }
   };
 
-  // Admin Phase 1 — run profile-analysis v2 (synchronous edge fn,
-  // returns structured EvaluationOutput).
-  const handleGenerateEvalV2 = async () => {
-    setGeneratingEvalV2(true);
-    setV2Eval(null);
-    setV2EvalError('');
-    setV2EvalElapsed(null);
-    setV2EvalId(null);
-    try {
-      const { data, error: invErr } = await supabase.functions.invoke('profile-analysis-v2', { body: {} });
-      if (invErr) throw new Error(invErr.message || 'v2 eval failed');
-      if (data?.error) throw new Error(data.message || data.error);
-      if (!data?.ok || !data?.evaluation) throw new Error('v2 eval: unexpected response');
-      setV2Eval(normalizeEvaluation(data.evaluation));
-      setV2EvalId(data.evaluation_id ?? null);
-      setV2EvalElapsed(data.elapsed_ms ?? null);
-    } catch (err) {
-      setV2EvalError(err instanceof Error ? err.message : 'v2 eval failed');
-    } finally {
-      setGeneratingEvalV2(false);
-    }
-  };
-
-  // Kick off generate-program v3 (chained: skeleton -> audits -> fill ->
-  // safety -> save). Background job + poll; on completion, navigate to the
-  // saved program. Skeleton + raw program output are no longer surfaced
-  // inline — admins inspect the result via the program detail page.
-  const handleGenerateProgramV3 = async () => {
-    setGeneratingProgramV3(true);
-    setV3ProgramError('');
-    setV3ProgramStage(null);
-    try {
-      const { data: kickoff, error: kickErr } = await supabase.functions.invoke('generate-program-v3', { body: {} });
-      if (kickErr) throw new Error(kickErr.message || 'v3 kickoff failed');
-      if (kickoff?.error) throw new Error(kickoff.message || kickoff.error);
-      const jobId: string | null = kickoff?.job_id ?? null;
-      if (!jobId) throw new Error('v3 kickoff: no job_id returned');
-      setV3ProgramStage('pending');
-
-      let delay = 3000;
-      const maxAttempts = 80;
-      for (let i = 0; i < maxAttempts; i++) {
-        await new Promise((r) => setTimeout(r, delay));
-        const { data: status, error: statusErr } = await supabase.functions.invoke('program-job-status', {
-          body: { job_id: jobId },
-        });
-        if (statusErr) throw new Error(statusErr.message || 'v3 status check failed');
-        if (status?.error && status?.status !== 'failed') throw new Error(status.error);
-        setV3ProgramStage(status?.stage ?? status?.status ?? null);
-        if (status?.status === 'complete') {
-          if (status.program_id) {
-            navigate(`/programs/${status.program_id}`);
-            return;
-          }
-          throw new Error('v3 completed but no program_id returned');
-        }
-        if (status?.status === 'failed') {
-          throw new Error(status.error || 'v3 generation failed');
-        }
-        delay = Math.min(delay + 1000, 8000);
-      }
-      throw new Error('v3 generation timed out');
-    } catch (err) {
-      setV3ProgramError(err instanceof Error ? err.message : 'v3 program failed');
-    } finally {
-      setGeneratingProgramV3(false);
-      setV3ProgramStage(null);
-    }
-  };
-
   const handleGenerateProgram = async () => {
     setGenerateLoading(true);
     setError('');
     try {
       // Kick off background generation — returns immediately with job_id
-      const { data, error } = await supabase.functions.invoke('generate-program', {
-        body: analysisResult?.evaluationId ? { evaluation_id: analysisResult.evaluationId } : {},
+      const { data, error } = await supabase.functions.invoke('generate-program-v3', {
+        body: {},
       });
       if (error) throw new Error(error.message || 'Failed to generate program');
       if (data?.error) throw new Error(data.message || data.error || 'Failed to generate program');
@@ -1501,12 +1468,12 @@ export default function AthletePage({ session }: { session: Session }) {
                 {/* Tier 4 — competition history. Sits directly under the intake
                     tiers (1–3); the feature itself is the /athletedata route.
                     Phase B v1: admin only. */}
-                {isAdmin && (
+                {(isAdmin || ATHLETEDATA_PUBLIC_TIER) && (
                   <div className="settings-card" style={{ borderColor: competitionAthleteId ? '#2ec486' : undefined }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                       <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: competitionAthleteId ? '#2ec486' : 'var(--accent)' }}>Tier 4</span>
                       {competitionAthleteId && <span style={{ fontSize: 12, color: '#2ec486', fontWeight: 700 }}>Linked ✓</span>}
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· optional, admin only</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· optional</span>
                     </div>
                     <h2 className="settings-card-title" style={{ marginBottom: 2 }}>Competition History</h2>
                     <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
@@ -1522,140 +1489,6 @@ export default function AthletePage({ session }: { session: Session }) {
                     >
                       {competitionAthleteId ? 'View your competition history →' : 'Link your competition profile →'}
                     </button>
-                  </div>
-                )}
-
-                {/* Admin · Phase 1 v2 evaluation testing */}
-                {isAdmin && (
-                  <div className="settings-card" style={{ marginTop: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--text-muted)', marginBottom: 4 }}>
-                      Admin · Phase 1 v2 evaluation testing
-                    </div>
-                    <h2 className="settings-card-title" style={{ marginBottom: 8 }}>v2 Profile Evaluation</h2>
-                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
-                      Run the v2 evaluator (structured output via the shared payload). Phase 1 admins-only.
-                    </div>
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface2)', border: '1px solid var(--border)' }}
-                      onClick={handleGenerateEvalV2}
-                      disabled={generatingEvalV2}
-                    >
-                      {generatingEvalV2 ? 'Running v2…' : 'Run Eval (v2)'}
-                    </button>
-                    {v2EvalError && <div className="error-msg" style={{ marginTop: 12 }}>{v2EvalError}</div>}
-                    {v2Eval && (
-                      <div style={{ marginTop: 12 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--text-muted)', marginBottom: 6 }}>
-                          v2 result
-                          {v2EvalElapsed != null && <> · {(v2EvalElapsed / 1000).toFixed(1)}s</>}
-                          {v2EvalId && <> · id {v2EvalId.slice(0, 8)}…</>}
-                        </div>
-                        <div style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13 }}>
-                          <div style={{ fontWeight: 700, marginBottom: 8 }}>{v2Eval.headline_takeaway}</div>
-                          {v2Eval.strengths.length > 0 && (
-                            <div style={{ marginBottom: 10 }}>
-                              <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4, color: '#2ec486' }}>Strengths</div>
-                              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
-                                {v2Eval.strengths.map((s, i) => <li key={i}>{s}</li>)}
-                              </ul>
-                            </div>
-                          )}
-                          {v2Eval.weaknesses_and_priorities.length > 0 && (
-                            <div style={{ marginBottom: 10 }}>
-                              <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4, color: 'var(--accent)' }}>Weaknesses & Priorities</div>
-                              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
-                                {v2Eval.weaknesses_and_priorities.map((w, i) => <li key={i}>{w}</li>)}
-                              </ol>
-                            </div>
-                          )}
-                          <div style={{ marginBottom: 10, fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                            {v2Eval.detailed_analysis}
-                          </div>
-                          {v2Eval.recommendations.length > 0 && (
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4 }}>Recommendations</div>
-                              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
-                                {v2Eval.recommendations.map((r, i) => <li key={i}>{r}</li>)}
-                              </ol>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Admin · Phase 1 v3 chained-generation testing */}
-                {isAdmin && (
-                  <div className="settings-card" style={{ marginTop: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--text-muted)', marginBottom: 4 }}>
-                      Admin · Phase 1 v3 chained generation
-                    </div>
-                    <h2 className="settings-card-title" style={{ marginBottom: 8 }}>v3 Program Generator (chained)</h2>
-                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
-                      Chained pipeline: skeleton call → audits → fill call (with skeleton as planning context) → safety review → save. Phase 1 admins-only.
-                    </div>
-                    {!generatingProgramV3 ? (
-                      <button
-                        type="button"
-                        className="auth-btn"
-                        style={{ padding: '8px 16px', fontSize: 13, background: 'var(--surface2)', border: '1px solid var(--border)' }}
-                        onClick={handleGenerateProgramV3}
-                      >
-                        Generate (v3 — chained)
-                      </button>
-                    ) : (
-                      <div style={{
-                        padding: 14,
-                        background: 'var(--surface)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 8,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 6,
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div className="loading-pulse" style={{ width: 14, height: 14, flexShrink: 0 }} />
-                          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
-                            Generating your personalized program with AI
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                          This usually takes around 5 minutes. You can leave this page open — we'll take you to your program as soon as it's ready.
-                        </div>
-                        {v3ProgramStage && (() => {
-                          const labels: Record<string, string> = {
-                            pending: 'Queued…',
-                            starting: 'Starting…',
-                            payload_building: 'Reading your profile…',
-                            payload_built: 'Profile ready, planning skeleton…',
-                            skeleton_attempt_1: 'Drafting 4-week skeleton…',
-                            skeleton_attempt_2: 'Revising skeleton (attempt 2)…',
-                            skeleton_attempt_3: 'Revising skeleton (attempt 3)…',
-                            skeleton_auditing: 'Validating skeleton structure…',
-                            writer_attempt_1: 'Filling movement details…',
-                            writer_attempt_2: 'Revising fill (attempt 2)…',
-                            writer_attempt_3: 'Revising fill (attempt 3)…',
-                            auditing: 'Checking program structure…',
-                            safety_review: 'Safety review…',
-                            safety_regen_1: 'Adjusting for safety (1)…',
-                            safety_regen_2: 'Adjusting for safety (2)…',
-                            safety_regen_3: 'Adjusting for safety (3)…',
-                            saving: 'Saving…',
-                            processing: 'Working…',
-                          };
-                          const label = labels[v3ProgramStage] ?? `Stage: ${v3ProgramStage}`;
-                          return (
-                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                              {label}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-                    {v3ProgramError && <div className="error-msg" style={{ marginTop: 12 }}>{v3ProgramError}</div>}
                   </div>
                 )}
 
@@ -1819,6 +1652,7 @@ export default function AthletePage({ session }: { session: Session }) {
                                   if (!ev) return null;
                                   const label = kind === 'profile' ? 'Profile Evaluation' : kind === 'training' ? 'Training Review' : 'Nutrition Review';
                                   const isExpanded = expandedEvalId === ev.id;
+                                  const structured = kind === 'profile' ? (ev as Evaluation).structured_evaluation : null;
                                   return (
                                     <div key={ev.id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
                                       <button
@@ -1841,11 +1675,15 @@ export default function AthletePage({ session }: { session: Session }) {
                                         <span style={{ fontWeight: 600 }}>{label}</span>
                                         <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isExpanded ? '▲' : '▼'}</span>
                                       </button>
-                                      {isExpanded && ev.analysis && (
+                                      {isExpanded && (structured || ev.analysis) && (
                                         <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-                                          <div className="workout-review-section" style={{ marginTop: 0 }}>
-                                            <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.analysis) }} />
-                                          </div>
+                                          {structured ? (
+                                            <StructuredEvalView e={normalizeEvaluation(structured)} />
+                                          ) : (
+                                            <div className="workout-review-section" style={{ marginTop: 0 }}>
+                                              <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.analysis!) }} />
+                                            </div>
+                                          )}
                                         </div>
                                       )}
                                     </div>

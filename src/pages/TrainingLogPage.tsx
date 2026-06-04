@@ -1352,7 +1352,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
             {loading ? (
               <div className="page-loading"><div className="loading-pulse" /></div>
-            ) : logs.length === 0 && scheduled.length === 0 && engineSessions.length === 0 ? (
+            ) : view !== 'calendar' && logs.length === 0 && scheduled.length === 0 && engineSessions.length === 0 ? (
               <div className="workout-review-section" style={{ textAlign: 'center', padding: 40 }}>
                 <p style={{ color: 'var(--text-dim)', marginBottom: 20 }}>No workouts logged yet.</p>
                 <button className="auth-btn" onClick={() => navigate('/workout/start')} style={{ maxWidth: 200 }}>
@@ -1374,6 +1374,22 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   <span className="wc-legend-item"><span className="wc-legend-swatch wc-legend-swatch--scheduled" />Scheduled</span>
                   <span className="wc-legend-item"><span className="wc-legend-swatch wc-legend-swatch--today" />Today</span>
                 </div>
+
+                {/* Empty-calendar hint — when there's nothing logged or scheduled
+                    yet, guide the user to schedule (tap a date) or log a workout
+                    so they're not staring at a blank grid. */}
+                {logs.length === 0 && scheduled.length === 0 && engineSessions.length === 0 && (
+                  <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, marginTop: 16 }}>
+                    Tap any date from today onward to schedule a session — or{' '}
+                    <button
+                      type="button"
+                      onClick={() => navigate('/workout/start')}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', font: 'inherit', padding: 0, textDecoration: 'underline' }}
+                    >
+                      log a workout
+                    </button>.
+                  </p>
+                )}
 
                 {/* Day sheet — slides up over the calendar for any populated
                     date, plus today-forward empty dates so they can be scheduled.

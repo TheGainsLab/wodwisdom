@@ -7,6 +7,10 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJ
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 export const ANON_KEY = SUPABASE_ANON_KEY;
 
+// Dev-only: expose the client on window so admin one-offs (e.g. the
+// migrate-cohort-to-v3 dry-run) can be invoked from the browser console.
+if (import.meta.env.DEV) (window as unknown as { supabase: typeof supabase }).supabase = supabase;
+
 /** Returns fresh auth headers for fetch (e.g. streaming). Use supabase.functions.invoke() when possible. */
 export async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession();
