@@ -439,17 +439,28 @@ export default function CompetitionHistoryExperience({
               style={{ flex: '1 1 220px', minWidth: 0 }}
               disabled={searching}
             />
-            <select
-              className="lift-input"
-              value={searchDivision}
-              onChange={e => setSearchDivision(e.target.value as '' | 'men' | 'women')}
-              disabled={searching}
-              style={{ flex: '0 0 auto' }}
-            >
-              <option value="">All divisions</option>
-              <option value="men">Men</option>
-              <option value="women">Women</option>
-            </select>
+            <div style={{ display: 'flex', flex: '0 0 auto', gap: 4, padding: 3, borderRadius: 8, background: 'var(--surface2)' }}>
+              {([['', 'All'], ['men', 'Men'], ['women', 'Women']] as const).map(([val, label]) => (
+                <button
+                  key={val || 'all'}
+                  type="button"
+                  disabled={searching}
+                  onClick={() => setSearchDivision(val)}
+                  style={{
+                    padding: '7px 14px',
+                    fontSize: 13,
+                    borderRadius: 6,
+                    border: 'none',
+                    cursor: searching ? 'default' : 'pointer',
+                    background: searchDivision === val ? 'var(--accent)' : 'transparent',
+                    color: searchDivision === val ? '#fff' : 'var(--text-dim)',
+                    fontWeight: searchDivision === val ? 700 : 500,
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               className="auth-btn"
