@@ -48,16 +48,14 @@ async function redispatch(jobId: string, userId: string): Promise<void> {
   });
 }
 
-Deno.serve(async (req) => {
-  // Service-only. pg_cron passes the service key in the Authorization header.
-  const auth = req.headers.get("Authorization") ?? "";
-  if (auth.replace("Bearer ", "") !== SUPABASE_SERVICE_KEY) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
+Deno.serve(async (_req) => {
+  // No inbound auth check — matching monthly-generation-cron's deliberate
+  // pattern (see its header comment). Gating is verify_jwt=false + the function
+  // URL being unguessable; a custom bearer-check against the service/anon key
+  // silently 401's every pg_cron run because pg_cron's key doesn't match the
+  // function's env. The real safety guard is find_stale_program_jobs, which only
+  // ever returns jobs whose lease has already expired — a healthy job heartbeats
+  // and is invisible to the sweep, so even a stray call can't disrupt live work.
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
   const { data, error } = await supa.rpc("find_stale_program_jobs", {
