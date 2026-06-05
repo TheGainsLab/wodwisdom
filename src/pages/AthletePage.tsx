@@ -1399,7 +1399,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         />
                       </div>
                       <div className="lift-item">
-                        <span className="lift-label">Session length (min) <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11 }}>(30–120 min)</span></span>
+                        <span className="lift-label">Typical session length <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11 }}>(30–120 min)</span></span>
                         <input
                           className="lift-input"
                           type="number"
@@ -1420,11 +1420,15 @@ export default function AthletePage({ session }: { session: Session }) {
                       <textarea
                         className="lift-input"
                         rows={3}
+                        maxLength={500}
                         placeholder='e.g. "Prep for the Open next year, also want to add 20 lbs to my deadlift and drop my 5K under 22 min"'
                         value={goal}
                         onChange={e => { setGoal(e.target.value); markDirty(); }}
                         style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
                       />
+                      <div style={{ fontSize: 11, color: goal.length >= 500 ? '#e5484d' : 'var(--text-muted)', textAlign: 'right', marginTop: 4 }}>
+                        {goal.length} / 500
+                      </div>
                     </div>
 
                     <div style={{ marginBottom: 16 }}>

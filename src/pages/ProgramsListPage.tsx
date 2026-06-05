@@ -144,24 +144,43 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                 <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Calendar size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                   <span className="history-question">My Calendar</span>
-                  <span className="history-time" style={{ marginLeft: 'auto' }}>Schedule &amp; log your training</span>
+                  <span className="history-time" style={{ marginLeft: 'auto' }}>
+                    {programs.length === 0 && !hasEngine ? 'Generate a program to schedule training' : 'Schedule & log your training'}
+                  </span>
                 </div>
               </div>
             )}
 
-            {/* Analytics — progress dashboards (AI Programming only) */}
+            {/* Analytics — progress dashboards (AI Programming only). Locked until
+                there's a program to analyze; tapping the locked state routes to
+                the profile to generate. */}
             {(hasProgramming || isAdmin) && (
-              <div
-                className="history-item"
-                style={{ marginBottom: 16, cursor: 'pointer', borderLeft: '3px solid var(--accent)' }}
-                onClick={() => navigate('/training-log?view=analytics')}
-              >
-                <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <BarChart3 size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                  <span className="history-question">Analytics</span>
-                  <span className="history-time" style={{ marginLeft: 'auto' }}>Strength, metcons &amp; progress</span>
+              programs.length > 0 ? (
+                <div
+                  className="history-item"
+                  style={{ marginBottom: 16, cursor: 'pointer', borderLeft: '3px solid var(--accent)' }}
+                  onClick={() => navigate('/training-log?view=analytics')}
+                >
+                  <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <BarChart3 size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                    <span className="history-question">Analytics</span>
+                    <span className="history-time" style={{ marginLeft: 'auto' }}>Strength, metcons &amp; progress</span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div
+                  className="history-item"
+                  style={{ marginBottom: 16, cursor: 'pointer', borderLeft: '3px solid var(--border)', opacity: 0.6 }}
+                  onClick={() => navigate('/profile')}
+                  title="Create your program to unlock Analytics"
+                >
+                  <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <BarChart3 size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                    <span className="history-question" style={{ color: 'var(--text-dim)' }}>Analytics</span>
+                    <span className="history-time" style={{ marginLeft: 'auto' }}>Create your program to unlock</span>
+                  </div>
+                </div>
+              )
             )}
 
             {/* Engine card */}
@@ -309,9 +328,9 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                   </>
                 ) : (
                   <>
-                    <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Your profile is ready</p>
-                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 16 }}>Head to your profile to continue.</p>
-                    <button className="auth-btn" onClick={() => navigate('/profile')}>Go to Profile</button>
+                    <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Generate your program</p>
+                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 16 }}>Your profile and evaluation are ready.</p>
+                    <button className="auth-btn" onClick={() => navigate('/profile')}>Go to Profile →</button>
                   </>
                 )}
               </div>
