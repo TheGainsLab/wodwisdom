@@ -89,7 +89,7 @@ export default function HomePage({ session }: { session: Session }) {
   // ── Tiles. locked=true → dimmed + lock badge → routes to checkout for `plan`. ──
   const tiles: Array<{ key: string; label: string; sub: string; to: string; icon: React.ReactNode; locked: boolean; plan: string }> = [
     { key: 'coach', label: 'AI Coach', sub: 'Ask anything', to: '/chat', icon: <MessageSquare size={20} />, locked: false, plan: '' },
-    { key: 'training', label: 'Training', sub: 'Programs & calendar', to: '/programs', icon: <Dumbbell size={20} />, locked: !hasProgramming, plan: 'programming' },
+    { key: 'training', label: 'AI Program', sub: 'Programs & calendar', to: '/programs', icon: <Dumbbell size={20} />, locked: !hasProgramming, plan: 'programming' },
     { key: 'engine', label: 'Engine', sub: 'Year of the Engine', to: '/engine', icon: <Flame size={20} />, locked: !hasEngine, plan: 'engine' },
     { key: 'nutrition', label: 'Nutrition', sub: 'Log & track', to: '/nutrition', icon: <Apple size={20} />, locked: !hasNutrition, plan: 'nutrition' },
     { key: 'athletedata', label: 'Athlete Data', sub: 'Competition history', to: '/athletedata', icon: <Trophy size={20} />, locked: false, plan: '' },

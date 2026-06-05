@@ -735,6 +735,11 @@ export default function AthletePage({ session }: { session: Session }) {
             text: status.analysis,
             evaluationId,
           });
+          // A successful manual run consumed one eval credit server-side
+          // (consume_eval_credit). Reflect it locally so "Run New" hides for a
+          // free user instead of lingering and 403-ing on the next click.
+          // (Admins keep it — hasEvalCredit short-circuits on isAdmin.)
+          setEvalCreditsRemaining((c) => Math.max(0, c - 1));
           fetchEvaluations();
           return;
         }
@@ -1510,61 +1515,21 @@ export default function AthletePage({ session }: { session: Session }) {
                 )}
 
                 {(() => {
-                  // Credit gate. Free users get one manual eval (server-enforced
-                  // via consume_eval_credit). Admins bypass. Once exhausted, the
-                  // "Save & Run" button collapses back to plain "Save Profile".
-                  const hasEvalCredit = isAdmin || evalCreditsRemaining > 0;
-                  const willAnalyze = tierStatus.canRunEval && !hasGeneratedProgram && hasEvalCredit;
-                  const hasEvaluation = evaluations.length > 0;
-                  // Clean + eligible + no eval yet → show a direct "Run Free Evaluation" trigger
-                  // so users who saved earlier (before becoming eligible) aren't stranded at "Saved ✓".
-                  const canRunEvalNow = willAnalyze && !isDirty && !hasEvaluation && !saving && !analysisLoading;
-                  const saveBtnLabel = saving
-                    ? 'Saving...'
-                    : analysisLoading === 'profile'
-                      ? 'Running evaluation...'
-                      : canRunEvalNow
-                        ? 'Run Free Evaluation'
-                        : !isDirty
-                          ? 'Saved ✓'
-                          : willAnalyze
-                            ? 'Save & Run Free Evaluation'
-                            : 'Save Profile';
+                  // Pure SAVE button. Running the free evaluation lives entirely in
+                  // the Evaluation Status Card above (which saves first if dirty) —
+                  // keeping save and run-eval separate avoids the "wait, does this
+                  // also run/save?" confusion.
+                  const saveBtnLabel = saving ? 'Saving...' : !isDirty ? 'Saved ✓' : 'Save Profile';
                   return (
                     <>
                       <button
                         className="auth-btn"
-                        onClick={async () => {
-                          if (canRunEvalNow) {
-                            fetchProfileAnalysis();
-                            return;
-                          }
-                          const ok = await saveProfile();
-                          if (!ok) return;
-                          if (willAnalyze) fetchProfileAnalysis();
-                        }}
+                        onClick={async () => { await saveProfile(); }}
                         disabled={saving || !!analysisLoading}
-                        style={
-                          canRunEvalNow
-                            ? { background: 'var(--accent)', color: 'white' }
-                            : !isDirty && !analysisLoading
-                              ? { background: '#2ec486', color: 'white' }
-                              : undefined
-                        }
+                        style={!isDirty && !saving && !analysisLoading ? { background: '#2ec486', color: 'white' } : undefined}
                       >
                         {saveBtnLabel}
                       </button>
-                      {willAnalyze && isDirty && (
-                        <button
-                          className="auth-btn"
-                          style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}
-                          onClick={async () => { await saveProfile(); }}
-                          disabled={saving || !!analysisLoading}
-                          title="Save your profile without spending your free evaluation."
-                        >
-                          Save without evaluation
-                        </button>
-                      )}
                       {!tierStatus.canRunEval && !hasGeneratedProgram && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
                           Finish your Basics, Lifts, Skills, and Conditioning to run your free evaluation.
