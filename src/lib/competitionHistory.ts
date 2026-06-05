@@ -60,6 +60,11 @@ export interface CompetitionResult {
   worldwide_percentile: number;
   cohort_n: number;
   worldwide_n: number;
+  // Top-1% (p99) score within the athlete's own gender/division cohort + its
+  // unit (may differ from scoring_unit on dual-scoring workouts). Used to
+  // estimate the top-1% W/kg per workout (see p99WPerKg). Bundle 1.6.0+.
+  cohort_p99_threshold?: number | null;
+  cohort_p99_threshold_unit?: ScoringUnit | null;
   // Per-result work/power (bundle 1.7.0). For COMPETED results these are at a
   // population-default mass (body_mass_basis "default_84m_64w"); rescale to the
   // athlete via `joules_bodyweight_component` (see personalizedPower). For
@@ -325,6 +330,39 @@ export function personalizedPower(
     return { watts, wPerKg: watts / userKg, estimated: true };
   }
   return { watts: r.avg_power_watts, wPerKg: r.avg_w_per_kg ?? null, estimated: true };
+}
+
+/**
+ * Estimate the top-1% (p99) W/kg for a workout, on the SAME basis as the
+ * athlete's displayed wPerKg (so "you vs top 1%" share one scale). The p99 is
+ * already scoped to the athlete's own gender/division cohort upstream. We scale
+ * the athlete's own W/kg by the score ratio:
+ *   - time workouts → power ∝ 1/time, so × (your_time / p99_time). Exact — the
+ *     work is identical (fixed reps), only the time differs.
+ *   - rep/AMRAP     → power ∝ reps,   so × (p99_reps / your_reps). Approximate
+ *     (assumes linear work-per-rep across movements).
+ * Returns null when there's no p99, the units don't match (dual-scoring), or the
+ * scoring unit isn't time/reps (load/distance power models are ambiguous).
+ */
+export function p99WPerKg(entry: CompetitionWorkoutEntry, athleteWPerKg: number): number | null {
+  const r = entry.result;
+  const p99 = r.cohort_p99_threshold;
+  const score = r.raw_score;
+  if (p99 == null || !Number.isFinite(p99) || p99 <= 0) return null;
+  if (!Number.isFinite(score) || score <= 0) return null;
+  // The ratio is only valid when the p99 is in the same unit as the athlete's score.
+  const p99Unit = r.cohort_p99_threshold_unit ?? r.scoring_unit;
+  if (p99Unit !== r.scoring_unit) return null;
+  let ratio: number;
+  if (r.scoring_unit === 'time') {
+    ratio = score / p99;       // faster (smaller) top-1% time → higher power
+  } else if (r.scoring_unit === 'reps') {
+    ratio = p99 / score;       // more top-1% reps → higher power
+  } else {
+    return null;               // load / distance: power model is ambiguous
+  }
+  if (!Number.isFinite(ratio) || ratio <= 0) return null;
+  return athleteWPerKg * ratio;
 }
 
 // ============================================================

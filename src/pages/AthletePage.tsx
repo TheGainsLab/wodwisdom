@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -514,6 +514,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const [skills, setSkills] = useState<Record<string, SkillLevel>>({});
   const [conditioning, setConditioning] = useState<Record<string, string | number>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [isDirty, setIsDirty] = useState(true);
@@ -588,7 +589,9 @@ export default function AthletePage({ session }: { session: Session }) {
     }
   };
 
-  useEffect(() => {
+  const loadProfile = useCallback(() => {
+    setLoading(true);
+    setLoadError(false);
     Promise.all([
       supabase
         .from('athlete_profiles')
@@ -651,8 +654,17 @@ export default function AthletePage({ session }: { session: Session }) {
         setTrainingEvaluations(trainingEvalRes.data);
       }
       setLoading(false);
+    }).catch((e) => {
+      // A failed load (e.g. a transient network "Failed to fetch") must NOT
+      // silently blank the form — that reads as "my data got wiped." Surface a
+      // retry instead; the data is safe server-side.
+      console.error('[AthletePage] profile load failed:', e);
+      setLoadError(true);
+      setLoading(false);
     });
   }, [session.user.id]);
+
+  useEffect(() => { loadProfile(); }, [loadProfile]);
 
   const markDirty = () => setIsDirty(true);
 
@@ -966,6 +978,11 @@ export default function AthletePage({ session }: { session: Session }) {
 
             {loading ? (
               <div className="page-loading"><div className="loading-pulse" /></div>
+            ) : loadError ? (
+              <div className="workout-review-section" style={{ textAlign: 'center', padding: 40 }}>
+                <p style={{ color: 'var(--text-dim)', marginBottom: 20 }}>Couldn’t load your profile — check your connection and try again. Your data is safe.</p>
+                <button className="auth-btn" style={{ maxWidth: 200 }} onClick={() => loadProfile()}>Retry</button>
+              </div>
             ) : (
               <>
                 {/* Evaluation Status Card — first-class entry point for the free Tier 2 evaluation.
@@ -1357,7 +1374,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   status={tierStatus.tier3}
                   defaultExpanded={tierStatus.nextTier === 3 && (isAdmin || hasFeature('programming'))}
                   locked={!isAdmin && !hasFeature('programming')}
-                  lockMessage="Requires AI Programming subscription"
+                  lockMessage="Requires AI Programming or All Access subscription"
                   onUpgrade={() => navigate('/features/programs')}
                 >
                   <div className="settings-card" style={{ padding: 16 }}>
@@ -1537,6 +1554,17 @@ export default function AthletePage({ session }: { session: Session }) {
                       >
                         {saveBtnLabel}
                       </button>
+                      {willAnalyze && isDirty && (
+                        <button
+                          className="auth-btn"
+                          style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                          onClick={async () => { await saveProfile(); }}
+                          disabled={saving || !!analysisLoading}
+                          title="Save your profile without spending your free evaluation."
+                        >
+                          Save without evaluation
+                        </button>
+                      )}
                       {!tierStatus.canRunEval && !hasGeneratedProgram && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
                           Finish your Basics, Lifts, Skills, and Conditioning to run your free evaluation.
