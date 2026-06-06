@@ -71,6 +71,9 @@ interface ProgramPoolDay {
   program_name: string;
   week_num: number;
   day_num: number;
+  /** One-line preview of the day's content — strength lift · metcon. Empty when
+   *  the day has neither (rare). Lets the picker show what's being scheduled. */
+  summary?: string;
 }
 
 // Calendar-first add: a schedulable Engine day (repeatable pool → completed days
@@ -682,6 +685,51 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           const pool: ProgramPoolDay[] = wkRows
             .filter((w) => !completed.has(w.id) && !scheduledWorkoutIds.has(w.id))
             .map((w) => ({ id: w.id, program_id: w.program_id, program_name: nameById.get(w.program_id) ?? 'Program', week_num: w.week_num, day_num: w.day_num }));
+
+          // Preview line per schedulable day: strength lift · metcon. Pull blocks
+          // (+ first movement) for just the pool days and fold into a summary so
+          // the picker shows what's being added, not only "Wk 1 Day 1".
+          const poolIds = pool.map((d) => d.id);
+          if (poolIds.length) {
+            type BlockRow = {
+              program_workout_id: string;
+              block_type: string;
+              block_label: string | null;
+              block_scheme: string | null;
+              sort_order: number;
+              program_movements_v2: { movement: string; sort_order: number }[] | null;
+            };
+            const blockRows: BlockRow[] = [];
+            for (let i = 0; i < poolIds.length; i += 100) {
+              const { data: bl } = await supabase
+                .from('program_blocks_v2')
+                .select('program_workout_id, block_type, block_label, block_scheme, sort_order, program_movements_v2(movement, sort_order)')
+                .in('program_workout_id', poolIds.slice(i, i + 100));
+              blockRows.push(...((bl as BlockRow[]) || []));
+            }
+            const byWorkout = new Map<string, BlockRow[]>();
+            for (const b of blockRows) {
+              const arr = byWorkout.get(b.program_workout_id) ?? [];
+              arr.push(b);
+              byWorkout.set(b.program_workout_id, arr);
+            }
+            const firstOfType = (blocks: BlockRow[], t: string) =>
+              blocks.filter((b) => b.block_type === t).sort((a, b) => a.sort_order - b.sort_order)[0];
+            for (const d of pool) {
+              const blocks = byWorkout.get(d.id) ?? [];
+              const strength = firstOfType(blocks, 'strength');
+              const metcon = firstOfType(blocks, 'metcon');
+              const parts: string[] = [];
+              const lift = strength?.program_movements_v2
+                ?.slice()
+                .sort((a, b) => a.sort_order - b.sort_order)[0]?.movement
+                ?? strength?.block_label ?? undefined;
+              if (lift) parts.push(lift);
+              const mLabel = metcon?.block_label || metcon?.block_scheme || undefined;
+              if (mLabel) parts.push(mLabel);
+              d.summary = parts.join(' · ');
+            }
+          }
           setProgramPool(pool);
           setSelProgramId((prev) => prev ?? programList[0].id);
         }
@@ -1640,10 +1688,11 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                       {programDays.length === 0 ? (
                                         <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>No schedulable days left.</div>
                                       ) : (
-                                        <div className="day-schedule-quickpick" style={{ position: 'static', maxHeight: 200, overflowY: 'auto' }}>
+                                        <div className="day-schedule-quickpick" style={{ position: 'static', maxHeight: '50vh', overflowY: 'auto' }}>
                                           {programDays.map(d => (
-                                            <button key={d.id} type="button" className="day-schedule-qp-item" onClick={() => handleScheduleProgram(d.id, selectedDate)}>
-                                              <span>Wk {d.week_num} Day {d.day_num}</span>
+                                            <button key={d.id} type="button" className="day-schedule-qp-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }} onClick={() => handleScheduleProgram(d.id, selectedDate)}>
+                                              <span style={{ fontWeight: 600 }}>Wk {d.week_num} Day {d.day_num}</span>
+                                              {d.summary && <span style={{ fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'normal', textAlign: 'left' }}>{d.summary}</span>}
                                             </button>
                                           ))}
                                         </div>
@@ -1656,7 +1705,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                       {enginePool.length === 0 ? (
                                         <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>No unlocked Engine days.</div>
                                       ) : (
-                                        <div className="day-schedule-quickpick" style={{ position: 'static', maxHeight: 200, overflowY: 'auto' }}>
+                                        <div className="day-schedule-quickpick" style={{ position: 'static', maxHeight: '50vh', overflowY: 'auto' }}>
                                           {enginePool.map(d => (
                                             <button key={d.id} type="button" className="day-schedule-qp-item" onClick={() => handleScheduleEngine(d.id, selectedDate)}>
                                               <span>{formatEngineDayType(d.day_type)} Day {d.day_number}</span>

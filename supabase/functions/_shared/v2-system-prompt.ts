@@ -77,7 +77,11 @@ The skeleton has already chosen the strength_scheme for each strength day (volum
 
 Math: multiply the chosen % by the athlete's 1RM, then round DOWN to the nearest plate-math step (5 lbs / 2.5 kg). Never round UP across the athlete's 1RM — the load_sanity audit will catch it.
 
-When the skeleton's scheme says "Build to heavy single" — interpret as a climbing-load pattern (e.g., 5 ascending sets working up toward ~90%), NOT a 1RM attempt. Only treat as a true 1RM attempt when the scheme/notes explicitly say "1RM attempt" / "max attempt" / "new 1RM" — those are the only schemes where prescribed weight may exceed stored 1RM.
+WORK-UP / "BUILD TO" SCHEMES. When the scheme says "Build to" / "Work up to" a heavy single / double / triple, the warm-up ramp is the ATHLETE'S DISCRETION — they pick their own jumps based on how the bar feels that day. Do NOT prescribe the ascending sets. Emit ONLY the top working set at the target: e.g. "Work up to a heavy triple (~90%)" → ONE movement row with sets = 1, rep_scheme = [3], weight = the ~90% number, rpe ~8–9. The "work up to it" instruction lives in block_notes / block_scheme as prose, never as invented fixed-weight sets. NEVER stamp the top weight across multiple sets (e.g. 5×3 at the top triple) — that reads as 15 reps at 90% and contradicts the build-up instruction.
+
+If the scheme prescribes a back-off AFTER the work-up — "work up to a heavy single, THEN 3×1 @85%" — that is TWO prescriptions, so emit TWO movement rows: (1) the work-up target (sets = 1, rep_scheme = [1], weight = the heavy-single target), and (2) the fixed back-off as its own honest row (sets = 3, rep_scheme = [1], weight = the 85% number). Only the back-off is fixed; the work-up stays the athlete's call.
+
+Interpret "Build to a heavy single" as a climbing-load TOP set toward ~90%, NOT a 1RM attempt. Only treat as a true 1RM attempt when the scheme/notes explicitly say "1RM attempt" / "max attempt" / "new 1RM" — those are the only schemes where prescribed weight may exceed stored 1RM. Fixed-load schemes ("5x3 @85%", "4x4 @80%") are different — there the multiple sets ARE the prescription and all share one weight; emit them as written.
 
 SKILLS BLOCK EXECUTION
 The skeleton has already chosen skill_focus for each Skills block (which movement / family is being trained that day). Your job is to fill in the specific movements + scheme. The Skills block is for gymnastics + monostructural / odd-object technique — HSPU variants, muscle-ups, T2B, rope climbs, pistols, handstand walk, ring dips, double-unders, box jumps, wall walks. NOT barbell technical work — snatches / cleans / jerks belong in Strength.
@@ -181,7 +185,8 @@ WORK SPECIFIER — pick exactly ONE per movement, based on what counts the work 
         - EMOM 10, 5 reps/minute:        rep_scheme = [5]             (same — one iteration, clock repeats)
         - Strength "5x5":                rep_scheme = [5,5,5,5,5]     (sets = 5, rep_scheme each set)
         - Strength "1x5":                rep_scheme = [5]
-        - Strength "Build to heavy single": rep_scheme = [1]
+        - Strength "Build to heavy single": rep_scheme = [1], sets = 1   (top set ONLY — the warm-up ramp is athlete discretion, not prescribed sets)
+        - Strength "Work up to heavy triple": rep_scheme = [3], sets = 1   (one top triple at the target; do NOT emit 5×3 at the top weight)
 
     If a single iteration covers all the work for that movement (AMRAP / EMOM / single-pass / one set), rep_scheme has ONE entry. Code uses the rounds count from block_scheme as a separate multiplier when needed.
 

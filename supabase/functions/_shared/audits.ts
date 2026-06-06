@@ -750,6 +750,70 @@ export function auditVocabularyCompliance(
 }
 
 // ============================================================
+// Rule — "work up to" / "build to" schemes keep the ramp athlete-discretion
+// ============================================================
+//
+// A strength block whose scheme/notes say "work up to" / "build to" a heavy
+// single/double/triple is GRANTING the athlete discretion over the warm-up
+// ramp — they pick their own jumps based on how the bar feels. The structured
+// prescription should be the TOP working set only (sets = 1), with any fixed
+// back-off ("...then 3×1 @85%") in its OWN movement row. The writer's failure
+// mode is to flatten the whole ramp onto the top weight — "5×3 @ the top
+// triple" — which reads as 15 reps at 90% and contradicts the build-up text.
+//
+// Signature: a strength movement carrying BOTH multiple sets (≥3) AND multiple
+// reps-per-set (≥2) inside a work-up block. A legitimate back-off row (3×1)
+// has reps-per-set = 1 → does NOT trip. A fixed-load scheme ("5x3 @85%")
+// carries no work-up language → does NOT trip. Block-local: surgical rewrites
+// the block down to the top set (+ a separate back-off row if prescribed).
+
+const WORKUP_LANGUAGE = ["work up", "work-up", "build to", "build up", "ascend"];
+
+function isWorkupScheme(block: BlockPrescription): boolean {
+  const s = `${block.block_scheme ?? ""} ${block.block_notes ?? ""}`.toLowerCase();
+  return WORKUP_LANGUAGE.some((k) => s.includes(k));
+}
+
+/** Reps within a single set. rep_scheme entries are per-iteration, and for a
+ *  uniform strength scheme every entry is the same; take the max to be safe.
+ *  Falls back to reps/sets, then reps. */
+function repsPerSet(m: MovementPrescription): number {
+  if (Array.isArray(m.rep_scheme) && m.rep_scheme.length > 0) {
+    const nums = m.rep_scheme.filter((n): n is number => typeof n === "number" && n > 0);
+    if (nums.length > 0) return Math.max(...nums);
+  }
+  if (m.reps != null && m.sets != null && m.sets > 0) return Math.round(m.reps / m.sets);
+  if (m.reps != null) return m.reps;
+  return 0;
+}
+
+export function auditWorkupTopSet(output: WriterOutput): AuditResult {
+  const violations: string[] = [];
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        if (b.block_type !== "strength") continue;
+        if (!isWorkupScheme(b)) continue;
+        const movements = safeMovements(b);
+        for (let j = 0; j < movements.length; j++) {
+          const m = movements[j];
+          const sets = m.sets ?? 0;
+          const rps = repsPerSet(m);
+          if (sets >= 3 && rps >= 2) {
+            violations.push(
+              `Week ${week.week_num} Day ${day.day_num} block[${i}] (strength) movement[${j}] "${m.movement}": the block scheme says "work up / build to" — that's an athlete-discretion ramp — but the movement is prescribed as ${sets}×${rps} at one weight, which flattens the whole ramp onto the top set (reads as ${sets * rps} reps at the top weight). Emit ONLY the top working set (sets = 1, rep_scheme = [${rps}]) at the target weight; the warm-up ramp is the athlete's call and stays in the notes as prose. If a fixed back-off follows the work-up (e.g. "then 3×1 @85%"), give the back-off its OWN movement row.`,
+            );
+          }
+        }
+      }
+    }
+  }
+  return { rule: "workup_top_set", passed: violations.length === 0, violations };
+}
+
+// ============================================================
 // Convenience: lift the 7 audits as a list for the runner.
 // ============================================================
 
@@ -779,6 +843,7 @@ export const ALL_AUDITS = [
   (ctx: AuditContext): AuditResult => auditMetconMonostructural(ctx.output),
   (ctx: AuditContext): AuditResult => auditMetconBarbellLoads(ctx.output),
   (ctx: AuditContext): AuditResult => auditRequiredFields(ctx.output),
+  (ctx: AuditContext): AuditResult => auditWorkupTopSet(ctx.output),
   (ctx: AuditContext): AuditResult => auditMetconDuration(ctx.output, ctx.skeleton),
   (ctx: AuditContext): AuditResult => auditDayCount(ctx.output, ctx.daysPerWeek),
   (ctx: AuditContext): AuditResult => auditLoadSanity(ctx.output, ctx.lifts),
@@ -808,6 +873,7 @@ export const AUDIT_KIND: Record<string, AuditKind> = {
   metcon_barbell_one_load: "block-local",
   metcon_duration_matches_focus: "block-local",
   required_fields: "block-local",
+  workup_top_set: "block-local",
   do_not_program: "block-local",
   // Structural — whole-program issues; only writer-retry can fix
   block_type_enum: "structural-writer",

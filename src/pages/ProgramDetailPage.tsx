@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase, ADJUST_WORKOUT_ENDPOINT, getAuthHeaders } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { useMovementVocab, matchMovements } from '../lib/movementVocab';
+import { GainsName } from '../components/GainsLogo';
 import Nav from '../components/Nav';
 import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksDisplay';
 
@@ -175,6 +176,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [navOpen, setNavOpen] = useState(false);
+  const [editingProgramName, setEditingProgramName] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
   const [generatingNextMonth, setGeneratingNextMonth] = useState(false);
 
@@ -681,14 +683,26 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
           {program ? (
-            <input
-              type="text"
-              className="program-detail-name-input"
-              value={program.name}
-              onChange={e => setProgram(p => p ? { ...p, name: e.target.value } : null)}
-              onBlur={e => handleNameChange(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
-            />
+            editingProgramName ? (
+              <input
+                type="text"
+                className="program-detail-name-input"
+                autoFocus
+                value={program.name}
+                onChange={e => setProgram(p => p ? { ...p, name: e.target.value } : null)}
+                onBlur={e => { handleNameChange(e.target.value); setEditingProgramName(false); }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
+              />
+            ) : (
+              <h1
+                className="program-detail-name-input"
+                style={{ cursor: 'pointer', margin: 0, background: 'none', border: 'none' }}
+                title="Click to rename"
+                onClick={() => setEditingProgramName(true)}
+              >
+                <GainsName name={program.name} />
+              </h1>
+            )
           ) : (
             <h1>{monthFilter ? `Month ${monthFilter}` : 'Program'}</h1>
           )}

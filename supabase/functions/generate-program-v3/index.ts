@@ -764,7 +764,7 @@ async function stageSaving(
       .from("programs")
       .insert({
         user_id: userId,
-        name: "AI Programmer (v3)",
+        name: "My GAINS Program",
         program_version: "v3",
         month_plan: output.month_plan ?? null,
         source: "generated",
@@ -794,7 +794,7 @@ async function stageSaving(
   if (!alreadySaved) {
     try {
       await saveProgramV3(supa, userId, output, {
-        name: "AI Programmer (v3)",
+        name: "My GAINS Program",
         skeleton,
         programId, // always append mode in the dispatcher (shell pre-created for first-cycle)
         monthNumber,
