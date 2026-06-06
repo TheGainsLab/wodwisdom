@@ -639,7 +639,10 @@ export default function AthletePage({ session }: { session: Session }) {
         setTdeeOverride(d.tdee_override != null ? String(d.tdee_override) : '');
         setDaysPerWeek(d.days_per_week != null ? String(d.days_per_week) : '');
         setSessionLengthMinutes(d.session_length_minutes != null ? String(d.session_length_minutes) : '');
-        setInjuriesConstraints(d.injuries_constraints || '');
+        // "None" is the sentinel we save for "no constraints" (Tier-3 completion
+        // + the generator both want a definite value). Show it as an EMPTY box so
+        // the field reads "leave blank if none" consistently on reload.
+        setInjuriesConstraints(d.injuries_constraints && d.injuries_constraints !== 'None' ? d.injuries_constraints : '');
         setGoal(d.goal || '');
         setSelfPerceptionLevel(d.self_perception_level || '');
         setEvalCreditsRemaining(typeof d.eval_credits_remaining === 'number' ? d.eval_credits_remaining : 1);
@@ -1414,7 +1417,7 @@ export default function AthletePage({ session }: { session: Session }) {
                     </div>
 
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>
                         What are your goals? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(free text)</span>
                       </div>
                       <textarea
@@ -1432,7 +1435,7 @@ export default function AthletePage({ session }: { session: Session }) {
                     </div>
 
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>
                         What level do you think you are? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -1450,13 +1453,13 @@ export default function AthletePage({ session }: { session: Session }) {
                     </div>
 
                     <div>
-                      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>
-                        Injuries or movement constraints <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(type "none" if none)</span>
+                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>
+                        Injuries or movement constraints <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(leave blank if none)</span>
                       </div>
                       <textarea
                         className="lift-input"
                         rows={3}
-                        placeholder='e.g. "right shoulder — no overhead pressing". Leave blank or type "none" if you have no constraints.'
+                        placeholder='e.g. "right shoulder — no overhead pressing". Leave blank if you have no constraints.'
                         value={injuriesConstraints}
                         onChange={e => { setInjuriesConstraints(e.target.value); markDirty(); }}
                         style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
