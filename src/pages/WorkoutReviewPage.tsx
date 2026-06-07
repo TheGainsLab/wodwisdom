@@ -153,7 +153,7 @@ interface CoachMessage {
   streaming?: boolean;
 }
 
-function CoachChat({ workoutId }: { session: Session; workoutId: string | null; workoutText: string }) {
+function CoachChat({ session, workoutId }: { session: Session; workoutId: string | null; workoutText: string }) {
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -164,6 +164,35 @@ function CoachChat({ workoutId }: { session: Session; workoutId: string | null; 
   };
 
   useEffect(() => { scrollToBottom(); }, [messages]);
+
+  // Rehydrate this day's prior coach conversation so it's there in context when
+  // the user returns to the workout. The chat fn already persists each message
+  // to chat_messages tagged context_type='workout' + context_id=workout.id; we
+  // just reload that thread (oldest-first) into the box. Also gives the coach
+  // conversational continuity across visits, since sendMessage seeds history
+  // from `messages`.
+  useEffect(() => {
+    if (!workoutId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('chat_messages')
+        .select('question, answer, created_at')
+        .eq('user_id', session.user.id)
+        .eq('context_type', 'workout')
+        .eq('context_id', workoutId)
+        .order('created_at', { ascending: true })
+        .limit(50);
+      if (cancelled || !data) return;
+      const prior: CoachMessage[] = [];
+      for (const row of data as { question: string; answer: string }[]) {
+        if (row.question) prior.push({ role: 'user', content: row.question });
+        if (row.answer) prior.push({ role: 'assistant', content: row.answer });
+      }
+      if (prior.length) setMessages(prior);
+    })();
+    return () => { cancelled = true; };
+  }, [workoutId, session.user.id]);
 
   const sendMessage = useCallback(async () => {
     const question = input.trim();
