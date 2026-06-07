@@ -88,6 +88,36 @@ async function getSubscriptionEntitlements(subscriptionId: string): Promise<{ pl
   return { plan, features: [] };
 }
 
+// Resolve a feature list from price/subscription metadata. `entitlements` (a
+// comma list) wins; otherwise the `plan` name maps through PLAN_ENTITLEMENTS.
+function featuresFromMetadata(meta: Record<string, string> | undefined | null): string[] {
+  if (!meta) return [];
+  if (meta.entitlements) return meta.entitlements.split(",").map(s => s.trim()).filter(Boolean);
+  if (meta.plan && PLAN_ENTITLEMENTS[meta.plan]) return PLAN_ENTITLEMENTS[meta.plan];
+  return [];
+}
+
+// Features a single invoice line grants, resolved from its price metadata.
+// Uses the price object embedded in the event when it carries metadata; falls
+// back to fetching the price by id otherwise.
+// deno-lint-ignore no-explicit-any
+async function priceFeatures(price: any): Promise<string[]> {
+  const embedded = featuresFromMetadata(price?.metadata);
+  if (embedded.length) return embedded;
+  const id = price?.id;
+  if (!id) return [];
+  try {
+    const r = await fetchWithTimeout(`https://api.stripe.com/v1/prices/${id}`, {
+      headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+    }, 15_000);
+    if (r.ok) {
+      const p = await r.json();
+      return featuresFromMetadata(p?.metadata);
+    }
+  } catch { /* fall through to empty */ }
+  return [];
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { status: 200 });
 
@@ -242,8 +272,32 @@ serve(async (req) => {
 
         const payFeatures = new Set((payEntitlements || []).map(e => e.feature));
 
+        // Which products did THIS invoice bill for a NEW period? Skip proration
+        // lines (mid-cycle add / upgrade / downgrade) — those are the same month,
+        // not a new one, so a subscription update can't tick a drip forward. Each
+        // real line resolves to its features via the price metadata, so a payment
+        // for one product never advances another (separate purchases stay
+        // independent). All Access bills as a single price whose metadata lists
+        // every feature, so its one line advances both branches — as intended.
+        const billedFeatures = new Set<string>();
+        let sawRealLine = false;
+        for (const line of (invoice.lines?.data ?? [])) {
+          if (line.proration) continue;
+          sawRealLine = true;
+          for (const f of await priceFeatures(line.price)) billedFeatures.add(f);
+        }
+        // Safety net: a real line existed but no features resolved (price missing
+        // metadata) — fall back to stored entitlements so delivery never silently
+        // stops, and log loudly so the misconfiguration is visible.
+        let advance = billedFeatures;
+        if (billedFeatures.size === 0 && sawRealLine) {
+          console.warn(`[webhook] invoice ${invoice.id}: no features resolved from line metadata; falling back to stored entitlements`);
+          advance = payFeatures;
+        }
+        console.log(`[webhook] invoice ${invoice.id} billing_reason=${invoice.billing_reason} advancing=[${[...advance].join(",")}]`);
+
         // Programming users: trigger next month generation
-        if (payFeatures.has("programming")) {
+        if (advance.has("programming")) {
           // Find the user's most recent generated program
           const { data: programs } = await supa
             .from("programs")
@@ -279,7 +333,7 @@ serve(async (req) => {
         // Engine users: unlock next month (capped at 36). Also creates the
         // athlete_profiles row if it doesn't exist yet — an Engine subscriber
         // who pays before picking a program still gets their first month.
-        if (payFeatures.has("engine")) {
+        if (advance.has("engine")) {
           const { data: athleteProfile } = await supa
             .from("athlete_profiles")
             .select("engine_months_unlocked")
@@ -367,7 +421,7 @@ serve(async (req) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("Webhook error:", e.message);
-    return new Response(JSON.stringify({ error: e.message }), { status: 400 });
+    console.error("Webhook error:", (e as Error).message);
+    return new Response(JSON.stringify({ error: (e as Error).message }), { status: 400 });
   }
 });
