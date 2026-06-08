@@ -564,6 +564,47 @@ export function timeDomainBreakdown(
   });
 }
 
+export interface WkgBucketStat {
+  bucket: 'short' | 'medium' | 'long';
+  /** Items in this bucket. */
+  n: number;
+  /** Items in this bucket that had a usable W/kg. */
+  nWithPower: number;
+  /** Mean W/kg across the items that had power; null if none did. */
+  avgWkg: number | null;
+}
+
+/**
+ * Generic per-time-domain W/kg rollup. Both the program metcons (Analytics) and
+ * the linked competition results flow through this single helper so the two
+ * surfaces bucket identically and can't drift — the bucket key ('short' |
+ * 'medium' | 'long') is ours, defined the same way on both sides. `getBucket`
+ * returns the item's bucket (anything outside the three is ignored); `getWkg`
+ * returns the item's W/kg (personalized for program, population-default for
+ * competition), null when unavailable.
+ */
+export function bucketByTimeDomain<T>(
+  items: T[],
+  getBucket: (item: T) => string | null | undefined,
+  getWkg: (item: T) => number | null | undefined,
+): WkgBucketStat[] {
+  const buckets: Array<'short' | 'medium' | 'long'> = ['short', 'medium', 'long'];
+  return buckets.map((bucket) => {
+    const inBucket = items.filter((it) => getBucket(it) === bucket);
+    const wkgs: number[] = [];
+    for (const it of inBucket) {
+      const w = getWkg(it);
+      if (typeof w === 'number' && Number.isFinite(w) && w > 0) wkgs.push(w);
+    }
+    return {
+      bucket,
+      n: inBucket.length,
+      nWithPower: wkgs.length,
+      avgWkg: wkgs.length ? wkgs.reduce((a, b) => a + b, 0) / wkgs.length : null,
+    };
+  });
+}
+
 /**
  * Flatten the unique movements across all of the athlete's results, with how
  * many of their workouts each appeared in. Newest-first ordering is preserved
