@@ -30,6 +30,8 @@ interface MetconBlockLite {
   time_domain: string | null;
   capped: boolean | null;
   percentile: number | null;
+  notes: string | null;
+  faults: Array<{ movement: string; faults: string[] }>;
   workout_date: string;
 }
 
@@ -215,14 +217,17 @@ function fmtSeconds(s: number): string {
 
 /** Detail card shown under a chart when a bar is clicked. */
 function MetconDetailCard({
-  title, sub, stats, body, onClose,
+  title, sub, stats, body, notes, faults, onClose,
 }: {
   title: string;
   sub?: string;
   stats: Array<{ label: string; value: string }>;
   body?: string;
+  notes?: string | null;
+  faults?: Array<{ movement: string; faults: string[] }>;
   onClose: () => void;
 }) {
+  const hasBelow = !!(body || (faults && faults.length > 0) || notes);
   return (
     <div style={{
       marginTop: 8, padding: 12, background: 'var(--surface)',
@@ -240,7 +245,7 @@ function MetconDetailCard({
         >×</button>
       </div>
       {stats.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: body ? 8 : 0 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: hasBelow ? 8 : 0 }}>
           {stats.map((s, i) => (
             <div key={i}>
               <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
@@ -255,6 +260,21 @@ function MetconDetailCard({
           borderTop: '1px solid var(--border)', paddingTop: 8,
         }}>
           {body}
+        </div>
+      )}
+      {faults && faults.length > 0 && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 8 }}>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Faults observed</div>
+          {faults.map((f, i) => (
+            <div key={i} style={{ fontSize: 12, color: 'var(--danger, #e74c3c)', marginBottom: 2 }}>
+              <span style={{ fontWeight: 600 }}>{f.movement}:</span> {f.faults.join(', ')}
+            </div>
+          ))}
+        </div>
+      )}
+      {notes && (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic', marginTop: 8 }}>
+          {notes}
         </div>
       )}
     </div>
@@ -544,7 +564,7 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
           if (b.percentile != null) stats.push({ label: 'Percentile', value: `${Math.round(b.percentile)}th` });
           const title = new Date(b.workout_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
           const sub = [b.block_label, b.rx ? 'Rx' : null].filter(Boolean).join(' · ') || undefined;
-          return <MetconDetailCard title={title} sub={sub} stats={stats} body={b.block_text} onClose={() => setSelected(null)} />;
+          return <MetconDetailCard title={title} sub={sub} stats={stats} body={b.block_text} notes={b.notes} faults={b.faults} onClose={() => setSelected(null)} />;
         })()}
         {competitionAthleteId && historicalLoaded && historicalChart.length > 0 && (
           <>

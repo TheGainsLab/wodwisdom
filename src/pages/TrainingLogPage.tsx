@@ -151,6 +151,7 @@ interface WorkoutLogBlock {
   block_type: string;
   block_label: string | null;
   block_text: string;
+  notes: string | null;
   score: string | null;
   rx: boolean;
   sort_order: number;
@@ -824,7 +825,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         const [{ data: blocks }, { data: entries }] = await Promise.all([
           supabase
             .from('workout_log_blocks')
-            .select('id, log_id, block_type, block_label, block_text, score, rx, sort_order, percentile, performance_tier, median_benchmark, excellent_benchmark, capped, capped_reps, joules, avg_power_watts, avg_w_per_kg, body_mass_kg, work_seconds, cardio_modality, time_domain')
+            .select('id, log_id, block_type, block_label, block_text, notes, score, rx, sort_order, percentile, performance_tier, median_benchmark, excellent_benchmark, capped, capped_reps, joules, avg_power_watts, avg_w_per_kg, body_mass_kg, work_seconds, cardio_modality, time_domain')
             .in('log_id', logIds),
           supabase
             .from('workout_log_entries')
@@ -1082,23 +1083,31 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       avg_power_watts: number | null; avg_w_per_kg: number | null;
       work_seconds: number | null; time_domain: string | null;
       capped: boolean | null; percentile: number | null;
+      notes: string | null;
+      faults: Array<{ movement: string; faults: string[] }>;
       workout_date: string;
     }> = [];
     for (const log of logs) {
+      const logEntries = entriesByLog[log.id] || [];
       for (const b of blocksByLog[log.id] || []) {
         if (b.block_type !== 'metcon') continue;
+        const faults = logEntries
+          .filter(e => (e.block_id ? e.block_id === b.id : e.block_label === b.block_label) && e.faults_observed && e.faults_observed.length > 0)
+          .map(e => ({ movement: e.movement, faults: e.faults_observed as string[] }));
         out.push({
           id: b.id, log_id: b.log_id, block_label: b.block_label, block_text: b.block_text,
           score: b.score, rx: b.rx,
           avg_power_watts: b.avg_power_watts, avg_w_per_kg: b.avg_w_per_kg,
           work_seconds: b.work_seconds, time_domain: b.time_domain,
           capped: b.capped, percentile: b.percentile,
+          notes: b.notes,
+          faults,
           workout_date: log.workout_date,
         });
       }
     }
     return out;
-  }, [logs, blocksByLog]);
+  }, [logs, blocksByLog, entriesByLog]);
 
   // Cross-lift summary charts (top of Strength tab). Sorted by value desc so
   // the biggest contributors land at the top.
@@ -2567,6 +2576,24 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                                 </span>
                                                 )
                                               ))}
+                                            </div>
+                                          )}
+
+                                          {/* Faults the athlete flagged on this metcon — their qualitative limiters. */}
+                                          {block.block_type === 'metcon' && blockEntries.some(e => e.faults_observed && e.faults_observed.length > 0) && (
+                                            <div style={{ paddingLeft: 8, marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                              {blockEntries.filter(e => e.faults_observed && e.faults_observed.length > 0).map((e, ei) => (
+                                                <span key={ei} style={{ fontSize: 11, color: 'var(--danger, #e74c3c)' }}>
+                                                  <span style={{ fontWeight: 600 }}>{formatMovementName(e.movement)}:</span> {e.faults_observed!.join(', ')}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+
+                                          {/* Block-level note the athlete left (e.g. "New Fran PR!"). */}
+                                          {block.notes && (
+                                            <div style={{ paddingLeft: 8, marginTop: 6, fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                                              {block.notes}
                                             </div>
                                           )}
                                         </div>
