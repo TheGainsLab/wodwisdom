@@ -9,25 +9,41 @@ const PN: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 /** Dashed image-placeholder box. Swap each for a real <img> once art is ready. */
-const Placeholder: React.FC<{ label: string; ratio?: string }> = ({ label, ratio = '16 / 10' }) => (
-  <div style={{
-    width: '100%',
-    aspectRatio: ratio,
-    border: '2px dashed var(--border)',
-    borderRadius: 14,
-    background: 'var(--surface)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'var(--text-dim)',
-    fontSize: 14,
-    textAlign: 'center',
-    padding: 24,
-    boxSizing: 'border-box',
-  }}>
-    {label}
-  </div>
-);
+// One shared image frame so every landing-page screenshot looks uniform on
+// mobile: full-width, natural aspect ratio, rounded, subtle border + shadow,
+// lazy-loaded. Pass `src` once the art exists; until then it renders the
+// dashed placeholder box (sized by `ratio`) with the same corner radius.
+const IMG_FRAME: React.CSSProperties = {
+  width: '100%',
+  display: 'block',
+  borderRadius: 14,
+  border: '1px solid var(--border)',
+  boxShadow: '0 8px 30px rgba(0,0,0,.25)',
+};
+const Placeholder: React.FC<{ label: string; src?: string; alt?: string; ratio?: string }> = ({ label, src, alt, ratio = '16 / 10' }) => {
+  if (src) {
+    return <img src={src} alt={alt ?? ''} loading="lazy" style={IMG_FRAME} />;
+  }
+  return (
+    <div style={{
+      width: '100%',
+      aspectRatio: ratio,
+      border: '2px dashed var(--border)',
+      borderRadius: 14,
+      background: 'var(--surface)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: 'var(--text-dim)',
+      fontSize: 14,
+      textAlign: 'center',
+      padding: 24,
+      boxSizing: 'border-box',
+    }}>
+      {label}
+    </div>
+  );
+};
 
 /** Small uppercase accent label that sits above a section headline. */
 const Eyebrow: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -131,22 +147,7 @@ export default function LandingPage() {
 
         {/* Visual: evaluation screenshot with a highlighted callout. */}
         <div style={{ position: 'relative', width: '100%', maxWidth: 820, margin: '48px auto 0' }}>
-          {/* TODO: replace placeholder with evaluation screenshot (~820×512, 16:10) */}
-          <div style={{
-            aspectRatio: '16 / 10',
-            border: '2px dashed var(--border)',
-            borderRadius: 14,
-            background: 'var(--surface)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-dim)',
-            fontSize: 14,
-            textAlign: 'center',
-            padding: 24,
-          }}>
-            [ Image placeholder — Evaluation screenshot (~820×512) ]
-          </div>
+          <Placeholder src="/images/hero-eval.png" alt="Your GAINS evaluation" label="[ Image placeholder — Evaluation screenshot (~820×512) ]" />
           <div style={{
             position: 'absolute',
             right: 'clamp(-12px, -2vw, 0px)',
@@ -195,24 +196,13 @@ export default function LandingPage() {
               </div>
               <div style={{ marginTop: 12, fontSize: 14, color: 'var(--text-muted)' }}>Saved.</div>
             </div>
-            {/* Right — your coach */}
-            <div style={{ background: 'var(--surface)', border: '2px solid var(--accent)', borderRadius: 14, padding: 24 }}>
-              <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 16 }}>
-                Your Coach
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-                <span style={{ fontSize: 20, fontWeight: 700 }}>Fran</span>
-                <span style={{ fontSize: 24, fontWeight: 800 }}>3:42</span>
-              </div>
-              <ul style={{ margin: '14px 0 0', paddingLeft: 18, fontSize: 15, lineHeight: 1.6, color: 'var(--text-dim)' }}>
-                <li>Top 12% power output.</li>
-                <li>Gymnastics endurance remains a limiter.</li>
-                <li>Aerobic recovery improving.</li>
-              </ul>
-              <div style={{ marginTop: 14, fontSize: 15, fontWeight: 600 }}>
-                Recommendation: <span style={{ color: 'var(--accent)' }}>increase gymnastics density.</span>
-              </div>
-            </div>
+            {/* Right — your coach (real evaluation screenshot) */}
+            <img
+              src="/images/fran-data.png"
+              alt="Your coach's read on Fran: top 12% power output, gymnastics endurance limiter, aerobic recovery improving — recommendation: increase gymnastics density"
+              loading="lazy"
+              style={{ width: '100%', display: 'block', borderRadius: 14, border: '2px solid var(--accent)', boxShadow: '0 8px 30px rgba(0,0,0,.25)' }}
+            />
           </div>
         </div>
       </section>
@@ -240,8 +230,7 @@ export default function LandingPage() {
             From those, the coach evaluates every part of your fitness — strength, conditioning, gymnastics, competition performance, and movement limitations — before recommending what comes next. It starts with your profile and gets sharper every time you train.
           </p>
           <div style={{ maxWidth: 920, margin: '32px auto 0' }}>
-            {/* TODO: replace with full evaluation screenshot (a different view than the hero) */}
-            <Placeholder label="[ Image placeholder — Full evaluation screenshot (different view than hero) ]" />
+            <Placeholder src="/images/section2-eval.png" alt="A full GAINS fitness evaluation" label="[ Image placeholder — Full evaluation screenshot (different view than hero) ]" />
           </div>
           <div style={{ textAlign: 'center', marginTop: 32 }}>
             <Link to="/auth?signup=1" className="landing-cta">Get Your Free Evaluation</Link>
