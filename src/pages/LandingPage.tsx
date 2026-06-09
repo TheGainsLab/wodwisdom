@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import GainsLogo from '../components/GainsLogo';
+import GainsLogo, { GainsName } from '../components/GainsLogo';
 import '../landing.css';
 
 /** Inline styled plan name — bold + accent color, used throughout FAQs */
@@ -75,10 +75,16 @@ export default function LandingPage() {
       {/* ===== Hero ===== */}
       <section className="landing-hero">
         <GainsLogo className="landing-hero-logo" />
-        <h1 className="landing-hero-title">The program that follows you.</h1>
+        <h1 className="landing-hero-title">Stop Following Someone Else's Program</h1>
         <p className="landing-hero-sub">
-          We trained an AI on the CrossFit methodology: study guides, journal articles, seminars and more. This is the AI that speaks your language. Share some basic info and the AI builds a program tailored exactly to you, coaches every session and learns as you log your results, maximizing the impact of every training session.
+          Most training plans are written for thousands of anonymous athletes. <GainsName name="GAINS" /> starts with you.
         </p>
+        <ul className="landing-hero-list" style={{ textAlign: 'left', maxWidth: 600, margin: '0 auto 22px', paddingLeft: 22, lineHeight: 1.6 }}>
+          <li style={{ marginBottom: 10 }}><strong>Competition Benchmark:</strong> See exactly how you compare. Identify the weaknesses that actually cost you points. Prioritize what moves the needle.</li>
+          <li style={{ marginBottom: 10 }}><strong>Detailed Evaluations:</strong> Your lifts, skills, conditioning benchmarks, training history, and goals. Every data point that matters.</li>
+          <li style={{ marginBottom: 10 }}><strong>Personalized Coaching:</strong> Get assistance with training, nutrition, recovery, workout pacing, anything you need to maximize your results.</li>
+          <li><strong>AI That Adapts:</strong> Your fitness changes. Your program follows. New PR? New goal? <GainsName name="GAINS" /> is the program that follows you.</li>
+        </ul>
       </section>
 
       {/* ===== Divider ===== */}
