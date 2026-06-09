@@ -498,51 +498,32 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
 
   return (
     <div>
-      {/* ── Top stats card ── */}
-      <div style={{
-        marginTop: 12, marginBottom: 12, padding: 14,
-        background: SECTION_BG, borderRadius: 8,
-      }}>
-        <div style={{
-          fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
-          color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8,
-        }}>
-          Power
-        </div>
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-          <Stat label="MetCons completed" value={programStats.total.toString()} />
-          <Stat
-            label="Average"
-            value={programStats.avgWkg != null ? `${programStats.avgWkg.toFixed(2)} W/kg` : '—'}
-            sub={programStats.nWithPower < programStats.total
-              ? `${programStats.nWithPower}/${programStats.total} with power`
-              : undefined}
-          />
-        </div>
-        {competitionAthleteId && historicalLoaded && historicalStats.total > 0 && (
+      {/* ── Power charts — each chart sits directly under its own stats ── */}
+      <CollapsibleSection title="Power Charts" defaultOpen>
+        {/* Program group: program stats, then the program chart. */}
+        <div style={{ padding: 14, marginBottom: 12, background: SECTION_BG, borderRadius: 8 }}>
           <div style={{
-            marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)',
-            display: 'flex', gap: 24, flexWrap: 'wrap',
+            fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+            color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8,
           }}>
-            <Stat label="Historical MetCons" value={historicalStats.total.toString()} />
+            Power
+          </div>
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+            <Stat label="MetCons completed" value={programStats.total.toString()} />
             <Stat
-              label="Historical Average"
-              value={historicalStats.avgWkg != null ? `${historicalStats.avgWkg.toFixed(2)} W/kg` : '—'}
-              sub={historicalStats.nWithPower < historicalStats.total
-                ? `${historicalStats.nWithPower}/${historicalStats.total} with power`
+              label="Average"
+              value={programStats.avgWkg != null ? `${programStats.avgWkg.toFixed(2)} W/kg` : '—'}
+              sub={programStats.nWithPower < programStats.total
+                ? `${programStats.nWithPower}/${programStats.total} with power`
                 : undefined}
             />
           </div>
-        )}
-        {bodyweightKg == null && (
-          <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-            Add bodyweight to your profile for personalized W/kg. Currently using a cohort estimate.
-          </div>
-        )}
-      </div>
-
-      {/* ── Power charts — expanded by default ── */}
-      <CollapsibleSection title="Power Charts" defaultOpen>
+          {bodyweightKg == null && (
+            <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              Add bodyweight to your profile for personalized W/kg. Currently using a cohort estimate.
+            </div>
+          )}
+        </div>
         <BucketLegend />
         <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
           Program — last 90 days (chronological)
@@ -566,8 +547,28 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
           const sub = [b.block_label, b.rx ? 'Rx' : null].filter(Boolean).join(' · ') || undefined;
           return <MetconDetailCard title={title} sub={sub} stats={stats} body={b.block_text} notes={b.notes} faults={b.faults} onClose={() => setSelected(null)} />;
         })()}
-        {competitionAthleteId && historicalLoaded && historicalChart.length > 0 && (
+        {competitionAthleteId && historicalLoaded && historicalStats.total > 0 && (
           <>
+            {/* Historical group: historical stats, then the historical chart. */}
+            <div style={{ padding: 14, margin: '16px 0 12px', background: SECTION_BG, borderRadius: 8 }}>
+              <div style={{
+                fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+                color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8,
+              }}>
+                Historical Power
+              </div>
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                <Stat label="Historical MetCons" value={historicalStats.total.toString()} />
+                <Stat
+                  label="Historical Average"
+                  value={historicalStats.avgWkg != null ? `${historicalStats.avgWkg.toFixed(2)} W/kg` : '—'}
+                  sub={historicalStats.nWithPower < historicalStats.total
+                    ? `${historicalStats.nWithPower}/${historicalStats.total} with power`
+                    : undefined}
+                />
+              </div>
+            </div>
+            {historicalChart.length > 0 && (<>
             <div style={{
               fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase',
               letterSpacing: 0.5, margin: '14px 0 6px',
@@ -594,6 +595,7 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
               const sub = [String(r.year), r.stage].filter(Boolean).join(' · ');
               return <MetconDetailCard title={r.workout_name} sub={sub} stats={stats} body={body} onClose={() => setSelected(null)} />;
             })()}
+            </>)}
           </>
         )}
         <TimeDomainBreakdown
