@@ -100,11 +100,15 @@ const BUCKET_ORDER: Array<'short' | 'medium' | 'long'> = ['short', 'medium', 'lo
 const BUCKET_LABEL: Record<'short' | 'medium' | 'long', string> = {
   short: 'Short', medium: 'Medium', long: 'Long',
 };
+// Neutral slate ramp for the time-domain buckets so the bars stay on-brand
+// (the red is reserved for selection). Ordinal: light → dark = short → long.
 const BUCKET_COLOR: Record<string, string> = {
-  short: '#f5a524',   // amber
-  medium: '#2ec486',  // green
-  long: '#5b8def',    // blue
+  short: '#9aa3b2',   // light slate
+  medium: '#5b6472',  // mid slate
+  long: '#2f3742',    // dark slate
 };
+// Brand red — every bar gets a hairline of it; a tapped bar fills with it.
+const SELECTED_COLOR = '#F4433B';
 
 /** Personalized W/kg using the athlete's bodyweight. Falls back to the
  *  cohort-default `avg_w_per_kg` (population basis) when bodyweight is
@@ -190,9 +194,13 @@ function WkgBarChart({
               <div style={{
                 width: '100%',
                 height: `${maxVal > 0 ? Math.max((it.value / maxVal) * 100, 4) : 4}%`,
-                background: (it.bucket && BUCKET_COLOR[it.bucket]) || 'var(--accent)', borderRadius: 2,
+                // Tapped bar fills brand red; otherwise the slate bucket color.
+                background: isSel ? SELECTED_COLOR : ((it.bucket && BUCKET_COLOR[it.bucket]) || 'var(--accent)'),
+                borderRadius: 2,
+                // Hairline red outline on every bar.
+                border: `1px solid ${SELECTED_COLOR}`,
+                boxSizing: 'border-box',
                 opacity: dim ? 0.4 : 1,
-                outline: isSel ? '2px solid var(--text)' : 'none', outlineOffset: 1,
               }} />
             </button>
           );
