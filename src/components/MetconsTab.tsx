@@ -428,7 +428,11 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
           ? { key: `${r.year}-${r.workout_name}-${i}`, label: `${r.year} ${r.workout_name}`, value: w, bucket: r.workout?.time_domain?.bucket ?? undefined }
           : null;
       })
-      .filter((x): x is NonNullable<typeof x> => x !== null);
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+      // Chronological, oldest→newest (matches the program chart). Labels start
+      // with the 4-digit year, so a label sort orders by year then workout
+      // (e.g. "2019 19.1" before "2019 19.5" before "2026 Event 1").
+      .sort((a, b) => a.label.localeCompare(b.label));
   }, [historical, bodyweightKg]);
 
   // ── Per-time-domain power rollups (shared helper → can't drift from the
