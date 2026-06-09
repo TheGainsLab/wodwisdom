@@ -832,6 +832,10 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
               const restoredMetcon: Record<string, MetconEntryValues> = { ...initialMetcon };
               const restoredSkills: Record<string, SkillsEntryValues> = { ...initialSkills };
               const restoredAccessory: Record<string, AccessoryEntryValues> = { ...initialAccessory };
+              // Restore which review faults the user previously checked. Keyed
+              // to match the checkbox keys (`${bi}-str` / `${bi}-m{n}` / `${bi}-sk{n}`)
+              // so they re-tick on reload instead of always reading as unchecked.
+              const restoredFaults: Record<string, string[]> = {};
 
               // Group entries by block_label to figure out which block index they belong to
               for (const entry of savedEntryRows) {
@@ -849,6 +853,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                     quality: (entry.quality as EntryValues['quality']) ?? undefined,
                     set_number: entry.set_number,
                   };
+                  if (entry.faults_observed?.length) restoredFaults[`${bi}-str`] = entry.faults_observed;
                 } else if (block.type === 'metcon') {
                   const key = `${bi}-m${entry.sort_order}`;
                   restoredMetcon[key] = {
@@ -861,6 +866,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                     rpe: entry.rpe ?? undefined,
                     quality: (entry.quality as MetconEntryValues['quality']) ?? undefined,
                   };
+                  if (entry.faults_observed?.length) restoredFaults[key] = entry.faults_observed;
                 } else if (block.type === 'skills') {
                   const key = `${bi}-sk${entry.sort_order}`;
                   restoredSkills[key] = {
@@ -872,6 +878,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                     quality: (entry.quality as SkillsEntryValues['quality']) ?? undefined,
                     variation: entry.variation ?? undefined,
                   };
+                  if (entry.faults_observed?.length) restoredFaults[key] = entry.faults_observed;
                 } else if (block.type === 'accessory') {
                   const key = `${bi}-ac${entry.sort_order}`;
                   restoredAccessory[key] = {
@@ -893,6 +900,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
               setMetconEntries(restoredMetcon);
               setSkillsEntries(restoredSkills);
               setAccessoryEntries(restoredAccessory);
+              if (Object.keys(restoredFaults).length > 0) setCheckedFaults(restoredFaults);
             }
           }
         }
