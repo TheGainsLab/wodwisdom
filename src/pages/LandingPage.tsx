@@ -52,18 +52,6 @@ const Eyebrow: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </div>
 );
 
-/** Horizontal "A → B → C" chip flow. */
-const Flow: React.FC<{ steps: string[] }> = ({ steps }) => (
-  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-    {steps.map((s, i) => (
-      <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 999, padding: '6px 14px', fontSize: 14, fontWeight: 600 }}>{s}</span>
-        {i < steps.length - 1 && <span style={{ color: 'var(--accent)', fontWeight: 700 }}>&rarr;</span>}
-      </span>
-    ))}
-  </div>
-);
-
 const sectionHeadline: React.CSSProperties = { fontSize: 'clamp(26px,3.4vw,34px)', fontWeight: 700, letterSpacing: '-.5px', lineHeight: 1.2, marginBottom: 16 };
 const bodyP: React.CSSProperties = { fontSize: 16, lineHeight: 1.7, color: 'var(--text-dim)', marginBottom: 16 };
 const featureRow: React.CSSProperties = { display: 'flex', gap: 48, alignItems: 'center', flexWrap: 'wrap' };
@@ -344,12 +332,12 @@ export default function LandingPage() {
       <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="landing-container">
           <Eyebrow>It Learns From Every Workout</Eyebrow>
-          <h2 style={{ ...sectionHeadline, textAlign: 'center' }}>Your Coach Learns From Every Workout.</h2>
-          <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0 28px' }}>
-            <Flow steps={['Assessment', 'Training', 'Results', 'Updated Understanding', 'Better Decisions', '↻ Training']} />
-          </div>
+          <h2 style={{ ...sectionHeadline, textAlign: 'center', marginBottom: 28 }}>Your Coach Learns From Every Workout.</h2>
+          <p style={{ ...bodyP, maxWidth: 760, margin: '0 auto 16px', textAlign: 'center' }}>
+            Most programs stay fixed. Yours adapts. Every workout, every score, every RPE, every quality rating sharpens the next decision — so the coach gets sharper every time you train.
+          </p>
           <p style={{ ...bodyP, maxWidth: 760, margin: '0 auto 28px', textAlign: 'center' }}>
-            Most programs stay fixed. Your coach adapts. Every score, every session, every piece of feedback sharpens the next decision. Over time it even learns to calibrate you — how your reported exertion and quality line up with your actual output — so its read on you keeps getting more accurate the longer you train. Your program isn't a fixed plan; it's a working model that adjusts to how you actually respond.
+            Over time it even learns to calibrate you: how your reported effort and quality line up with your actual output, so its read on you keeps getting more accurate. Your program isn't a fixed plan — it's a working model that adjusts to how you respond.
           </p>
           <div style={{ maxWidth: 760, margin: '0 auto' }}>
             {/* TODO: replace with the adaptation-cycle diagram */}
