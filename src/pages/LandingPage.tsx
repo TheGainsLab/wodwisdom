@@ -145,25 +145,9 @@ export default function LandingPage() {
           <a href="#how-it-works" className="landing-cta landing-cta-outline">See How It Works &rarr;</a>
         </div>
 
-        {/* Visual: evaluation screenshot with a highlighted callout. */}
-        <div style={{ position: 'relative', width: '100%', maxWidth: 820, margin: '48px auto 0' }}>
+        {/* Visual: evaluation screenshot. */}
+        <div style={{ width: '100%', maxWidth: 820, margin: '48px auto 0' }}>
           <Placeholder src="/images/hero-eval.png" alt="Your GAINS evaluation" label="[ Image placeholder — Evaluation screenshot (~820×512) ]" />
-          <div style={{
-            position: 'absolute',
-            right: 'clamp(-12px, -2vw, 0px)',
-            top: '28%',
-            maxWidth: 280,
-            background: 'var(--accent)',
-            color: 'white',
-            borderRadius: 10,
-            padding: '12px 16px',
-            fontSize: 14,
-            lineHeight: 1.5,
-            boxShadow: '0 8px 24px rgba(0,0,0,.25)',
-            textAlign: 'left',
-          }}>
-            "Your profile tells the story of a strength-dominant athlete…"
-          </div>
         </div>
 
         <p style={{ marginTop: 24, fontSize: 14, color: 'var(--text-dim)', fontWeight: 500 }}>
@@ -185,16 +169,13 @@ export default function LandingPage() {
 
           {/* Split screen: anonymous record vs. personalized coach read */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
-            {/* Left — someone else's workout */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
-              <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 16 }}>
-                Someone Else's Workout
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-                <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-dim)' }}>Fran</span>
-                <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-dim)' }}>3:42</span>
-              </div>
-              <div style={{ marginTop: 12, fontSize: 14, color: 'var(--text-muted)' }}>Saved.</div>
+            {/* Left — someone else's workout: just a logged result, no insight */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 }}>
+              <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-dim)' }}>Fran</span>
+              <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-dim)' }}>3:42</span>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-label="Logged">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
             </div>
             {/* Right — your coach (real evaluation screenshot) */}
             <img
@@ -259,32 +240,33 @@ export default function LandingPage() {
             </p>
           </div>
           <div style={featureCol}>
-            {/* TODO: replace with power-duration curve + percentile/ranking screenshot */}
-            <Placeholder label="[ Image placeholder — Power-duration curve + percentile / ranking view ]" />
+            <Placeholder src="/images/power-duration-curve.png" alt="Power-duration curve — your watts per kilogram across every time domain" label="[ Image placeholder — Power-duration curve + percentile / ranking view ]" />
           </div>
         </div>
       </section>
 
       {/* ===== Your Coach, Every Training Day ===== */}
       <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
-        <div className="landing-container" style={featureRow}>
-          <div style={featureCol}>
-            {/* TODO: replace with training-intent + coach-chat screenshots (rowing-pacing example) */}
-            <Placeholder label="[ Image placeholder — Training-intent screen + coach chat (rowing-pacing example) ]" />
+        <div className="landing-container" style={{ maxWidth: 760 }}>
+          <Eyebrow>Your Coach, Every Training Day</Eyebrow>
+          <h2 style={sectionHeadline}>Every Workout Has a Purpose.</h2>
+          <p style={bodyP}>The coach doesn't just tell you what to do. For each session it explains:</p>
+          <ul style={{ margin: '0 0 16px', paddingLeft: 18, fontSize: 16, lineHeight: 1.8, color: 'var(--text-dim)' }}>
+            <li>Why today's workout exists</li>
+            <li>What adaptation you're chasing</li>
+            <li>What success looks like</li>
+            <li>How it fits into your goals</li>
+          </ul>
+          {/* Training-intent screen — illustrates the bullets above. */}
+          <div style={{ margin: '8px 0 28px' }}>
+            <Placeholder src="/images/training-intent.png" alt="A training day with its intent: why it exists, the adaptation, and what success looks like" label="[ Image placeholder — Training-intent screen ]" />
           </div>
-          <div style={featureCol}>
-            <Eyebrow>Your Coach, Every Training Day</Eyebrow>
-            <h2 style={sectionHeadline}>Every Workout Has a Purpose.</h2>
-            <p style={bodyP}>The coach doesn't just tell you what to do. For each session it explains:</p>
-            <ul style={{ margin: '0 0 16px', paddingLeft: 18, fontSize: 16, lineHeight: 1.8, color: 'var(--text-dim)' }}>
-              <li>Why today's workout exists</li>
-              <li>What adaptation you're chasing</li>
-              <li>What success looks like</li>
-              <li>How it fits into your goals</li>
-            </ul>
-            <p style={{ ...bodyP, marginBottom: 0 }}>
-              <span style={{ fontWeight: 600, color: 'var(--text)' }}>Ask the Coach:</span> And when you have a question, the coach answers in context. It sees your profile, your history, today's workout, and your strengths and weaknesses — so the answer is specific to you, not generic internet advice. Your first three questions are free.
-            </p>
+          <p style={{ ...bodyP, marginBottom: 0 }}>
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Ask the Coach:</span> And when you have a question, the coach answers in context. It sees your profile, your history, today's workout, and your strengths and weaknesses — so the answer is specific to you, not generic internet advice. Your first three questions are free.
+          </p>
+          {/* Coach-chat screen (rowing-pacing example). */}
+          <div style={{ marginTop: 20 }}>
+            <Placeholder src="/images/AI-coach.png" alt="The AI coach answering a pacing question in the context of your workout" label="[ Image placeholder — Coach chat (rowing-pacing example) ]" />
           </div>
         </div>
       </section>
