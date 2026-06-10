@@ -26,6 +26,7 @@ interface MetconBlockLite {
   rx: boolean;
   avg_power_watts: number | null;
   avg_w_per_kg: number | null;
+  joules: number | null;
   work_seconds: number | null;
   time_domain: string | null;
   capped: boolean | null;
@@ -92,7 +93,6 @@ function fmtHistoricalMovements(movements?: HistoricalMovement[]): string {
 }
 
 const SECTION_BG = 'var(--surface2)';
-const PROGRAM_WINDOW_DAYS = 90;
 
 // Time-domain bucketing — buckets are ours (same boundaries on program +
 // competition), so program and historical can share one color language.
@@ -327,8 +327,8 @@ function TimeDomainBreakdown({
     </div>
   );
   return (
-    <div style={{ marginTop: 12 }}>
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+    <div style={{ marginTop: 16 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: 0.8, color: 'var(--text)', textTransform: 'uppercase', marginBottom: 10 }}>
         Power by time domain
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: showHistorical ? '72px 1fr 1fr' : '72px 1fr', gap: '6px 10px', alignItems: 'center' }}>
@@ -421,30 +421,30 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
     };
   }, [historical, bodyweightKg]);
 
-  // ── Program chart series — chronological, last 90 days ──
-  const programChart = useMemo(() => {
-    const cutoff = new Date();
-    cutoff.setHours(0, 0, 0, 0);
-    cutoff.setDate(cutoff.getDate() - PROGRAM_WINDOW_DAYS);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
-    const items = metconBlocks
-      .filter(b => b.workout_date >= cutoffStr)
+  // ── Program power-duration points — one per metcon with a power read.
+  // Duration is recovered exactly as joules / avg_power_watts (metcons don't
+  // persist work_seconds; the power calc's time is implicit in that ratio). ──
+  const programCurvePoints = useMemo(() => {
+    return metconBlocks
       .map(b => {
         const w = wPerKg(b.avg_power_watts, b.avg_w_per_kg, bodyweightKg);
-        return w != null && Number.isFinite(w)
-          ? { key: b.id, label: formatDate(b.workout_date), subLabel: b.score ?? undefined, value: w, bucket: b.time_domain ?? undefined }
-          : null;
+        if (w == null || !Number.isFinite(w)) return null;
+        if (b.joules == null || b.avg_power_watts == null || b.avg_power_watts <= 0) return null;
+        const durationSec = b.joules / b.avg_power_watts;
+        if (!Number.isFinite(durationSec) || durationSec <= 0) return null;
+        return { key: b.id, durationSec, wkg: w, bucket: b.time_domain ?? undefined, label: formatDate(b.workout_date), subLabel: b.score ?? undefined };
       })
-      .filter((x): x is NonNullable<typeof x> => x !== null)
-      .sort((a, b) => a.label.localeCompare(b.label));
-    // Sort by underlying date (label is "Jan 5" — string sort breaks). Resort using original date.
-    items.sort((a, b) => {
-      const da = metconBlocks.find(x => x.id === a.key)?.workout_date ?? '';
-      const db = metconBlocks.find(x => x.id === b.key)?.workout_date ?? '';
-      return da.localeCompare(db);
-    });
-    return items;
+      .filter((x): x is NonNullable<typeof x> => x !== null);
   }, [metconBlocks, bodyweightKg]);
+
+  // Bars ordered short → long by duration, so the power-duration shape reads
+  // left-to-right (high W/kg at short, falling off as duration grows). Label is
+  // the workout's duration; the date/score ride along as the tooltip sub-label.
+  const programDurationBars = useMemo(() =>
+    [...programCurvePoints]
+      .sort((a, b) => a.durationSec - b.durationSec)
+      .map(p => ({ key: p.key, label: fmtSeconds(p.durationSec), subLabel: p.subLabel, value: p.wkg, bucket: p.bucket })),
+    [programCurvePoints]);
 
   // ── Historical chart series — chronological, label = workout name ──
   const historicalChart = useMemo(() => {
@@ -511,8 +511,8 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
         {/* Program group: program stats, then the program chart. */}
         <div style={{ padding: 14, marginBottom: 12, background: SECTION_BG, borderRadius: 8 }}>
           <div style={{
-            fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
-            color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8,
+            fontSize: 13, fontWeight: 800, letterSpacing: 0.8,
+            color: 'var(--text)', textTransform: 'uppercase', marginBottom: 10,
           }}>
             Power
           </div>
@@ -532,15 +532,19 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
             </div>
           )}
         </div>
-        <BucketLegend />
-        <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-          Program — last 90 days (chronological)
+        <div style={{ fontSize: 10, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+          Power vs Duration
         </div>
+        <BucketLegend />
+        <div style={{ height: 10 }} />
         <WkgBarChart
-          items={programChart}
+          items={programDurationBars}
           selectedKey={selected?.source === 'program' ? selected.key : null}
           onSelect={(k) => setSelected(prev => prev?.source === 'program' && prev.key === k ? null : { source: 'program', key: k })}
         />
+        <div style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center', marginTop: 2 }}>
+          shorter ← duration → longer
+        </div>
         {selected?.source === 'program' && (() => {
           const b = metconBlocks.find(x => x.id === selected.key);
           if (!b) return null;
@@ -558,10 +562,11 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
         {competitionAthleteId && historicalLoaded && historicalStats.total > 0 && (
           <>
             {/* Historical group: historical stats, then the historical chart. */}
+            <div style={{ borderTop: '1px solid var(--border)', margin: '28px 0 0' }} />
             <div style={{ padding: 14, margin: '16px 0 12px', background: SECTION_BG, borderRadius: 8 }}>
               <div style={{
-                fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
-                color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8,
+                fontSize: 13, fontWeight: 800, letterSpacing: 0.8,
+                color: 'var(--text)', textTransform: 'uppercase', marginBottom: 10,
               }}>
                 Historical Power
               </div>
@@ -606,6 +611,7 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
             </>)}
           </>
         )}
+        <div style={{ borderTop: '1px solid var(--border)', margin: '28px 0 0' }} />
         <TimeDomainBreakdown
           program={programBuckets}
           historical={historicalBuckets}

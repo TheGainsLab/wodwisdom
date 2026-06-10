@@ -1081,6 +1081,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       id: string; log_id: string; block_label: string | null; block_text: string;
       score: string | null; rx: boolean;
       avg_power_watts: number | null; avg_w_per_kg: number | null;
+      joules: number | null;
       work_seconds: number | null; time_domain: string | null;
       capped: boolean | null; percentile: number | null;
       notes: string | null;
@@ -1098,6 +1099,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           id: b.id, log_id: b.log_id, block_label: b.block_label, block_text: b.block_text,
           score: b.score, rx: b.rx,
           avg_power_watts: b.avg_power_watts, avg_w_per_kg: b.avg_w_per_kg,
+          joules: b.joules,
           work_seconds: b.work_seconds, time_domain: b.time_domain,
           capped: b.capped, percentile: b.percentile,
           notes: b.notes,
