@@ -298,17 +298,14 @@ export default function LandingPage() {
             <Eyebrow>A Common Language for Fitness</Eyebrow>
             <h2 style={sectionHeadline}>Fitness Needs a Common Language.</h2>
             <p style={bodyP}>
-              A rowing workout doesn't look like a lifting workout. A two-minute sprint doesn't look like a twenty-minute grinder. The coach converts performance into a common measurement — watts and watts per kilogram — so progress can be tracked across every time domain on one scale.
+              A rowing workout doesn't look like a lifting workout. A two-minute sprint doesn't look like a twenty-minute grinder. The coach converts every result into watts and watts per kilogram — one scale for every workout you do.
             </p>
-            <p style={{ ...bodyP, marginBottom: 8, fontWeight: 600, color: 'var(--text)' }}>Now you can see:</p>
-            <ul style={{ margin: '0 0 16px', paddingLeft: 18, fontSize: 16, lineHeight: 1.8, color: 'var(--text-dim)' }}>
-              <li>What you're strong at</li>
-              <li>Where you're weak</li>
-              <li>What's improving</li>
-              <li>What's stagnating</li>
-            </ul>
+            <p style={{ ...bodyP, marginBottom: 12, fontWeight: 600, color: 'var(--text)' }}>That unlocks two things you couldn't see before:</p>
             <p style={bodyP}>
-              <span style={{ fontWeight: 600, color: 'var(--text)' }}>…and where you stand:</span> Your numbers aren't read in isolation — they're compared against 15 million workouts, plus Open, Quarterfinal, and competition data. So you can see exactly where you rank and how far you are from the top 1%.
+              <span style={{ fontWeight: 600, color: 'var(--text)' }}>Progress over time.</span> Because everything's on one scale, you can finally tell what's improving and what's stalling — across every time domain, not just the workouts you happen to repeat.
+            </p>
+            <p style={{ ...bodyP, marginBottom: 0 }}>
+              <span style={{ fontWeight: 600, color: 'var(--text)' }}>Where you stand.</span> Your numbers are ranked against 15 million workouts, plus Open, Quarterfinal, and competition data — so you know exactly where you sit, and how far you are from the top 1%.
             </p>
           </div>
           <div style={featureCol}>
