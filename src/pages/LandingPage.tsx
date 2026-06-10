@@ -68,6 +68,8 @@ const sectionHeadline: React.CSSProperties = { fontSize: 'clamp(26px,3.4vw,34px)
 const bodyP: React.CSSProperties = { fontSize: 16, lineHeight: 1.7, color: 'var(--text-dim)', marginBottom: 16 };
 const featureRow: React.CSSProperties = { display: 'flex', gap: 48, alignItems: 'center', flexWrap: 'wrap' };
 const featureCol: React.CSSProperties = { flex: '1 1 360px', minWidth: 280 };
+const stepBadge: React.CSSProperties = { flex: '0 0 auto', width: 34, height: 34, borderRadius: '50%', border: '2px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 15 };
+const stepTitle: React.CSSProperties = { fontSize: 17, fontWeight: 700, color: 'var(--text)' };
 
 const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   {
@@ -229,29 +231,62 @@ export default function LandingPage() {
       <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="landing-container">
           <Eyebrow>How It Knows You</Eyebrow>
-          <h2 style={{ ...sectionHeadline, textAlign: 'center' }}>Before Programming, Understanding</h2>
-          <div className="landing-offerings-grid">
-            <div className="landing-offering-card">
-              <h3>Your Profile</h3>
-              <p>Strength numbers, key ratios, skills, benchmarks, goals.</p>
-            </div>
-            <div className="landing-offering-card">
-              <h3>Your History</h3>
-              <p>Competition results, training history, past performance.</p>
-            </div>
-            <div className="landing-offering-card">
-              <h3>Your Training</h3>
-              <p>Every workout, every score, every RPE, every quality rating.</p>
-            </div>
-          </div>
-          <p style={{ ...bodyP, maxWidth: 760, margin: '32px auto 0', textAlign: 'center' }}>
-            From those, the coach evaluates every part of your fitness — strength, conditioning, gymnastics, competition performance, and movement limitations — before recommending what comes next. It starts with your profile and gets sharper every time you train.
+          <h2 style={sectionHeadline}>Get Your Free Evaluation.</h2>
+          <p style={{ ...bodyP, maxWidth: 720 }}>
+            Before it programs anything, the coach builds a complete picture of you — strength, conditioning, gymnastics, competition performance, and movement limitations. That picture is your evaluation, and it's the foundation of everything that follows.
           </p>
-          <div style={{ maxWidth: 920, margin: '32px auto 0' }}>
-            <Placeholder src="/images/section2-eval.png" alt="A full GAINS fitness evaluation" label="[ Image placeholder — Full evaluation screenshot (different view than hero) ]" />
+
+          {/* Numbered path: build profile → add history → get evaluation (the destination). */}
+          <div style={{ maxWidth: 640, marginTop: 28 }}>
+            {/* ① Build your profile */}
+            <div style={{ display: 'flex', gap: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={stepBadge}>1</div>
+                <div style={{ flex: 1, width: 2, background: 'var(--accent)', minHeight: 16 }} />
+              </div>
+              <div style={{ paddingBottom: 28 }}>
+                <div style={stepTitle}>Build your profile <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>— about five minutes.</span></div>
+                <p style={{ ...bodyP, marginTop: 4, marginBottom: 0 }}>Strength numbers, key ratios, skills, benchmarks, goals.</p>
+              </div>
+            </div>
+            {/* ② Add your history */}
+            <div style={{ display: 'flex', gap: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={stepBadge}>2</div>
+                <div style={{ flex: 1, width: 2, background: 'var(--accent)', minHeight: 16 }} />
+              </div>
+              <div style={{ paddingBottom: 28 }}>
+                <div style={stepTitle}>Add your history <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>— have you done the CrossFit Open?</span></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 14 }}>
+                  <div>
+                    <Link to="/auth?signup=1&path=link" className="landing-cta" style={{ display: 'inline-block', padding: '10px 20px', fontSize: 14 }}>Yes — link my history</Link>
+                    <p style={{ ...bodyP, fontSize: 14, marginTop: 6, marginBottom: 0 }}>Link your Opens and get your entire competitive career analyzed in seconds.</p>
+                  </div>
+                  <div>
+                    <Link to="/auth?signup=1&path=benchmark" className="landing-cta landing-cta-outline" style={{ display: 'inline-block', padding: '10px 20px', fontSize: 14 }}>No — see how you'd stack up</Link>
+                    <p style={{ ...bodyP, fontSize: 14, marginTop: 6, marginBottom: 0 }}>Complete a few past Open workouts and we'll build your baseline.</p>
+                  </div>
+                </div>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 14, marginBottom: 0 }}>Free account — takes a minute. Then you're in.</p>
+              </div>
+            </div>
+            {/* ③ Get your evaluation — the destination */}
+            <div style={{ display: 'flex', gap: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ ...stepBadge, background: 'var(--accent)', borderColor: 'var(--accent)', color: '#fff' }}>3</div>
+              </div>
+              <div style={{ alignSelf: 'center' }}>
+                <div style={stepTitle}>Get your evaluation <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>— your strengths, your weaknesses, where you rank.</span></div>
+              </div>
+            </div>
           </div>
-          <div style={{ textAlign: 'center', marginTop: 32 }}>
-            <Link to="/auth?signup=1" className="landing-cta">Get Your Free Evaluation</Link>
+
+          {/* The evaluation itself */}
+          <div style={{ maxWidth: 920, margin: '36px auto 0' }}>
+            <Placeholder src="/images/section2-eval.png" alt="A full GAINS fitness evaluation" label="[ Image placeholder — Full evaluation screenshot ]" />
+            <p style={{ textAlign: 'center', fontSize: 17, fontWeight: 600, color: 'var(--text)', lineHeight: 1.6, margin: '20px auto 0' }}>
+              Your evaluation identifies your gaps. Your program fixes them.
+            </p>
           </div>
         </div>
       </section>
