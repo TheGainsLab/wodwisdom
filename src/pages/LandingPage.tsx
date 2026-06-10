@@ -160,30 +160,67 @@ export default function LandingPage() {
         <div className="landing-container">
           <Eyebrow>Data comes to life</Eyebrow>
           <h2 style={sectionHeadline}>Most Apps Record Your Workout. Your Coach Interprets It.</h2>
-          <p style={{ ...bodyP, maxWidth: 680 }}>
+          <p style={{ ...bodyP, maxWidth: 680, marginBottom: 36 }}>
             A spreadsheet saves your score. A coach tells you what it means — and what to do about it.
           </p>
-          <div style={{ marginBottom: 36 }}>
-            <Flow steps={['Workout', 'Context', 'Insight', 'Action']} />
+
+          {/* Split screen: a bare logged result vs. the personalized coach read */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, alignItems: 'start' }}>
+            {/* Left — Most Apps: just a logged result, no insight */}
+            <div>
+              <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 15, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 14 }}>
+                Most Apps
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '22px 0' }}>
+                <span style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-dim)' }}>Fran</span>
+                <span style={{ fontSize: 32, fontWeight: 800, color: 'var(--text-dim)' }}>3:42</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 9px' }}>RX</span>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-label="Logged">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </div>
+            </div>
+            {/* Right — With GAINS: the high-info context card */}
+            <div>
+              <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 15, fontWeight: 700, color: 'var(--accent)', marginBottom: 14 }}>
+                With GAINS
+              </div>
+              <img
+                src="/images/fran-data.png"
+                alt="Your coach's read on Fran: top 12% power output, gymnastics endurance limiter, aerobic recovery improving — recommendation: increase gymnastics density"
+                loading="lazy"
+                style={{ width: '100%', display: 'block', borderRadius: 14, border: '2px solid var(--accent)', boxShadow: '0 8px 30px rgba(0,0,0,.25)' }}
+              />
+            </div>
           </div>
 
-          {/* Split screen: anonymous record vs. personalized coach read */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
-            {/* Left — someone else's workout: just a logged result, no insight */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 }}>
-              <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-dim)' }}>Fran</span>
-              <span style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-dim)' }}>3:42</span>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-label="Logged">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+          {/* The Difference — Workout → Context → Insight → Action (repositioned from the pills). */}
+          <div style={{ marginTop: 40, maxWidth: 680 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text)', marginBottom: 16 }}>
+              The Difference
             </div>
-            {/* Right — your coach (real evaluation screenshot) */}
-            <img
-              src="/images/fran-data.png"
-              alt="Your coach's read on Fran: top 12% power output, gymnastics endurance limiter, aerobic recovery improving — recommendation: increase gymnastics density"
-              loading="lazy"
-              style={{ width: '100%', display: 'block', borderRadius: 14, border: '2px solid var(--accent)', boxShadow: '0 8px 30px rgba(0,0,0,.25)' }}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 16, lineHeight: 1.5 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <span style={{ fontWeight: 700, color: 'var(--accent)', flex: '0 0 84px' }}>Workout</span>
+                <span style={{ color: 'var(--text-muted)' }}>&rarr;</span>
+                <span style={{ color: 'var(--text-dim)' }}>Fran 3:42</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <span style={{ fontWeight: 700, color: 'var(--accent)', flex: '0 0 84px' }}>Context</span>
+                <span style={{ color: 'var(--text-muted)' }}>&rarr;</span>
+                <span style={{ color: 'var(--text-dim)' }}>97th percentile &middot; <span style={{ color: 'var(--accent)', fontWeight: 600 }}>3.70 W/kg</span></span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <span style={{ fontWeight: 700, color: 'var(--accent)', flex: '0 0 84px' }}>Insight</span>
+                <span style={{ color: 'var(--text-muted)' }}>&rarr;</span>
+                <span style={{ color: 'var(--text-dim)' }}>Elite power, but the thruster lean is leaking some of it</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <span style={{ fontWeight: 700, color: 'var(--accent)', flex: '0 0 84px' }}>Action</span>
+                <span style={{ color: 'var(--text-muted)' }}>&rarr;</span>
+                <span style={{ color: 'var(--text-dim)' }}>Thruster hip drive practice</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
