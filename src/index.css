@@ -478,7 +478,7 @@ body.landing-body{overflow:auto;height:auto}
 .program-day-label{font-weight:600;flex-shrink:0}
 .program-day-summary-lines{display:flex;flex-direction:column;gap:2px;padding-left:26px}
 .program-day-summary-line{display:flex;align-items:baseline;gap:6px;font-size:12px;min-width:0}
-.program-day-summary-label{color:var(--text-dim);font-weight:600;flex-shrink:0}
+.program-day-summary-label{color:var(--accent);font-weight:600;flex-shrink:0}
 .program-day-summary-text{color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .program-day-chevron{color:var(--text-dim);transition:transform .2s ease;flex-shrink:0}
 .program-day-chevron.expanded{transform:rotate(180deg)}
