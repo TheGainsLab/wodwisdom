@@ -822,18 +822,17 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                           .filter((b) => ['strength', 'metcon', 'cardio', 'skills', 'accessory', 'other'].includes(b.block_type))
                                           .map((b) => {
                                             const label = BLOCK_DISPLAY[b.block_type] ?? b.block_type.charAt(0).toUpperCase() + b.block_type.slice(1);
-                                            // Prefer block_scheme (most informative — "5x5 @80%",
-                                            // "21-15-9 for time"), then block_label, then first movement.
+                                            // Lead with the movements (so athletes can see the weaknesses
+                                            // being targeted), then the scheme. CSS ellipsis trims overflow.
+                                            const moves = b.movements.map((m) => m.movement).filter(Boolean).slice(0, 3).join(' · ');
+                                            const scheme = (b.block_scheme && b.block_scheme.trim()) || (b.block_label && b.block_label.trim()) || '';
                                             const text =
-                                              (b.block_scheme && b.block_scheme.trim()) ||
-                                              (b.block_label && b.block_label.trim()) ||
-                                              (b.movements[0]?.movement ?? '') ||
+                                              [moves, scheme].filter(Boolean).join(' — ') ||
                                               (b.block_type === 'other' ? 'Rest day' : '');
-                                            const trimmed = text.length > 40 ? text.slice(0, 38) + '…' : text;
                                             return (
                                               <div key={b.id} className="program-day-summary-line">
                                                 <span className="program-day-summary-label">{label}:</span>
-                                                <span className="program-day-summary-text">{trimmed}</span>
+                                                <span className="program-day-summary-text">{text}</span>
                                               </div>
                                             );
                                           })
