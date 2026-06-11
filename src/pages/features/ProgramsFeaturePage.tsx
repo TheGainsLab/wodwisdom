@@ -8,7 +8,6 @@ const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
 
 export default function ProgramsFeaturePage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [evalExpanded, setEvalExpanded] = useState(false);
 
   const buyProgramming = async () => {
     setCheckoutLoading(true);
@@ -31,7 +30,7 @@ export default function ProgramsFeaturePage() {
   }, []);
 
   return (
-    <div className="feature-page">
+    <div className="feature-page feature-page-single">
       {/* Header */}
       <header className="feature-header">
         <div className="feature-header-inner">
@@ -65,117 +64,38 @@ export default function ProgramsFeaturePage() {
             <div className="feature-text">
               <h3 style={{ textAlign: 'center' }}>Step 1 — Your evaluation</h3>
               <p>
-                AI generates a detailed evaluation, focused on strengths, weaknesses and training priorities, building a foundation for long term gains.
+                Your evaluation pinpoints where you rank, what's holding you back, and what to fix first.
               </p>
-              <div className="workout-review-section" style={{ maxWidth: 720, margin: '24px 0 16px' }}>
-                <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>
-                  Profile Evaluation
-                </h3>
-                <div
-                  className="workout-review-content"
-                  style={{
-                    maxHeight: evalExpanded ? 'none' : 380,
-                    overflow: 'hidden',
-                    position: 'relative',
-                  }}
-                >
-                  <p>
-                    Looking at your profile, you're a well-rounded athlete with some clear strengths and specific areas that need work.
-                  </p>
-
-                  <p><strong>Your Strength Foundation is Solid</strong></p>
-                  <p>
-                    Your squat pattern is strong across the board. Back squat at 1.8x bodyweight and front squat at 1.6x are solid numbers for a 50-year-old. Your front squat to back squat ratio of 88% is excellent — most athletes struggle to get above 85%. Your deadlift at 2.5x bodyweight shows good posterior chain strength. The Olympic lifts tell an interesting story though — your clean at 325 is respectable, but your jerk at 315 means you're leaving weight on the platform. That 10-pound gap suggests your overhead strength or receiving position needs work.
-                  </p>
-
-                  <p><strong>Skills Show Experience but Gaps</strong></p>
-                  <p>
-                    You've clearly put time into the high-skill movements. Advanced HSPU and muscle-ups indicate good pressing strength and coordination. Your butterfly pull-ups being advanced while kipping are intermediate suggests you rushed the progression — the reference material emphasizes mastering the controlled shoulder kip before adding complexity. Your L-sit being beginner level is a red flag for core strength and shoulder stability, especially given your advanced upper body gymnastics work.
-                  </p>
-
-                  <p><strong>Conditioning Reveals Your Athletic Background</strong></p>
-                  <p>
-                    Your conditioning profile screams "former athlete who stayed fit." That 6:30 mile suggests good aerobic capacity, but your rowing times are inconsistent with your running — a 6:20 2K row is solid but your 5K row at 16:54 shows you fade on longer pieces. Your bike output is respectable but nothing special. The gap between your short and long efforts suggests you rely more on strength than aerobic development.
-                  </p>
-
-                  <p><strong>The Bigger Picture</strong></p>
-                  <p>
-                    Your strength supports your gymnastics skills well, but there are technical gaps that limit your ceiling. That jerk being 40 pounds behind your clean, combined with your overhead squat being only 65% of your back squat, points to overhead mobility or receiving position issues. Your advanced butterfly pull-ups paired with beginner L-sits suggests you've prioritized flashy skills over foundational midline strength.
-                  </p>
-
-                  <p><strong>Your Priorities</strong></p>
-                  <p>
-                    First priority: Fix your jerk mechanics and overhead position. Work push jerks from stands, overhead squats, and get that jerk closer to your clean. Second priority: Address the L-sit deficiency — it's limiting your midline strength for everything else. Third priority: Build aerobic capacity through longer, controlled efforts to match your anaerobic power with sustainable work capacity.
-                  </p>
-
-                  <p>
-                    You've got the strength and skill base of a competitive master's athlete. Clean up these technical gaps and you'll see everything improve.
-                  </p>
-
-                  {!evalExpanded && (
-                    <div style={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      height: 80,
-                      background: 'linear-gradient(to bottom, transparent, var(--surface))',
-                      pointerEvents: 'none',
-                    }} />
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEvalExpanded(e => !e)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--accent)',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    marginTop: 12,
-                    fontFamily: 'inherit',
-                    padding: 0,
-                  }}
-                >
-                  {evalExpanded ? 'Show less ↑' : 'Read more ↓'}
-                </button>
-              </div>
+              <img
+                src="/images/weak-eval.png"
+                alt="A GAINS profile evaluation calling out strengths, weaknesses, and training priorities"
+                loading="lazy"
+                className="feature-img"
+                style={{ maxWidth: 560 }}
+              />
+              <p style={{ marginTop: 28 }}>
+                Your program is built to attack exactly that. The AI takes your profile and goals and turns every gap into work on your calendar — your Olympic lifts, your gymnastics, your aerobic engine.
+              </p>
+              <img src="/images/Program-week.png" alt="A week of programming targeting your weaknesses" className="feature-img" style={{ maxWidth: 560 }} />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Step 2 — Program */}
+      {/* Step 2 — Inside a Training Day */}
       <section className="feature-section">
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Step 2 — Your program</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 2 — Inside a Training Day</h3>
               <p>
-                AI combines your evaluation, your profile and your goals to build a training program which optimizes your results.
+                Every day breaks down into blocks — warm-up to cooldown — each with loads, targets, and coaching cues.
               </p>
-              <img src="/images/Program-Card.png" alt="Sample program day" className="feature-img" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Step 4 — Coaching */}
-      <section className="feature-section">
-        <div className="feature-container">
-          <div className="feature-row">
-            <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Step 4 — Coaching</h3>
-              <p>
-                Tap Coach to get personalized assistance — review the training intent to understand the goals for the day, with links to sources at the bottom.
+              <img src="/images/Single-Day.png" alt="A single training day — warm-up, skills, strength, accessory, metcon, and cool-down" className="feature-img" style={{ maxWidth: 560 }} />
+              <p style={{ marginTop: 24 }}>
+                Tap Coach on any block and you get the why, how to pace it, and what to watch for — not just a list of movements.
               </p>
-              <img src="/images/coach-overview.png" alt="Coach view with training intent and expandable sections" className="feature-img" />
-              <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '24px 0' }} />
-              <img src="/images/coach-skills.png" alt="Skills coaching with movement cues and common faults" className="feature-img" />
-              <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '24px 0' }} />
-              <img src="/images/coach-metcon.png" alt="MetCon coaching with pacing strategy and movement cues" className="feature-img" />
+              <img src="/images/coach-day.png" alt="Coach guidance for a training day — intent, pacing, and what to watch for" className="feature-img" style={{ maxWidth: 560 }} />
             </div>
           </div>
         </div>
