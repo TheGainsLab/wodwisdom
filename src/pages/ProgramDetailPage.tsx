@@ -1078,7 +1078,8 @@ function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
     const headerSuffix: string[] = [];
     if (b.block_label) headerSuffix.push(b.block_label);
     if (b.block_scheme) headerSuffix.push(b.block_scheme);
-    if (b.time_cap_seconds) headerSuffix.push(`cap ${Math.round(b.time_cap_seconds / 60)} min`);
+    // Skip the redundant cap when the scheme already states the duration (AMRAP/EMOM).
+    if (b.time_cap_seconds && !/\b(amrap|emom)\b/i.test(b.block_scheme ?? '')) headerSuffix.push(`cap ${Math.round(b.time_cap_seconds / 60)} min`);
     lines.push(`${labelHeader}:${headerSuffix.length ? ' ' + headerSuffix.join(' — ') : ''}`);
     if (b.block_notes) lines.push(`  ${b.block_notes}`);
     for (const m of b.movements) lines.push(`  ${fmt(m)}`);
@@ -1266,7 +1267,10 @@ function V3BlockCard({ block, onUpdateMovement, onAddMovement, onRemoveMovement,
   onRemoveMovement?: (movementId: string) => Promise<void>;
 }) {
   const displayLabel = BLOCK_DISPLAY[block.block_type] ?? block.block_type;
-  const timeCapMin = block.time_cap_seconds ? Math.round(block.time_cap_seconds / 60) : null;
+  // AMRAP / EMOM bake the duration into the scheme ("AMRAP 12", "EMOM 8"), so a
+  // separate "cap 12 min" pill is redundant — suppress it for those.
+  const schemeBakesDuration = /\b(amrap|emom)\b/i.test(block.block_scheme ?? '');
+  const timeCapMin = block.time_cap_seconds && !schemeBakesDuration ? Math.round(block.time_cap_seconds / 60) : null;
 
   // Reuse the existing .workout-block-label[data-block="…"] CSS for
   // per-block-type colors (warm-up amber, skills purple, strength pink,
