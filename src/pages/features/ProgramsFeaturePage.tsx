@@ -54,6 +54,9 @@ export default function ProgramsFeaturePage() {
         <p className="feature-hero-sub">
           The program that follows you.
         </p>
+        <p className="feature-hero-body">
+          Built from your strength, skills, conditioning, and competition history — then aimed at the adaptations that move your fitness the most. You train on what's actually holding you back, so you get fitter faster.
+        </p>
       </section>
 
       {/* Step 1 — Profile */}
