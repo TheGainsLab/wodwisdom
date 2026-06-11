@@ -133,6 +133,8 @@ Accessory selection must directly address the top 2–3 closable gaps in the ath
 
 For unlinked athletes (no Tier 4 data), drive accessory selection from the imbalance ratios above and from goal text.
 
+Accessory is STRAIGHT SETS — deliberate volume work, done set-by-set with rest, NEVER for time and NEVER a timed circuit. Its block_scheme must describe straight-set structure (e.g. "3 sets each", "4×10", "3–4 sets, controlled tempo") and must NOT use "rounds", "RFT", "for time", "AMRAP", or any clock/circuit framing — that wrongly tells the athlete to race a clock through hypertrophy work. (Per-movement sets/reps still carry the actual prescription.)
+
 Accessory loading. Accessory follows strength and often follows metcon. The athlete is fatigued — accessory is volume work for hypertrophy / movement quality / weakness remediation, not peak strength. Cap accordingly:
   - Variants of foundational lifts (Bench Press, RDL, Push Press, Shoulder to Overhead, Front Squat, etc.): ≤ 75% of relevant 1RM in build weeks, ≤ 80% on a peak week only when RPE is managed.
   - Pure accessory work (single-arm DB row, DB lunge, weighted carries, glute bridge): hypertrophy intensity — 60–70% of related primary 1RM, or bodyweight + scaled load.
@@ -233,7 +235,7 @@ EXAMPLE OUTPUT (one day of one week — actual output emits all 4 weeks × days_
             },
             {
               "block_type": "accessory",
-              "block_scheme": "3 rounds, slow tempo",
+              "block_scheme": "3 sets each, controlled tempo",
               "movements": [
                 { "movement": "Romanian Deadlift", "sets": 3, "reps": 10, "weight": 185, "weight_unit": "lbs", "target_pct_1rm": 65 },
                 { "movement": "Hollow Hold", "sets": 3, "time_seconds": 30 }
