@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
-import ProfileMockup from '../../components/ProfileMockup';
 import '../../features.css';
 
 const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
@@ -59,31 +58,12 @@ export default function ProgramsFeaturePage() {
         </p>
       </section>
 
-      {/* Step 1 — Profile */}
-      <section className="feature-section">
-        <div className="feature-container">
-          <div className="feature-row">
-            <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Step 1 — Your profile</h3>
-              <p>
-                Five minutes to build the profile that powers your program.
-              </p>
-              <ul>
-                <li>Strength, skill levels, and conditioning benchmarks</li>
-                <li>Training history and goals</li>
-              </ul>
-              <ProfileMockup />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Step 2 — Evaluation */}
+      {/* Step 1 — Evaluation */}
       <section className="feature-section">
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Step 2 — Your evaluation</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 1 — Your evaluation</h3>
               <p>
                 AI generates a detailed evaluation, focused on strengths, weaknesses and training priorities, building a foundation for long term gains.
               </p>
@@ -167,12 +147,12 @@ export default function ProgramsFeaturePage() {
         </div>
       </section>
 
-      {/* Step 3 — Program */}
+      {/* Step 2 — Program */}
       <section className="feature-section">
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Step 3 — Your program</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 2 — Your program</h3>
               <p>
                 AI combines your evaluation, your profile and your goals to build a training program which optimizes your results.
               </p>
