@@ -1477,7 +1477,7 @@ function V3AiEditPanel({ state, request, setRequest, proposal, error, onSubmit, 
             autoFocus
           />
           <button type="button" className="ai-block-edit-go" onClick={onSubmit} disabled={state === 'loading' || !request.trim()}>
-            {state === 'loading' ? 'Thinking…' : 'Propose'}
+            {state === 'loading' ? 'Thinking…' : 'Ask AI'}
           </button>
           <button type="button" className="ai-block-edit-cancel" onClick={onCancel} disabled={state === 'loading'}>Cancel</button>
         </div>
@@ -1580,6 +1580,17 @@ function V3MovementEditRow({ movement, onUpdate, onRemove }: {
   const [weight, setWeight] = useState<string>(movement.weight != null ? String(movement.weight) : '');
   const [unit, setUnit] = useState<'lbs' | 'kg'>((movement.weight_unit as 'lbs' | 'kg') ?? 'lbs');
   const [scaling, setScaling] = useState(movement.scaling_note ?? '');
+  // Cardio metcon movements measure work as distance or calories, not reps.
+  // Surface the right field so editing PRESERVES the measure instead of
+  // silently switching a "Row 500m" / "16 cal" into reps.
+  const [distance, setDistance] = useState<string>(movement.distance != null ? String(movement.distance) : '');
+  const [distanceUnit, setDistanceUnit] = useState<string>(movement.distance_unit ?? 'm');
+  const [calories, setCalories] = useState<string>(movement.calories != null ? String(movement.calories) : '');
+  // Which work measure the row edits. Derived initially from the movement, but
+  // the athlete can switch it deliberately via the measure selector.
+  const [measure, setMeasure] = useState<'reps' | 'distance' | 'calories'>(
+    movement.distance != null ? 'distance' : movement.calories != null ? 'calories' : 'reps',
+  );
 
   // Typeahead: suggest canonical movement names (matches display_name + aliases,
   // so "T2B" → "Toes To Bar"). Suggests, never forces — a no-match name is kept.
@@ -1655,6 +1666,46 @@ function V3MovementEditRow({ movement, onUpdate, onRemove }: {
     catch { setScaling(movement.scaling_note ?? ''); }
   };
 
+  const commitDistance = async () => {
+    const trimmed = distance.trim();
+    const next = trimmed === '' ? null : Number(trimmed);
+    if (next != null && (!Number.isFinite(next) || next < 0)) { setDistance(movement.distance != null ? String(movement.distance) : ''); return; }
+    if (next === (movement.distance ?? null)) return;
+    try { await onUpdate(movement.id, { distance: next }); }
+    catch { setDistance(movement.distance != null ? String(movement.distance) : ''); }
+  };
+
+  const commitDistanceUnit = async (nextUnit: string) => {
+    setDistanceUnit(nextUnit);
+    if (nextUnit === (movement.distance_unit ?? 'm')) return;
+    try { await onUpdate(movement.id, { distance_unit: nextUnit }); }
+    catch { setDistanceUnit(movement.distance_unit ?? 'm'); }
+  };
+
+  const commitCalories = async () => {
+    const trimmed = calories.trim();
+    const next = trimmed === '' ? null : Math.round(Number(trimmed));
+    if (next != null && (!Number.isFinite(next) || next < 0)) { setCalories(movement.calories != null ? String(movement.calories) : ''); return; }
+    if (next === (movement.calories ?? null)) return;
+    try { await onUpdate(movement.id, { calories: next }); }
+    catch { setCalories(movement.calories != null ? String(movement.calories) : ''); }
+  };
+
+  // Deliberately switch the work measure. Clears the other measures so the
+  // movement always carries exactly one; the new field starts empty to fill in.
+  const commitMeasure = async (next: 'reps' | 'distance' | 'calories') => {
+    if (next === measure) return;
+    const prev = measure;
+    setMeasure(next);
+    const patch: Partial<ProgramMovementV2> = {};
+    if (next !== 'reps') { patch.reps = null; patch.rep_scheme = null; setReps(''); }
+    if (next !== 'distance') { patch.distance = null; patch.distance_unit = null; setDistance(''); }
+    if (next !== 'calories') { patch.calories = null; setCalories(''); }
+    if (next === 'distance') patch.distance_unit = movement.distance_unit ?? distanceUnit ?? 'm';
+    try { await onUpdate(movement.id, patch); }
+    catch { setMeasure(prev); }
+  };
+
   return (
     <div className="movement-edit-row">
       <div className="movement-edit-name-wrap">
@@ -1693,16 +1744,62 @@ function V3MovementEditRow({ movement, onUpdate, onRemove }: {
         placeholder="Sets"
         aria-label="Sets"
       />
-      <input
-        type="text"
-        inputMode="numeric"
-        className="movement-edit-input movement-edit-input--reps"
-        value={reps}
-        onChange={e => setReps(e.target.value)}
-        onBlur={commitReps}
-        placeholder="Reps"
-        aria-label="Reps or scheme (e.g. 21-15-9)"
-      />
+      <select
+        className="movement-edit-input"
+        value={measure}
+        onChange={e => commitMeasure(e.target.value as 'reps' | 'distance' | 'calories')}
+        aria-label="Work measure"
+        title="How this movement is measured"
+      >
+        <option value="reps">Reps</option>
+        <option value="distance">Dist</option>
+        <option value="calories">Cal</option>
+      </select>
+      {measure === 'distance' ? (
+        <div className="movement-edit-weight">
+          <input
+            type="number"
+            inputMode="decimal"
+            className="movement-edit-input movement-edit-input--num"
+            value={distance}
+            onChange={e => setDistance(e.target.value)}
+            onBlur={commitDistance}
+            placeholder="Dist"
+            aria-label="Distance"
+          />
+          <select
+            className="movement-edit-input movement-edit-input--unit"
+            value={distanceUnit}
+            onChange={e => commitDistanceUnit(e.target.value)}
+            aria-label="Distance unit"
+          >
+            <option value="m">m</option>
+            <option value="ft">ft</option>
+          </select>
+        </div>
+      ) : measure === 'calories' ? (
+        <input
+          type="number"
+          inputMode="numeric"
+          className="movement-edit-input movement-edit-input--reps"
+          value={calories}
+          onChange={e => setCalories(e.target.value)}
+          onBlur={commitCalories}
+          placeholder="Cal"
+          aria-label="Calories"
+        />
+      ) : (
+        <input
+          type="text"
+          inputMode="numeric"
+          className="movement-edit-input movement-edit-input--reps"
+          value={reps}
+          onChange={e => setReps(e.target.value)}
+          onBlur={commitReps}
+          placeholder="Reps"
+          aria-label="Reps or scheme (e.g. 21-15-9)"
+        />
+      )}
       <div className="movement-edit-weight">
         <input
           type="number"
