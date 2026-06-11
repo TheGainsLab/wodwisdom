@@ -62,33 +62,23 @@ const stepTitle: React.CSSProperties = { fontSize: 17, fontWeight: 700, color: '
 const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   {
     q: 'How can I try it before paying?',
-    a: <><a href="/auth?signup=1" style={{ color: 'var(--accent)', fontWeight: 600 }}>Create a free account</a> to get access to <PN>AI Coach</PN>, the AI trained on the methodology, physiology and biochemistry. <PN>AI Coach</PN> is also included with <PN>AI Programming</PN>, <PN>Year of the Engine</PN> and <PN>All Access</PN> Programs.</>,
+    a: <>Create a <a href="/auth?signup=1" style={{ color: 'var(--accent)', fontWeight: 600 }}>free account</a>, then your evaluation, 3 coach questions, and unlimited past-Open workouts — no card required.</>,
   },
   {
-    q: "What's the difference among the programs?",
-    a: <>
-      <PN>AI Coach</PN> is an AI trained on the methodology. Get advice about anything related to fitness. It's like having access to a high-level coach 24/7.
-      <br /><br />
-      <PN>Year of the Engine</PN> is a personalized conditioning program for athletes at any level.
-      <br /><br />
-      <PN>AI Programming</PN> is customized programming written by an AI trained on methodology. Complete a user profile and the AI writes a program tailored precisely to you. Log your results and the AI learns, updating your training so you always get exactly what you need.
-    </>,
+    q: "What's the difference between the plans?",
+    a: <><PN>AI Programming</PN> builds and adapts your full training program; <PN>Year of the Engine</PN> is the conditioning program; <PN>All Access</PN> is both.</>,
   },
   {
     q: 'Can I cancel anytime?',
-    a: 'Yes. There are no contracts or commitments. You can cancel your subscription at any time and retain access through the end of your billing period.',
+    a: 'Yes. No contracts or commitments — cancel anytime and keep access through the end of your billing period.',
   },
   {
-    q: 'What else is included with my Year of the Engine subscription?',
-    a: <>All <PN>Year of the Engine</PN> subscribers also get access to the <PN>AI Coach</PN> feature and the <PN>AI Nutrition</PN> feature with unlimited usage at no additional cost.</>,
+    q: "What's included with every plan?",
+    a: 'Your AI coach, full analytics, and competition rankings.',
   },
   {
-    q: 'What else is included with my AI Programming subscription?',
-    a: <>All <PN>AI Programming</PN> subscribers also get access to the <PN>AI Coach</PN> feature with 20 questions a day and the <PN>AI Nutrition</PN> feature with unlimited usage at no additional cost.</>,
-  },
-  {
-    q: 'What is included in the All Access membership?',
-    a: <><PN>All Access</PN> members get access to <PN>AI Programming</PN>, <PN>Year of the Engine</PN>, <PN>AI Coach</PN>, and <PN>AI Nutrition</PN>. All of this for under $50 a month.</>,
+    q: 'What is All Access?',
+    a: <>Both programs — <PN>AI Programming</PN> and <PN>Year of the Engine</PN> — under one subscription, coach included.</>,
   },
   {
     q: 'I have additional questions. How can I contact you?',
@@ -146,7 +136,7 @@ export default function LandingPage() {
       </section>
 
       {/* ===== Data comes to life ===== */}
-      <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
+      <section id="how-it-works" className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="landing-container">
           <Eyebrow>Data comes to life</Eyebrow>
           <h2 style={sectionHeadline}>Most Apps Record Your Workout. Your Coach Interprets It.</h2>
@@ -346,81 +336,37 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== Explore the Platform ===== */}
+      {/* ===== Plans ===== */}
       <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
-        <div className="landing-container">
-          <h2 style={{ ...sectionHeadline, textAlign: 'center' }}>Explore the Platform</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20, marginTop: 32 }}>
-            <div className="landing-offering-card">
-              <h3>AI Programming</h3>
-              <p>Training built around you.</p>
-            </div>
-            <div className="landing-offering-card">
-              <h3>Analytics</h3>
-              <p>Know if you're improving.</p>
-            </div>
-            <div className="landing-offering-card">
-              <h3>Competition Intelligence</h3>
-              <p>See where you stand.</p>
-            </div>
-            <div className="landing-offering-card">
-              <h3>Nutrition</h3>
-              <p>Support recovery and performance.</p>
-            </div>
+        <div className="landing-container" style={{ maxWidth: 720 }}>
+          <h2 style={{ ...sectionHeadline, textAlign: 'center' }}>Let's Make Some Gains.</h2>
+          <p style={{ ...bodyP, textAlign: 'center', maxWidth: 600, margin: '0 auto 28px' }}>
+            Two programs, one bundle. The AI coach, analytics, and competition rankings come with all of them.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16, margin: '0 0 24px' }}>
+            <Link to="/features/programs" className="landing-offering-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+              <h3>AI Programming &rarr;</h3>
+              <p>Your program, built and adapted around you, with coaching guidance on every exercise.</p>
+            </Link>
+            <Link to="/features/engine" className="landing-offering-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+              <h3>Year of the Engine &rarr;</h3>
+              <p>Conditioning calibrated to you, every interval paced to your fitness.</p>
+            </Link>
+            <Link to="/auth?signup=1" className="landing-offering-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+              <h3>All Access &rarr;</h3>
+              <p>Both programs together.</p>
+            </Link>
           </div>
-        </div>
-      </section>
-
-      {/* ===== Divider ===== */}
-      <div className="landing-container" style={{ padding: '0 24px' }}>
-        <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: 0 }} />
-      </div>
-
-      {/* ===== How to Work With Us ===== */}
-      <section id="how-it-works" className="landing-explainer">
-        <div className="landing-container">
-          <h2 className="landing-section-title">Let's Make Some Gains</h2>
-          <div className="landing-offerings-grid">
-            <div className="landing-offering-card">
-              <h3>AI Coach</h3>
-              <p className="landing-offering-tagline">The brain of a Level 4 coach, available any time</p>
-              <p>Get answers you can trust, grounded in the methodology. Or go deeper—switch to science mode and talk with an AI trained on physiology and biochemistry.</p>
-              <Link to="/features/coaching" className="landing-offering-learn-more">See how it works &rarr;</Link>
-            </div>
-            <div className="landing-offering-card">
-              <h3>AI Programming</h3>
-              <p className="landing-offering-tagline">Stop following someone else's program.</p>
-              <p>AI trained on the methodology builds your program, provides coaching guidance for every exercise, and adapts as you train. See your progress with our analytics. The program follows you.</p>
-              <Link to="/features/programs" className="landing-offering-learn-more">See how it works &rarr;</Link>
-            </div>
-            <div className="landing-offering-card">
-              <h3>Year of the Engine</h3>
-              <p className="landing-offering-tagline">The best conditioning program, calibrated to you</p>
-              <p>Custom targets for every training day, pacing each interval to your fitness. Machine learning targets each energy system independently. Real-time coaching guides you through every session. Analytics give you a window into your progress — share results with AI for even deeper insights.</p>
-              <Link to="/features/engine" className="landing-offering-learn-more">See how it works &rarr;</Link>
-            </div>
-            <div className="landing-offering-card">
-              <h3>AI Nutrition</h3>
-              <p className="landing-offering-tagline">Tracking your training? Track your fuel.</p>
-              <p>Log meals with photos, barcodes, or by searching millions of foods and restaurant menus. Build templates for your go-to meals. Track macros against your targets. Because what you put in is half the equation.</p>
-              <Link to="/features/nutrition" className="landing-offering-learn-more">See how it works &rarr;</Link>
-            </div>
-          </div>
-          <div style={{ textAlign: 'center', marginTop: 32 }}>
-            <Link to="/auth?signup=1" className="landing-cta">Try it Free</Link>
-            <p style={{ marginTop: 16, fontSize: 14, color: 'var(--text-dim)', maxWidth: 560, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.6 }}>
-              Create a free account, quickly fill out a profile, and get personalized guidance from an AI coach trained on the methodology, plus an in-depth evaluation of your fitness — free!
-            </p>
-          </div>
+          <p style={{ ...bodyP, marginBottom: 8 }}>Every plan includes your AI coach, full analytics, and competition rankings. No add-ons.</p>
+          <p style={{ ...bodyP, marginBottom: 0 }}>
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Free — start here:</span> 1 evaluation, 3 coach questions, unlimited past-Open workouts. Then pick a plan.
+          </p>
         </div>
       </section>
 
       {/* ===== Pricing ===== */}
       <section id="pricing" className="landing-pricing">
         <div className="landing-container">
-          <p style={{ textAlign: 'center', fontSize: 15, color: 'var(--text-dim)', maxWidth: 640, margin: '0 auto 24px', lineHeight: 1.6 }}>
-            Personalized training and coaching for less than you'd pay for most group programs. Even bigger savings for quarterly plans and combined services.
-          </p>
           <div className="landing-pricing-table">
             <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
               <button
@@ -441,12 +387,9 @@ export default function LandingPage() {
               <span>{pricingInterval === 'monthly' ? 'Monthly' : 'Quarterly'}</span>
             </div>
             {[
-              { plan: 'coach', name: 'AI Coach', monthly: '$7.99', quarterly: '$17.99' },
-              { plan: 'nutrition', name: 'AI Nutrition', monthly: '$7.99', quarterly: '$17.99' },
-              { plan: 'coach_nutrition', name: 'AI Coach + AI Nutrition', monthly: '$11.99', quarterly: '$29.99' },
-              { plan: 'engine', name: 'AI Year of the Engine', monthly: '$29.99', quarterly: '$74.99', note: '(AI Coach and AI Nutrition included)' },
-              { plan: 'programming', name: 'AI Programming', monthly: '$29.99', quarterly: '$74.99', note: '(AI Coach and AI Nutrition included)' },
-              { plan: 'all_access', name: 'All Access', monthly: '$49.99', quarterly: '$119.99', note: '(AI Coach, AI Programming, YoE and AI Nutrition)' },
+              { plan: 'programming', name: 'AI Programming', monthly: '$29.99', quarterly: '$74.99' },
+              { plan: 'engine', name: 'Year of the Engine', monthly: '$29.99', quarterly: '$74.99' },
+              { plan: 'all_access', name: 'All Access', monthly: '$49.99', quarterly: '$119.99', note: '(AI Programming and Year of the Engine)' },
             ].map(p => (
               <div
                 key={p.plan}
