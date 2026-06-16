@@ -702,6 +702,7 @@ export default function CompetitionHistoryExperience({
                     history={competitionHistory}
                     userAge={userAge}
                     userBodyMassKg={userBodyMassKg}
+                    athleteName={linkedBundle.identity.name}
                     canLog={canLog}
                     onThrowbackLogged={() => setThrowbackToken((t) => t + 1)}
                     scope={scope}

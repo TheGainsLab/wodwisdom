@@ -140,6 +140,28 @@ Rules:
 - Use recent training to account for recent practice or fatigue.
 - Be concise and practical. Athlete-focused voice.`;
 
+const ACCESSORY_PROMPT = `You are an expert strength & conditioning coach preparing an athlete for their accessory / supporting work. Focus ONLY on the Accessory portion of the workout below. Ignore strength, metcon, skills, warm-up, and cool-down blocks.
+
+Output valid JSON only, no markdown or extra text:
+{
+  "block_type": "accessory",
+  "block_label": "Accessory",
+  "time_domain": "Set/rep tempo, rest between movements, total block duration.",
+  "cues_and_faults": [
+    { "movement": "Movement name", "cues": ["Cue 1", "Cue 2", "Cue 3"], "common_faults": ["Fault 1", "Fault 2"] }
+  ]
+}
+
+Rules:
+- Do NOT include a "prescription" field — it is injected separately.
+- Provide cues_and_faults for EVERY movement in the accessory block.
+- Accessory work targets supporting strength, hypertrophy, and structural balance — emphasize controlled tempo, full range of motion, and quality over load.
+- Cues: 2-3 actionable points of performance per movement (positioning, tempo, mind-muscle, what "good" looks like at the prescribed load).
+- Common faults: 1-2 most common errors — typically using momentum, partial range of motion, losing midline/posture, or chasing load over control.
+- time_domain should describe tempo, rest, and total duration.
+- Ground advice in the provided reference material when available.
+- Be concise and practical. Athlete-focused voice.`;
+
 // ---------------------------------------------------------------------------
 // Session-intent detection & prompt modifiers
 // ---------------------------------------------------------------------------
@@ -549,6 +571,12 @@ async function runReview(
           .then((r): [string, string] => ["skills", r])
       );
     }
+    if (blockTextByType["accessory"]) {
+      calls.push(
+        stagger(2000).then(() => callClaude(claudeOpts(ACCESSORY_PROMPT + strengthContext, buildUserContent(blockTextByType["accessory"], blockStructuredByType["accessory"]), 1024)))
+          .then((r): [string, string] => ["accessory", r])
+      );
+    }
 
     const results = await Promise.all(calls);
     const resultMap: Record<string, string> = {};
@@ -578,6 +606,13 @@ async function runReview(
       const parsed = parseJSON(resultMap["metcon"]);
       if (parsed?.block_type) {
         parsed.prescription = blockTextByType["metcon"] || "";
+        blocks.push(parsed);
+      }
+    }
+    if (resultMap["accessory"]) {
+      const parsed = parseJSON(resultMap["accessory"]);
+      if (parsed?.block_type) {
+        parsed.prescription = blockTextByType["accessory"] || "";
         blocks.push(parsed);
       }
     }

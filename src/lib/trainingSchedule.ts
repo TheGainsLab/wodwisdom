@@ -4,11 +4,12 @@
 // DAY the user plans to do. One row per source per date (DB partial unique
 // indexes) — a collision surfaces as Postgres 23505.
 //
-// Two sources, two product rules:
-//  - Program days are once-and-done: at most one schedule row per program day
-//    (reschedule = update the existing row). Completed days drop from the pool.
-//  - Engine days are a repeatable pool: the same engine day may be scheduled to
-//    multiple dates (you can repeat-DO an engine day, so repeat-PLAN is allowed).
+// Both sources are once-and-done on the calendar:
+//  - Program days: at most one schedule row per program day (reschedule = update
+//    the existing row). Completed days drop from the pool.
+//  - Engine days: at most one schedule row per engine day (DB unique
+//    uniq_schedule_engine_once). You can repeat-DO an engine day, but you can't
+//    schedule a repeat — reschedule = move the existing row instead.
 import { supabase } from './supabase';
 
 export interface ScheduleResult {
@@ -18,11 +19,12 @@ export interface ScheduleResult {
   error?: string;
 }
 
-function friendlyError(code: string | undefined, source: 'program' | 'engine', fallback: string): string {
+function friendlyError(code: string | undefined, source: 'program' | 'engine', fallback: string, message?: string): string {
   if (code === '23505') {
-    return source === 'program'
-      ? 'That date already has a program day scheduled.'
-      : 'That date already has an Engine session scheduled.';
+    if (source === 'program') return 'That date already has a program day scheduled.';
+    // Engine has two unique guards: once-per-engine-day, and one-per-date.
+    if (message && message.includes('engine_once')) return 'That Engine day is already on your calendar.';
+    return 'That date already has an Engine session scheduled.';
   }
   return fallback;
 }
@@ -40,7 +42,8 @@ export async function scheduleProgramDay(userId: string, programWorkoutId: strin
 
 /**
  * Schedule an Engine day onto a date (new row) — the engine_workout_id producer.
- * Repeats allowed: always inserts, no "already done/scheduled" guard.
+ * Once-and-done: the DB rejects a second row for the same engine day (23505 →
+ * "already on your calendar"). To move it, use rescheduleRow instead.
  */
 export async function scheduleEngineDay(userId: string, engineWorkoutId: string, date: string): Promise<ScheduleResult> {
   const { data, error } = await supabase
@@ -48,14 +51,14 @@ export async function scheduleEngineDay(userId: string, engineWorkoutId: string,
     .insert({ user_id: userId, engine_workout_id: engineWorkoutId, scheduled_date: date })
     .select('id, scheduled_date')
     .single();
-  if (error || !data) return { error: friendlyError(error?.code, 'engine', error?.message || 'Could not add to calendar.') };
+  if (error || !data) return { error: friendlyError(error?.code, 'engine', error?.message || 'Could not add to calendar.', error?.message) };
   return { id: data.id as string, scheduled_date: data.scheduled_date as string };
 }
 
 /** Move an existing schedule row to a new date. source only drives the error copy. */
 export async function rescheduleRow(rowId: string, date: string, source: 'program' | 'engine'): Promise<ScheduleResult> {
   const { error } = await supabase.from('training_schedule').update({ scheduled_date: date }).eq('id', rowId);
-  if (error) return { error: friendlyError(error.code, source, error.message || 'Could not reschedule.') };
+  if (error) return { error: friendlyError(error.code, source, error.message || 'Could not reschedule.', error.message) };
   return { id: rowId, scheduled_date: date };
 }
 

@@ -17,6 +17,8 @@ interface WorkoutLog {
   workout_text: string;
   workout_type: string;
   created_at: string;
+  status: string;
+  source_id: string | null;
 }
 
 interface ScheduledEntry {
@@ -165,6 +167,7 @@ interface WorkoutLogBlock {
   work_seconds: number | null;
   cardio_modality: string | null;
   time_domain: string | null;
+  performed_date: string | null;
 }
 
 interface WorkoutLogEntry {
@@ -643,7 +646,8 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
   // Lazy-load the schedulable pools the first time the Add panel opens.
   //  - Program: once-and-done → drop completed + already-scheduled days.
-  //  - Engine: repeatable → keep all unlocked days, tag completed with a count.
+  //  - Engine: once-and-done on the calendar → drop already-scheduled days
+  //    (repeat-DOING is fine; tag prior completions with a count).
   const loadPools = useCallback(async () => {
     setPoolLoading(true);
     try {
@@ -695,8 +699,15 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           for (const s of engineSessions) {
             if (s.program_day_number != null) doneCount.set(s.program_day_number, (doneCount.get(s.program_day_number) || 0) + 1);
           }
+          // Once-and-done: an engine day already on the calendar drops from the pool.
+          const { data: engSched } = await supabase
+            .from('training_schedule')
+            .select('engine_workout_id')
+            .eq('user_id', session.user.id)
+            .not('engine_workout_id', 'is', null);
+          const scheduledEngineIds = new Set(((engSched as { engine_workout_id: string | null }[]) || []).map((s) => s.engine_workout_id));
           const pool: EnginePoolDay[] = wk
-            .filter((w) => (w.month ?? 1) <= unlocked)
+            .filter((w) => (w.month ?? 1) <= unlocked && !scheduledEngineIds.has(w.id))
             .map((w) => ({ id: w.id, day_number: w.day_number, month: w.month ?? 1, day_type: w.day_type, doneCount: doneCount.get(w.day_number) || 0 }));
           setEnginePool(pool);
         }
@@ -726,7 +737,8 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     setScheduleError(null);
     const res = await scheduleEngineDay(session.user.id, engineWorkoutId, date);
     if (res.error) { setScheduleError(res.error); return; }
-    await fetchSchedules(); // repeats allowed → leave it in the pool
+    setEnginePool((prev) => prev.filter((d) => d.id !== engineWorkoutId)); // once-and-done
+    await fetchSchedules();
     setAddOpen(false);
   }, [session.user.id, fetchSchedules]);
 
@@ -742,7 +754,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     (async () => {
       const { data } = await supabase
         .from('workout_logs')
-        .select('id, workout_date, workout_text, workout_type, created_at')
+        .select('id, workout_date, workout_text, workout_type, created_at, status, source_id')
         .eq('user_id', session.user.id)
         .order('workout_date', { ascending: false })
         .limit(200);
@@ -776,7 +788,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         const [{ data: blocks }, { data: entries }] = await Promise.all([
           supabase
             .from('workout_log_blocks')
-            .select('id, log_id, block_type, block_label, block_text, score, rx, sort_order, percentile, performance_tier, median_benchmark, excellent_benchmark, capped, capped_reps, joules, avg_power_watts, avg_w_per_kg, body_mass_kg, work_seconds, cardio_modality, time_domain')
+            .select('id, log_id, block_type, block_label, block_text, score, rx, sort_order, percentile, performance_tier, median_benchmark, excellent_benchmark, capped, capped_reps, joules, avg_power_watts, avg_w_per_kg, body_mass_kg, work_seconds, cardio_modality, time_domain, performed_date')
             .in('log_id', logIds),
           supabase
             .from('workout_log_entries')
@@ -864,15 +876,6 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
   // ── Derived data for overview tab ──
 
-  const logsByDate = useMemo(() => {
-    const map: Record<string, WorkoutLog[]> = {};
-    for (const log of logs) {
-      if (!map[log.workout_date]) map[log.workout_date] = [];
-      map[log.workout_date].push(log);
-    }
-    return map;
-  }, [logs]);
-
   const scheduledByDate = useMemo(() => {
     const map: Record<string, ScheduledEntry[]> = {};
     for (const s of scheduled) {
@@ -907,23 +910,86 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     return map;
   }, [engineTimeTrials]);
 
-  // Month-grid inputs: completed-day counts + per-date status (scheduled /
-  // completed / both) for distinct, non-heatmap styling. Completed merges
-  // manual/AI logs + Engine sessions; the grid stays source-agnostic.
+  // Journal core: a workout's blocks can land on different calendar days
+  // (per-block performed_date). Group each log's blocks by the date performed,
+  // and derive which dates show a COMPLETION (a workout finished there, i.e. the
+  // last block of a completed log) vs PARTIAL progress (blocks done, nothing
+  // finished there). A date can hold blocks from several workouts.
+  const { logBlocksByDate, completedDates, partialDates } = useMemo(() => {
+    const byDate = new Map<string, Map<string, WorkoutLogBlock[]>>();
+    const completed = new Set<string>();
+    const partial = new Set<string>();
+    const place = (date: string, logId: string, block: WorkoutLogBlock | null) => {
+      if (!byDate.has(date)) byDate.set(date, new Map());
+      const m = byDate.get(date)!;
+      if (!m.has(logId)) m.set(logId, []);
+      if (block) m.get(logId)!.push(block);
+    };
+    for (const log of logs) {
+      const blocks = blocksByLog[log.id] || [];
+      const datesForLog = new Set<string>();
+      if (blocks.length === 0) {
+        // v1 prose log (no structured blocks): anchor on its workout_date.
+        datesForLog.add(log.workout_date);
+        place(log.workout_date, log.id, null);
+      } else {
+        for (const b of blocks) {
+          const d = b.performed_date || log.workout_date;
+          datesForLog.add(d);
+          place(d, log.id, b);
+        }
+      }
+      if (log.status === 'completed' && datesForLog.size > 0) {
+        const finish = [...datesForLog].sort().at(-1)!;
+        completed.add(finish);
+        for (const d of datesForLog) if (d !== finish) partial.add(d);
+      } else {
+        for (const d of datesForLog) partial.add(d);
+      }
+    }
+    return { logBlocksByDate: byDate, completedDates: completed, partialDates: partial };
+  }, [logs, blocksByLog]);
+
+  // source_id (program_workout_id) → its scheduled entry, for day-detail labels.
+  const scheduleBySource = useMemo(() => {
+    const m = new Map<string, ScheduledEntry>();
+    for (const s of scheduled) m.set(s.program_workout_id, s);
+    return m;
+  }, [scheduled]);
+  const logById = useMemo(() => new Map(logs.map(l => [l.id, l])), [logs]);
+  // Blocks completed per date (numerator only — a date can hold blocks from
+  // several workouts, so no denominator). Shown on in-progress cells.
+  const blockCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const [date, byLog] of logBlocksByDate) {
+      let n = 0;
+      for (const blocks of byLog.values()) n += blocks.length;
+      if (n > 0) map[date] = n;
+    }
+    return map;
+  }, [logBlocksByDate]);
+
+  // Month-grid inputs: completed-day counts (heatmap fallback) + per-date status.
   const workoutCounts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const log of logs) map[log.workout_date] = (map[log.workout_date] || 0) + 1;
     for (const e of engineSessions) map[e.date] = (map[e.date] || 0) + 1;
     return map;
   }, [logs, engineSessions]);
+  // Completed wins over partial wins over scheduled; scheduled+completed = both.
   const dayStatus = useMemo(() => {
-    const map: Record<string, 'scheduled' | 'completed' | 'both'> = {};
-    for (const d of Object.keys(logsByDate)) map[d] = 'completed';
+    const map: Record<string, 'scheduled' | 'partial' | 'completed' | 'both'> = {};
+    for (const d of completedDates) map[d] = 'completed';
     for (const d of Object.keys(engineByDate)) map[d] = 'completed';
-    for (const d of Object.keys(scheduledByDate)) map[d] = map[d] === 'completed' ? 'both' : 'scheduled';
-    for (const d of Object.keys(engineScheduledByDate)) map[d] = map[d] === 'completed' || map[d] === 'both' ? 'both' : 'scheduled';
+    for (const d of partialDates) if (map[d] !== 'completed') map[d] = 'partial';
+    for (const d of Object.keys(scheduledByDate)) {
+      map[d] = map[d] === 'completed' ? 'both' : map[d] === 'partial' ? 'partial' : 'scheduled';
+    }
+    for (const d of Object.keys(engineScheduledByDate)) {
+      map[d] = (map[d] === 'completed' || map[d] === 'both') ? 'both' : map[d] === 'partial' ? 'partial' : 'scheduled';
+    }
     return map;
-  }, [logsByDate, engineByDate, scheduledByDate, engineScheduledByDate]);
+  }, [completedDates, partialDates, engineByDate, scheduledByDate, engineScheduledByDate]);
 
   // Today (local) — calendar-first add is offered for today-forward dates only.
   const todayStr = localDateString();
@@ -1365,12 +1431,14 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                 <WorkoutCalendar
                   workoutCounts={workoutCounts}
                   dayStatus={dayStatus}
+                  blockCounts={blockCounts}
                   allowFuture
                   selectedDate={selectedDate}
                   onDayClick={(key) => setSelectedDate(selectedDate === key ? null : key)}
                 />
                 <div className="wc-legend">
                   <span className="wc-legend-item"><span className="wc-legend-swatch wc-legend-swatch--completed" />Completed</span>
+                  <span className="wc-legend-item"><span className="wc-legend-swatch wc-legend-swatch--partial" />In progress</span>
                   <span className="wc-legend-item"><span className="wc-legend-swatch wc-legend-swatch--scheduled" />Scheduled</span>
                   <span className="wc-legend-item"><span className="wc-legend-swatch wc-legend-swatch--today" />Today</span>
                 </div>
@@ -1378,7 +1446,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                 {/* Day sheet — slides up over the calendar for any populated
                     date, plus today-forward empty dates so they can be scheduled.
                     Backdrop tap / Escape / ✕ dismiss it; clicks inside don't. */}
-                {selectedDate && (logsByDate[selectedDate] || scheduledByDate[selectedDate] || engineByDate[selectedDate] || engineScheduledByDate[selectedDate] || selectedDate >= todayStr) && (
+                {selectedDate && (logBlocksByDate.has(selectedDate) || scheduledByDate[selectedDate] || engineByDate[selectedDate] || engineScheduledByDate[selectedDate] || selectedDate >= todayStr) && (
                   <div className="day-sheet-backdrop" onClick={() => setSelectedDate(null)}>
                   <div className="day-sheet" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
                     <div className="day-sheet-handle" />
@@ -1404,7 +1472,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                           <button type="button" className={`wc-day-ghost-btn${previewOpen.has(s.id) ? ' wc-day-ghost-btn--active' : ''}`} onClick={() => togglePreview(s.id)} aria-expanded={previewOpen.has(s.id)}>
                             <ChevronDown size={13} style={{ transform: previewOpen.has(s.id) ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} /> Preview
                           </button>
-                          <button type="button" className="wc-day-scheduled-open" onClick={() => navigate(`/programs/${s.program_id}?day=${s.program_workout_id}`)}>Start</button>
+                          <button type="button" className="wc-day-scheduled-open" onClick={() => navigate(`/day/${s.program_workout_id}`)}>Start</button>
                         </div>
                         {previewOpen.has(s.id) && <SchedulePreview workoutId={s.program_workout_id} />}
                       </div>
@@ -1480,26 +1548,45 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         </div>
                       );
                     })}
-                    {(logsByDate[selectedDate] || []).map(log => {
-                      const logBlocks = blocksByLog[log.id] || [];
+                    {[...(logBlocksByDate.get(selectedDate)?.entries() ?? [])].map(([logId, dateBlocks]) => {
+                      const log = logById.get(logId);
+                      if (!log) return null;
                       const logEntries = entriesByLog[log.id] || [];
+                      const sched = log.source_id ? scheduleBySource.get(log.source_id) : undefined;
+                      // Per-workout label (never a date-level fraction). Show the
+                      // owning workout + Done/In-progress; note its scheduled date
+                      // when a block was done on a different day than planned.
+                      const groupLabel = sched
+                        ? `${sched.program_name} · Wk ${sched.week_num} Day ${sched.day_num}`
+                        : (TYPE_LABELS[log.workout_type] || log.workout_type);
+                      const schedNote = sched && sched.scheduled_date !== selectedDate
+                        ? `Scheduled ${new Date(sched.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                        : null;
+                      const inProgress = log.status !== 'completed';
                       return (
                         <div key={log.id} style={{ marginBottom: 8 }}>
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{groupLabel}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: inProgress ? '#f39c12' : 'var(--accent)' }}>{inProgress ? 'In progress' : 'Done'}</span>
+                                {schedNote && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· {schedNote}</span>}
+                              </div>
+                            </div>
                             <button
                               onClick={() => navigate('/workout/start', { state: { edit_log_id: log.id } })}
                               style={{
                                 background: 'none', border: '1px solid var(--border)', borderRadius: 6,
                                 color: 'var(--text-dim)', cursor: 'pointer', padding: '4px 10px',
                                 fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5,
-                                fontFamily: "'Outfit', sans-serif",
+                                fontFamily: "'Outfit', sans-serif", flexShrink: 0,
                               }}
                             >
                               Edit
                             </button>
                           </div>
-                          {logBlocks.length > 0 ? (
-                        logBlocks.map((block, i) => {
+                          {dateBlocks.length > 0 ? (
+                        dateBlocks.map((block, i) => {
                           const blockEntries = logEntries.filter(e => e.block_id === block.id);
                           return (
                           <div key={`${log.id}-${i}`} className="wc-day-detail-block">

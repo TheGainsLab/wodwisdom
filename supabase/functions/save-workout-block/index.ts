@@ -198,6 +198,17 @@ Deno.serve(async (req) => {
 
     // ── 2. Delete any existing block at this sort_order, then insert ──
     // (This acts as an upsert keyed on log_id + sort_order)
+    // First preserve the block's original performed_date across the upsert, so
+    // editing a block on a later day doesn't move when it was actually done. New
+    // blocks (no prior row) fall through to the column's CURRENT_DATE default.
+    const { data: priorBlk } = await supa
+      .from("workout_log_blocks")
+      .select("performed_date")
+      .eq("log_id", logId)
+      .eq("sort_order", block.sort_order)
+      .maybeSingle();
+    const priorPerformedDate = (priorBlk as { performed_date?: string | null } | null)?.performed_date ?? null;
+
     await supa
       .from("workout_log_blocks")
       .delete()
@@ -243,6 +254,9 @@ Deno.serve(async (req) => {
         rx: block.rx ?? false,
         notes: block.notes?.trim() || null,
         sort_order: block.sort_order,
+        // Preserve a re-saved block's original date; omit for new blocks so the
+        // column's CURRENT_DATE default stamps the save day.
+        ...(priorPerformedDate ? { performed_date: priorPerformedDate } : {}),
         capped: isCapped,
         capped_reps: cappedReps,
         percentile:

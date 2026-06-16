@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase';
 import { localDateString } from '../lib/localDate';
 import Nav from '../components/Nav';
 import { BlockContent } from '../components/WorkoutBlocksDisplay';
+import { BlockCoachingBody, coachingForBlockType, formatReviewMarkdown, CHEVRON_DOWN } from '../components/reviewCoaching';
+import { useWorkoutReview } from '../lib/useWorkoutReview';
 import {
   calculateBenchmarks,
   calculateBenchmarksLocal,
@@ -314,7 +316,24 @@ const compactInputStyle = {
   fontSize: 14,
 };
 
-export default function StartWorkoutPage({ session }: { session: Session }) {
+interface WorkoutSourceState {
+  workout_text?: string;
+  source_id?: string;
+  edit_log_id?: string;
+}
+
+export default function StartWorkoutPage({ session, sourceStateProp, onExit, onDone, embedded }: {
+  session: Session;
+  // When embedded (e.g. on a day page) the caller passes the source + exit
+  // callbacks directly instead of going through route state / navigation.
+  // Omitted in the standalone route — defaults preserve the original behavior.
+  sourceStateProp?: WorkoutSourceState | null;
+  onExit?: () => void;
+  onDone?: () => void;
+  // When true, render just the logging body (no app shell / nav / header) so a
+  // day page can host it inline.
+  embedded?: boolean;
+}) {
   const navigate = useNavigate();
   const location = useLocation();
   const [navOpen, setNavOpen] = useState(false);
@@ -348,6 +367,10 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   // In-progress tracking: which blocks have been saved, and the parent log id
   const [inProgressLogId, setInProgressLogId] = useState<string | null>(null);
   const [savedBlocks, setSavedBlocks] = useState<Set<number>>(new Set());
+  // Blocks the user actually interacted with. The movement fields are PRE-FILLED
+  // with the prescription, so "has a value" can't tell logged from merely-viewed
+  // — this set does. "Done" only flushes touched (or block-level-edited) blocks.
+  const [touchedBlocks, setTouchedBlocks] = useState<Set<number>>(new Set());
   const [savingBlock, setSavingBlock] = useState<number | null>(null);
   // Per-movement skip tracking. Key conventions match the existing entry maps:
   //   strength  → `${bi}-strength`   (one toggle per block; covers all sets)
@@ -361,12 +384,11 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   const [resolvedSourceId, setResolvedSourceId] = useState<string | null>(null);
   const [userUnits, setUserUnits] = useState<'lbs' | 'kg'>('lbs');
 
-  const sourceState = location.state as {
-    workout_text?: string;
-    source_id?: string;
-    edit_log_id?: string;
-  } | null;
+  const sourceState = sourceStateProp ?? (location.state as WorkoutSourceState | null);
   const isEditMode = !!sourceState?.edit_log_id;
+  // Exit seams: route navigation by default, caller callbacks when embedded.
+  const goBack = onExit ?? (() => navigate(-1));
+  const goDone = onDone ?? (() => navigate('/training-log'));
 
   // Fetch blocks from program_workout_blocks on mount
   useEffect(() => {
@@ -954,7 +976,16 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     })();
   }, [sourceState?.source_id, sourceState?.edit_log_id]);
 
+  // Key format is `${bi}-…` for every entry/fault/skip map, so the leading
+  // integer is the block index.
+  const markTouched = (bi: number) => {
+    if (!Number.isInteger(bi) || bi < 0) return;
+    setTouchedBlocks(prev => prev.has(bi) ? prev : new Set(prev).add(bi));
+  };
+  const touchBlockFromKey = (key: string) => markTouched(parseInt(key, 10));
+
   const setEntry = (key: string, field: keyof EntryValues, value: unknown) => {
+    touchBlockFromKey(key);
     setEntryValues(prev => ({
       ...prev,
       [key]: { ...prev[key], [field]: value },
@@ -962,6 +993,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   };
 
   const setMetconEntry = (key: string, field: keyof MetconEntryValues, value: unknown) => {
+    touchBlockFromKey(key);
     setMetconEntries(prev => ({
       ...prev,
       [key]: { ...prev[key], [field]: value },
@@ -969,6 +1001,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   };
 
   const setSkillEntry = (key: string, field: keyof SkillsEntryValues, value: unknown) => {
+    touchBlockFromKey(key);
     setSkillsEntries(prev => ({
       ...prev,
       [key]: { ...prev[key], [field]: value },
@@ -976,6 +1009,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   };
 
   const setAccessoryEntry = (key: string, field: keyof AccessoryEntryValues, value: unknown) => {
+    touchBlockFromKey(key);
     setAccessoryEntries(prev => ({
       ...prev,
       [key]: { ...prev[key], [field]: value },
@@ -983,6 +1017,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
   };
 
   const toggleFault = (entryKey: string, fault: string) => {
+    touchBlockFromKey(entryKey);
     setCheckedFaults(prev => {
       const current = prev[entryKey] ?? [];
       const next = current.includes(fault)
@@ -994,6 +1029,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
 
   const isSkipped = (key: string) => !!skippedKeys[key];
   const setSkippedFlag = (key: string, val: boolean) => {
+    touchBlockFromKey(key);
     setSkippedKeys(prev => {
       const next = { ...prev, [key]: val };
       if (!val) delete next[key];
@@ -1430,6 +1466,39 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     };
   };
 
+  // Whether a built payload carries ACTUAL user input (vs only the pre-filled
+  // prescription — movement names + empty set rows). Save & Exit uses this so
+  // merely-viewed blocks aren't flushed into the log.
+  const payloadHasInput = (p: ReturnType<typeof buildBlockPayload>): boolean => {
+    if (!p) return false;
+    // reps/weight/rpe/etc. are PRE-FILLED with the prescription, so they can't
+    // distinguish logged from viewed — `touchedBlocks` covers movement edits.
+    // Here we only check signals that are never pre-filled (block-level + skips).
+    const entrySignal = (p.entries ?? []).some((e: any) =>
+      e.completed === false ||
+      (Array.isArray(e.faults_observed) && e.faults_observed.length > 0) ||
+      e.scaling_note || e.variation
+    );
+    return entrySignal || !!p.score || !!p.notes || p.capped === true ||
+      p.cardio_avg_watts != null || p.cardio_work_seconds != null;
+  };
+
+  // ── Inline coaching: Coach ▾ per block + Session intent + Sources, on the
+  // same surface as the prescription and the log inputs. Lazy — generates only
+  // when a disclosure opens. The day page IS the whole workout. ──
+  const coachWorkoutText = useMemo(() => blocks.map(b => `${b.label}: ${b.text}`).join('\n'), [blocks]);
+  const { review: coachReview, loading: coachLoading, error: coachError, generate: ensureCoach } =
+    useWorkoutReview(resolvedSourceId, coachWorkoutText);
+  const [coachOpenBlocks, setCoachOpenBlocks] = useState<Set<number>>(new Set());
+  const [intentOpen, setIntentOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const toggleCoachBlock = (bi: number) => {
+    setCoachOpenBlocks(prev => { const n = new Set(prev); if (n.has(bi)) n.delete(bi); else n.add(bi); return n; });
+    ensureCoach();
+  };
+  const coachSourceTitles = coachReview?.sources ? [...new Set(coachReview.sources.map(s => s.title).filter(Boolean))] : [];
+  const COACHABLE_TYPES = ['skills', 'strength', 'metcon', 'accessory'];
+
   /** Save a single block (creates in-progress log if needed) */
   const saveBlock = async (bi: number) => {
     const payload = buildBlockPayload(bi);
@@ -1477,6 +1546,9 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
         if (blocks[bi].type === 'warm-up' || blocks[bi].type === 'mobility' || blocks[bi].type === 'cool-down') continue;
         const payload = buildBlockPayload(bi);
         if (!payload) continue;
+        // Only flush blocks the user actually engaged with — not ones merely
+        // viewed (whose movement fields are pre-filled with the prescription).
+        if (!touchedBlocks.has(bi) && !payloadHasInput(payload)) continue;
         const workoutText = sourceState?.workout_text?.trim() ||
           blocks.map(b => `${b.label}: ${b.text}`).join('\n');
         const { data, error: fnErr } = await supabase.functions.invoke('save-workout-block', {
@@ -1501,7 +1573,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
           return;
         }
       }
-      navigate(-1);
+      goBack();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save progress');
     } finally {
@@ -1547,24 +1619,13 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
     }
   };
 
-  return (
-    <div className="app-layout">
-      <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
-      <div className="main-content">
-        <header className="page-header">
-          <button className="menu-btn" onClick={() => setNavOpen(true)}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
-          </button>
-          <h1>{isEditMode ? 'Edit Workout' : inProgressLogId ? 'Resume Workout' : 'Start Workout'}</h1>
-        </header>
-
-        <div className="page-body">
+  const body = (
           <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 0' }}>
             {success ? (
               <div className="workout-review-section" style={{ textAlign: 'center', padding: 32 }}>
                 <h3 style={{ marginBottom: 12 }}>Workout saved!</h3>
                 <p style={{ color: 'var(--text-dim)', marginBottom: 20 }}>Your workout has been logged.</p>
-                <button className="auth-btn" onClick={() => navigate('/training-log')} style={{ maxWidth: 200 }}>
+                <button className="auth-btn" onClick={goDone} style={{ maxWidth: 200 }}>
                   View Training Log
                 </button>
               </div>
@@ -1573,7 +1634,7 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
             ) : blocks.length === 0 ? (
               <div className="workout-review-section" style={{ textAlign: 'center', padding: 32 }}>
                 <p style={{ color: 'var(--text-dim)' }}>{error || 'No workout blocks found.'}</p>
-                <button className="auth-btn" onClick={() => navigate(-1)} style={{ marginTop: 16 }}>Go Back</button>
+                <button className="auth-btn" onClick={goBack} style={{ marginTop: 16 }}>Go Back</button>
               </div>
             ) : (
               <>
@@ -1586,22 +1647,51 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                   </div>
                 </div>
 
+                {resolvedSourceId && (
+                  <div className="wr-sources-section" style={{ marginBottom: 16 }}>
+                    <button className="wr-sources-toggle" onClick={() => { const n = !intentOpen; setIntentOpen(n); if (n) ensureCoach(); }} aria-expanded={intentOpen}>
+                      <span className="wr-sources-label">Today's training intent</span>
+                      <span className={`workout-review-block-chevron${intentOpen ? ' workout-review-block-chevron--open' : ''}`}>{CHEVRON_DOWN}</span>
+                    </button>
+                    {intentOpen && (
+                      coachReview?.intent
+                        ? <div className="wr-intent-card" style={{ marginTop: 8 }}><div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatReviewMarkdown(coachReview.intent) }} /></div>
+                        : coachLoading ? <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '8px 2px' }}>Loading coaching…</div>
+                        : coachError ? <div style={{ fontSize: 13, color: 'var(--accent)', padding: '8px 2px' }}>{coachError}</div>
+                        : null
+                    )}
+                  </div>
+                )}
+
                 {blocks.map((block, bi) => {
                   const locked = savedBlocks.has(bi);
                   return (
                   <div key={bi} className={'workout-review-section' + (locked ? ' block-locked' : '')} style={{ marginBottom: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                       <h3>
                         {block.label}
                       </h3>
-                      {locked && (
-                        <button
-                          style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}
-                          onClick={() => setSavedBlocks(prev => { const next = new Set(prev); next.delete(bi); return next; })}
-                        >
-                          Edit
-                        </button>
-                      )}
+                      <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                        {COACHABLE_TYPES.includes(block.type) && resolvedSourceId && (
+                          <button
+                            type="button"
+                            className={`block-ai-edit-toggle${coachOpenBlocks.has(bi) ? ' block-coach-toggle--open' : ''}`}
+                            onClick={() => toggleCoachBlock(bi)}
+                            aria-expanded={coachOpenBlocks.has(bi)}
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+                            Coach
+                          </button>
+                        )}
+                        {locked && (
+                          <button
+                            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: "'Outfit',sans-serif" }}
+                            onClick={() => setSavedBlocks(prev => { const next = new Set(prev); next.delete(bi); return next; })}
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
                     </div>
                     {(block.scheme || block.timeCapSeconds) && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
@@ -1641,6 +1731,18 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                     <div className="workout-review-content" style={{ marginBottom: 16 }}>
                       <BlockContent label={block.label} content={block.text} />
                     </div>
+
+                    {coachOpenBlocks.has(bi) && (() => {
+                      const cb = coachingForBlockType(coachReview, block.type);
+                      return (
+                        <div className="block-coach-body" style={{ marginBottom: 16 }}>
+                          {cb ? <BlockCoachingBody block={cb} />
+                            : coachLoading ? <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '4px 2px' }}>Loading coaching…</div>
+                            : coachError ? <div style={{ fontSize: 13, color: 'var(--accent)', padding: '4px 2px' }}>{coachError}</div>
+                            : <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '4px 2px' }}>No coaching for this block.</div>}
+                        </div>
+                      );
+                    })()}
 
                     {block.type === 'strength' && (() => {
                       const setKeys = Object.keys(entryValues)
@@ -2233,22 +2335,59 @@ export default function StartWorkoutPage({ session }: { session: Session }) {
                   );
                 })}
 
+                {resolvedSourceId && (
+                  <div className="wr-sources-section" style={{ marginBottom: 16 }}>
+                    <button className="wr-sources-toggle" onClick={() => { const n = !sourcesOpen; setSourcesOpen(n); if (n) ensureCoach(); }} aria-expanded={sourcesOpen}>
+                      <span className="wr-sources-label">Sources{coachSourceTitles.length ? ` (${coachSourceTitles.length})` : ''}</span>
+                      <span className={`workout-review-block-chevron${sourcesOpen ? ' workout-review-block-chevron--open' : ''}`}>{CHEVRON_DOWN}</span>
+                    </button>
+                    {sourcesOpen && (
+                      coachSourceTitles.length
+                        ? <div className="wr-sources-list">{coachSourceTitles.map((t, j) => <span key={j} className="source-chip">{t}</span>)}</div>
+                        : coachLoading ? <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '8px 2px' }}>Loading…</div>
+                        : null
+                    )}
+                  </div>
+                )}
+
                 {error && <div className="auth-error" style={{ display: 'block', marginBottom: 16 }}>{error}</div>}
 
                 <div className="sw-bottom-actions" style={{ display: 'flex', gap: 12, marginTop: 24 }}>
-                  <button className="auth-btn" style={{ flex: 1, background: 'var(--surface2)', color: 'var(--text)' }} onClick={() => navigate(-1)}>
+                  <button className="auth-btn" style={{ flex: 1, background: 'var(--surface2)', color: 'var(--text)' }} onClick={goBack}>
                     Back
                   </button>
-                  <button className="auth-btn" onClick={handleSaveAndExit} disabled={saving} style={{ flex: 1, background: 'var(--surface2)', color: 'var(--text)' }}>
-                    {saving ? 'Saving...' : 'Save & Exit'}
-                  </button>
-                  <button className="auth-btn" onClick={handleFinish} disabled={saving} style={{ flex: 1 }}>
-                    {saving ? 'Saving...' : 'Finish Workout'}
-                  </button>
+                  {isEditMode ? (
+                    // Edit mode: re-save the whole log (batch delete+reinsert via log-workout).
+                    <button className="auth-btn" onClick={handleFinish} disabled={saving} style={{ flex: 1 }}>
+                      {saving ? 'Saving...' : 'Save changes'}
+                    </button>
+                  ) : (
+                    // New logging: one action. Flushes the blocks you logged and
+                    // auto-completes when every block is logged or skipped.
+                    <button className="auth-btn" onClick={handleSaveAndExit} disabled={saving} style={{ flex: 1 }}>
+                      {saving ? 'Saving...' : 'Done'}
+                    </button>
+                  )}
                 </div>
               </>
             )}
           </div>
+  );
+
+  if (embedded) return body;
+
+  return (
+    <div className="app-layout">
+      <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
+      <div className="main-content">
+        <header className="page-header">
+          <button className="menu-btn" onClick={() => setNavOpen(true)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+          </button>
+          <h1>{isEditMode ? 'Edit Workout' : inProgressLogId ? 'Resume Workout' : 'Start Workout'}</h1>
+        </header>
+        <div className="page-body">
+          {body}
         </div>
       </div>
     </div>

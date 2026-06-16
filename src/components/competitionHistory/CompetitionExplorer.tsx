@@ -52,6 +52,7 @@ export default function CompetitionExplorer({
   history,
   userAge,
   userBodyMassKg,
+  athleteName,
   canLog,
   onThrowbackLogged,
   scope,
@@ -62,6 +63,7 @@ export default function CompetitionExplorer({
   history: NormalizedCompetitionHistory;
   userAge: number | null;
   userBodyMassKg: number | null;
+  athleteName?: string | null;
   canLog: boolean;
   /** Called after a throwback is logged + its form closed, so the parent can
    *  refetch and merge it into "Your workouts". */
@@ -360,6 +362,7 @@ export default function CompetitionExplorer({
         <WorkoutDetail
           entry={selectedWorkout}
           userKg={userBodyMassKg}
+          athleteName={athleteName}
           onClose={() => setSelectedWorkout(null)}
           onLogAgain={openLogForEntry}
         />

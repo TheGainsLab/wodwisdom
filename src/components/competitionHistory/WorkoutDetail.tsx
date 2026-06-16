@@ -12,8 +12,11 @@
  * Rendered as a modal overlay so it doesn't shift the page underneath.
  */
 
-import type { CompetitionWorkoutEntry, ScoringUnit } from '../../lib/competitionHistory';
+import { useState } from 'react';
+import type { CompetitionWorkoutEntry } from '../../lib/competitionHistory';
 import { personalizedPower } from '../../lib/competitionHistory';
+import { buildShareCardData, formatScore } from '../../lib/shareCard';
+import ShareCardModal from './ShareCardModal';
 
 const STAGE_LABEL: Record<string, string> = {
   open: 'Open',
@@ -23,25 +26,6 @@ const STAGE_LABEL: Record<string, string> = {
   games: 'Games',
 };
 
-function formatScore(unit: ScoringUnit, value: number, text: string | null): string {
-  if (text) return text;
-  switch (unit) {
-    case 'time': {
-      const m = Math.floor(value / 60);
-      const s = Math.round(value % 60);
-      return `${m}:${String(s).padStart(2, '0')}`;
-    }
-    case 'reps':
-      return `${value} reps`;
-    case 'load_lbs':
-      return `${value} lb`;
-    case 'distance':
-      return `${value} m`;
-    default:
-      return String(value);
-  }
-}
-
 function nf(n: number): string {
   return n.toLocaleString();
 }
@@ -49,14 +33,17 @@ function nf(n: number): string {
 export default function WorkoutDetail({
   entry,
   userKg,
+  athleteName,
   onClose,
   onLogAgain,
 }: {
   entry: CompetitionWorkoutEntry;
   userKg?: number | null;
+  athleteName?: string | null;
   onClose: () => void;
   onLogAgain?: (entry: CompetitionWorkoutEntry) => void;
 }) {
+  const [showShare, setShowShare] = useState(false);
   const w = entry.workout;
   const r = entry.result;
   const stageLabel = STAGE_LABEL[entry.stage] ?? entry.stage;
@@ -210,8 +197,16 @@ export default function WorkoutDetail({
         </div>
         )}
 
-        {onLogAgain && (
-          <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="auth-btn"
+            style={{ padding: '8px 16px', fontSize: 13, fontFamily: 'inherit' }}
+            onClick={() => setShowShare(true)}
+          >
+            Share
+          </button>
+          {onLogAgain && (
             <button
               type="button"
               className="auth-btn"
@@ -220,9 +215,17 @@ export default function WorkoutDetail({
             >
               Log this again
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
+      {showShare && (
+        <ShareCardModal
+          data={buildShareCardData(entry, userKg, athleteName)}
+          cacheId={`${entry.competition_workout_id}:${userKg ?? 'na'}`}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </div>
   );
 }

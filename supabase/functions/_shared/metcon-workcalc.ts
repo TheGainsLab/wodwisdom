@@ -23,7 +23,7 @@
 import { computeWork } from "./work-calc.ts";
 import type { WorkCalcMovement, Gender } from "./compute-benchmarks.ts";
 
-const MODEL = "claude-sonnet-4-20250514";
+const MODEL = "claude-sonnet-4-6";
 const RESOLVE_TIMEOUT_MS = 30_000;
 const LBS_PER_KG = 0.45359237;
 

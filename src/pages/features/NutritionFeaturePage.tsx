@@ -48,9 +48,9 @@ export default function NutritionFeaturePage() {
       {/* Hero */}
       <section className="feature-hero">
         <span className="feature-hero-badge">Nutrition</span>
-        <h1 className="feature-hero-title">Track fuel, not just reps</h1>
+        <h1 className="feature-hero-title">Fuel built for how you train.</h1>
         <p className="feature-hero-sub">
-          Nutrition data with a snap - just take a photo of whatever you eat and AI handles the rest. You can also scan barcodes, search a database and build your favorite meals, whether you're cooking at home or going out to eat.
+          A complete nutrition app that knows what you burned. Photo logging, barcodes, millions of foods — plus calorie burn computed from your actual training output, not a guess. Track what goes in against what your training actually took out.
         </p>
       </section>
 
@@ -61,16 +61,16 @@ export default function NutritionFeaturePage() {
             <div className="feature-text">
               <h3 style={{ textAlign: 'center' }}>Nutrition dashboard</h3>
               <p>
-                Daily intake at a glance - know instantly if you're in a surplus or deficit. Updates in real time so you can plan your days and weeks easily.
+                Daily intake at a glance — know instantly if you're in a surplus or deficit. Updates in real time, so you can plan your days and weeks easily.
               </p>
               <ul>
                 <li>Daily macro tracking</li>
-                <li>Calorie and nutrient targets</li>
+                <li>Targets set for your training, not a generic goal</li>
                 <li>Real-time progress updates</li>
               </ul>
             </div>
             <div className="feature-screenshot">
-              <img src="/images/nutrition-1.png" alt="Nutrition Dashboard" style={{ width: '100%', borderRadius: 12 }} />
+              <img src="/images/nutr2.png" alt="Nutrition Dashboard" style={{ width: '100%' }} />
             </div>
           </div>
         </div>
@@ -87,7 +87,7 @@ export default function NutritionFeaturePage() {
               </p>
             </div>
             <div className="feature-screenshot">
-              <img src="/images/nutrition-2.png" alt="Barcode Scanner & Food Search" style={{ width: '100%', borderRadius: 12 }} />
+              <img src="/images/nutr1.png" alt="Barcode Scanner & Food Search" style={{ width: '100%' }} />
             </div>
           </div>
         </div>
@@ -100,7 +100,7 @@ export default function NutritionFeaturePage() {
             <div className="feature-text">
               <h3 style={{ textAlign: 'center' }}>Meal builder & templates</h3>
               <p>
-                Quickly save your favorites and log them with a single tap. Favorite meals at home? Select the ingredients and save the meal. Usual lunch place during work? Save it, and log your meal before you order next time! It's that easy.
+                Build the meals you eat all the time once, then log them with a single tap. Combine ingredients into a go-to dinner, or save your usual order from the spot down the street — next time it's one tap, not a re-entry.
               </p>
               <ul>
                 <li>Combine foods into complete meals</li>
@@ -109,7 +109,7 @@ export default function NutritionFeaturePage() {
               </ul>
             </div>
             <div className="feature-screenshot">
-              <img src="/images/nutrition-3.png" alt="Meal Builder & Templates" style={{ width: '100%', borderRadius: 12 }} />
+              <img src="/images/nutrition-3.png" alt="Meal Builder & Templates" style={{ width: '100%' }} />
             </div>
           </div>
         </div>
@@ -119,15 +119,15 @@ export default function NutritionFeaturePage() {
       <section className="feature-footer-cta">
         <h2>AI Nutrition — $7.99/mo</h2>
         <p className="feature-footer-details">
-          Photo logging. Barcode scanner. Millions of foods. Meal templates. Macro tracking.
+          Photo logging, barcode scanner, millions of foods, restaurant and brand menus, meal templates, and macro tracking — a complete nutrition app.
         </p>
         <div className="feature-footer-actions">
           <button className="feature-cta" onClick={buyNutrition} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
         </div>
         <p style={{ maxWidth: 540, margin: '24px auto 0', color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.6 }}>
-          AI Nutrition is included with{' '}
+          Already training with us? AI Nutrition is included free with{' '}
           <Link to="/features/programs" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>AI Programming</Link>,{' '}
-          <Link to="/features/engine" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>AI Year of the Engine</Link>, and{' '}
+          <Link to="/features/engine" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>Year of the Engine</Link>, and{' '}
           <Link to="/#pricing" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>All Access</Link>.
         </p>
       </section>

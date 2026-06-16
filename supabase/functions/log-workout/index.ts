@@ -151,6 +151,11 @@ Deno.serve(async (req) => {
     // 1. Create or update the workout_logs row
     let log: { id: string };
 
+    // Preserve each block's performed_date across the destructive rewrite below,
+    // so a day logged across multiple calendar dates keeps its real per-block
+    // dates. New blocks (no prior) fall back to the workout's date.
+    const priorPerformedBySort = new Map<number, string>();
+
     if (existingLogId) {
       // Resuming an in-progress workout — update it and wipe old blocks/entries
       const { data: existing, error: fetchErr } = await supa
@@ -177,6 +182,16 @@ Deno.serve(async (req) => {
           status: 500,
           headers: { ...cors, "Content-Type": "application/json" },
         });
+      }
+
+      // Snapshot existing per-block performed dates before wiping, keyed by
+      // sort_order (the stable block identity), so the reinsert can keep them.
+      const { data: priorBlocks } = await supa
+        .from("workout_log_blocks")
+        .select("sort_order, performed_date")
+        .eq("log_id", existingLogId);
+      for (const pb of (priorBlocks as { sort_order: number; performed_date: string | null }[] | null) ?? []) {
+        if (pb.performed_date) priorPerformedBySort.set(pb.sort_order, pb.performed_date);
       }
 
       // Delete old child rows — they'll be re-inserted below
@@ -251,6 +266,9 @@ Deno.serve(async (req) => {
           rx: b.rx ?? false,
           notes: b.notes?.trim() || null,
           sort_order: i,
+          // Keep the block's original performed date; new blocks default to the
+          // workout's date (Phase 1 training journal).
+          performed_date: priorPerformedBySort.get(i) ?? dateStr,
           capped: isCapped,
           capped_reps: cappedReps,
           percentile: !isCapped && b.percentile != null && b.percentile >= 1 && b.percentile <= 99

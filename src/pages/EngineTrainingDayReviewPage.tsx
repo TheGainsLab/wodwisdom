@@ -4,8 +4,18 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase, CHAT_ENDPOINT, getAuthHeaders } from '../lib/supabase';
 import Nav from '../components/Nav';
 import { formatMarkdown } from '../lib/formatMarkdown';
-import { loadUserProgress, getProgramMapping, loadWorkoutForDay, type EngineWorkout } from '../lib/engineService';
-import { ChevronLeft } from 'lucide-react';
+import {
+  loadUserProgress,
+  getProgramMapping,
+  loadWorkoutForDay,
+  getWorkoutSessionByDay,
+  isPersonalBestSession,
+  type EngineWorkout,
+  type EngineWorkoutSession,
+} from '../lib/engineService';
+import { buildEngineShareCardData } from '../lib/shareCard';
+import ShareCardModal from '../components/competitionHistory/ShareCardModal';
+import { ChevronLeft, Share2 } from 'lucide-react';
 
 interface CoachMessage {
   role: 'user' | 'assistant';
@@ -181,6 +191,9 @@ export default function EngineTrainingDayReviewPage({ session: _session }: { ses
   const [programVersion, setProgramVersion] = useState<string | null>(null);
   const [workout, setWorkout] = useState<EngineWorkout | null>(null);
   const [dayTypeName, setDayTypeName] = useState<string>('');
+  const [completedSession, setCompletedSession] = useState<EngineWorkoutSession | null>(null);
+  const [completedIsPR, setCompletedIsPR] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   const programDay = Number(dayNumber);
 
@@ -212,6 +225,13 @@ export default function EngineTrainingDayReviewPage({ session: _session }: { ses
             .eq('id', w.day_type)
             .maybeSingle();
           setDayTypeName(dt?.name || w.day_type);
+        }
+
+        // A completed session for this day (if any) → enable re-sharing its card.
+        const s = await getWorkoutSessionByDay(programDay).catch(() => null);
+        if (s?.completed && s.total_output != null && s.day_type !== 'time_trial') {
+          setCompletedSession(s);
+          setCompletedIsPR(await isPersonalBestSession(s).catch(() => false));
         }
       } finally {
         setLoading(false);
@@ -275,6 +295,15 @@ export default function EngineTrainingDayReviewPage({ session: _session }: { ses
                   <p style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>
                     Ask the coach about pacing, the day type's purpose, how this session fits your recent training, or what's coming next.
                   </p>
+                  {completedSession && (
+                    <button
+                      className="engine-btn engine-btn-secondary"
+                      onClick={() => setShowShare(true)}
+                      style={{ marginTop: 12 }}
+                    >
+                      <Share2 size={16} /> Share this session
+                    </button>
+                  )}
                 </div>
 
                 {workout?.block_count ? (
@@ -291,6 +320,17 @@ export default function EngineTrainingDayReviewPage({ session: _session }: { ses
           </div>
         </div>
       </div>
+
+      {showShare && completedSession && (
+        <ShareCardModal
+          data={buildEngineShareCardData(completedSession, {
+            dayTypeLabel: dayTypeName || completedSession.day_type || 'Engine',
+            isPR: completedIsPR,
+          })}
+          cacheId={completedSession.id}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </div>
   );
 }

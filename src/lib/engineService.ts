@@ -333,6 +333,23 @@ export async function loadCompletedSessions(
   return data ?? [];
 }
 
+/** Concise, human modality label for share cards / summaries. */
+const MODALITY_LABELS: Record<string, string> = {
+  c2_row_erg: 'Row', rogue_row_erg: 'Row',
+  c2_bike_erg: 'Bike Erg', echo_bike: 'Echo Bike', assault_bike: 'Assault Bike',
+  airdyne_bike: 'AirDyne', other_bike: 'Bike', outdoor_bike_ride: 'Ride',
+  c2_ski_erg: 'Ski Erg',
+  assault_runner: 'Assault Runner', assault_runner_run: 'Assault Runner',
+  trueform: 'TrueForm', trueform_treadmill: 'TrueForm',
+  motorized_treadmill: 'Treadmill', other_treadmill: 'Treadmill',
+  outdoor_run: 'Run', road_run: 'Run', track_run: 'Run', trail_run: 'Trail Run',
+};
+
+export function engineModalityLabel(modality: string | null | undefined): string {
+  if (!modality) return 'Engine';
+  return MODALITY_LABELS[modality] ?? modality.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 /** Load completed sessions filtered by day type (e.g. all past anaerobic days). */
 export async function getSessionsByDayType(
   dayType: string
@@ -346,6 +363,51 @@ export async function getSessionsByDayType(
 
   if (error) throw error;
   return data ?? [];
+}
+
+/**
+ * Best PACE (calculated_rpm) for a (day_type, modality, units) — used for the
+ * "personal best" check on the completion/review screens and share card. Pace,
+ * not raw output, so it's duration-normalized (a longer session of the same day
+ * type doesn't auto-win). Scoped by units because pace is incomparable across
+ * units (cal/min vs m/min). RLS scopes to the user. Pass the current session id
+ * to exclude it.
+ */
+export async function getBestPaceForDayType(
+  dayType: string,
+  modality: string,
+  units: string,
+  excludeSessionId?: string,
+): Promise<number | null> {
+  let q = supabase
+    .from('engine_workout_sessions')
+    .select('calculated_rpm')
+    .eq('completed', true)
+    .eq('day_type', dayType)
+    .eq('modality', modality)
+    .eq('units', units)
+    .not('calculated_rpm', 'is', null)
+    .order('calculated_rpm', { ascending: false })
+    .limit(1);
+  if (excludeSessionId) q = q.neq('id', excludeSessionId);
+
+  const { data, error } = await q.maybeSingle();
+  if (error) throw error;
+  return (data?.calculated_rpm as number | undefined) ?? null;
+}
+
+/** True when this session's pace is the best ever for its day-type/modality/units. */
+export async function isPersonalBestSession(session: EngineWorkoutSession): Promise<boolean> {
+  if (session.calculated_rpm == null || !session.day_type || !session.modality || !session.units) {
+    return false;
+  }
+  const best = await getBestPaceForDayType(
+    session.day_type,
+    session.modality,
+    session.units,
+    session.id,
+  );
+  return best == null || session.calculated_rpm > best;
 }
 
 /** Get a specific session by program day number. */

@@ -16,18 +16,21 @@ import {
   getSessionsByDayType,
   getPerformanceMetrics,
   findPrecedingRocketRacesA,
+  isPersonalBestSession,
   type EngineWorkout,
   type EngineWorkoutSession,
   type EngineTimeTrial,
   type EnginePerformanceMetrics,
   calculateWorkDurationMinutes,
 } from '../lib/engineService';
+import { buildEngineShareCardData } from '../lib/shareCard';
+import ShareCardModal from '../components/competitionHistory/ShareCardModal';
 import { localDateString } from '../lib/localDate';
 import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertTriangle, Calendar, X } from 'lucide-react';
+import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertTriangle, Calendar, X, Share2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { scheduleEngineDay, unschedule } from '../lib/trainingSchedule';
+import { scheduleEngineDay, rescheduleRow, unschedule } from '../lib/trainingSchedule';
 
 // ── Types & Constants ────────────────────────────────────────────────
 
@@ -392,6 +395,10 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const [logRPE, setLogRPE] = useState(5);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
+  // Completed-session summary (vs-target + PR) + share card.
+  const [completedSession, setCompletedSession] = useState<EngineWorkoutSession | null>(null);
+  const [completedIsPR, setCompletedIsPR] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   // ── Load data ──
   useEffect(() => {
@@ -643,7 +650,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
       const avgWorkRestRatio = totalRestSeconds > 0 ? totalWorkSeconds / totalRestSeconds : null;
 
       // Save session
-      await saveWorkoutSession({
+      const saved = await saveWorkoutSession({
         date: localDateString(),
         program_day: dayNumber,
         program_day_number: dayNumber,
@@ -668,6 +675,11 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         completed: true,
         program_version: programVersion,
       });
+      setCompletedSession(saved);
+      // PR = best output ever for this day-type/modality/units (time trials excluded).
+      if (workout.day_type !== 'time_trial') {
+        setCompletedIsPR(await isPersonalBestSession(saved).catch(() => false));
+      }
 
       // Save time trial baseline if this is a time trial
       if (workout.day_type === 'time_trial' && output > 0) {
@@ -1545,14 +1557,15 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
               </div>
             </div>
 
-            {/* Duration summary */}
+            {/* Duration summary — pace is per WORK minute (the workout's defined
+                work time), not the elapsed clock, so it matches the saved pace. */}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-dim)' }}>
               <span>Duration: {formatTime(totalElapsed)}</span>
               {logOutput && (
                 <span>
                   {isRateUnit(selectedUnit)
                     ? `Pace: ${Math.round(parseFloat(logOutput))} ${selectedUnit}`
-                    : `Pace: ${(parseFloat(logOutput) / Math.max(totalElapsed / 60, 1)).toFixed(1)} ${selectedUnit}/min`}
+                    : `Pace: ${(parseFloat(logOutput) / ((workout ? calculateWorkDurationMinutes(workout) : 0) || Math.max(totalElapsed / 60, 1))).toFixed(1)} ${selectedUnit}/min`}
                 </span>
               )}
             </div>
@@ -1616,8 +1629,32 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
               </div>
             </div>
 
+            {/* vs-target / PR readout (programmed days only) */}
+            {!isTimeTrial && completedSession?.performance_ratio != null && (() => {
+              const ratio = completedSession.performance_ratio;
+              const color = completedIsPR || ratio >= 1.05 ? '#4ade80' : ratio >= 0.95 ? 'var(--text)' : '#facc15';
+              const dtLabel = (workout?.day_type ?? 'Engine').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+              const label = completedIsPR
+                ? `${dtLabel} PR`
+                : ratio >= 1.05
+                ? `${Math.round((ratio - 1) * 100)}% above target`
+                : ratio >= 0.95
+                ? 'Held target'
+                : `${Math.round((1 - ratio) * 100)}% below target`;
+              return <div style={{ fontSize: 14, fontWeight: 600, color, marginTop: 4 }}>{label}</div>;
+            })()}
+
             <hr className="engine-divider" style={{ width: '100%' }} />
 
+            {!isTimeTrial && completedSession && (
+              <button
+                className="engine-btn engine-btn-secondary"
+                onClick={() => setShowShare(true)}
+                style={{ width: '100%' }}
+              >
+                <Share2 size={16} /> Share
+              </button>
+            )}
             <button
               className="engine-btn engine-btn-primary"
               onClick={() => navigate('/engine')}
@@ -1636,6 +1673,17 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
             )}
           </div>
         </div>
+
+        {showShare && completedSession && (
+          <ShareCardModal
+            data={buildEngineShareCardData(completedSession, {
+              dayTypeLabel: completedSession.day_type ?? 'Engine',
+              isPR: completedIsPR,
+            })}
+            cacheId={completedSession.id}
+            onClose={() => setShowShare(false)}
+          />
+        )}
       </div>
     );
   }
@@ -1685,9 +1733,10 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 }
 
 // ── Add-to-calendar affordance for an Engine day ──────────────────────
-// Engine days are a repeatable pool, so the same day can be scheduled to
-// multiple dates. Shows existing scheduled dates as removable chips + a
-// quick-pick of the next 14 days. Writes training_schedule.engine_workout_id.
+// Engine days are once-and-done on the calendar: at most one scheduled date per
+// engine day. Shows the scheduled date as a removable chip + a quick-pick of the
+// next 14 days. Picking a date when one is already set MOVES it (reschedule),
+// never adds a second. Writes training_schedule.engine_workout_id.
 
 function nextNScheduleDays(n: number): { key: string; label: string }[] {
   const out: { key: string; label: string }[] = [];
@@ -1736,9 +1785,17 @@ function EngineDayScheduleControl({ engineWorkoutId, userId }: { engineWorkoutId
   const add = async (date: string) => {
     setError(null);
     setPickerOpen(false);
+    // Once-and-done: if already scheduled, move the existing row instead of adding.
+    if (rows.length > 0) {
+      const existing = rows[0];
+      const res = await rescheduleRow(existing.id, date, 'engine');
+      if (res.error) { setError(res.error); return; }
+      setRows([{ id: existing.id, scheduled_date: date }]);
+      return;
+    }
     const res = await scheduleEngineDay(userId, engineWorkoutId, date);
     if (res.error) { setError(res.error); return; }
-    setRows(prev => [...prev, { id: res.id!, scheduled_date: res.scheduled_date! }].sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date)));
+    setRows([{ id: res.id!, scheduled_date: res.scheduled_date! }]);
   };
 
   const remove = async (rowId: string) => {
@@ -1772,7 +1829,7 @@ function EngineDayScheduleControl({ engineWorkoutId, userId }: { engineWorkoutId
           className="engine-btn engine-btn-secondary engine-btn-sm"
           onClick={() => setPickerOpen(o => !o)}
         >
-          <Calendar size={14} /> Add to calendar
+          <Calendar size={14} /> {rows.length > 0 ? 'Reschedule' : 'Add to calendar'}
         </button>
       </div>
       {error && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>{error}</div>}

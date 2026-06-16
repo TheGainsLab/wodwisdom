@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-type DayStatus = 'scheduled' | 'completed' | 'both';
+type DayStatus = 'scheduled' | 'partial' | 'completed' | 'both';
 
 interface WorkoutCalendarProps {
   /** Map of "YYYY-MM-DD" → number of workouts that day */
@@ -17,6 +17,12 @@ interface WorkoutCalendarProps {
   dayStatus?: Record<string, DayStatus>;
   /** Allow navigating into future months (scheduled days live in the future). */
   allowFuture?: boolean;
+  /**
+   * Optional per-date count of blocks completed that day. Shown on in-progress
+   * (partial) cells as a bare number — a date can hold blocks from multiple
+   * workouts, so there's no denominator.
+   */
+  blockCounts?: Record<string, number>;
 }
 
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -36,7 +42,7 @@ function getIntensity(count: number): number {
   return 3;
 }
 
-export default function WorkoutCalendar({ workoutCounts, selectedDate, onDayClick, dayStatus, allowFuture }: WorkoutCalendarProps) {
+export default function WorkoutCalendar({ workoutCounts, selectedDate, onDayClick, dayStatus, allowFuture, blockCounts }: WorkoutCalendarProps) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -56,13 +62,18 @@ export default function WorkoutCalendar({ workoutCounts, selectedDate, onDayClic
   const isCurrentMonth = year === today.getFullYear() && month === today.getMonth();
   const todayKey = toKey(today.getFullYear(), today.getMonth(), today.getDate());
 
-  // Count workouts this month
-  const monthWorkouts = Array.from({ length: daysInMonth }, (_, i) => {
-    const key = toKey(year, month, i + 1);
-    return workoutCounts[key] || 0;
-  });
-  const totalThisMonth = monthWorkouts.reduce((s, n) => s + n, 0);
-  const activeDays = monthWorkouts.filter(n => n > 0).length;
+  // Month stat cards: days completed vs. days scheduled (status-driven).
+  let daysCompleted = 0;
+  let daysScheduled = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const st = dayStatus?.[toKey(year, month, d)];
+    if (st === 'completed' || st === 'both') daysCompleted++;
+    if (st === 'scheduled' || st === 'both') daysScheduled++;
+  }
+  // Fallback for count-only callers (no dayStatus): any logged day counts as completed.
+  if (!dayStatus) {
+    daysCompleted = Array.from({ length: daysInMonth }, (_, i) => workoutCounts[toKey(year, month, i + 1)] || 0).filter(n => n > 0).length;
+  }
 
   return (
     <div className="wc-container">
@@ -92,13 +103,18 @@ export default function WorkoutCalendar({ workoutCounts, selectedDate, onDayClic
           const isSelected = selectedDate === key;
           const status = dayStatus?.[key];
           const hasContent = count > 0 || !!status;
+          // Completed = the prominent state (solid fill + check). Driven by status
+          // when provided, else by count for plain heat-map callers.
+          const isCompleted = status ? (status === 'completed' || status === 'both') : count > 0;
           // With allowFuture (the calendar-first add flow), empty today-forward
           // dates are also tappable so the parent can open an "Add" panel.
           const addable = !!allowFuture && key >= todayKey;
           const clickable = hasContent || addable;
           const statusClass = status ? ` wc-cell--${status}` : '';
           const title = status === 'scheduled' ? 'Scheduled'
+            : status === 'partial' ? 'In progress'
             : status === 'both' ? 'Scheduled + completed'
+            : status === 'completed' ? 'Completed'
             : count ? `${count} workout${count > 1 ? 's' : ''}` : addable ? 'Add training' : 'Rest day';
           return (
             <div
@@ -108,6 +124,13 @@ export default function WorkoutCalendar({ workoutCounts, selectedDate, onDayClic
               onClick={clickable && onDayClick ? () => onDayClick(key) : undefined}
             >
               <span className="wc-cell-num">{day}</span>
+              {isCompleted ? (
+                <svg className="wc-cell-check" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : status === 'partial' && (blockCounts?.[key] ?? 0) > 0 ? (
+                <span className="wc-cell-blocks" title={`${blockCounts![key]} block${blockCounts![key] > 1 ? 's' : ''} done`}>{blockCounts![key]}</span>
+              ) : null}
             </div>
           );
         })}
@@ -115,12 +138,12 @@ export default function WorkoutCalendar({ workoutCounts, selectedDate, onDayClic
 
       <div className="wc-stats">
         <div className="wc-stat">
-          <span className="wc-stat-value">{totalThisMonth}</span>
-          <span className="wc-stat-label">workouts</span>
+          <span className="wc-stat-value">{daysCompleted}</span>
+          <span className="wc-stat-label">days completed</span>
         </div>
         <div className="wc-stat">
-          <span className="wc-stat-value">{activeDays}</span>
-          <span className="wc-stat-label">active days</span>
+          <span className="wc-stat-value">{daysScheduled}</span>
+          <span className="wc-stat-label">days scheduled</span>
         </div>
       </div>
     </div>

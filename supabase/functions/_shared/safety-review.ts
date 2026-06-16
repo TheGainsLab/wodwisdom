@@ -27,7 +27,7 @@
 import type { WriterOutput } from "./v2-output-schema.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-const MODEL = "claude-sonnet-4-20250514";
+const MODEL = "claude-sonnet-4-6";
 
 export interface SafetyReviewResult {
   safe: boolean;

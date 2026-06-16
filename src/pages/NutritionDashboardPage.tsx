@@ -170,6 +170,11 @@ export default function NutritionDashboardPage({ session }: { session: Session }
 
   const handleFoodLogged = () => {
     closePanel();
+    // Dismiss any open overlay sheet so the user lands back on the nutrition home
+    setFoodDetailTarget(null);
+    setShowFavoritesSheet(false);
+    setShowTemplatesSheet(false);
+    setShowMealBuilder(false);
     loadDay();
     setFavoritesLoaded(false); // Refresh favorites on next open (auto-favorite may have triggered)
   };

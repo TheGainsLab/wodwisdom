@@ -6,7 +6,6 @@ import {
   loadCompletedSessions,
   loadTimeTrialBaselines,
   loadAllTimeTrials,
-  loadUserProgress,
   type EngineWorkoutSession,
   type EngineTimeTrial,
 } from '../lib/engineService';
@@ -208,7 +207,6 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
   const [sessions, setSessions] = useState<EngineWorkoutSession[]>([]);
   const [baselines, setBaselines] = useState<EngineTimeTrial[]>([]);
   const [allTrials, setAllTrials] = useState<EngineTimeTrial[]>([]);
-  const [currentDay, setCurrentDay] = useState(1);
   const { hasFeature } = useEntitlements(session.user.id);
   const hasAccess = hasFeature('engine');
 
@@ -221,16 +219,14 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
 
   useEffect(() => {
     (async () => {
-      const [sessResult, blResult, allTrialResult, progressResult] = await Promise.allSettled([
+      const [sessResult, blResult, allTrialResult] = await Promise.allSettled([
         loadCompletedSessions(),
         loadTimeTrialBaselines(),
         loadAllTimeTrials(),
-        loadUserProgress(),
       ]);
       if (sessResult.status === 'fulfilled') setSessions(sessResult.value);
       if (blResult.status === 'fulfilled') setBaselines(blResult.value);
       if (allTrialResult.status === 'fulfilled') setAllTrials(allTrialResult.value);
-      if (progressResult.status === 'fulfilled') setCurrentDay(progressResult.value?.engine_current_day ?? 1);
       setLoading(false);
     })();
   }, [session.user.id]);
@@ -369,10 +365,6 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
             </div>
             <div className="engine-stat-label">Avg Perf</div>
           </div>
-          <div className="engine-stat" style={{ textAlign: 'center' }}>
-            <div className="engine-stat-value">{currentDay}</div>
-            <div className="engine-stat-label">Current Day</div>
-          </div>
         </div>
 
         {/* Analytics menu */}
@@ -411,10 +403,6 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
           <div className="engine-stat" style={{ textAlign: 'center' }}>
             <div className="engine-stat-value">{avgRPE > 0 ? avgRPE.toFixed(1) : '—'}</div>
             <div className="engine-stat-label">Avg RPE</div>
-          </div>
-          <div className="engine-stat" style={{ textAlign: 'center' }}>
-            <div className="engine-stat-value">{currentDay}</div>
-            <div className="engine-stat-label">Current Day</div>
           </div>
         </div>
 

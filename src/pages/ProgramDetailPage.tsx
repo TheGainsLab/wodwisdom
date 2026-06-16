@@ -6,6 +6,9 @@ import { useEntitlements } from '../hooks/useEntitlements';
 import { useMovementVocab, matchMovements } from '../lib/movementVocab';
 import Nav from '../components/Nav';
 import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksDisplay';
+import { BlockCoachingBody, coachingForBlockType, formatReviewMarkdown, CHEVRON_DOWN, type ReviewBlock } from '../components/reviewCoaching';
+import { useWorkoutReview } from '../lib/useWorkoutReview';
+import BlockLog, { type DayLogController } from '../components/blockLog';
 
 interface ProgramBlock {
   id: string;
@@ -26,7 +29,7 @@ interface ProgramWorkout {
 
 // v3 structured data shapes — fetched from program_blocks_v2 +
 // program_movements_v2 when programs.program_version === 'v3'.
-interface ProgramMovementV2 {
+export interface ProgramMovementV2 {
   id: string;
   block_id: string;
   movement: string;
@@ -45,7 +48,7 @@ interface ProgramMovementV2 {
   sort_order: number;
 }
 
-interface ProgramBlockV2 {
+export interface ProgramBlockV2 {
   id: string;
   program_workout_id: string;
   block_type: string;
@@ -60,7 +63,7 @@ interface ProgramBlockV2 {
 }
 
 // AI Edit proposal shape (BlockPrescription from the adjust-workout edge fn).
-interface BlockProposalMovement {
+export interface BlockProposalMovement {
   movement: string;
   sets?: number | null;
   reps?: number | null;
@@ -76,7 +79,7 @@ interface BlockProposalMovement {
   cardio_modality?: string | null;
   calories?: number | null;
 }
-interface BlockProposal {
+export interface BlockProposal {
   block_type: string;
   block_label?: string | null;
   block_scheme?: string | null;
@@ -87,7 +90,7 @@ interface BlockProposal {
 }
 
 /** Mirror save-program-v3's reconcileReps: rep_scheme present → reps = sum. */
-function reconcileReps(
+export function reconcileReps(
   reps: number | null | undefined,
   repScheme: number[] | null | undefined,
 ): { reps: number | null; rep_scheme: number[] | null } {
@@ -178,14 +181,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
   const [generatingNextMonth, setGeneratingNextMonth] = useState(false);
 
-  const toggleDay = useCallback((workoutId: string) => {
-    setExpandedDays(prev => {
-      const next = new Set(prev);
-      if (next.has(workoutId)) next.delete(workoutId);
-      else next.add(workoutId);
-      return next;
-    });
-  }, []);
 
   // v3 movement edit. Optimistic local update + UPDATE; revert on error.
   const updateMovementField = useCallback(async (movementId: string, patch: Partial<ProgramMovementV2>) => {
@@ -213,6 +208,35 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
             ...b,
             movements: b.movements.map(m => m.id === movementId ? restore : m),
           })));
+        }
+        return next;
+      });
+      throw error;
+    }
+  }, []);
+
+  // v3 edit a block-level field (e.g. block_scheme — the "Every 90s for 12 min"
+  // line). Optimistic, with rollback on error. Same pattern as movement edits.
+  const updateBlockField = useCallback(async (blockId: string, patch: Partial<ProgramBlockV2>) => {
+    let previous: ProgramBlockV2 | undefined;
+    setV3BlocksByWorkout(prev => {
+      const next = new Map(prev);
+      for (const [wid, blocks] of next) {
+        next.set(wid, blocks.map(b => {
+          if (b.id !== blockId) return b;
+          previous = b;
+          return { ...b, ...patch };
+        }));
+      }
+      return next;
+    });
+    const { error } = await supabase.from('program_blocks_v2').update(patch).eq('id', blockId);
+    if (error && previous) {
+      const restore = previous;
+      setV3BlocksByWorkout(prev => {
+        const next = new Map(prev);
+        for (const [wid, blocks] of next) {
+          next.set(wid, blocks.map(b => b.id === blockId ? restore : b));
         }
         return next;
       });
@@ -742,8 +766,8 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                               <div className="program-day-headrow">
                               <button
                                 className="program-day-header"
-                                onClick={() => toggleDay(w.id)}
-                                aria-expanded={isExpanded}
+                                onClick={() => navigate(`/day/${w.id}`)}
+                                aria-label={`Open Day ${w.day_num}`}
                               >
                                 <div className="program-day-left">
                                   <div className="program-day-top-row">
@@ -816,12 +840,12 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                   )}
                                 </div>
                                 <svg
-                                  className={`program-day-chevron${isExpanded ? ' expanded' : ''}`}
+                                  className="program-day-chevron"
                                   width="16" height="16" viewBox="0 0 24 24"
                                   fill="none" stroke="currentColor" strokeWidth="2"
                                   strokeLinecap="round" strokeLinejoin="round"
                                 >
-                                  <polyline points="6 9 12 15 18 9" />
+                                  <polyline points="9 6 15 12 9 18" />
                                 </svg>
                               </button>
                               <DayScheduleControl
@@ -837,7 +861,10 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                     {program?.program_version === 'v3' ? (
                                       <V3DayView
                                         blocks={v3BlocksByWorkout.get(w.id) ?? []}
+                                        sourceId={w.id}
+                                        workoutText={v3BlocksToProse(v3BlocksByWorkout.get(w.id) ?? [])}
                                         onUpdateMovement={updateMovementField}
+                                        onUpdateBlock={updateBlockField}
                                         onAddMovement={addMovementToBlock}
                                         onRemoveMovement={removeMovementFromBlock}
                                         aiEditedBlockIds={aiEditedBlockIds}
@@ -883,24 +910,23 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                         day_num: w.day_num,
                                         ...(isV3 ? { v3_blocks: v3Blocks, program_version: 'v3' as const } : {}),
                                       };
-                                      const startState = {
-                                        workout_text: text,
-                                        source_id: w.id,
-                                        ...(isV3 ? { v3_blocks: v3Blocks, program_version: 'v3' as const } : {}),
-                                      };
                                       return (
                                         <>
-                                          <button
-                                            className="auth-btn"
-                                            onClick={() => navigate('/workout-review', { state: reviewState })}
-                                            style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: done ? 'var(--text-dim)' : 'var(--text)' }}
-                                          >
-                                            Coach
-                                          </button>
+                                          {/* v3 days get inline per-block coaching; only v1 keeps the
+                                              standalone Coach page button. */}
+                                          {!isV3 && (
+                                            <button
+                                              className="auth-btn"
+                                              onClick={() => navigate('/workout-review', { state: reviewState })}
+                                              style={{ padding: '8px 14px', fontSize: 13, background: 'var(--surface2)', color: done ? 'var(--text-dim)' : 'var(--text)' }}
+                                            >
+                                              Coach
+                                            </button>
+                                          )}
                                           {!done && (
                                             <button
                                               className="auth-btn"
-                                              onClick={() => navigate('/workout/start', { state: startState })}
+                                              onClick={() => navigate(`/day/${w.id}`)}
                                               style={{ padding: '8px 14px', fontSize: 13 }}
                                             >
                                               {ip ? 'Resume' : 'Start'}
@@ -990,7 +1016,7 @@ function formatRepPrescription(m: ProgramMovementV2): string | null {
   return null;
 }
 
-function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
+export function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
   if (!blocks.length) return '';
   const fmt = (m: ProgramMovementV2) => {
     const parts: string[] = [];
@@ -1045,9 +1071,19 @@ interface AiEditHandlers {
 interface V3DayViewProps extends AiEditHandlers {
   blocks: ProgramBlockV2[];
   onUpdateMovement?: (movementId: string, patch: Partial<ProgramMovementV2>) => Promise<void>;
+  onUpdateBlock?: (blockId: string, patch: Partial<ProgramBlockV2>) => Promise<void>;
   onAddMovement?: (blockId: string) => Promise<void>;
   onRemoveMovement?: (movementId: string) => Promise<void>;
+  // Inline coaching ("Coach ▾" per block). The review is fetched once per day and
+  // shared across blocks; sourceId = program_workout_id, workoutText = the prose.
+  sourceId?: string;
+  workoutText?: string;
+  // When present (the day page), each block renders its type-specific log UI.
+  logging?: DayLogController;
 }
+
+// Block types the workout review generates coaching for (skills/strength/metcon).
+const COACHABLE_BLOCK_TYPES = ['skills', 'strength', 'metcon', 'accessory'];
 
 // Block display labels — aligned with v1 prose conventions so the
 // same labels work in the V3DayView UI chip + the v3BlocksToProse
@@ -1184,7 +1220,14 @@ function DayScheduleControl({ entry, takenDates, onPick, onClear }: {
   );
 }
 
-function V3DayView({ blocks, onUpdateMovement, onAddMovement, onRemoveMovement, ...ai }: V3DayViewProps) {
+export function V3DayView({ blocks, sourceId, workoutText, logging, onUpdateMovement, onUpdateBlock, onAddMovement, onRemoveMovement, ...ai }: V3DayViewProps) {
+  // One review per day, lazily generated when any "Coach ▾" / intent / sources opens.
+  const { review, loading, error, generate } = useWorkoutReview(sourceId ?? null, workoutText ?? '');
+  const [intentOpen, setIntentOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const canCoach = !!sourceId && !!(workoutText && workoutText.trim());
+  const sourceTitles = review?.sources ? [...new Set(review.sources.map(s => s.title).filter(Boolean))] : [];
+
   if (!blocks.length) {
     return (
       <div style={{ padding: 12, fontSize: 13, color: 'var(--text-dim)', fontStyle: 'italic' }}>
@@ -1194,16 +1237,72 @@ function V3DayView({ blocks, onUpdateMovement, onAddMovement, onRemoveMovement, 
   }
   return (
     <div className="workout-blocks">
-      {blocks.map((b) => <V3BlockCard key={b.id} block={b} onUpdateMovement={onUpdateMovement} onAddMovement={onAddMovement} onRemoveMovement={onRemoveMovement} {...ai} />)}
+      {/* Session intent (day-level "why"), collapsed, near the top. */}
+      {canCoach && (
+        <div className="wr-sources-section">
+          <button className="wr-sources-toggle" onClick={() => { const n = !intentOpen; setIntentOpen(n); if (n) generate(); }} aria-expanded={intentOpen}>
+            <span className="wr-sources-label">Today's training intent</span>
+            <span className={`workout-review-block-chevron${intentOpen ? ' workout-review-block-chevron--open' : ''}`}>{CHEVRON_DOWN}</span>
+          </button>
+          {intentOpen && (
+            review?.intent
+              ? <div className="wr-intent-card" style={{ marginTop: 8 }}><div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatReviewMarkdown(review.intent) }} /></div>
+              : loading ? <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '8px 2px' }}>Loading coaching…</div>
+              : error ? <div style={{ fontSize: 13, color: 'var(--accent)', padding: '8px 2px' }}>{error}</div>
+              : null
+          )}
+        </div>
+      )}
+
+      {blocks.map((b) => (
+        <V3BlockCard
+          key={b.id}
+          block={b}
+          onUpdateMovement={onUpdateMovement}
+          onUpdateBlock={onUpdateBlock}
+          onAddMovement={onAddMovement}
+          onRemoveMovement={onRemoveMovement}
+          canCoach={canCoach}
+          coaching={coachingForBlockType(review, b.block_type)}
+          coachingLoading={loading}
+          coachingError={error}
+          onEnsureCoaching={generate}
+          logging={logging}
+          {...ai}
+        />
+      ))}
+
+      {/* Sources, collapsed, at the bottom. */}
+      {canCoach && (
+        <div className="wr-sources-section">
+          <button className="wr-sources-toggle" onClick={() => { const n = !sourcesOpen; setSourcesOpen(n); if (n) generate(); }} aria-expanded={sourcesOpen}>
+            <span className="wr-sources-label">Sources{sourceTitles.length ? ` (${sourceTitles.length})` : ''}</span>
+            <span className={`workout-review-block-chevron${sourcesOpen ? ' workout-review-block-chevron--open' : ''}`}>{CHEVRON_DOWN}</span>
+          </button>
+          {sourcesOpen && (
+            sourceTitles.length
+              ? <div className="wr-sources-list">{sourceTitles.map((t, j) => <span key={j} className="source-chip">{t}</span>)}</div>
+              : loading ? <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '8px 2px' }}>Loading…</div>
+              : null
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function V3BlockCard({ block, onUpdateMovement, onAddMovement, onRemoveMovement, aiEditedBlockIds, onProposeAiEdit, onApplyAiProposal, onRefuseAiProposal }: AiEditHandlers & {
+function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, onRemoveMovement, aiEditedBlockIds, onProposeAiEdit, onApplyAiProposal, onRefuseAiProposal, canCoach, coaching, coachingLoading, coachingError, onEnsureCoaching, logging }: AiEditHandlers & {
   block: ProgramBlockV2;
   onUpdateMovement?: (movementId: string, patch: Partial<ProgramMovementV2>) => Promise<void>;
+  onUpdateBlock?: (blockId: string, patch: Partial<ProgramBlockV2>) => Promise<void>;
   onAddMovement?: (blockId: string) => Promise<void>;
   onRemoveMovement?: (movementId: string) => Promise<void>;
+  canCoach?: boolean;
+  coaching?: ReviewBlock | null;
+  coachingLoading?: boolean;
+  coachingError?: string | null;
+  onEnsureCoaching?: () => void;
+  logging?: DayLogController;
 }) {
   const displayLabel = BLOCK_DISPLAY[block.block_type] ?? block.block_type;
   const timeCapMin = block.time_cap_seconds ? Math.round(block.time_cap_seconds / 60) : null;
@@ -1241,10 +1340,29 @@ function V3BlockCard({ block, onUpdateMovement, onAddMovement, onRemoveMovement,
 
   const [editing, setEditing] = useState(false);
   const canEdit = !!onUpdateMovement;
+
+  // Block-level scheme ("Every 90s for 12 min (8 sets)"), editable in edit mode.
+  const [scheme, setScheme] = useState(block.block_scheme ?? '');
+  const commitScheme = async () => {
+    if (!onUpdateBlock) return;
+    const trimmed = scheme.trim();
+    const next = trimmed === '' ? null : trimmed;
+    if (next === (block.block_scheme ?? null)) return;
+    try { await onUpdateBlock(block.id, { block_scheme: next }); }
+    catch { setScheme(block.block_scheme ?? ''); }
+  };
   // AI Edit is overkill for warm-up / cool-down — manual edit covers those.
   const aiEditAllowedType = block.block_type !== 'warm-up' && block.block_type !== 'cool-down';
   const canAiEdit = !!onProposeAiEdit && !!onApplyAiProposal && !!onRefuseAiProposal && aiEditAllowedType;
   const locked = aiEditedBlockIds?.has(block.id) ?? false;
+  // Inline coaching disclosure (skills/strength/metcon). Collapsed by default;
+  // opening it lazily generates the day's review.
+  const showCoach = !!canCoach && COACHABLE_BLOCK_TYPES.includes(block.block_type);
+  // Logged blocks dim to read as "done". The Log/Edit footer stays full-bright
+  // (rendered outside the dimmed wrapper). Editing un-dims so fields are clear.
+  const isLogged = !!logging && !editing && logging.isSaved(block.sort_order);
+  const [coachOpen, setCoachOpen] = useState(false);
+  const toggleCoach = () => { const n = !coachOpen; setCoachOpen(n); if (n) onEnsureCoaching?.(); };
 
   // AI Edit state machine (one-shot per block).
   const [aiState, setAiState] = useState<'idle' | 'input' | 'loading' | 'review'>('idle');
@@ -1289,6 +1407,7 @@ function V3BlockCard({ block, onUpdateMovement, onAddMovement, onRemoveMovement,
 
   return (
     <div className="workout-block" data-block={block.block_type}>
+      <div style={isLogged ? { opacity: 0.5, transition: 'opacity 0.15s' } : undefined}>
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <span className="workout-block-label" data-block={block.block_type}>{displayLabel}</span>
         {block.block_label && <span style={labelStyle}>{block.block_label}</span>}
@@ -1330,10 +1449,34 @@ function V3BlockCard({ block, onUpdateMovement, onAddMovement, onRemoveMovement,
                 </button>
               )
             )}
+            {showCoach && (
+              <button
+                type="button"
+                className={`block-ai-edit-toggle${coachOpen ? ' block-coach-toggle--open' : ''}`}
+                onClick={toggleCoach}
+                aria-expanded={coachOpen}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+                Coach
+              </button>
+            )}
           </span>
         )}
       </div>
-      {block.block_scheme && <div style={schemeStyle}>{block.block_scheme}</div>}
+      {editing && onUpdateBlock ? (
+        <input
+          type="text"
+          className="movement-edit-input"
+          style={{ ...schemeStyle, width: '100%' }}
+          value={scheme}
+          onChange={e => setScheme(e.target.value)}
+          onBlur={commitScheme}
+          placeholder="Scheme (e.g. Every 90s for 12 min (8 sets))"
+          aria-label="Block scheme"
+        />
+      ) : (
+        block.block_scheme && <div style={schemeStyle}>{block.block_scheme}</div>
+      )}
       {block.block_notes && <div style={notesStyle}>{block.block_notes}</div>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {block.movements.map((m) => (
@@ -1347,6 +1490,9 @@ function V3BlockCard({ block, onUpdateMovement, onAddMovement, onRemoveMovement,
           </button>
         )}
       </div>
+      </div>
+
+      {logging && !editing && <BlockLog block={block} controller={logging} coaching={coaching ?? null} onEnsureCoaching={onEnsureCoaching} />}
 
       {canAiEdit && !locked && aiState !== 'idle' && (
         <V3AiEditPanel
@@ -1360,6 +1506,20 @@ function V3BlockCard({ block, onUpdateMovement, onAddMovement, onRemoveMovement,
           onRefuse={refuseProposal}
           onCancel={() => { setAiState('idle'); setAiError(null); setAiRequest(''); }}
         />
+      )}
+
+      {showCoach && coachOpen && (
+        <div className="block-coach-body" style={{ marginTop: 10 }}>
+          {coaching ? (
+            <BlockCoachingBody block={coaching} />
+          ) : coachingLoading ? (
+            <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '4px 2px' }}>Loading coaching…</div>
+          ) : coachingError ? (
+            <div style={{ fontSize: 13, color: 'var(--accent)', padding: '4px 2px' }}>{coachingError}</div>
+          ) : (
+            <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '4px 2px' }}>No coaching for this block.</div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -1516,7 +1676,12 @@ function V3MovementEditRow({ movement, onUpdate, onRemove }: {
   const [reps, setReps] = useState<string>(repsToText(movement));
   const [weight, setWeight] = useState<string>(movement.weight != null ? String(movement.weight) : '');
   const [unit, setUnit] = useState<'lbs' | 'kg'>((movement.weight_unit as 'lbs' | 'kg') ?? 'lbs');
+  const [distance, setDistance] = useState<string>(movement.distance != null ? String(movement.distance) : '');
+  const [distanceUnit, setDistanceUnit] = useState<string>(movement.distance_unit ?? 'm');
   const [scaling, setScaling] = useState(movement.scaling_note ?? '');
+
+  // Distance-based movements (row/run/bike/etc.) prescribe distance, not reps.
+  const hasDistance = movement.distance != null;
 
   // Typeahead: suggest canonical movement names (matches display_name + aliases,
   // so "T2B" → "Toes To Bar"). Suggests, never forces — a no-match name is kept.
@@ -1584,6 +1749,22 @@ function V3MovementEditRow({ movement, onUpdate, onRemove }: {
     catch { setUnit((movement.weight_unit as 'lbs' | 'kg') ?? 'lbs'); }
   };
 
+  const commitDistance = async () => {
+    const trimmed = distance.trim();
+    const next = trimmed === '' ? null : Number(trimmed);
+    if (next != null && (!Number.isFinite(next) || next < 0)) { setDistance(movement.distance != null ? String(movement.distance) : ''); return; }
+    if (next === (movement.distance ?? null)) return;
+    try { await onUpdate(movement.id, { distance: next }); }
+    catch { setDistance(movement.distance != null ? String(movement.distance) : ''); }
+  };
+
+  const commitDistanceUnit = async (nextUnit: string) => {
+    setDistanceUnit(nextUnit);
+    if (nextUnit === (movement.distance_unit ?? 'm')) return;
+    try { await onUpdate(movement.id, { distance_unit: nextUnit }); }
+    catch { setDistanceUnit(movement.distance_unit ?? 'm'); }
+  };
+
   const commitScaling = async () => {
     const trimmed = scaling.trim();
     const next = trimmed === '' ? null : trimmed;
@@ -1630,16 +1811,43 @@ function V3MovementEditRow({ movement, onUpdate, onRemove }: {
         placeholder="Sets"
         aria-label="Sets"
       />
-      <input
-        type="text"
-        inputMode="numeric"
-        className="movement-edit-input movement-edit-input--reps"
-        value={reps}
-        onChange={e => setReps(e.target.value)}
-        onBlur={commitReps}
-        placeholder="Reps"
-        aria-label="Reps or scheme (e.g. 21-15-9)"
-      />
+      {hasDistance ? (
+        <div className="movement-edit-weight">
+          <input
+            type="number"
+            inputMode="decimal"
+            className="movement-edit-input movement-edit-input--reps"
+            value={distance}
+            onChange={e => setDistance(e.target.value)}
+            onBlur={commitDistance}
+            placeholder="Dist"
+            aria-label="Distance"
+          />
+          <select
+            className="movement-edit-input movement-edit-input--unit"
+            value={distanceUnit}
+            onChange={e => commitDistanceUnit(e.target.value)}
+            aria-label="Distance unit"
+          >
+            <option value="m">m</option>
+            <option value="km">km</option>
+            <option value="mi">mi</option>
+            <option value="ft">ft</option>
+            <option value="cal">cal</option>
+          </select>
+        </div>
+      ) : (
+        <input
+          type="text"
+          inputMode="numeric"
+          className="movement-edit-input movement-edit-input--reps"
+          value={reps}
+          onChange={e => setReps(e.target.value)}
+          onBlur={commitReps}
+          placeholder="Reps"
+          aria-label="Reps or scheme (e.g. 21-15-9)"
+        />
+      )}
       <div className="movement-edit-weight">
         <input
           type="number"
