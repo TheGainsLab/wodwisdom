@@ -29,7 +29,7 @@ interface Linkage {
 
 export default function AthleteDataPage({ session }: { session: Session }) {
   const navigate = useNavigate();
-  const { isAdmin, hasFeature, loading: entLoading } = useEntitlements(session.user.id);
+  const { isAdmin, loading: entLoading } = useEntitlements(session.user.id);
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [linkage, setLinkage] = useState<Linkage>({ id: null, label: null });
@@ -69,11 +69,9 @@ export default function AthleteDataPage({ session }: { session: Session }) {
   // ATHLETEDATA_PUBLIC_TIER flag flips. Server-side gates on the edge
   // functions enforce the same boundary.
   const hasAccess = isAdmin || ATHLETEDATA_PUBLIC_TIER;
-  // Try-It (logging results against the cohort): paid competition_log or
-  // bundled `programming` (AI Programming / All-Access). Admin bypass for
-  // testing. Only matters when the page is accessible — gate is harmless
-  // until ATHLETEDATA_PUBLIC_TIER opens the page to non-admins.
-  const canLog = isAdmin || hasFeature('competition_log') || hasFeature('programming');
+  // Try-It (do competition workouts + get scored against the cohort) is a FREE
+  // feature for everyone — search, import, do the workouts, see your results.
+  const canLog = true;
 
   useEffect(() => {
     if (!entLoading && !hasAccess) navigate('/profile', { replace: true });

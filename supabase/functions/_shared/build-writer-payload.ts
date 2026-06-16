@@ -104,20 +104,31 @@ export interface CompetitionPayload {
 export interface PreviousCycleSummary {
   program_id: string;
   program_name: string | null;
-  program_created_at: string | null;
   last_completed_date: string | null;
-  workouts: {
-    prescribed: number;
-    completed: number;
-    completion_pct: number | null;
+  /** Whether the prior cycle had any completed logs to lean on. Informational
+   *  only — absence of logging is NEVER a penalty (a busy week / light logger
+   *  is not low capacity); we just progress off the prescription instead. */
+  logged: boolean;
+  /** Per-lift PRESCRIPTION from last cycle (the backbone — always present for a
+   *  v3 prior cycle; empty for a v1 prior program). logged_* are additive: null
+   *  when unlogged → progress normally, never cut. */
+  strength: Array<{
+    lift: string;                    // canonical key, e.g. "back_squat"
+    top_pct_1rm: number | null;      // heaviest % prescribed last cycle
+    top_weight: number | null;       // heaviest prescribed weight (lb)
+    sessions: number;                // # strength/accessory blocks it appeared in
+    logged_avg_rpe: number | null;   // null = unlogged
+    logged_hit_rate: number | null;  // % sets actual ≥ prescribed; null = unlogged
+  }>;
+  /** Metcon coverage from last cycle's prescribed time caps — to rebalance
+   *  time-domain spread this cycle. */
+  conditioning: {
+    metcons: number;
+    time_domains: { short: number; medium: number; long: number; untimed: number };
   };
-  movement_skip: {
-    total_entries: number;
-    skipped_entries: number;
-    skip_pct: number | null;
-  };
-  /** Map keyed by canonical skill key (e.g. "bar_muscle_ups").
-   *  Empty object when athlete didn't log any canonical skills last cycle. */
+  /** Map keyed by canonical skill key (e.g. "bar_muscle_ups"). Reps/holds the
+   *  athlete ACTUALLY logged — positive signal only; never used to regress a
+   *  skill (low/absent volume may just mean it wasn't logged). */
   skill_volume: Record<string, {
     total_reps: number;
     total_hold_seconds: number;
@@ -144,6 +155,16 @@ export interface WriterPayload {
   previous_cycle: PreviousCycleSummary | null;
   /** display_name strings — the writer's allowed-movement set. */
   vocabulary: string[];
+  /** Latest COMPLETE profile evaluation narrative (profile_evaluations.analysis).
+   *  The coach's synthesized fitness judgment. Read on EVERY generation (month 1
+   *  and continuation) — the profile/eval can change between cycles. NULL when the
+   *  athlete has no completed evaluation yet, or the read soft-failed. */
+  profile_evaluation: string | null;
+  /** Latest training evaluation narrative (training_evaluations.analysis) — the
+   *  coach's read of recent training. Populated only for continuation months
+   *  (month >= 2); month 1 has no training history. Complements previous_cycle
+   *  (structured actuals) with narrative interpretation. NULL otherwise. */
+  training_evaluation: string | null;
   /** Concatenated RAG context (TODO: wire to v1's searchChunks chain). */
   rag: string;
 }
@@ -304,6 +325,20 @@ export interface BuildWriterPayloadOptions {
    * career array adds ~50–100k tokens of noise.
    */
   includeAllResults?: boolean;
+  /**
+   * Surface the coaching evaluations (profile_evaluation always; training_
+   * evaluation for month >= 2) in the payload. ONLY the program GENERATOR
+   * should set this. The profile EVALUATOR (profile-analysis-v2) also builds
+   * this payload to PRODUCE an evaluation — feeding it the latest evaluation
+   * would be circular — so it leaves this false. Defaults to false.
+   */
+  includeEvaluations?: boolean;
+  /**
+   * Month being generated (1 for first cycle, >= 2 for continuation). Gates the
+   * training evaluation read (month >= 2 only; month 1 has no training history).
+   * Only consulted when includeEvaluations is true. Defaults to 1.
+   */
+  monthNumber?: number;
 }
 
 export async function buildWriterPayload(
@@ -312,6 +347,8 @@ export async function buildWriterPayload(
   options: BuildWriterPayloadOptions = {},
 ): Promise<WriterPayload> {
   const includeAllResults = options.includeAllResults ?? true;
+  const includeEvaluations = options.includeEvaluations ?? false;
+  const monthNumber = options.monthNumber ?? 1;
 
   // 1. Athlete profile row — hard requirement.
   const { data: profile, error: profileErr } = await supa
@@ -363,6 +400,48 @@ export async function buildWriterPayload(
       `[build-writer-payload] user_previous_cycle_summary failed for ${userId}:`,
       err,
     );
+  }
+
+  // 3c. Coaching evaluations — GENERATOR ONLY (includeEvaluations). Both
+  // soft-fail to null — a missing evaluation never blocks generation (same
+  // contract as previous_cycle).
+  //   - profile_evaluation: latest COMPLETE profile eval narrative. Read on
+  //     every generation; the athlete's profile/eval can change between cycles.
+  //   - training_evaluation: latest training eval narrative — continuation only
+  //     (month >= 2). Month 1 has no training history to review.
+  let profile_evaluation: string | null = null;
+  let training_evaluation: string | null = null;
+  if (includeEvaluations) {
+    try {
+      const { data: pe } = await supa
+        .from("profile_evaluations")
+        .select("analysis")
+        .eq("user_id", userId)
+        .eq("status", "complete")
+        .not("analysis", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (pe?.analysis) profile_evaluation = pe.analysis as string;
+    } catch (err) {
+      console.warn(`[build-writer-payload] profile_evaluations read failed for ${userId}:`, err);
+    }
+
+    if (monthNumber >= 2) {
+      try {
+        const { data: te } = await supa
+          .from("training_evaluations")
+          .select("analysis")
+          .eq("user_id", userId)
+          .not("analysis", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (te?.analysis) training_evaluation = te.analysis as string;
+      } catch (err) {
+        console.warn(`[build-writer-payload] training_evaluations read failed for ${userId}:`, err);
+      }
+    }
   }
 
   // 4. Hydrate JSONB blobs to complete canonical-key maps. We need
@@ -443,6 +522,8 @@ export async function buildWriterPayload(
     competition,
     previous_cycle,
     vocabulary,
+    profile_evaluation,
+    training_evaluation,
     rag,
   };
 }

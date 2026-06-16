@@ -204,7 +204,7 @@ export async function computeBlockBenchmark(
     gender,
     workout_type: workoutType,
     time_cap_seconds: block.time_cap_seconds,
-    block_scheme_hint: block.block_scheme ?? null,
+    block_scheme_hint: block.block_scheme ?? undefined,
     rounds,
   };
 

@@ -26,15 +26,23 @@ injuries_structured.do_not_program is the canonical filter. Honor it when pickin
 When empirical performance data (Tier 4) is present, prefer it over self-reported skill levels.
 
 PRIOR CYCLE CONTINUITY (when previous_cycle is non-null)
-Treat previous_cycle as evidence of what the athlete actually completed, not what was prescribed. It should bend the cycle's structural choices:
-  - workouts.completion_pct < 70 → Reduce session count or shorten sessions. The athlete missed too many workouts to absorb a full prescribed cycle.
-  - workouts.completion_pct ≥ 90 → Athlete is consistent. Hold or increase volume.
-  - movement_skip.skip_pct ≥ 20 → Trim accessory + skills volume across the cycle. Athlete is running out of time/energy mid-session — keep main strength + metcon intact.
-  - movement_skip.skip_pct == 0 AND completion_pct ≥ 90 → Athlete finishes everything. Push schemes slightly (top of percentage ranges, longer metcons, more accessory).
-  - skill_volume[<skill>].total_reps very low (< 30) on a Track-A skill from prior cycle → Either re-emphasize with extra Skills-block time, or drop to Track B and free capacity. Decide based on competition_frequency + proficiency_gap.
-  - skill_volume[<skill>].total_reps high (≥ 100) and the skill was Track A last cycle → Skill is getting trained. Continue Track A; expect proficiency_gap to close.
+previous_cycle is the athlete's last completed cycle. Use it to PROGRESS from what was already prescribed — never to penalize. The prior PRESCRIPTION is the backbone; logged actuals (when present) only let you push a lift faster or ease one back. CRITICAL: absence of logging is neutral, not a signal. If previous_cycle.logged is false, or any logged_* / volume field is null/low, that may simply mean the athlete didn't log (a busy week ≠ low capacity) — continue and progress the prescription as normal. NEVER cut session count, deload, trim volume, or regress a skill because something wasn't logged.
+  - strength[] is last cycle's prescription per lift: top_pct_1rm, top_weight, sessions. Build this cycle's strength_progression as a step UP from those (e.g. last top 80% → open slightly higher, or add volume at the same %). Keep the emphasized lifts emphasized unless goal/Tier data says otherwise.
+  - strength[].logged_hit_rate / logged_avg_rpe (null = unlogged → ignore, progress normally):
+      • hit_rate ≥ ~80 AND avg_rpe ≤ ~8 → loads were comfortably hit → progress THAT lift a bit more aggressively (top of the % range).
+      • clear logged struggle (hit_rate low AND avg_rpe ≥ ~9 across several sessions) → ease THAT ONE lift (hold % or a small back-off). Never generalize one lift's struggle into a cycle-wide cut.
+  - conditioning.time_domains is last cycle's metcon coverage (short/medium/long/untimed). Rebalance toward the under-served buckets this cycle (aim for the roughly one-third split).
+  - skill_volume[<skill>] is reps/holds the athlete ACTUALLY logged — positive signal only:
+      • high (≥ ~100 reps) on a Track-A skill → it's getting trained; continue Track A, expect the gap to close.
+      • low or absent → do NOT drop or regress it on that basis (it may just be unlogged). Decide Track A/B from competition_frequency + proficiency_gap as usual.
 
 When previous_cycle is null, proceed on Tier 1–4 alone.
+
+COACH'S EVALUATIONS (when present)
+Two narrative evaluations may accompany the payload. They are a coach's synthesized judgment — weight them heavily; they interpret the raw Tier data and the athlete's trajectory in ways the numbers alone don't.
+  - profile_evaluation: the coach's fitness evaluation of this athlete (strengths, the biggest measurable weaknesses, what to prioritize). Present on every cycle. Let it steer which weaknesses you attack and how you bias the strength axes / skill priorities this cycle. When it conflicts with a self-reported field, trust the evaluation.
+  - training_evaluation: the coach's read of the athlete's RECENT training (continuation cycles only). Use it together with previous_cycle: previous_cycle is the structured prescription + logged actuals, training_evaluation is the narrative interpretation (fatigue, adherence quality, what's working). Same non-penalty rule as previous_cycle — a quiet log is never a reason to cut. Let it inform deload placement and where to push vs. ease.
+When an evaluation is absent (null), simply proceed on the structured data.
 
 STRENGTH AXES + OLY BALANCE LEVER
 The program advances the athlete on two strength axes:

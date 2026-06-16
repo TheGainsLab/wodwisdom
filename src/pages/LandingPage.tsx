@@ -130,8 +130,8 @@ export default function LandingPage() {
           <Placeholder src="/images/hero-eval.png" alt="Your GAINS evaluation" label="[ Image placeholder — Evaluation screenshot (~820×512) ]" />
         </div>
 
-        <p style={{ marginTop: 24, fontSize: 15, color: 'var(--text-dim)', fontWeight: 500 }}>
-          <span style={{ color: 'var(--accent)' }}>Free evaluation.</span> No credit card. Five minutes.
+        <p style={{ marginTop: 24, fontSize: 14, color: 'var(--text-dim)', fontWeight: 500 }}>
+          Always available. Never forgets.
         </p>
       </section>
 
@@ -201,9 +201,6 @@ export default function LandingPage() {
                 <span style={{ color: 'var(--text-dim)' }}>Thruster hip drive practice</span>
               </div>
             </div>
-            <p style={{ ...bodyP, marginTop: 20, marginBottom: 0 }}>
-              A score isn't just a job well done, a benchmark, or another number on a list. It's actionable information — and a point on the continuum toward your goal.
-            </p>
           </div>
         </div>
       </section>
@@ -212,9 +209,9 @@ export default function LandingPage() {
       <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="landing-container">
           <Eyebrow>How It Knows You</Eyebrow>
-          <h2 style={sectionHeadline}>A personalized program starts with a person.</h2>
+          <h2 style={sectionHeadline}>Get Your Free Evaluation.</h2>
           <p style={{ ...bodyP, maxWidth: 720 }}>
-            Before it programs anything, the coach learns you — strength, conditioning, gymnastics, movement limitations, goals. That picture is your evaluation, and it's the foundation of everything that follows.
+            Before it programs anything, the coach builds a complete picture of you — strength, conditioning, gymnastics, competition performance, and movement limitations. That picture is your evaluation, and it's the foundation of everything that follows.
           </p>
 
           {/* Numbered path: build profile → add history → get evaluation (the destination). */}
@@ -230,15 +227,25 @@ export default function LandingPage() {
                 <p style={{ ...bodyP, marginTop: 4, marginBottom: 0 }}>Strength numbers, key ratios, skills, benchmarks, goals.</p>
               </div>
             </div>
-            {/* ② Add as much history as you want */}
+            {/* ② Add your history */}
             <div style={{ display: 'flex', gap: 16 }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div style={stepBadge}>2</div>
                 <div style={{ flex: 1, width: 2, background: 'var(--accent)', minHeight: 16 }} />
               </div>
               <div style={{ paddingBottom: 28 }}>
-                <div style={stepTitle}>Add as much history as you want.</div>
-                <p style={{ ...bodyP, marginTop: 4, marginBottom: 0 }}>Competed before? Link your seasons and your coach analyzes your entire career in seconds — nothing like it exists anywhere. Never competed? Doesn't matter — your profile gives your coach everything it needs.</p>
+                <div style={stepTitle}>Add your history <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>— have you done the CrossFit Open?</span></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 14 }}>
+                  <div>
+                    <Link to="/auth?signup=1&path=link" className="landing-cta" style={{ display: 'inline-block', padding: '10px 20px', fontSize: 14 }}>Yes — link my history</Link>
+                    <p style={{ ...bodyP, fontSize: 14, marginTop: 6, marginBottom: 0 }}>Link your Opens and get your entire competitive career analyzed in seconds.</p>
+                  </div>
+                  <div>
+                    <Link to="/auth?signup=1&path=benchmark" className="landing-cta landing-cta-outline" style={{ display: 'inline-block', padding: '10px 20px', fontSize: 14 }}>No — see how you'd stack up</Link>
+                    <p style={{ ...bodyP, fontSize: 14, marginTop: 6, marginBottom: 0 }}>Complete a few past Open workouts and we'll build your baseline.</p>
+                  </div>
+                </div>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 14, marginBottom: 0 }}>Free account — takes a minute. Then you're in.</p>
               </div>
             </div>
             {/* ③ Get your evaluation — the destination */}
@@ -246,9 +253,8 @@ export default function LandingPage() {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div style={{ ...stepBadge, background: 'var(--accent)', borderColor: 'var(--accent)', color: '#fff' }}>3</div>
               </div>
-              <div>
+              <div style={{ alignSelf: 'center' }}>
                 <div style={stepTitle}>Get your evaluation <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>— your strengths, your weaknesses, where you rank.</span></div>
-                <p style={{ ...bodyP, marginTop: 4, marginBottom: 0 }}>Then explore the rest of your free account: your full athlete data dashboard, any past open workout to test yourself on, your first coach questions.</p>
               </div>
             </div>
           </div>
@@ -259,30 +265,25 @@ export default function LandingPage() {
             <p style={{ textAlign: 'center', fontSize: 17, fontWeight: 600, color: 'var(--text)', lineHeight: 1.6, margin: '20px auto 0' }}>
               Your evaluation identifies your gaps. Your program fixes them.
             </p>
-            <div style={{ textAlign: 'center', marginTop: 24 }}>
-              <Link to="/auth?signup=1" className="landing-cta">Get Your Free Evaluation</Link>
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 14, marginBottom: 0 }}>No credit card required</p>
-            </div>
           </div>
         </div>
       </section>
 
-      {/* ===== What the Data Does for You ===== */}
+      {/* ===== A Common Language for Fitness ===== */}
       <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="landing-container" style={featureRow}>
           <div style={featureCol}>
-            <Eyebrow>What the Data Does for You</Eyebrow>
-            <h2 style={sectionHeadline}>What 15 Million Competition Results Do for You.</h2>
-            <p style={{ ...bodyP, marginBottom: 16 }}>
-              Every season of the worldwide online open. Every quarterfinal. Every championship leaderboard in the sport's history. Your coach has studied all of it — and that's what makes it precise.
-            </p>
-            <p style={{ ...bodyP, marginBottom: 4, fontWeight: 600, color: 'var(--text)' }}>Stop guessing about your weaknesses.</p>
+            <Eyebrow>A Common Language for Fitness</Eyebrow>
+            <h2 style={sectionHeadline}>Fitness Needs a Common Language.</h2>
             <p style={bodyP}>
-              “I'm bad at long workouts” becomes “your average power drops 31% past the ten-minute mark.” Your coach doesn't deal in feelings — it measures the exact gap between you and the athletes ranked above you, then your program attacks it first, because closing it moves you up the most.
+              A rowing workout doesn't look like a lifting workout. A two-minute sprint doesn't look like a twenty-minute grinder. The coach converts every result into watts and watts per kilogram — one scale for every workout you do.
             </p>
-            <p style={{ ...bodyP, marginBottom: 4, fontWeight: 600, color: 'var(--text)' }}>Stop guessing about your progress.</p>
+            <p style={{ ...bodyP, marginBottom: 12, fontWeight: 600, color: 'var(--text)' }}>That unlocks two things you couldn't see before:</p>
+            <p style={bodyP}>
+              <span style={{ fontWeight: 600, color: 'var(--text)' }}>Progress over time.</span> Because everything's on one scale, you can finally tell what's improving and what's stalling — across every time domain, not just the workouts you happen to repeat.
+            </p>
             <p style={{ ...bodyP, marginBottom: 0 }}>
-              The sport has never been able to turn scores into fitness. You do well on a seven-minute workout and worse on a ten — was it the barbell? The gymnastics? The engine? Until now, nobody could say. Your coach can: it converts every result into one measurement — watts per kilogram — and reads it across every dimension that matters: time domain, modality, load. Measured against the sport's entire competitive history, across more parameters than any platform anywhere. You don't have to wait six months to repeat a benchmark to know it's working. You can watch yourself climb.
+              <span style={{ fontWeight: 600, color: 'var(--text)' }}>Where you stand.</span> Your numbers are ranked against 15 million workouts, plus Open, Quarterfinal, and competition data — so you know exactly where you sit, and how far you are from the top 1%.
             </p>
           </div>
           <div style={featureCol}>
@@ -295,26 +296,24 @@ export default function LandingPage() {
       <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="landing-container" style={{ maxWidth: 760 }}>
           <Eyebrow>Your Coach, Every Training Day</Eyebrow>
-          <h2 style={sectionHeadline}>A complete day, built around you.</h2>
-          <p style={bodyP}>
-            Every session arrives whole — warm-up to cooldown. Skills progressions, strength at your percentages, conditioning paced to your engine. The loads are computed from your numbers, the structure from your gaps. Nothing generic. Nothing guessed.
-          </p>
-          {/* Single training day — illustrates the bullets above. */}
+          <h2 style={sectionHeadline}>Every Workout Has a Purpose.</h2>
+          <p style={bodyP}>The coach doesn't just tell you what to do. For each session it explains:</p>
+          <ul style={{ margin: '0 0 16px', paddingLeft: 18, fontSize: 16, lineHeight: 1.8, color: 'var(--text-dim)' }}>
+            <li>Why today's workout exists</li>
+            <li>What adaptation you're chasing</li>
+            <li>What success looks like</li>
+            <li>How it fits into your goals</li>
+          </ul>
+          {/* Training-intent screen — illustrates the bullets above. */}
           <div style={{ margin: '8px 0 28px' }}>
-            <Placeholder src="/images/Single-Day.png" alt="A single training day — warm-up, skills, strength, accessory, metcon, and cool-down" label="[ Image placeholder — Single day ]" />
+            <Placeholder src="/images/training-intent.png" alt="A training day with its intent: why it exists, the adaptation, and what success looks like" label="[ Image placeholder — Training-intent screen ]" />
           </div>
           <p style={{ ...bodyP, marginBottom: 0 }}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Why this workout? How should I pace it? What if my shoulder's cranky today?</span> The coach answers from your data — your profile, your history, today's session — so every answer is about you, not generic internet advice.
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Ask the Coach:</span> And when you have a question, the coach answers in context. It sees your profile, your history, today's workout, and your strengths and weaknesses — so the answer is specific to you, not generic internet advice. Your first three questions are free.
           </p>
           {/* Coach-chat screen (rowing-pacing example). */}
           <div style={{ marginTop: 20 }}>
-            <Placeholder src="/images/strong-rower.png" alt="The AI coach answering a pacing question in the context of your workout" label="[ Image placeholder — Coach chat (rowing-pacing example) ]" />
-          </div>
-          <p style={{ ...bodyP, marginTop: 28, marginBottom: 0 }}>
-            This is just the start. AI editing on every block, a coach in your pocket, and a learning model that sharpens with every score you log — built to improve your fitness faster than anything else out there.
-          </p>
-          <div style={{ marginTop: 20 }}>
-            <Link to="/features/programs" className="landing-cta">Explore AI Programming →</Link>
+            <Placeholder src="/images/AI-coach.png" alt="The AI coach answering a pacing question in the context of your workout" label="[ Image placeholder — Coach chat (rowing-pacing example) ]" />
           </div>
         </div>
       </section>
@@ -325,17 +324,15 @@ export default function LandingPage() {
           <Eyebrow>It Learns From Every Workout</Eyebrow>
           <h2 style={{ ...sectionHeadline, textAlign: 'center', marginBottom: 28 }}>Your Coach Learns From Every Workout.</h2>
           <p style={{ ...bodyP, maxWidth: 760, margin: '0 auto 16px', textAlign: 'center' }}>
-            Every score, RPE, and quality rating you log teaches the coach about you — and everything it builds for you gets sharper.
-          </p>
-          <p style={{ ...bodyP, maxWidth: 760, margin: '0 auto 8px', textAlign: 'center' }}>
-            <strong>AI Programming:</strong> log RPE 9 and miss reps → next week backs off the load.
+            Most programs stay fixed. Yours adapts. Every workout, every score, every RPE, every quality rating sharpens the next decision — so the coach gets sharper every time you train.
           </p>
           <p style={{ ...bodyP, maxWidth: 760, margin: '0 auto 28px', textAlign: 'center' }}>
-            <strong>Year of the Engine — our dedicated conditioning program:</strong> post a faster 2K → every interval re-paces to your new fitness.
+            Over time it even learns to calibrate you: how your reported effort and quality line up with your actual output, so its read on you keeps getting more accurate. Your program isn't a fixed plan — it's a working model that adjusts to how you respond.
           </p>
-          <p style={{ ...bodyP, maxWidth: 760, margin: '0 auto', textAlign: 'center' }}>
-            It knows when to push — and when pushing is the wrong call. Your plan isn't fixed. It's a working model of you, adjusting to how you respond.
-          </p>
+          <div style={{ maxWidth: 760, margin: '0 auto' }}>
+            {/* TODO: replace with the adaptation-cycle diagram */}
+            <Placeholder label="[ Image placeholder — Adaptation cycle diagram ]" ratio="16 / 9" />
+          </div>
         </div>
       </section>
 
@@ -344,7 +341,7 @@ export default function LandingPage() {
         <div className="landing-container" style={{ maxWidth: 720 }}>
           <h2 style={{ ...sectionHeadline, textAlign: 'center' }}>Let's Make Some Gains.</h2>
           <p style={{ ...bodyP, textAlign: 'center', maxWidth: 600, margin: '0 auto 28px' }}>
-            Two programs, one bundle — and the coach comes with all of them.
+            Two programs, one bundle. The AI coach, analytics, and competition rankings come with all of them.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16, margin: '0 0 24px' }}>
             <Link to="/features/programs" className="landing-offering-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
@@ -355,17 +352,14 @@ export default function LandingPage() {
               <h3>Year of the Engine &rarr;</h3>
               <p>Conditioning calibrated to you, every interval paced to your fitness.</p>
             </Link>
-            <Link to="/features/nutrition" className="landing-offering-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
-              <h3>AI Nutrition &rarr;</h3>
-              <p>Fuel built for how you train, with targets set to your training and calorie burn from your real output.</p>
+            <Link to="/auth?signup=1" className="landing-offering-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+              <h3>All Access &rarr;</h3>
+              <p>Both programs together.</p>
             </Link>
           </div>
-          <p style={{ ...bodyP, marginBottom: 16 }}>
-            Individualized coaching typically runs $100–300 a month. Big-name templates charge $30–60 for the same workout sent to everyone. <span style={{ fontWeight: 600, color: 'var(--text)' }}>GAINS builds yours — for less than either.</span>
-          </p>
-          <p style={{ ...bodyP, marginBottom: 8 }}>Every plan includes your AI coach, full analytics, competition rankings, and a complete nutrition app. No add-ons.</p>
+          <p style={{ ...bodyP, marginBottom: 8 }}>Every plan includes your AI coach, full analytics, and competition rankings. No add-ons.</p>
           <p style={{ ...bodyP, marginBottom: 0 }}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Not ready to pick?</span> Start free: your evaluation, your athlete dashboard, three coach questions, unlimited past open workouts. Pick a plan when you're ready.
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Free — start here:</span> 1 evaluation, 3 coach questions, unlimited past-Open workouts. Then pick a plan.
           </p>
         </div>
       </section>

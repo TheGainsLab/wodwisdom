@@ -92,6 +92,14 @@ export interface SaveProgramV3Opts {
   gymName?: string | null;
   isOngoing?: boolean;
   committed?: boolean;
+  /** APPEND MODE: when set, do NOT insert a new programs row — append this
+   *  cycle's workouts/blocks/movements to the existing program and bump
+   *  generated_months. Used by v3 monthly continuation. */
+  programId?: string;
+  /** Which cycle this output is (1 = first cycle). Drives program_workouts.
+   *  month_number + a month-offset sort_order so multiple cycles coexist in one
+   *  program and render under their own "Month N" section. Defaults to 1. */
+  monthNumber?: number;
 }
 
 /**
@@ -105,28 +113,43 @@ export async function saveProgramV3(
   output: WriterOutput,
   opts: SaveProgramV3Opts,
 ): Promise<string> {
-  // 1. programs row.
-  const programRow: Record<string, unknown> = {
-    user_id: userId,
-    name: opts.name,
-    program_version: "v3",
-    month_plan: output.month_plan ?? null,
-  };
-  if (opts.source === "external") {
-    programRow.source = "external";
-    if (opts.gymName) programRow.gym_name = opts.gymName;
-    programRow.is_ongoing = opts.isOngoing === true;
-    programRow.committed = opts.committed === true;
+  const monthNumber = opts.monthNumber ?? 1;
+  const appendMode = !!opts.programId;
+
+  // 1. programs row — insert a new one (first cycle) or reuse the existing
+  //    program (append/continuation mode).
+  let programId: string;
+  if (appendMode) {
+    programId = opts.programId!;
+  } else {
+    const programRow: Record<string, unknown> = {
+      user_id: userId,
+      name: opts.name,
+      program_version: "v3",
+      month_plan: output.month_plan ?? null,
+      // AI-generated programs must be source='generated' so the programs list
+      // renders month expansion AND the auto-continuation paths (stripe-webhook
+      // + monthly-generation-cron both filter .eq("source","generated")) can
+      // find this program to drip the next month. Freelance ingestion overrides
+      // to 'external' below.
+      source: "generated",
+    };
+    if (opts.source === "external") {
+      programRow.source = "external";
+      if (opts.gymName) programRow.gym_name = opts.gymName;
+      programRow.is_ongoing = opts.isOngoing === true;
+      programRow.committed = opts.committed === true;
+    }
+    const { data: program, error: progErr } = await supa
+      .from("programs")
+      .insert(programRow)
+      .select("id")
+      .single();
+    if (progErr || !program) {
+      throw new Error(`[save-v3] programs insert failed: ${progErr?.message ?? "unknown"}`);
+    }
+    programId = program.id as string;
   }
-  const { data: program, error: progErr } = await supa
-    .from("programs")
-    .insert(programRow)
-    .select("id")
-    .single();
-  if (progErr || !program) {
-    throw new Error(`[save-v3] programs insert failed: ${progErr?.message ?? "unknown"}`);
-  }
-  const programId = program.id as string;
 
   try {
     // 2. program_workouts — one row per day.
@@ -137,8 +160,12 @@ export async function saveProgramV3(
           program_id: programId,
           week_num: week.week_num,
           day_num: day.day_num,
+          month_number: monthNumber,
           workout_text: null,
-          sort_order: (week.week_num - 1) * 10 + day.day_num,
+          // Month-offset so cycles sort sequentially (month 2 after month 1)
+          // within the program; ProgramDetailPage orders by sort_order and
+          // groups by month_number. Month 1 → (0)+..., matching prior rows.
+          sort_order: (monthNumber - 1) * 100 + (week.week_num - 1) * 10 + day.day_num,
         });
       }
     }
@@ -243,9 +270,36 @@ export async function saveProgramV3(
       if (mvErr) throw new Error(`[save-v3] program_movements_v2 insert failed: ${mvErr.message}`);
     }
 
+    // Record how many cycles this program now has. Set for BOTH paths: first
+    // cycle → 1 (so continuation math nextMonth = generated_months + 1 works),
+    // append → the new month number. Only ever raises.
+    const { error: bumpErr } = await supa
+      .from("programs")
+      .update({ generated_months: monthNumber }) // NB: programs has no updated_at column
+      .eq("id", programId)
+      .lt("generated_months", monthNumber); // no-op if already at/ahead of this month
+    if (bumpErr) {
+      // Non-fatal for first cycle (generated_months may already be >=1), but in
+      // append mode a failure here means continuation math would stall — surface it.
+      if (appendMode) throw new Error(`[save-v3] generated_months bump failed: ${bumpErr.message}`);
+      console.warn(`[save-v3] generated_months bump warning: ${bumpErr.message}`);
+    }
+
     return programId;
   } catch (err) {
-    await supa.from("programs").delete().eq("id", programId).then(() => {}, () => {});
+    if (appendMode) {
+      // Append failure: remove ONLY this cycle's partial rows (cascades to its
+      // blocks/movements). NEVER delete the program — prior months must survive.
+      await supa
+        .from("program_workouts")
+        .delete()
+        .eq("program_id", programId)
+        .eq("month_number", monthNumber)
+        .then(() => {}, () => {});
+    } else {
+      // First-cycle failure: delete the new program (children cascade).
+      await supa.from("programs").delete().eq("id", programId).then(() => {}, () => {});
+    }
     throw err;
   }
 }

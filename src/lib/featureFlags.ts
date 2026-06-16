@@ -28,4 +28,4 @@
  *   2. Set `ATHLETEDATA_PUBLIC_TIER` in supabase/functions/_shared/feature-flags.ts to `true`
  *   3. Redeploy: search-competition-athletes, competition-catalog, verify-competition-athlete
  */
-export const ATHLETEDATA_PUBLIC_TIER = false;
+export const ATHLETEDATA_PUBLIC_TIER = true;

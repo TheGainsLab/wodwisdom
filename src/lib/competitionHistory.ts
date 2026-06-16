@@ -60,6 +60,11 @@ export interface CompetitionResult {
   worldwide_percentile: number;
   cohort_n: number;
   worldwide_n: number;
+  // Top-1% (p99) score within the athlete's own gender/division cohort + its
+  // unit (may differ from scoring_unit on dual-scoring workouts). Used to
+  // estimate the top-1% W/kg per workout (see p99WPerKg). Bundle 1.6.0+.
+  cohort_p99_threshold?: number | null;
+  cohort_p99_threshold_unit?: ScoringUnit | null;
   // Per-result work/power (bundle 1.7.0). For COMPETED results these are at a
   // population-default mass (body_mass_basis "default_84m_64w"); rescale to the
   // athlete via `joules_bodyweight_component` (see personalizedPower). For
@@ -327,6 +332,39 @@ export function personalizedPower(
   return { watts: r.avg_power_watts, wPerKg: r.avg_w_per_kg ?? null, estimated: true };
 }
 
+/**
+ * Estimate the top-1% (p99) W/kg for a workout, on the SAME basis as the
+ * athlete's displayed wPerKg (so "you vs top 1%" share one scale). The p99 is
+ * already scoped to the athlete's own gender/division cohort upstream. We scale
+ * the athlete's own W/kg by the score ratio:
+ *   - time workouts → power ∝ 1/time, so × (your_time / p99_time). Exact — the
+ *     work is identical (fixed reps), only the time differs.
+ *   - rep/AMRAP     → power ∝ reps,   so × (p99_reps / your_reps). Approximate
+ *     (assumes linear work-per-rep across movements).
+ * Returns null when there's no p99, the units don't match (dual-scoring), or the
+ * scoring unit isn't time/reps (load/distance power models are ambiguous).
+ */
+export function p99WPerKg(entry: CompetitionWorkoutEntry, athleteWPerKg: number): number | null {
+  const r = entry.result;
+  const p99 = r.cohort_p99_threshold;
+  const score = r.raw_score;
+  if (p99 == null || !Number.isFinite(p99) || p99 <= 0) return null;
+  if (!Number.isFinite(score) || score <= 0) return null;
+  // The ratio is only valid when the p99 is in the same unit as the athlete's score.
+  const p99Unit = r.cohort_p99_threshold_unit ?? r.scoring_unit;
+  if (p99Unit !== r.scoring_unit) return null;
+  let ratio: number;
+  if (r.scoring_unit === 'time') {
+    ratio = score / p99;       // faster (smaller) top-1% time → higher power
+  } else if (r.scoring_unit === 'reps') {
+    ratio = p99 / score;       // more top-1% reps → higher power
+  } else {
+    return null;               // load / distance: power model is ambiguous
+  }
+  if (!Number.isFinite(ratio) || ratio <= 0) return null;
+  return athleteWPerKg * ratio;
+}
+
 // ============================================================
 // Placement (POST /workouts/{id}/placement) — "where you'd have landed"
 // ============================================================
@@ -523,6 +561,47 @@ export function timeDomainBreakdown(
       (e) => e.workout.time_domain?.bucket === bucket,
     );
     return { bucket, n: entries.length, avgPct: avgCohortPercentile(entries) };
+  });
+}
+
+export interface WkgBucketStat {
+  bucket: 'short' | 'medium' | 'long';
+  /** Items in this bucket. */
+  n: number;
+  /** Items in this bucket that had a usable W/kg. */
+  nWithPower: number;
+  /** Mean W/kg across the items that had power; null if none did. */
+  avgWkg: number | null;
+}
+
+/**
+ * Generic per-time-domain W/kg rollup. Both the program metcons (Analytics) and
+ * the linked competition results flow through this single helper so the two
+ * surfaces bucket identically and can't drift — the bucket key ('short' |
+ * 'medium' | 'long') is ours, defined the same way on both sides. `getBucket`
+ * returns the item's bucket (anything outside the three is ignored); `getWkg`
+ * returns the item's W/kg (personalized for program, population-default for
+ * competition), null when unavailable.
+ */
+export function bucketByTimeDomain<T>(
+  items: T[],
+  getBucket: (item: T) => string | null | undefined,
+  getWkg: (item: T) => number | null | undefined,
+): WkgBucketStat[] {
+  const buckets: Array<'short' | 'medium' | 'long'> = ['short', 'medium', 'long'];
+  return buckets.map((bucket) => {
+    const inBucket = items.filter((it) => getBucket(it) === bucket);
+    const wkgs: number[] = [];
+    for (const it of inBucket) {
+      const w = getWkg(it);
+      if (typeof w === 'number' && Number.isFinite(w) && w > 0) wkgs.push(w);
+    }
+    return {
+      bucket,
+      n: inBucket.length,
+      nWithPower: wkgs.length,
+      avgWkg: wkgs.length ? wkgs.reduce((a, b) => a + b, 0) / wkgs.length : null,
+    };
   });
 }
 

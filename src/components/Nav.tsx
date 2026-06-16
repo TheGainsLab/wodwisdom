@@ -15,7 +15,7 @@ export default function Nav({ isOpen, onClose }: NavProps) {
   const [hasProgramming, setHasProgramming] = useState(false);
   const [hasNutrition, setHasNutrition] = useState(false);
 
-  const isChatActive = location.pathname === '/' || location.pathname === '/history' || location.pathname === '/bookmarks';
+  const isChatActive = location.pathname === '/chat' || location.pathname === '/history' || location.pathname === '/bookmarks';
   const isEngineActive = location.pathname.startsWith('/engine');
   const isTrainingActive = location.pathname.startsWith('/programs') || location.pathname === '/training-log' || location.pathname.startsWith('/ailog') || location.pathname === '/workout-review' || location.pathname.startsWith('/workout');
   const isNutritionActive = location.pathname.startsWith('/nutrition');
@@ -62,16 +62,20 @@ export default function Nav({ isOpen, onClose }: NavProps) {
           <GainsLogo className="nav-title" />
         </div>
         <div className="nav-links">
+          <button className={"nav-link " + (location.pathname === "/" ? "active" : "")} onClick={() => goTo("/")}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+            Home
+          </button>
           <div className="nav-group">
             <button className={"nav-group-header " + (isChatActive ? "active" : "")} onClick={() => setChatExpanded(!chatExpanded)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-              Chat
+              Coach
               <svg className={"nav-chevron " + (chatExpanded ? "expanded" : "")} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
             </button>
             {chatExpanded && (
               <div className="nav-group-items">
-                <button className={"nav-link sub " + (location.pathname === "/" ? "active" : "")} onClick={() => goTo("/")}>
-                  <span className="nav-sub-dot" />Chat
+                <button className={"nav-link sub " + (location.pathname === "/chat" ? "active" : "")} onClick={() => goTo("/chat")}>
+                  <span className="nav-sub-dot" />Coach
                 </button>
                 <button className={"nav-link sub " + (location.pathname === "/history" ? "active" : "")} onClick={() => goTo("/history")}>
                   <span className="nav-sub-dot" />History

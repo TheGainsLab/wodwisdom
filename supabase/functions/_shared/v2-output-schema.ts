@@ -213,6 +213,8 @@ function buildMovementSchema(units: "lbs" | "kg") {
       time_seconds: { type: "integer", minimum: 1, maximum: 7200 },
       distance: { type: "number", minimum: 0 },
       distance_unit: { type: "string", enum: ["ft", "m"] },
+      calories: { type: "number", minimum: 0, description: "For calorie-based cardio (e.g. '30 cal row', '20 cal bike'). Use THIS field — never reps/rep_scheme — for Cal Row / Cal Bike / Cal Ski-erg. Total calories across the prescription (e.g. 4 rounds of 10 cal → 40)." },
+      cardio_modality: { type: "string", description: "Machine for a monostructural movement (e.g. an erg inside a metcon)." },
       scaling_note: { type: "string", maxLength: 500 },
       target_pct_1rm: {
         type: "number",
@@ -357,6 +359,22 @@ export function buildEmitBlockTool(units: "lbs" | "kg", sessionLengthMinutes: nu
     description:
       "Emit ONE corrected block to replace a block that failed an audit. Use the same schema as blocks in the writer's full program output — block_type from the canonical enum, optional block_label / block_scheme / time_cap_seconds / block_notes, and movements[] with display_name strings from the vocabulary.",
     input_schema: buildBlockSchema(units, sessionLengthMinutes),
+  };
+}
+
+/**
+ * Tool for the v3 PER-WEEK fill — emit a single week (week_num + days[]).
+ * Splitting the monolithic 4-week fill into one call per week keeps each call
+ * small + fast (well under the timeout) and individually retryable. Pair with
+ * `tool_choice: { type: "tool", name: "emit_week" }`. The assembled weeks become
+ * a WriterOutput (month_plan supplied from the skeleton).
+ */
+export function buildEmitWeekTool(daysPerWeek: number, units: "lbs" | "kg", sessionLengthMinutes: number | null) {
+  return {
+    name: "emit_week",
+    description:
+      "Emit ONE week of the structured program: week_num plus days[] (one entry per training day, day_num 1..N), each day with blocks[] from the canonical block_type enum and movements[] using display_name strings from the vocabulary. Fill ONLY the requested week, honoring that week's skeleton structure.",
+    input_schema: buildWeekSchema(daysPerWeek, units, sessionLengthMinutes),
   };
 }
 

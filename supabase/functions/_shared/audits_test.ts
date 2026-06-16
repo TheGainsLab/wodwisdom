@@ -13,9 +13,11 @@ import {
   auditStrengthOneLift,
   auditMetconOnePiece,
   auditRequiredFields,
+  auditDoNotProgram,
   auditDayCount,
   auditLoadSanity,
   auditVocabularyCompliance,
+  auditWorkupTopSet,
 } from "./audits.ts";
 import type {
   BlockPrescription,
@@ -81,6 +83,38 @@ function baselineOutput(daysPerWeek = 3): WriterOutput {
     weeks,
   };
 }
+
+// ============================================================
+// Rule — do_not_program (injury safety)
+// ============================================================
+
+Deno.test("auditDoNotProgram: empty list → passes", () => {
+  const out = baselineOutput();
+  const r = auditDoNotProgram(out, []);
+  assert(r.passed);
+  assertEquals(r.violations.length, 0);
+});
+
+Deno.test("auditDoNotProgram: no banned movement present → passes", () => {
+  const out = baselineOutput(); // strength blocks of Back Squat
+  const r = auditDoNotProgram(out, ["Overhead Squat", "Snatch"]);
+  assert(r.passed);
+});
+
+Deno.test("auditDoNotProgram: banned movement programmed → fails with locator", () => {
+  const out = baselineOutput(); // contains Back Squat on every day
+  const r = auditDoNotProgram(out, ["Back Squat"]);
+  assert(!r.passed);
+  assert(r.violations.length > 0);
+  assert(r.violations[0].includes("Back Squat"));
+  assert(r.violations[0].includes("do-not-program"));
+});
+
+Deno.test("auditDoNotProgram: match is case/whitespace-insensitive", () => {
+  const out = baselineOutput();
+  const r = auditDoNotProgram(out, ["  back squat  "]);
+  assert(!r.passed, "normalized name should still match");
+});
 
 // ============================================================
 // Rule 1 — block_type enum
@@ -459,6 +493,70 @@ Deno.test('auditVocabularyCompliance: day with no blocks array → no crash, no 
   delete (out.weeks[0].days[0] as any).blocks;
   const result = auditVocabularyCompliance(out, ['Back Squat']);
   assert(result.passed);
+});
+
+
+// ============================================================
+// Rule — workup_top_set ("work up to" keeps the ramp athlete-discretion)
+// ============================================================
+
+Deno.test("auditWorkupTopSet: work-up block flattened to 5×3 → fails", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks = [
+    block("strength", [mv("Deadlift", { sets: 5, reps: undefined, rep_scheme: [3], weight: 455 })], {
+      block_scheme: "Work up to heavy triple",
+    }),
+  ];
+  const result = auditWorkupTopSet(out);
+  assert(!result.passed);
+  assert(result.violations[0].includes("Week 1 Day 1 block[0]"));
+  assert(result.violations[0].includes("5×3"));
+});
+
+Deno.test("auditWorkupTopSet: legitimate single top set passes", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks = [
+    block("strength", [mv("Deadlift", { sets: 1, reps: undefined, rep_scheme: [3], weight: 455 })], {
+      block_scheme: "Work up to heavy triple",
+    }),
+  ];
+  assert(auditWorkupTopSet(out).passed);
+});
+
+Deno.test("auditWorkupTopSet: top set + separate 3×1 back-off row passes", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks = [
+    block(
+      "strength",
+      [
+        mv("Snatch", { sets: 1, reps: undefined, rep_scheme: [1], weight: 250 }),
+        mv("Snatch", { sets: 3, reps: undefined, rep_scheme: [1], weight: 225 }),
+      ],
+      { block_scheme: "Work up to a heavy single, then 3×1 @85%" },
+    ),
+  ];
+  // back-off row is sets=3 but reps-per-set=1 → does NOT trip.
+  assert(auditWorkupTopSet(out).passed);
+});
+
+Deno.test("auditWorkupTopSet: fixed-load 5x3 @85% with no work-up language passes", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks = [
+    block("strength", [mv("Deadlift", { sets: 5, reps: undefined, rep_scheme: [3], weight: 430 })], {
+      block_scheme: "5x3 @85%",
+    }),
+  ];
+  assert(auditWorkupTopSet(out).passed);
+});
+
+Deno.test("auditWorkupTopSet: non-strength block with work-up language is ignored", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks = [
+    block("accessory", [mv("Back Squat", { sets: 5, reps: undefined, rep_scheme: [3], weight: 300 })], {
+      block_scheme: "Build to a heavy triple",
+    }),
+  ];
+  assert(auditWorkupTopSet(out).passed);
 });
 
 

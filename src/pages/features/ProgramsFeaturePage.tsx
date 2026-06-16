@@ -53,7 +53,7 @@ export default function ProgramsFeaturePage() {
           The program that follows you.
         </p>
         <p className="feature-hero-body">
-          You train on what's actually holding you back — so you get fitter faster. Built from your strengths, your gaps, and your goals, then rebuilt as you improve.
+          Built from your strength, skills, conditioning, and competition history — then aimed at the adaptations that move your fitness the most. You train on what's actually holding you back, so you get fitter faster.
         </p>
       </section>
 
@@ -62,9 +62,9 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Your Evaluation</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 1 — Your evaluation</h3>
               <p>
-                Your evaluation pinpoints where you rank and what's holding you back — in specifics, not vibes.
+                Your evaluation pinpoints where you rank, what's holding you back, and what to fix first.
               </p>
               <img
                 src="/images/weak-eval.png"
@@ -74,12 +74,9 @@ export default function ProgramsFeaturePage() {
                 style={{ maxWidth: 560 }}
               />
               <p style={{ marginTop: 28 }}>
-                Then your program attacks exactly that. Every weakness above becomes work on your calendar — same gaps, now a plan.
+                Your program is built to attack exactly that. The AI takes your profile and goals and turns every gap into work on your calendar — your Olympic lifts, your gymnastics, your aerobic engine.
               </p>
               <img src="/images/Program-week.png" alt="A week of programming targeting your weaknesses" className="feature-img" style={{ maxWidth: 560 }} />
-              <p style={{ marginTop: 28 }}>
-                Nothing generic. Nothing guessed. The program is the answer to your evaluation.
-              </p>
             </div>
           </div>
         </div>
@@ -90,68 +87,34 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row">
             <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Inside a Training Day</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 2 — Inside a Training Day</h3>
               <p>
                 Every day breaks down into blocks — warm-up to cooldown — each with loads, targets, and coaching cues.
               </p>
               <img src="/images/Single-Day.png" alt="A single training day — warm-up, skills, strength, accessory, metcon, and cool-down" className="feature-img" style={{ maxWidth: 560 }} />
               <p style={{ marginTop: 24 }}>
-                But a good coach tells you why. Tap into any session and you get the intent behind it — what each block is building, and how the pieces fit together.
+                Tap Coach on any block and you get the why, how to pace it, and what to watch for — not just a list of movements.
               </p>
-              <img src="/images/training-intent2.png" alt="Coach guidance for a training day — intent, pacing, and what to watch for" className="feature-img" style={{ maxWidth: 560 }} />
-              <p style={{ marginTop: 24 }}>
-                Go deeper on any movement: how to pace it, what good looks like, and the exact faults to avoid.
-              </p>
-              <img src="/images/metcon-coach2.png" alt="Movement-level coaching — pacing, what good looks like, and faults to avoid" className="feature-img" style={{ maxWidth: 560 }} />
-              <p style={{ marginTop: 24 }}>
-                This is the difference between a list of movements and a coach who explains them.
-              </p>
+              <img src="/images/coach-day.png" alt="Coach guidance for a training day — intent, pacing, and what to watch for" className="feature-img" style={{ maxWidth: 560 }} />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Step 3 — AI Coaches, You're in Control */}
+      {/* Step 5 — Ongoing */}
       <section className="feature-section">
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>You're in Control</h3>
+              <h3 style={{ textAlign: 'center' }}>Step 5 — Ongoing</h3>
               <p>
-                Life happens. Equipment breaks, your shoulder's cranky, you've got 40 minutes instead of 60. Tell your coach what changed — in plain language.
+                AI is with you every time you train.
               </p>
               <p>
-                You ask, in plain language
+                Log your results and the program adapts. Flag weaknesses and the AI adjusts. Demonstrate proficiency and the challenges increase. Update your profile anytime.
               </p>
-              <img src="/images/swap1.png" alt="Ask the AI to swap a movement" className="feature-img" style={{ maxWidth: 560 }} />
-              <p style={{ marginTop: 24 }}>
-                It swaps the movement and keeps the stimulus — the row becomes an Echo Bike, the aerobic demand stays exactly the same.
-              </p>
-              <img src="/images/swap2.png" alt="The AI swaps the movement while preserving the stimulus" className="feature-img" style={{ maxWidth: 560 }} />
-              <p style={{ marginTop: 24 }}>
-                And the new movement comes fully coached, to your numbers — not a generic substitution, but a re-coached block built for you.
-              </p>
-              <img src="/images/swap3.png" alt="The swapped movement comes coached and scaled to your numbers" className="feature-img" style={{ maxWidth: 560 }} />
-              <p style={{ marginTop: 24 }}>
-                No group program can do this. Your coach does it in seconds.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Fully Personalized */}
-      <section className="feature-section">
-        <div className="feature-container">
-          <div className="feature-row">
-            <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Built Around Your Week</h3>
               <p>
-                Three days or six. Forty-five minutes or ninety. Your goals, your level, your injuries. You set the constraints up front — and the program is built to fit them, not the other way around.
-              </p>
-              <img src="/images/context-goals.png" alt="Setting your training days, time available, and limits so the program fits your life" className="feature-img" style={{ maxWidth: 560 }} />
-              <p style={{ marginTop: 24 }}>
-                A plan that fits your life is a plan you'll actually keep.
+                Every month, AI evaluates your performance and updates your evaluation, then generates another month of training. Your evaluation history tells the story of your progress.
               </p>
             </div>
           </div>

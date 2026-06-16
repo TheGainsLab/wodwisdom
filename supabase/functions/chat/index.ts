@@ -4,6 +4,7 @@ import { fetchAndFormatProgramContext } from "../_shared/training-program.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import { reassembleV3WorkoutText } from "../_shared/v3-workout-prose.ts";
+import { fetchTier4Bundle, type Tier4Bundle } from "../_shared/fetch-tier4-bundle.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -12,6 +13,38 @@ const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 const FREE_LIMIT = 3;
 const DAILY_LIMIT = 20;
+
+/**
+ * Build the Coach's competition-history context from a linked athlete's Tier 4
+ * bundle. Injects the athlete's REAL competition data (Open / Quarterfinals /
+ * Games results, movement affinities, fitness signature, power profile) as
+ * trimmed JSON so the Coach can ground performance/competition/weakness/
+ * programming answers in specific evidence. JSON (not prose) keeps it accurate —
+ * the model cites only what's here, no fabrication. Available to ALL linked
+ * users, free tier included (Athlete Data is a free feature).
+ */
+function buildCompetitionContext(bundle: Tier4Bundle): string {
+  const compact = {
+    identity: bundle.identity,
+    competition_summary: bundle.competition_summary,
+    movement_affinity: (bundle.movement_affinity ?? []).slice(0, 12),
+    character_affinity: bundle.character_affinity ?? [],
+    fitness_signature: bundle.fitness_signature ?? null,
+    movement_competency: bundle.movement_competency ?? null,
+    power_profile: bundle.power_profile ?? null,
+    recent_results: (bundle.recent_raw_results ?? []).slice(0, 12),
+  };
+  return (
+    "\n\nLINKED COMPETITION HISTORY — the athlete's REAL CrossFit competition data " +
+    "(Open / Quarterfinals / Games results, movement affinities, fitness signature, " +
+    "and power profile). Use it to ground any performance, competition, weakness, or " +
+    "programming question with SPECIFIC evidence — cite real placements, percentiles, " +
+    "and movements. Power figures use a population body-mass estimate unless the " +
+    "athlete's bodyweight is known, so treat them as cohort-relative rather than exact " +
+    "prescriptions. Never invent results beyond what is provided here.\n" +
+    JSON.stringify(compact)
+  );
+}
 
 function buildAthleteContext(
   lifts: Record<string, number> | null | undefined,
@@ -311,7 +344,7 @@ Deno.serve(async (req) => {
     // Fetch athlete profile for prompt personalization (including Engine state)
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
-      .select("lifts, skills, conditioning, bodyweight, units, gender, engine_program_version, engine_current_day, engine_months_unlocked")
+      .select("lifts, skills, conditioning, bodyweight, units, gender, engine_program_version, engine_current_day, engine_months_unlocked, competition_athlete_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -586,7 +619,11 @@ Deno.serve(async (req) => {
     // Context is auto-included for any user with data — no toggle gate.
     const shouldFetchHistory = !isFreeTier;
     const shouldFetchProgram = userTier === "ai_programming" || userTier === "all_access" || userTier === "coach_standalone";
-    const [embData, recentTraining, programContext] = await Promise.all([
+    // Linked competition history (Tier 4) — available to ALL linked users, free
+    // tier included. Fetched in parallel below (zero added latency); skipped for
+    // meta questions where it's noise.
+    const competitorId = (athleteProfile?.competition_athlete_id as string | null) ?? null;
+    const [embData, recentTraining, programContext, competitionBundle] = await Promise.all([
       isMeta
         ? Promise.resolve(null)
         : fetchWithTimeout("https://api.openai.com/v1/embeddings", {
@@ -602,8 +639,15 @@ Deno.serve(async (req) => {
           }, 10_000).then((r) => r.json()),
       shouldFetchHistory ? fetchAndFormatRecentHistory(supa, user.id) : Promise.resolve(""),
       shouldFetchProgram ? fetchAndFormatProgramContext(supa, user.id) : Promise.resolve(""),
+      (competitorId && !isMeta)
+        ? fetchTier4Bundle(competitorId, { include: ["competency", "signature", "power_profile"] }).catch((e) => {
+            console.error("[chat] competition bundle fetch failed:", e);
+            return null;
+          })
+        : Promise.resolve(null),
     ]);
     const queryEmb = embData?.data?.[0]?.embedding;
+    const competitionContext = competitionBundle ? buildCompetitionContext(competitionBundle) : "";
 
     // Retrieve matching chunks from vector store, filtered by category. Skipped for META.
     // Engine coaching mode locks retrieval to ['engine', 'journal']. The router's
@@ -708,6 +752,8 @@ Deno.serve(async (req) => {
           engineContext +
           // AI Program context (if applicable)
           aiProgramContext +
+          // Linked competition history (Tier 4) — grounds performance/competition answers
+          competitionContext +
           // Recent training history
           (recentTraining ? "\n\n" + recentTraining : "") +
           // User program workouts (non-Engine)

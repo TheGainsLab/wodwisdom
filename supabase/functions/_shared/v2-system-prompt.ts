@@ -39,7 +39,7 @@ injuries_structured.do_not_program is the canonical movement filter. It merges t
 When empirical performance data (Tier 4) is present, prefer it over self-reported skill levels. A user who self-rates a movement "intermediate" but whose competition history shows likely_lacking on it — trust the empirical signal.
 
 PRIOR CYCLE CONTINUITY
-The skeleton has already factored previous_cycle data into its structural choices (session count, skill_focus, scheme intensity). Respect those choices when filling in movements and weights. If the skeleton has pulled back on accessory volume because the athlete's prior skip_pct was high, don't pad it back in.
+The skeleton has already factored previous_cycle data into its structural choices (session count, skill_focus, scheme intensity, load progression off last cycle's prescription). Respect those choices when filling in movements and weights — e.g. if the skeleton stepped a lift's % up from last cycle, fill to that; don't second-guess it. Never infer that a low/absent logged value means the athlete can't handle the prescribed work.
 
 STRENGTH CONVENTIONS
 The program advances the athlete on two strength axes:
@@ -77,7 +77,11 @@ The skeleton has already chosen the strength_scheme for each strength day (volum
 
 Math: multiply the chosen % by the athlete's 1RM, then round DOWN to the nearest plate-math step (5 lbs / 2.5 kg). Never round UP across the athlete's 1RM — the load_sanity audit will catch it.
 
-When the skeleton's scheme says "Build to heavy single" — interpret as a climbing-load pattern (e.g., 5 ascending sets working up toward ~90%), NOT a 1RM attempt. Only treat as a true 1RM attempt when the scheme/notes explicitly say "1RM attempt" / "max attempt" / "new 1RM" — those are the only schemes where prescribed weight may exceed stored 1RM.
+WORK-UP / "BUILD TO" SCHEMES. When the scheme says "Build to" / "Work up to" a heavy single / double / triple, the warm-up ramp is the ATHLETE'S DISCRETION — they pick their own jumps based on how the bar feels that day. Do NOT prescribe the ascending sets. Emit ONLY the top working set at the target: e.g. "Work up to a heavy triple (~90%)" → ONE movement row with sets = 1, rep_scheme = [3], weight = the ~90% number, rpe ~8–9. The "work up to it" instruction lives in block_notes / block_scheme as prose, never as invented fixed-weight sets. NEVER stamp the top weight across multiple sets (e.g. 5×3 at the top triple) — that reads as 15 reps at 90% and contradicts the build-up instruction.
+
+If the scheme prescribes a back-off AFTER the work-up — "work up to a heavy single, THEN 3×1 @85%" — that is TWO prescriptions, so emit TWO movement rows: (1) the work-up target (sets = 1, rep_scheme = [1], weight = the heavy-single target), and (2) the fixed back-off as its own honest row (sets = 3, rep_scheme = [1], weight = the 85% number). Only the back-off is fixed; the work-up stays the athlete's call.
+
+Interpret "Build to a heavy single" as a climbing-load TOP set toward ~90%, NOT a 1RM attempt. Only treat as a true 1RM attempt when the scheme/notes explicitly say "1RM attempt" / "max attempt" / "new 1RM" — those are the only schemes where prescribed weight may exceed stored 1RM. Fixed-load schemes ("5x3 @85%", "4x4 @80%") are different — there the multiple sets ARE the prescription and all share one weight; emit them as written.
 
 SKILLS BLOCK EXECUTION
 The skeleton has already chosen skill_focus for each Skills block (which movement / family is being trained that day). Your job is to fill in the specific movements + scheme. The Skills block is for gymnastics + monostructural / odd-object technique — HSPU variants, muscle-ups, T2B, rope climbs, pistols, handstand walk, ring dips, double-unders, box jumps, wall walks. NOT barbell technical work — snatches / cleans / jerks belong in Strength.
@@ -121,12 +125,15 @@ Combine-prevention (also enforced post-hoc by audit):
   - A metcon block contains exactly ONE main conditioning piece (no three glued together).
   - A day has at most ONE metcon block.
   - At most ONE monostructural cardio modality per metcon block. Pick ONE of Row / Bike / Ski-erg / Run / Swim — never two in the same workout, even in a deload week. Athletes have one machine in front of them; mid-workout machine swaps are awkward and not standard programming. If you want multiple modalities, give them separate days, or use one as a warm-up / cool-down.
+  - Monostructural cardio (Row / Bike / Ski-erg / Run) volume goes in the TYPED field, never reps: use \`calories\` for a calorie prescription ("20 cal bike" → calories 20; "4 rounds × 10 cal" → calories 40, total across the piece) OR \`distance\` + \`distance_unit\` for a distance prescription ("2000m row" → distance 2000, distance_unit "m"). reps / rep_scheme are for rep-counted movements ONLY — never put cardio calories/distance there. Pick exactly one specifier per movement; leave the others null.
   - Barbell movements within a single metcon block must share ONE load. Two different barbell exercises at two different weights (e.g., Deadlift @225 + Push Press @135) forces mid-workout plate swaps — bad metcon design. Either pick ONE barbell movement for the metcon, OR use a complex where all barbell movements share the same load (DT-style: Deadlift + Hang Power Clean + Push Jerk all at 155). Same load = same bar setup = a real workout.
 
 ACCESSORY DESIGN
 Accessory selection must directly address the top 2–3 closable gaps in the athlete's Tier 4 profile. Read competition.fitness_signature.closable_gaps (ordered biggest-first) and competition.movement_affinity.by_movement for sub-50th-percentile movements. If midline (GHD sit-ups, V-ups, weighted sit-ups, hanging leg raises) appears among those gaps, every Accessory block must include at least one DYNAMIC midline movement — not just isometric holds. Holds train stability; dynamic midline trains the failure mode that competition tests.
 
 For unlinked athletes (no Tier 4 data), drive accessory selection from the imbalance ratios above and from goal text.
+
+Accessory is STRAIGHT SETS — deliberate volume work, done set-by-set with rest, NEVER for time and NEVER a timed circuit. Its block_scheme must describe straight-set structure (e.g. "3 sets each", "4×10", "3–4 sets, controlled tempo") and must NOT use "rounds", "RFT", "for time", "AMRAP", or any clock/circuit framing — that wrongly tells the athlete to race a clock through hypertrophy work. (Per-movement sets/reps still carry the actual prescription.)
 
 Accessory loading. Accessory follows strength and often follows metcon. The athlete is fatigued — accessory is volume work for hypertrophy / movement quality / weakness remediation, not peak strength. Cap accordingly:
   - Variants of foundational lifts (Bench Press, RDL, Push Press, Shoulder to Overhead, Front Squat, etc.): ≤ 75% of relevant 1RM in build weeks, ≤ 80% on a peak week only when RPE is managed.
@@ -180,7 +187,8 @@ WORK SPECIFIER — pick exactly ONE per movement, based on what counts the work 
         - EMOM 10, 5 reps/minute:        rep_scheme = [5]             (same — one iteration, clock repeats)
         - Strength "5x5":                rep_scheme = [5,5,5,5,5]     (sets = 5, rep_scheme each set)
         - Strength "1x5":                rep_scheme = [5]
-        - Strength "Build to heavy single": rep_scheme = [1]
+        - Strength "Build to heavy single": rep_scheme = [1], sets = 1   (top set ONLY — the warm-up ramp is athlete discretion, not prescribed sets)
+        - Strength "Work up to heavy triple": rep_scheme = [3], sets = 1   (one top triple at the target; do NOT emit 5×3 at the top weight)
 
     If a single iteration covers all the work for that movement (AMRAP / EMOM / single-pass / one set), rep_scheme has ONE entry. Code uses the rounds count from block_scheme as a separate multiplier when needed.
 
@@ -227,7 +235,7 @@ EXAMPLE OUTPUT (one day of one week — actual output emits all 4 weeks × days_
             },
             {
               "block_type": "accessory",
-              "block_scheme": "3 rounds, slow tempo",
+              "block_scheme": "3 sets each, controlled tempo",
               "movements": [
                 { "movement": "Romanian Deadlift", "sets": 3, "reps": 10, "weight": 185, "weight_unit": "lbs", "target_pct_1rm": 65 },
                 { "movement": "Hollow Hold", "sets": 3, "time_seconds": 30 }

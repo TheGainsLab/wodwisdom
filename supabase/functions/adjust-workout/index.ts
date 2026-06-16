@@ -193,7 +193,8 @@ RULES (honor every one):
 - All weights in the athlete's units. Plate math: lbs → nearest 5, kg → nearest 2.5. Prescribed barbell weight ≤ the relevant 1RM unless the scheme is an explicit max attempt.
 - At most ONE monostructural cardio modality (Row / Bike / Ski-erg / Run / Swim) per metcon. Barbell movements within a metcon share ONE load.
 - Movements use display-name strings from the vocabulary list in the user message.
-- Pick exactly ONE work specifier per movement: rep-counted → emit rep_scheme as the per-iteration breakdown ([21,15,9] chipper, [15,15,15] for 3 RFT, [100] single-pass, [10] one AMRAP round); do NOT also set reps. distance-counted → distance + distance_unit. calorie-counted → rep_scheme per iteration with scaling_note "Calories".
+- Pick exactly ONE work specifier per movement: rep-counted → emit rep_scheme as the per-iteration breakdown ([21,15,9] chipper, [15,15,15] for 3 RFT, [100] single-pass, [10] one AMRAP round); do NOT also set reps. distance-counted → distance + distance_unit. calorie-counted (Cal Row / Cal Bike / Cal Ski-erg) → the \`calories\` field (total calories across the prescription); NEVER encode calories as reps/rep_scheme.
+- Do NOT change how a movement measures work from how it currently stands: if the movement uses distance, keep distance; if calories, keep calories; if reps, keep reps. Never silently convert a "Row 500m" into reps or calories — preserve the measure UNLESS the athlete explicitly asks to change it.
 - Every movement must populate at least one of {sets, reps, rep_scheme, calories, weight, time_seconds, distance} > 0.
 
 Emit ONLY the revised block via the emit_block tool. No prose outside the tool call.`;

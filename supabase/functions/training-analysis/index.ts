@@ -57,7 +57,8 @@ function formatProfile(profile: ProfileData): string {
 }
 
 async function retrieveRAGContext(
-  supa: ReturnType<typeof createClient>,
+  // deno-lint-ignore no-explicit-any
+  supa: any,
   profileData: ProfileData
 ): Promise<string> {
   if (!OPENAI_API_KEY) return "";
@@ -108,16 +109,22 @@ Deno.serve(async (req) => {
 
     const supa = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
     const token = authHeader.replace("Bearer ", "");
-    const {
-      data: { user },
-      error: authErr,
-    } = await supa.auth.getUser(token);
 
-    if (authErr || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+    // Auth: internal server-to-server (generate-next-month passes
+    // x-webhook-user-id + service key for continuation/migration) OR a user JWT.
+    const webhookUserId = req.headers.get("x-webhook-user-id");
+    let userId: string;
+    if (webhookUserId && token === SUPABASE_SERVICE_KEY) {
+      userId = webhookUserId;
+    } else {
+      const { data: { user }, error: authErr } = await supa.auth.getUser(token);
+      if (authErr || !user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+      userId = user.id;
     }
 
     // Parse optional month context from request body
@@ -136,9 +143,9 @@ Deno.serve(async (req) => {
       supa
         .from("athlete_profiles")
         .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .maybeSingle(),
-      fetchAndFormatRecentHistory(supa, user.id, { days: 14, maxLines: 40 }),
+      fetchAndFormatRecentHistory(supa, userId, { days: 14, maxLines: 40 }),
     ]);
 
     const profileData: ProfileData = profileRes.data || {};
@@ -186,7 +193,7 @@ Deno.serve(async (req) => {
 
     // Save training evaluation
     const evalRow: Record<string, unknown> = {
-      user_id: user.id,
+      user_id: userId,
       analysis,
       training_snapshot: recentTraining,
       month_number: monthNumber,

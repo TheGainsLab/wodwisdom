@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase, ADJUST_WORKOUT_ENDPOINT, getAuthHeaders } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { useMovementVocab, matchMovements } from '../lib/movementVocab';
+import { GainsName } from '../components/GainsLogo';
 import Nav from '../components/Nav';
 import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksDisplay';
 import { BlockCoachingBody, coachingForBlockType, formatReviewMarkdown, CHEVRON_DOWN, type ReviewBlock } from '../components/reviewCoaching';
@@ -178,6 +179,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [navOpen, setNavOpen] = useState(false);
+  const [editingProgramName, setEditingProgramName] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
   const [generatingNextMonth, setGeneratingNextMonth] = useState(false);
 
@@ -661,6 +663,39 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     }
   };
 
+  // TEMP (admin/v3 testing): invoke generate-program-v3 continuation directly
+  // (program_id only → the function derives month from generated_months) to
+  // verify the month-append path before generate-next-month is repointed at v3.
+  const handleGenerateNextMonthV3 = async () => {
+    if (!program || generatingNextMonth) return;
+    setGeneratingNextMonth(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-program-v3', {
+        body: { program_id: program.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.message || data.error);
+      const pollInterval = setInterval(async () => {
+        const { data: jobData } = await supabase.functions.invoke('program-job-status', {
+          body: { job_id: data.job_id },
+        });
+        if (jobData?.status === 'complete') {
+          clearInterval(pollInterval);
+          setGeneratingNextMonth(false);
+          loadProgram();
+        } else if (jobData?.status === 'failed') {
+          clearInterval(pollInterval);
+          setGeneratingNextMonth(false);
+          alert('v3 next month failed: ' + (jobData?.error || 'Unknown error'));
+        }
+      }, 5000);
+    } catch (err: any) {
+      console.error('Generate next month (v3) failed:', err);
+      setGeneratingNextMonth(false);
+      alert('Failed to start v3 generation: ' + (err?.message || 'unknown'));
+    }
+  };
+
   if (!id) return null;
 
   return (
@@ -672,14 +707,26 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
           {program ? (
-            <input
-              type="text"
-              className="program-detail-name-input"
-              value={program.name}
-              onChange={e => setProgram(p => p ? { ...p, name: e.target.value } : null)}
-              onBlur={e => handleNameChange(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
-            />
+            editingProgramName ? (
+              <input
+                type="text"
+                className="program-detail-name-input"
+                autoFocus
+                value={program.name}
+                onChange={e => setProgram(p => p ? { ...p, name: e.target.value } : null)}
+                onBlur={e => { handleNameChange(e.target.value); setEditingProgramName(false); }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
+              />
+            ) : (
+              <h1
+                className="program-detail-name-input"
+                style={{ cursor: 'pointer', margin: 0, background: 'none', border: 'none' }}
+                title="Click to rename"
+                onClick={() => setEditingProgramName(true)}
+              >
+                <GainsName name={program.name} />
+              </h1>
+            )
           ) : (
             <h1>{monthFilter ? `Month ${monthFilter}` : 'Program'}</h1>
           )}
@@ -799,18 +846,17 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                           .filter((b) => ['strength', 'metcon', 'cardio', 'skills', 'accessory', 'other'].includes(b.block_type))
                                           .map((b) => {
                                             const label = BLOCK_DISPLAY[b.block_type] ?? b.block_type.charAt(0).toUpperCase() + b.block_type.slice(1);
-                                            // Prefer block_scheme (most informative — "5x5 @80%",
-                                            // "21-15-9 for time"), then block_label, then first movement.
+                                            // Lead with the movements (so athletes can see the weaknesses
+                                            // being targeted), then the scheme. CSS ellipsis trims overflow.
+                                            const moves = b.movements.map((m) => m.movement).filter(Boolean).slice(0, 3).join(' · ');
+                                            const scheme = (b.block_scheme && b.block_scheme.trim()) || (b.block_label && b.block_label.trim()) || '';
                                             const text =
-                                              (b.block_scheme && b.block_scheme.trim()) ||
-                                              (b.block_label && b.block_label.trim()) ||
-                                              (b.movements[0]?.movement ?? '') ||
+                                              [moves, scheme].filter(Boolean).join(' — ') ||
                                               (b.block_type === 'other' ? 'Rest day' : '');
-                                            const trimmed = text.length > 40 ? text.slice(0, 38) + '…' : text;
                                             return (
                                               <div key={b.id} className="program-day-summary-line">
                                                 <span className="program-day-summary-label">{label}:</span>
-                                                <span className="program-day-summary-text">{trimmed}</span>
+                                                <span className="program-day-summary-text">{text}</span>
                                               </div>
                                             );
                                           })
@@ -960,14 +1006,27 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           : 'Generate the next month to continue your program.'}
                       </div>
                     </div>
-                    <button
-                      className="auth-btn"
-                      disabled={generatingNextMonth}
-                      onClick={handleGenerateNextMonth}
-                      style={{ whiteSpace: 'nowrap', opacity: generatingNextMonth ? 0.6 : 1 }}
-                    >
-                      {generatingNextMonth ? 'Generating...' : `Generate Month ${(program.generated_months || 1) + 1}`}
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <button
+                        className="auth-btn"
+                        disabled={generatingNextMonth}
+                        onClick={handleGenerateNextMonth}
+                        style={{ whiteSpace: 'nowrap', opacity: generatingNextMonth ? 0.6 : 1 }}
+                      >
+                        {generatingNextMonth ? 'Generating...' : `Generate Month ${(program.generated_months || 1) + 1}`}
+                      </button>
+                      {program.program_version === 'v3' && (
+                        <button
+                          className="auth-btn"
+                          disabled={generatingNextMonth}
+                          onClick={handleGenerateNextMonthV3}
+                          title="TEMP admin test: append next month via generate-program-v3 (continuation)"
+                          style={{ whiteSpace: 'nowrap', opacity: generatingNextMonth ? 0.6 : 1, background: 'var(--surface)', border: '1px solid var(--accent)', color: 'var(--accent)' }}
+                        >
+                          {generatingNextMonth ? '…' : `v3 Month ${(program.generated_months || 1) + 1} (test)`}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
                 <div className="program-detail-actions" style={{ marginTop: 24 }}>
@@ -1044,7 +1103,8 @@ export function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
     const headerSuffix: string[] = [];
     if (b.block_label) headerSuffix.push(b.block_label);
     if (b.block_scheme) headerSuffix.push(b.block_scheme);
-    if (b.time_cap_seconds) headerSuffix.push(`cap ${Math.round(b.time_cap_seconds / 60)} min`);
+    // Skip the redundant cap when the scheme already states the duration (AMRAP/EMOM).
+    if (b.time_cap_seconds && !/\b(amrap|emom)\b/i.test(b.block_scheme ?? '')) headerSuffix.push(`cap ${Math.round(b.time_cap_seconds / 60)} min`);
     lines.push(`${labelHeader}:${headerSuffix.length ? ' ' + headerSuffix.join(' — ') : ''}`);
     if (b.block_notes) lines.push(`  ${b.block_notes}`);
     for (const m of b.movements) lines.push(`  ${fmt(m)}`);
@@ -1305,7 +1365,10 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
   logging?: DayLogController;
 }) {
   const displayLabel = BLOCK_DISPLAY[block.block_type] ?? block.block_type;
-  const timeCapMin = block.time_cap_seconds ? Math.round(block.time_cap_seconds / 60) : null;
+  // AMRAP / EMOM bake the duration into the scheme ("AMRAP 12", "EMOM 8"), so a
+  // separate "cap 12 min" pill is redundant — suppress it for those.
+  const schemeBakesDuration = /\b(amrap|emom)\b/i.test(block.block_scheme ?? '');
+  const timeCapMin = block.time_cap_seconds && !schemeBakesDuration ? Math.round(block.time_cap_seconds / 60) : null;
 
   // Reuse the existing .workout-block-label[data-block="…"] CSS for
   // per-block-type colors (warm-up amber, skills purple, strength pink,
@@ -1574,7 +1637,7 @@ function V3AiEditPanel({ state, request, setRequest, proposal, error, onSubmit, 
             autoFocus
           />
           <button type="button" className="ai-block-edit-go" onClick={onSubmit} disabled={state === 'loading' || !request.trim()}>
-            {state === 'loading' ? 'Thinking…' : 'Propose'}
+            {state === 'loading' ? 'Thinking…' : 'Ask AI'}
           </button>
           <button type="button" className="ai-block-edit-cancel" onClick={onCancel} disabled={state === 'loading'}>Cancel</button>
         </div>
@@ -1676,12 +1739,18 @@ function V3MovementEditRow({ movement, onUpdate, onRemove }: {
   const [reps, setReps] = useState<string>(repsToText(movement));
   const [weight, setWeight] = useState<string>(movement.weight != null ? String(movement.weight) : '');
   const [unit, setUnit] = useState<'lbs' | 'kg'>((movement.weight_unit as 'lbs' | 'kg') ?? 'lbs');
+  const [scaling, setScaling] = useState(movement.scaling_note ?? '');
+  // Cardio metcon movements measure work as distance or calories, not reps.
+  // Surface the right field so editing PRESERVES the measure instead of
+  // silently switching a "Row 500m" / "16 cal" into reps.
   const [distance, setDistance] = useState<string>(movement.distance != null ? String(movement.distance) : '');
   const [distanceUnit, setDistanceUnit] = useState<string>(movement.distance_unit ?? 'm');
-  const [scaling, setScaling] = useState(movement.scaling_note ?? '');
-
-  // Distance-based movements (row/run/bike/etc.) prescribe distance, not reps.
-  const hasDistance = movement.distance != null;
+  const [calories, setCalories] = useState<string>(movement.calories != null ? String(movement.calories) : '');
+  // Which work measure the row edits. Derived initially from the movement, but
+  // the athlete can switch it deliberately via the measure selector.
+  const [measure, setMeasure] = useState<'reps' | 'distance' | 'calories'>(
+    movement.distance != null ? 'distance' : movement.calories != null ? 'calories' : 'reps',
+  );
 
   // Typeahead: suggest canonical movement names (matches display_name + aliases,
   // so "T2B" → "Toes To Bar"). Suggests, never forces — a no-match name is kept.
@@ -1749,6 +1818,14 @@ function V3MovementEditRow({ movement, onUpdate, onRemove }: {
     catch { setUnit((movement.weight_unit as 'lbs' | 'kg') ?? 'lbs'); }
   };
 
+  const commitScaling = async () => {
+    const trimmed = scaling.trim();
+    const next = trimmed === '' ? null : trimmed;
+    if (next === (movement.scaling_note ?? null)) return;
+    try { await onUpdate(movement.id, { scaling_note: next }); }
+    catch { setScaling(movement.scaling_note ?? ''); }
+  };
+
   const commitDistance = async () => {
     const trimmed = distance.trim();
     const next = trimmed === '' ? null : Number(trimmed);
@@ -1765,12 +1842,28 @@ function V3MovementEditRow({ movement, onUpdate, onRemove }: {
     catch { setDistanceUnit(movement.distance_unit ?? 'm'); }
   };
 
-  const commitScaling = async () => {
-    const trimmed = scaling.trim();
-    const next = trimmed === '' ? null : trimmed;
-    if (next === (movement.scaling_note ?? null)) return;
-    try { await onUpdate(movement.id, { scaling_note: next }); }
-    catch { setScaling(movement.scaling_note ?? ''); }
+  const commitCalories = async () => {
+    const trimmed = calories.trim();
+    const next = trimmed === '' ? null : Math.round(Number(trimmed));
+    if (next != null && (!Number.isFinite(next) || next < 0)) { setCalories(movement.calories != null ? String(movement.calories) : ''); return; }
+    if (next === (movement.calories ?? null)) return;
+    try { await onUpdate(movement.id, { calories: next }); }
+    catch { setCalories(movement.calories != null ? String(movement.calories) : ''); }
+  };
+
+  // Deliberately switch the work measure. Clears the other measures so the
+  // movement always carries exactly one; the new field starts empty to fill in.
+  const commitMeasure = async (next: 'reps' | 'distance' | 'calories') => {
+    if (next === measure) return;
+    const prev = measure;
+    setMeasure(next);
+    const patch: Partial<ProgramMovementV2> = {};
+    if (next !== 'reps') { patch.reps = null; patch.rep_scheme = null; setReps(''); }
+    if (next !== 'distance') { patch.distance = null; patch.distance_unit = null; setDistance(''); }
+    if (next !== 'calories') { patch.calories = null; setCalories(''); }
+    if (next === 'distance') patch.distance_unit = movement.distance_unit ?? distanceUnit ?? 'm';
+    try { await onUpdate(movement.id, patch); }
+    catch { setMeasure(prev); }
   };
 
   return (
@@ -1811,12 +1904,23 @@ function V3MovementEditRow({ movement, onUpdate, onRemove }: {
         placeholder="Sets"
         aria-label="Sets"
       />
-      {hasDistance ? (
+      <select
+        className="movement-edit-input"
+        value={measure}
+        onChange={e => commitMeasure(e.target.value as 'reps' | 'distance' | 'calories')}
+        aria-label="Work measure"
+        title="How this movement is measured"
+      >
+        <option value="reps">Reps</option>
+        <option value="distance">Dist</option>
+        <option value="calories">Cal</option>
+      </select>
+      {measure === 'distance' ? (
         <div className="movement-edit-weight">
           <input
             type="number"
             inputMode="decimal"
-            className="movement-edit-input movement-edit-input--reps"
+            className="movement-edit-input movement-edit-input--num"
             value={distance}
             onChange={e => setDistance(e.target.value)}
             onBlur={commitDistance}
@@ -1830,12 +1934,20 @@ function V3MovementEditRow({ movement, onUpdate, onRemove }: {
             aria-label="Distance unit"
           >
             <option value="m">m</option>
-            <option value="km">km</option>
-            <option value="mi">mi</option>
             <option value="ft">ft</option>
-            <option value="cal">cal</option>
           </select>
         </div>
+      ) : measure === 'calories' ? (
+        <input
+          type="number"
+          inputMode="numeric"
+          className="movement-edit-input movement-edit-input--reps"
+          value={calories}
+          onChange={e => setCalories(e.target.value)}
+          onBlur={commitCalories}
+          placeholder="Cal"
+          aria-label="Calories"
+        />
       ) : (
         <input
           type="text"

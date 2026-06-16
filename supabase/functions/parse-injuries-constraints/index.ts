@@ -166,19 +166,30 @@ Deno.serve(async (req) => {
     }
     const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authErr } = await supa.auth.getUser(token);
-    if (authErr || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+
+    // Auth: internal server-to-server (build-writer-payload / gen path passes
+    // x-webhook-user-id + service key to keep injuries_structured fresh before
+    // generation) OR a user JWT (profile-save trigger).
+    const webhookUserId = req.headers.get("x-webhook-user-id");
+    let userId: string;
+    if (webhookUserId && token === SUPABASE_SERVICE_KEY) {
+      userId = webhookUserId;
+    } else {
+      const { data: { user }, error: authErr } = await supa.auth.getUser(token);
+      if (authErr || !user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+      userId = user.id;
     }
 
     // 2. Read current text + cached hash from the profile.
     const { data: profile, error: profileErr } = await supa
       .from("athlete_profiles")
       .select("injuries_constraints, injuries_constraints_hash")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle<{ injuries_constraints: string | null; injuries_constraints_hash: string | null }>();
     if (profileErr) throw new Error(`Profile fetch: ${profileErr.message}`);
     if (!profile) {
@@ -218,7 +229,7 @@ Deno.serve(async (req) => {
         injuries_structured: structured,
         injuries_constraints_hash: newHash,
       })
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
     if (updateErr) throw new Error(`Profile update: ${updateErr.message}`);
 
     return new Response(

@@ -37,6 +37,9 @@ verify_jwt = false
 [functions.monthly-generation-cron]
 verify_jwt = false
 
+[functions.migrate-cohort-to-v3]
+verify_jwt = false
+
 [functions.profile-analysis]
 verify_jwt = false
 
@@ -47,6 +50,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.generate-program-v3]
+verify_jwt = false
+
+[functions.job-reaper]
 verify_jwt = false
 
 [functions.profile-analysis-status]

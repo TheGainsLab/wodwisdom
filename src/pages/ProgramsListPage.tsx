@@ -13,6 +13,7 @@ interface Program {
   source?: string;
   workout_count?: number;
   generated_months?: number;
+  month_counts?: Record<number, number>;
 }
 
 export default function ProgramsListPage({ session }: { session: Session }) {
@@ -22,8 +23,6 @@ export default function ProgramsListPage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
   const [hasEvaluation, setHasEvaluation] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [generateError, setGenerateError] = useState('');
   const { hasFeature, isAdmin } = useEntitlements(session.user.id);
   const hasEngine = hasFeature('engine');
   const hasProgramming = hasFeature('programming');
@@ -38,7 +37,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
       const [progData, profileRes, evalRes] = await Promise.all([
         supabase
           .from('programs')
-          .select('id, name, created_at, source, generated_months, program_workouts(count)')
+          .select('id, name, created_at, source, generated_months, program_workouts(month_number)')
           .eq('user_id', session.user.id)
           .neq('committed', false)
           .order('created_at', { ascending: false }),
@@ -67,58 +66,24 @@ export default function ProgramsListPage({ session }: { session: Session }) {
       setHasEvaluation(!!(evalRes.data && evalRes.data.length > 0));
 
       if (progData.data) {
-        setPrograms(progData.data.map((p: any) => ({
-          ...p,
-          workout_count: p.program_workouts?.[0]?.count ?? 0,
-        })));
+        setPrograms(progData.data.map((p: any) => {
+          const rows: { month_number?: number }[] = p.program_workouts ?? [];
+          const monthCounts: Record<number, number> = {};
+          for (const r of rows) {
+            const m = r.month_number ?? 1;
+            monthCounts[m] = (monthCounts[m] ?? 0) + 1;
+          }
+          return {
+            ...p,
+            workout_count: rows.length,
+            month_counts: monthCounts,
+          };
+        }));
       }
     } catch (err) {
       console.error('[ProgramsListPage] Failed to load:', err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGenerate = async () => {
-    setGenerating(true);
-    setGenerateError('');
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-program', {
-        body: {},
-      });
-      if (error) throw new Error(error.message || 'Failed to generate program');
-      if (data?.error) throw new Error(data.error || 'Failed to generate program');
-      const jobId = data?.job_id;
-      if (!jobId) throw new Error('No job ID returned');
-
-      let delay = 3000;
-      const maxDelay = 8000;
-      const maxAttempts = 80;
-      for (let i = 0; i < maxAttempts; i++) {
-        await new Promise((r) => setTimeout(r, delay));
-        const { data: status, error: statusErr } = await supabase.functions.invoke('program-job-status', {
-          body: { job_id: jobId },
-        });
-        if (statusErr) throw new Error(statusErr.message || 'Failed to check job status');
-        if (status?.error && status?.status !== 'failed') throw new Error(status.error);
-
-        if (status?.status === 'complete') {
-          if (status.program_id) {
-            navigate(`/programs/${status.program_id}`);
-            return;
-          }
-          throw new Error('Program completed but no ID returned');
-        }
-        if (status?.status === 'failed') {
-          throw new Error(status.error || 'Program generation failed');
-        }
-        delay = Math.min(delay + 1000, maxDelay);
-      }
-      throw new Error('Program generation timed out');
-    } catch (err) {
-      setGenerateError(err instanceof Error ? err.message : 'Failed to generate program');
-    } finally {
-      setGenerating(false);
     }
   };
 
@@ -179,24 +144,43 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                 <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Calendar size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                   <span className="history-question">My Calendar</span>
-                  <span className="history-time" style={{ marginLeft: 'auto' }}>Schedule &amp; log your training</span>
+                  <span className="history-time" style={{ marginLeft: 'auto' }}>
+                    {programs.length === 0 && !hasEngine ? 'Generate a program to schedule training' : 'Schedule & log your training'}
+                  </span>
                 </div>
               </div>
             )}
 
-            {/* Analytics — progress dashboards (AI Programming only) */}
+            {/* Analytics — progress dashboards (AI Programming only). Locked until
+                there's a program to analyze; tapping the locked state routes to
+                the profile to generate. */}
             {(hasProgramming || isAdmin) && (
-              <div
-                className="history-item"
-                style={{ marginBottom: 16, cursor: 'pointer', borderLeft: '3px solid var(--accent)' }}
-                onClick={() => navigate('/training-log?view=analytics')}
-              >
-                <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <BarChart3 size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                  <span className="history-question">Analytics</span>
-                  <span className="history-time" style={{ marginLeft: 'auto' }}>Strength, metcons &amp; progress</span>
+              programs.length > 0 ? (
+                <div
+                  className="history-item"
+                  style={{ marginBottom: 16, cursor: 'pointer', borderLeft: '3px solid var(--accent)' }}
+                  onClick={() => navigate('/training-log?view=analytics')}
+                >
+                  <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <BarChart3 size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                    <span className="history-question">Analytics</span>
+                    <span className="history-time" style={{ marginLeft: 'auto' }}>Strength, metcons &amp; progress</span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div
+                  className="history-item"
+                  style={{ marginBottom: 16, cursor: 'pointer', borderLeft: '3px solid var(--border)', opacity: 0.6 }}
+                  onClick={() => navigate('/profile')}
+                  title="Create your program to unlock Analytics"
+                >
+                  <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <BarChart3 size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                    <span className="history-question" style={{ color: 'var(--text-dim)' }}>Analytics</span>
+                    <span className="history-time" style={{ marginLeft: 'auto' }}>Create your program to unlock</span>
+                  </div>
+                </div>
+              )
             )}
 
             {/* Engine card */}
@@ -339,17 +323,14 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                 ) : !hasEvaluation ? (
                   <>
                     <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Get your profile evaluated</p>
-                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 16 }}>Your profile is set up. Run an AI evaluation to unlock program generation.</p>
+                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 16 }}>Your profile is set up. Run your AI evaluation on your profile to continue.</p>
                     <button className="auth-btn" onClick={() => navigate('/profile')}>Go to Evaluation</button>
                   </>
                 ) : (
                   <>
-                    <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Ready to generate your program</p>
-                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 16 }}>Your evaluation is complete. Generate a personalized program based on your profile and analysis.</p>
-                    {generateError && <div className="error-msg" style={{ marginBottom: 12 }}>{generateError}</div>}
-                    <button className="auth-btn" onClick={handleGenerate} disabled={generating}>
-                      {generating ? 'Generating...' : 'Generate Program'}
-                    </button>
+                    <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Generate your program</p>
+                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 16 }}>Your profile and evaluation are ready.</p>
+                    <button className="auth-btn" onClick={() => navigate('/profile')}>Go to Profile →</button>
                   </>
                 )}
               </div>
@@ -363,17 +344,24 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                 }).flatMap(p => {
                   const isOwn = p.source !== 'external';
                   const isGenerated = p.source === 'generated';
-                  const months = isGenerated && (p.generated_months || 1) > 1
-                    ? Array.from({ length: p.generated_months || 1 }, (_, i) => i + 1).reverse()
-                    : [0]; // 0 = show as single program (non-generated or single month)
+                  // Expand into "Month N" cards from the months ACTUALLY present
+                  // (a migrated v3 program may start at month 2, so we must not
+                  // assume a contiguous 1..generated_months). A single month-1
+                  // program renders as one card; a single month-N>1 (migration)
+                  // still shows as "Month N".
+                  const presentMonths = Object.keys(p.month_counts || {})
+                    .map(Number)
+                    .filter((m) => m >= 1)
+                    .sort((a, b) => a - b);
+                  const isMulti = isGenerated &&
+                    (presentMonths.length > 1 || (presentMonths.length === 1 && presentMonths[0] > 1));
+                  const months = isMulti ? [...presentMonths].reverse() : [0];
 
                   return months.map(month => {
                     const isMonthCard = month > 0;
                     const label = isMonthCard ? `Month ${month}` : p.name;
-                    const workoutsPerMonth = 20;
-                    const workoutLabel = isMonthCard
-                      ? `${workoutsPerMonth} workouts`
-                      : `${p.workout_count} workout${p.workout_count !== 1 ? 's' : ''}`;
+                    const count = isMonthCard ? (p.month_counts?.[month] ?? 0) : (p.workout_count ?? 0);
+                    const workoutLabel = `${count} workout${count !== 1 ? 's' : ''}`;
 
                     return (
                       <div

@@ -12,7 +12,7 @@
 
 import { useMemo, useState } from 'react';
 import type { CompetitionWorkoutEntry, NormalizedCompetitionHistory } from '../../lib/competitionHistory';
-import { personalizedPower } from '../../lib/competitionHistory';
+import { personalizedPower, p99WPerKg } from '../../lib/competitionHistory';
 import WorkoutDetail from './WorkoutDetail';
 
 const STAGE_LABEL: Record<string, string> = {
@@ -36,6 +36,8 @@ interface PowerRow {
   watts: number;
   wPerKg: number;
   estimated: boolean;
+  /** Top-1% (p99) W/kg for this workout, same basis as wPerKg. Null when not estimable. */
+  topWPerKg: number | null;
 }
 
 export default function PowerPanel({
@@ -57,7 +59,7 @@ export default function PowerPanel({
     for (const entry of Object.values(history.byId)) {
       const p = personalizedPower(entry, userKg);
       if (p && p.wPerKg != null) {
-        rows.push({ entry, watts: p.watts, wPerKg: p.wPerKg, estimated: p.estimated });
+        rows.push({ entry, watts: p.watts, wPerKg: p.wPerKg, estimated: p.estimated, topWPerKg: p99WPerKg(entry, p.wPerKg) });
       }
     }
     return rows;
@@ -112,6 +114,7 @@ export default function PowerPanel({
             const e = r.entry;
             const stageLabel = STAGE_LABEL[e.stage] ?? e.stage;
             const bucket = e.workout.time_domain?.bucket;
+            const atOrAbove = r.topWPerKg != null && r.wPerKg >= r.topWPerKg;
             return (
               <button
                 key={e.competition_workout_id}
@@ -144,9 +147,25 @@ export default function PowerPanel({
                     {e.source === 'logged' ? ' · logged' : ''}
                   </div>
                 </div>
-                <div style={{ fontSize: 18, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                  {r.wPerKg.toFixed(1)}
-                  <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-dim)' }}> W/kg</span>
+                <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <div
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 700,
+                      display: 'inline-block',
+                      ...(atOrAbove
+                        ? { border: '1.5px solid #2ec486', borderRadius: 6, padding: '2px 8px', color: '#2ec486' }
+                        : {}),
+                    }}
+                  >
+                    {r.wPerKg.toFixed(1)}
+                    <span style={{ fontSize: 11, fontWeight: 500, color: atOrAbove ? '#2ec486' : 'var(--text-dim)' }}> W/kg</span>
+                  </div>
+                  {r.topWPerKg != null && (
+                    <div style={{ fontSize: 11, color: '#e5484d', fontWeight: 600, marginTop: 4 }}>
+                      Top 1% · {r.topWPerKg.toFixed(1)}
+                    </div>
+                  )}
                 </div>
               </button>
             );
