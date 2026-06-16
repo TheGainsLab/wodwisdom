@@ -357,12 +357,11 @@ function AccessoryLog({ block, controller, coaching }: { block: ProgramBlockV2; 
   );
   const set = (id: string, f: 'weight' | 'reps' | 'rpe', v: string) => setVals(p => ({ ...p, [id]: { ...p[id], [f]: v } }));
   const { checked, toggle } = useChecked();
-  const faults = blockFaults(coaching, block.movements);
   const save = () => {
-    const blockFaultsChecked = checked['block'] ?? [];
     const entries: LogEntry[] = block.movements.map((m) => {
       const r = vals[m.id] ?? { weight: '', reps: '', rpe: '' };
-      return emptyEntry(m.movement, { sets: m.sets ?? null, weight: numOrNull(r.weight), weight_unit: m.weight_unit || controller.userUnits, reps_completed: intOrNull(r.reps), rpe: numOrNull(r.rpe), faults_observed: blockFaultsChecked.length ? blockFaultsChecked : null, prescribed_weight: m.weight ?? null, prescribed_reps: m.reps ?? null });
+      const f = checked[m.id] ?? [];
+      return emptyEntry(m.movement, { sets: m.sets ?? null, weight: numOrNull(r.weight), weight_unit: m.weight_unit || controller.userUnits, reps_completed: intOrNull(r.reps), rpe: numOrNull(r.rpe), faults_observed: f.length ? f : null, prescribed_weight: m.weight ?? null, prescribed_reps: m.reps ?? null });
     });
     controller.saveBlock({ label: block.block_label || 'Accessory', type: 'accessory', text: blockText(block), score: null, rx: false, notes: null, sort_order: block.sort_order, entries, capped: false, capped_reps: null });
   };
@@ -373,16 +372,19 @@ function AccessoryLog({ block, controller, coaching }: { block: ProgramBlockV2; 
       </div>
       {block.movements.map((m) => {
         const r = vals[m.id] ?? { weight: '', reps: '', rpe: '' };
+        const faults = faultsForMovement(coaching, m.movement);
         return (
-          <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 6, alignItems: 'center', marginBottom: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>{m.movement}</span>
-            <input style={inputStyle} inputMode="decimal" value={r.weight} onChange={e => set(m.id, 'weight', e.target.value)} />
-            <input style={inputStyle} inputMode="numeric" value={r.reps} onChange={e => set(m.id, 'reps', e.target.value)} />
-            <RpeSelect value={r.rpe} onChange={v => set(m.id, 'rpe', v)} />
+          <div key={m.id} style={{ marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 6, alignItems: 'center' }}>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{m.movement}</span>
+              <input style={inputStyle} inputMode="decimal" value={r.weight} onChange={e => set(m.id, 'weight', e.target.value)} />
+              <input style={inputStyle} inputMode="numeric" value={r.reps} onChange={e => set(m.id, 'reps', e.target.value)} />
+              <RpeSelect value={r.rpe} onChange={v => set(m.id, 'rpe', v)} />
+            </div>
+            <FaultChecklist faults={faults} checked={checked[m.id] ?? []} onToggle={(f) => toggle(m.id, f)} />
           </div>
         );
       })}
-      <FaultChecklist faults={faults} checked={checked['block'] ?? []} onToggle={(f) => toggle('block', f)} />
       <SaveButton saving={saving} onSave={save} />
     </div>
   );
