@@ -1574,7 +1574,7 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
       {showCoach && coachOpen && (
         <div className="block-coach-body" style={{ marginTop: 10 }}>
           {coaching ? (
-            <BlockCoachingBody block={coaching} />
+            <BlockCoachingBody block={coaching} hidePrescription />
           ) : coachingLoading ? (
             <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '4px 2px' }}>Loading coaching…</div>
           ) : coachingError ? (

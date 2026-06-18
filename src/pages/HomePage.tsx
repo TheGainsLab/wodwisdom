@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
-import { MessageSquare, Trophy, Flame, Dumbbell, Apple, User, ChevronRight, Lock } from 'lucide-react';
+import { MessageSquare, Trophy, Flame, Dumbbell, Apple, User, ChevronRight, Lock, Settings } from 'lucide-react';
 
 /**
  * HomePage — the persistent landing at `/` (chat moved to `/chat`).
@@ -74,7 +74,7 @@ export default function HomePage({ session }: { session: Session }) {
       return { title: 'Generate your program', body: 'Your evaluation is complete — head to your profile to generate your first program.', cta: 'Go to Profile', to: '/profile' };
     }
     if (hasProgram) {
-      return { title: "Today's training", body: 'Pick up your program — view your calendar, start a session, and log your results.', cta: 'Open My Calendar', to: '/training-log' };
+      return { title: "Today's training", body: 'Pick up your program — view your calendar, start a session, and log your results.', cta: 'Open My Programs', to: '/programs' };
     }
     if (hasEngine) {
       return { title: 'Your Engine training', body: 'Jump into your Engine dashboard and log a session.', cta: 'Open Engine', to: '/engine' };
@@ -94,6 +94,7 @@ export default function HomePage({ session }: { session: Session }) {
     { key: 'nutrition', label: 'Nutrition', sub: 'Log & track', to: '/nutrition', icon: <Apple size={20} />, locked: !hasNutrition, plan: 'nutrition' },
     { key: 'athletedata', label: 'Athlete Data', sub: 'Competition history', to: '/athletedata', icon: <Trophy size={20} />, locked: false, plan: '' },
     { key: 'profile', label: 'Profile', sub: 'Your athlete data', to: '/profile', icon: <User size={20} />, locked: false, plan: '' },
+    { key: 'settings', label: 'Settings', sub: 'Billing, account & sign out', to: '/settings', icon: <Settings size={20} />, locked: false, plan: '' },
   ];
 
   const onTile = (t: { locked: boolean; plan: string; to: string }) =>

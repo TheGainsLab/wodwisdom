@@ -319,9 +319,35 @@ function applyIntentModifier(basePrompt: string, intent: SessionIntent): string 
 // callClaude imported from _shared/call-claude.ts (retry + Haiku fallback)
 
 function parseJSON(raw: string): Record<string, unknown> | null {
+  if (!raw) return null;
+  const start = raw.indexOf("{");
+  if (start === -1) return null;
+  const body = raw.slice(start);
+  // 1. Normal parse (greedy match to the last closing brace).
   try {
-    const match = raw.match(/\{[\s\S]*\}/);
-    return JSON.parse(match ? match[0] : raw);
+    const match = body.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+  } catch { /* fall through to repair */ }
+  // 2. Repair a truncated response (e.g. the model hit max_tokens mid-object):
+  //    walk the text, then close any still-open string / arrays / objects.
+  try {
+    const stack: string[] = [];
+    let inStr = false, esc = false;
+    for (let i = 0; i < body.length; i++) {
+      const c = body[i];
+      if (esc) { esc = false; continue; }
+      if (c === "\\") { esc = true; continue; }
+      if (c === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (c === "{") stack.push("}");
+      else if (c === "[") stack.push("]");
+      else if (c === "}" || c === "]") stack.pop();
+    }
+    let fixed = body;
+    if (inStr) fixed += '"';            // close a dangling string
+    fixed = fixed.replace(/,\s*$/, ""); // drop a trailing comma / partial token
+    for (let i = stack.length - 1; i >= 0; i--) fixed += stack[i];
+    return JSON.parse(fixed);
   } catch {
     return null;
   }
@@ -553,27 +579,27 @@ async function runReview(
     if (blockTextByType["metcon"]) {
       const metconIntent = detectSessionIntent(blockTextByType["metcon"], "metcon", athleteProfile);
       calls.push(
-        stagger(500).then(() => callClaude(claudeOpts(applyIntentModifier(METCON_PROMPT, metconIntent) + journalContext, buildUserContent(blockTextByType["metcon"], blockStructuredByType["metcon"]), 1024)))
+        stagger(500).then(() => callClaude(claudeOpts(applyIntentModifier(METCON_PROMPT, metconIntent) + journalContext, buildUserContent(blockTextByType["metcon"], blockStructuredByType["metcon"]), 2000)))
           .then((r): [string, string] => ["metcon", r])
       );
     }
     if (blockTextByType["strength"]) {
       const strengthIntent = detectSessionIntent(blockTextByType["strength"], "strength", athleteProfile);
       calls.push(
-        stagger(1000).then(() => callClaude(claudeOpts(applyIntentModifier(STRENGTH_PROMPT, strengthIntent) + strengthContext, buildUserContent(blockTextByType["strength"], blockStructuredByType["strength"]), 1024)))
+        stagger(1000).then(() => callClaude(claudeOpts(applyIntentModifier(STRENGTH_PROMPT, strengthIntent) + strengthContext, buildUserContent(blockTextByType["strength"], blockStructuredByType["strength"]), 2000)))
           .then((r): [string, string] => ["strength", r])
       );
     }
     if (blockTextByType["skills"]) {
       const skillsIntent = detectSessionIntent(blockTextByType["skills"], "skills", athleteProfile);
       calls.push(
-        stagger(1500).then(() => callClaude(claudeOpts(applyIntentModifier(SKILLS_PROMPT, skillsIntent) + journalContext, buildUserContent(blockTextByType["skills"], blockStructuredByType["skills"]), 1024)))
+        stagger(1500).then(() => callClaude(claudeOpts(applyIntentModifier(SKILLS_PROMPT, skillsIntent) + journalContext, buildUserContent(blockTextByType["skills"], blockStructuredByType["skills"]), 2000)))
           .then((r): [string, string] => ["skills", r])
       );
     }
     if (blockTextByType["accessory"]) {
       calls.push(
-        stagger(2000).then(() => callClaude(claudeOpts(ACCESSORY_PROMPT + strengthContext, buildUserContent(blockTextByType["accessory"], blockStructuredByType["accessory"]), 1024)))
+        stagger(2000).then(() => callClaude(claudeOpts(ACCESSORY_PROMPT + strengthContext, buildUserContent(blockTextByType["accessory"], blockStructuredByType["accessory"]), 2000)))
           .then((r): [string, string] => ["accessory", r])
       );
     }
@@ -588,32 +614,17 @@ async function runReview(
     const intentParsed = parseJSON(resultMap["intent"] || "");
     const blocks: Record<string, unknown>[] = [];
 
-    if (resultMap["skills"]) {
-      const parsed = parseJSON(resultMap["skills"]);
+    // Assemble each block's coaching. A parse failure is logged (not silently
+    // dropped) so a missing block shows up in the function logs.
+    for (const t of ["skills", "strength", "metcon", "accessory"]) {
+      const raw = resultMap[t];
+      if (!raw) continue;
+      const parsed = parseJSON(raw);
       if (parsed?.block_type) {
-        parsed.prescription = blockTextByType["skills"] || "";
+        parsed.prescription = blockTextByType[t] || "";
         blocks.push(parsed);
-      }
-    }
-    if (resultMap["strength"]) {
-      const parsed = parseJSON(resultMap["strength"]);
-      if (parsed?.block_type) {
-        parsed.prescription = blockTextByType["strength"] || "";
-        blocks.push(parsed);
-      }
-    }
-    if (resultMap["metcon"]) {
-      const parsed = parseJSON(resultMap["metcon"]);
-      if (parsed?.block_type) {
-        parsed.prescription = blockTextByType["metcon"] || "";
-        blocks.push(parsed);
-      }
-    }
-    if (resultMap["accessory"]) {
-      const parsed = parseJSON(resultMap["accessory"]);
-      if (parsed?.block_type) {
-        parsed.prescription = blockTextByType["accessory"] || "";
-        blocks.push(parsed);
+      } else {
+        console.error(`[workout-review] ${t} coaching dropped — unparseable response (${raw.length} chars)`);
       }
     }
 

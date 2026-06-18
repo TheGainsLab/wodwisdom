@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase, ADJUST_WORKOUT_ENDPOINT, getAuthHeaders } from '../lib/supabase';
 import { localDateString } from '../lib/localDate';
 import Nav from '../components/Nav';
+import CoachChat from '../components/CoachChat';
 import {
   V3DayView, v3BlocksToProse, reconcileReps,
   type ProgramBlockV2, type ProgramMovementV2, type BlockProposal,
@@ -265,6 +266,9 @@ export default function DayPage(_props: { session: Session }) {
                   onApplyAiProposal={applyAiProposal}
                   onRefuseAiProposal={refuseAiProposal}
                 />
+
+                {/* Ask the AI Coach about this day — the day is passed as context. */}
+                <CoachChat session={_props.session} workoutId={workoutId ?? null} />
 
                 {/* Done — the day auto-completes as each block is saved; this
                     just leaves. (Log a block via its own Save on the card.) */}

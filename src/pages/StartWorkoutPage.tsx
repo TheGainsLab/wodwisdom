@@ -1744,7 +1744,7 @@ export default function StartWorkoutPage({ session, sourceStateProp, onExit, onD
                       const cb = coachingForBlockType(coachReview, block.type);
                       return (
                         <div className="block-coach-body" style={{ marginBottom: 16 }}>
-                          {cb ? <BlockCoachingBody block={cb} />
+                          {cb ? <BlockCoachingBody block={cb} hidePrescription />
                             : coachLoading ? <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '4px 2px' }}>Loading coaching…</div>
                             : coachError ? <div style={{ fontSize: 13, color: 'var(--accent)', padding: '4px 2px' }}>{coachError}</div>
                             : <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '4px 2px' }}>No coaching for this block.</div>}

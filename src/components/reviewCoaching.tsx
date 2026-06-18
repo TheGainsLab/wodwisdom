@@ -98,17 +98,17 @@ export function MovementCard({ cf }: { cf: ReviewBlockCue }) {
 // The inner content only (no header/toggle), so it can drop under a block row
 // that owns its own "Coach ▾" disclosure.
 // ---------------------------------------------------------------------------
-export function BlockCoachingBody({ block }: { block: ReviewBlock }) {
+export function BlockCoachingBody({ block, hidePrescription }: { block: ReviewBlock; hidePrescription?: boolean }) {
   return (
     <div className="workout-review-block-body">
-      {block.prescription && (
+      {!hidePrescription && block.prescription && (
         <div className={`wr-prescription wr-prescription--${block.block_type}`}>
           <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatReviewMarkdown(block.prescription) }} />
         </div>
       )}
       {block.time_domain && (
         <div className="wr-time-domain">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+          <div className="wr-game-plan-label">Game Plan</div>
           <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatReviewMarkdown(block.time_domain) }} />
         </div>
       )}

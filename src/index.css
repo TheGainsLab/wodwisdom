@@ -282,8 +282,8 @@ body.landing-body{overflow:auto;height:auto}
 .wr-prescription--metcon{border-left-color:#4ade80}
 .wr-prescription .workout-review-content{font-size:14px;line-height:1.6;font-weight:600;color:var(--text)}
 /* Time domain with clock icon */
-.wr-time-domain{display:flex;gap:10px;align-items:flex-start;margin-bottom:16px;padding:12px 14px;background:var(--bg);border:1px solid #ffffff;border-radius:8px}
-.wr-time-domain svg{flex-shrink:0;margin-top:3px;color:var(--text-dim)}
+.wr-time-domain{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;padding:12px 14px;background:var(--bg);border:1px solid #ffffff;border-radius:8px}
+.wr-game-plan-label{text-transform:uppercase;letter-spacing:1px;font-size:12px;font-weight:700;color:var(--accent)}
 .wr-time-domain .workout-review-content{font-size:14px;line-height:1.6}
 /* Movement cards */
 .wr-movement-cards{display:flex;flex-direction:column;gap:10px}
@@ -297,10 +297,10 @@ body.landing-body{overflow:auto;height:auto}
 .wr-fault-list{margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
 .wr-fault-item{color:var(--text-dim)}
 /* Sources collapsible */
-.wr-sources-section{margin-top:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.wr-sources-section{margin-top:24px;background:var(--surface);border:1px solid #ffffff;border-radius:var(--radius);overflow:hidden}
 .wr-sources-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;padding:14px 20px;background:none;border:none;cursor:pointer;font-family:'Outfit',sans-serif;color:var(--text-dim);text-align:left}
 .wr-sources-toggle:hover{background:var(--surface2)}
-.wr-sources-label{font-size:13px;font-weight:600;text-transform:uppercase}
+.wr-sources-label{font-size:13px;font-weight:600;text-transform:uppercase;color:var(--accent)}
 .wr-sources-list{display:flex;flex-wrap:wrap;gap:8px;padding:0 20px 16px}
 /* Collapsible block */
 .workout-review-block{padding:0;overflow:hidden}

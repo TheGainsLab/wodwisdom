@@ -263,18 +263,17 @@ function MetconLog({ block, controller, coaching }: { block: ProgramBlockV2; con
   const [cappedReps, setCappedReps] = useState('');
   const [notes, setNotes] = useState('');
   const { checked, toggle } = useChecked();
-  const faults = blockFaults(coaching, block.movements);
   // "Hit the cap" only applies to for-time work; AMRAP/EMOM score IS rounds+reps.
   const isForTime = inferMetconType(block) === 'for_time';
   const save = () => {
-    const blockFaultsChecked = checked['block'] ?? [];
     const entries: LogEntry[] = block.movements.map((m) => {
       const isCal = m.calories != null && m.calories > 0;
+      const f = checked[m.id] ?? [];
       return emptyEntry(m.movement, {
         reps: isCal ? (m.calories ?? null) : (m.reps ?? null),
         weight: m.weight ?? null, weight_unit: m.weight_unit || controller.userUnits,
         distance: isCal ? null : (m.distance ?? null), distance_unit: isCal ? 'cal' : (m.distance_unit ?? null),
-        faults_observed: blockFaultsChecked.length ? blockFaultsChecked : null,
+        faults_observed: f.length ? f : null,
         prescribed_weight: m.weight ?? null, prescribed_reps: m.reps ?? null,
       });
     });
@@ -307,7 +306,16 @@ function MetconLog({ block, controller, coaching }: { block: ProgramBlockV2; con
         {isForTime && capped && <input style={{ ...inputStyle, width: 120 }} inputMode="numeric" placeholder="reps at cap" value={cappedReps} onChange={e => setCappedReps(e.target.value)} />}
       </div>
       <input style={{ ...inputStyle, textAlign: 'left' }} placeholder="Notes (optional)" value={notes} onChange={e => setNotes(e.target.value)} />
-      <FaultChecklist faults={faults} checked={checked['block'] ?? []} onToggle={(f) => toggle('block', f)} />
+      {block.movements.map((m) => {
+        const mFaults = faultsForMovement(coaching, m.movement);
+        if (!mFaults.length) return null;
+        return (
+          <div key={m.id} style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>{m.movement}</div>
+            <FaultChecklist faults={mFaults} checked={checked[m.id] ?? []} onToggle={(f) => toggle(m.id, f)} />
+          </div>
+        );
+      })}
       <SaveButton saving={saving} onSave={save} />
     </div>
   );
@@ -443,14 +451,16 @@ export default function BlockLog({ block, controller, coaching, onEnsureCoaching
   }
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => { setOpen(true); onEnsureCoaching?.(); }}
-        style={{ width: '100%', marginTop: 10, padding: '10px 12px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: "'Outfit', sans-serif" }}
-      >
-        Log block
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
-      </button>
+      <div style={{ textAlign: 'center', marginTop: 10 }}>
+        <button
+          type="button"
+          onClick={() => { setOpen(true); onEnsureCoaching?.(); }}
+          style={{ padding: '7px 14px', background: 'transparent', border: '1px solid #ffffff', borderRadius: 8, color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: "'Outfit', sans-serif" }}
+        >
+          Log block
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+        </button>
+      </div>
     );
   }
   return (
