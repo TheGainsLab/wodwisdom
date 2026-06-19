@@ -12,7 +12,6 @@ import {
   detectFatigue,
   detectWeakRoots,
   formatConditioningState,
-  nextHeroAfter,
   type PerfMetricRow,
   rollupSystems,
   type TimeTrialRow,
@@ -122,14 +121,6 @@ Deno.test("detectWeakRoots: requires confidence AND a current time trial", () =>
   );
 });
 
-// ── next hero ────────────────────────────────────────────────────────────
-Deno.test("nextHeroAfter: returns the next introduced hero day-type", () => {
-  assertEquals(nextHeroAfter(50)?.type, "polarized");
-  assertEquals(nextHeroAfter(200)?.type, "hybrid_anaerobic");
-  assertEquals(nextHeroAfter(700), null);
-  assertEquals(nextHeroAfter(null), null);
-});
-
 // ── fatigue heuristic ────────────────────────────────────────────────────
 Deno.test("detectFatigue: high RPE with sub-target output flags accumulation", () => {
   const sessions = [
@@ -152,14 +143,13 @@ Deno.test("detectFatigue: long gap since last session is flagged", () => {
 // ── format: no-op + smoke ────────────────────────────────────────────────
 Deno.test("formatConditioningState: empty input → no-op", () => {
   assertEquals(
-    formatConditioningState({ currentDay: null, metrics: [], timeTrials: [], sessions: [], now: NOW }),
+    formatConditioningState({ metrics: [], timeTrials: [], sessions: [], now: NOW }),
     "",
   );
 });
 
 Deno.test("formatConditioningState: produces a labelled block with the key sections", () => {
   const out = formatConditioningState({
-    currentDay: 200,
     metrics: [
       metric({ day_type: "endurance", modality: "c2_row", rolling_avg_ratio: 1.05 }),
       metric({ day_type: "threshold", modality: "c2_row", rolling_avg_ratio: 0.9 }),
@@ -174,7 +164,9 @@ Deno.test("formatConditioningState: produces a labelled block with the key secti
   assert(out.includes("Calibration:"));
   assert(out.includes("Energy systems:"));
   assert(out.includes("Weak root"));
-  assert(out.includes("Next new day-type"));
+  // diagnosis is position-free: no curriculum/next-day line
+  assert(!out.includes("Next new day-type"));
+  assert(!out.includes("Curriculum"));
   // phosphagen guard present
   assert(out.toLowerCase().includes("phosphagen"));
 });

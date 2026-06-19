@@ -27,9 +27,14 @@ export async function buildConditioningState(
 
 ## Inputs (queried in parallel)
 
+> **Position-free by design.** The diagnosis is keyed entirely to `day_type + modality`, which are
+> program-agnostic — so it is identical for `main_5day`, `3day`, and the `_varied` variants, and needs
+> no sequence/catalog reconciliation. Curriculum position and "what's next" readiness are deliberately
+> **out of scope here**: they only matter as a *decision input for Lever B*, where they must be sourced
+> from `engine_program_mapping` (the athlete's actual upcoming rows), not from a catalog-day ladder.
+
 | Source | Fields | Used for |
 |---|---|---|
-| `athlete_profiles` | `engine_program_version`, `engine_current_day` | Curriculum position → tier + next hero day-type |
 | `engine_time_trials` | `modality`, `units`, `calculated_rpm`, `date`, `is_current` | **Substrate validity gate** + baseline progression |
 | `engine_user_performance_metrics` | `day_type`, `modality`, `rolling_avg_ratio`, `rolling_count`, `learned_max_pace`, `last_4_ratios` | The ~20 mastery scores + trend + confidence |
 | `engine_workout_sessions` | `date`, `day_type`, `modality`, `performance_ratio`, `perceived_exertion`, `average_heart_rate`, `peak_heart_rate` | Recency, recovery gaps, RPE-vs-output divergence |
@@ -51,21 +56,21 @@ Phosphagen (PH) is intentionally **not** an axis — no PH score is produced.
 3. **Energy-system roll-up.** Aggregate the rooted competencies into **AB / AP / LT / GL** status,
    confidence-weighted. Flag a **weak root** only when ratio is clearly < 1.0 *and* confidence is
    adequate *and* the modality's TT is valid.
-4. **Curriculum position.** Map `engine_current_day` → tier/phase; identify the **next hero
-   day-type** coming and whether its prerequisite roots are strong → a readiness flag.
-5. **Fatigue / recency.** Inter-session gaps; last-session date; **RPE-vs-ratio divergence**
+4. **Fatigue / recency.** Inter-session gaps; last-session date; **RPE-vs-ratio divergence**
    (high RPE + low ratio = fatigue signal).
+
+> *Deferred to Lever B:* curriculum position and "next day-type readiness." These are forward-looking
+> *scheduling* questions, not diagnosis — source them from `engine_program_mapping` when they drive a
+> sequencing decision, not from a position index here.
 
 ## Output (compact labelled block, token-budgeted)
 
 ```
 ENGINE CONDITIONING STATE
-Calibration: C2 Row TT current (12d). Bike TT STALE (61d) — bike scores low-confidence.
-  Baseline: row 285→312 rpm over 5 trials (+9%).
-Energy systems (row): AB strong (1.04, rising) · AP solid (1.01) · LT lagging (0.92, flat) · GL solid (1.02)
-Weak root: LT (threshold 0.91 x4, flux 0.93) — confidence ok.
-Curriculum: day 318 (Tier 2, flux_stages phase). Next hero: hybrid_aerobic (~day 245-window already seen).
-  Readiness: AP/flux prerequisites met; LT softness may show under density.
+Calibration: c2 row: TT 12d old, baseline +9%. echo bike: TT 61d old STALE — scores low-confidence.
+Energy systems: Aerobic base strong (1.05, rising) · Aerobic power solid (1.01) · Lactate threshold lagging (0.92, flat) · Glycolytic solid (1.02)
+Weak root(s): Lactate threshold (threshold 0.91, n=4).
+Fatigue: Last 3 sessions: high effort (avg RPE 8.7) but output below target (avg ratio 0.94) — possible fatigue accumulation.
 Fatigue: last 3 sessions RPE 8-9 vs ratio falling — possible accumulation. 4-day gap before that.
 ```
 

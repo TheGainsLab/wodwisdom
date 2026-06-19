@@ -72,42 +72,6 @@ export const SYSTEM_LABEL: Record<EnergySystem, string> = {
   GL: "Glycolytic",
 };
 
-/** Hero day-type introduced at each catalog day (first appearance, main_5day). */
-export const HERO_LADDER: { day: number; type: string }[] = [
-  { day: 62, type: "polarized" },
-  { day: 122, type: "rocket_races_a" },
-  { day: 182, type: "flux" },
-  { day: 195, type: "ascending" },
-  { day: 242, type: "hybrid_anaerobic" },
-  { day: 245, type: "hybrid_aerobic" },
-  { day: 302, type: "flux_stages" },
-  { day: 362, type: "devour" },
-  { day: 385, type: "ascending_devour" },
-  { day: 405, type: "descending_devour" },
-  { day: 422, type: "infinity" },
-  { day: 482, type: "towers" },
-  { day: 542, type: "afterburner" },
-  { day: 602, type: "atomic" },
-  { day: 662, type: "synthesis" },
-];
-
-/** Root energy systems an upcoming hero type leans on (for readiness check). */
-export const HERO_PREREQS: Record<string, EnergySystem[]> = {
-  flux: ["AB", "LT"],
-  flux_stages: ["LT"],
-  ascending: ["LT", "GL"],
-  hybrid_aerobic: ["AP"],
-  hybrid_anaerobic: ["GL"],
-  devour: ["AB", "LT"],
-  ascending_devour: ["AB", "LT"],
-  descending_devour: ["AB"],
-  atomic: ["AP"],
-  towers: ["AB", "AP"],
-  infinity: ["AB", "LT"],
-  afterburner: ["GL", "AP"],
-  synthesis: ["AB", "AP", "LT", "GL"],
-};
-
 // Thresholds
 const STRONG = 1.04;
 const LAGGING = 0.97;
@@ -142,7 +106,6 @@ export interface SessionRow {
 }
 
 export interface ConditioningInputs {
-  currentDay: number | null;
   metrics: PerfMetricRow[];
   timeTrials: TimeTrialRow[];
   sessions: SessionRow[];
@@ -294,14 +257,6 @@ export function detectWeakRoots(
   return out;
 }
 
-export function nextHeroAfter(currentDay: number | null): { type: string; day: number } | null {
-  if (currentDay === null) return null;
-  for (const h of HERO_LADDER) {
-    if (h.day > currentDay) return { type: h.type, day: h.day };
-  }
-  return null;
-}
-
 /** Fatigue heuristic: recent high RPE alongside flat/low performance ratios. */
 export function detectFatigue(sessions: SessionRow[], now: Date): string[] {
   const flags: string[] = [];
@@ -351,7 +306,6 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
   const systems = rollupSystems(inputs.metrics, cal);
   const weakRoots = detectWeakRoots(inputs.metrics, cal);
   const fatigue = detectFatigue(inputs.sessions, now);
-  const nextHero = nextHeroAfter(inputs.currentDay);
 
   const parts: string[] = ["\n\nENGINE CONDITIONING STATE"];
 
@@ -392,23 +346,6 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
     parts.push("Weak root(s): " + segs.join("; ") + ".");
   }
 
-  // Curriculum position + next hero readiness
-  if (inputs.currentDay != null) {
-    let line = `Curriculum: day ${inputs.currentDay}.`;
-    if (nextHero) {
-      const prereqs = HERO_PREREQS[nextHero.type] ?? [];
-      const lagging = prereqs.filter((p) => {
-        const s = systems.find((x) => x.system === p);
-        return s && (s.status === "lagging" || weakRoots.some((w) => w.system === p));
-      });
-      const readiness = lagging.length
-        ? `prerequisite ${lagging.map((l) => SYSTEM_LABEL[l]).join(", ")} lagging — may be exposed`
-        : "prerequisites met";
-      line += ` Next new day-type: ${nextHero.type.replace(/_/g, " ")} (~day ${nextHero.day}) — ${readiness}.`;
-    }
-    parts.push(line);
-  }
-
   // Fatigue
   if (fatigue.length) parts.push("Fatigue: " + fatigue.join(" "));
 
@@ -422,9 +359,10 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
 // ─── Fetch wrapper ───────────────────────────────────────────────────────────
 
 /**
- * Fetches Engine performance metrics, time trials, recent sessions and the
- * athlete's current day, then formats a conditioning-state block for the AI.
- * Returns "" for users with no Engine data.
+ * Fetches Engine performance metrics, time trials and recent sessions, then
+ * formats a conditioning-state block for the AI. Pure day_type-keyed diagnosis
+ * — no program position, so it is correct for every program variant and
+ * reusable across all AI features. Returns "" for users with no Engine data.
  */
 export async function buildConditioningState(
   supa: SupabaseClient,
@@ -434,29 +372,26 @@ export async function buildConditioningState(
   const recentDays = opts?.recentDays ?? 90;
   const cutoff = new Date(Date.now() - recentDays * 86400000).toISOString().slice(0, 10);
 
-  const [{ data: profile }, { data: metrics }, { data: timeTrials }, { data: sessions }] =
-    await Promise.all([
-      supa.from("athlete_profiles").select("engine_current_day").eq("user_id", userId).maybeSingle(),
-      supa
-        .from("engine_user_performance_metrics")
-        .select("day_type, modality, rolling_avg_ratio, rolling_count, last_4_ratios, learned_max_pace")
-        .eq("user_id", userId),
-      supa
-        .from("engine_time_trials")
-        .select("modality, calculated_rpm, date, is_current")
-        .eq("user_id", userId)
-        .order("date", { ascending: true }),
-      supa
-        .from("engine_workout_sessions")
-        .select("date, day_type, modality, performance_ratio, perceived_exertion")
-        .eq("user_id", userId)
-        .eq("completed", true)
-        .gte("date", cutoff)
-        .order("date", { ascending: false }),
-    ]);
+  const [{ data: metrics }, { data: timeTrials }, { data: sessions }] = await Promise.all([
+    supa
+      .from("engine_user_performance_metrics")
+      .select("day_type, modality, rolling_avg_ratio, rolling_count, last_4_ratios, learned_max_pace")
+      .eq("user_id", userId),
+    supa
+      .from("engine_time_trials")
+      .select("modality, calculated_rpm, date, is_current")
+      .eq("user_id", userId)
+      .order("date", { ascending: true }),
+    supa
+      .from("engine_workout_sessions")
+      .select("date, day_type, modality, performance_ratio, perceived_exertion")
+      .eq("user_id", userId)
+      .eq("completed", true)
+      .gte("date", cutoff)
+      .order("date", { ascending: false }),
+  ]);
 
   return formatConditioningState({
-    currentDay: (profile as { engine_current_day?: number } | null)?.engine_current_day ?? null,
     metrics: (metrics as PerfMetricRow[]) ?? [],
     timeTrials: (timeTrials as TimeTrialRow[]) ?? [],
     sessions: (sessions as SessionRow[]) ?? [],
