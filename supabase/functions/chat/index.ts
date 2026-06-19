@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
+import { buildConditioningState } from "../_shared/conditioning-state.ts";
 import { fetchAndFormatProgramContext } from "../_shared/training-program.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
@@ -259,6 +260,15 @@ async function buildEngineCoachingContext(
   parts.push(
     "\nYou are coaching this athlete through today's Engine session. Ground advice in today's day type and coaching intent, the recent training patterns, and the time trial baselines when relevant.",
   );
+
+  // Aggregated conditioning state (energy-system mastery roll-up). No-ops to ""
+  // when the athlete has no Engine performance metrics yet.
+  try {
+    const conditioning = await buildConditioningState(supa, userId);
+    if (conditioning) parts.push(conditioning);
+  } catch (err) {
+    console.error("[chat] buildConditioningState failed:", err);
+  }
 
   return parts.join("\n");
 }
