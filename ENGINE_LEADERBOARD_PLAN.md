@@ -22,6 +22,17 @@
 3. **Comparison key = catalog `day_number`, never `program_sequence_order`.**
    Variants reorder the catalog, so the only stable workout identity is the
    catalog day number (`engine_program_mapping.engine_workout_day_number`).
+   **RESOLVED (was open question #2):** `engine_workout_sessions.program_day_number`
+   already stores the **catalog day_number**, not the sequence position. Trace:
+   the dashboard links with `day.day_number` (catalog) → URL param →
+   `loadWorkoutForDay` queries `engine_workouts.day_number` against the
+   `main_5day` catalog → saved as `program_day_number`
+   (EngineDashboardPage.tsx:260, EngineTrainingDayPage.tsx:358/655–656,
+   engineService.ts:285). So per-workout boards can key directly on
+   `program_day_number` with **no mapping resolution**, and a Hyrox user and a
+   720 user who hit the same catalog day are directly comparable. (`program_day`
+   is a redundant duplicate of `program_day_number`; a user can reach the same
+   catalog day via two tracks — dedupe to their best.)
 
 ## 2. Data we capture
 
@@ -97,8 +108,11 @@ energy-system story. Already captured per session
 (`workout_data.avg_work_rest_ratio`) and already used as a chart axis in
 `EngineAnalyticsPage.renderWorkRest()`.
 - Metric: peak / best-avg `actual_pace` per `(modality, work:rest band)`.
-- Bands ≈ long rest 1:3–1:5+ (glycolytic) / balanced 1:1–1:2 (VO2-threshold) /
-  short-or-continuous (aerobic durability).
+- Bands already exist in code — `formatWorkRestRatio()` buckets to
+  `3:1 / 2:1 / 3:2 / 1:1 / 2:3 / 1:2 / 1:3` (long-rest = glycolytic, balanced ≈
+  VO2-threshold, short/continuous = aerobic durability), and
+  `EngineAnalyticsPage.renderWorkRest()` already groups avg pace by these buckets
+  per modality. The leaderboard reuses the same bucketing.
 - **Caveat — work duration confound:** a 1:1 at 15s work vs 4-min work yield very
   different paces. Band by `(work:rest band × work-duration bucket)`, or treat
   ratio as a coarse axis.
@@ -135,7 +149,29 @@ on **peak pace** (robust to structure) or **pin to a specific catalog day**.
 
 **C4 — Volume (per machine).** Sum `total_output` (or meters) per window — doesn't
 need a standardized effort; more work legitimately = more output. Comparable once
-`(modality, units)` fixed.
+`(modality, units)` fixed. (Training load `intensity³ × avg_hr × √duration` is an
+alternative effort-weighted volume metric, but HR-dependent — secondary.)
+
+### Axis D — Energy-system signatures (already computed, athlete-archetype)
+The Overview analytics already compute three **dimensionless pace ratios** that
+characterize *what kind of athlete* you are, not just how fit:
+- **Glycolytic** = avg anaerobic pace ÷ time-trial pace
+- **Aerobic** = avg max-aerobic-power pace ÷ time-trial pace
+- **Systems** = avg anaerobic pace ÷ avg max-aerobic-power pace (top-end spread)
+
+Because they're ratios of paces, units cancel. They're computed per modality, so
+rank within a machine to stay rigorous — but conceptually they rank *archetype*:
+the **Systems** board crowns the most explosive/glycolytic-dominant athlete, the
+**Aerobic** board the biggest diesel engine. Novel, brag-worthy, and **already
+calculated** — strong engagement value for near-zero new computation.
+
+### Engagement features layered on top (low build cost)
+- **PR feed — "PRs set this week."** `isPersonalBestSession()` and
+  `learned_max_pace` (per `day_type×modality`, in `engine_user_performance_metrics`)
+  already detect bests. Surface a rolling feed of opted-in users' new PRs — social
+  proof without a ranking. Share-card accents ("PR", "% above target") already exist.
+- **HR efficiency** = `(pace ÷ avg_hr) × 1000` (already in HR Analytics). Engaging
+  "most efficient engine" framing but HR is age/individual-dependent → v2 experiment.
 
 ## 4. Privacy & identity *(confirmed: opt-in via profile)*
 - Add `engine_leaderboard_opt_in boolean DEFAULT false` to `athlete_profiles`,
@@ -153,8 +189,8 @@ is the scale-up option.
 ## 6. Open questions / caveats
 1. **Ranking metric for the universal board** — best vs rolling vs consistency vs
    improved (all viable as separate boards).
-2. **Confirm what `program_day_number` stores** (catalog day vs sequence order); if
-   sequence, resolve via mapping before per-workout comparison.
+2. ~~Confirm what `program_day_number` stores~~ **RESOLVED** — it's the catalog
+   day_number; per-workout boards key on it directly (see §1.3).
 3. **Work-duration confound** on work:rest bands (§C2).
 4. **Min-N per board** before display, to avoid leaderboards of one (matters most
    for per-machine / per-day-type / pillar boards).
