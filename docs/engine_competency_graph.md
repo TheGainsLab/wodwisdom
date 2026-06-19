@@ -188,3 +188,28 @@ scalar lacks:
    same-tier variant, insert an extra exposure of a weak root, hold/advance a phase — never invent a
    novel session. The day-type is the seam where AI reaches into the plan without corrupting the
    authored progression or the day-keyed analytics.
+
+---
+
+## 5. Intervention ladder (Stage 4 scope)
+
+Three levers of personalization, escalating in power and risk. The governing rule: **the day-type
+template is the guardrail; the AI is a dial inside it, never a blank page.**
+
+| Lever | What it changes | Status / scope | Guardrail |
+|---|---|---|---|
+| **A — Intensity** | Target pace per day | **Live today** (rolling-ratio) | Derived from time-trial substrate |
+| **B — Sequence** | Which day-type runs next (swap / insert / repeat / hold) | **Stage-4 core** | Only authored day-types; diagnose gap first |
+| **C — Content** | Params *inside* a day (interval count, work/rest, volume, progression) | **Stage-4 extension** | **Strictly within each day-type's `block_N_params` ranges** |
+
+**Why C is needed (not just B):** sometimes the right fix for a gap is *more dose of the same
+stimulus*, not a different day — e.g. a lagging-LT athlete needs `flux` with more surges, not a
+different day-type. Sequence moves can't express that; bounded content tuning can.
+
+**The envelope principle:** every day-type's `block_N_params` already define legal ranges
+(round-count, work/rest, pace). Tuning *within* those ranges = delivering the author's design,
+personalized. `devour` sanctions ~4–8 rounds; picking 6 vs 8 is dialing, not inventing.
+
+**Hard limit (never crossed):** invent novel structures, exceed a day-type's envelope, or change what
+a day-type fundamentally *is*. That boundary protects the periodization and the "an expert built
+this" guarantee. Crossing it = AI-generated programming, a different product with different risk.
