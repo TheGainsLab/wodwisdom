@@ -112,7 +112,8 @@ threshold ──┬─> flux
             └─> devour
 
 anaerobic ──┬─> hybrid_anaerobic
-            └─> afterburner
+            ├─> afterburner
+            └─> ascending        # glycolytic-demand side of the transition
 
 interval ──> ascending
 hybrid_aerobic, devour, flux_stages ──> infinity
@@ -121,8 +122,11 @@ ALL ──> synthesis        # the capstone audit
 ```
 
 Three structural facts the AI can exploit:
-1. **`endurance`, `max_aerobic_power`, `threshold` are the load-bearing roots.** Weakness here
-   propagates into many downstream competencies.
+1. **`endurance`, `max_aerobic_power`, `threshold`, `anaerobic` are the load-bearing roots** —
+   one per energy-system axis (AB, AP, LT, GL). Weakness in any propagates into many downstream
+   competencies. `anaerobic` earns root status because its output is a *fairly direct measure of
+   glycolytic power* (a near-readout of the GL system, much as `time_trial` is for the aerobic
+   scale), and it underpins `hybrid_anaerobic`, `afterburner`, and the glycolytic side of `ascending`.
 2. **Assessment nodes are checkpoints, not competencies:** `time_trial` (scale), `rocket_races_b`
    (consistency check), `infinity` / `afterburner` (expression), `synthesis` (final audit). Read
    these as *integration readouts*, not as targets to push.
