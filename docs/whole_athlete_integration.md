@@ -126,3 +126,41 @@ One computation, three consumers — no drift.
 - Activates only for all-access; programming-only and engine-only paths unchanged.
 - Generation gains *awareness*, not control over the Engine — coexistence, never re-prescription.
 - All signals heuristic, transparent, confidence-gated, consistent with the read layer.
+
+---
+
+## Constraint: there is no "Engine-as-block" primitive (awareness is the ceiling)
+
+Today an Engine session **cannot be inserted into an AI-generated program**. Three separate systems
+would each have to change:
+
+1. **Schema** — v3 block types are movement-based only (`warm-up, mobility, skills, strength,
+   accessory, metcon, active-recovery, cool-down`); blocks are made of `program_movements_v2`. An
+   Engine session is a day_type + modality + interval structure, not movements. No block type can
+   hold "Engine Day 184."
+2. **Execution UI** — Engine runs in its own runner (`EngineTrainingDayPage`: timer, modality, pace
+   targets, pace/HR/RPE logging → `engine_workout_sessions`); program blocks render/log as movements
+   → `workout_logs`. Separate execution + logging paths.
+3. **Progression** — the Engine owns `current_day`, `months_unlocked`, time-trial baselines, and the
+   performance metrics; a program day has none of that.
+
+**Consequence:** Part B (awareness) is the ceiling without new plumbing. Generation can be told *not to
+duplicate* the Engine, but it cannot *place* an Engine session. The two programs coordinate only by
+avoidance, and generation stays structural (no day alignment) — see the split table above.
+
+### The bridge (separate track, after Part B): an `engine_conditioning` block type
+
+A new block type referencing an Engine session would let generation actually place conditioning. Two
+flavors, very different in risk:
+
+- **Surface / reference (recommended first):** the program drops a deep-link card ("Conditioning →
+  your next Engine session → Open in Engine") on its conditioning days. The Engine keeps execution +
+  progression; the program becomes the home-base calendar that points to it. Unifies the calendar and
+  gives day alignment, low risk, preserves both systems' authority. Completion read back from
+  `engine_workout_sessions`.
+- **Orchestrate (deferred):** the generator selects specific Engine day_types and schedules them as
+  part of its own periodization. This reaches into the Engine's authored 720-day sequence (**Lever B**)
+  and fights its 5-day cadence — the authored-arc decision we are deliberately deferring.
+
+This bridge is what would collapse the structural/acute split (generation would *know* day alignment
+because it placed the session) — but only by accepting progression coupling. Treat as its own track.
