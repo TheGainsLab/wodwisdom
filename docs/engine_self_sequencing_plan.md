@@ -92,6 +92,16 @@ adapted sequence written to training_schedule (engine rows)
   insert weak-root exposures, hold/advance phase, tune params within each day-type's `block_N_params`
   ranges. Never author novel day-types/structures.
 
+### Generative, not selective
+
+The 22 day-types are a **generative grammar**, not a 720-day list to pick from. Picking a pre-authored
+catalog day is deterministic and needs no AI — **generation within the envelope is the whole reason to
+use AI.** The AI generates a concrete day by choosing values inside a day_type's `block_N_params`
+envelope (Lever B = which day_type, Lever C = the params, together). A generated day has the **same
+`block_params` shape as a catalog day**, so the Engine runner executes it unchanged: persist the
+generated workout as an `engine_workout` row, then schedule it in `training_schedule`. The catalogue is
+effectively unlimited; the validator guarantees every generated value stays inside the authored bounds.
+
 ## Remaining build (revised)
 
 1. ✅ **`computeConditioningDiagnosis()`** — structured single-source diagnosis (done;
