@@ -6,8 +6,9 @@ read layer (`docs/conditioning_state_spec.md`, `_shared/conditioning-state.ts`).
 ## The problem (sharpest for all-access)
 
 An all-access athlete runs **two programs at once**: the AI-generated CrossFit/strength program
-(`generate-program-v2/v3`, calendar-structured, `days_per_week`) and the self-paced Engine
-(720-day conditioning). The **read** layer is now cross-aware (profile/training analysis see both).
+(`generate-program-v3`, calendar-structured, `days_per_week`) and the self-paced Engine
+(720-day conditioning, on its **own separate route tree** `/engine/*` with its own dashboard, training,
+review, and analytics UI). The **read** layer is now cross-aware (profile/training analysis see both).
 The **generate/act** layer is not. Concrete risks:
 
 - **Concurrent-load conflict** — a hard metcon prescribed on top of a hard Engine session.
@@ -47,14 +48,24 @@ signals with different time horizons and consumers — do **not** conflate them:
 black box). Keep `conditioning-state.ts` pure/Engine-only and reusable; `buildAthleteLoadState`
 *composes* it with the programming side.
 
-**Consumers:**
-- **chat** (engine coach + general coach): "6 sessions across both programs this week, RPE trending up
-  — consider an easier piece today."
-- **adjust-workout / finalize-modification**: scale today's prescription when combined load is high.
+**Consumers — and why it must hit BOTH UIs.** The two programs live on **separate routes**: the Engine
+coach is reached from `/engine/training/:day/review` (calls `chat` with `engine_program_day`), while the
+programming coach/adjust-workout is reached from the main app. Neither UI shows the whole athlete — only
+the shared backend signal does. So the combined readiness must be injected into **both** coach surfaces:
+- **chat, Engine side** (`engine_program_day` present): "you've also done 4 programming sessions this
+  week — today's Engine threshold piece is fine, but keep it controlled."
+- **chat, programming side + adjust-workout / finalize-modification**: scale today's metcon when the
+  athlete also has Engine load stacked up this week.
+
+The athlete hits these on different days from different routes; the backend signal is the only place the
+two programs meet.
 
 ---
 
 ## Part B — Engine-aware program generation
+
+Target is **`generate-program-v3`** only — it consumes `buildWriterPayload()` / `WriterPayload`
+(`generate-program-v3/index.ts:704`). v2 is a deprecated iterative step and is not touched.
 
 Add an optional field to `WriterPayload` (`_shared/build-writer-payload.ts`):
 
@@ -74,7 +85,7 @@ concurrent_conditioning: {
 Populated in `buildWriterPayload()`, gated on: has `programming` entitlement **and** Engine data
 present. Pure-programming athletes → `null` → generation unchanged. Pure-Engine athletes don't generate.
 
-**Writer-prompt rules** (added to the v2/v3 system prompt when the field is present):
+**Writer-prompt rules** (added to the v3 system prompt when the field is present):
 
 1. **Don't duplicate Engine volume.** The athlete already does N conditioning sessions/week on the
    Engine. Bias *this program's* conditioning down, and toward **complementary** stimuli (mixed-modal
@@ -104,9 +115,10 @@ One computation, three consumers — no drift.
 ## Build order
 
 1. **Refactor** — extract `computeConditioningDiagnosis()` as the single source.
-2. **Part B** — `concurrent_conditioning` payload field + population (entitlement-gated) + v2/v3 writer
+2. **Part B** — `concurrent_conditioning` payload field + population (entitlement-gated) + v3 writer
    rules. (Highest value for all-access; structural, low-risk.)
-3. **Part A** — `buildAthleteLoadState()` merging both programs → wire into chat + adjust-workout.
+3. **Part A** — `buildAthleteLoadState()` merging both programs → wire into **both** coach surfaces
+   (chat Engine-side and programming-side) + adjust-workout.
 4. Tests + runtime verification (one all-access fixture end-to-end).
 
 ## Scope guardrails
