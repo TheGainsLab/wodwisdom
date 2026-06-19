@@ -10,6 +10,33 @@ without breaking the authored arc.
 
 ---
 
+## 0. The reference substrate: `time_trial` → every target
+
+`time_trial` is not really a peer competency — it is the **scale the entire target system is
+computed on**. Every training day has a *personalized* target derived from it:
+
+```
+target_pace = time_trial_baseline_rpm                 # per modality/units, latest is_current trial
+            × prescribed_intensity%(day_type)         # from the day-type block params / intent
+            × rolling_avg_ratio(day_type, modality)   # the per-competency personal adaptation
+```
+
+(Exception: `rocket_races_b` targets the athlete's own prior `rocket_races_a` actual pace.)
+
+Implications the AI must respect:
+
+- **The time trial is the denominator of every mastery score.** `performance_ratio = actual / target`,
+  and `target` is anchored to the baseline. So a **stale or invalid time trial is a global confound**:
+  a too-low baseline makes every competency look green; a too-hot baseline deflates everything.
+  No ratio can be read honestly without knowing each modality's time-trial **recency** and **validity**.
+- **It is per-modality.** Cross-modality comparison (and the analytics' energy-system ratios) only hold
+  when each modality has a current baseline. A modality with no recent time trial has *uncalibrated* targets.
+- **It recurs ~every 20 days by design** — the cadence keeps the substrate fresh. Tracking baseline
+  *progression* across trials is itself a top-line fitness signal (is the engine getting bigger?), separate
+  from the per-day ratios.
+
+Everything below sits on top of this substrate.
+
 ## 1. The two axes
 
 Every day-type sits on two axes:
@@ -46,10 +73,10 @@ you do not "push the target" the way you would on a development day.
 The catalog introduces these in order. Each tier assumes the tiers below it are in place — that
 is the prerequisite structure the AI can reason over.
 
-### Tier 0 — Anchor (the measuring stick)
+### Tier 0 — Reference substrate (not a peer node — see §0)
 | Type | Role | Class | First seen |
 |---|---|---|---|
-| `time_trial` | Sets the scale; all targets derive from it. Recurs every ~20 days. | ASSESSMENT | Day 1 |
+| `time_trial` | The scale every target is computed on (the denominator of every `performance_ratio`); per-modality; recurs ~every 20 days. | ASSESSMENT | Day 1 |
 
 ### Tier 1 — Foundation: energy-system primitives ("build the components")
 | Type | Trains | Role | Class | First seen |
