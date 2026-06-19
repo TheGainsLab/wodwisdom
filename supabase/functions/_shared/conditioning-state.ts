@@ -286,13 +286,30 @@ export function detectFatigue(sessions: SessionRow[], now: Date): string[] {
 
 // ─── Compose + format ────────────────────────────────────────────────────────
 
-export function formatConditioningState(inputs: ConditioningInputs): string {
+// ─── Structured diagnosis (single source) ───────────────────────────────────
+
+/**
+ * The structured conditioning diagnosis. This is the single source consumed by
+ * three downstream uses: the prompt text block (formatConditioningState), the
+ * all-access generation payload, and — most demanding — the Engine
+ * self-sequencer, which feeds it to an AI to adapt the training schedule.
+ */
+export interface ConditioningDiagnosis {
+  hasData: boolean;
+  modalities: string[];
+  calibration: ModalityCalibration[];
+  systems: SystemStatus[];
+  weakRoots: WeakRoot[];
+  fatigue: string[];
+}
+
+/** Compute the structured diagnosis from raw rows. Pure, day_type-keyed. */
+export function computeConditioningDiagnosis(inputs: ConditioningInputs): ConditioningDiagnosis {
   const now = inputs.now ?? new Date();
   const staleAfterDays = inputs.staleAfterDays ?? DEFAULT_STALE_DAYS;
 
   const hasData =
     inputs.metrics.length > 0 || inputs.sessions.length > 0 || inputs.timeTrials.length > 0;
-  if (!hasData) return "";
 
   // Modalities in play = those that appear in metrics or sessions.
   const modalities = Array.from(
@@ -303,18 +320,26 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
   );
 
   const cal = computeCalibration(modalities, inputs.timeTrials, now, staleAfterDays);
-  const systems = rollupSystems(inputs.metrics, cal);
-  const weakRoots = detectWeakRoots(inputs.metrics, cal);
-  const fatigue = detectFatigue(inputs.sessions, now);
+  return {
+    hasData,
+    modalities,
+    calibration: modalities.map((m) => cal.get(m)!).filter(Boolean),
+    systems: rollupSystems(inputs.metrics, cal),
+    weakRoots: detectWeakRoots(inputs.metrics, cal),
+    fatigue: detectFatigue(inputs.sessions, now),
+  };
+}
+
+export function formatConditioningState(inputs: ConditioningInputs): string {
+  const diag = computeConditioningDiagnosis(inputs);
+  if (!diag.hasData) return "";
 
   const parts: string[] = ["\n\nENGINE CONDITIONING STATE"];
 
   // Calibration
   const calLines: string[] = [];
-  for (const m of modalities) {
-    const c = cal.get(m);
-    if (!c) continue;
-    const mod = m.replace(/_/g, " ");
+  for (const c of diag.calibration) {
+    const mod = c.modality.replace(/_/g, " ");
     if (c.status === "uncalibrated") {
       calLines.push(`${mod}: no current time trial — scores UNCALIBRATED, treat as unknown.`);
     } else {
@@ -329,7 +354,7 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
   if (calLines.length) parts.push("Calibration: " + calLines.join(" "));
 
   // Energy systems
-  const sysWithData = systems.filter((s) => s.status !== "no-data");
+  const sysWithData = diag.systems.filter((s) => s.status !== "no-data");
   if (sysWithData.length) {
     const segs = sysWithData.map((s) => {
       const trend = s.trend ? `, ${s.trend}` : "";
@@ -339,15 +364,15 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
   }
 
   // Weak roots
-  if (weakRoots.length) {
-    const segs = weakRoots.map(
+  if (diag.weakRoots.length) {
+    const segs = diag.weakRoots.map(
       (w) => `${SYSTEM_LABEL[w.system]} (${w.dayType.replace(/_/g, " ")} ${w.score.toFixed(2)}, n=${w.count})`,
     );
     parts.push("Weak root(s): " + segs.join("; ") + ".");
   }
 
   // Fatigue
-  if (fatigue.length) parts.push("Fatigue: " + fatigue.join(" "));
+  if (diag.fatigue.length) parts.push("Fatigue: " + diag.fatigue.join(" "));
 
   parts.push(
     "Read the above as conditioning context. Do not infer phosphagen/sprint capacity — the Engine does not train it. Treat stale/uncalibrated modalities as unknown rather than diagnosing them.",

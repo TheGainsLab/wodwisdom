@@ -9,6 +9,7 @@ import { assert, assertEquals } from "jsr:@std/assert";
 
 import {
   computeCalibration,
+  computeConditioningDiagnosis,
   detectFatigue,
   detectWeakRoots,
   formatConditioningState,
@@ -138,6 +139,31 @@ Deno.test("detectFatigue: long gap since last session is flagged", () => {
     NOW,
   );
   assert(flags.some((f) => f.includes("since last session")));
+});
+
+// ── structured diagnosis (the AI sequencer's input) ──────────────────────
+Deno.test("computeConditioningDiagnosis: returns structured fields", () => {
+  const diag = computeConditioningDiagnosis({
+    metrics: [
+      metric({ day_type: "endurance", modality: "c2_row", rolling_avg_ratio: 1.06 }),
+      metric({ day_type: "threshold", modality: "c2_row", rolling_avg_ratio: 0.9 }),
+    ],
+    timeTrials: [tt("c2_row", "2026-06-10")],
+    sessions: [],
+    now: NOW,
+  });
+  assertEquals(diag.hasData, true);
+  assertEquals(diag.modalities, ["c2_row"]);
+  assertEquals(diag.calibration[0].status, "current");
+  assertEquals(diag.systems.find((s) => s.system === "AB")?.status, "strong");
+  assertEquals(diag.systems.find((s) => s.system === "LT")?.status, "lagging");
+  assertEquals(diag.weakRoots.length, 1); // threshold root weak + current TT
+});
+
+Deno.test("computeConditioningDiagnosis: empty → hasData false", () => {
+  const diag = computeConditioningDiagnosis({ metrics: [], timeTrials: [], sessions: [], now: NOW });
+  assertEquals(diag.hasData, false);
+  assertEquals(diag.modalities.length, 0);
 });
 
 // ── format: no-op + smoke ────────────────────────────────────────────────

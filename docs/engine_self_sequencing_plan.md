@@ -68,19 +68,43 @@ review) stays as-is — independent and harmless; all-access users already get c
    ("inserted an extra threshold exposure — your LT is lagging").
 8. **Tests + runtime verification** (pure decision-policy tests + one end-to-end fixture).
 
-## Three decisions to lock before step 4
+## Locked decisions (the architecture)
 
-1. **Trigger** — when does the Engine re-evaluate? (after each completed session / at phase boundaries /
-   on demand). *Recommend: after each session, cheaply, plus a phase-boundary review.*
-2. **Authority** — who decides? (deterministic rules over the diagnosis / AI reasoning / user-confirmed).
-   *Recommend: rules-first within the guardrails — explainable and safe — AI as an optional later layer.*
-3. **Guardrail scope** — strictly within the day-type taxonomy + param envelope (Lever B/C), or may it
-   author novel sequences/structures? *Recommend: within taxonomy + envelope only; that's the
-   authored-arc protection we designed.*
+The flow:
 
-## Open coordination question
+```
+completed engine_workout_sessions
+        ↓
+computeConditioningDiagnosis()   ← our model (calibration + AB/AP/LT/GL roll-up + weak roots + fatigue)
+        ↓                          (built: supabase/functions/_shared/conditioning-state.ts)
+AI sequencer  +  day-type catalogue (engine_day_types: coaching_intent, block_N_params envelope;
+        ↓                            competency graph: tiers + prerequisite edges)
+adapted sequence written to training_schedule (engine rows)
+```
 
-No backend sequencer exists yet, and `training_schedule` is frontend-written. **Where is the
-self-sequencing logic being built** — is the team building it elsewhere, or is this workstream to build
-it here? That determines whether the next concrete action is "reconcile with existing WIP" or "start the
-`computeConditioningDiagnosis()` extraction."
+- **Build location:** here (no existing WIP — only the manual scheduling rails + the diagnosis brain).
+- **Trigger:** **weekly, starting after month 1** (month 1 builds the baseline data — sessions + time
+  trials — needed for a valid diagnosis; no adaptation before then).
+- **Authority:** **all AI.** The AI makes the re-sequencing decision from the diagnosis + catalogue.
+  (Not deterministic rules.) A deterministic **validation** layer still enforces the guardrails on the
+  AI's output.
+- **Guardrail scope:** **taxonomy + parameter envelope only** (settled). Substitute same-tier day-types,
+  insert weak-root exposures, hold/advance phase, tune params within each day-type's `block_N_params`
+  ranges. Never author novel day-types/structures.
+
+## Remaining build (revised)
+
+1. ✅ **`computeConditioningDiagnosis()`** — structured single-source diagnosis (done;
+   `conditioning-state.ts`). The AI's input.
+2. **Catalogue payload** — expose the day-type taxonomy (coaching_intent + `block_N_params` envelopes)
+   and competency graph (tiers + prerequisite edges) as the AI's option space. *Re-add prerequisite edges
+   to code (removed in the position-free cleanup).*
+3. **AI sequencer edge function** — assemble prompt (diagnosis + catalogue + guardrails + current
+   position + upcoming window) → Claude call with a structured output schema → the proposed adapted
+   sequence. Use `_shared/call-claude.ts`.
+4. **Guardrail validation** — deterministically reject/repair any AI output that leaves the taxonomy or a
+   day-type's param envelope before it is persisted.
+5. **Persist to `training_schedule`** — write engine rows; runner/dashboard resolve "next" from the
+   adapted schedule (fall back to mapping). Preserve once-and-done + months gating.
+6. **Weekly trigger** — cron gated on month ≥ 2; explainability ("why did the Engine change this?") from
+   `coaching_intent` + diagnosis; tests + one end-to-end fixture.
