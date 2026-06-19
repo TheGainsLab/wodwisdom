@@ -83,8 +83,8 @@ adapted sequence written to training_schedule (engine rows)
 ```
 
 - **Build location:** here (no existing WIP — only the manual scheduling rails + the diagnosis brain).
-- **Trigger:** **weekly, starting after month 1** (month 1 builds the baseline data — sessions + time
-  trials — needed for a valid diagnosis; no adaptation before then).
+- **Trigger:** **weekly, starting after the athlete completes 10 Engine days** (those first 10 build the
+  baseline — sessions + time trials — needed for a valid diagnosis; the loop no-ops before then).
 - **Authority:** **all AI.** The AI makes the re-sequencing decision from the diagnosis + catalogue.
   (Not deterministic rules.) A deterministic **validation** layer still enforces the guardrails on the
   AI's output.
@@ -109,12 +109,13 @@ effectively unlimited; the validator guarantees every generated value stays insi
 2. **Catalogue payload** — expose the day-type taxonomy (coaching_intent + `block_N_params` envelopes)
    and competency graph (tiers + prerequisite edges) as the AI's option space. *Re-add prerequisite edges
    to code (removed in the position-free cleanup).*
-3. **AI sequencer edge function** — assemble prompt (diagnosis + catalogue + guardrails + current
-   position + upcoming window) → Claude call with a structured output schema → the proposed adapted
-   sequence. Use `_shared/call-claude.ts`.
-4. **Guardrail validation** — deterministically reject/repair any AI output that leaves the taxonomy or a
-   day-type's param envelope before it is persisted.
-5. **Persist to `training_schedule`** — write engine rows; runner/dashboard resolve "next" from the
-   adapted schedule (fall back to mapping). Preserve once-and-done + months gating.
-6. **Weekly trigger** — cron gated on month ≥ 2; explainability ("why did the Engine change this?") from
-   `coaching_intent` + diagnosis; tests + one end-to-end fixture.
+3. ✅ **AI sequencer edge function** (`engine-resequence`) — gate (>=10 completed days) → diagnosis +
+   catalogue + current phase → `callClaude` → `parseProposal` → `validateProposal` → persist accepted
+   days as `engine_workouts` rows + schedule in `training_schedule`. `dry_run` supported.
+4. ✅ **Guardrail validation** — `validateProposal` deterministically rejects any AI output outside the
+   taxonomy or a day-type's envelope before persistence.
+5. **Make `training_schedule` the "next" authority (frontend)** — runner/dashboard should resolve and run
+   the scheduled generated day (load `engine_workout` by id) rather than only walking the static mapping.
+   *Remaining: frontend wiring + smarter date placement (rest days).* 
+6. **Weekly cron wrapper** — call `engine-resequence` per eligible athlete on cadence. Explainability
+   (the per-day `reason` is already returned/stored); end-to-end fixture test.
