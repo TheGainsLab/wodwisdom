@@ -3,19 +3,40 @@
 How to make the two siloed programs behave like one coached athlete. Builds on the conditioning-state
 read layer (`docs/conditioning_state_spec.md`, `_shared/conditioning-state.ts`).
 
+## Governing principle (read this first)
+
+> **All-access = a complete AI program AND a complete Engine, both at FULL footprint, surfaced in one
+> calendar. Choosing both never shrinks either one.**
+
+All-access users are high-volume athletes (two-a-days, lots of gym time) or pick-and-choosers. They pay
+for two full products *because they want both in full*. Therefore:
+
+- **Additive, not substitutive.** The Engine session is shown **alongside** the program's full day
+  (metcon included), never in place of it. The unified calendar is a **superset** of both programs.
+- **Same-day Engine + metcon is expected**, not a conflict to resolve away — it's the two-a-day they want.
+- **No volume budgeting / deduplication.** The program is generated at full footprint independent of
+  Engine cadence; the Engine runs its full cadence.
+- **Pick-and-choose.** The calendar presents the full menu of both; the athlete picks what they do; the
+  AI coaches based on what they *actually* complete.
+
+The AI's role across both programs is **coordination + honest fatigue flagging — never subtraction.**
+
 ## The problem (sharpest for all-access)
 
 An all-access athlete runs **two programs at once**: the AI-generated CrossFit/strength program
 (`generate-program-v3`, calendar-structured, `days_per_week`) and the self-paced Engine
 (720-day conditioning, on its **own separate route tree** `/engine/*` with its own dashboard, training,
 review, and analytics UI). The **read** layer is now cross-aware (profile/training analysis see both).
-The **generate/act** layer is not. Concrete risks:
+The **generate/act** layer is not — the two programs don't *meet* anywhere. The real gaps (note: NOT
+"too much volume" — that's wanted):
 
-- **Concurrent-load conflict** — a hard metcon prescribed on top of a hard Engine session.
-- **Redundant conditioning** — the program adds steady erg intervals the Engine already owns.
-- **Blind to true gaps** — the program can't bias toward a lagging energy system it can't see.
-- **Readiness underestimated** — the conditioning-state fatigue signal counts Engine load only;
-  the strength/metcon load sits on top, unseen.
+- **No single calendar** — the athlete manages two apps; nothing shows the combined day/week.
+- **No sequencing help** — on a day with both a hard metcon and a hard Engine piece, nothing advises
+  order / AM-PM / relative intensity.
+- **Genuine overreaching can hide** — the readiness signal counts Engine load only; the strength/metcon
+  load sits on top, unseen. (The fix is *flagging*, not trimming.)
+- **No complementary awareness** — the program can't *choose* to lean into its lane (mixed-modal) when
+  it knows the Engine owns monostructural aerobic work. (A quality option, never a reason to write less.)
 
 ## The key architectural split
 
@@ -24,14 +45,16 @@ The generated program **is** calendar-structured. So at *generation time* you kn
 but **not** which calendar day the athlete will do a given Engine session. That forces two distinct
 signals with different time horizons and consumers — do **not** conflate them:
 
-| Signal | Horizon | Knows day alignment? | Consumer |
-|---|---|---|---|
-| **Structural conditioning load** | the month ahead | No (Engine self-paced) | program **generation** |
-| **Acute combined readiness** | today | Yes (today's Engine session is known) | **daily coach** / adjust-workout |
+| Signal | Horizon | Knows day alignment? | Consumer | Used for |
+|---|---|---|---|---|
+| **Structural awareness** | the month ahead | No (Engine self-paced) | program **generation** | complementary *emphasis* only |
+| **Acute combined readiness** | today | Yes (today's Engine session is known) | **daily coach** / adjust-workout | sequencing + overreaching flags |
 
-> Generation deconflicts at the **weekly-load / structural** level. Day-level deconfliction happens at
-> **daily-coaching** time, when today's actual Engine session is knowable. This split is forced by the
-> Engine's self-paced design, and trying to do day-level planning at generation time would be wrong.
+> Neither signal *subtracts*. Generation uses structural awareness to shape the program's *character*
+> (lean into mixed-modal) at full footprint. The daily coach uses acute readiness — where today's Engine
+> session IS knowable — to advise **sequencing** (order, AM/PM) and to **flag genuine overreaching**.
+> The split is forced by the Engine being self-paced; day-level *planning* can only happen at coaching
+> time, and even then it advises, it doesn't trim.
 
 ---
 
@@ -48,14 +71,18 @@ signals with different time horizons and consumers — do **not** conflate them:
 black box). Keep `conditioning-state.ts` pure/Engine-only and reusable; `buildAthleteLoadState`
 *composes* it with the programming side.
 
+It **advises, it doesn't auto-trim.** Default is full volume; the coach helps the athlete *sequence* the
+two sessions and only suggests backing off on *genuine* fatigue signals (RPE climbing, output dropping,
+HR drift) — as a recommendation the athlete can take or leave, respecting that they chose this load.
+
 **Consumers — and why it must hit BOTH UIs.** The two programs live on **separate routes**: the Engine
 coach is reached from `/engine/training/:day/review` (calls `chat` with `engine_program_day`), while the
 programming coach/adjust-workout is reached from the main app. Neither UI shows the whole athlete — only
 the shared backend signal does. So the combined readiness must be injected into **both** coach surfaces:
-- **chat, Engine side** (`engine_program_day` present): "you've also done 4 programming sessions this
-  week — today's Engine threshold piece is fine, but keep it controlled."
-- **chat, programming side + adjust-workout / finalize-modification**: scale today's metcon when the
-  athlete also has Engine load stacked up this week.
+- **chat, Engine side** (`engine_program_day` present): "you've got a hard metcon logged today too —
+  do this Engine threshold piece fresh in the AM, metcon in the PM."
+- **chat, programming side + adjust-workout / finalize-modification**: sequencing advice, and an
+  *optional* scale suggestion only when genuine overreaching shows — never an automatic reduction.
 
 The athlete hits these on different days from different routes; the backend signal is the only place the
 two programs meet.
@@ -85,20 +112,21 @@ concurrent_conditioning: {
 Populated in `buildWriterPayload()`, gated on: has `programming` entitlement **and** Engine data
 present. Pure-programming athletes → `null` → generation unchanged. Pure-Engine athletes don't generate.
 
-**Writer-prompt rules** (added to the v3 system prompt when the field is present):
+**Writer-prompt rules** (added to the v3 system prompt when the field is present). The field is for
+*awareness and complementary emphasis only* — *never* to reduce the program's footprint:
 
-1. **Don't duplicate Engine volume.** The athlete already does N conditioning sessions/week on the
-   Engine. Bias *this program's* conditioning down, and toward **complementary** stimuli (mixed-modal
-   CrossFit metcons, gymnastic-conditioning), not steady erg intervals the Engine already owns.
-2. **Reduce metabolic redundancy week-wide.** Exact day alignment is unknown, so don't try to dodge a
-   specific Engine day — instead lower the program's overall same-system metabolic load so the *combined
-   week* is balanced.
-3. **Treat the combined week as the real frequency.** Effective load ≈ `days_per_week` + Engine
-   sessions/week. Set program volume/intensity against the combined total, not `days_per_week` alone.
-4. **Support gaps in its own lane, don't double-dose.** If LT is lagging, the program may support it via
-   tempo/pacing choices — coordinated with, not stacked on, the Engine.
-5. **Never re-prescribe or replace the Engine.** The Engine stays the authored, separate program.
-   Generation only adjusts *its own* conditioning to coexist.
+1. **Generate a complete program at full footprint.** The athlete chose both products and wants both
+   in full. Do **not** shrink volume, drop metcons, or lower intensity because the Engine exists. The
+   combined week is *supposed* to be high — that's what they bought.
+2. **Lean into your lane (optional, quality only).** You may *emphasize* what the program does best —
+   mixed-modal, barbell cycling, gymnastics under fatigue — knowing the Engine covers monostructural
+   aerobic/glycolytic work. This shapes *character*, not *amount*. Never write less; just need not be
+   the sole source of pure-erg conditioning.
+3. **Same-day coexistence is fine.** A program day may carry a full metcon even though the athlete also
+   has an Engine session that day — that two-a-day is intended. Sequencing is the daily coach's job
+   (Part A), not generation's.
+4. **Never re-prescribe or replace the Engine.** The Engine stays the authored, separate program at its
+   full cadence. Generation neither selects Engine content nor trims its own to make room.
 
 ---
 
@@ -144,18 +172,22 @@ would each have to change:
 3. **Progression** — the Engine owns `current_day`, `months_unlocked`, time-trial baselines, and the
    performance metrics; a program day has none of that.
 
-**Consequence:** Part B (awareness) is the ceiling without new plumbing. Generation can be told *not to
-duplicate* the Engine, but it cannot *place* an Engine session. The two programs coordinate only by
-avoidance, and generation stays structural (no day alignment) — see the split table above.
+**Consequence:** Part B (awareness) is the ceiling without new plumbing. The two programs run in full but
+never *meet* on one calendar; the athlete still manages two apps. The bridge below fixes the calendar
+unification — **additively** (it surfaces the Engine session alongside the full program day, it does not
+replace anything).
 
 ### The bridge (separate track, after Part B): an `engine_conditioning` block type
 
-A new block type referencing an Engine session would let generation actually place conditioning. Two
-flavors, very different in risk:
+A new block type referencing an Engine session would surface it *inside* the program calendar — **as an
+additional block alongside the full program day, never replacing the metcon.** The unified calendar is a
+**superset** of both programs (full AI program day + the Engine session, including same-day two-a-days).
+Two flavors, very different in risk:
 
-- **Surface / reference (recommended first):** the program drops a deep-link card ("Conditioning →
-  your next Engine session → Open in Engine") on its conditioning days. The Engine keeps execution +
-  progression; the program becomes the home-base calendar that points to it. Unifies the calendar and
+- **Surface / reference (recommended first):** the program shows a deep-link card ("Engine →
+  your next Engine session → Open in Engine") on the calendar, added to whatever else that day holds.
+  The Engine keeps execution + progression; the program becomes the home-base calendar that points to it.
+  Unifies the calendar and
   gives day alignment, low risk, preserves both systems' authority. Completion read back from
   `engine_workout_sessions`.
 - **Orchestrate (deferred):** the generator selects specific Engine day_types and schedules them as
