@@ -1,162 +1,174 @@
 # Engine Leaderboard — Design Plan
 
-> Status: **planning / outline**. No code yet. Captures the data we already
-> capture for Engine users, the comparison model, the board layout, and the
-> infrastructure work required before building.
+> Status: **planning / outline**. No implementation yet. Captures the data we
+> capture for Engine users, the comparison-axis model, the board set, and the
+> infrastructure required before building.
 
-## 1. Architectural premise (read this first)
+## 1. Architectural premises (read first)
 
-The Engine program is **self-paced**. Each user has their own
-`athlete_profiles.engine_current_day` and advances independently as they
-complete sessions. At any given calendar moment, users are scattered across
-the 720-day program — **there is no shared "today's workout" everyone does
-together.**
+1. **Self-paced.** Each user has their own `athlete_profiles.engine_current_day`
+   and advances independently. At any calendar moment users are scattered across
+   the program — **there is no shared "today's workout."** The comparison axis is
+   the *workout / demand*, never the calendar date (like an erg "all-time class"
+   board).
+2. **Multi-track, one catalog.** Beyond the 720-day program, users can switch
+   tracks (Hyrox, VO2 / VO3 / VO4, 3-day variants, varied order). These are
+   registered in `engine_programs` and mapped via `engine_program_mapping`. They
+   do **not** define new workouts — each track's "Cat. Day" points back into the
+   **same shared `engine_workouts` catalog** and the same 22 `day_type`s. So a
+   leaderboard built on the shared catalog / day_types / normalized metrics works
+   across all tracks automatically. **Track-switching is a non-issue if we never
+   key on a track's per-variant sequence position.**
+3. **Comparison key = catalog `day_number`, never `program_sequence_order`.**
+   Variants reorder the catalog, so the only stable workout identity is the
+   catalog day number (`engine_program_mapping.engine_workout_day_number`).
 
-The consequence for ranking: the comparison axis is **the workout itself,
-not the calendar date**. Two users are comparable when they performed the
-*same prescribed workout*, regardless of *when* they did it — the same model
-as an erg / Peloton "all-time class leaderboard."
+## 2. Data we capture
 
-"Top scores across different days" therefore means: *for each program
-day / workout, who posted the top scores.*
+Per completed workout → one row in **`engine_workout_sessions`** (RLS-locked to
+the owner):
 
-## 2. Data we already capture
-
-Every completed workout writes a row to **`engine_workout_sessions`**
-(RLS-locked to the owning user). Fields relevant to ranking:
-
-| Field | Meaning | Role in leaderboard |
+| Field | Meaning | Use |
 |---|---|---|
-| `program_day_number` | Which program day this session was | Primary comparison key (exact same prescribed blocks/intensity) — see §6 caveat |
-| `day_type` | One of 22 workout types (`time_trial`, `endurance`, `threshold`, `rocket_races_a`, …) | Broader comparison key / grouping |
-| `modality` | Equipment (`c2_row_erg`, `echo_bike`, `assault_runner`, …) | Pace only comparable within one modality |
-| `units` | calories / meters / watts | Must match to compare absolute output |
-| `actual_pace` / `calculated_rpm` | Absolute output rate | Absolute-speed ranking |
-| `target_pace` | Expected pace from the user's time trial | Baseline for normalization |
-| `performance_ratio` | `actual_pace / target_pace` | **Normalized effort — comparable across fitness levels and modalities** |
-| `total_output` | Total cals / meters | Volume ranking |
-| `average_heart_rate` / `peak_heart_rate` | Heart rate | Efficiency / intensity context |
+| `program_day_number` | Program day of the session | Resolve to catalog day for per-workout comparison |
+| `day_type` | One of 22 workout types | Grouping / energy-system boards |
+| `modality` | Equipment (`c2_row_erg`, `echo_bike`, `ski_erg`, runner…) | **Required filter on all absolute boards** |
+| `units` | calories / meters / watts | Must match within a board |
+| `actual_pace` / `calculated_rpm` | Absolute output rate | Absolute / per-workout boards |
+| `target_pace` | Expected pace from user's time trial | Baseline |
+| `performance_ratio` | `actual_pace / target_pace` | **The one machine-agnostic performance signal** |
+| `total_output` | Total cals / meters | Volume boards |
+| `average_heart_rate` / `peak_heart_rate` | HR | Efficiency context (noisy) |
 | `perceived_exertion` | 1–10 RPE | Effort context |
-| `phase` / `month` | Program phase / calendar month in program | Progress grouping |
-| `date` / `created_at` | When logged | Streaks, recency, time-windowing |
-| `program_version` | Variant (`5-day` / `3-day` / `_varied`) | Fairness scoping — see §6 |
+| `date` / `created_at` | When logged | Streaks, recency, windowing |
+| `workout_data` (jsonb) | Realized session detail | Holds `avg_work_rest_ratio`, `total_work_time`, `total_rest_time`, `intervals_completed` |
 
-Supporting tables:
-- **`engine_time_trials`** — per-modality fitness baselines (`calculated_rpm`,
-  `is_current`). A pure fitness ranking by machine.
+Supporting:
+- **`engine_time_trials`** — per-modality standardized benchmark (`calculated_rpm`,
+  `is_current`). Day 1 of every track is a `time_trial` (600s max effort).
 - **`engine_user_performance_metrics`** — per `(user, day_type, modality)`:
-  `learned_max_pace`, `rolling_avg_ratio`, rolling last-4 ratios. Already a
-  consistency signal, computed on every save by the
-  `update_engine_performance_metrics` RPC.
+  `learned_max_pace`, `rolling_avg_ratio`, rolling last-4 ratios.
+- **`engine_workouts.avg_work_rest_ratio`** — prescribed work:rest per catalog day.
 
-## 3. The central design tension — what is fair to compare?
+## 3. The comparison-axis model
 
-Two candidate ranking metrics, each with trade-offs:
+The central finding from design discussion: **`performance_ratio` is the only
+metric that is genuinely machine-agnostic.** It's a pure percentage ("I exceeded
+my target by 6%"), so the machine cancels out and it pools across all machines
+*and* all tracks. Everything else either measures real physical output (machine-
+locked) or measures adherence (machine-irrelevant but not a performance ranking).
 
-1. **Absolute pace** (`actual_pace` / `calculated_rpm`) — pure speed. Valid
-   **only within a fixed `(day_type|program_day, modality, units)` triple.**
-   Rewards the genuinely fittest athlete, but is equipment-gated and can feel
-   intimidating to newer users.
-2. **Performance ratio** (`actual_pace / target_pace`) — already normalized to
-   each athlete's own time trial. Comparable across people of different fitness
-   and loosely across modalities. Rewards "beating your own target," which fits
-   a structured program and is more inclusive.
+That gives three axes:
 
-**Recommendation (pending your call — you marked this TBD):** lead with
-**performance ratio** for cross-user boards, and offer **absolute-pace**
-boards scoped to a single `(workout, modality, units)` for the competitive /
-PR crowd. A simple toggle on one board can serve both.
+### Axis A — Universal (machine cancels out): the performance-ratio family
+One global board where the whole community competes together, regardless of
+machine or track. The dimensionless property is inherited by anything derived
+from the ratio, so this is several boards:
+- **Execution score** — best single `performance_ratio` (peak).
+- **Sustained quality** — rolling-average ratio (`rolling_avg_ratio`, last-4 stored).
+- **Most consistent** — lowest variance in ratio.
+- **Most improved** — trend/slope of ratio over time (also dimensionless → still
+  machine-agnostic).
 
-## 4. Proposed board structure
+This is the inclusive headline: nobody is excluded by equipment or track, and you
+win by executing *your own* targets.
 
-**Board A — Per-Workout Leaderboards** *(the headline; matches "top scores
-across different days")*
-- For a given workout (`program_day_number`, or `day_type` for the broader
-  view), rank everyone who has *ever* completed it.
-- Filters: modality, units, time window (this week / month / all-time).
-- Default metric: `performance_ratio`; toggle to absolute pace when a single
-  modality+units is selected.
-- This is the recurring engagement driver: every workout has its own all-time
-  board, and a user beating a workout immediately sees where they landed.
+### Axis B — Adherence (machine-irrelevant): showing up
+Counts of activity, comparable across everyone. Ranks discipline, not fitness —
+the most inclusive boards, great for retention:
+- Current **streak**, **sessions** per week/month, **total training minutes**.
 
-**Board B — By Workout Type** (the 22 `day_type`s)
-- Aggregate across all program days of a type: best and average
-  `performance_ratio` per user, drill-down into per-modality absolute boards.
-- Good "records book" browse experience.
+### Axis C — Machine-locked (machine is the unit): absolute performance
+Most users train on one machine, so once they **select a machine**, these boards
+are well-populated. Rule: fixing the machine isn't enough — you must also fix the
+*effort/demand*, because sprint pace and endurance pace on the same rower aren't
+comparable. Sub-boards, by how the effort is standardized:
 
-**Board C — Modality Records**
-- Per `(modality, units)`: top current time-trial `calculated_rpm` from
-  `engine_time_trials WHERE is_current`. A pure fitness ranking by machine,
-  independent of program progress.
+**C1 — Time-trial records (standardized effort) → the headline machine-locked board.**
+One identical 600s max test per machine, stored in `engine_time_trials`
+(`is_current`). Directly comparable, hard to dispute, feeds PR history and
+most-improved. "Biggest Engine" per machine.
 
-**Secondary / supporting metrics** (surface as smaller boards or profile
-badges, not the headline):
-- **Consistency** — sessions logged per window; current streak (from `date`).
-- **Volume** — sum of `total_output` per modality over a window.
-- **Program progress** — furthest `program_day_number` / month reached, or
-  completion rate.
+**C2 — Work:rest-ratio bands (the primary performance axis) — preferred over raw day_type.**
+Work:rest ratio is a continuous, physiologically meaningful variable that *cuts
+across* day types and largely determines achievable pace. It collapses the 22
+types into a few **dense, well-populated** bands while preserving the
+energy-system story. Already captured per session
+(`workout_data.avg_work_rest_ratio`) and already used as a chart axis in
+`EngineAnalyticsPage.renderWorkRest()`.
+- Metric: peak / best-avg `actual_pace` per `(modality, work:rest band)`.
+- Bands ≈ long rest 1:3–1:5+ (glycolytic) / balanced 1:1–1:2 (VO2-threshold) /
+  short-or-continuous (aerobic durability).
+- **Caveat — work duration confound:** a 1:1 at 15s work vs 4-min work yield very
+  different paces. Band by `(work:rest band × work-duration bucket)`, or treat
+  ratio as a coarse axis.
+- **Caveat — jsonb:** RPC reads `workout_data->>'avg_work_rest_ratio'`; promote to
+  a real indexed column if it becomes primary.
 
-## 5. Prerequisite infrastructure (gaps in today's model)
+**C3 — Day-type "engine pillars" (named presets layered on C2).**
+A day type makes a good standalone board only when it's diagnostic / max-
+expression, structurally standardized, and names a distinct quality. Four qualify
+and together form an **"engine profile" across the energy-system ladder** — a
+sprinter tops one, a diesel engine tops another, so there are multiple ways to win:
 
-These are real blockers, not afterthoughts — fold them into the build.
+| Day type | Measures | Board name | Metric |
+|---|---|---|---|
+| `anaerobic` | Glycolytic power (max-effort bursts) | **Biggest Glycolytic Engine** | peak pace |
+| `max_aerobic_power` | VO2max (severe intervals) | **Biggest Aerobic Power / VO2max** | best avg pace |
+| `threshold` | Lactate threshold (sustained) | **Biggest Threshold Engine** | best sustained pace |
+| `time_trial` | Aerobic max ceiling (diagnostic) | **Biggest Engine** | `calculated_rpm` |
 
-### 5a. Cross-user read path
-Every Engine table is RLS-locked to its owner, so no user can read another's
-sessions today. The leaderboard needs one of:
-- **`SECURITY DEFINER` RPC(s)** that return only pre-aggregated, opt-in,
-  leaderboard-safe columns (display name, metric, rank) — mirrors the existing
-  `admin_list_engine_sessions` pattern but available to all `authenticated`
-  users. **Recommended** — least new surface area, easy to scope to opted-in
-  users only.
-- A **materialized view** refreshed on a schedule — better at scale, more
-  moving parts (refresh cadence, staleness).
+Specials:
+- `synthesis` — phase-12 capstone ("audit of conditioning completeness"). Sparse
+  by design → a **prestige / "you made it"** board.
+- `rocket_races_a/b` — uniquely test **pacing consistency**; rank *lowest output
+  variance*, not max pace. Niche but on-brand.
 
-### 5b. Opt-in + identity *(confirmed: opt-in via profile)*
-- Add an **opt-in flag** to `athlete_profiles`
-  (e.g. `engine_leaderboard_opt_in boolean DEFAULT false`), toggled from the
-  user's profile/settings.
-- Add a **public-safe display name** for the leaderboard. Today sessions only
-  join to `profiles.full_name` / email — neither is appropriate to show
-  publicly by default. Options: reuse `full_name` with consent, or add a
-  dedicated `engine_leaderboard_display_name` (and optional avatar).
-- The aggregation RPC must filter to `engine_leaderboard_opt_in = true` so
-  non-participants never appear.
+**Exclude from max-pace boards:** `endurance`, `polarized`, `flux`, `flux_stages`,
+`devour` family, `towers`, `ascending`, `interval` — these prescribe Zone-2 / fixed
+sub-max pace, so ranking pace rewards doing them *wrong*. They feed volume /
+consistency boards only.
 
-## 6. Open questions / fairness caveats to resolve before building
+**Standardization caveat:** only `time_trial` is fully fixed (600s). `anaerobic`,
+`max_aerobic_power`, `threshold` vary in rounds/duration across catalog days — rank
+on **peak pace** (robust to structure) or **pin to a specific catalog day**.
 
-1. **Ranking metric** — performance ratio vs absolute vs toggle. *(You marked
-   TBD; recommendation in §3.)*
-2. **Comparison key = catalog day vs sequence order.** Program variants
-   (`main_5day_varied`, etc.) **reorder** the catalog via
-   `engine_program_mapping` — `program_sequence_order` differs from the catalog
-   `engine_workout_day_number`. To compare users on the *same actual workout
-   content*, the key must be the **catalog day_number**, not the per-variant
-   sequence position. **Action:** confirm what `engine_workout_sessions.program_day_number`
-   actually stores (catalog day vs sequence order). If it stores sequence
-   order, the leaderboard must resolve it back to catalog day via the mapping
-   table, or rank by `day_type` only.
-3. **Cross-modality fairness.** Even on the same workout, a rower and a bike
-   produce non-comparable absolute output. `performance_ratio` normalizes this;
-   absolute boards must always be modality+units-scoped.
-4. **Time-trial dependence.** `performance_ratio` and `target_pace` are only
-   meaningful if the user has a current time trial for that modality
-   (`is_current = true`). Sessions without one should be excluded from
-   ratio-based boards.
-5. **Anti-cheat.** Scores are self-reported. For v1, accept honor-system; flag
-   implausible `performance_ratio` outliers (e.g. > some threshold) for review
+**C4 — Volume (per machine).** Sum `total_output` (or meters) per window — doesn't
+need a standardized effort; more work legitimately = more output. Comparable once
+`(modality, units)` fixed.
+
+## 4. Privacy & identity *(confirmed: opt-in via profile)*
+- Add `engine_leaderboard_opt_in boolean DEFAULT false` to `athlete_profiles`,
+  toggled in profile/settings. Aggregation must filter to opted-in users only.
+- Add a public-safe display name (`engine_leaderboard_display_name`, optional
+  avatar). Don't expose `profiles.full_name` / email by default.
+
+## 5. Cross-user read path
+All Engine tables are RLS-locked to the owner — no user can read another's rows
+today. Provide a **`SECURITY DEFINER` aggregation RPC** (mirroring
+`admin_list_engine_sessions`) available to `authenticated`, returning only
+opt-in, leaderboard-safe columns (display name, metric, rank). Materialized view
+is the scale-up option.
+
+## 6. Open questions / caveats
+1. **Ranking metric for the universal board** — best vs rolling vs consistency vs
+   improved (all viable as separate boards).
+2. **Confirm what `program_day_number` stores** (catalog day vs sequence order); if
+   sequence, resolve via mapping before per-workout comparison.
+3. **Work-duration confound** on work:rest bands (§C2).
+4. **Min-N per board** before display, to avoid leaderboards of one (matters most
+   for per-machine / per-day-type / pillar boards).
+5. **Anti-cheat** — scores self-reported; flag implausible ratio outliers for v1
    rather than blocking.
-6. **Minimum participation.** Boards with one entry aren't compelling — decide
-   a minimum-N before a board is shown, and how sparse workouts (rare day
-   types) are handled.
+6. **Cross-day-type ratio comparability** — is +5% on a sprint == +5% on endurance?
+   Second-order; accept for v1.
 
 ## 7. Suggested build order
-
-1. Confirm §6.2 (comparison key) and §3 (ranking metric).
-2. Migration: opt-in flag + display name on `athlete_profiles`; profile UI to
-   set them.
-3. Migration: `SECURITY DEFINER` aggregation RPC(s) for Board A
-   (per-workout), filtered to opted-in users, returning rank + display name +
-   metric only.
-4. Frontend: leaderboard page + per-workout entry points from the workout
-   review screen ("you ranked #N on this workout").
-5. Layer in Boards B/C and secondary metrics once A is validated.
+1. Confirm §6.1–6.2.
+2. Migration: opt-in flag + display name on `athlete_profiles`; profile UI.
+3. Migration: `SECURITY DEFINER` aggregation RPC(s), opt-in-filtered.
+4. Ship two headline boards first: **Axis A execution score** (universal) +
+   **Axis B streak** (adherence) — both well-populated day one.
+5. Add machine-locked layer: **C1 time-trial records**, then **C2 work:rest bands**
+   with the **C3 pillar** presets.
+6. Layer in volume, most-improved, and the synthesis/rocket-races specials.
