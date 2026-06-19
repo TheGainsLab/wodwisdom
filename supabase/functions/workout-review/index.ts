@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
+import { buildConditioningState } from "../_shared/conditioning-state.ts";
 import { searchChunks, deduplicateChunks, formatChunksAsContext } from "../_shared/rag.ts";
 import { callClaude } from "../_shared/call-claude.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
@@ -388,7 +389,7 @@ async function runReview(
       workoutSection: string,
       structured?: V3StructuredBlock,
     ): string => {
-      const base = `ATHLETE PROFILE:\n${profileStr}\n\nRECENT TRAINING (last 14 days):\n${recentStr}\n\nWORKOUT:\n${workoutSection}`;
+      const base = `ATHLETE PROFILE:\n${profileStr}\n\nRECENT TRAINING (last 14 days):\n${recentStr}${conditioningState}\n\nWORKOUT:\n${workoutSection}`;
       if (!structured) return base;
       return `${base}\n\nSTRUCTURED PRESCRIPTION (canonical typed prescription — treat these fields as authoritative over any numbers parsed from the prose above):\n${JSON.stringify(structured, null, 2)}`;
     };
@@ -744,7 +745,7 @@ Deno.serve(async (req) => {
     // AI Programming and All Access are the plans that bundle Coach access;
     // both grant the `programming` feature via PLAN_ENTITLEMENTS in the
     // stripe-webhook. Year of the Engine, Coach-only, and Nutrition do not.
-    const [profileRes, entitlementRes, athleteRes, recentTraining] = await Promise.all([
+    const [profileRes, entitlementRes, athleteRes, recentTraining, conditioningState] = await Promise.all([
       supa.from("profiles").select("role").eq("id", user.id).single(),
       supa.from("user_entitlements").select("id")
         .eq("user_id", user.id)
@@ -753,6 +754,7 @@ Deno.serve(async (req) => {
         .limit(1),
       supa.from("athlete_profiles").select("lifts, skills, conditioning, bodyweight, units, age, height, gender").eq("user_id", user.id).maybeSingle(),
       fetchAndFormatRecentHistory(supa, user.id, { days: 14, maxLines: 25 }),
+      buildConditioningState(supa, user.id),
     ]);
 
     const athleteProfile = athleteRes.data as AthleteProfileData | null;

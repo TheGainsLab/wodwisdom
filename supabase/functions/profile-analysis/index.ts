@@ -21,6 +21,7 @@ import {
   formatChunksAsContext,
 } from "../_shared/rag.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
+import { buildConditioningState } from "../_shared/conditioning-state.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { getTierStatus } from "../_shared/tier-status.ts";
 import { deriveAthleteDiagnostic, type AthleteDiagnostic } from "../_shared/derive-athlete-diagnostic.ts";
@@ -251,12 +252,13 @@ async function runAnalysis(
     const trainingDays = isContinuation ? 35 : 14;
     const trainingMaxLines = isContinuation ? 60 : 30;
 
-    const [ragContext, comparisonContext, recentTraining] = await Promise.all([
+    const [ragContext, comparisonContext, recentTraining, conditioningState] = await Promise.all([
       retrieveRAGContext(supa, profileData),
       Promise.resolve(buildComparisonContext(prevEval, profileData)),
       fetchAndFormatRecentHistory(supa, userId, { days: trainingDays, maxLines: trainingMaxLines }),
+      buildConditioningState(supa, userId),
     ]);
-    const trainingBlock = recentTraining ? `\n\n${recentTraining}` : "";
+    const trainingBlock = (recentTraining ? `\n\n${recentTraining}` : "") + conditioningState;
 
     const userPrompt = `Here is an athlete's full profile:\n\n${profileStr}${trainingBlock}\n\nGive this athlete a comprehensive profile evaluation. Cover all domains they have data for — strength, skills, and conditioning — in a single cohesive assessment.\n\nYour evaluation should:\n- Identify their strongest areas and their biggest limiters\n- Ground your strength assessment in the structured ATHLETE LIFT FINDINGS section (per-lift levels, active flags, accessory pool). The math is already done — interpret it, don't redo it.\n- For skills, consider prerequisite chains (strict before kipping, kipping before butterfly) and competition frequency\n- For conditioning, assess work capacity and compare across modalities (run vs row vs bike)\n- Connect the dots across domains — how do their strengths and weaknesses in one area affect another?\n- If a Training Context section is present, weigh their stated goal, injuries/constraints, training frequency, session length, and any unavailable equipment when choosing priorities. Don't recommend movements blocked by their constraints, and skew priorities toward what serves their goal in the time and equipment they have. If their self-perceived level diverges from what their data shows, address that gap directly.\n- End with 2-3 clear priorities for improvement, ranked by impact and feasibility given their constraints, time available, and goal\n\nWrite like a coach talking to the athlete. Be direct, specific, and concise. No bullet-point tier lists — write in short paragraphs.${comparisonContext}`;
 
