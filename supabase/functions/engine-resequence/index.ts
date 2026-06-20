@@ -2,14 +2,19 @@
  * engine-resequence — the Engine self-sequencer loop.
  *
  * Flow: gate (>= 10 completed Engine days) → conditioning diagnosis + day-type
- * catalogue + current phase → AI generates the upcoming sequence WITHIN each
- * day-type's parameter envelope → parse + deterministically validate → persist
- * each accepted day as an engine_workouts row and schedule it in
- * training_schedule.
+ * catalogue + current phase → AI generates the next week WITHIN each day-type's
+ * parameter envelope → parse + deterministically validate → persist each accepted
+ * day as an engine_workouts row and override the upcoming position
+ * (engine_user_day_overrides) to point at it.
  *
  * The day-types are a generative grammar: the AI chooses values inside each
  * envelope (the reason to use AI). A generated day shares the catalog
- * block_params shape, so the runner executes it unchanged.
+ * block_params shape, so the runner executes it unchanged. Overriding the
+ * WORKOUT CONTENT at a position leaves progression, access gating and the UI
+ * (all position-based) untouched. current_day = highest completed + 1, so the
+ * AI fills positions just ahead; positions beyond the generated week fall back
+ * to the static catalog until the user finishes the week and the next run fills
+ * them. Relies on sequential completion (athletes are counseled to it).
  *
  * Trigger: intended to run weekly per athlete once they've completed >= 10
  * Engine sessions. This function resequences one athlete; a thin cron wrapper
@@ -51,12 +56,6 @@ const SYSTEM_PROMPT =
   `- Stay within max_duration_minutes.\n\n` +
   `Output ONLY JSON, no prose, in this shape:\n` +
   `{"summary":"one-line rationale","days":[{"day_type":"<id>","reason":"<why this day>","blocks":[{ ...params... }]}]}`;
-
-function addDays(dateStr: string, n: number): string {
-  const d = new Date(dateStr + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
 
 /** Rough total minutes for display: work (rounds×workDuration) + numeric rest per block. */
 function estimateMinutes(blocks: Record<string, unknown>[]): number {
@@ -107,20 +106,23 @@ Deno.serve(async (req) => {
     ]);
     if (!diagnosis) return json({ skipped: true, reason: "no conditioning diagnosis available" });
 
-    // 3) Current phase (gates legal day-types) = phase of the highest completed catalog day.
+    // 3) Current position + phase. current_day = highest completed + 1 (sequential).
+    //    Phase (gates legal day-types) = phase of the highest completed catalog day.
     const { data: maxDay } = await supa
       .from("engine_workout_sessions")
       .select("program_day_number")
       .eq("user_id", userId).eq("completed", true)
       .not("program_day_number", "is", null)
       .order("program_day_number", { ascending: false }).limit(1).maybeSingle();
+    const highestCompleted = (maxDay?.program_day_number as number) ?? 0;
+    const currentDay = highestCompleted + 1;
     let currentPhase = 1;
-    if (maxDay?.program_day_number != null) {
+    if (highestCompleted > 0) {
       const { data: w } = await supa
         .from("engine_workouts")
         .select("phase")
         .eq("program_type", "main_5day")
-        .eq("day_number", maxDay.program_day_number).maybeSingle();
+        .eq("day_number", highestCompleted).maybeSingle();
       currentPhase = (w?.phase as number) ?? 1;
     }
 
@@ -151,6 +153,7 @@ Deno.serve(async (req) => {
     if (dryRun || result.accepted.length === 0) {
       return json({
         dry_run: dryRun,
+        currentDay,
         currentPhase,
         maxDays,
         summary: proposal.summary,
@@ -160,27 +163,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 6) Persist accepted days as engine_workouts rows + schedule them.
+    // 6) Persist each accepted day as an engine_workouts row, then override the
+    //    upcoming position (currentDay, +1, ...) to point at it. Pure content swap:
+    //    progression/access/UI are position-based and untouched.
     const programType = `gen:${userId}`;
     const { data: lastGen } = await supa
       .from("engine_workouts")
       .select("day_number")
       .eq("program_type", programType)
       .order("day_number", { ascending: false }).limit(1).maybeSingle();
-    let nextDayNumber = ((lastGen?.day_number as number) ?? 0) + 1;
+    let nextGenNumber = ((lastGen?.day_number as number) ?? 0) + 1;
 
-    const today = new Date().toISOString().slice(0, 10);
-    const { data: lastSched } = await supa
-      .from("training_schedule")
-      .select("scheduled_date")
-      .eq("user_id", userId).not("engine_workout_id", "is", null)
-      .gte("scheduled_date", today)
-      .order("scheduled_date", { ascending: false }).limit(1).maybeSingle();
-    let cursor = lastSched?.scheduled_date ? addDays(lastSched.scheduled_date as string, 1) : addDays(today, 1);
-
-    const scheduled: { day_type: string; date: string; reason: string }[] = [];
+    const placed: { position: number; day_type: string; reason: string }[] = [];
     const persistErrors: string[] = [];
 
+    let position = currentDay;
     for (const day of result.accepted as ProposedDay[]) {
       try {
         const blocks = day.blocks;
@@ -188,7 +185,7 @@ Deno.serve(async (req) => {
           .from("engine_workouts")
           .insert({
             program_type: programType,
-            day_number: nextDayNumber,
+            day_number: nextGenNumber,
             day_type: day.day_type,
             phase: currentPhase,
             block_count: blocks.length,
@@ -201,27 +198,32 @@ Deno.serve(async (req) => {
           .select("id").single();
         if (wErr || !wrow) throw new Error(wErr?.message ?? "insert engine_workouts failed");
 
-        const { error: sErr } = await supa
-          .from("training_schedule")
-          .insert({ user_id: userId, engine_workout_id: wrow.id, scheduled_date: cursor });
-        if (sErr) throw new Error(sErr.message);
+        // Upsert the position override (one row per user+position; re-runs replace).
+        const { error: oErr } = await supa
+          .from("engine_user_day_overrides")
+          .upsert(
+            { user_id: userId, sequence_position: position, engine_workout_id: wrow.id, reason: day.reason, updated_at: new Date().toISOString() },
+            { onConflict: "user_id,sequence_position" },
+          );
+        if (oErr) throw new Error(oErr.message);
 
-        scheduled.push({ day_type: day.day_type, date: cursor, reason: day.reason });
-        nextDayNumber += 1;
-        cursor = addDays(cursor, 1);
+        placed.push({ position, day_type: day.day_type, reason: day.reason });
+        nextGenNumber += 1;
+        position += 1;
       } catch (e) {
-        persistErrors.push(`${day.day_type}: ${e instanceof Error ? e.message : String(e)}`);
+        persistErrors.push(`pos ${position} ${day.day_type}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 
-    console.log(`[engine-resequence] user=${userId} phase=${currentPhase} scheduled=${scheduled.length} errors=${result.errors.length + persistErrors.length}`);
+    console.log(`[engine-resequence] user=${userId} currentDay=${currentDay} phase=${currentPhase} placed=${placed.length} errors=${result.errors.length + persistErrors.length}`);
 
     return json({
+      currentDay,
       currentPhase,
       maxDays,
       summary: proposal.summary,
-      persisted: scheduled.length,
-      scheduled,
+      persisted: placed.length,
+      placed,
       validation_errors: result.errors,
       persist_errors: persistErrors,
     });

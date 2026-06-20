@@ -79,8 +79,17 @@ computeConditioningDiagnosis()   ← our model (calibration + AB/AP/LT/GL roll-u
         ↓                          (built: supabase/functions/_shared/conditioning-state.ts)
 AI sequencer  +  day-type catalogue (engine_day_types: coaching_intent, block_N_params envelope;
         ↓                            competency graph: tiers + prerequisite edges)
-adapted sequence written to training_schedule (engine rows)
+generated days saved as engine_workouts rows; engine_user_day_overrides maps the user's
+upcoming positions (current_day, +1, ...) → those generated workouts
 ```
+
+The Engine queue is **position-based** (`engine_current_day` = highest completed + 1; the dashboard /
+runner resolve a day by position). Month-unlock is the access/billing unit (12-20 days); the operating
+unit is **sequential weekly completion** (athletes are counseled to it — jumping breaks the AI). The
+sequencer overrides only the **content** at the next week's positions; progression, access gating and the
+UI are untouched. Positions beyond the generated week fall back to the static catalog until the user
+finishes the week and the next run fills them. Trigger is **completion-driven** (finish the generated
+week → generate the next), gated on >= 10 completed days.
 
 - **Build location:** here (no existing WIP — only the manual scheduling rails + the diagnosis brain).
 - **Trigger:** **weekly, starting after the athlete completes 10 Engine days** (those first 10 build the
@@ -114,8 +123,11 @@ effectively unlimited; the validator guarantees every generated value stays insi
    days as `engine_workouts` rows + schedule in `training_schedule`. `dry_run` supported.
 4. ✅ **Guardrail validation** — `validateProposal` deterministically rejects any AI output outside the
    taxonomy or a day-type's envelope before persistence.
-5. **Make `training_schedule` the "next" authority (frontend)** — runner/dashboard should resolve and run
-   the scheduled generated day (load `engine_workout` by id) rather than only walking the static mapping.
-   *Remaining: frontend wiring + smarter date placement (rest days).* 
-6. **Weekly cron wrapper** — call `engine-resequence` per eligible athlete on cadence. Explainability
-   (the per-day `reason` is already returned/stored); end-to-end fixture test.
+5. ✅ **Per-user position override** — `engine_user_day_overrides` (migration) maps a user's
+   `sequence_position` → a generated `engine_workout`. `engine-resequence` writes overrides at positions
+   `current_day..+N-1` (not `training_schedule`). `getWorkoutsForProgram` + `loadWorkoutForDay` swap the
+   generated content in at overridden positions and fall back to the catalog elsewhere. Pure content
+   swap; dashboard/runner/logging/access-gating unchanged.
+6. **Trigger wiring (remaining)** — fire `engine-resequence` when a user finishes their generated week
+   (completion-driven), gated on >= 10 completed days. Plus end-to-end runtime verification (`dry_run`
+   first). The per-day `reason` is already stored on the override row for explainability.
