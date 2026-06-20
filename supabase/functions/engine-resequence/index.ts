@@ -41,11 +41,13 @@ const SYSTEM_PROMPT =
   `You are the Engine conditioning sequencer. You personalise an athlete's UPCOMING conditioning by ` +
   `GENERATING training days within a fixed taxonomy — you never invent day-types or parameters outside ` +
   `their authored envelopes.\n\n` +
-  `You are given: (1) the athlete's conditioning diagnosis (energy-system mastery, weak roots, fatigue, ` +
-  `calibration), (2) the day-type catalogue with each type's parameter envelope, and (3) the athlete's ` +
+  `You are given: (1) the athlete's RAW conditioning signals (per-competency rolling ratios + recent ` +
+  `trend, time-trial/calibration age, days since last session — no labels; you interpret them), ` +
+  `(2) the day-type catalogue with each type's parameter envelope, and (3) the athlete's ` +
   `current phase and how many days to generate.\n\n` +
-  `Choose day-types that serve the diagnosis: shore up lagging/weak energy systems, respect prerequisites, ` +
-  `and ease total load when fatigue signals are present. For each chosen day, GENERATE concrete block ` +
+  `Read the signals and form your own judgment: which energy systems are behind, what's trending down, ` +
+  `whether a layoff warrants re-baselining, which prerequisites are met. Then choose day-types that ` +
+  `serve that judgment. For each chosen day, GENERATE concrete block ` +
   `parameters STRICTLY inside that day-type's envelope.\n\n` +
   `Rules:\n` +
   `- Only use day_types whose phase_requirement <= the athlete's current phase.\n` +
