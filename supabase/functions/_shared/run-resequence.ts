@@ -117,31 +117,48 @@ export async function runResequence(
     .from("engine_programs").select("days_per_week").eq("id", version).maybeSingle();
   const maxDays = (program?.days_per_week as number) ?? 5;
 
-  // 3b) Current position = highest completed program_day_number IN THIS PROGRAM + 1.
-  // program_day_number == the catalog day_number; scope by program_version so a
-  // switch (which resets engine_current_day to that program's own progress) is
-  // sequenced correctly rather than off a different program's completions.
-  const { data: maxDay } = await supa
+  // 3b) How far the athlete has progressed. program_day_number == the catalog
+  // day_number; scope by program_version (a switch resets to that program's own
+  // progress). We derive two things from their completions:
+  //   - the furthest catalog day reached -> currentPhase (max phase unlocked; the
+  //     5-day phase arc is monotonic in day_number, so max day = max phase).
+  //   - the furthest SEQUENCE position reached -> which days come next. Curated
+  //     programs (hyrox/vo2) map NON-monotonic catalog days, so "next" must be
+  //     walked in program_sequence_order, never by catalog day number.
+  const { data: doneRows } = await supa
     .from("engine_workout_sessions")
     .select("program_day_number")
     .eq("user_id", userId).eq("completed", true).eq("program_version", version)
-    .not("program_day_number", "is", null)
-    .order("program_day_number", { ascending: false }).limit(1).maybeSingle();
-  const highestCompleted = (maxDay?.program_day_number as number) ?? 0;
+    .not("program_day_number", "is", null);
+  const completedDays = new Set<number>((doneRows ?? []).map((r) => r.program_day_number as number));
+  const highestCompleted = completedDays.size ? Math.max(...completedDays) : 0;
   const currentDay = highestCompleted + 1;
 
-  // 3c) The next maxDays positions = the program's mapped catalog days after the
-  // furthest completed one, in sequence order. main_5day's mapping is identity, so
-  // this reduces to currentDay..currentDay+maxDays-1; curated programs skip the gaps.
-  const { data: mapRows } = await supa
+  // Full position<->catalog-day mapping for this program, in sequence order.
+  const { data: mapAll } = await supa
     .from("engine_program_mapping")
     .select("engine_workout_day_number, program_sequence_order")
     .eq("engine_program_id", version)
-    .gt("engine_workout_day_number", highestCompleted)
-    .order("program_sequence_order", { ascending: true })
-    .limit(maxDays);
-  let blockPositions = (mapRows ?? []).map((m) => m.engine_workout_day_number as number);
-  // Fallback for a program with no mapping rows: consecutive positions.
+    .order("program_sequence_order", { ascending: true });
+  const mapping = (mapAll ?? []).map((m) => ({
+    day: m.engine_workout_day_number as number,
+    seq: m.program_sequence_order as number,
+  }));
+
+  // Furthest sequence position the athlete has completed (sequential-completion model).
+  let maxCompletedSeq = 0;
+  for (const m of mapping) {
+    if (completedDays.has(m.day) && m.seq > maxCompletedSeq) maxCompletedSeq = m.seq;
+  }
+
+  // 3c) The next maxDays positions = the program's mapped days AFTER that sequence
+  // position, in sequence order. Correct for monotonic (main_5day identity) AND
+  // curated non-monotonic (hyrox/vo2) programs alike.
+  let blockPositions = mapping
+    .filter((m) => m.seq > maxCompletedSeq)
+    .slice(0, maxDays)
+    .map((m) => m.day);
+  // Fallback for a program with no mapping rows: consecutive catalog days.
   if (blockPositions.length === 0) {
     blockPositions = Array.from({ length: maxDays }, (_, i) => currentDay + i);
   }
