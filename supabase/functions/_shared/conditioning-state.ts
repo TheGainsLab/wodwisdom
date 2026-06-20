@@ -153,7 +153,11 @@ function computeCalibration(
     const [modality, units] = key.split("|");
     modalitiesWithTrials.add(modality);
     const sorted = trials.slice().sort((a, b) => a.date.localeCompare(b.date));
-    const current = sorted.filter((t) => t.is_current).at(-1) ?? sorted.at(-1);
+    // Only the active baseline. A retired trial (is_current=false, superseded by a
+    // newer one — often after a unit switch) is NOT a live baseline; the runner
+    // (loadTimeTrialBaselines) ignores it, so the diagnosis must too. No fallback:
+    // if nothing is current for this (modality, units), report no baseline.
+    const current = sorted.filter((t) => t.is_current).at(-1);
     out.push({
       modality,
       units: units || null,
