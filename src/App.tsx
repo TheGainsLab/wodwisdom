@@ -21,6 +21,7 @@ const AdminAthleteProfilePage = lazy(() => import('./pages/AdminAthleteProfilePa
 const AdminEvaluationsPage = lazy(() => import('./pages/AdminEvaluationsPage'));
 const AdminEngineSessionsPage = lazy(() => import('./pages/AdminEngineSessionsPage'));
 const AdminEngineSessionDetailPage = lazy(() => import('./pages/AdminEngineSessionDetailPage'));
+const AdminEngineResequencePage = lazy(() => import('./pages/AdminEngineResequencePage'));
 const AdminChatPage = lazy(() => import('./pages/AdminChatPage'));
 const AdminRatingsPage = lazy(() => import('./pages/AdminRatingsPage'));
 const AdminWorkoutLogsPage = lazy(() => import('./pages/AdminWorkoutLogsPage'));
@@ -174,6 +175,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/admin/users/:id/evaluations/:evalType/:evalId" element={<AdminEvaluationsPage session={session} />} />
             <Route path="/admin/users/:id/engine-sessions" element={<AdminEngineSessionsPage session={session} />} />
             <Route path="/admin/users/:id/engine-sessions/:sessionId" element={<AdminEngineSessionDetailPage session={session} />} />
+            <Route path="/admin/users/:id/engine-resequence" element={<AdminEngineResequencePage session={session} />} />
             <Route path="/admin/users/:id/chat" element={<AdminChatPage session={session} />} />
             <Route path="/admin/users/:id/workouts" element={<AdminWorkoutLogsPage session={session} />} />
             <Route path="/admin/users/:id/workouts/:workoutId" element={<AdminWorkoutLogDetailPage session={session} />} />

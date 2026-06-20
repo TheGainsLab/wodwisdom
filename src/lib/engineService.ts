@@ -192,6 +192,12 @@ export async function loadWorkoutForDay(
   dayNumber: number,
   programType = 'main_5day'
 ): Promise<EngineWorkout | null> {
+  // AI self-sequencer override: if this user has a generated workout at this
+  // position, serve it instead of the catalog day. Pure content swap — the
+  // position (dayNumber) is preserved so progression/logging are unchanged.
+  const override = await loadDayOverride(dayNumber);
+  if (override) return { ...override, day_number: dayNumber };
+
   const { data, error } = await supabase
     .from('engine_workouts')
     .select('*')
@@ -201,6 +207,26 @@ export async function loadWorkoutForDay(
 
   if (error) throw error;
   return data;
+}
+
+/** Load the current user's generated workout at a sequence position, if any. */
+async function loadDayOverride(position: number): Promise<EngineWorkout | null> {
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth?.user?.id;
+  if (!uid) return null;
+  const { data: ov } = await supabase
+    .from('engine_user_day_overrides')
+    .select('engine_workout_id')
+    .eq('user_id', uid)
+    .eq('sequence_position', position)
+    .maybeSingle();
+  if (!ov?.engine_workout_id) return null;
+  const { data: w } = await supabase
+    .from('engine_workouts')
+    .select('*')
+    .eq('id', ov.engine_workout_id)
+    .maybeSingle();
+  return w ?? null;
 }
 
 /** Load all day type definitions. */
@@ -300,7 +326,37 @@ export async function getWorkoutsForProgram(
     if (!w) continue;
     result.push({ ...w, month: m.month });
   }
+
+  // AI self-sequencer overrides: swap generated workout content in at any
+  // position this user has an override for. Sparse — everything else is catalog.
+  // Matched on day_number, which is the position the dashboard/runner use
+  // (and the program_day_number the sequencer keys overrides by).
+  await applyDayOverrides(result);
   return result;
+}
+
+/** Replace workout content at positions the current user has overrides for (in place). */
+async function applyDayOverrides(result: EngineWorkout[]): Promise<void> {
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth?.user?.id;
+  if (!uid) return;
+  const { data: overrides } = await supabase
+    .from('engine_user_day_overrides')
+    .select('sequence_position, engine_workout_id')
+    .eq('user_id', uid);
+  if (!overrides || overrides.length === 0) return;
+
+  const genById = new Map<string, EngineWorkout>();
+  const ids = overrides.map((o) => o.engine_workout_id);
+  const { data: gen } = await supabase.from('engine_workouts').select('*').in('id', ids);
+  for (const w of gen ?? []) genById.set(w.id, w as EngineWorkout);
+
+  const ovByPos = new Map(overrides.map((o) => [o.sequence_position, o.engine_workout_id]));
+  for (let i = 0; i < result.length; i++) {
+    const gid = ovByPos.get(result[i].day_number);
+    const g = gid ? genById.get(gid) : undefined;
+    if (g) result[i] = { ...g, day_number: result[i].day_number, month: result[i].month };
+  }
 }
 
 // ─── Completed sessions (user-scoped) ────────────────────────────────
