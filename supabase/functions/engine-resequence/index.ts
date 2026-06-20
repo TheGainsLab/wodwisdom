@@ -85,8 +85,20 @@ Deno.serve(async (req) => {
     if (authErr || !user) return json({ error: "Unauthorized" }, 401);
 
     const body = await req.json().catch(() => ({}));
-    const dryRun = body?.dry_run === true;
-    const userId = user.id;
+    // Safe by default during the verification phase: only writes when explicitly
+    // told { dry_run: false }. The auto-trigger must pass dry_run:false.
+    let dryRun = body?.dry_run !== false;
+    const debug = body?.debug === true; // also echo the assembled prompt
+    let userId = user.id;
+
+    // Admin preview: an admin can run this for ANOTHER user to inspect what the
+    // AI found and what it would change. This path never writes.
+    if (body?.target_user_id && body.target_user_id !== user.id) {
+      const { data: prof } = await supa.from("profiles").select("role").eq("id", user.id).maybeSingle();
+      if (prof?.role !== "admin") return json({ error: "Forbidden" }, 403);
+      userId = body.target_user_id as string;
+      dryRun = true;
+    }
 
     // 1) Gate: at least MIN_COMPLETED_DAYS completed Engine sessions.
     const { count: completed } = await supa
@@ -153,13 +165,19 @@ Deno.serve(async (req) => {
     if (dryRun || result.accepted.length === 0) {
       return json({
         dry_run: dryRun,
+        persisted: 0,
         currentDay,
         currentPhase,
         maxDays,
         summary: proposal.summary,
+        // Full verification view: what the AI found (diagnosis), every day it
+        // proposed, what passed the envelope validator, and why anything failed.
+        diagnosis,
+        proposed: proposal.days,
         accepted: result.accepted,
-        errors: result.errors,
-        persisted: 0,
+        validation_errors: result.errors,
+        raw_ai_output: raw,
+        ...(debug ? { prompt: userContent } : {}),
       });
     }
 
