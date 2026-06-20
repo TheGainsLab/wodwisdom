@@ -37,6 +37,9 @@ verify_jwt = false
 [functions.monthly-generation-cron]
 verify_jwt = false
 
+[functions.engine-resequence-cron]
+verify_jwt = false
+
 [functions.profile-analysis]
 verify_jwt = false
 

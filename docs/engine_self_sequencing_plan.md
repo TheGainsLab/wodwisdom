@@ -128,6 +128,18 @@ effectively unlimited; the validator guarantees every generated value stays insi
    `current_day..+N-1` (not `training_schedule`). `getWorkoutsForProgram` + `loadWorkoutForDay` swap the
    generated content in at overridden positions and fall back to the catalog elsewhere. Pure content
    swap; dashboard/runner/logging/access-gating unchanged.
-6. **Trigger wiring (remaining)** — fire `engine-resequence` when a user finishes their generated week
-   (completion-driven), gated on >= 10 completed days. Plus end-to-end runtime verification (`dry_run`
-   first). The per-day `reason` is already stored on the override row for explainability.
+6. ✅ **Intensity ownership (#4)** — on AI days (`program_type 'gen:'`) the runtime target drops the
+   rolling multiplier (`effectiveRollingMult` in `EngineTrainingDayPage`); the AI's paceRange IS the
+   target, rolling becomes a read-only sensor. No-op for catalog days.
+7. ✅ **Automatic trigger (#5)** — server-side cron (`engine-resequence-cron`) runs the shared
+   `runResequence()` core for opt-in athletes (`athlete_profiles.engine_ai_sequencing`, default false)
+   whose current block is consumed (`current_day` past their highest override). No client involvement,
+   self-healing, test-user-gated. `engine-resequence` (HTTP) is now a thin wrapper over the same core for
+   admin dry-run preview.
+
+### Rollout / ops
+- Apply migration `20260620100000_engine_ai_sequencing_flag.sql`.
+- Deploy `engine-resequence` + `engine-resequence-cron` (the latter is `verify_jwt=false`).
+- Schedule the cron via pg_cron (e.g. every 15 min).
+- Enable test athletes: `UPDATE athlete_profiles SET engine_ai_sequencing = true WHERE user_id = '…'`.
+- Widen by bulk-enabling / flipping the default once validated. The flag is also a per-user kill-switch.

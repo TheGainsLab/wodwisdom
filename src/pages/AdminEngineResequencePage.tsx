@@ -8,7 +8,7 @@ import AdminSubPageLayout from '../components/admin/AdminSubPageLayout';
 interface GeneratedBlock { [k: string]: unknown }
 interface ProposedDay { day_type: string; reason: string; blocks: GeneratedBlock[] }
 interface PreviewResult {
-  skipped?: boolean;
+  status?: string;
   reason?: string;
   dry_run?: boolean;
   currentDay?: number;
@@ -83,13 +83,13 @@ export default function AdminEngineResequencePage({ session }: { session: Sessio
         </div>
       )}
 
-      {result?.skipped && (
+      {result?.status === 'skipped' && (
         <div style={{ marginTop: 16, padding: 12, background: '#2a2a1a', borderRadius: 8, color: '#dd9' }}>
           Sequencer skipped: {result.reason}
         </div>
       )}
 
-      {result && !result.skipped && (
+      {result && result.status !== 'skipped' && (
         <div style={{ marginTop: 20 }}>
           <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
             <Stat label="Current day" value={currentDay} />
