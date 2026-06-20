@@ -39,6 +39,11 @@ const SYSTEM_PROMPT =
   `for it to catch up. BUT scale that confidence by the sample count: where a competency has a solid ` +
   `rolling history (n≈3-4) and a clear trend, set intensity decisively; where it is thin (n≈1, or no ` +
   `rolling data at all), stay conservative — pick a mid/standard intensity, don't jump on one session.\n\n` +
+  `Recalibration: the athlete is automatically re-baselined by a scheduled monthly time trial, so you do ` +
+  `NOT need to add one just to keep calibration fresh. Inserting your own time trial spends one of this ` +
+  `block's training days, so only do it when the signals strongly suggest the current baseline no longer ` +
+  `holds — e.g. a long layoff, a modality change, or recent paces that clearly contradict it — not merely ` +
+  `because the baseline is aging.\n\n` +
   `Rules:\n` +
   `- Only use day_types whose phase_requirement <= the athlete's current phase.\n` +
   `- Supply exactly block_count blocks, each an object with the same keys as the day-type's block_N_params.\n` +
