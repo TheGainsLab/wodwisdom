@@ -37,20 +37,26 @@ Deno.serve(async (_req) => {
     for (const row of flagged ?? []) {
       const uid = row.user_id as string;
       try {
-        // current_day = highest completed program_day_number + 1
+        // Position + overrides are program-scoped (the athlete may have switched
+        // programs; positions are reused across programs). Resolve their program.
+        const { data: prof } = await supa
+          .from("athlete_profiles").select("engine_program_version").eq("user_id", uid).maybeSingle();
+        const version = (prof?.engine_program_version as string) ?? "main_5day";
+
+        // current_day = highest completed program_day_number IN THIS PROGRAM + 1
         const { data: maxDay } = await supa
           .from("engine_workout_sessions")
           .select("program_day_number")
-          .eq("user_id", uid).eq("completed", true)
+          .eq("user_id", uid).eq("completed", true).eq("program_version", version)
           .not("program_day_number", "is", null)
           .order("program_day_number", { ascending: false }).limit(1).maybeSingle();
         const currentDay = ((maxDay?.program_day_number as number) ?? 0) + 1;
 
-        // highest generated override position
+        // highest generated override position for THIS program
         const { data: maxOv } = await supa
           .from("engine_user_day_overrides")
           .select("sequence_position")
-          .eq("user_id", uid)
+          .eq("user_id", uid).eq("program_version", version)
           .order("sequence_position", { ascending: false }).limit(1).maybeSingle();
         const maxOverride = (maxOv?.sequence_position as number | undefined) ?? null;
 

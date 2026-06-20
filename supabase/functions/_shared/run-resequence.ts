@@ -102,15 +102,46 @@ export async function runResequence(
   ]);
   if (!diagnosis) return { status: "skipped", reason: "no conditioning diagnosis available" };
 
-  // 3) Current position + phase. current_day = highest completed + 1 (sequential).
+  // 3) Program + cadence. The athlete's program defines the position space:
+  // specialty programs curate NON-consecutive catalog days via engine_program_mapping,
+  // so "the next N positions" must come from the mapping, not currentDay+i.
+  const { data: prof } = await supa
+    .from("athlete_profiles").select("engine_program_version").eq("user_id", userId).maybeSingle();
+  const version = (prof?.engine_program_version as string) ?? "main_5day";
+  const { data: program } = await supa
+    .from("engine_programs").select("days_per_week").eq("id", version).maybeSingle();
+  const maxDays = (program?.days_per_week as number) ?? 5;
+
+  // 3b) Current position = highest completed program_day_number IN THIS PROGRAM + 1.
+  // program_day_number == the catalog day_number; scope by program_version so a
+  // switch (which resets engine_current_day to that program's own progress) is
+  // sequenced correctly rather than off a different program's completions.
   const { data: maxDay } = await supa
     .from("engine_workout_sessions")
     .select("program_day_number")
-    .eq("user_id", userId).eq("completed", true)
+    .eq("user_id", userId).eq("completed", true).eq("program_version", version)
     .not("program_day_number", "is", null)
     .order("program_day_number", { ascending: false }).limit(1).maybeSingle();
   const highestCompleted = (maxDay?.program_day_number as number) ?? 0;
   const currentDay = highestCompleted + 1;
+
+  // 3c) The next maxDays positions = the program's mapped catalog days after the
+  // furthest completed one, in sequence order. main_5day's mapping is identity, so
+  // this reduces to currentDay..currentDay+maxDays-1; curated programs skip the gaps.
+  const { data: mapRows } = await supa
+    .from("engine_program_mapping")
+    .select("engine_workout_day_number, program_sequence_order")
+    .eq("engine_program_id", version)
+    .gt("engine_workout_day_number", highestCompleted)
+    .order("program_sequence_order", { ascending: true })
+    .limit(maxDays);
+  let blockPositions = (mapRows ?? []).map((m) => m.engine_workout_day_number as number);
+  // Fallback for a program with no mapping rows: consecutive positions.
+  if (blockPositions.length === 0) {
+    blockPositions = Array.from({ length: maxDays }, (_, i) => currentDay + i);
+  }
+
+  // 3d) Phase at the current position (read from the curated catalog day).
   let currentPhase = 1;
   if (highestCompleted > 0) {
     const { data: w } = await supa
@@ -121,16 +152,7 @@ export async function runResequence(
     currentPhase = (w?.phase as number) ?? 1;
   }
 
-  // 4) Cadence = days_per_week from the program registry (handles 3/4/5/6/...).
-  const { data: prof } = await supa
-    .from("athlete_profiles").select("engine_program_version").eq("user_id", userId).maybeSingle();
-  const version = (prof?.engine_program_version as string) ?? "main_5day";
-  const { data: program } = await supa
-    .from("engine_programs").select("days_per_week").eq("id", version).maybeSingle();
-  const maxDays = (program?.days_per_week as number) ?? 5;
-
-  // 4b) Pin month-boundary time trials (left as the catalog TT; AI fills the rest).
-  const blockPositions = Array.from({ length: maxDays }, (_, i) => currentDay + i);
+  // 4) Pin month-boundary time trials (left as the catalog TT; AI fills the rest).
   const { data: catalogBlock } = await supa
     .from("engine_workouts")
     .select("day_number, day_type")
@@ -224,8 +246,8 @@ export async function runResequence(
       const { error: oErr } = await supa
         .from("engine_user_day_overrides")
         .upsert(
-          { user_id: userId, sequence_position: position, engine_workout_id: wrow.id, reason: day.reason, updated_at: new Date().toISOString() },
-          { onConflict: "user_id,sequence_position" },
+          { user_id: userId, program_version: version, sequence_position: position, engine_workout_id: wrow.id, reason: day.reason, updated_at: new Date().toISOString() },
+          { onConflict: "user_id,program_version,sequence_position" },
         );
       if (oErr) throw new Error(oErr.message);
 
