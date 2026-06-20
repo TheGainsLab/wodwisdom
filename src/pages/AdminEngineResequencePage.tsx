@@ -14,6 +14,9 @@ interface PreviewResult {
   currentDay?: number;
   currentPhase?: number;
   maxDays?: number;
+  days_to_generate?: number;
+  pinned_time_trials?: number[];
+  ai_positions?: number[];
   summary?: string;
   diagnosis?: string;
   proposed?: ProposedDay[];
@@ -104,12 +107,18 @@ export default function AdminEngineResequencePage({ session }: { session: Sessio
             <pre style={preStyle}>{result.diagnosis?.trim() || 'No diagnosis produced.'}</pre>
           </Section>
 
-          <Section title={`Proposed sequence — would replace positions ${currentDay}–${currentDay + accepted.length - 1}`}>
+          {result.pinned_time_trials && result.pinned_time_trials.length > 0 && (
+            <div style={{ marginTop: 12, fontSize: 13, color: '#9bd' }}>
+              Pinned time trial(s) at position {result.pinned_time_trials.join(', ')} — left as the scheduled monthly recalibration; the AI fills the rest.
+            </div>
+          )}
+
+          <Section title="Proposed sequence — would replace these positions">
             {accepted.length === 0 && <div style={{ color: '#999' }}>No days passed validation.</div>}
             {accepted.map((d, i) => (
               <div key={i} style={{ border: '1px solid #333', borderRadius: 8, padding: 12, marginBottom: 10 }}>
                 <div style={{ fontWeight: 600, color: '#f0a050' }}>
-                  Day {currentDay + i} — {humanize(d.day_type)}
+                  Day {result.ai_positions?.[i] ?? currentDay + i} — {humanize(d.day_type)}
                 </div>
                 <div style={{ color: '#bbb', fontSize: 13, margin: '4px 0 8px' }}>{d.reason}</div>
                 {d.blocks.map((b, bi) => (
