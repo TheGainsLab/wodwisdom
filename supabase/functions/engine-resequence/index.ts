@@ -140,10 +140,15 @@ Deno.serve(async (req) => {
       currentPhase = (w?.phase as number) ?? 1;
     }
 
-    // 4) How many days to generate = a week at the athlete's cadence.
+    // 4) How many days to generate = a week at the athlete's program cadence.
+    //    Read days_per_week from the program registry (handles 3/4/5/6/...),
+    //    not a string match on the version label.
     const { data: prof } = await supa
       .from("athlete_profiles").select("engine_program_version").eq("user_id", userId).maybeSingle();
-    const maxDays = String(prof?.engine_program_version ?? "5-day").includes("3") ? 3 : 5;
+    const version = (prof?.engine_program_version as string) ?? "main_5day";
+    const { data: program } = await supa
+      .from("engine_programs").select("days_per_week").eq("id", version).maybeSingle();
+    const maxDays = (program?.days_per_week as number) ?? 5;
 
     // 5) Ask the AI to generate the upcoming sequence within the envelopes.
     const userContent =
