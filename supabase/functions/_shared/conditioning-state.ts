@@ -68,6 +68,7 @@ export interface PerfMetricRow {
 
 export interface TimeTrialRow {
   modality: string;
+  units: string | null;
   calculated_rpm: number | null;
   date: string;
   is_current: boolean;
@@ -111,12 +112,16 @@ export interface CompetencySignal {
   learned_max_pace: number | null; // best actual pace ever for this competency
 }
 
-/** Per-modality calibration — raw time-trial age; targets derive from it. */
+/**
+ * Per-(modality, units) calibration — raw time-trial age + baseline. Keyed by
+ * units because calculated_rpm is an absolute pace and units (watts vs cals) put
+ * a modality on different scales — they must never be compared.
+ */
 export interface ModalityCalibration {
   modality: string;
+  units: string | null;
   time_trial_age_days: number | null; // null = no current time trial
   baseline_rpm: number | null;
-  baseline_delta_pct: number | null; // first→latest current TT, raw % change
 }
 
 export interface ConditioningDiagnosis {
@@ -127,32 +132,43 @@ export interface ConditioningDiagnosis {
 }
 
 function computeCalibration(
-  modalities: string[],
+  metricModalities: string[],
   timeTrials: TimeTrialRow[],
   now: Date,
 ): ModalityCalibration[] {
-  const byModality = new Map<string, TimeTrialRow[]>();
+  // Key by (modality, units): calculated_rpm is an absolute pace, so a modality
+  // logged in different units (echo bike watts vs calories) is a different scale —
+  // never compare across units. Each unit gets its own baseline.
+  const byKey = new Map<string, TimeTrialRow[]>();
   for (const tt of timeTrials) {
-    const list = byModality.get(tt.modality) ?? [];
+    const key = `${tt.modality}|${tt.units ?? ""}`;
+    const list = byKey.get(key) ?? [];
     list.push(tt);
-    byModality.set(tt.modality, list);
+    byKey.set(key, list);
   }
-  return modalities.map((m) => {
-    const trials = (byModality.get(m) ?? []).slice().sort((a, b) => a.date.localeCompare(b.date));
-    const current = trials.filter((t) => t.is_current).at(-1) ?? trials.at(-1);
-    const first = num(trials[0]?.calculated_rpm);
-    const latest = num(current?.calculated_rpm);
-    const baseline_delta_pct =
-      first && latest && first > 0 && trials.length > 1
-        ? Math.round(((latest - first) / first) * 1000) / 10
-        : null;
-    return {
-      modality: m,
+
+  const out: ModalityCalibration[] = [];
+  const modalitiesWithTrials = new Set<string>();
+  for (const [key, trials] of byKey) {
+    const [modality, units] = key.split("|");
+    modalitiesWithTrials.add(modality);
+    const sorted = trials.slice().sort((a, b) => a.date.localeCompare(b.date));
+    const current = sorted.filter((t) => t.is_current).at(-1) ?? sorted.at(-1);
+    out.push({
+      modality,
+      units: units || null,
       time_trial_age_days: current ? daysBetween(current.date, now) : null,
-      baseline_rpm: latest,
-      baseline_delta_pct,
-    };
-  });
+      baseline_rpm: num(current?.calculated_rpm),
+    });
+  }
+
+  // Modalities trained (have metrics) but with no time trial at all → uncalibrated.
+  for (const m of metricModalities) {
+    if (!modalitiesWithTrials.has(m)) {
+      out.push({ modality: m, units: null, time_trial_age_days: null, baseline_rpm: null });
+    }
+  }
+  return out;
 }
 
 /** Compute the raw structured diagnosis. Pure, day_type-keyed, no judgments. */
@@ -182,15 +198,13 @@ export function computeConditioningDiagnosis(inputs: ConditioningInputs): Condit
     };
   });
 
-  const modalities = Array.from(
-    new Set([...inputs.metrics.map((m) => m.modality), ...inputs.timeTrials.map((t) => t.modality)]),
-  );
+  const metricModalities = Array.from(new Set(inputs.metrics.map((m) => m.modality)));
 
   return {
     hasData,
     daysSinceLastSession,
     competencies,
-    calibration: computeCalibration(modalities, inputs.timeTrials, now),
+    calibration: computeCalibration(metricModalities, inputs.timeTrials, now),
   };
 }
 
@@ -227,16 +241,13 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
   }
 
   if (diag.calibration.length) {
-    parts.push("\nCalibration (time-trial age per modality; all targets derive from it):");
+    parts.push("\nCalibration (time-trial age per modality+units; all targets derive from it):");
     for (const c of diag.calibration) {
-      const mod = c.modality.replace(/_/g, " ");
+      const mod = c.modality.replace(/_/g, " ") + (c.units ? ` (${c.units})` : "");
       if (c.time_trial_age_days == null) {
         parts.push(`- ${mod}: no current time trial — its targets are uncalibrated`);
       } else {
-        const prog = c.baseline_delta_pct != null
-          ? ` (${c.baseline_delta_pct >= 0 ? "+" : ""}${c.baseline_delta_pct}% over history)`
-          : "";
-        parts.push(`- ${mod}: ${c.time_trial_age_days}d old, baseline ${c.baseline_rpm ?? "?"}${prog}`);
+        parts.push(`- ${mod}: ${c.time_trial_age_days}d old, baseline ${c.baseline_rpm ?? "?"}`);
       }
     }
   }
@@ -267,7 +278,7 @@ export async function buildConditioningState(
       .eq("user_id", userId),
     supa
       .from("engine_time_trials")
-      .select("modality, calculated_rpm, date, is_current")
+      .select("modality, units, calculated_rpm, date, is_current")
       .eq("user_id", userId)
       .order("date", { ascending: true }),
     supa

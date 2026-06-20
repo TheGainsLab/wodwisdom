@@ -21,8 +21,8 @@ const NOW = new Date("2026-06-19T00:00:00Z");
 function metric(p: Partial<PerfMetricRow> & Pick<PerfMetricRow, "day_type" | "modality">): PerfMetricRow {
   return { rolling_avg_ratio: 1.0, rolling_count: 4, last_4_ratios: [1, 1, 1, 1], learned_max_pace: 100, ...p };
 }
-function tt(modality: string, date: string, rpm = 300, is_current = true): TimeTrialRow {
-  return { modality, calculated_rpm: rpm, date, is_current };
+function tt(modality: string, date: string, rpm = 300, is_current = true, units = "cal"): TimeTrialRow {
+  return { modality, units, calculated_rpm: rpm, date, is_current };
 }
 
 // ── structured diagnosis: raw passthrough + taxonomy tags ─────────────────
@@ -61,6 +61,24 @@ Deno.test("computeConditioningDiagnosis: no current time trial → null age (fac
   assertEquals(diag.calibration.find((c) => c.modality === "ski_erg")?.time_trial_age_days, null);
   // ratio still passed through verbatim — not suppressed, just uncalibrated context
   assertEquals(diag.competencies[0].rolling_avg_ratio, 1.2);
+});
+
+Deno.test("computeConditioningDiagnosis: separates calibration by units (no watt/cal mixing)", () => {
+  const diag = computeConditioningDiagnosis({
+    metrics: [metric({ day_type: "endurance", modality: "echo_bike", rolling_avg_ratio: 1.0 })],
+    timeTrials: [
+      tt("echo_bike", "2026-01-01", 18, false, "cal"), // old, calories
+      tt("echo_bike", "2026-05-27", 200, true, "watts"), // recent, watts
+    ],
+    sessions: [],
+    now: NOW,
+  });
+  const cal = diag.calibration.filter((c) => c.modality === "echo_bike");
+  assertEquals(cal.length, 2); // two units → two separate baselines, never compared
+  assertEquals(cal.find((c) => c.units === "watts")?.baseline_rpm, 200);
+  assertEquals(cal.find((c) => c.units === "cal")?.baseline_rpm, 18);
+  // the cross-history delta that produced "+1233%" is gone entirely
+  assert(!("baseline_delta_pct" in cal[0]));
 });
 
 Deno.test("computeConditioningDiagnosis: empty → hasData false", () => {
