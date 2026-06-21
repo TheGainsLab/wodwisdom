@@ -114,7 +114,7 @@ export async function runResequence(
     .from("athlete_profiles").select("engine_program_version").eq("user_id", userId).maybeSingle();
   const version = (prof?.engine_program_version as string) ?? "main_5day";
   const { data: program } = await supa
-    .from("engine_programs").select("days_per_week").eq("id", version).maybeSingle();
+    .from("engine_programs").select("days_per_week, name, description").eq("id", version).maybeSingle();
   const maxDays = (program?.days_per_week as number) ?? 5;
 
   // 3b) How far the athlete has progressed. program_day_number == the catalog
@@ -195,10 +195,36 @@ export async function runResequence(
       `sequence your days assuming a recalibration occurs; do not generate a time trial yourself unless ` +
       `the signals clearly call for an extra one.\n`
     : "";
+
+  // Goal/emphasis context: the program's stated purpose plus its OWN curated
+  // day-type for each slot the AI is filling. The curation IS the program's
+  // intent; without it the AI optimises only for current conditioning and
+  // specialty programs (hyrox/vo2) come out generic. The curated day-type is a
+  // baseline, not a lock — the AI adapts block params to the athlete's signals
+  // and may substitute the day-type when the data clearly warrants. Either way
+  // the result still passes phase-gating + envelope validation downstream.
+  const programGoal = program?.name
+    ? `PROGRAM: ${program.name}${program.description ? ` — ${program.description}` : ""}\n` +
+      `Bias your day-type choices toward this program's intent.\n`
+    : "";
+  const curatedByDay = new Map<number, string>(
+    (catalogBlock ?? []).map((d) => [d.day_number as number, d.day_type as string]),
+  );
+  const prescribedSlots = aiPositions
+    .map((p, i) => `  day ${i + 1}: program prescribes "${curatedByDay.get(p) ?? "unspecified"}"`)
+    .join("\n");
+  const prescribedNote = prescribedSlots
+    ? `PROGRAM-PRESCRIBED DAY-TYPES FOR THESE SLOTS (your baseline — keep each unless the ` +
+      `athlete's signals clearly call for a substitute; adapt the block parameters to their state either way):\n` +
+      `${prescribedSlots}\n`
+    : "";
+
   const userContent =
     `${diagnosis}\n\n` +
+    programGoal +
     `ATHLETE CURRENT PHASE: ${currentPhase} (only day_types with phase_requirement <= ${currentPhase} are legal)\n` +
     `GENERATE THE NEXT ${daysToGenerate} ENGINE DAYS.\n` +
+    prescribedNote +
     ttNote + `\n` +
     `${catalogueText}`;
 
