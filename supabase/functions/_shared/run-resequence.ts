@@ -39,6 +39,11 @@ const SYSTEM_PROMPT =
   `for it to catch up. BUT scale that confidence by the sample count: where a competency has a solid ` +
   `rolling history (n≈3-4) and a clear trend, set intensity decisively; where it is thin (n≈1, or no ` +
   `rolling data at all), stay conservative — pick a mid/standard intensity, don't jump on one session.\n\n` +
+  `Recalibration: the athlete is automatically re-baselined by a scheduled monthly time trial, so you do ` +
+  `NOT need to add one just to keep calibration fresh. Inserting your own time trial spends one of this ` +
+  `block's training days, so only do it when the signals strongly suggest the current baseline no longer ` +
+  `holds — e.g. a long layoff, a modality change, or recent paces that clearly contradict it — not merely ` +
+  `because the baseline is aging.\n\n` +
   `Rules:\n` +
   `- Only use day_types whose phase_requirement <= the athlete's current phase.\n` +
   `- Supply exactly block_count blocks, each an object with the same keys as the day-type's block_N_params.\n` +
@@ -102,15 +107,63 @@ export async function runResequence(
   ]);
   if (!diagnosis) return { status: "skipped", reason: "no conditioning diagnosis available" };
 
-  // 3) Current position + phase. current_day = highest completed + 1 (sequential).
-  const { data: maxDay } = await supa
+  // 3) Program + cadence. The athlete's program defines the position space:
+  // specialty programs curate NON-consecutive catalog days via engine_program_mapping,
+  // so "the next N positions" must come from the mapping, not currentDay+i.
+  const { data: prof } = await supa
+    .from("athlete_profiles").select("engine_program_version").eq("user_id", userId).maybeSingle();
+  const version = (prof?.engine_program_version as string) ?? "main_5day";
+  const { data: program } = await supa
+    .from("engine_programs").select("days_per_week").eq("id", version).maybeSingle();
+  const maxDays = (program?.days_per_week as number) ?? 5;
+
+  // 3b) How far the athlete has progressed. program_day_number == the catalog
+  // day_number; scope by program_version (a switch resets to that program's own
+  // progress). We derive two things from their completions:
+  //   - the furthest catalog day reached -> currentPhase (max phase unlocked; the
+  //     5-day phase arc is monotonic in day_number, so max day = max phase).
+  //   - the furthest SEQUENCE position reached -> which days come next. Curated
+  //     programs (hyrox/vo2) map NON-monotonic catalog days, so "next" must be
+  //     walked in program_sequence_order, never by catalog day number.
+  const { data: doneRows } = await supa
     .from("engine_workout_sessions")
     .select("program_day_number")
-    .eq("user_id", userId).eq("completed", true)
-    .not("program_day_number", "is", null)
-    .order("program_day_number", { ascending: false }).limit(1).maybeSingle();
-  const highestCompleted = (maxDay?.program_day_number as number) ?? 0;
+    .eq("user_id", userId).eq("completed", true).eq("program_version", version)
+    .not("program_day_number", "is", null);
+  const completedDays = new Set<number>((doneRows ?? []).map((r) => r.program_day_number as number));
+  const highestCompleted = completedDays.size ? Math.max(...completedDays) : 0;
   const currentDay = highestCompleted + 1;
+
+  // Full position<->catalog-day mapping for this program, in sequence order.
+  const { data: mapAll } = await supa
+    .from("engine_program_mapping")
+    .select("engine_workout_day_number, program_sequence_order")
+    .eq("engine_program_id", version)
+    .order("program_sequence_order", { ascending: true });
+  const mapping = (mapAll ?? []).map((m) => ({
+    day: m.engine_workout_day_number as number,
+    seq: m.program_sequence_order as number,
+  }));
+
+  // Furthest sequence position the athlete has completed (sequential-completion model).
+  let maxCompletedSeq = 0;
+  for (const m of mapping) {
+    if (completedDays.has(m.day) && m.seq > maxCompletedSeq) maxCompletedSeq = m.seq;
+  }
+
+  // 3c) The next maxDays positions = the program's mapped days AFTER that sequence
+  // position, in sequence order. Correct for monotonic (main_5day identity) AND
+  // curated non-monotonic (hyrox/vo2) programs alike.
+  let blockPositions = mapping
+    .filter((m) => m.seq > maxCompletedSeq)
+    .slice(0, maxDays)
+    .map((m) => m.day);
+  // Fallback for a program with no mapping rows: consecutive catalog days.
+  if (blockPositions.length === 0) {
+    blockPositions = Array.from({ length: maxDays }, (_, i) => currentDay + i);
+  }
+
+  // 3d) Phase at the current position (read from the curated catalog day).
   let currentPhase = 1;
   if (highestCompleted > 0) {
     const { data: w } = await supa
@@ -121,16 +174,7 @@ export async function runResequence(
     currentPhase = (w?.phase as number) ?? 1;
   }
 
-  // 4) Cadence = days_per_week from the program registry (handles 3/4/5/6/...).
-  const { data: prof } = await supa
-    .from("athlete_profiles").select("engine_program_version").eq("user_id", userId).maybeSingle();
-  const version = (prof?.engine_program_version as string) ?? "main_5day";
-  const { data: program } = await supa
-    .from("engine_programs").select("days_per_week").eq("id", version).maybeSingle();
-  const maxDays = (program?.days_per_week as number) ?? 5;
-
-  // 4b) Pin month-boundary time trials (left as the catalog TT; AI fills the rest).
-  const blockPositions = Array.from({ length: maxDays }, (_, i) => currentDay + i);
+  // 4) Pin month-boundary time trials (left as the catalog TT; AI fills the rest).
   const { data: catalogBlock } = await supa
     .from("engine_workouts")
     .select("day_number, day_type")
@@ -224,8 +268,8 @@ export async function runResequence(
       const { error: oErr } = await supa
         .from("engine_user_day_overrides")
         .upsert(
-          { user_id: userId, sequence_position: position, engine_workout_id: wrow.id, reason: day.reason, updated_at: new Date().toISOString() },
-          { onConflict: "user_id,sequence_position" },
+          { user_id: userId, program_version: version, sequence_position: position, engine_workout_id: wrow.id, reason: day.reason, updated_at: new Date().toISOString() },
+          { onConflict: "user_id,program_version,sequence_position" },
         );
       if (oErr) throw new Error(oErr.message);
 

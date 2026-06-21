@@ -214,10 +214,19 @@ async function loadDayOverride(position: number): Promise<EngineWorkout | null> 
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth?.user?.id;
   if (!uid) return null;
+  // Overrides are program-scoped: only serve content generated for the user's
+  // CURRENT program, never a different program's day at the same position.
+  const { data: prof } = await supabase
+    .from('athlete_profiles')
+    .select('engine_program_version')
+    .eq('user_id', uid)
+    .maybeSingle();
+  const version = prof?.engine_program_version ?? 'main_5day';
   const { data: ov } = await supabase
     .from('engine_user_day_overrides')
     .select('engine_workout_id')
     .eq('user_id', uid)
+    .eq('program_version', version)
     .eq('sequence_position', position)
     .maybeSingle();
   if (!ov?.engine_workout_id) return null;
@@ -330,20 +339,23 @@ export async function getWorkoutsForProgram(
   // AI self-sequencer overrides: swap generated workout content in at any
   // position this user has an override for. Sparse — everything else is catalog.
   // Matched on day_number, which is the position the dashboard/runner use
-  // (and the program_day_number the sequencer keys overrides by).
-  await applyDayOverrides(result);
+  // (and the program_day_number the sequencer keys overrides by). Scoped to this
+  // program so a different program's generated days never bleed in at the same
+  // position. Uses the raw engine_program_version (what the sequencer wrote).
+  await applyDayOverrides(result, version);
   return result;
 }
 
 /** Replace workout content at positions the current user has overrides for (in place). */
-async function applyDayOverrides(result: EngineWorkout[]): Promise<void> {
+async function applyDayOverrides(result: EngineWorkout[], version: string): Promise<void> {
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth?.user?.id;
   if (!uid) return;
   const { data: overrides } = await supabase
     .from('engine_user_day_overrides')
     .select('sequence_position, engine_workout_id')
-    .eq('user_id', uid);
+    .eq('user_id', uid)
+    .eq('program_version', version);
   if (!overrides || overrides.length === 0) return;
 
   const genById = new Map<string, EngineWorkout>();
@@ -769,6 +781,17 @@ export async function switchProgram(newProgramId: string): Promise<void> {
     .eq('user_id', user.id);
 
   if (error) throw error;
+
+  // Clear any prior AI overrides for the program being switched INTO. They were
+  // generated against an older position/diagnosis; leaving them would serve stale
+  // upcoming days (and the cron's "block consumed" check would treat them as a
+  // fresh block). The sequencer regenerates against the current diagnosis once the
+  // gate is met. Overrides for OTHER programs are left untouched.
+  await supabase
+    .from('engine_user_day_overrides')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('program_version', newProgramId);
 }
 
 /** Advance the user's current day (called after completing a workout). */
