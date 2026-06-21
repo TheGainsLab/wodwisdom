@@ -164,6 +164,16 @@ export default function EngineLeaderboardPage({ session }: { session: Session })
               )}
             </div>
           )}
+
+          <p style={{ marginTop: 20, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
+            Your name is shown on these boards.{' '}
+            <button
+              onClick={() => navigate('/settings')}
+              style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, font: 'inherit' }}
+            >
+              Appear as Anonymous in Settings
+            </button>.
+          </p>
         </div>
       </div>
     </div>
