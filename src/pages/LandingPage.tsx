@@ -334,8 +334,8 @@ export default function LandingPage() {
             Take Fran, for example. Most apps log &ldquo;3:42 RX&rdquo; and move on. GAINS gives you your coach's full read: power output, percentile, time domain, movement quality, and even faults flagged — all on one scale.
           </p>
 
-          {/* Split screen: a bare logged result vs. the personalized coach read */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, alignItems: 'start' }}>
+          {/* Bare logged result, then the personalized coach read — stacked (mobile-first, single column) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 28, alignItems: 'start', maxWidth: 560 }}>
             {/* Left — Most Apps: just a logged result, no insight */}
             <div>
               <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 15, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 14 }}>
@@ -454,7 +454,7 @@ export default function LandingPage() {
           <p style={{ ...bodyP, textAlign: 'center', maxWidth: 600, margin: '0 auto 28px' }}>
             Two programs, one bundle. The AI coach, analytics, and competition rankings come with all of them.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16, margin: '0 0 24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, margin: '0 auto 24px', maxWidth: 480 }}>
             <Link to="/features/programs" className="landing-offering-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
               <h3>AI Programming &rarr;</h3>
               <p>Your program, built and adapted around you, with coaching guidance on every exercise.</p>
