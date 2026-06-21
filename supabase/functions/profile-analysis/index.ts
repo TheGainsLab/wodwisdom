@@ -25,6 +25,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildConditioningState } from "../_shared/conditioning-state.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { getTierStatus } from "../_shared/tier-status.ts";
 import { buildWriterPayload, type WriterPayload } from "../_shared/build-writer-payload.ts";
@@ -230,14 +231,16 @@ async function runAnalysis(
       .limit(1)
       .maybeSingle();
 
-    const [payload, recentTraining] = await Promise.all([
+    const [payload, recentTraining, conditioningState] = await Promise.all([
       buildWriterPayload(supa, userId),
       fetchAndFormatRecentHistory(supa, userId, { days: trainingDays, maxLines: trainingMaxLines }),
+      buildConditioningState(supa, userId),
     ]);
 
     const comparison = buildComparisonContext(prevEval, profileData);
     const extraContext = [
       recentTraining ? `RECENT TRAINING (logged sessions):\n${recentTraining}` : "",
+      conditioningState.trim(),
       comparison,
     ].filter(Boolean).join("\n\n");
 

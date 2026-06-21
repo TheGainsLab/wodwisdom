@@ -131,6 +131,23 @@ function isRateUnit(unit: string): boolean {
   return unit === 'watts';
 }
 
+/**
+ * Effective rolling-ratio multiplier applied to the target pace.
+ *
+ * AI-generated days (program_type 'gen:<userId>') OWN their intensity — the AI's
+ * chosen paceRange already encodes where the athlete is, so the rolling_avg_ratio
+ * is NOT applied as a second multiplier (that would double-adapt). On those days
+ * rolling_avg_ratio stays a read-only sensor the sequencer reads, not an actuator.
+ * Catalog days keep the existing adaptive multiplier unchanged.
+ */
+function effectiveRollingMult(
+  workout: { program_type?: string | null } | null | undefined,
+  metrics: { rolling_avg_ratio?: number | null } | null | undefined,
+): number {
+  if (String(workout?.program_type ?? '').startsWith('gen:')) return 1;
+  return metrics?.rolling_avg_ratio ?? 1;
+}
+
 function formatTime(seconds: number): string {
   if (seconds < 0) seconds = 0;
   if (seconds >= 3600) {
@@ -616,10 +633,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
             if (!isMaxEffort && Array.isArray(paceRange) && paceRange.length >= 2) {
               let intensityMult = (paceRange[0] + paceRange[1]) / 2;
-              // Apply rolling average ratio adjustment (matches mobile app)
-              if (performanceMetrics?.rolling_avg_ratio) {
-                intensityMult *= performanceMetrics.rolling_avg_ratio;
-              }
+              // Apply rolling average ratio adjustment (matches mobile app).
+              // AI-generated days own intensity, so the multiplier is 1 for them.
+              intensityMult *= effectiveRollingMult(workout, performanceMetrics);
               const segTarget = baselineRpm * intensityMult;
               totalTargetPace += segTarget * seg.duration;
               totalTargetDuration += seg.duration;
@@ -949,7 +965,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                     const workDur = resolveNum(bp.workDuration, 0) || (bp.workDurationOptions?.[0] ?? 0);
                     const restDur = resolveRest(bp.restDuration, workDur) || (bp.restDurationOptions?.[0] ?? 0);
                     const pace = formatPace(bp.paceRange);
-                    const rollingAdj = performanceMetrics?.rolling_avg_ratio ?? 1;
+                    const rollingAdj = effectiveRollingMult(workout, performanceMetrics);
 
                     return (
                       <div key={blockIdx}>
@@ -1367,7 +1383,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
     if (seg && seg.type === 'work' && workout) {
       const raw = [workout.block_1_params, workout.block_2_params, workout.block_3_params, workout.block_4_params][seg.blockIndex];
       const bp = raw as unknown as BlockParams | null;
-      const rollingAdj = performanceMetrics?.rolling_avg_ratio ?? 1;
+      const rollingAdj = effectiveRollingMult(workout, performanceMetrics);
       if (bp) {
         currentGoal = calculateIntervalGoal(bp, seg.duration, seg.label, baseline?.calculated_rpm ?? 0, rollingAdj, isRateUnit(selectedUnit));
       }

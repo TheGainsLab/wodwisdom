@@ -40,6 +40,9 @@ verify_jwt = false
 [functions.migrate-cohort-to-v3]
 verify_jwt = false
 
+[functions.engine-resequence-cron]
+verify_jwt = false
+
 [functions.profile-analysis]
 verify_jwt = false
 

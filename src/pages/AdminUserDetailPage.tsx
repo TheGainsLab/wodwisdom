@@ -782,12 +782,20 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                   <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', margin: 0 }}>
                     Engine
                   </h3>
-                  <button
-                    onClick={() => navigate(`/admin/users/${id}/engine-sessions`)}
-                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
-                  >
-                    View sessions →
-                  </button>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <button
+                      onClick={() => navigate(`/admin/users/${id}/engine-resequence`)}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
+                    >
+                      AI preview →
+                    </button>
+                    <button
+                      onClick={() => navigate(`/admin/users/${id}/engine-sessions`)}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
+                    >
+                      View sessions →
+                    </button>
+                  </div>
                 </div>
                 <div
                   className="admin-stats-grid"

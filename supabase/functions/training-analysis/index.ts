@@ -5,6 +5,7 @@ import {
   formatChunksAsContext,
 } from "../_shared/rag.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
+import { buildConditioningState } from "../_shared/conditioning-state.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -139,13 +140,14 @@ Deno.serve(async (req) => {
     }
 
     // Fetch profile and recent training in parallel
-    const [profileRes, recentTraining] = await Promise.all([
+    const [profileRes, recentTraining, conditioningState] = await Promise.all([
       supa
         .from("athlete_profiles")
         .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender")
         .eq("user_id", userId)
         .maybeSingle(),
       fetchAndFormatRecentHistory(supa, userId, { days: 14, maxLines: 40 }),
+      buildConditioningState(supa, userId),
     ]);
 
     const profileData: ProfileData = profileRes.data || {};
@@ -162,7 +164,7 @@ Deno.serve(async (req) => {
     const profileStr = formatProfile(profileData);
     const ragContext = await retrieveRAGContext(supa, profileData);
 
-    const userPrompt = `Here is an athlete's profile:\n\n${profileStr}\n\n${recentTraining}\n\nAnalyze this athlete's recent training. Your evaluation should:\n\n- Assess training volume and frequency — how many days per week, how many sessions, rest days\n- Identify movement patterns and frequency — what are they hitting often, what's missing?\n- Look at intensity and loading — are they pushing hard enough? Too hard? Any signs of overreaching?\n- Cross-reference with their profile — are they training their weaknesses or just repeating strengths?\n- Note any gaps — movements, energy systems, or skills from their profile that aren't showing up in training\n- Comment on session structure — are they doing strength + metcon? Skills work? Just metcons?\n\nEnd with 2-3 specific, actionable recommendations for what to adjust in their training.\n\nWrite like a coach. Be direct, specific, and concise. Short paragraphs, no bullet-point lists.`;
+    const userPrompt = `Here is an athlete's profile:\n\n${profileStr}\n\n${recentTraining}${conditioningState}\n\nAnalyze this athlete's recent training. Your evaluation should:\n\n- Assess training volume and frequency — how many days per week, how many sessions, rest days\n- Identify movement patterns and frequency — what are they hitting often, what's missing?\n- Look at intensity and loading — are they pushing hard enough? Too hard? Any signs of overreaching?\n- Cross-reference with their profile — are they training their weaknesses or just repeating strengths?\n- Note any gaps — movements, energy systems, or skills from their profile that aren't showing up in training\n- Comment on session structure — are they doing strength + metcon? Skills work? Just metcons?\n\nEnd with 2-3 specific, actionable recommendations for what to adjust in their training.\n\nWrite like a coach. Be direct, specific, and concise. Short paragraphs, no bullet-point lists.`;
 
     const systemPrompt = SYSTEM_PROMPT + ragContext;
 
