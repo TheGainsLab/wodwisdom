@@ -371,6 +371,7 @@ async function runReview(
   athleteProfile: AthleteProfileData | null,
   profileStr: string,
   recentStr: string,
+  conditioningState: string,
 ): Promise<void> {
   const start = Date.now();
   console.log(`[workout-review] Job ${reviewId} start`);
@@ -841,7 +842,7 @@ Deno.serve(async (req) => {
     }
 
     EdgeRuntime.waitUntil(
-      runReview(supa, pending.id, trimmed, source_id ?? null, athleteProfile, profileStr, recentStr),
+      runReview(supa, pending.id, trimmed, source_id ?? null, athleteProfile, profileStr, recentStr, conditioningState),
     );
 
     return new Response(
