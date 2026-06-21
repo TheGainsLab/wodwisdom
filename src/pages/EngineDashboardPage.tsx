@@ -13,7 +13,7 @@ import {
   calculateWorkDurationMinutes,
 } from '../lib/engineService';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, Lock, Check, Play, Settings, BarChart3, Calendar } from 'lucide-react';
+import { ChevronLeft, Lock, Check, Play, Settings, BarChart3, Calendar, Trophy } from 'lucide-react';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -74,7 +74,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
   const [completedDays, setCompletedDays] = useState<Set<number>>(new Set());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [showSwitcher, setShowSwitcher] = useState(false);
-  const { hasFeature, loading: entLoading } = useEntitlements(session.user.id);
+  const { hasFeature, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
 
   const load = async () => {
     setLoading(true);
@@ -348,6 +348,17 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
               >
                 <BarChart3 size={18} /> Engine Analytics
               </button>
+
+              {/* Leaderboard button — admin-gated for Tier-1 testing */}
+              {isAdmin && (
+                <button
+                  className="engine-btn engine-btn-primary"
+                  onClick={() => navigate('/engine/leaderboard')}
+                  style={{ width: '100%' }}
+                >
+                  <Trophy size={18} /> Leaderboard
+                </button>
+              )}
 
               {/* Training Log button */}
               <button

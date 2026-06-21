@@ -8,12 +8,13 @@ import { cacheGet, cacheSet, profileKey, entitlementsKey } from '../lib/offlineC
 interface Profile {
   full_name: string;
   role: string;
+  leaderboard_anonymous: boolean;
 }
 
 export default function SettingsPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
-  const [profile, setProfile] = useState<Profile>({ full_name: '', role: 'user' });
+  const [profile, setProfile] = useState<Profile>({ full_name: '', role: 'user', leaderboard_anonymous: false });
   const [hasSubscription, setHasSubscription] = useState(false);
   const [userFeatures, setUserFeatures] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +47,7 @@ export default function SettingsPage({ session }: { session: Session }) {
     }
 
     Promise.all([
-      supabase.from('profiles').select('full_name, role').eq('id', uid).single(),
+      supabase.from('profiles').select('full_name, role, leaderboard_anonymous').eq('id', uid).single(),
       supabase.from('user_entitlements').select('feature')
         .eq('user_id', uid)
         .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString()),
@@ -217,6 +218,28 @@ export default function SettingsPage({ session }: { session: Session }) {
                   <button className="auth-btn" onClick={saveProfile} disabled={saving} style={{ marginTop: 4 }}>
                     {saving ? 'Saving...' : 'Save Profile'}
                   </button>
+                </div>
+
+                {/* Leaderboard Privacy */}
+                <div className="settings-card">
+                  <h2 className="settings-card-title">Leaderboard</h2>
+                  <div className="settings-row" style={{ alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div className="settings-label">Show me as Anonymous</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                        Your results still count toward the leaderboards, but your name is hidden — you appear as "Anonymous Athlete".
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={profile.leaderboard_anonymous}
+                      onChange={async (e) => {
+                        const v = e.target.checked;
+                        setProfile({ ...profile, leaderboard_anonymous: v });
+                        await supabase.from('profiles').update({ leaderboard_anonymous: v }).eq('id', session.user.id);
+                      }}
+                    />
+                  </div>
                 </div>
 
                 {/* Password Section */}
