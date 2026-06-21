@@ -67,8 +67,10 @@ Deno.test("computeConditioningDiagnosis: separates calibration by units (no watt
   const diag = computeConditioningDiagnosis({
     metrics: [metric({ day_type: "endurance", modality: "echo_bike", rolling_avg_ratio: 1.0 })],
     timeTrials: [
-      tt("echo_bike", "2026-01-01", 18, false, "cal"), // old, calories
-      tt("echo_bike", "2026-05-27", 200, true, "watts"), // recent, watts
+      // Both current: a per-unit baseline can be live for cal AND watts at once
+      // (they're never compared). Only is_current baselines surface post-13228be.
+      tt("echo_bike", "2026-01-01", 18, true, "cal"), // current, calories
+      tt("echo_bike", "2026-05-27", 200, true, "watts"), // current, watts
     ],
     sessions: [],
     now: NOW,
