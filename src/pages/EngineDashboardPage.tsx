@@ -181,6 +181,9 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
   // ── Derived data ──
 
   const currentDay = progress?.engine_current_day ?? 1;
+  // Athlete-facing day number for the current day (1,2,3… in program order).
+  // currentDay stays the catalog identity used for routing/completion.
+  const currentSeq = workouts.find((w) => w.day_number === currentDay)?.sequence_position ?? currentDay;
   const totalDays = workouts.length;
 
   // Use engine_months_unlocked from the database — incremented by payment webhooks
@@ -281,10 +284,10 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                         background: status === 'completed' ? 'rgba(34,197,94,.15)' : status === 'current' ? 'var(--accent)' : 'var(--surface2)',
                         color: status === 'completed' ? '#4ade80' : status === 'current' ? 'white' : 'var(--text-muted)',
                       }}>
-                        {status === 'completed' ? <Check size={14} /> : status === 'locked' ? <Lock size={12} /> : day.day_number}
+                        {status === 'completed' ? <Check size={14} /> : status === 'locked' ? <Lock size={12} /> : (day.sequence_position ?? day.day_number)}
                       </span>
 
-                      <span className="engine-exercise-name">Day {day.day_number}</span>
+                      <span className="engine-exercise-name">Day {day.sequence_position ?? day.day_number}</span>
 
                       <span className={'engine-badge ' + dayTypeBadge(day.day_type)}>
                         {day.day_type.replace(/_/g, ' ')}
@@ -319,7 +322,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
               {/* Stats */}
               <div className="engine-grid">
                 <div className="engine-stat">
-                  <div className="engine-stat-value">{currentDay}</div>
+                  <div className="engine-stat-value">{currentSeq}</div>
                   <div className="engine-stat-label">Current Day</div>
                 </div>
                 <div className="engine-stat">
@@ -334,7 +337,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                 onClick={() => navigate(`/engine/training/${currentDay}`)}
                 style={{ width: '100%' }}
               >
-                <Play size={18} /> Start Day {currentDay}
+                <Play size={18} /> Start Day {currentSeq}
               </button>
 
               {/* Analytics button */}

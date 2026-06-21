@@ -17,6 +17,7 @@ import {
   getPerformanceMetrics,
   findPrecedingRocketRacesA,
   isPersonalBestSession,
+  getProgramMapping,
   type EngineWorkout,
   type EngineWorkoutSession,
   type EngineTimeTrial,
@@ -391,6 +392,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const [breakdownExpanded, setBreakdownExpanded] = useState(false);
   const [currentDay, setCurrentDay] = useState(1);
   const [programVersion, setProgramVersion] = useState('main_5day');
+  // Athlete-facing day number (1,2,3… in program order). Resolved from the
+  // mapping; dayNumber (the route param) stays the catalog identity.
+  const [displayDay, setDisplayDay] = useState<number | null>(null);
   const [rocketADay, setRocketADay] = useState<number | null>(null);
   const [rocketASession, setRocketASession] = useState<EngineWorkoutSession | null>(null);
   const { hasFeature } = useEntitlements(session.user.id);
@@ -428,8 +432,15 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         ]);
         setWorkout(wk);
         setCurrentDay(progress?.engine_current_day ?? 1);
-        setProgramVersion(progress?.engine_program_version ?? 'main_5day');
+        const version = progress?.engine_program_version ?? 'main_5day';
+        setProgramVersion(version);
         setPreviousSession(!!prevSession);
+
+        // Resolve the athlete-facing day number for this catalog day.
+        const mapping = await getProgramMapping(version);
+        setDisplayDay(
+          mapping.find((m) => m.engine_workout_day_number === dayNumber)?.program_sequence_order ?? dayNumber,
+        );
 
         // Load workout history for this day type
         if (wk?.day_type) {
@@ -1624,7 +1635,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
               {isTimeTrial ? 'Baseline Saved' : 'Workout Complete'}
             </h2>
             <p className="engine-subheader">
-              Day {dayNumber} — {(workout?.day_type ?? '').replace(/_/g, ' ')}
+              Day {displayDay ?? dayNumber} — {(workout?.day_type ?? '').replace(/_/g, ' ')}
             </p>
 
             {/* Summary stats */}
@@ -1714,7 +1725,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>Day {dayNumber}</h1>
+          <h1>Day {displayDay ?? dayNumber}</h1>
           {workout && (
             <span className={'engine-badge ' + dayTypeBadge(workout.day_type)}>
               {workout.day_type.replace(/_/g, ' ')}
@@ -1727,7 +1738,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           <div className="engine-page">
             <div className="engine-empty">
               <div className="engine-empty-title">Workout not found</div>
-              <div className="engine-empty-desc">Day {dayNumber} doesn't exist in this program.</div>
+              <div className="engine-empty-desc">Day {displayDay ?? dayNumber} doesn't exist in this program.</div>
               <button className="engine-btn engine-btn-secondary" onClick={() => navigate('/engine')}>
                 <ChevronLeft size={16} /> Dashboard
               </button>

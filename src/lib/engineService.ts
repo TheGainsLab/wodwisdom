@@ -23,6 +23,10 @@ export interface EngineWorkout {
   base_intensity_percent: number | null;
   month: number | null;
   avg_work_rest_ratio: number | null;
+  // Athlete-facing day number (1,2,3… in program order). Display only — set by
+  // getWorkoutsForProgram from engine_program_mapping.program_sequence_order.
+  // day_number stays the catalog identity used for routing/overrides/completion.
+  sequence_position?: number;
 }
 
 export interface EngineDayType {
@@ -333,7 +337,7 @@ export async function getWorkoutsForProgram(
   for (const m of mapping) {
     const w = byDay.get(m.engine_workout_day_number);
     if (!w) continue;
-    result.push({ ...w, month: m.month });
+    result.push({ ...w, month: m.month, sequence_position: m.program_sequence_order });
   }
 
   // AI self-sequencer overrides: swap generated workout content in at any
