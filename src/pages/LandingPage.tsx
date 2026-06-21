@@ -246,10 +246,10 @@ export default function LandingPage() {
           <Placeholder src="/images/hero-eval.png" alt="A real GAINS athlete evaluation" label="[ Image placeholder — Evaluation screenshot (~820×512) ]" />
         </div>
 
-        <p style={{ marginTop: 18, fontSize: 18, color: 'var(--text)', fontWeight: 600, lineHeight: 1.5 }}>
+        <p style={{ ...bodyP, marginTop: 18 }}>
           What you see here is a preview. Your full evaluation is a complete map of your strengths, hidden bottlenecks, and exactly what to prioritize next.
         </p>
-        <p style={{ marginTop: 8, fontSize: 18, color: 'var(--text)', fontWeight: 600, lineHeight: 1.5 }}>
+        <p style={{ ...bodyP, marginTop: 8 }}>
           Every metric in your evaluation is benchmarked against <span style={{ color: 'var(--accent)' }}>15 million</span> real workout results — the largest dataset in fitness.
         </p>
       </section>
