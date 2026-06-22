@@ -247,10 +247,7 @@ export default function LandingPage() {
         </div>
 
         <p style={{ ...bodyP, marginTop: 18 }}>
-          What you see here is a preview. Your full evaluation is a complete map of your strengths, hidden bottlenecks, and exactly what to prioritize next.
-        </p>
-        <p style={{ ...bodyP, marginTop: 8 }}>
-          Every metric in your evaluation is benchmarked against <span style={{ color: 'var(--accent)' }}>15 million</span> real workout results — the largest dataset in fitness.
+          What you see here is a preview. Your full evaluation is a complete map — your strengths, your hidden bottlenecks, and exactly what to prioritize next. We measure your results against <span style={{ color: 'var(--accent)' }}>15 million</span> real competition scores, so every number in your evaluation actually means something. You see how good your numbers really are, and exactly where you stand.
         </p>
       </section>
 
