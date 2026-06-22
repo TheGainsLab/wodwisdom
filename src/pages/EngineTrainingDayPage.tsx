@@ -1298,6 +1298,23 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   >
                     <Play size={18} /> Start Workout
                   </button>
+                  {/* Quick-action coach chips — deep-link to the AI Coach with the question auto-asked. */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button
+                      className="engine-btn engine-btn-secondary"
+                      onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { autoQuestion: 'Can you please suggest a warmup for today?' } })}
+                      style={{ flex: 1, color: '#ffffff' }}
+                    >
+                      Warm-up
+                    </button>
+                    <button
+                      className="engine-btn engine-btn-secondary"
+                      onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { autoQuestion: 'How should I pace this?' } })}
+                      style={{ flex: 1, color: '#ffffff' }}
+                    >
+                      Pace this
+                    </button>
+                  </div>
                   <button
                     className="engine-btn engine-btn-secondary"
                     onClick={() => navigate(`/engine/training/${dayNumber}/review`)}

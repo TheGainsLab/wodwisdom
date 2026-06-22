@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, CHAT_ENDPOINT, getAuthHeaders } from '../lib/supabase';
 import Nav from '../components/Nav';
@@ -23,18 +23,19 @@ interface CoachMessage {
   streaming?: boolean;
 }
 
-function CoachChat({ engineProgramDay }: { engineProgramDay: number }) {
+function CoachChat({ engineProgramDay, autoQuestion }: { engineProgramDay: number; autoQuestion?: string }) {
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const autoFiredRef = useRef(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const sendMessage = useCallback(async () => {
-    const question = input.trim();
+  const sendMessage = useCallback(async (questionArg?: string) => {
+    const question = (questionArg ?? input).trim();
     if (!question || isLoading) return;
 
     const userMsg: CoachMessage = { role: 'user', content: question };
@@ -103,6 +104,14 @@ function CoachChat({ engineProgramDay }: { engineProgramDay: number }) {
     setIsLoading(false);
   }, [input, isLoading, messages, engineProgramDay]);
 
+  // Quick-action entry (Warm-up / Pace this from the start page): auto-ask once.
+  useEffect(() => {
+    if (autoQuestion && !autoFiredRef.current) {
+      autoFiredRef.current = true;
+      sendMessage(autoQuestion);
+    }
+  }, [autoQuestion, sendMessage]);
+
   return (
     <div style={{ marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 20 }}>
       <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--accent)', marginBottom: 12 }}>
@@ -157,7 +166,7 @@ function CoachChat({ engineProgramDay }: { engineProgramDay: number }) {
           disabled={isLoading}
         />
         <button
-          onClick={sendMessage}
+          onClick={() => sendMessage()}
           disabled={isLoading || !input.trim()}
           style={{
             width: 44,
@@ -186,6 +195,8 @@ function CoachChat({ engineProgramDay }: { engineProgramDay: number }) {
 export default function EngineTrainingDayReviewPage({ session: _session }: { session: Session }) {
   const { dayNumber } = useParams<{ dayNumber: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const autoQuestion = (location.state as { autoQuestion?: string } | null)?.autoQuestion;
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [programVersion, setProgramVersion] = useState<string | null>(null);
@@ -314,7 +325,7 @@ export default function EngineTrainingDayReviewPage({ session: _session }: { ses
                   </div>
                 ) : null}
 
-                <CoachChat engineProgramDay={programDay} />
+                <CoachChat engineProgramDay={programDay} autoQuestion={autoQuestion} />
               </>
             )}
           </div>
