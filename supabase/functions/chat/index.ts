@@ -156,6 +156,14 @@ const WORKOUT_COACHING_PROMPT =
  * Returns an empty string if any required record is missing (gracefully
  * degrades to normal chat rather than erroring out).
  */
+// Canned quick-action chip questions → stable cache keys. Only these (sent with
+// empty history) are cached; free-form questions are not (they depend on the
+// conversation). Match is case-insensitive on the trimmed question.
+const ENGINE_CHIP_KEYS: Record<string, string> = {
+  "can you please suggest a warmup for today?": "warmup",
+  "how should i pace this?": "pace",
+};
+
 async function buildEngineCoachingContext(
   supa: SupabaseClient,
   userId: string,
@@ -417,6 +425,43 @@ Deno.serve(async (req) => {
       engine_program_day > 0 &&
       (userTier === "engine" || userTier === "all_access") &&
       !!athleteProfile?.engine_program_version;
+
+    // Quick-action chip caching: a canned chip question sent with empty history
+    // is a pure function of (user, day, equipment, question). Serve a cache hit
+    // instantly (skip all RAG/LLM work) and don't charge a quota slot for it.
+    const cacheKey = (engineCoachingMode && (history?.length ?? 0) === 0)
+      ? (ENGINE_CHIP_KEYS[(question || "").trim().toLowerCase()] ?? null)
+      : null;
+    const cacheModality = typeof engine_modality === "string" ? engine_modality : "";
+    const cacheUnits = typeof engine_units === "string" ? engine_units : "";
+    if (cacheKey) {
+      const { data: cached } = await supa
+        .from("engine_coach_cache")
+        .select("answer")
+        .eq("user_id", user.id)
+        .eq("engine_program_day", engine_program_day)
+        .eq("modality", cacheModality)
+        .eq("units", cacheUnits)
+        .eq("question_key", cacheKey)
+        .maybeSingle();
+      if (cached?.answer) {
+        const enc = new TextEncoder();
+        const usagePayload = isFreeTier
+          ? { tier: "free", total_questions: totalCount, free_limit: FREE_LIMIT }
+          : { tier: "paid", daily_questions: dailyCount, daily_limit: DAILY_LIMIT };
+        const hitStream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(enc.encode(`data: ${JSON.stringify({ type: "sources", sources: [] })}\n\n`));
+            controller.enqueue(enc.encode(`data: ${JSON.stringify({ type: "delta", text: cached.answer })}\n\n`));
+            controller.enqueue(enc.encode(`data: ${JSON.stringify({ type: "done", cached: true, usage: usagePayload })}\n\n`));
+            controller.close();
+          },
+        });
+        return new Response(hitStream, {
+          headers: { ...cors, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+        });
+      }
+    }
 
     // Build a short conversational context (last 2 turns) for the query rewriter
     const recentTurnsForRewrite = (history || [])
@@ -880,6 +925,19 @@ Deno.serve(async (req) => {
             p_input_tokens: inputTokens,
             p_output_tokens: outputTokens,
           });
+
+          // Store the quick-action chip answer so re-taps serve instantly/free.
+          if (cacheKey && fullAnswer) {
+            await supa.from("engine_coach_cache").upsert({
+              user_id: userId,
+              engine_program_day,
+              modality: cacheModality,
+              units: cacheUnits,
+              question_key: cacheKey,
+              answer: fullAnswer,
+            }, { onConflict: "user_id,engine_program_day,modality,units,question_key" })
+              .then(() => {}, (e) => console.error("[chat] coach cache upsert failed:", e));
+          }
 
           // Send final event with message_id and usage
           const usagePayload = isFreeTier
