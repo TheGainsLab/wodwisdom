@@ -813,7 +813,20 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                               <div className="program-day-headrow">
                               <button
                                 className="program-day-header"
-                                onClick={() => navigate(`/day/${w.id}`)}
+                                onClick={() => {
+                                  // v3 days open the dedicated day surface; v1 days have no
+                                  // program_blocks_v2 rows (DayPage is v3-only) so they expand
+                                  // inline to the prose + Coach + Start body below.
+                                  if (program?.program_version === 'v3') {
+                                    navigate(`/day/${w.id}`);
+                                  } else {
+                                    setExpandedDays(prev => {
+                                      const next = new Set(prev);
+                                      if (next.has(w.id)) next.delete(w.id); else next.add(w.id);
+                                      return next;
+                                    });
+                                  }
+                                }}
                                 aria-label={`Open Day ${w.day_num}`}
                               >
                                 <div className="program-day-left">
@@ -972,7 +985,9 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                           {!done && (
                                             <button
                                               className="auth-btn"
-                                              onClick={() => navigate(`/day/${w.id}`)}
+                                              onClick={() => isV3
+                                                ? navigate(`/day/${w.id}`)
+                                                : navigate('/workout/start', { state: reviewState })}
                                               style={{ padding: '8px 14px', fontSize: 13 }}
                                             >
                                               {ip ? 'Resume' : 'Start'}
