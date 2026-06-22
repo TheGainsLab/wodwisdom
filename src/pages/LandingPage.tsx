@@ -310,7 +310,7 @@ export default function LandingPage() {
               And that's just the beginning.
             </p>
             <p style={{ ...bodyP, textAlign: 'center', maxWidth: 640, margin: '8px auto 0' }}>
-              Your free account unlocks the entire GAINS workout history — every Open, every Quarterfinal, every Regionals workout from years past. Test yourself against levels you never reached. Compare your progress to where you were years ago. All free, all yours.
+              Your free account unlocks our entire archive of past competition workouts. Test yourself against levels you never reached. Compare your progress to where you were years ago. All included.
             </p>
             <div style={{ textAlign: 'center', marginTop: 24 }}>
               <Link to="/auth?signup=1" className="landing-cta">Get Your Free Evaluation</Link>
