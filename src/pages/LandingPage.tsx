@@ -364,7 +364,7 @@ export default function LandingPage() {
           <Eyebrow>A Common Language for Fitness</Eyebrow>
           <h2 style={sectionHeadline}>Fitness Needs a Common Language.</h2>
           <p style={bodyP}>
-            A rowing workout doesn't look like a lifting workout. A two-minute sprint doesn't look like a twenty-minute grinder. The coach converts every result into watts and watts per kilogram — one scale for every workout you do.
+            A rowing workout doesn't look like a lifting workout. A two-minute sprint doesn't look like a twenty-minute chipper. So how do you measure them on the same terms? Our goal is work capacity — so the coach converts every result into power, measured in watts and watts per kilogram. One scale for every workout you do.
           </p>
           <p style={{ ...bodyP, fontWeight: 600, color: 'var(--text)', marginBottom: 0 }}>That unlocks a single view of your entire training.</p>
 
