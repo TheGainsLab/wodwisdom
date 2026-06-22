@@ -283,9 +283,9 @@ export default function LandingPage() {
                 <div style={{ flex: 1, width: 2, background: 'var(--accent)', minHeight: 16 }} />
               </div>
               <div style={{ paddingBottom: 28 }}>
-                <div style={stepTitle}>Link your competition history <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional, but powerful).</span></div>
+                <div style={stepTitle}>Add your competition history <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional, but powerful).</span></div>
                 <p style={{ ...bodyP, marginTop: 8, marginBottom: 0 }}>
-                  Done the Open? Quarterfinals? Regionals? Connect your history in seconds and we'll benchmark you against athletes at every level. No history? No problem — your profile is all we need.
+                  Connect your results in seconds and we'll benchmark you against athletes at every level. No history? No problem — your profile is all we need.
                 </p>
               </div>
             </div>
@@ -297,7 +297,7 @@ export default function LandingPage() {
               <div>
                 <div style={stepTitle}>Get your complete evaluation.</div>
                 <p style={{ ...bodyP, marginTop: 8, marginBottom: 0 }}>
-                  Your strengths, your hidden bottlenecks, and exactly where you rank against 15 million athletes. Delivered instantly.
+                  Your strengths, your hidden bottlenecks, and exactly where you rank across all aspects of your fitness. Delivered instantly.
                 </p>
               </div>
             </div>
