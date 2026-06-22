@@ -325,7 +325,7 @@ export default function LandingPage() {
           <Eyebrow>Data comes to life</Eyebrow>
           <h2 style={sectionHeadline}>Most Apps Save a Number. We Capture the Whole Picture.</h2>
           <p style={{ ...bodyP, maxWidth: 680, marginBottom: 36 }}>
-            Take Fran, for example. Most apps log &ldquo;3:42 RX&rdquo; and move on. GAINS gives you your coach's full read: power output, percentile, time domain, movement quality, and even faults flagged — all on one scale.
+            Most apps log &ldquo;3:42 RX&rdquo; and move on. GAINS gives you your coach's full read: power output, percentile, time domain, movement quality, and even faults flagged — all on one scale.
           </p>
 
           {/* Bare logged result, then the personalized coach read — stacked (mobile-first, single column) */}
