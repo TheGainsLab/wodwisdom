@@ -373,17 +373,13 @@ export default function LandingPage() {
           </div>
 
           <p style={bodyP}>
-            Your power across every metcon you've completed. Your average output. And your power-duration curve — how your watts per kilogram change across short, medium, and long time domains. All on one scale.
+            Now you can see your power across every metcon you've completed, plotted as a power-duration curve that shows how your output changes across short, medium, and long time domains. All on one scale — which unlocks two things you couldn't see before:
           </p>
-          <p style={{ ...bodyP, marginBottom: 12, fontWeight: 600, color: 'var(--text)' }}>That unlocks two things you couldn't see before:</p>
           <p style={bodyP}>
             <span style={{ fontWeight: 600, color: 'var(--text)' }}>Progress over time.</span> Because everything's on one scale, you can finally tell what's improving and what's stalling — across every time domain, not just the workouts you happen to repeat.
           </p>
-          <p style={bodyP}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Where you stand.</span> Your numbers are ranked against 15 million workouts, plus Open, Quarterfinal, and competition data — so you know exactly where you sit, and how far you are from the top 1%.
-          </p>
           <p style={{ ...bodyP, marginBottom: 0 }}>
-            Every percentile and ranking you see is measured against this dataset — the largest in fitness. It's what makes &ldquo;97th percentile&rdquo; mean something. And no other app has it.
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Where you stand.</span> Your numbers are ranked against the largest competitive dataset in the sport — so you know exactly where you sit, how far you are from the top, and you'll watch the gap close as you improve. No other app can tell you that.
           </p>
         </div>
       </section>
