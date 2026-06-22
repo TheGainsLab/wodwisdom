@@ -161,6 +161,8 @@ async function buildEngineCoachingContext(
   userId: string,
   programVersion: string,
   engineProgramDay: number,
+  selectedModality: string | null,
+  selectedUnits: string | null,
 ): Promise<string> {
   // Mapping row for the requested day
   const { data: mapping } = await supa
@@ -261,6 +263,13 @@ async function buildEngineCoachingContext(
   parts.push("\nTODAY'S SESSION:");
   if (dayTypeRow?.name) parts.push(`Day type: ${dayTypeRow.name}`);
   if (dayTypeRow?.coaching_intent) parts.push("", dayTypeRow.coaching_intent);
+  if (selectedModality) {
+    const modLabel = selectedModality.replace(/_/g, " ");
+    parts.push(
+      `\nSELECTED EQUIPMENT FOR TODAY: ${modLabel}${selectedUnits ? ` (measured in ${selectedUnits})` : ""}. ` +
+        `Tailor pacing and warm-up advice to THIS equipment — do not hedge across modalities, and use this modality's time-trial baseline for pace targets.`,
+    );
+  }
 
   if (recentSessions && recentSessions.length > 0) {
     parts.push(`\nRECENT TRAINING (last ${recentSessions.length} sessions, most recent first):`);
@@ -394,7 +403,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { question, history = [], source_filter, workout_id, engine_program_day } = await req.json();
+    const { question, history = [], source_filter, workout_id, engine_program_day, engine_modality, engine_units } = await req.json();
     console.log(`[chat] tier: ${userTier}, hasProfile: ${!!athleteProfile}, engineDay: ${athleteProfile?.engine_current_day || "n/a"}, engineProgramDay: ${engine_program_day ?? "n/a"}`);
 
     // Engine coaching mode: the Engine review page scopes the coach to a
@@ -508,6 +517,8 @@ Deno.serve(async (req) => {
           user.id,
           athleteProfile.engine_program_version,
           engine_program_day,
+          typeof engine_modality === "string" ? engine_modality : null,
+          typeof engine_units === "string" ? engine_units : null,
         );
       } catch (err) {
         console.error("[chat] Engine coaching context failed:", err);

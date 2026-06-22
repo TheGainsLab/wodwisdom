@@ -23,7 +23,7 @@ interface CoachMessage {
   streaming?: boolean;
 }
 
-function CoachChat({ engineProgramDay, autoQuestion }: { engineProgramDay: number; autoQuestion?: string }) {
+function CoachChat({ engineProgramDay, autoQuestion, modality, units }: { engineProgramDay: number; autoQuestion?: string; modality?: string; units?: string }) {
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -51,6 +51,8 @@ function CoachChat({ engineProgramDay, autoQuestion }: { engineProgramDay: numbe
           question,
           history: [...messages, userMsg].slice(-10),
           engine_program_day: engineProgramDay,
+          engine_modality: modality,
+          engine_units: units,
         }),
       });
 
@@ -102,7 +104,7 @@ function CoachChat({ engineProgramDay, autoQuestion }: { engineProgramDay: numbe
       setMessages((prev) => [...prev, { role: 'assistant', content: 'Failed to connect.' }]);
     }
     setIsLoading(false);
-  }, [input, isLoading, messages, engineProgramDay]);
+  }, [input, isLoading, messages, engineProgramDay, modality, units]);
 
   // Quick-action entry (Warm-up / Pace this from the start page): auto-ask once.
   useEffect(() => {
@@ -196,7 +198,10 @@ export default function EngineTrainingDayReviewPage({ session: _session }: { ses
   const { dayNumber } = useParams<{ dayNumber: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const autoQuestion = (location.state as { autoQuestion?: string } | null)?.autoQuestion;
+  const navState = location.state as { autoQuestion?: string; modality?: string; units?: string } | null;
+  const autoQuestion = navState?.autoQuestion;
+  const selectedModality = navState?.modality;
+  const selectedUnits = navState?.units;
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [programVersion, setProgramVersion] = useState<string | null>(null);
@@ -325,7 +330,7 @@ export default function EngineTrainingDayReviewPage({ session: _session }: { ses
                   </div>
                 ) : null}
 
-                <CoachChat engineProgramDay={programDay} autoQuestion={autoQuestion} />
+                <CoachChat engineProgramDay={programDay} autoQuestion={autoQuestion} modality={selectedModality} units={selectedUnits} />
               </>
             )}
           </div>

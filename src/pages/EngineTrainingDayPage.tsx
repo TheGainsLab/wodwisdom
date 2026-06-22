@@ -1298,18 +1298,19 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   >
                     <Play size={18} /> Start Workout
                   </button>
-                  {/* Quick-action coach chips — deep-link to the AI Coach with the question auto-asked. */}
+                  {/* Quick-action coach chips — deep-link to the AI Coach with the question
+                      auto-asked and today's chosen equipment passed through. */}
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                     <button
                       className="engine-btn engine-btn-secondary"
-                      onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { autoQuestion: 'Can you please suggest a warmup for today?' } })}
+                      onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { autoQuestion: 'Can you please suggest a warmup for today?', modality, units: selectedUnit } })}
                       style={{ flex: 1, color: '#ffffff' }}
                     >
                       Warm-up
                     </button>
                     <button
                       className="engine-btn engine-btn-secondary"
-                      onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { autoQuestion: 'How should I pace this?' } })}
+                      onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { autoQuestion: 'How should I pace this?', modality, units: selectedUnit } })}
                       style={{ flex: 1, color: '#ffffff' }}
                     >
                       Pace this
@@ -1317,7 +1318,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   </div>
                   <button
                     className="engine-btn engine-btn-secondary"
-                    onClick={() => navigate(`/engine/training/${dayNumber}/review`)}
+                    onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { modality, units: selectedUnit } })}
                     style={{ width: '100%', marginTop: 8, color: '#ffffff' }}
                   >
                     AI Coach
