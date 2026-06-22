@@ -429,7 +429,9 @@ Deno.serve(async (req) => {
     // Quick-action chip caching: a canned chip question sent with empty history
     // is a pure function of (user, day, equipment, question). Serve a cache hit
     // instantly (skip all RAG/LLM work) and don't charge a quota slot for it.
-    const cacheKey = (engineCoachingMode && (history?.length ?? 0) === 0)
+    // history includes the current question (frontend sends [...messages, userMsg]),
+    // so a fresh chip tap has length 1; a real follow-up has length >= 3.
+    const cacheKey = (engineCoachingMode && (history?.length ?? 0) <= 1)
       ? (ENGINE_CHIP_KEYS[(question || "").trim().toLowerCase()] ?? null)
       : null;
     const cacheModality = typeof engine_modality === "string" ? engine_modality : "";
