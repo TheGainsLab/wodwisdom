@@ -257,13 +257,10 @@ export default function LandingPage() {
           <Eyebrow>How It Knows You</Eyebrow>
           <h2 style={sectionHeadline}>Get Your Free Evaluation.</h2>
           <p style={{ ...bodyP, maxWidth: 720 }}>
-            Before we write a single rep of programming, your coach builds a complete picture of you — strength, conditioning, gymnastics, movement, and competition performance.
+            Before we write a single rep of programming, your coach builds a complete picture of you — strength, conditioning, gymnastics, movement, and competition performance. That becomes your Evaluation: a comprehensive and candid assessment of where you stand today.
           </p>
           <p style={{ ...bodyP, maxWidth: 720 }}>
-            That picture becomes your comprehensive Evaluation. It maps your strengths, exposes your hidden bottlenecks, and outlines exactly what you need to prioritize next — an honest assessment of where you stand today.
-          </p>
-          <p style={{ ...bodyP, maxWidth: 720 }}>
-            There is no obligation. If you decide to train with us, this evaluation becomes the foundation of your personalized program. If not, it's yours to keep, completely free.
+            There is no obligation. If you train with us, it becomes the foundation of your personalized program. If not, it's yours to keep, completely free.
           </p>
 
           {/* Numbered path: build profile → add history → get evaluation (the destination). */}
