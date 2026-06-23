@@ -1357,6 +1357,10 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           {segments.length > 0 && segments[0].label} — Block 1
         </div>
 
+        <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center' }}>
+          The timer starts when you press Start.
+        </div>
+
         <div style={{ display: 'flex', gap: 12, width: '100%', maxWidth: 320 }}>
           <button
             className="engine-btn engine-btn-secondary"
