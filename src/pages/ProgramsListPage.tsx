@@ -193,7 +193,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                 <div className="history-item-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Zap size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                   <span className="history-question">Year of the Engine</span>
-                  <span className="history-time" style={{ marginLeft: 'auto' }}>720-day conditioning program</span>
+                  <span className="history-time" style={{ marginLeft: 'auto' }}>AI-Powered Conditioning</span>
                 </div>
               </div>
             )}
