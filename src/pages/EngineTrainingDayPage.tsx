@@ -26,6 +26,7 @@ import {
 } from '../lib/engineService';
 import { buildEngineShareCardData } from '../lib/shareCard';
 import ShareCardModal from '../components/competitionHistory/ShareCardModal';
+import FiberSpectrum from '../components/engine/FiberSpectrum';
 import { localDateString } from '../lib/localDate';
 import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
@@ -952,6 +953,10 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   <div className="engine-stat-label">Blocks</div>
                 </div>
               </div>
+
+              {/* Energy-system spectrum — where today sits slow→fast, from the
+                  prescription's paceRange. Demystifies day-type names. */}
+              <FiberSpectrum dayType={workout?.day_type} />
 
               {/* Workout Breakdown — collapsible segment-by-segment preview */}
               <div className="engine-collapsible-card">
