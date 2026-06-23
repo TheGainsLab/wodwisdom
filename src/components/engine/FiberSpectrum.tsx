@@ -1,8 +1,9 @@
 import { DAY_TYPE_SPECTRUM, spectrumCaption } from '../../lib/dayTypeSpectrum';
 
-// Cool (slow/easy) → hot (fast/powerful). The track itself carries the meaning,
-// so color reinforces position: an endurance day lights up cool, anaerobic hot.
-const SPECTRUM_GRADIENT = 'linear-gradient(90deg, #22d3ee 0%, #4ade80 30%, #fbbf24 62%, #ef4444 100%)';
+// Cool (slow/easy) → hot (fast/powerful). Routed through the saturated magenta
+// side of the wheel (blue→violet→magenta→red) so it stays vivid the whole way
+// and never crosses the olive/gray that a blue→amber ramp drags through.
+const SPECTRUM_GRADIENT = 'linear-gradient(90deg, #3b82f6 0%, #8b5cf6 40%, #ec4899 72%, #ef4444 100%)';
 
 /**
  * Slow→fast energy-system spectrum for an Engine day type. Decodes cryptic names
@@ -49,10 +50,6 @@ export default function FiberSpectrum({ dayType }: { dayType?: string | null }) 
       <div style={{ position: 'relative', height: 14, borderRadius: 7, overflow: 'hidden' }}>
         {/* dimmed full cool→hot scale */}
         <div style={{ position: 'absolute', inset: 0, background: SPECTRUM_GRADIENT, opacity: 0.2 }} />
-        {/* quartile ticks for orientation */}
-        {[25, 50, 75].map((t) => (
-          <div key={t} style={{ position: 'absolute', left: `${t}%`, top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.10)' }} />
-        ))}
         {/* the day's lit zone — full-color gradient clipped to the lo–hi window */}
         <div style={{
           position: 'absolute', inset: 0,
