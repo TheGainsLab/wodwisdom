@@ -995,7 +995,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                     transition: 'transform 0.2s',
                   }}
                 />
-                Workout Breakdown
+                Workout Details
               </button>
 
               {breakdownExpanded && (
