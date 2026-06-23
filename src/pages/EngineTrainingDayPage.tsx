@@ -921,8 +921,6 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 </p>
               )}
 
-              <hr className="engine-divider" />
-
               {/* Energy-system spectrum — above the stat cards; where today sits
                   slow→fast, from the prescription's paceRange. */}
               <FiberSpectrum dayType={workout?.day_type} />
@@ -943,6 +941,8 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   <div className="engine-stat-label">Blocks</div>
                 </div>
               </div>
+
+              <hr className="engine-divider" />
 
               {/* Workout Breakdown — collapsible segment-by-segment preview */}
               <div className="engine-collapsible-card">
