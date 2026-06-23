@@ -778,20 +778,13 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
           <div className="engine-card">
             <div className="engine-section">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {workout && (
-                  <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                    {calculateWorkDurationMinutes(workout)} min work
-                  </span>
-                )}
-                {previousSession && (
+              {previousSession && (
+                <div style={{ marginBottom: 12 }}>
                   <span className="engine-badge engine-badge--endurance">
                     <Check size={10} /> Done
                   </span>
-                )}
-              </div>
-
-              <hr className="engine-divider" />
+                </div>
+              )}
 
               {/* Category buttons */}
               <div>
