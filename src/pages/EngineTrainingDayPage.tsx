@@ -923,8 +923,13 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
               <hr className="engine-divider" />
 
-              {/* Stats row */}
-              <div className="engine-grid">
+              {/* Energy-system spectrum — above the stat cards; where today sits
+                  slow→fast, from the prescription's paceRange. */}
+              <FiberSpectrum dayType={workout?.day_type} />
+
+              {/* Stats row — forced 2-up on all platforms (engine-grid stacks on
+                  mobile; these values are short and read fine side-by-side). */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div className="engine-stat">
                   <div className="engine-stat-value" style={{ fontSize: 22 }}>
                     {workout ? calculateWorkDurationMinutes(workout) : '—'}
@@ -938,10 +943,6 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   <div className="engine-stat-label">Blocks</div>
                 </div>
               </div>
-
-              {/* Energy-system spectrum — where today sits slow→fast, from the
-                  prescription's paceRange. Demystifies day-type names. */}
-              <FiberSpectrum dayType={workout?.day_type} />
 
               {/* Workout Breakdown — collapsible segment-by-segment preview */}
               <div className="engine-collapsible-card">
