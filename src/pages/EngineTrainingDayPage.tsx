@@ -30,9 +30,7 @@ import FiberSpectrum from '../components/engine/FiberSpectrum';
 import { localDateString } from '../lib/localDate';
 import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertTriangle, Calendar, X, Share2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { scheduleEngineDay, rescheduleRow, unschedule } from '../lib/trainingSchedule';
+import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertTriangle, Share2 } from 'lucide-react';
 
 // ── Types & Constants ────────────────────────────────────────────────
 
@@ -792,12 +790,6 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   </span>
                 )}
               </div>
-
-              {workout && (
-                <div style={{ marginTop: 10 }}>
-                  <EngineDayScheduleControl engineWorkoutId={workout.id} userId={session.user.id} />
-                </div>
-              )}
 
               <hr className="engine-divider" />
 
@@ -1778,130 +1770,6 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         {hasAccess && stage === 'logging' && renderLogging()}
         {hasAccess && stage === 'complete' && renderComplete()}
       </div>
-    </div>
-  );
-}
-
-// ── Add-to-calendar affordance for an Engine day ──────────────────────
-// Engine days are once-and-done on the calendar: at most one scheduled date per
-// engine day. Shows the scheduled date as a removable chip + a quick-pick of the
-// next 14 days. Picking a date when one is already set MOVES it (reschedule),
-// never adds a second. Writes training_schedule.engine_workout_id.
-
-function nextNScheduleDays(n: number): { key: string; label: string }[] {
-  const out: { key: string; label: string }[] = [];
-  const base = new Date();
-  for (let i = 0; i < n; i++) {
-    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
-    const label = i === 0 ? 'Today'
-      : i === 1 ? 'Tomorrow'
-      : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    out.push({ key: localDateString(d), label });
-  }
-  return out;
-}
-
-function formatScheduleChip(dateStr: string): string {
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
-
-function EngineDayScheduleControl({ engineWorkoutId, userId }: { engineWorkoutId: string; userId: string }) {
-  const [rows, setRows] = useState<{ id: string; scheduled_date: string }[]>([]);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    let active = true;
-    supabase
-      .from('training_schedule')
-      .select('id, scheduled_date')
-      .eq('engine_workout_id', engineWorkoutId)
-      .eq('user_id', userId)
-      .order('scheduled_date')
-      .then(({ data }) => { if (active && data) setRows(data as { id: string; scheduled_date: string }[]); });
-    return () => { active = false; };
-  }, [engineWorkoutId, userId]);
-
-  useEffect(() => {
-    if (!pickerOpen) return;
-    const h = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setPickerOpen(false);
-    };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, [pickerOpen]);
-
-  const add = async (date: string) => {
-    setError(null);
-    setPickerOpen(false);
-    // Once-and-done: if already scheduled, move the existing row instead of adding.
-    if (rows.length > 0) {
-      const existing = rows[0];
-      const res = await rescheduleRow(existing.id, date, 'engine');
-      if (res.error) { setError(res.error); return; }
-      setRows([{ id: existing.id, scheduled_date: date }]);
-      return;
-    }
-    const res = await scheduleEngineDay(userId, engineWorkoutId, date);
-    if (res.error) { setError(res.error); return; }
-    setRows([{ id: res.id!, scheduled_date: res.scheduled_date! }]);
-  };
-
-  const remove = async (rowId: string) => {
-    setError(null);
-    const res = await unschedule(rowId);
-    if (res.error) { setError(res.error); return; }
-    setRows(prev => prev.filter(r => r.id !== rowId));
-  };
-
-  const takenDates = new Set(rows.map(r => r.scheduled_date));
-  const days = nextNScheduleDays(14);
-
-  return (
-    <div className="engine-schedule" ref={wrapRef} style={{ position: 'relative' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-        {rows.map(r => (
-          <span key={r.id} className="engine-badge engine-badge--endurance" style={{ gap: 6 }}>
-            <Calendar size={11} /> {formatScheduleChip(r.scheduled_date)}
-            <button
-              type="button"
-              onClick={() => remove(r.id)}
-              aria-label="Remove from calendar"
-              style={{ background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer', color: 'inherit', display: 'inline-flex' }}
-            >
-              <X size={11} />
-            </button>
-          </span>
-        ))}
-        <button
-          type="button"
-          className="engine-btn engine-btn-secondary engine-btn-sm"
-          onClick={() => setPickerOpen(o => !o)}
-        >
-          <Calendar size={14} /> {rows.length > 0 ? 'Reschedule' : 'Add to calendar'}
-        </button>
-      </div>
-      {error && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>{error}</div>}
-      {pickerOpen && (
-        <div className="day-schedule-quickpick" style={{ position: 'absolute', zIndex: 20, marginTop: 4 }}>
-          {days.map(d => {
-            const taken = takenDates.has(d.key);
-            return (
-              <button
-                key={d.key}
-                type="button"
-                className="day-schedule-qp-item"
-                disabled={taken}
-                onClick={() => add(d.key)}
-              >
-                <span>{d.label}</span>
-                {taken && <span className="day-schedule-qp-taken">scheduled</span>}
-              </button>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
