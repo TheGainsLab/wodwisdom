@@ -13,7 +13,20 @@ export default function FiberSpectrum({ dayType }: { dayType?: string | null }) 
   const width = Math.max(3, Math.min(100 - left, s.hi - s.lo));
 
   return (
-    <div style={{ margin: '4px 0 8px' }}>
+    <div style={{
+      margin: '12px 0',
+      border: '1px solid var(--border)',
+      borderRadius: 10,
+      padding: '14px 16px',
+      background: 'var(--surface)',
+    }}>
+      <div style={{
+        fontSize: 12, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase',
+        color: 'var(--text)', marginBottom: 12,
+      }}>
+        What this session trains
+      </div>
+
       <div style={{
         display: 'flex', justifyContent: 'space-between',
         fontSize: 10, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase',

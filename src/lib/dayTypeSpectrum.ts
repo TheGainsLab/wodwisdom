@@ -41,14 +41,14 @@ export const DAY_TYPE_SPECTRUM: Record<string, DayTypeSpectrum> = {
   synthesis:         { lo: 12, hi: 96, gradient: true }, // max sprints + aerobic
 };
 
-/** Short, position-derived caption (no fabricated coaching claims). */
+/** Short, plain-language caption derived from position — no physiology jargon. */
 export function spectrumCaption(s: DayTypeSpectrum): string {
   const span = s.hi - s.lo;
-  if (span >= 55) return 'Full spectrum — slow base to max power';
+  if (span >= 55) return 'Mixed — easy work up to all-out';
   const mid = (s.lo + s.hi) / 2;
-  if (mid < 24) return 'Aerobic base · slow, oxidative';
-  if (mid < 42) return 'Aerobic · base to threshold';
-  if (mid < 56) return 'Threshold · sustained hard';
-  if (mid < 72) return 'Aerobic power · VO₂ effort';
-  return 'Glycolytic · fast, max power';
+  if (mid < 24) return 'Easy, steady aerobic';
+  if (mid < 42) return 'Easy to moderate';
+  if (mid < 56) return 'Sustained hard effort';
+  if (mid < 72) return 'Hard, high-power aerobic';
+  return 'Fast and powerful';
 }
