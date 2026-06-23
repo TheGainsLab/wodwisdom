@@ -1,4 +1,4 @@
-import { DAY_TYPE_SPECTRUM, spectrumCaption } from '../../lib/dayTypeSpectrum';
+import { DAY_TYPE_SPECTRUM } from '../../lib/dayTypeSpectrum';
 
 // Cool (slow/easy) → hot (fast/powerful). Routed through the saturated magenta
 // side of the wheel (blue→violet→magenta→red) so it stays vivid the whole way
@@ -63,10 +63,6 @@ export default function FiberSpectrum({ dayType }: { dayType?: string | null }) 
           position: 'absolute', top: 0, bottom: 0, left: `${left}%`, width: `${width}%`,
           border: '1px solid rgba(255,255,255,0.55)', borderRadius: 4,
         }} />
-      </div>
-
-      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
-        {spectrumCaption(s)}
       </div>
     </div>
   );
