@@ -5,10 +5,11 @@ import Nav from '../components/Nav';
 import { supabase } from '../lib/supabase';
 import { ChevronLeft, Trophy, Menu } from 'lucide-react';
 
-type Board = 'days' | 'time_trials';
+type Board = 'days' | 'time_trials' | 'improvement';
 
 interface DaysRow { rnk: number; display_name: string; days: number; is_viewer: boolean }
 interface TtRow { rnk: number; display_name: string; rpm: number; total_output: number; is_viewer: boolean }
+interface ImpRow { rnk: number; display_name: string; improvement_pct: number; first_rpm: number; best_rpm: number; is_viewer: boolean }
 interface TtBucket { modality: string; units: string; athletes: number; is_viewer_default: boolean }
 
 const labelModality = (m: string) =>
@@ -24,8 +25,10 @@ export default function EngineLeaderboardPage({ session }: { session: Session })
   const [buckets, setBuckets] = useState<TtBucket[]>([]);
   const [bucketKey, setBucketKey] = useState<string>('');
   const [ttRows, setTtRows] = useState<TtRow[]>([]);
+  const [impRows, setImpRows] = useState<ImpRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [ttLoading, setTtLoading] = useState(false);
+  const [impLoading, setImpLoading] = useState(false);
 
   // Days board + TT bucket list load once.
   useEffect(() => {
@@ -58,7 +61,21 @@ export default function EngineLeaderboardPage({ session }: { session: Session })
     })();
   }, [bucketKey, uid]);
 
-  const renderRow = (rnk: number, name: string, metric: string, isViewer: boolean, key: string | number) => {
+  // Improvement board reloads when the selected bucket changes.
+  useEffect(() => {
+    if (!bucketKey) { setImpRows([]); return; }
+    const [modality, units] = bucketKey.split('|');
+    (async () => {
+      setImpLoading(true);
+      const { data } = await supabase.rpc('engine_leaderboard_tt_improvement', {
+        p_viewer: uid, p_modality: modality, p_units: units,
+      });
+      setImpRows((data as ImpRow[]) ?? []);
+      setImpLoading(false);
+    })();
+  }, [bucketKey, uid]);
+
+  const renderRow = (rnk: number, name: string, metric: string, isViewer: boolean, key: string | number, sub?: string) => {
     // Insert a divider hint when the viewer's anchored row is detached from the top 10.
     return (
       <div
@@ -78,7 +95,10 @@ export default function EngineLeaderboardPage({ session }: { session: Session })
         <span style={{ flex: 1, fontWeight: 600 }}>
           {isViewer ? 'You' : name}
         </span>
-        <span style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{metric}</span>
+        <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ color: 'var(--text-muted)', display: 'block' }}>{metric}</span>
+          {sub && <span style={{ color: 'var(--text-dim)', fontSize: 12, display: 'block' }}>{sub}</span>}
+        </span>
       </div>
     );
   };
@@ -112,6 +132,11 @@ export default function EngineLeaderboardPage({ session }: { session: Session })
               onClick={() => setBoard('time_trials')}
               style={{ flex: 1 }}
             >Time Trials</button>
+            <button
+              className={'engine-btn ' + (board === 'improvement' ? 'engine-btn-primary' : 'engine-btn-secondary')}
+              onClick={() => setBoard('improvement')}
+              style={{ flex: 1 }}
+            >Most Improved</button>
           </div>
 
           {loading ? (
@@ -127,7 +152,7 @@ export default function EngineLeaderboardPage({ session }: { session: Session })
                   : days.map((r) => renderRow(r.rnk, r.display_name, `${r.days} days`, r.is_viewer, r.rnk))}
               </div>
             </div>
-          ) : (
+          ) : board === 'time_trials' ? (
             <div className="engine-section">
               {buckets.length === 0 ? (
                 <div className="engine-empty">
@@ -159,6 +184,43 @@ export default function EngineLeaderboardPage({ session }: { session: Session })
                             r.rnk, r.display_name,
                             `${Number(r.rpm).toFixed(1)} ${bucketKey.split('|')[1]}/min`,
                             r.is_viewer, r.rnk))}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="engine-section">
+              {buckets.length === 0 ? (
+                <div className="engine-empty">
+                  <div className="engine-empty-desc">Not enough athletes here yet — leaderboards open at 5 athletes per equipment.</div>
+                </div>
+              ) : (
+                <>
+                  <select
+                    value={bucketKey}
+                    onChange={(e) => setBucketKey(e.target.value)}
+                    className="engine-input"
+                    style={{ width: '100%', marginBottom: 12 }}
+                  >
+                    {buckets.map((b) => (
+                      <option key={`${b.modality}|${b.units}`} value={`${b.modality}|${b.units}`}>
+                        {labelModality(b.modality)} · {b.units} ({b.athletes})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="engine-subheader" style={{ marginBottom: 8 }}>
+                    Ranked by % pace improvement from your first time trial to your best, on this equipment.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {impLoading
+                      ? <div className="engine-empty-desc">Loading…</div>
+                      : impRows.length === 0
+                        ? <div className="engine-empty-desc">Not enough athletes with 2+ time trials in this bucket yet.</div>
+                        : impRows.map((r) => renderRow(
+                            r.rnk, r.display_name,
+                            `+${Number(r.improvement_pct).toFixed(1)}%`,
+                            r.is_viewer, r.rnk,
+                            `${Number(r.first_rpm).toFixed(0)} → ${Number(r.best_rpm).toFixed(0)} ${bucketKey.split('|')[1]}/min`))}
                   </div>
                 </>
               )}
