@@ -848,7 +848,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
               {/* Baseline display */}
               {hasMatchingBaseline && baseline && (
-                <div className="engine-stat" style={{ textAlign: 'center' }}>
+                <>
+                  <hr className="engine-divider" />
+                  <div className="engine-stat" style={{ textAlign: 'center' }}>
                   <div className="engine-stat-label">Current Baseline ({selectedMod?.label})</div>
                   <div className="engine-stat-value" style={{ fontSize: 22 }}>
                     {baseline.total_output} {baseline.units ?? 'cal'}
@@ -857,7 +859,8 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                     {/* Rate units (watts): total_output above already IS the pace; no "/min" line. */}
                     {!isRateUnit(baseline.units ?? '') && baseline.calculated_rpm ? `${baseline.calculated_rpm.toFixed(1)} ${baseline.units ?? 'cal'}/min` : ''}
                   </div>
-                </div>
+                  </div>
+                </>
               )}
 
               {/* Baseline warning */}
