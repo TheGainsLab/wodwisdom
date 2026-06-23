@@ -945,6 +945,41 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 </div>
               </div>
 
+              {/* Plain parameters summary — states the structure in words, since the
+                  Workout Breakdown below lists every round but never summarizes it. */}
+              {!isTimeTrial && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'center' }}>
+                  {blocks.map(({ index: blockIdx, bp }) => {
+                    const rounds = resolveNum(bp.rounds, 1);
+                    const workDur = resolveNum(bp.workDuration, 0) || (bp.workDurationOptions?.[0] ?? 0);
+                    const restDur = resolveRest(bp.restDuration, workDur) || (bp.restDurationOptions?.[0] ?? 0);
+                    if (!workDur) return null;
+
+                    // Work/rest can change each round (increasing/decreasing intervals);
+                    // show a start→end range so the line stays accurate, not just round 1.
+                    const workInc = bp.workDurationIncrement ?? 0;
+                    const restInc = bp.restDurationIncrement ?? 0;
+                    const finalWork = Math.max(0, workDur + (rounds - 1) * workInc);
+                    const finalRest = Math.max(0, restDur + (rounds - 1) * restInc);
+                    const workStr = workInc
+                      ? `${formatDuration(workDur)} → ${formatDuration(finalWork)} work`
+                      : `${formatDuration(workDur)} work`;
+                    const restStr = restDur <= 0
+                      ? ''
+                      : restInc
+                        ? ` / ${formatDuration(restDur)} → ${formatDuration(finalRest)} rest`
+                        : ` / ${formatDuration(restDur)} rest`;
+
+                    return (
+                      <div key={`summary-${blockIdx}`} style={{ fontSize: 14, color: 'var(--text-dim)' }}>
+                        {blocks.length > 1 && <strong style={{ color: 'var(--text)' }}>Block {blockIdx + 1}: </strong>}
+                        {rounds} {rounds === 1 ? 'round' : 'rounds'} · {workStr}{restStr}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               <hr className="engine-divider" />
 
               {/* Workout Breakdown — collapsible segment-by-segment preview */}
