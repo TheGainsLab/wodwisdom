@@ -25,6 +25,8 @@ export default function EngineLeaderboardPage({ session }: { session: Session })
   const [buckets, setBuckets] = useState<TtBucket[]>([]);
   const [bucketKey, setBucketKey] = useState<string>('');
   const [ttRows, setTtRows] = useState<TtRow[]>([]);
+  const [impBuckets, setImpBuckets] = useState<TtBucket[]>([]);
+  const [impBucketKey, setImpBucketKey] = useState<string>('');
   const [impRows, setImpRows] = useState<ImpRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [ttLoading, setTtLoading] = useState(false);
@@ -34,15 +36,20 @@ export default function EngineLeaderboardPage({ session }: { session: Session })
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [d, b] = await Promise.all([
+      const [d, b, ib] = await Promise.all([
         supabase.rpc('engine_leaderboard_days', { p_viewer: uid, p_window_days: 30 }),
         supabase.rpc('engine_leaderboard_tt_buckets', { p_viewer: uid }),
+        supabase.rpc('engine_leaderboard_tt_improvement_buckets', { p_viewer: uid }),
       ]);
       setDays((d.data as DaysRow[]) ?? []);
       const bk = (b.data as TtBucket[]) ?? [];
       setBuckets(bk);
       const def = bk.find((x) => x.is_viewer_default) ?? bk[0];
       if (def) setBucketKey(`${def.modality}|${def.units}`);
+      const ibk = (ib.data as TtBucket[]) ?? [];
+      setImpBuckets(ibk);
+      const idef = ibk.find((x) => x.is_viewer_default) ?? ibk[0];
+      if (idef) setImpBucketKey(`${idef.modality}|${idef.units}`);
       setLoading(false);
     })();
   }, [uid]);
@@ -61,10 +68,10 @@ export default function EngineLeaderboardPage({ session }: { session: Session })
     })();
   }, [bucketKey, uid]);
 
-  // Improvement board reloads when the selected bucket changes.
+  // Improvement board reloads when its selected bucket changes.
   useEffect(() => {
-    if (!bucketKey) { setImpRows([]); return; }
-    const [modality, units] = bucketKey.split('|');
+    if (!impBucketKey) { setImpRows([]); return; }
+    const [modality, units] = impBucketKey.split('|');
     (async () => {
       setImpLoading(true);
       const { data } = await supabase.rpc('engine_leaderboard_tt_improvement', {
@@ -73,7 +80,7 @@ export default function EngineLeaderboardPage({ session }: { session: Session })
       setImpRows((data as ImpRow[]) ?? []);
       setImpLoading(false);
     })();
-  }, [bucketKey, uid]);
+  }, [impBucketKey, uid]);
 
   const renderRow = (rnk: number, name: string, metric: string, isViewer: boolean, key: string | number, sub?: string) => {
     // Insert a divider hint when the viewer's anchored row is detached from the top 10.
@@ -132,11 +139,13 @@ export default function EngineLeaderboardPage({ session }: { session: Session })
               onClick={() => setBoard('time_trials')}
               style={{ flex: 1 }}
             >Time Trials</button>
-            <button
-              className={'engine-btn ' + (board === 'improvement' ? 'engine-btn-primary' : 'engine-btn-secondary')}
-              onClick={() => setBoard('improvement')}
-              style={{ flex: 1 }}
-            >Most Improved</button>
+            {impBuckets.length > 0 && (
+              <button
+                className={'engine-btn ' + (board === 'improvement' ? 'engine-btn-primary' : 'engine-btn-secondary')}
+                onClick={() => setBoard('improvement')}
+                style={{ flex: 1 }}
+              >Most Improved</button>
+            )}
           </div>
 
           {loading ? (
@@ -190,40 +199,32 @@ export default function EngineLeaderboardPage({ session }: { session: Session })
             </div>
           ) : (
             <div className="engine-section">
-              {buckets.length === 0 ? (
-                <div className="engine-empty">
-                  <div className="engine-empty-desc">Not enough athletes here yet — leaderboards open at 5 athletes per equipment.</div>
-                </div>
-              ) : (
-                <>
-                  <select
-                    value={bucketKey}
-                    onChange={(e) => setBucketKey(e.target.value)}
-                    className="engine-input"
-                    style={{ width: '100%', marginBottom: 12 }}
-                  >
-                    {buckets.map((b) => (
-                      <option key={`${b.modality}|${b.units}`} value={`${b.modality}|${b.units}`}>
-                        {labelModality(b.modality)} · {b.units} ({b.athletes})
-                      </option>
-                    ))}
-                  </select>
-                  <p className="engine-subheader" style={{ marginBottom: 8 }}>
-                    Ranked by % pace improvement from your first time trial to your best, on this equipment.
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {impLoading
-                      ? <div className="engine-empty-desc">Loading…</div>
-                      : impRows.length === 0
-                        ? <div className="engine-empty-desc">Not enough athletes with 2+ time trials in this bucket yet.</div>
-                        : impRows.map((r) => renderRow(
-                            r.rnk, r.display_name,
-                            `+${Number(r.improvement_pct).toFixed(1)}%`,
-                            r.is_viewer, r.rnk,
-                            `${Number(r.first_rpm).toFixed(0)} → ${Number(r.best_rpm).toFixed(0)} ${bucketKey.split('|')[1]}/min`))}
-                  </div>
-                </>
-              )}
+              <select
+                value={impBucketKey}
+                onChange={(e) => setImpBucketKey(e.target.value)}
+                className="engine-input"
+                style={{ width: '100%', marginBottom: 12 }}
+              >
+                {impBuckets.map((b) => (
+                  <option key={`${b.modality}|${b.units}`} value={`${b.modality}|${b.units}`}>
+                    {labelModality(b.modality)} · {b.units} ({b.athletes})
+                  </option>
+                ))}
+              </select>
+              <p className="engine-subheader" style={{ marginBottom: 8 }}>
+                Ranked by % pace improvement from your first time trial to your best, on this equipment.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {impLoading
+                  ? <div className="engine-empty-desc">Loading…</div>
+                  : impRows.length === 0
+                    ? <div className="engine-empty-desc">Not enough athletes with 2+ time trials in this bucket yet.</div>
+                    : impRows.map((r) => renderRow(
+                        r.rnk, r.display_name,
+                        `+${Number(r.improvement_pct).toFixed(1)}%`,
+                        r.is_viewer, r.rnk,
+                        `${Number(r.first_rpm).toFixed(0)} → ${Number(r.best_rpm).toFixed(0)} ${impBucketKey.split('|')[1]}/min`))}
+              </div>
             </div>
           )}
 
