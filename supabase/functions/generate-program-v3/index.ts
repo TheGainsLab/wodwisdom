@@ -49,7 +49,7 @@ import {
   summarizeAuditRun,
   classifyFailuresByKind,
 } from "../_shared/audit-runner.ts";
-import { clampLoadSanity } from "../_shared/programmatic-fixes.ts";
+import { clampLoadSanity, stripInternalMarkers } from "../_shared/programmatic-fixes.ts";
 import { surgicallyRewriteBlock, spliceBlock } from "../_shared/surgical-block-fix.ts";
 import { reviewSafety } from "../_shared/safety-review.ts";
 import { saveProgramV3 } from "../_shared/save-program-v3.ts";
@@ -790,6 +790,14 @@ async function stageSaving(
   const output = rs.output!;
   const monthNumber = rs.continuation.monthNumber;
   const safety = rs.safety ?? { safe: true, reasoning: "", errored: true };
+
+  // Always-run sanitize: strip internal Track/week/deload markers the writer
+  // leaks into athlete-facing block_label / block_scheme. Runs after surgical
+  // (which can also leak), right before save. Deterministic, idempotent.
+  const stripped = stripInternalMarkers(output);
+  if (stripped.patched > 0) {
+    console.log(`[generate-program-v3] stripped ${stripped.patched} internal marker(s) from labels/schemes`);
+  }
 
   // Resolve the target program id:
   //  - continuation: the existing program (append).
