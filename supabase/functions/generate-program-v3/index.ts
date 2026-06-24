@@ -68,6 +68,12 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = "claude-sonnet-4-6";
 const MAX_SKELETON_ATTEMPTS = 3;
+// The skeleton emits up to 8k tokens of Sonnet output; 60s was too tight and a
+// slow call threw TimeoutError, hard-failing the job. The skeleton's LLM call
+// already sits inside the MAX_SKELETON_ATTEMPTS audit-retry loop, which is the
+// ONLY multiplier on the call — keep ATTEMPTS × this timeout under the ~400s
+// edge wall-clock (3 × 120s = 360s) rather than nesting a second retry loop.
+const SKELETON_TIMEOUT_MS = 120_000;
 const FUNCTION_NAME = "generate-program-v3";
 
 interface ClaudeContentBlock {
@@ -165,7 +171,7 @@ export async function callSkeletonWriter(
       tool_choice: { type: "tool", name: "emit_skeleton" },
       messages: [{ role: "user", content: userMessage }],
     }),
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(SKELETON_TIMEOUT_MS),
   });
 
   if (!resp.ok) {
@@ -326,7 +332,25 @@ async function generateSkeletonWithAudits(
   for (let attempt = 1; attempt <= MAX_SKELETON_ATTEMPTS; attempt++) {
     console.log(`[generate-program-v3] skeleton attempt ${attempt}/${MAX_SKELETON_ATTEMPTS}`);
     await setStage(`skeleton_attempt_${attempt}`);
-    const skeleton = await callSkeletonWriter(payload, retryViolations);
+    let skeleton: SkeletonOutput;
+    try {
+      skeleton = await callSkeletonWriter(payload, retryViolations);
+    } catch (err) {
+      // Transient failure (timeout / dropped connection / 5xx / 429): consume
+      // this attempt and retry with the SAME violations instead of hard-failing
+      // the job. This audit loop is the only multiplier on the LLM call, so total
+      // wall-clock stays bounded — no nested retry product.
+      const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      const isTransient = err instanceof Error &&
+        (err.name === "TimeoutError" ||
+          /timed out|timeout|aborted/i.test(err.message) ||
+          /Claude HTTP (5\d\d|429)/.test(err.message));
+      if (isTransient && attempt < MAX_SKELETON_ATTEMPTS) {
+        console.warn(`[generate-program-v3] skeleton transient (${msg}); retry ${attempt}/${MAX_SKELETON_ATTEMPTS}`);
+        continue;
+      }
+      throw err;
+    }
     lastSkeleton = skeleton;
     await setStage("skeleton_auditing");
     const auditResult = runSkeletonAudits({
