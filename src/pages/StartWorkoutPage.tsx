@@ -529,7 +529,7 @@ export default function StartWorkoutPage({ session, sourceStateProp, onExit, onD
           if (b.block_label && b.block_label !== (BLOCK_TYPE_LABELS[b.block_type] || b.block_type)) {
             lines.push(b.block_label);
           }
-          if (b.block_notes) lines.push(b.block_notes);
+          // block_notes is internal writer reasoning — not shown to the athlete.
           for (const m of movements) lines.push(fmtMv(m));
           // Pre-populate parsed_tasks from the structured movements so the
           // log form doesn't need to re-parse the prose. v3 movements

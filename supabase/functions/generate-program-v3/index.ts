@@ -68,6 +68,12 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = "claude-sonnet-4-6";
 const MAX_SKELETON_ATTEMPTS = 3;
+// The skeleton emits up to 8k tokens of Sonnet output; 60s was too tight and a
+// slow call threw TimeoutError, hard-failing the job. The skeleton's LLM call
+// already sits inside the MAX_SKELETON_ATTEMPTS audit-retry loop, which is the
+// ONLY multiplier on the call — keep ATTEMPTS × this timeout under the ~400s
+// edge wall-clock (3 × 120s = 360s) rather than nesting a second retry loop.
+const SKELETON_TIMEOUT_MS = 120_000;
 const FUNCTION_NAME = "generate-program-v3";
 
 interface ClaudeContentBlock {
@@ -149,6 +155,7 @@ export async function callSkeletonWriter(
     ? `${retryViolations}\n\n---\n\n${payloadBlock}\n\n${ruleRecap}`
     : `${payloadBlock}\n\n${ruleRecap}`;
 
+  const t0 = Date.now();
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -165,7 +172,7 @@ export async function callSkeletonWriter(
       tool_choice: { type: "tool", name: "emit_skeleton" },
       messages: [{ role: "user", content: userMessage }],
     }),
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(SKELETON_TIMEOUT_MS),
   });
 
   if (!resp.ok) {
@@ -183,20 +190,29 @@ export async function callSkeletonWriter(
     );
   }
   console.log(
-    `[generate-program-v3 skeleton] Claude usage: input=${data.usage?.input_tokens} output=${data.usage?.output_tokens} stop_reason=${data.stop_reason}`,
+    `[generate-program-v3 skeleton] Claude usage: input=${data.usage?.input_tokens} output=${data.usage?.output_tokens} stop_reason=${data.stop_reason} fetch_ms=${Date.now() - t0}`,
   );
   return toolUse.input as SkeletonOutput;
 }
 
-const MAX_WEEK_FILL_ATTEMPTS = 3;
+// EVAL STOPGAP (not the long-term answer — streaming + fresh-invocation re-entry
+// is, see notes). Real logs show a week fill emitting 7.7k+ tokens of Sonnet
+// output takes 130s and a 6-day week can need >150s. No fixed total-duration
+// timeout that ALSO leaves room for a retry fits under the ~400s edge wall-clock,
+// so: ONE attempt with a single generous budget (covers a ~200s+ verbose week,
+// still ~70s clear of the wall). A transient blip now fails the run and you
+// re-kick — acceptable for evaluation, not for production load.
+const MAX_WEEK_FILL_ATTEMPTS = 1;
+const WEEK_FILL_TIMEOUT_MS = 330_000;
 
 /**
  * Fill ONE week of the program. Reuses the v2 writer prompt + an emit_week
  * tool, with the full skeleton as context, the specific week to fill, and the
  * already-generated prior weeks (so loads/volume progress across the cycle
- * instead of repeating). Small + fast vs. the old monolithic 4-week call, and
- * auto-retries transient failures (timeout / 5xx / 429) so a single slow call
- * doesn't fail the whole job.
+ * instead of repeating). Small + fast vs. the old monolithic 4-week call.
+ * EVAL STOPGAP: single attempt with a generous (330s) budget — a slow-but-
+ * healthy week completes; a timeout fails the run (re-kick) rather than burning
+ * a second attempt the wall-clock can't afford. See the constants below.
  */
 async function callWeekFill(
   payload: WriterPayload,
@@ -243,6 +259,7 @@ async function callWeekFill(
 
   let lastErr: unknown = null;
   for (let attempt = 1; attempt <= MAX_WEEK_FILL_ATTEMPTS; attempt++) {
+    const t0 = Date.now();
     try {
       const resp = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -260,7 +277,7 @@ async function callWeekFill(
           tool_choice: { type: "tool", name: "emit_week" },
           messages: [{ role: "user", content: userMessage }],
         }),
-        signal: AbortSignal.timeout(100_000),
+        signal: AbortSignal.timeout(WEEK_FILL_TIMEOUT_MS),
       });
 
       if (!resp.ok) {
@@ -284,20 +301,24 @@ async function callWeekFill(
         );
       }
       console.log(
-        `[generate-program-v3 fill week ${weekNum}] usage: input=${data.usage?.input_tokens} output=${data.usage?.output_tokens} stop_reason=${data.stop_reason}`,
+        `[generate-program-v3 fill week ${weekNum}] usage: input=${data.usage?.input_tokens} output=${data.usage?.output_tokens} stop_reason=${data.stop_reason} fetch_ms=${Date.now() - t0}`,
       );
       const week = toolUse.input as WeekPrescription;
       week.week_num = weekNum; // enforce regardless of what the model emitted
       return week;
     } catch (err) {
       lastErr = err;
+      const elapsed = Date.now() - t0;
       const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
       const isTransient = err instanceof Error &&
         (err.name === "TimeoutError" || /timed out|timeout|aborted/i.test(err.message));
       if (isTransient && attempt < MAX_WEEK_FILL_ATTEMPTS) {
-        console.warn(`[generate-program-v3 fill week ${weekNum}] transient (${msg}); retry ${attempt}/${MAX_WEEK_FILL_ATTEMPTS}`);
+        console.warn(`[generate-program-v3 fill week ${weekNum}] transient after ${elapsed}ms (${msg}); retry ${attempt}/${MAX_WEEK_FILL_ATTEMPTS}`);
         continue;
       }
+      // Stopgap is single-attempt, so a timeout lands here and fails the stage —
+      // log how long it ran so we can see how close it got to the 330s budget.
+      console.warn(`[generate-program-v3 fill week ${weekNum}] giving up after ${elapsed}ms (${msg})`);
       throw err;
     }
   }
@@ -319,7 +340,25 @@ async function generateSkeletonWithAudits(
   for (let attempt = 1; attempt <= MAX_SKELETON_ATTEMPTS; attempt++) {
     console.log(`[generate-program-v3] skeleton attempt ${attempt}/${MAX_SKELETON_ATTEMPTS}`);
     await setStage(`skeleton_attempt_${attempt}`);
-    const skeleton = await callSkeletonWriter(payload, retryViolations);
+    let skeleton: SkeletonOutput;
+    try {
+      skeleton = await callSkeletonWriter(payload, retryViolations);
+    } catch (err) {
+      // Transient failure (timeout / dropped connection / 5xx / 429): consume
+      // this attempt and retry with the SAME violations instead of hard-failing
+      // the job. This audit loop is the only multiplier on the LLM call, so total
+      // wall-clock stays bounded — no nested retry product.
+      const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      const isTransient = err instanceof Error &&
+        (err.name === "TimeoutError" ||
+          /timed out|timeout|aborted/i.test(err.message) ||
+          /Claude HTTP (5\d\d|429)/.test(err.message));
+      if (isTransient && attempt < MAX_SKELETON_ATTEMPTS) {
+        console.warn(`[generate-program-v3] skeleton transient (${msg}); retry ${attempt}/${MAX_SKELETON_ATTEMPTS}`);
+        continue;
+      }
+      throw err;
+    }
     lastSkeleton = skeleton;
     await setStage("skeleton_auditing");
     const auditResult = runSkeletonAudits({

@@ -772,10 +772,15 @@ export default function AthletePage({ session }: { session: Session }) {
       const jobId = data?.job_id;
       if (!jobId) throw new Error('No job ID returned');
 
-      // Poll for completion with backoff: 3s, 4s, 5s, 6s, ... capped at 8s
+      // Poll for completion with backoff: 3s, 4s, 5s, 6s, ... capped at 8s.
+      // Budget must exceed the real end-to-end job time: a 4-day athlete runs
+      // ~13 min wall-clock (skeleton + 4 week-fills + benchmark + surgical
+      // passes + save, each its own edge invocation), and a heavy 6-day athlete
+      // longer. 150 attempts × ~8s ≈ 20 min, comfortably clear, so the UI no
+      // longer reports a false timeout while the job is still completing.
       let delay = 3000;
       const maxDelay = 8000;
-      const maxAttempts = 80; // ~400s worth of polling
+      const maxAttempts = 150; // ~20 min worth of polling
       for (let i = 0; i < maxAttempts; i++) {
         await new Promise((r) => setTimeout(r, delay));
         const { data: status, error: statusErr } = await supabase.functions.invoke('program-job-status', {

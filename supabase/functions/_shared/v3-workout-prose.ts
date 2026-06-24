@@ -112,7 +112,7 @@ export async function reassembleV3WorkoutText(
     if (b.block_scheme) header.push(b.block_scheme);
     if (b.time_cap_seconds) header.push(`cap ${Math.round(b.time_cap_seconds / 60)} min`);
     if (header.length) lines.push(header.join(" — "));
-    if (b.block_notes) lines.push(b.block_notes);
+    // block_notes is the writer's internal reasoning — not surfaced to the athlete.
     for (const m of movsByBlock.get(b.id) ?? []) lines.push(formatMovement(m));
     sections.push(lines.join("\n"));
   }
