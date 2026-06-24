@@ -188,7 +188,14 @@ export async function callSkeletonWriter(
   return toolUse.input as SkeletonOutput;
 }
 
-const MAX_WEEK_FILL_ATTEMPTS = 3;
+// One retry max: a week fill emits up to max_tokens (16k) of Sonnet output,
+// which can run well past two minutes. The per-call budget (WEEK_FILL_TIMEOUT_MS)
+// is generous enough that a slow-but-healthy call still completes; the retry is
+// for genuinely transient failures (5xx / 429 / dropped connection). Keep
+// ATTEMPTS × TIMEOUT under the ~400s edge wall-clock so the whole fill finishes
+// inside one invocation instead of getting wall-clock-killed and reaper-resumed.
+const MAX_WEEK_FILL_ATTEMPTS = 2;
+const WEEK_FILL_TIMEOUT_MS = 175_000;
 
 /**
  * Fill ONE week of the program. Reuses the v2 writer prompt + an emit_week
@@ -260,7 +267,7 @@ async function callWeekFill(
           tool_choice: { type: "tool", name: "emit_week" },
           messages: [{ role: "user", content: userMessage }],
         }),
-        signal: AbortSignal.timeout(100_000),
+        signal: AbortSignal.timeout(WEEK_FILL_TIMEOUT_MS),
       });
 
       if (!resp.ok) {
