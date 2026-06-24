@@ -1121,7 +1121,7 @@ export function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
     // Skip the redundant cap when the scheme already states the duration (AMRAP/EMOM).
     if (b.time_cap_seconds && !/\b(amrap|emom)\b/i.test(b.block_scheme ?? '')) headerSuffix.push(`cap ${Math.round(b.time_cap_seconds / 60)} min`);
     lines.push(`${labelHeader}:${headerSuffix.length ? ' ' + headerSuffix.join(' — ') : ''}`);
-    if (b.block_notes) lines.push(`  ${b.block_notes}`);
+    // block_notes is internal writer reasoning — not exported to the athlete.
     for (const m of b.movements) lines.push(`  ${fmt(m)}`);
     sections.push(lines.join('\n'));
   }
@@ -1409,12 +1409,6 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
     marginTop: 6,
     marginBottom: 4,
   };
-  const notesStyle: React.CSSProperties = {
-    fontSize: 12,
-    color: 'var(--text-dim)',
-    marginBottom: 8,
-    fontStyle: 'italic',
-  };
 
   const [editing, setEditing] = useState(false);
   const canEdit = !!onUpdateMovement;
@@ -1555,7 +1549,9 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
       ) : (
         block.block_scheme && <div style={schemeStyle}>{block.block_scheme}</div>
       )}
-      {block.block_notes && <div style={notesStyle}>{block.block_notes}</div>}
+      {/* block_notes is the writer's internal reasoning (load math, percentile/
+          ratio justification) — kept in the DB for admin/eval, not shown to the
+          athlete. Execution cues live in each movement's scaling_note. */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {block.movements.map((m) => (
           editing
