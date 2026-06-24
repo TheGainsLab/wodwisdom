@@ -116,3 +116,65 @@ export function clampLoadSanity(
   return { patched, log };
 }
 
+/**
+ * Strip the writer's INTERNAL programming markers from athlete-facing fields.
+ *
+ * The writer is told to keep Track A/B labels and week/deload tags in
+ * block_notes (hidden reasoning), but it leaks them into block_label and
+ * block_scheme anyway. These tokens are a controlled, finite vocabulary —
+ * safe to remove deterministically (regex), unlike coaching prose, which is
+ * open-ended and handled at the prompt level.
+ *
+ * Removes from block_label AND block_scheme:
+ *   - "Track A" / "Track B" / "Track A/B" (with any leading separator)
+ *   - parentheticals mentioning a week or deload — "(Wk 4 Deload)", "(Week 3)"
+ *   - a trailing "— Deload" tag
+ * Then cleans up any dangling separators / doubled spaces.
+ *
+ * Always-run (not audit-gated). Idempotent. Mutates in place; returns a count.
+ */
+export function stripInternalMarkers(
+  output: WriterOutput,
+): { patched: number; log: string[] } {
+  const log: string[] = [];
+  let patched = 0;
+
+  const clean = (raw: string): string => {
+    let s = raw;
+    // "Track A" / "Track B" / "Track A/B" with an optional leading dash/em-dash.
+    s = s.replace(/\s*[—–-]?\s*Track\s+[A-Z](?:\/[A-Z])?\b/gi, "");
+    // Parentheticals that mention a week or deload: "(Wk 4 Deload)", "(Week 3)".
+    s = s.replace(/\s*\((?:[^)]*\b(?:wk|week|deload)\b[^)]*)\)/gi, "");
+    // A trailing "— Deload" / "- deload" tag.
+    s = s.replace(/\s*[—–-]\s*deload\b/gi, "");
+    // Tidy: drop a dangling trailing separator, collapse doubled spaces.
+    s = s.replace(/\s*[—–-]\s*$/, "").replace(/\s{2,}/g, " ").trim();
+    return s;
+  };
+
+  for (const week of output.weeks ?? []) {
+    for (const day of week.days ?? []) {
+      for (const b of day.blocks ?? []) {
+        if (typeof b.block_label === "string" && b.block_label) {
+          const next = clean(b.block_label);
+          if (next !== b.block_label) {
+            log.push(`Week ${week.week_num} Day ${day.day_num} (${b.block_type}) block_label: "${b.block_label}" → "${next}"`);
+            b.block_label = next;
+            patched++;
+          }
+        }
+        if (typeof b.block_scheme === "string" && b.block_scheme) {
+          const next = clean(b.block_scheme);
+          if (next !== b.block_scheme) {
+            log.push(`Week ${week.week_num} Day ${day.day_num} (${b.block_type}) block_scheme: "${b.block_scheme}" → "${next}"`);
+            b.block_scheme = next;
+            patched++;
+          }
+        }
+      }
+    }
+  }
+
+  return { patched, log };
+}
+

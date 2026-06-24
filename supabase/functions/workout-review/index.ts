@@ -92,7 +92,7 @@ Rules:
 - Provide cues_and_faults for EVERY movement in the metcon.
 - Cues: 2-3 actionable points of performance per movement. Personalize using athlete profile (e.g. specific loads from their 1RMs, scaling based on their skill level).
 - Common faults: 1-2 most common errors at the prescribed intensity/volume.
-- time_domain must include pacing strategy and what will limit this specific athlete.
+- time_domain must include pacing strategy and what will limit this specific athlete; do NOT restate the movements, reps, or scheme (already on the card).
 - Ground advice in the provided reference material when available.
 - Use recent training to account for fatigue or similar recent volume.
 - Be concise and practical. Athlete-focused voice.`;
@@ -103,7 +103,7 @@ Output valid JSON only, no markdown or extra text:
 {
   "block_type": "strength",
   "block_label": "Strength",
-  "time_domain": "Rest intervals between sets, total block duration, tempo if prescribed.",
+  "time_domain": "Strategy only: total block duration estimate, RPE progression across sets, and the one judgment call (e.g. when to stop a grinding set). Do NOT restate rest/sets/reps/% — those are on the card.",
   "cues_and_faults": [
     { "movement": "Movement name", "cues": ["Cue 1", "Cue 2", "Cue 3"], "common_faults": ["Fault 1", "Fault 2"] }
   ]
@@ -114,7 +114,7 @@ Rules:
 - Provide cues_and_faults for EVERY lift in the strength block.
 - Cues: 2-3 actionable points of performance per lift. Personalize using athlete profile — calculate specific working weights from their 1RMs (e.g. "75% of 300lb back squat = 225lb").
 - Common faults: 1-2 most common errors at the prescribed intensity.
-- time_domain must include recommended rest intervals and RPE expectations.
+- time_domain focuses on RPE progression and the strategic judgment call; do NOT restate rest/sets/reps/% (already on the card).
 - Ground advice in the provided reference material when available (periodization, load management, biomechanics).
 - Use recent training to account for fatigue or similar recent volume.
 - Be concise and practical. Athlete-focused voice.`;
@@ -125,7 +125,7 @@ Output valid JSON only, no markdown or extra text:
 {
   "block_type": "skills",
   "block_label": "Skills",
-  "time_domain": "Format/tempo (e.g. EMOM structure), total duration.",
+  "time_domain": "Strategy only: what to prioritize this session and the one focus that unlocks progress, plus a total duration estimate. Do NOT restate the EMOM/format structure — it's on the card.",
   "cues_and_faults": [
     { "movement": "Movement name", "cues": ["Cue 1", "Cue 2", "Cue 3"], "common_faults": ["Fault 1", "Fault 2"] }
   ]
@@ -136,10 +136,18 @@ Rules:
 - Provide cues_and_faults for EVERY movement in the skills block.
 - Cues: 2-3 actionable points of performance per movement. Personalize using athlete profile — if the athlete can't do the movement as written, provide a progression path and scaling option.
 - Common faults: 1-2 most common errors for that movement.
-- time_domain should describe the practice format and total duration.
+- time_domain gives the session priority/focus and a duration estimate; do NOT restate the format/structure (already on the card).
 - Ground advice in the provided reference material when available (progressions, skill transfer, quality metrics).
 - Use recent training to account for recent practice or fatigue.
 - Be concise and practical. Athlete-focused voice.`;
+
+// Appended to every per-block Coach prompt. Enforces glanceable output and
+// kills duplication of the prescription that the athlete already sees on the card.
+const COACH_OUTPUT_RULES = `
+
+OUTPUT RULES (these OVERRIDE any conflicting instruction above):
+- Each cue and each common_fault is ONE short line — a single actionable phrase, ~15 words max. No multi-sentence paragraphs, no rationale essays.
+- time_domain carries ONLY net-new strategy: expected duration for THIS athlete, the limiter, and pacing/RPE guidance. NEVER restate the scheme, sets, reps, %, rounds, or rest intervals — those are already shown to the athlete on the workout card. If you have nothing strategic to add beyond the prescription, keep time_domain to a single short sentence.`;
 
 const ACCESSORY_PROMPT = `You are an expert strength & conditioning coach preparing an athlete for their accessory / supporting work. Focus ONLY on the Accessory portion of the workout below. Ignore strength, metcon, skills, warm-up, and cool-down blocks.
 
@@ -147,7 +155,7 @@ Output valid JSON only, no markdown or extra text:
 {
   "block_type": "accessory",
   "block_label": "Accessory",
-  "time_domain": "Set/rep tempo, rest between movements, total block duration.",
+  "time_domain": "Strategy only: the quality focus (tempo intent, what 'good' looks like) and a total duration estimate. Do NOT restate sets/reps/rest — already on the card.",
   "cues_and_faults": [
     { "movement": "Movement name", "cues": ["Cue 1", "Cue 2", "Cue 3"], "common_faults": ["Fault 1", "Fault 2"] }
   ]
@@ -159,7 +167,7 @@ Rules:
 - Accessory work targets supporting strength, hypertrophy, and structural balance — emphasize controlled tempo, full range of motion, and quality over load.
 - Cues: 2-3 actionable points of performance per movement (positioning, tempo, mind-muscle, what "good" looks like at the prescribed load).
 - Common faults: 1-2 most common errors — typically using momentum, partial range of motion, losing midline/posture, or chasing load over control.
-- time_domain should describe tempo, rest, and total duration.
+- time_domain gives the quality focus and a duration estimate; do NOT restate sets/reps/rest (already on the card).
 - Ground advice in the provided reference material when available.
 - Be concise and practical. Athlete-focused voice.`;
 
@@ -581,27 +589,27 @@ async function runReview(
     if (blockTextByType["metcon"]) {
       const metconIntent = detectSessionIntent(blockTextByType["metcon"], "metcon", athleteProfile);
       calls.push(
-        stagger(500).then(() => callClaude(claudeOpts(applyIntentModifier(METCON_PROMPT, metconIntent) + journalContext, buildUserContent(blockTextByType["metcon"], blockStructuredByType["metcon"]), 2000)))
+        stagger(500).then(() => callClaude(claudeOpts(applyIntentModifier(METCON_PROMPT, metconIntent) + COACH_OUTPUT_RULES + journalContext, buildUserContent(blockTextByType["metcon"], blockStructuredByType["metcon"]), 2000)))
           .then((r): [string, string] => ["metcon", r])
       );
     }
     if (blockTextByType["strength"]) {
       const strengthIntent = detectSessionIntent(blockTextByType["strength"], "strength", athleteProfile);
       calls.push(
-        stagger(1000).then(() => callClaude(claudeOpts(applyIntentModifier(STRENGTH_PROMPT, strengthIntent) + strengthContext, buildUserContent(blockTextByType["strength"], blockStructuredByType["strength"]), 2000)))
+        stagger(1000).then(() => callClaude(claudeOpts(applyIntentModifier(STRENGTH_PROMPT, strengthIntent) + COACH_OUTPUT_RULES + strengthContext, buildUserContent(blockTextByType["strength"], blockStructuredByType["strength"]), 2000)))
           .then((r): [string, string] => ["strength", r])
       );
     }
     if (blockTextByType["skills"]) {
       const skillsIntent = detectSessionIntent(blockTextByType["skills"], "skills", athleteProfile);
       calls.push(
-        stagger(1500).then(() => callClaude(claudeOpts(applyIntentModifier(SKILLS_PROMPT, skillsIntent) + journalContext, buildUserContent(blockTextByType["skills"], blockStructuredByType["skills"]), 2000)))
+        stagger(1500).then(() => callClaude(claudeOpts(applyIntentModifier(SKILLS_PROMPT, skillsIntent) + COACH_OUTPUT_RULES + journalContext, buildUserContent(blockTextByType["skills"], blockStructuredByType["skills"]), 2000)))
           .then((r): [string, string] => ["skills", r])
       );
     }
     if (blockTextByType["accessory"]) {
       calls.push(
-        stagger(2000).then(() => callClaude(claudeOpts(ACCESSORY_PROMPT + strengthContext, buildUserContent(blockTextByType["accessory"], blockStructuredByType["accessory"]), 2000)))
+        stagger(2000).then(() => callClaude(claudeOpts(ACCESSORY_PROMPT + COACH_OUTPUT_RULES + strengthContext, buildUserContent(blockTextByType["accessory"], blockStructuredByType["accessory"]), 2000)))
           .then((r): [string, string] => ["accessory", r])
       );
     }

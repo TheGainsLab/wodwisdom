@@ -65,29 +65,51 @@ export function coachingForBlockType(review: WorkoutReview | null, blockType: st
 // ---------------------------------------------------------------------------
 // Movement card — one movement's cues + common faults
 // ---------------------------------------------------------------------------
-export function MovementCard({ cf }: { cf: ReviewBlockCue }) {
+export function MovementCard({ cf, defaultOpen = false }: { cf: ReviewBlockCue; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const hasBody = (cf.cues?.length ?? 0) > 0 || (cf.common_faults?.length ?? 0) > 0;
   return (
     <div className="wr-movement-card">
-      <div className="wr-movement-name">{cf.movement}</div>
-      {cf.cues && cf.cues.length > 0 && (
-        <ul className="wr-cue-list">
-          {cf.cues.map((cue, j) => (
-            <li key={j} className="wr-cue-item">
-              <svg className="wr-cue-icon wr-cue-icon--do" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-              <span>{cue}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {cf.common_faults && cf.common_faults.length > 0 && (
-        <ul className="wr-cue-list wr-fault-list">
-          {cf.common_faults.map((fault, j) => (
-            <li key={j} className="wr-cue-item wr-fault-item">
-              <svg className="wr-cue-icon wr-cue-icon--avoid" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              <span>{fault}</span>
-            </li>
-          ))}
-        </ul>
+      <button
+        type="button"
+        className="wr-movement-toggle"
+        onClick={() => hasBody && setOpen(o => !o)}
+        aria-expanded={open}
+        disabled={!hasBody}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+          width: '100%', background: 'none', border: 'none', padding: '6px 0',
+          cursor: hasBody ? 'pointer' : 'default', textAlign: 'left', color: 'inherit',
+        }}
+      >
+        <span className="wr-movement-name">{cf.movement}</span>
+        {hasBody && (
+          <span className={`workout-review-block-chevron${open ? ' workout-review-block-chevron--open' : ''}`}>{CHEVRON_DOWN}</span>
+        )}
+      </button>
+      {open && hasBody && (
+        <div className="wr-movement-body">
+          {cf.cues && cf.cues.length > 0 && (
+            <ul className="wr-cue-list">
+              {cf.cues.map((cue, j) => (
+                <li key={j} className="wr-cue-item">
+                  <svg className="wr-cue-icon wr-cue-icon--do" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  <span>{cue}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {cf.common_faults && cf.common_faults.length > 0 && (
+            <ul className="wr-cue-list wr-fault-list">
+              {cf.common_faults.map((fault, j) => (
+                <li key={j} className="wr-cue-item wr-fault-item">
+                  <svg className="wr-cue-icon wr-cue-icon--avoid" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                  <span>{fault}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   );
