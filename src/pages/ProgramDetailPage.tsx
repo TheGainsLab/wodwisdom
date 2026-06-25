@@ -1380,10 +1380,6 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
   logging?: DayLogController;
 }) {
   const displayLabel = BLOCK_DISPLAY[block.block_type] ?? block.block_type;
-  // AMRAP / EMOM bake the duration into the scheme ("AMRAP 12", "EMOM 8"), so a
-  // separate "cap 12 min" pill is redundant — suppress it for those.
-  const schemeBakesDuration = /\b(amrap|emom)\b/i.test(block.block_scheme ?? '');
-  const timeCapMin = block.time_cap_seconds && !schemeBakesDuration ? Math.round(block.time_cap_seconds / 60) : null;
 
   // Reuse the existing .workout-block-label[data-block="…"] CSS for
   // per-block-type colors (warm-up amber, skills purple, strength pink,
@@ -1392,15 +1388,6 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
     fontSize: 13,
     fontWeight: 600,
     color: 'var(--text)',
-  };
-  const capPillStyle: React.CSSProperties = {
-    display: 'inline-block',
-    fontSize: 11,
-    padding: '2px 8px',
-    borderRadius: 999,
-    background: 'var(--surface2)',
-    color: 'var(--text-dim)',
-    marginLeft: 'auto',
   };
   const schemeStyle: React.CSSProperties = {
     fontSize: 13,
@@ -1484,7 +1471,6 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <span className="workout-block-label" data-block={block.block_type}>{displayLabel}</span>
         {block.block_label && <span style={labelStyle}>{block.block_label}</span>}
-        {timeCapMin != null && <span style={capPillStyle}>cap {timeCapMin} min</span>}
         {(canEdit || canAiEdit) && (
           <span style={{ display: 'inline-flex', gap: 6, marginLeft: 'auto' }}>
             {canEdit && (

@@ -175,7 +175,6 @@ NEVER include — every one of these is the Coach panel's job, NOT block_scheme:
   • execution cues / tempo: "consistent depth and bar path", "feel the positions", "controlled touch-and-go or reset each rep", "controlled eccentric"
   • target times / pacing: "Target 11–14 min", "aim for ~90s/round"
   • redundant scheme clarifications: "all 5 sets across at the same load" (5x5 already means that)
-  • the time cap: NEVER write "Time cap: 7 min" / "cap 14 min" in block_scheme — the cap lives in the time_cap_seconds field and the card renders it as a pill. Set time_cap_seconds; do not restate it in prose.
   • the internal Track A/B label or week/deload tags
 If you find yourself writing a phrase that tells the athlete HOW WELL or HOW HARD to do it, stop — that sentence belongs in Coach, not here.
 
