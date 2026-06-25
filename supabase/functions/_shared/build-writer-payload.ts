@@ -251,15 +251,18 @@ function sliceTier4Bundle(bundle: Tier4Bundle, includeAllResults: boolean): Comp
 }
 
 // ============================================================
-// Vocabulary fetch — display_name strings from movements WHERE
-// competition_count > 0. The writer's allowed-movement set.
+// Vocabulary fetch — display_name strings for the ENTIRE curated movements
+// catalog (no competition_count filter). The writer's allowed-movement set.
+// competition_count is a relevance signal, not an inclusion gate: filtering on
+// it hid the whole support/accessory catalog (RDL, Strict Press, rows, etc.),
+// which made the writer substitute the nearest competition movement. Suitability
+// is already guarded by the curated table + do-not-program list + safety review.
 // ============================================================
 
 export async function fetchVocabulary(supa: SupabaseClient): Promise<string[]> {
   const { data, error } = await supa
     .from("movements")
     .select("display_name")
-    .gt("competition_count", 0)
     .order("display_name", { ascending: true });
 
   if (error) {
