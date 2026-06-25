@@ -394,8 +394,8 @@ body.landing-body{overflow:auto;height:auto}
 .ai-edit-revert:hover{border-color:var(--danger);color:var(--danger)}
 .ai-edit-error{margin-top:8px;padding:8px 12px;background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.3);border-radius:6px;font-size:12px;color:#ff6b6b;line-height:1.4}
 /* Per-block edit toggle (program detail page) */
-.block-edit-toggle{display:inline-flex;align-items:center;gap:4px;background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-muted);padding:4px 10px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
-.block-edit-toggle:hover{border-color:var(--accent);color:var(--accent)}
+.block-edit-toggle{display:inline-flex;align-items:center;gap:4px;background:none;border:1px solid var(--accent);border-radius:6px;color:var(--text);padding:4px 10px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;opacity:.85}
+.block-edit-toggle:hover{opacity:1;background:var(--accent-glow)}
 .movement-edit-row{display:flex;flex-wrap:wrap;gap:6px;padding:6px 0;border-bottom:1px dashed var(--border)}
 .movement-edit-input{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-family:'Outfit',sans-serif;font-size:13px;outline:none;transition:border-color .15s}
 .movement-edit-input:focus{border-color:var(--accent)}
@@ -419,7 +419,7 @@ body.landing-body{overflow:auto;height:auto}
 .movement-suggest-item{display:block;width:100%;text-align:left;background:none;border:none;color:var(--text);padding:7px 10px;font-family:'Outfit',sans-serif;font-size:13px;cursor:pointer}
 .movement-suggest-item:hover{background:var(--surface2)}
 /* AI Edit (per-block, one-shot) */
-.block-ai-edit-toggle{display:inline-flex;align-items:center;gap:4px;background:none;border:1px solid var(--accent);border-radius:6px;color:var(--accent);padding:4px 10px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;opacity:.85}
+.block-ai-edit-toggle{display:inline-flex;align-items:center;gap:4px;background:none;border:1px solid var(--accent);border-radius:6px;color:var(--text);padding:4px 10px;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;opacity:.85}
 .block-ai-edit-toggle:hover:not(:disabled){opacity:1;background:var(--accent-glow)}
 .block-ai-edit-toggle:disabled{opacity:.5;cursor:not-allowed}
 .block-coach-toggle--open{opacity:1;background:var(--accent-glow)}
