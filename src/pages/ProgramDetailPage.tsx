@@ -1299,9 +1299,7 @@ export function V3DayView({ blocks, sourceId, workoutText, logging, onUpdateMove
   // One review per day, lazily generated when any "Coach ▾" / intent / sources opens.
   const { review, loading, error, generate } = useWorkoutReview(sourceId ?? null, workoutText ?? '');
   const [intentOpen, setIntentOpen] = useState(false);
-  const [sourcesOpen, setSourcesOpen] = useState(false);
   const canCoach = !!sourceId && !!(workoutText && workoutText.trim());
-  const sourceTitles = review?.sources ? [...new Set(review.sources.map(s => s.title).filter(Boolean))] : [];
 
   if (!blocks.length) {
     return (
@@ -1347,21 +1345,6 @@ export function V3DayView({ blocks, sourceId, workoutText, logging, onUpdateMove
         />
       ))}
 
-      {/* Sources, collapsed, at the bottom. */}
-      {canCoach && (
-        <div className="wr-sources-section">
-          <button className="wr-sources-toggle" onClick={() => { const n = !sourcesOpen; setSourcesOpen(n); if (n) generate(); }} aria-expanded={sourcesOpen}>
-            <span className="wr-sources-label">Sources{sourceTitles.length ? ` (${sourceTitles.length})` : ''}</span>
-            <span className={`workout-review-block-chevron${sourcesOpen ? ' workout-review-block-chevron--open' : ''}`}>{CHEVRON_DOWN}</span>
-          </button>
-          {sourcesOpen && (
-            sourceTitles.length
-              ? <div className="wr-sources-list">{sourceTitles.map((t, j) => <span key={j} className="source-chip">{t}</span>)}</div>
-              : loading ? <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '8px 2px' }}>Loading…</div>
-              : null
-          )}
-        </div>
-      )}
     </div>
   );
 }
