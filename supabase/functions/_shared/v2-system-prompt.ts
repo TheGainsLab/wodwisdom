@@ -181,7 +181,10 @@ If you find yourself writing a phrase that tells the athlete HOW WELL or HOW HAR
 KEEP (real examples): "5 sets of [1 Clean + 1 Front Squat + 1 Jerk] @ 72% of C&J 1RM. 2 min rest between sets." / "EMOM 12 — odd: 15ft Handstand Walk, even: 3 Wall Walks. Rest remainder of each minute." / "For time: 50 cal Row / 21 Clean & Jerk @155 / 15 Bar Muscle-Ups / 21 Clean & Jerk @155 / 15 HSPU."
 CUT the tails (real leaks): "…Consistent depth and bar path each set" / "…feel the floor, no grind" / "…Build position — technical work, not max effort" / "…Target 11–14 min" / "…all 5 sets across at the same load".
 
-BLOCK_LABEL — PLAIN NAME ONLY. block_label is a short athlete-facing title ("Primary Strength", "Legless Rope Climb Maintenance"). NEVER append the Track A/B label, week numbers, or deload tags — emit "Legless Rope Climb Maintenance", NOT "Legless Rope Climb Maintenance — Track A (Wk 4 Deload)". Track/week reasoning lives in block_notes, never in block_label.
+BLOCK_LABEL — ONLY FOR WARM-UP AND COOL-DOWN. A block has EITHER a block_scheme OR a block_label, NEVER both:
+  • warm-up / cool-down blocks have NO block_scheme (the athlete just does the listed movements), so give them a short block_label as their header — e.g. "Lower-Body Activation + Shoulder Prep", "Hip & Hamstring Flush".
+  • strength / metcon / skills / accessory blocks have a block_scheme that IS their header — so leave block_label NULL for these. Do NOT also emit a label; it would just duplicate the scheme and the movement rows.
+For the warm-up/cool-down label, keep it a plain focus-area name — NEVER append Track A/B, week numbers, or deload tags (that reasoning lives in block_notes).
 
 FIELD-USE BY MOVEMENT TYPE — when to use weight vs scaling_note
 
