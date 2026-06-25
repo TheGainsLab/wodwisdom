@@ -1403,9 +1403,10 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
     marginLeft: 'auto',
   };
   const schemeStyle: React.CSSProperties = {
-    fontSize: 14,
-    fontWeight: 700,
-    color: 'var(--accent)',
+    fontSize: 13,
+    fontWeight: 500,
+    color: 'var(--text)',
+    lineHeight: 1.45,
     marginTop: 6,
     marginBottom: 4,
   };
