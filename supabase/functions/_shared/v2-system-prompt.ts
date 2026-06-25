@@ -164,7 +164,22 @@ NOTES — WHERE TEXT GOES. Two text fields, two distinct audiences:
       • For WARM-UP and COOL-DOWN blocks: there is NO Coach panel for these, so scaling_note is their ONLY guidance channel. Keep a SHORT cue or spec here (~12 words, single phrase) — e.g. "Full depth, upright torso", "Empty bar, snatch grip", "Wall-kick if needed; just activate shoulders". Still terse, never a paragraph.
     (Athletes can add their own note to any movement later via Edit — you never pre-fill one beyond the rules above.) Percentile / ratio justification and Track labels are reasoning — they go in block_notes, never in scaling_note.
 
-BLOCK_SCHEME — STRUCTURE ONLY (athlete-facing, keep it tight). block_scheme states ONLY the work structure: the scheme/format ("5x5 @75%", "AMRAP 12", "EMOM 10"), round or minute assignments (EMOM "odd: X / even: Y"), complex pairing ("1 Squat Clean + 1 Jerk per set"), the per-round breakdown for metcons ("3 RFT: Row 200m / 10 Box Jump-Over / 12 DB Snatch"), and rest between sets. It must NOT contain: coaching cues or effort/feel descriptions ("light technical work", "easy deload volume", "conversational pace", "consistent depth and bar path", "feel the positions"), rationale, target-time / pacing advice, OR the internal Track A/B label or week/deload tags. Those belong in block_notes (reasoning) or are the Coach panel's job. Do NOT restate sets/reps/% that already appear in the movement rows — only add structure the rows can't express (complex pairing, EMOM minute layout, metcon round breakdown, rest). KEEP: "EMOM 12 — odd: 15ft Handstand Walk, even: 3 Wall Walks. Rest remainder of each minute." CUT the tail: any "...Focus on smooth lat pull, not speed" or "...as brief Track B maintenance closer".
+BLOCK_SCHEME — STRUCTURE ONLY. block_scheme answers ONE question: "how is the work organized?" Nothing else. It is the readable workout structure, and that is ALL it is.
+
+You are given the skeleton's scheme + focus for this block — build block_scheme by expanding THAT into a clean readable line: spell out the format/scheme, the complex pairing or per-round breakdown, loads, and rest. Add the structure; add NOTHING else.
+
+INCLUDE (structure only): the scheme/format ("5x5 @75%", "AMRAP 12", "EMOM 10"), round or minute assignments (EMOM "odd: X / even: Y"), complex pairing spelled out ("5 sets of [1 Clean + 1 Front Squat + 1 Jerk] @72%"), the per-round breakdown for metcons ("3 RFT: Row 200m / 10 Box Jump-Over / 12 DB Snatch"), and rest between sets ("2 min rest").
+
+NEVER include — every one of these is the Coach panel's job, NOT block_scheme:
+  • effort / feel / intent words: "light technical work", "easy deload volume", "build position", "no grind", "no strain", "conversational pace", "this is technical work not max effort"
+  • execution cues / tempo: "consistent depth and bar path", "feel the positions", "controlled touch-and-go or reset each rep", "controlled eccentric"
+  • target times / pacing: "Target 11–14 min", "aim for ~90s/round"
+  • redundant scheme clarifications: "all 5 sets across at the same load" (5x5 already means that)
+  • the internal Track A/B label or week/deload tags
+If you find yourself writing a phrase that tells the athlete HOW WELL or HOW HARD to do it, stop — that sentence belongs in Coach, not here.
+
+KEEP (real examples): "5 sets of [1 Clean + 1 Front Squat + 1 Jerk] @ 72% of C&J 1RM. 2 min rest between sets." / "EMOM 12 — odd: 15ft Handstand Walk, even: 3 Wall Walks. Rest remainder of each minute." / "For time: 50 cal Row / 21 Clean & Jerk @155 / 15 Bar Muscle-Ups / 21 Clean & Jerk @155 / 15 HSPU."
+CUT the tails (real leaks): "…Consistent depth and bar path each set" / "…feel the floor, no grind" / "…Build position — technical work, not max effort" / "…Target 11–14 min" / "…all 5 sets across at the same load".
 
 BLOCK_LABEL — PLAIN NAME ONLY. block_label is a short athlete-facing title ("Primary Strength", "Legless Rope Climb Maintenance"). NEVER append the Track A/B label, week numbers, or deload tags — emit "Legless Rope Climb Maintenance", NOT "Legless Rope Climb Maintenance — Track A (Wk 4 Deload)". Track/week reasoning lives in block_notes, never in block_label.
 
