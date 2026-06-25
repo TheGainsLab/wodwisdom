@@ -215,7 +215,7 @@ function buildMovementSchema(units: "lbs" | "kg") {
       distance_unit: { type: "string", enum: ["ft", "m"] },
       calories: { type: "number", minimum: 0, description: "For calorie-based cardio (e.g. '30 cal row', '20 cal bike'). Use THIS field — never reps/rep_scheme — for Cal Row / Cal Bike / Cal Ski-erg. Total calories across the prescription (e.g. 4 rounds of 10 cal → 40)." },
       cardio_modality: { type: "string", description: "Machine for a monostructural movement (e.g. an erg inside a metcon)." },
-      scaling_note: { type: "string", maxLength: 240, description: "ONE short athlete-facing execution cue (~12 words, single phrase) plus any required non-load spec. No rationale, fault-correction, or multi-sentence coaching — that lives in the Coach panel." },
+      scaling_note: { type: "string", maxLength: 240, description: "EMPTY by default — leave null. NO coaching cues, notes, or guidance (all of that lives in the Coach panel). Populate ONLY with a bare hard-prescription spec that has no other field — box height ('24-inch box'), band, or deficit — spec text only, no coaching words. Most movements have none." },
       target_pct_1rm: {
         type: "number",
         minimum: 30,
@@ -429,7 +429,7 @@ export function buildIngestProgramTool() {
       distance_unit: { type: "string", enum: ["ft", "m"] },
       calories: { type: "number", minimum: 0, description: "For calorie-based cardio (e.g. '30 cal row')." },
       cardio_modality: { type: "string", description: "Machine for a monostructural movement; from the modality list in the user message." },
-      scaling_note: { type: "string", maxLength: 240, description: "ONE short athlete-facing execution cue (~12 words, single phrase) plus any required non-load spec. No rationale, fault-correction, or multi-sentence coaching — that lives in the Coach panel." },
+      scaling_note: { type: "string", maxLength: 240, description: "EMPTY by default — leave null. NO coaching cues, notes, or guidance (all of that lives in the Coach panel). Populate ONLY with a bare hard-prescription spec that has no other field — box height ('24-inch box'), band, or deficit — spec text only, no coaching words. Most movements have none." },
     },
     required: ["movement"],
     additionalProperties: false,
