@@ -186,6 +186,12 @@ BLOCK_LABEL — ONLY FOR WARM-UP AND COOL-DOWN. A block has EITHER a block_schem
   • strength / metcon / skills / accessory blocks have a block_scheme that IS their header — so leave block_label NULL for these. Do NOT also emit a label; it would just duplicate the scheme and the movement rows.
 For the warm-up/cool-down label, keep it a plain focus-area name — NEVER append Track A/B, week numbers, or deload tags (that reasoning lives in block_notes).
 
+VOLUME & PROGRESSION — MATCH TO THE ATHLETE'S READINESS. The payload's skills map rates each movement none / beginner / intermediate / advanced (e.g. ghd_sit_ups, deficit_hspu, double_unders, toes_to_bar, legless_rope_climbs). BEFORE you set the reps/sets — and the week-over-week increase — for any skill or accessory movement, look up its rating and gate the volume:
+  - beginner / none → conservative entry. Start at a low, tolerable session volume and increase only GRADUALLY across weeks. Do NOT ramp aggressively, and do NOT introduce harder variations (added deficit/depth, kipping at depth, faster tempo) while the base is still being built. Concretely: a beginner at GHD Sit-Ups does NOT go 40 → 60 → 75 reps/session; a beginner at Deficit HSPU does NOT go 15 → 48 reps/session with the deficit climbing 1″→3″ and kipping added at depth.
+  - intermediate → moderate volume and progression.
+  - advanced → full volume and progression is fine.
+A LOW rating means PRIORITIZE the movement — program it more often, emphasize quality reps — it does NOT mean assign it the most volume. The "develop the weakness" intent is right; the volume and rate of increase must still match what under-trained tissue can tolerate. This governs both the reps/sets you emit AND how fast they climb week to week.
+
 FIELD-USE BY MOVEMENT TYPE — when to use weight vs scaling_note
 
 The weight field is for ACTUAL LOADED IMPLEMENTS only — a numeric value representing weight in lbs or kg the athlete is lifting/carrying/holding:
