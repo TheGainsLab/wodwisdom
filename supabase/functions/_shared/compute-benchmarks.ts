@@ -330,6 +330,20 @@ async function fetchWorkCalcJoules(
       );
       return null;
     }
+    // Gate on fully_computed. The stage_power_curve is built ONLY from
+    // fully-computed workouts, and work-calc returns a PARTIAL total_joules when
+    // a movement can't be computed — dividing partial joules by the full-workout
+    // curve under-estimates the time. Per upstream, only divide when
+    // fully_computed === true (a partial_work entry in warnings[] signals the
+    // incomplete total). Mirrors the realization-path gate in metcon-workcalc.ts.
+    if (obj.fully_computed !== true) {
+      const warnings = Array.isArray(obj.warnings) ? obj.warnings : [];
+      console.warn(
+        `[compute-benchmarks] work-calc not fully_computed (fully_computed=${String(obj.fully_computed)}, ` +
+          `warnings=${JSON.stringify(warnings).slice(0, 200)}); skipping benchmark (returning null)`,
+      );
+      return null;
+    }
     return obj.total_joules;
   } catch (err) {
     if ((err as Error).name === "AbortError") {
