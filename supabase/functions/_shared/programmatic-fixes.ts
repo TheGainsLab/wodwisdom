@@ -116,6 +116,37 @@ export function clampLoadSanity(
   return { patched, log };
 }
 
+/** Block types that carry a block_scheme as their header — they must NOT also
+ *  have a block_label (it just duplicates the scheme + movement rows). Warm-up
+ *  and cool-down are intentionally excluded: they have no scheme, so their
+ *  block_label IS their header and is kept. */
+const NO_LABEL_BLOCK_TYPES = new Set(["strength", "metcon", "skills", "accessory"]);
+
+/**
+ * Enforce the label rule: strength / metcon / skills / accessory blocks have NO
+ * block_label (the block_scheme is their header); warm-up / cool-down keep their
+ * label. The writer mostly honors this but leaks a label on metcons ~half the
+ * time; this guarantees it. Always-run, idempotent, mutates in place.
+ */
+export function enforceNoLabelOnCoachedBlocks(
+  output: WriterOutput,
+): { patched: number; log: string[] } {
+  const log: string[] = [];
+  let patched = 0;
+  for (const week of output.weeks ?? []) {
+    for (const day of week.days ?? []) {
+      for (const b of day.blocks ?? []) {
+        if (NO_LABEL_BLOCK_TYPES.has(b.block_type) && b.block_label != null) {
+          log.push(`Week ${week.week_num} Day ${day.day_num} (${b.block_type}) dropped redundant block_label "${b.block_label}"`);
+          b.block_label = undefined;
+          patched++;
+        }
+      }
+    }
+  }
+  return { patched, log };
+}
+
 /**
  * Strip the writer's INTERNAL programming markers from athlete-facing fields.
  *
