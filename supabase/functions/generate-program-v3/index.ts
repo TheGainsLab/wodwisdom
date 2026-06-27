@@ -49,7 +49,7 @@ import {
   summarizeAuditRun,
   classifyFailuresByKind,
 } from "../_shared/audit-runner.ts";
-import { clampLoadSanity, stripInternalMarkers } from "../_shared/programmatic-fixes.ts";
+import { clampLoadSanity, stripInternalMarkers, enforceNoLabelOnCoachedBlocks } from "../_shared/programmatic-fixes.ts";
 import { surgicallyRewriteBlock, spliceBlock } from "../_shared/surgical-block-fix.ts";
 import { reviewSafety } from "../_shared/safety-review.ts";
 import { saveProgramV3 } from "../_shared/save-program-v3.ts";
@@ -797,6 +797,12 @@ async function stageSaving(
   const stripped = stripInternalMarkers(output);
   if (stripped.patched > 0) {
     console.log(`[generate-program-v3] stripped ${stripped.patched} internal marker(s) from labels/schemes`);
+  }
+  // Coached blocks (strength/metcon/skills/accessory) must have NO block_label —
+  // the block_scheme is their header. Warm-up/cool-down keep their label.
+  const labelFix = enforceNoLabelOnCoachedBlocks(output);
+  if (labelFix.patched > 0) {
+    console.log(`[generate-program-v3] dropped ${labelFix.patched} redundant block_label(s) from coached blocks`);
   }
 
   // Resolve the target program id:
