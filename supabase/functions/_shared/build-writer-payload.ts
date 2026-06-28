@@ -42,6 +42,13 @@ import {
 import { computeEquipmentBlockedMovements } from "./equipment-movements.ts";
 import { fetchTier4Bundle, type Tier4Bundle } from "./fetch-tier4-bundle.ts";
 import { buildRagContext } from "./build-rag-context.ts";
+import {
+  type AthleteModel,
+  buildAthleteModel,
+  profileStaticFromRow,
+} from "./athlete-model.ts";
+import { buildTrainingSummary } from "./training-summary.ts";
+import { persistAthleteModel } from "./persist-athlete-model.ts";
 
 // ============================================================
 // Payload types
@@ -147,6 +154,13 @@ export interface WriterPayload {
   /** All canonical equipment keys; false when absent. */
   equipment: Record<string, boolean>;
   training_context: TrainingContextPayload;
+  /** Deterministic Athlete Model (coaching-state Step 1) — the authoritative,
+   *  precomputed fact-sheet every LLM stage consumes instead of re-deriving:
+   *  strength ratios, bodyweight multipliers, normative positions, recovery
+   *  class. Always present (generation never depends on persistence; an
+   *  unpersisted fallback carries version 0). FACTS only — no priority labels;
+   *  "what to train" is Coaching Strategy's call. */
+  athlete_model: AthleteModel;
   /** Tier 4 slice when linked + fetch succeeded; null otherwise. */
   competition: CompetitionPayload | null;
   /** Step 27 carry-forward: most-recently-active completed cycle's
@@ -306,6 +320,7 @@ interface AthleteProfileRow {
   injuries_structured: InjuryConstraints | null;
   self_perception_level: string | null;
   competition_athlete_id: string | null;
+  updated_at: string | null;
 }
 
 const PROFILE_COLS =
@@ -313,7 +328,7 @@ const PROFILE_COLS =
   "lifts, skills, conditioning, equipment, " +
   "days_per_week, session_length_minutes, " +
   "goal, injuries_constraints, injuries_structured, self_perception_level, " +
-  "competition_athlete_id";
+  "competition_athlete_id, updated_at";
 
 // ============================================================
 // Main entry point.
@@ -502,6 +517,38 @@ export async function buildWriterPayload(
     ).sort(),
   };
 
+  // 7. Athlete Model (coaching-state Step 1) — compute the deterministic
+  // fact-sheet, persist an immutable version (append-only-on-change), and
+  // attach it for the LLM stages. Persistence is BEST-EFFORT: a failure must
+  // never block generation, so we fall back to an unpersisted version-0 model
+  // (same soft contract as previous_cycle / evaluations). Both the eval and
+  // the generator build this payload, so both consume the same fact-sheet.
+  const profileStatic = profileStaticFromRow(profile);
+  // Step 4: observed training evidence (best-effort; empty summary when there
+  // are no logs → the Model stays intake-based, no-penalty). Window is relative
+  // to NOW (current training picture).
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const trainingSummary = await buildTrainingSummary(supa, userId, todayISO);
+  const modelContent = buildAthleteModel(profileStatic, competition, {
+    asOf: asString(profile.updated_at),
+    trainingSummary,
+  });
+  let athlete_model: AthleteModel = {
+    ...modelContent,
+    version: 0,
+    profile_version: 0,
+    created_at: new Date().toISOString(),
+  };
+  try {
+    const persisted = await persistAthleteModel(supa, userId, modelContent, profileStatic);
+    athlete_model = persisted.model;
+  } catch (err) {
+    console.warn(
+      `[build-writer-payload] athlete model persistence failed for ${userId} (using unpersisted v0):`,
+      err,
+    );
+  }
+
   return {
     basics: {
       age: asNumber(profile.age),
@@ -522,6 +569,7 @@ export async function buildWriterPayload(
       injuries_structured: mergedInjuriesStructured,
       self_perception_level: asString(profile.self_perception_level),
     },
+    athlete_model,
     competition,
     previous_cycle,
     vocabulary,

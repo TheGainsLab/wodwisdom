@@ -23,6 +23,8 @@ import type {
   SkeletonOutput,
   WeekSkeleton,
 } from "./v3-output-schema.ts";
+import type { TrainingDesignInput } from "./training-design-input.ts";
+import { checkAllocationInvariants } from "./training-design-invariants.ts";
 
 export interface SkeletonAuditResult {
   rule: string;
@@ -33,6 +35,21 @@ export interface SkeletonAuditResult {
 export interface SkeletonAuditContext {
   skeleton: SkeletonOutput;
   daysPerWeek: number;
+  /** When present, the allocation invariants run — the skeleton's declared
+   *  block_intents must faithfully execute this plan (Step 3). */
+  trainingDesignInput?: TrainingDesignInput;
+}
+
+/** Allocation invariants — the skeleton's declared block_intents must match the
+ *  TrainingDesignInput (every priority developed, no deprioritized develop, etc.).
+ *  Warnings are logged via violations only when hard; soft warnings are dropped
+ *  here (the runner surfaces them separately if needed). */
+export function auditSkeletonAllocation(
+  skeleton: SkeletonOutput,
+  tdi: TrainingDesignInput,
+): SkeletonAuditResult {
+  const r = checkAllocationInvariants(tdi, skeleton);
+  return { rule: "allocation_intent", passed: r.passed, violations: r.violations };
 }
 
 // ============================================================
@@ -219,6 +236,10 @@ export function runSkeletonAudits(ctx: SkeletonAuditContext): SkeletonAuditRunRe
     auditSkeletonStrengthFields(ctx.skeleton),
     auditSkeletonBackToBack(ctx.skeleton),
   ];
+  // Allocation invariants — only when the plan is available to check against.
+  if (ctx.trainingDesignInput) {
+    all.push(auditSkeletonAllocation(ctx.skeleton, ctx.trainingDesignInput));
+  }
   const failures = all.filter((r) => !r.passed);
   return { passed: failures.length === 0, failures, all };
 }

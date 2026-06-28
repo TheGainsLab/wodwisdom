@@ -28,6 +28,8 @@ import type { WriterPayload } from "./build-writer-payload.ts";
 import type { SkeletonOutput } from "./v3-output-schema.ts";
 import type { WriterOutput, WeekPrescription } from "./v2-output-schema.ts";
 import type { BlockLocation } from "./compute-block-benchmark.ts";
+import type { CoachState } from "./coach-state.ts";
+import type { TrainingDesignInput } from "./training-design-input.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -52,6 +54,7 @@ export const MAX_DISPATCH_ATTEMPTS = 3;
 
 export type Stage =
   | "payload_building"
+  | "coach_state"
   | "skeleton"
   | "fill_week_1"
   | "fill_week_2"
@@ -69,6 +72,7 @@ export const FIRST_STAGE: Stage = "payload_building";
  *  than relying on this. Everything else advances linearly. */
 const LINEAR_ORDER: Stage[] = [
   "payload_building",
+  "coach_state",
   "skeleton",
   "fill_week_1",
   "fill_week_2",
@@ -87,6 +91,7 @@ export function nextLinearStage(s: Stage): Stage | "complete" {
 }
 
 const WRITER_STAGES = new Set<Stage>([
+  "coach_state",
   "skeleton",
   "fill_week_1",
   "fill_week_2",
@@ -128,6 +133,12 @@ export interface ResumeState {
   /** Built once in payload_building — rebuilding re-fires parse-injuries +
    *  re-hits the DB and can drift. */
   payload?: WriterPayload;
+  /** CoachState (judgment) — reuse-if-current by (athlete_model_version,
+   *  coach_state_builder_version), built/persisted in the coach_state stage. */
+  coachState?: CoachState;
+  /** The execution CONTRACT projected from CoachState — the ONLY intent the
+   *  skeleton + week-fill consume (Step 3). Decision-data is stripped. */
+  trainingDesignInput?: TrainingDesignInput;
   /** Also mirrored to program_jobs.skeleton_json for the admin panel. */
   skeleton?: SkeletonOutput;
   /** Accumulated one per fill_week_N stage. */

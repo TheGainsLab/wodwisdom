@@ -1,0 +1,265 @@
+{
+  "name": "injured_competitor",
+  "description": "Same shape as the intermediate competitor but with an overhead-pressing injury constraint that should trigger safety-review flags if the writer programs prohibited movements. (SYNTHETIC test fixture — NOT real athlete data)",
+  "profile": {
+    "age": 28,
+    "height": 65,
+    "bodyweight": 145,
+    "gender": "female",
+    "units": "lbs",
+    "lifts": {
+      "back_squat": 215,
+      "front_squat": 185,
+      "overhead_squat": 145,
+      "deadlift": 275,
+      "bench_press": 145,
+      "snatch": 130,
+      "power_snatch": 115,
+      "clean": 165,
+      "clean_and_jerk": 175,
+      "jerk": 175,
+      "power_clean": 145,
+      "push_jerk": 165,
+      "press": 95,
+      "push_press": 125
+    },
+    "skills": {
+      "strict_pull_ups": "intermediate",
+      "kipping_pull_ups": "advanced",
+      "butterfly_pull_ups": "intermediate",
+      "chest_to_bar_pull_ups": "intermediate",
+      "muscle_ups": "beginner",
+      "bar_muscle_ups": "beginner",
+      "strict_ring_muscle_ups": "none",
+      "toes_to_bar": "intermediate",
+      "wall_facing_hspu": "intermediate",
+      "hspu": "intermediate",
+      "strict_hspu": "beginner",
+      "deficit_hspu": "none",
+      "handstand_walk": "beginner",
+      "rope_climbs": "intermediate",
+      "legless_rope_climbs": "none",
+      "ring_dips": "intermediate",
+      "l_sit": "intermediate",
+      "double_unders": "advanced",
+      "pistols": "intermediate"
+    },
+    "conditioning": {
+      "1_mile_run": "7:00",
+      "5k_run": "23:00",
+      "1k_row": "3:50",
+      "2k_row": "7:45",
+      "5k_row": "20:30",
+      "1min_bike_cals": 16,
+      "10min_bike_cals": 130
+    },
+    "equipment": {
+      "barbell": true,
+      "dumbbells": true,
+      "kettlebells": true,
+      "rower": true,
+      "assault_bike": true,
+      "ski_erg": false,
+      "treadmill": false,
+      "pull_up_bar": true,
+      "rings": true,
+      "rope": true,
+      "ghd": true,
+      "parallettes": false,
+      "pegboard": false,
+      "box": true,
+      "wall_ball": true,
+      "sled": false,
+      "blocks": false,
+      "bands": true
+    },
+    "days_per_week": 5,
+    "session_length_minutes": 75,
+    "goal": "Make Quarterfinals next year. Need to improve my muscle-ups (especially bar) and my olympic lifting consistency.",
+    "injuries_constraints": "Torn rotator cuff in left shoulder (3 months out). No overhead pressing of any kind — no snatches, no jerks, no push press, no HSPU, no overhead squats. Can press at chest level or below.",
+    "self_perception_level": "intermediate",
+    "competition_athlete_id": null
+  },
+  "competition": null,
+  "expected_model": {
+    "thresholds_version": "v1",
+    "model_builder_version": "v1.2",
+    "inference_version": null,
+    "capabilities": {
+      "back_squat": {
+        "value": 215,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "front_squat": {
+        "value": 185,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "overhead_squat": {
+        "value": 145,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "deadlift": {
+        "value": 275,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "snatch": {
+        "value": 130,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "power_snatch": {
+        "value": 115,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "clean": {
+        "value": 165,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "clean_and_jerk": {
+        "value": 175,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "jerk": {
+        "value": 175,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "power_clean": {
+        "value": 145,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "push_jerk": {
+        "value": 165,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "press": {
+        "value": 95,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "push_press": {
+        "value": 125,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "bench_press": {
+        "value": 145,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      }
+    },
+    "capability_revisions": [],
+    "recovery_class": "open",
+    "strength_ratios": {
+      "snatch_to_back_squat": 0.605,
+      "clean_jerk_to_back_squat": 0.814,
+      "snatch_to_clean_jerk": 0.743,
+      "front_squat_to_back_squat": 0.86,
+      "overhead_squat_to_snatch": 1.115,
+      "back_squat_to_bodyweight": 1.483,
+      "deadlift_to_bodyweight": 1.897,
+      "press_to_bodyweight": 0.655,
+      "bench_to_bodyweight": 1,
+      "deadlift_to_back_squat": 1.279
+    },
+    "derived_metrics": {},
+    "competition_movements": {},
+    "normative": {
+      "snatch_to_back_squat": {
+        "value": 0.605,
+        "threshold": 0.6,
+        "gap": 0.005,
+        "position": "at_or_near"
+      },
+      "clean_jerk_to_back_squat": {
+        "value": 0.814,
+        "threshold": 0.8,
+        "gap": 0.014,
+        "position": "at_or_near"
+      },
+      "snatch_to_clean_jerk": {
+        "value": 0.743,
+        "threshold": 0.76,
+        "gap": -0.017,
+        "position": "at_or_near"
+      },
+      "front_squat_to_back_squat": {
+        "value": 0.86,
+        "threshold": 0.85,
+        "gap": 0.01,
+        "position": "at_or_near"
+      },
+      "overhead_squat_to_snatch": {
+        "value": 1.115,
+        "threshold": 0.95,
+        "gap": 0.165,
+        "position": "well_above"
+      },
+      "deadlift_to_back_squat": {
+        "value": 1.279,
+        "threshold": 1.3,
+        "gap": -0.021,
+        "position": "at_or_near"
+      },
+      "back_squat_to_bodyweight": {
+        "value": 1.483,
+        "threshold": 1.5,
+        "gap": -0.017,
+        "position": "at_or_near"
+      },
+      "deadlift_to_bodyweight": {
+        "value": 1.897,
+        "threshold": 2,
+        "gap": -0.103,
+        "position": "below"
+      },
+      "press_to_bodyweight": {
+        "value": 0.655,
+        "threshold": 0.6,
+        "gap": 0.055,
+        "position": "above"
+      },
+      "bench_to_bodyweight": {
+        "value": 1,
+        "threshold": 1,
+        "gap": 0,
+        "position": "at_or_near"
+      }
+    },
+    "ranked_by_position": [
+      "deadlift_to_bodyweight",
+      "snatch_to_clean_jerk",
+      "deadlift_to_back_squat",
+      "back_squat_to_bodyweight",
+      "bench_to_bodyweight",
+      "snatch_to_back_squat",
+      "front_squat_to_back_squat",
+      "clean_jerk_to_back_squat",
+      "press_to_bodyweight",
+      "overhead_squat_to_snatch"
+    ]
+  }
+}

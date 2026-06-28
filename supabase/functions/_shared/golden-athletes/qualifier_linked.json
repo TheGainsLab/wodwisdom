@@ -1,0 +1,486 @@
+{
+  "name": "qualifier_linked",
+  "description": "Male qualifier-tier athlete with Tier 4 link. Strong across the board. Made Quarterfinals last 2 seasons. (SYNTHETIC test fixture — NOT real athlete data)",
+  "profile": {
+    "age": 30,
+    "height": 70,
+    "bodyweight": 175,
+    "gender": "male",
+    "units": "lbs",
+    "lifts": {
+      "back_squat": 405,
+      "front_squat": 345,
+      "overhead_squat": 265,
+      "deadlift": 485,
+      "bench_press": 275,
+      "snatch": 245,
+      "power_snatch": 215,
+      "clean": 315,
+      "clean_and_jerk": 305,
+      "jerk": 305,
+      "power_clean": 275,
+      "push_jerk": 305,
+      "press": 175,
+      "push_press": 245
+    },
+    "skills": {
+      "strict_pull_ups": "advanced",
+      "kipping_pull_ups": "advanced",
+      "butterfly_pull_ups": "advanced",
+      "chest_to_bar_pull_ups": "advanced",
+      "muscle_ups": "advanced",
+      "bar_muscle_ups": "advanced",
+      "strict_ring_muscle_ups": "intermediate",
+      "toes_to_bar": "advanced",
+      "wall_facing_hspu": "advanced",
+      "hspu": "advanced",
+      "strict_hspu": "intermediate",
+      "deficit_hspu": "intermediate",
+      "handstand_walk": "advanced",
+      "rope_climbs": "advanced",
+      "legless_rope_climbs": "intermediate",
+      "ring_dips": "advanced",
+      "l_sit": "intermediate",
+      "double_unders": "advanced",
+      "pistols": "advanced"
+    },
+    "conditioning": {
+      "1_mile_run": "5:30",
+      "5k_run": "18:30",
+      "1k_row": "3:08",
+      "2k_row": "6:50",
+      "5k_row": "18:10",
+      "1min_bike_cals": 25,
+      "10min_bike_cals": 215
+    },
+    "equipment": {
+      "barbell": true,
+      "dumbbells": true,
+      "kettlebells": true,
+      "rower": true,
+      "assault_bike": true,
+      "ski_erg": true,
+      "treadmill": true,
+      "pull_up_bar": true,
+      "rings": true,
+      "rope": true,
+      "ghd": true,
+      "parallettes": true,
+      "pegboard": false,
+      "box": true,
+      "wall_ball": true,
+      "sled": true,
+      "blocks": true,
+      "bands": true
+    },
+    "days_per_week": 6,
+    "session_length_minutes": 120,
+    "goal": "Make Semifinals this season. Top weakness is heavy carries / odd-object work — needs prioritizing.",
+    "injuries_constraints": "Tendinopathy in left elbow when doing high-rep ring work. Manageable with reduced volume.",
+    "self_perception_level": "advanced",
+    "competition_athlete_id": "999001"
+  },
+  "competition": {
+    "competition_summary": {
+      "overall_competitive_tier": "qualifier",
+      "seasons_competed": 4,
+      "latest_percentile": 96.2,
+      "trend": {
+        "direction": "improving",
+        "percentile_points_per_year": 1.8
+      },
+      "consistency": 0.82
+    },
+    "power_profile": {
+      "body_mass_basis": "default_84m_64w",
+      "calc_version": "1.9.0",
+      "computed_from_n_results": 50,
+      "computed_from_n_finished": 16,
+      "n_skipped_amrap_no_rounds": 13,
+      "n_skipped_capped_no_finish": 0,
+      "n_skipped_unmodeled": 8,
+      "overall": {
+        "avg_power_watts": 245,
+        "avg_w_per_kg": 2.92,
+        "cohort_percentile": 92,
+        "n_results": 16
+      },
+      "by_modality": {
+        "G": {
+          "avg_power_watts": 220,
+          "avg_w_per_kg": 2.62,
+          "n_results": 4,
+          "cohort_percentile": 90.5
+        },
+        "M": {
+          "avg_power_watts": null,
+          "avg_w_per_kg": null,
+          "n_results": 0,
+          "cohort_percentile": null
+        },
+        "W": {
+          "avg_power_watts": 235,
+          "avg_w_per_kg": 2.8,
+          "n_results": 3,
+          "cohort_percentile": 88
+        },
+        "mixed": {
+          "avg_power_watts": 252,
+          "avg_w_per_kg": 3,
+          "n_results": 9,
+          "cohort_percentile": 93.2
+        }
+      },
+      "by_time_domain": {
+        "short": {
+          "avg_power_watts": 295,
+          "avg_w_per_kg": 3.51,
+          "n_results": 6,
+          "cohort_percentile": 94.5
+        },
+        "medium": {
+          "avg_power_watts": 230,
+          "avg_w_per_kg": 2.74,
+          "n_results": 8,
+          "cohort_percentile": 90
+        },
+        "long": {
+          "avg_power_watts": 195,
+          "avg_w_per_kg": 2.32,
+          "n_results": 2,
+          "cohort_percentile": 82
+        }
+      },
+      "peak_power_result": {
+        "competition_workout_id": "fixture-23-1",
+        "workout_name": "23.1",
+        "stage": "open",
+        "season": 2023,
+        "avg_power_watts": 340,
+        "avg_w_per_kg": 4.05,
+        "cohort_percentile": 97.5
+      },
+      "watts_trend": {
+        "direction": "improving",
+        "slope_watts_per_year": 12.4,
+        "from_year": 2020,
+        "to_year": 2024,
+        "n_results_basis": 14,
+        "confidence": "medium"
+      }
+    },
+    "movement_affinity": [
+      {
+        "category": "pulling",
+        "exposures": 18,
+        "avg_percentile": 94.5,
+        "trend": {
+          "direction": "improving",
+          "percentile_points_per_year": 2
+        },
+        "by_movement": {
+          "pull-up": {
+            "exposures": 8,
+            "avg_percentile": 95.1
+          },
+          "chest-to-bar pull-up": {
+            "exposures": 6,
+            "avg_percentile": 93.8
+          },
+          "bar muscle-up": {
+            "exposures": 4,
+            "avg_percentile": 94.6
+          }
+        },
+        "by_stage": {
+          "open": {
+            "exposures": 12,
+            "avg_percentile": 97.1
+          },
+          "quarterfinals": {
+            "exposures": 6,
+            "avg_percentile": 89.2
+          }
+        }
+      },
+      {
+        "category": "olympic_lifting",
+        "exposures": 9,
+        "avg_percentile": 88.7,
+        "trend": {
+          "direction": "plateau",
+          "percentile_points_per_year": 0.3
+        },
+        "by_movement": {
+          "snatch": {
+            "exposures": 4,
+            "avg_percentile": 91.2
+          },
+          "clean and jerk": {
+            "exposures": 5,
+            "avg_percentile": 86.5
+          }
+        },
+        "by_stage": {
+          "open": {
+            "exposures": 6,
+            "avg_percentile": 93.4
+          },
+          "quarterfinals": {
+            "exposures": 3,
+            "avg_percentile": 79.2
+          }
+        }
+      }
+    ]
+  },
+  "expected_model": {
+    "thresholds_version": "v1",
+    "model_builder_version": "v1.2",
+    "inference_version": null,
+    "capabilities": {
+      "back_squat": {
+        "value": 405,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "front_squat": {
+        "value": 345,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "overhead_squat": {
+        "value": 265,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "deadlift": {
+        "value": 485,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "snatch": {
+        "value": 245,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "power_snatch": {
+        "value": 215,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "clean": {
+        "value": 315,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "clean_and_jerk": {
+        "value": 305,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "jerk": {
+        "value": 305,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "power_clean": {
+        "value": 275,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "push_jerk": {
+        "value": 305,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "press": {
+        "value": 175,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "push_press": {
+        "value": 245,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "bench_press": {
+        "value": 275,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      }
+    },
+    "capability_revisions": [],
+    "recovery_class": "open",
+    "strength_ratios": {
+      "snatch_to_back_squat": 0.605,
+      "clean_jerk_to_back_squat": 0.753,
+      "snatch_to_clean_jerk": 0.803,
+      "front_squat_to_back_squat": 0.852,
+      "overhead_squat_to_snatch": 1.082,
+      "back_squat_to_bodyweight": 2.314,
+      "deadlift_to_bodyweight": 2.771,
+      "press_to_bodyweight": 1,
+      "bench_to_bodyweight": 1.571,
+      "deadlift_to_back_squat": 1.198
+    },
+    "derived_metrics": {
+      "competition_tier": "qualifier",
+      "power_overall_percentile": 92,
+      "power_time_domain_percentiles": {
+        "short": 94.5,
+        "medium": 90,
+        "long": 82
+      }
+    },
+    "competition_movements": {
+      "pull_up_competition_percentile": {
+        "movement": "pull-up",
+        "percentile": 95.1,
+        "threshold": 50,
+        "gap": 45.1,
+        "position": "well_above",
+        "sample_size": 8,
+        "confidence": "high"
+      },
+      "chest_to_bar_pull_up_competition_percentile": {
+        "movement": "chest-to-bar pull-up",
+        "percentile": 93.8,
+        "threshold": 50,
+        "gap": 43.8,
+        "position": "well_above",
+        "sample_size": 6,
+        "confidence": "medium"
+      },
+      "bar_muscle_up_competition_percentile": {
+        "movement": "bar muscle-up",
+        "percentile": 94.6,
+        "threshold": 50,
+        "gap": 44.6,
+        "position": "well_above",
+        "sample_size": 4,
+        "confidence": "medium"
+      },
+      "snatch_competition_percentile": {
+        "movement": "snatch",
+        "percentile": 91.2,
+        "threshold": 50,
+        "gap": 41.2,
+        "position": "well_above",
+        "sample_size": 4,
+        "confidence": "medium"
+      },
+      "clean_and_jerk_competition_percentile": {
+        "movement": "clean and jerk",
+        "percentile": 86.5,
+        "threshold": 50,
+        "gap": 36.5,
+        "position": "well_above",
+        "sample_size": 5,
+        "confidence": "medium"
+      }
+    },
+    "normative": {
+      "snatch_to_back_squat": {
+        "value": 0.605,
+        "threshold": 0.6,
+        "gap": 0.005,
+        "position": "at_or_near"
+      },
+      "clean_jerk_to_back_squat": {
+        "value": 0.753,
+        "threshold": 0.8,
+        "gap": -0.047,
+        "position": "below"
+      },
+      "snatch_to_clean_jerk": {
+        "value": 0.803,
+        "threshold": 0.76,
+        "gap": 0.043,
+        "position": "above"
+      },
+      "front_squat_to_back_squat": {
+        "value": 0.852,
+        "threshold": 0.85,
+        "gap": 0.002,
+        "position": "at_or_near"
+      },
+      "overhead_squat_to_snatch": {
+        "value": 1.082,
+        "threshold": 0.95,
+        "gap": 0.132,
+        "position": "above"
+      },
+      "deadlift_to_back_squat": {
+        "value": 1.198,
+        "threshold": 1.3,
+        "gap": -0.102,
+        "position": "below"
+      },
+      "back_squat_to_bodyweight": {
+        "value": 2.314,
+        "threshold": 1.9,
+        "gap": 0.414,
+        "position": "well_above"
+      },
+      "deadlift_to_bodyweight": {
+        "value": 2.771,
+        "threshold": 2.5,
+        "gap": 0.271,
+        "position": "above"
+      },
+      "press_to_bodyweight": {
+        "value": 1,
+        "threshold": 0.86,
+        "gap": 0.14,
+        "position": "well_above"
+      },
+      "bench_to_bodyweight": {
+        "value": 1.571,
+        "threshold": 1.46,
+        "gap": 0.111,
+        "position": "above"
+      },
+      "competition_latest_percentile": {
+        "value": 96.2,
+        "threshold": 50,
+        "gap": 46.2,
+        "position": "well_above"
+      },
+      "power_overall_percentile": {
+        "value": 92,
+        "threshold": 50,
+        "gap": 42,
+        "position": "well_above"
+      }
+    },
+    "ranked_by_position": [
+      "deadlift_to_back_squat",
+      "clean_jerk_to_back_squat",
+      "front_squat_to_back_squat",
+      "snatch_to_back_squat",
+      "snatch_to_clean_jerk",
+      "bench_to_bodyweight",
+      "deadlift_to_bodyweight",
+      "overhead_squat_to_snatch",
+      "press_to_bodyweight",
+      "back_squat_to_bodyweight",
+      "power_overall_percentile",
+      "competition_latest_percentile"
+    ]
+  }
+}
