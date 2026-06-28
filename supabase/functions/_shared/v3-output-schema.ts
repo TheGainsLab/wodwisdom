@@ -22,6 +22,34 @@
  */
 
 import { BLOCK_TYPES, MONTH_PLAN_SCHEMA, type BlockType, type MonthPlan } from "./v2-output-schema.ts";
+import { FOCUS_AREAS, type FocusArea } from "./coach-state.ts";
+
+// ============================================================
+// Block intent — Step 3 "declared, not inferred" allocation. Each coaching
+// block (strength / skills / accessory / metcon) declares the SINGLE coaching
+// purpose it serves, so downstream never has to infer intent from the movements
+// chosen. Enables exact allocation invariants + per-block explainability +
+// deterministic CoachState→Program traceability.
+// ============================================================
+
+export type BlockPurpose = "develop" | "maintain" | "support";
+
+/** Focus-bearing block types that must declare a coaching intent. Structural
+ *  blocks (warm-up / mobility / cool-down / active-recovery) don't. */
+export const FOCUS_BEARING_BLOCK_TYPES: BlockType[] = ["strength", "skills", "accessory", "metcon"];
+
+export interface BlockIntent {
+  /** Which block this intent describes (a focus-bearing block_type). */
+  block_type: BlockType;
+  /** The SINGLE primary coaching axis this block serves. */
+  focus: FocusArea;
+  /** Why this block exists: develop a priority, maintain a strength, or support
+   *  a priority/primary lift (e.g. accessory). */
+  purpose: BlockPurpose;
+  /** When purpose = develop: the rank of the CoachState priority this serves
+   *  (1 = highest). Optional for maintain/support. Pure traceability. */
+  source_priority_rank?: number;
+}
 
 // ============================================================
 // TypeScript types
@@ -62,6 +90,13 @@ export interface DaySkeleton {
    * E.g., "Deficit HSPU progression", "Ring MU technique", "Skill maintenance EMOM".
    */
   skill_focus?: string;
+  /**
+   * DECLARED coaching intent — one entry per focus-bearing block this day
+   * (strength / skills / accessory / metcon). Each names the single FocusArea it
+   * serves + its purpose (develop / maintain / support), so allocation is
+   * explicit, not inferred. (Step 3 "explicit block intent".)
+   */
+  block_intents: BlockIntent[];
 }
 
 /**
@@ -109,8 +144,24 @@ function buildDaySkeletonSchema(daysPerWeek: number) {
       strength_scheme: { type: "string", maxLength: 300 },
       metcon_focus: { type: "string", maxLength: 300 },
       skill_focus: { type: "string", maxLength: 300 },
+      block_intents: {
+        type: "array",
+        description:
+          "One entry per focus-bearing block this day (strength / skills / accessory / metcon). Each declares the SINGLE FocusArea it serves + its purpose. develop must trace to a CoachState priority via source_priority_rank.",
+        items: {
+          type: "object",
+          properties: {
+            block_type: { type: "string", enum: ["strength", "skills", "accessory", "metcon"] },
+            focus: { type: "string", enum: [...FOCUS_AREAS] },
+            purpose: { type: "string", enum: ["develop", "maintain", "support"] },
+            source_priority_rank: { type: "integer", minimum: 1, maximum: 5 },
+          },
+          required: ["block_type", "focus", "purpose"],
+          additionalProperties: false,
+        },
+      },
     },
-    required: ["day_num", "day_intent", "block_types"],
+    required: ["day_num", "day_intent", "block_types", "block_intents"],
     additionalProperties: false,
   };
 }
@@ -142,7 +193,7 @@ export function buildEmitSkeletonTool(daysPerWeek: number) {
   return {
     name: "emit_skeleton",
     description:
-      "Emit the structural skeleton for this athlete's 4-week training cycle. The skeleton declares the 4-week month plan plus, for each training day, which block types exist + the primary lift / metcon focus / skill focus when applicable. Do NOT emit movement-level data (sets, reps, weight) — those are filled by subsequent per-week calls. Keep the skeleton tight and structural; this is the decision layer that constrains the per-week fills.",
+      "Emit the structural skeleton for this athlete's 4-week training cycle. The skeleton declares the 4-week month plan plus, for each training day, which block types exist + the primary lift / metcon focus / skill focus when applicable, AND block_intents — the declared coaching purpose (focus + develop/maintain/support) of each focus-bearing block. Do NOT emit movement-level data (sets, reps, weight) — those are filled by subsequent per-week calls. Keep the skeleton tight and structural; this is the decision layer that constrains the per-week fills.",
     input_schema: {
       type: "object",
       properties: {

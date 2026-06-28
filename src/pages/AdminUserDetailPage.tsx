@@ -716,12 +716,20 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                   <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', margin: 0 }}>
                     Athlete Profile
                   </h3>
-                  <button
-                    onClick={() => navigate(`/admin/users/${id}/athlete-profile`)}
-                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
-                  >
-                    View full →
-                  </button>
+                  <div style={{ display: 'flex', gap: 16 }}>
+                    <button
+                      onClick={() => navigate(`/admin/users/${id}/athlete-model`)}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
+                    >
+                      Model →
+                    </button>
+                    <button
+                      onClick={() => navigate(`/admin/users/${id}/athlete-profile`)}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
+                    >
+                      View full →
+                    </button>
+                  </div>
                 </div>
                 {athlete ? (
                   <div

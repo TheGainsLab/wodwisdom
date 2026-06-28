@@ -28,15 +28,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildConditioningState } from "../_shared/conditioning-state.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { getTierStatus } from "../_shared/tier-status.ts";
-import { buildWriterPayload, type WriterPayload } from "../_shared/build-writer-payload.ts";
-import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
-import { V2_PROFILE_ANALYSIS_SYSTEM_PROMPT } from "../_shared/v2-profile-analysis-prompt.ts";
-import { EMIT_EVALUATION_TOOL, type EvaluationOutput } from "../_shared/v2-output-schema.ts";
+import { buildWriterPayload } from "../_shared/build-writer-payload.ts";
+import { type EvaluationOutput } from "../_shared/v2-output-schema.ts";
+import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts";
+import { evaluationFromCoachState } from "../_shared/coach-state.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-const MODEL = "claude-sonnet-4-20250514";
 
 interface ProfileData {
   lifts?: Record<string, number> | null;
@@ -122,56 +120,10 @@ function buildComparisonContext(
   return `CHANGES SINCE LAST EVALUATION (${date}):\n${changes.join("\n")}`;
 }
 
-async function callEvaluator(payload: WriterPayload, extraContext: string): Promise<EvaluationOutput> {
-  if (!ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY not configured");
-  }
-  let userMessage = `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(payload, null, 2)}`;
-  if (extraContext) {
-    userMessage +=
-      `\n\n${extraContext}\n\n` +
-      `Weigh the RECENT TRAINING above as evidence of what the athlete is actually doing now, ` +
-      `and explicitly acknowledge any meaningful CHANGES SINCE LAST EVALUATION (progress or regression) in your assessment.`;
-  }
-
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 8000,
-      stream: false,
-      system: V2_PROFILE_ANALYSIS_SYSTEM_PROMPT,
-      tools: [EMIT_EVALUATION_TOOL],
-      tool_choice: { type: "tool", name: "emit_evaluation" },
-      messages: [{ role: "user", content: userMessage }],
-    }),
-    signal: AbortSignal.timeout(120_000),
-  });
-
-  if (!resp.ok) {
-    const body = await resp.text().catch(() => "");
-    throw new Error(`Claude HTTP ${resp.status}: ${body.slice(0, 500)}`);
-  }
-
-  const data = (await resp.json()) as ClaudeResponse;
-  const toolUse = (data.content ?? []).find(
-    (b) => b.type === "tool_use" && b.name === "emit_evaluation",
-  );
-  if (!toolUse || typeof toolUse.input !== "object" || toolUse.input == null) {
-    throw new Error(
-      `Claude response missing emit_evaluation tool_use. stop_reason=${data.stop_reason}`,
-    );
-  }
-  console.log(
-    `[profile-analysis] Claude usage: input=${data.usage?.input_tokens} output=${data.usage?.output_tokens}`,
-  );
-  return toolUse.input as EvaluationOutput;
-}
+// (Step 4 cutover) The standalone evaluator was retired: the eval is now the
+// CoachState projection (see runAnalysis) — same judgment as the program,
+// training-aware via the synthesized Athlete Model. This also removed the
+// hardcoded model pin; the CoachState path uses the current model.
 
 /**
  * Flatten the structured evaluation into the markdown `analysis` text column —
@@ -208,43 +160,21 @@ async function runAnalysis(
       .update({ status: "processing" })
       .eq("id", evalId);
 
-    const isContinuation = monthNumber > 1;
-    const trainingDays = isContinuation ? 35 : 14;
-    const trainingMaxLines = isContinuation ? 60 : 30;
-
-    // Read EVERYTHING we have on this athlete:
-    //   - payload: canonical Tier 1–4 (incl. full Tier 4 — competency, signature,
-    //     power_profile, all_results — and previous_cycle carry-forward).
-    //     includeEvaluations stays false (the default): an evaluator must never
-    //     ingest its own prior evaluation.
-    //   - recentTraining: actual logged sessions (workout logs + engine), so the
-    //     eval reflects what they're really doing, not just self-reported numbers.
-    //   - prevEval → comparison: lift/skill/conditioning changes since last eval.
-    const { data: prevEval } = await supa
-      .from("profile_evaluations")
-      .select("profile_snapshot, created_at")
-      .eq("user_id", userId)
-      .neq("id", evalId)
-      .eq("status", "complete")
-      .not("analysis", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const [payload, recentTraining, conditioningState] = await Promise.all([
-      buildWriterPayload(supa, userId),
-      fetchAndFormatRecentHistory(supa, userId, { days: trainingDays, maxLines: trainingMaxLines }),
-      buildConditioningState(supa, userId),
-    ]);
-
-    const comparison = buildComparisonContext(prevEval, profileData);
-    const extraContext = [
-      recentTraining ? `RECENT TRAINING (logged sessions):\n${recentTraining}` : "",
-      conditioningState.trim(),
-      comparison,
-    ].filter(Boolean).join("\n\n");
-
-    const evaluation = await callEvaluator(payload, extraContext);
+    // Step 4 cutover: the eval IS the CoachState projection — the SAME judgment
+    // the program is built from (aligned by construction), and training-aware via
+    // the synthesized Athlete Model that buildWriterPayload computes + persists
+    // (capabilities revised from logged evidence). reuse-if-current keeps the
+    // eval and the program on a single CoachState. The old standalone-evaluator
+    // path (recent-training/comparison context fed to a separate prompt) is
+    // retired — that awareness now lives in the Model itself.
+    const payload = await buildWriterPayload(supa, userId);
+    const { coach_state, version: csVersion, reused } = await generateAndPersistCoachState(
+      supa,
+      userId,
+      payload,
+    );
+    console.log(`[profile-analysis] coach_state v${csVersion} (reused=${reused}, AM v${payload.athlete_model.version})`);
+    const evaluation = evaluationFromCoachState(coach_state);
     const analysis = serializeEvaluation(evaluation);
 
     await supa

@@ -65,12 +65,25 @@ function reconcileReps(
  */
 function buildBlockIntent(
   daySkel:
-    | { day_intent: string; primary_lift?: string; strength_scheme?: string; metcon_focus?: string; skill_focus?: string }
+    | {
+      day_intent: string;
+      primary_lift?: string;
+      strength_scheme?: string;
+      metcon_focus?: string;
+      skill_focus?: string;
+      block_intents?: Array<{
+        block_type: string;
+        focus: string;
+        purpose: string;
+        source_priority_rank?: number;
+      }>;
+    }
     | undefined,
   blockType: string,
-): Record<string, string> | null {
+): Record<string, unknown> | null {
   if (!daySkel) return null;
-  const base: Record<string, string> = { day_intent: daySkel.day_intent };
+  const base: Record<string, unknown> = { day_intent: daySkel.day_intent };
+  // Movement-level focus the fill reads (the lift / skill / metcon descriptor).
   if (blockType === "strength") {
     if (daySkel.primary_lift) base.focus = daySkel.primary_lift;
     if (daySkel.strength_scheme) base.scheme = daySkel.strength_scheme;
@@ -78,6 +91,15 @@ function buildBlockIntent(
     if (daySkel.metcon_focus) base.focus = daySkel.metcon_focus;
   } else if (blockType === "skills") {
     if (daySkel.skill_focus) base.focus = daySkel.skill_focus;
+  }
+  // DECLARED coaching intent (Step 3): the FocusArea + purpose this block serves.
+  // Distinct from `focus` above (a movement descriptor) — coaching_focus is the
+  // typed axis, for explainability + traceability.
+  const declared = daySkel.block_intents?.find((bi) => bi.block_type === blockType);
+  if (declared) {
+    base.coaching_focus = declared.focus;
+    base.purpose = declared.purpose;
+    if (declared.source_priority_rank != null) base.source_priority_rank = declared.source_priority_rank;
   }
   return base;
 }
@@ -184,7 +206,14 @@ export async function saveProgramV3(
     // Index skeleton days for block_intent. Empty when no skeleton (ingested).
     const skelDayByKey = new Map<
       string,
-      { day_intent: string; primary_lift?: string; strength_scheme?: string; metcon_focus?: string; skill_focus?: string }
+      {
+        day_intent: string;
+        primary_lift?: string;
+        strength_scheme?: string;
+        metcon_focus?: string;
+        skill_focus?: string;
+        block_intents?: Array<{ block_type: string; focus: string; purpose: string; source_priority_rank?: number }>;
+      }
     >();
     if (opts.skeleton) {
       for (const skWeek of opts.skeleton.weeks) {

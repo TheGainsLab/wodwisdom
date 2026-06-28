@@ -26,6 +26,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { buildWriterPayload, type WriterPayload } from "../_shared/build-writer-payload.ts";
+import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts";
+import { buildTrainingDesignInput, type TrainingDesignInput } from "../_shared/training-design-input.ts";
 import { V3_SKELETON_SYSTEM_PROMPT } from "../_shared/v3-skeleton-prompt.ts";
 import { V2_GENERATE_PROGRAM_SYSTEM_PROMPT } from "../_shared/v2-system-prompt.ts";
 import {
@@ -132,13 +134,12 @@ class SkeletonLoopExhausted extends Error {
  * Call the v3 skeleton writer. Returns parsed SkeletonOutput on success.
  */
 export async function callSkeletonWriter(
-  payload: WriterPayload,
+  tdi: TrainingDesignInput,
   retryViolations: string,
 ): Promise<SkeletonOutput> {
   if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
-  const daysPerWeek = payload.training_context.days_per_week;
-  const units = payload.basics.units ?? "lbs";
+  const daysPerWeek = tdi.days_per_week;
 
   const ruleRecap = [
     "=== KEY RULES (re-check before emit) ===",
@@ -146,14 +147,14 @@ export async function callSkeletonWriter(
     "- Every training day includes strength + accessory + metcon block types. Skills 2–4 days per week.",
     "- Emit STRUCTURE ONLY — no sets / reps / weight / movement names. Those are filled in subsequent per-week calls.",
     "- primary_lift uses canonical display names (Back Squat, Deadlift, Snatch, Clean and Jerk, etc.) or a complex description.",
-    `- All weights in athlete's units (${units}).`,
-    "- Honor injuries_structured.do_not_program when picking primary_lift / metcon_focus / skill_focus.",
+    "- ALLOCATE the given priorities/maintain/deprioritize — never invent, promote, or drop one. Every priority must appear in the structure; no block built around a deprioritized focus.",
+    "- Honor do_not_program when picking primary_lift / metcon_focus / skill_focus.",
   ].join("\n");
 
-  const payloadBlock = `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(payload, null, 2)}`;
+  const inputBlock = `TRAINING DESIGN INPUT (JSON — the FIXED plan to allocate):\n${JSON.stringify(tdi, null, 2)}`;
   const userMessage = retryViolations
-    ? `${retryViolations}\n\n---\n\n${payloadBlock}\n\n${ruleRecap}`
-    : `${payloadBlock}\n\n${ruleRecap}`;
+    ? `${retryViolations}\n\n---\n\n${inputBlock}\n\n${ruleRecap}`
+    : `${inputBlock}\n\n${ruleRecap}`;
 
   const t0 = Date.now();
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -246,13 +247,21 @@ async function callWeekFill(
   const priorBlock = priorWeeks.length > 0
     ? `ALREADY-GENERATED PRIOR WEEKS (progress from these):\n${JSON.stringify(priorWeeks, null, 2)}`
     : "No prior weeks (this is week 1).";
-  // Evals shape STRUCTURE (the skeleton), not movement-level fills — strip the
-  // long profile/training evaluation narratives from the per-week payload. They
-  // bloat every fill + surgical call (a continuation carries BOTH evals) and can
-  // nudge the writer toward off-vocabulary movements the eval mentions, which
-  // then fail audits and pile up surgical fixes until the job blows the wall
-  // clock. The skeleton already baked the eval's intent into day/block decisions.
-  const { profile_evaluation: _pe, training_evaluation: _te, ...fillPayload } = payload;
+  // The week-fill EXECUTES the skeleton — it must not reinterpret intent, so the
+  // DECISION-data is stripped from its payload (Step 3): athlete_model (facts +
+  // normatives) and competition (percentiles) are what an earlier version used to
+  // re-derive priorities + ratios in block_notes; the skeleton already encoded
+  // all of that. The evals are stripped too (they shape STRUCTURE, not fills, and
+  // bloat every call). What remains is execution input only — basics/units, 1RMs,
+  // skill levels (variant selection), conditioning baselines (pace), equipment,
+  // injuries, previous_cycle (progression), vocabulary, rag.
+  const {
+    profile_evaluation: _pe,
+    training_evaluation: _te,
+    athlete_model: _am,
+    competition: _comp,
+    ...fillPayload
+  } = payload;
   const payloadBlock = `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(fillPayload, null, 2)}`;
   const baseMessage = `${thisWeekBlock}\n\n${priorBlock}\n\n${arcBlock}\n\n${payloadBlock}\n\n${ruleRecap}`;
   const userMessage = extraContext ? `${extraContext}\n\n---\n\n${baseMessage}` : baseMessage;
@@ -330,7 +339,7 @@ async function callWeekFill(
 // ============================================================
 
 async function generateSkeletonWithAudits(
-  payload: WriterPayload,
+  tdi: TrainingDesignInput,
   setStage: SetStage = NO_STAGE,
 ): Promise<SkeletonOutput> {
   let retryViolations = "";
@@ -342,7 +351,7 @@ async function generateSkeletonWithAudits(
     await setStage(`skeleton_attempt_${attempt}`);
     let skeleton: SkeletonOutput;
     try {
-      skeleton = await callSkeletonWriter(payload, retryViolations);
+      skeleton = await callSkeletonWriter(tdi, retryViolations);
     } catch (err) {
       // Transient failure (timeout / dropped connection / 5xx / 429): consume
       // this attempt and retry with the SAME violations instead of hard-failing
@@ -363,7 +372,8 @@ async function generateSkeletonWithAudits(
     await setStage("skeleton_auditing");
     const auditResult = runSkeletonAudits({
       skeleton,
-      daysPerWeek: payload.training_context.days_per_week,
+      daysPerWeek: tdi.days_per_week,
+      trainingDesignInput: tdi,
     });
     console.log(`[generate-program-v3] skeleton audits: ${summarizeSkeletonAuditRun(auditResult)}`);
     if (auditResult.passed) return skeleton;
@@ -578,9 +588,59 @@ async function stagePayloadBuilding(
   );
 
   return {
-    next: "skeleton",
+    next: "coach_state",
     resumeState: { ...rs, payload, startedAtMs: rs.startedAtMs ?? Date.now() },
     displayStage: "payload_built",
+  };
+}
+
+/**
+ * coach_state stage (Step 3) — the judgment layer in the pipeline. Reuse-if-
+ * current by (athlete_model_version, coach_state_builder_version); generate +
+ * persist on a miss. Then project the FIXED CoachState into the TrainingDesign
+ * contract the skeleton + week-fill consume. Re-entry is safe (reuse-if-current
+ * returns the cached snapshot), so the 2-attempt retry only guards transient
+ * LLM errors before this writer stage gives up.
+ */
+async function stageCoachState(
+  supa: SupabaseClient,
+  job: ProgramJobRow,
+  rs: ResumeState,
+): Promise<StageOutcome> {
+  const payload = rs.payload!;
+
+  let result: Awaited<ReturnType<typeof generateAndPersistCoachState>> | undefined;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      result = await generateAndPersistCoachState(supa, job.user_id, payload);
+      break;
+    } catch (e) {
+      lastErr = e;
+      console.warn(`[generate-program-v3] coach_state attempt ${attempt}/2 failed:`, e);
+    }
+  }
+  if (!result) throw lastErr ?? new Error("coach_state generation failed");
+
+  const coachState = result.coach_state;
+  console.log(
+    `[generate-program-v3] coach_state v${result.version} (reused=${result.reused}, refs AM v${payload.athlete_model.version})`,
+  );
+
+  const trainingDesignInput = buildTrainingDesignInput(coachState, {
+    days_per_week: payload.training_context.days_per_week,
+    session_length_minutes: payload.training_context.session_length_minutes,
+    equipment: payload.equipment,
+    do_not_program: payload.training_context.injuries_structured?.do_not_program ?? [],
+    vocabulary: payload.vocabulary,
+    lifts: payload.lifts,
+    previous_cycle: payload.previous_cycle,
+  });
+
+  return {
+    next: "skeleton",
+    resumeState: { ...rs, coachState, trainingDesignInput },
+    displayStage: "coach_state_done",
   };
 }
 
@@ -589,8 +649,10 @@ async function stageSkeleton(
   _job: ProgramJobRow,
   rs: ResumeState,
 ): Promise<StageOutcome> {
-  const payload = rs.payload!;
-  const skeleton = await generateSkeletonWithAudits(payload);
+  // The skeleton consumes the TrainingDesignInput CONTRACT — the FIXED plan,
+  // with decision-data stripped — never the raw payload. Allocate, don't reinterpret.
+  const tdi = rs.trainingDesignInput!;
+  const skeleton = await generateSkeletonWithAudits(tdi);
   console.log("[generate-program-v3] skeleton passed audits");
   return {
     next: "fill_week_1",
@@ -939,6 +1001,8 @@ async function runStage(jobId: string): Promise<void> {
   switch (stage) {
     case "payload_building":
       return runStageWithLease(supa, jobId, userId, FUNCTION_NAME, stage, (j, rs) => stagePayloadBuilding(supa, j, rs));
+    case "coach_state":
+      return runStageWithLease(supa, jobId, userId, FUNCTION_NAME, stage, (j, rs) => stageCoachState(supa, j, rs));
     case "skeleton":
       return runStageWithLease(supa, jobId, userId, FUNCTION_NAME, stage, (j, rs) => stageSkeleton(supa, j, rs));
     case "fill_week_1":

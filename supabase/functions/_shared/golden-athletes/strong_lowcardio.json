@@ -1,0 +1,265 @@
+{
+  "name": "strong_lowcardio",
+  "description": "Strong male (advanced lifts) with weak gymnastics and weak conditioning. Asymmetric profile. Goal: bigger lifts; conditioning is maintenance. (SYNTHETIC test fixture — NOT real athlete data)",
+  "profile": {
+    "age": 35,
+    "height": 72,
+    "bodyweight": 200,
+    "gender": "male",
+    "units": "lbs",
+    "lifts": {
+      "back_squat": 405,
+      "front_squat": 320,
+      "overhead_squat": 185,
+      "deadlift": 475,
+      "bench_press": 305,
+      "snatch": 165,
+      "power_snatch": 145,
+      "clean": 245,
+      "clean_and_jerk": 235,
+      "jerk": 235,
+      "power_clean": 215,
+      "push_jerk": 235,
+      "press": 175,
+      "push_press": 225
+    },
+    "skills": {
+      "strict_pull_ups": "beginner",
+      "kipping_pull_ups": "beginner",
+      "butterfly_pull_ups": "none",
+      "chest_to_bar_pull_ups": "none",
+      "muscle_ups": "none",
+      "bar_muscle_ups": "none",
+      "strict_ring_muscle_ups": "none",
+      "toes_to_bar": "beginner",
+      "wall_facing_hspu": "none",
+      "hspu": "none",
+      "strict_hspu": "none",
+      "deficit_hspu": "none",
+      "handstand_walk": "none",
+      "rope_climbs": "beginner",
+      "legless_rope_climbs": "none",
+      "ring_dips": "beginner",
+      "l_sit": "none",
+      "double_unders": "beginner",
+      "pistols": "beginner"
+    },
+    "conditioning": {
+      "1_mile_run": "10:00",
+      "5k_run": "32:00",
+      "1k_row": "4:15",
+      "2k_row": "8:45",
+      "5k_row": "23:30",
+      "1min_bike_cals": 14,
+      "10min_bike_cals": 115
+    },
+    "equipment": {
+      "barbell": true,
+      "dumbbells": true,
+      "kettlebells": true,
+      "rower": true,
+      "assault_bike": false,
+      "ski_erg": false,
+      "treadmill": false,
+      "pull_up_bar": true,
+      "rings": false,
+      "rope": false,
+      "ghd": false,
+      "parallettes": false,
+      "pegboard": false,
+      "box": true,
+      "wall_ball": false,
+      "sled": false,
+      "blocks": true,
+      "bands": true
+    },
+    "days_per_week": 4,
+    "session_length_minutes": 90,
+    "goal": "Add 50lbs to my back squat over the next year. Maintain conditioning. I'm a powerlifter trying to add some CrossFit work.",
+    "injuries_constraints": "Mild chronic lower back stiffness. No issues with squats or deads if I warm up properly.",
+    "self_perception_level": "intermediate",
+    "competition_athlete_id": null
+  },
+  "competition": null,
+  "expected_model": {
+    "thresholds_version": "v1",
+    "model_builder_version": "v1.2",
+    "inference_version": null,
+    "capabilities": {
+      "back_squat": {
+        "value": 405,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "front_squat": {
+        "value": 320,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "overhead_squat": {
+        "value": 185,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "deadlift": {
+        "value": 475,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "snatch": {
+        "value": 165,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "power_snatch": {
+        "value": 145,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "clean": {
+        "value": 245,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "clean_and_jerk": {
+        "value": 235,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "jerk": {
+        "value": 235,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "power_clean": {
+        "value": 215,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "push_jerk": {
+        "value": 235,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "press": {
+        "value": 175,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "push_press": {
+        "value": 225,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "bench_press": {
+        "value": 305,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      }
+    },
+    "capability_revisions": [],
+    "recovery_class": "masters_35",
+    "strength_ratios": {
+      "snatch_to_back_squat": 0.407,
+      "clean_jerk_to_back_squat": 0.58,
+      "snatch_to_clean_jerk": 0.702,
+      "front_squat_to_back_squat": 0.79,
+      "overhead_squat_to_snatch": 1.121,
+      "back_squat_to_bodyweight": 2.025,
+      "deadlift_to_bodyweight": 2.375,
+      "press_to_bodyweight": 0.875,
+      "bench_to_bodyweight": 1.525,
+      "deadlift_to_back_squat": 1.173
+    },
+    "derived_metrics": {},
+    "competition_movements": {},
+    "normative": {
+      "snatch_to_back_squat": {
+        "value": 0.407,
+        "threshold": 0.6,
+        "gap": -0.193,
+        "position": "well_below"
+      },
+      "clean_jerk_to_back_squat": {
+        "value": 0.58,
+        "threshold": 0.8,
+        "gap": -0.22,
+        "position": "well_below"
+      },
+      "snatch_to_clean_jerk": {
+        "value": 0.702,
+        "threshold": 0.76,
+        "gap": -0.058,
+        "position": "below"
+      },
+      "front_squat_to_back_squat": {
+        "value": 0.79,
+        "threshold": 0.85,
+        "gap": -0.06,
+        "position": "below"
+      },
+      "overhead_squat_to_snatch": {
+        "value": 1.121,
+        "threshold": 0.95,
+        "gap": 0.171,
+        "position": "well_above"
+      },
+      "deadlift_to_back_squat": {
+        "value": 1.173,
+        "threshold": 1.3,
+        "gap": -0.127,
+        "position": "below"
+      },
+      "back_squat_to_bodyweight": {
+        "value": 2.025,
+        "threshold": 1.9,
+        "gap": 0.125,
+        "position": "above"
+      },
+      "deadlift_to_bodyweight": {
+        "value": 2.375,
+        "threshold": 2.5,
+        "gap": -0.125,
+        "position": "at_or_near"
+      },
+      "press_to_bodyweight": {
+        "value": 0.875,
+        "threshold": 0.86,
+        "gap": 0.015,
+        "position": "at_or_near"
+      },
+      "bench_to_bodyweight": {
+        "value": 1.525,
+        "threshold": 1.46,
+        "gap": 0.065,
+        "position": "at_or_near"
+      }
+    },
+    "ranked_by_position": [
+      "snatch_to_back_squat",
+      "clean_jerk_to_back_squat",
+      "deadlift_to_back_squat",
+      "snatch_to_clean_jerk",
+      "front_squat_to_back_squat",
+      "deadlift_to_bodyweight",
+      "press_to_bodyweight",
+      "bench_to_bodyweight",
+      "back_squat_to_bodyweight",
+      "overhead_squat_to_snatch"
+    ]
+  }
+}

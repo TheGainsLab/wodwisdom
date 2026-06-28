@@ -1,0 +1,235 @@
+{
+  "name": "beginner_fitness",
+  "description": "New-ish male athlete, modest lifts, beginner skills, basic conditioning, no Tier 4 linkage. Goal: get fitter + lose weight. (SYNTHETIC test fixture — NOT real athlete data)",
+  "profile": {
+    "age": 32,
+    "height": 70,
+    "bodyweight": 180,
+    "gender": "male",
+    "units": "lbs",
+    "lifts": {
+      "back_squat": 225,
+      "deadlift": 275,
+      "bench_press": 185,
+      "snatch": 95,
+      "clean_and_jerk": 135
+    },
+    "skills": {
+      "strict_pull_ups": "beginner",
+      "kipping_pull_ups": "beginner",
+      "butterfly_pull_ups": "none",
+      "chest_to_bar_pull_ups": "none",
+      "muscle_ups": "none",
+      "bar_muscle_ups": "none",
+      "strict_ring_muscle_ups": "none",
+      "toes_to_bar": "beginner",
+      "wall_facing_hspu": "none",
+      "hspu": "none",
+      "strict_hspu": "none",
+      "deficit_hspu": "none",
+      "handstand_walk": "none",
+      "rope_climbs": "beginner",
+      "legless_rope_climbs": "none",
+      "ring_dips": "beginner",
+      "l_sit": "beginner",
+      "double_unders": "beginner",
+      "pistols": "beginner"
+    },
+    "conditioning": {
+      "1_mile_run": "8:30",
+      "5k_run": "28:00",
+      "1k_row": "4:00",
+      "2k_row": "8:00",
+      "5k_row": "21:00",
+      "1min_bike_cals": 18,
+      "10min_bike_cals": 145
+    },
+    "equipment": {
+      "barbell": true,
+      "dumbbells": true,
+      "kettlebells": false,
+      "rower": true,
+      "assault_bike": false,
+      "ski_erg": false,
+      "treadmill": false,
+      "pull_up_bar": true,
+      "rings": false,
+      "rope": false,
+      "ghd": false,
+      "parallettes": false,
+      "pegboard": false,
+      "box": true,
+      "wall_ball": true,
+      "sled": false,
+      "blocks": false,
+      "bands": true
+    },
+    "days_per_week": 4,
+    "session_length_minutes": 60,
+    "goal": "Get in shape, lose 15 lbs, be able to do CrossFit workouts at my local box.",
+    "injuries_constraints": "None.",
+    "self_perception_level": "beginner",
+    "competition_athlete_id": null
+  },
+  "competition": null,
+  "expected_model": {
+    "thresholds_version": "v1",
+    "model_builder_version": "v1.2",
+    "inference_version": null,
+    "capabilities": {
+      "back_squat": {
+        "value": 225,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "front_squat": {
+        "value": null,
+        "source": "missing",
+        "confidence": "low",
+        "as_of": null
+      },
+      "overhead_squat": {
+        "value": null,
+        "source": "missing",
+        "confidence": "low",
+        "as_of": null
+      },
+      "deadlift": {
+        "value": 275,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "snatch": {
+        "value": 95,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "power_snatch": {
+        "value": null,
+        "source": "missing",
+        "confidence": "low",
+        "as_of": null
+      },
+      "clean": {
+        "value": null,
+        "source": "missing",
+        "confidence": "low",
+        "as_of": null
+      },
+      "clean_and_jerk": {
+        "value": 135,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      },
+      "jerk": {
+        "value": null,
+        "source": "missing",
+        "confidence": "low",
+        "as_of": null
+      },
+      "power_clean": {
+        "value": null,
+        "source": "missing",
+        "confidence": "low",
+        "as_of": null
+      },
+      "push_jerk": {
+        "value": null,
+        "source": "missing",
+        "confidence": "low",
+        "as_of": null
+      },
+      "press": {
+        "value": null,
+        "source": "missing",
+        "confidence": "low",
+        "as_of": null
+      },
+      "push_press": {
+        "value": null,
+        "source": "missing",
+        "confidence": "low",
+        "as_of": null
+      },
+      "bench_press": {
+        "value": 185,
+        "source": "self_reported",
+        "confidence": "low",
+        "as_of": null
+      }
+    },
+    "capability_revisions": [],
+    "recovery_class": "open",
+    "strength_ratios": {
+      "snatch_to_back_squat": 0.422,
+      "clean_jerk_to_back_squat": 0.6,
+      "snatch_to_clean_jerk": 0.704,
+      "front_squat_to_back_squat": null,
+      "overhead_squat_to_snatch": null,
+      "back_squat_to_bodyweight": 1.25,
+      "deadlift_to_bodyweight": 1.528,
+      "press_to_bodyweight": null,
+      "bench_to_bodyweight": 1.028,
+      "deadlift_to_back_squat": 1.222
+    },
+    "derived_metrics": {},
+    "competition_movements": {},
+    "normative": {
+      "snatch_to_back_squat": {
+        "value": 0.422,
+        "threshold": 0.6,
+        "gap": -0.178,
+        "position": "well_below"
+      },
+      "clean_jerk_to_back_squat": {
+        "value": 0.6,
+        "threshold": 0.8,
+        "gap": -0.2,
+        "position": "well_below"
+      },
+      "snatch_to_clean_jerk": {
+        "value": 0.704,
+        "threshold": 0.76,
+        "gap": -0.056,
+        "position": "below"
+      },
+      "deadlift_to_back_squat": {
+        "value": 1.222,
+        "threshold": 1.3,
+        "gap": -0.078,
+        "position": "below"
+      },
+      "back_squat_to_bodyweight": {
+        "value": 1.25,
+        "threshold": 1.9,
+        "gap": -0.65,
+        "position": "well_below"
+      },
+      "deadlift_to_bodyweight": {
+        "value": 1.528,
+        "threshold": 2.5,
+        "gap": -0.972,
+        "position": "well_below"
+      },
+      "bench_to_bodyweight": {
+        "value": 1.028,
+        "threshold": 1.46,
+        "gap": -0.432,
+        "position": "well_below"
+      }
+    },
+    "ranked_by_position": [
+      "deadlift_to_bodyweight",
+      "back_squat_to_bodyweight",
+      "snatch_to_back_squat",
+      "bench_to_bodyweight",
+      "clean_jerk_to_back_squat",
+      "snatch_to_clean_jerk",
+      "deadlift_to_back_squat"
+    ]
+  }
+}

@@ -199,11 +199,13 @@ for (const fixture of ALL_FIXTURES) {
       const supa = makeStubSupa({ profileRow: fixture.profileRow });
       const payload = await buildWriterPayload(supa, "test-user-id");
 
-      // 12 top-level keys per the locked contract (Step 27 added previous_cycle;
-      // eval-consumption added profile_evaluation + training_evaluation).
+      // 13 top-level keys per the locked contract (Step 27 added previous_cycle;
+      // eval-consumption added profile_evaluation + training_evaluation;
+      // coaching-state Step 1 added athlete_model).
       assertEquals(
         Object.keys(payload).sort(),
         [
+          "athlete_model",
           "basics",
           "competition",
           "conditioning",
@@ -218,6 +220,12 @@ for (const fixture of ALL_FIXTURES) {
           "vocabulary",
         ],
       );
+
+      // athlete_model is always present (unpersisted v0 fallback when the
+      // stub has no athlete_models table) with the deterministic fact-sheet.
+      assertEquals(typeof payload.athlete_model.recovery_class, "string");
+      assert(payload.athlete_model.strength_ratios !== undefined);
+      assert(payload.athlete_model.capabilities !== undefined);
 
       assertCanonicalShape(payload);
 

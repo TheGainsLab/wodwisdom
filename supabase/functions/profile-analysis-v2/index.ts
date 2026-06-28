@@ -21,71 +21,35 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { buildWriterPayload, type WriterPayload } from "../_shared/build-writer-payload.ts";
-import { V2_PROFILE_ANALYSIS_SYSTEM_PROMPT } from "../_shared/v2-profile-analysis-prompt.ts";
-import { EMIT_EVALUATION_TOOL, type EvaluationOutput } from "../_shared/v2-output-schema.ts";
+import { buildWriterPayload } from "../_shared/build-writer-payload.ts";
+import {
+  type CoachStateContent,
+  evaluationFromCoachState,
+} from "../_shared/coach-state.ts";
+import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-const MODEL = "claude-sonnet-4-6";
 
-interface ClaudeContentBlock {
-  type?: string;
-  name?: string;
-  input?: unknown;
-  text?: string;
-}
-
-interface ClaudeResponse {
-  content?: ClaudeContentBlock[];
-  stop_reason?: string;
-  usage?: { input_tokens?: number; output_tokens?: number };
-}
-
-async function callEvaluator(payload: WriterPayload): Promise<EvaluationOutput> {
-  if (!ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY not configured");
+/** Render the derived evaluation into the prose `analysis` column the program
+ *  generator reads (build-writer-payload). Keeps the generator working
+ *  unchanged in Step 2 — its narrative is now provably derived from the typed
+ *  CoachState. Markdown, athlete/coach voice. */
+function renderAnalysisProse(cs: CoachStateContent): string {
+  const ev = evaluationFromCoachState(cs);
+  const lines: string[] = [];
+  lines.push(`**${ev.headline_takeaway}**`, "");
+  lines.push(ev.detailed_analysis, "");
+  if (ev.strengths.length) {
+    lines.push("### Strengths", ...ev.strengths.map((s) => `- ${s}`), "");
   }
-  const userMessage = `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(payload, null, 2)}`;
-
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 8000,
-      stream: false,
-      system: V2_PROFILE_ANALYSIS_SYSTEM_PROMPT,
-      tools: [EMIT_EVALUATION_TOOL],
-      tool_choice: { type: "tool", name: "emit_evaluation" },
-      messages: [{ role: "user", content: userMessage }],
-    }),
-    signal: AbortSignal.timeout(120_000),
-  });
-
-  if (!resp.ok) {
-    const body = await resp.text().catch(() => "");
-    throw new Error(`Claude HTTP ${resp.status}: ${body.slice(0, 500)}`);
+  if (ev.weaknesses_and_priorities.length) {
+    lines.push("### Priorities", ...ev.weaknesses_and_priorities.map((s) => `- ${s}`), "");
   }
-
-  const data = (await resp.json()) as ClaudeResponse;
-  const toolUse = (data.content ?? []).find(
-    (b) => b.type === "tool_use" && b.name === "emit_evaluation",
-  );
-  if (!toolUse || typeof toolUse.input !== "object" || toolUse.input == null) {
-    throw new Error(
-      `Claude response missing emit_evaluation tool_use. stop_reason=${data.stop_reason}`,
-    );
+  if (ev.recommendations.length) {
+    lines.push("### Recommendations", ...ev.recommendations.map((s) => `- ${s}`), "");
   }
-  console.log(
-    `[profile-analysis-v2] Claude usage: input=${data.usage?.input_tokens} output=${data.usage?.output_tokens}`,
-  );
-  return toolUse.input as EvaluationOutput;
+  return lines.join("\n").trim();
 }
 
 Deno.serve(async (req) => {
@@ -124,31 +88,54 @@ Deno.serve(async (req) => {
       );
     }
 
+    // 2b. Target athlete — admin may evaluate any user via body.user_id; defaults
+    //     to the caller. `force` (the "Re-run" override) bypasses reuse-if-current.
+    let body: { user_id?: string; force?: boolean } = {};
+    if (req.method === "POST") body = await req.json().catch(() => ({}));
+    const targetUserId = body.user_id ?? user.id;
+    const force = body.force === true;
+
     const t0 = Date.now();
 
     // 3. Build the writer payload (same shared module).
-    console.log(`[profile-analysis-v2] building payload for user ${user.id}`);
-    const payload = await buildWriterPayload(supa, user.id);
+    console.log(`[profile-analysis-v2] building payload for user ${targetUserId}`);
+    const payload = await buildWriterPayload(supa, targetUserId);
     console.log(
       `[profile-analysis-v2] payload built (competition_linked=${payload.competition != null} vocabulary_size=${payload.vocabulary.length})`,
     );
 
-    // 4. Call evaluator LLM.
-    const evaluation = await callEvaluator(payload);
+    // 4. Get the CoachState (judgment) — reuse-if-current by (athlete_model_version,
+    //    coach_state_builder_version); generate + persist on a miss or when forced
+    //    ("Re-run"). Shared with the program generator's coach_state stage, so eval
+    //    and program build CoachState identically. The persisted snapshot IS the
+    //    source of truth.
+    const { coach_state: coachState, version: coachStateVersion, reused } =
+      await generateAndPersistCoachState(supa, targetUserId, payload, { force });
+    console.log(
+      `[profile-analysis-v2] coach_state v${coachStateVersion} (reused=${reused}, refs athlete_model v${payload.athlete_model.version})`,
+    );
 
-    // 5. Save to profile_evaluations.
+    // 5. Derive the athlete-facing evaluation FROM the typed CoachState (the
+    //     eval renders from the decisions, so it can't drift) and persist it to
+    //     profile_evaluations: structured_evaluation keeps the existing UI shape,
+    //     analysis keeps the prose the program generator reads (Step 2 leaves
+    //     the generator untouched — it consumes the typed object in Step 3).
+    const evaluation = evaluationFromCoachState(coachState);
     let evaluationId: string | null = null;
     try {
       const { data: row, error: insErr } = await supa
         .from("profile_evaluations")
         .insert({
-          user_id: user.id,
+          user_id: targetUserId,
           evaluation_version: "v2",
           structured_evaluation: evaluation,
+          analysis: renderAnalysisProse(coachState),
           profile_snapshot: {
             basics: payload.basics,
             training_context: payload.training_context,
             competition_linked: payload.competition != null,
+            athlete_model_version: payload.athlete_model.version,
+            coach_state_version: coachStateVersion,
           },
         })
         .select("id")
@@ -172,6 +159,9 @@ Deno.serve(async (req) => {
         ok: true,
         elapsed_ms: elapsedMs,
         evaluation_id: evaluationId,
+        coach_state_version: coachStateVersion,
+        athlete_model_version: payload.athlete_model.version,
+        coach_state: coachState,
         evaluation,
       }),
       { status: 200, headers: { ...cors, "Content-Type": "application/json" } },

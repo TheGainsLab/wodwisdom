@@ -192,3 +192,6 @@ verify_jwt = false
 
 [functions.compute-benchmarks]
 verify_jwt = false
+
+[functions.athlete-model-inspect]
+verify_jwt = false
