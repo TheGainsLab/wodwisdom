@@ -65,6 +65,48 @@ export interface TrainingSummary {
   movement_volume: Record<string, { reps: number; sessions: number }>;
 }
 
+// ── Diff — "what changed in your TRAINING" (one of the three diffs) ──
+export interface TrainingSummaryDiff {
+  lift_changes: Array<{
+    lift: string;
+    from_est_1rm: number | null;
+    to_est_1rm: number;
+    from_sessions: number;
+    to_sessions: number;
+  }>;
+  /** Movements logged in `next` that weren't in `prev`. */
+  new_movements: string[];
+  sessions_logged_from: number;
+  sessions_logged_to: number;
+}
+
+export function trainingSummaryDiff(
+  prev: TrainingSummary | null,
+  next: TrainingSummary,
+): TrainingSummaryDiff {
+  const lift_changes: TrainingSummaryDiff["lift_changes"] = [];
+  for (const [lift, ev] of Object.entries(next.lifts)) {
+    const before = prev?.lifts?.[lift];
+    if (!before || before.best_est_1rm !== ev.best_est_1rm || before.sessions !== ev.sessions) {
+      lift_changes.push({
+        lift,
+        from_est_1rm: before?.best_est_1rm ?? null,
+        to_est_1rm: ev.best_est_1rm,
+        from_sessions: before?.sessions ?? 0,
+        to_sessions: ev.sessions,
+      });
+    }
+  }
+  const prevMoves = new Set(Object.keys(prev?.movement_volume ?? {}));
+  const new_movements = Object.keys(next.movement_volume).filter((m) => !prevMoves.has(m));
+  return {
+    lift_changes,
+    new_movements,
+    sessions_logged_from: prev?.sessions_logged ?? 0,
+    sessions_logged_to: next.sessions_logged,
+  };
+}
+
 // ── e1RM estimate (Epley + reps-in-reserve from RPE) ─────────────────
 // effective_reps = reps + RIR, where RIR = max(0, 10 - rpe). A set of
 // 5 @ RPE 8 (2 in reserve) implies ~a 7-rep capacity → a higher 1RM than

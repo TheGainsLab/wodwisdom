@@ -349,6 +349,37 @@ export const EMIT_COACH_STATE_TOOL = {
 // rationale, so it can never drift from the decisions. Pure, no LLM.
 // ============================================================
 
+// ── Diff — "what we're CHANGING and why" (one of the three diffs) ──
+export interface CoachStateDiff {
+  priorities_added: FocusArea[];
+  priorities_removed: FocusArea[];
+  rank_changes: Array<{ focus: FocusArea; from: number; to: number }>;
+  recovery_change: { from: RecoveryStance; to: RecoveryStance } | null;
+  strength_emphasis_change: { from: StrengthEmphasis; to: StrengthEmphasis } | null;
+}
+
+export function coachStateDiff(
+  prev: CoachStateContent | null,
+  next: CoachStateContent,
+): CoachStateDiff {
+  const prevP = new Map((prev?.priorities ?? []).map((p) => [p.focus, p.rank]));
+  const nextP = new Map(next.priorities.map((p) => [p.focus, p.rank]));
+  const priorities_added = [...nextP.keys()].filter((f) => !prevP.has(f));
+  const priorities_removed = [...prevP.keys()].filter((f) => !nextP.has(f));
+  const rank_changes: CoachStateDiff["rank_changes"] = [];
+  for (const [focus, rank] of nextP) {
+    const before = prevP.get(focus);
+    if (before != null && before !== rank) rank_changes.push({ focus, from: before, to: rank });
+  }
+  const recovery_change = prev && prev.recovery_posture.stance !== next.recovery_posture.stance
+    ? { from: prev.recovery_posture.stance, to: next.recovery_posture.stance }
+    : null;
+  const strength_emphasis_change = prev && prev.strength_emphasis.value !== next.strength_emphasis.value
+    ? { from: prev.strength_emphasis.value, to: next.strength_emphasis.value }
+    : null;
+  return { priorities_added, priorities_removed, rank_changes, recovery_change, strength_emphasis_change };
+}
+
 export function evaluationFromCoachState(cs: CoachStateContent): EvaluationOutput {
   const ranked = [...cs.priorities].sort((a, b) => a.rank - b.rank);
   return {

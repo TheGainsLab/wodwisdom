@@ -61,6 +61,23 @@ interface InspectResponse {
     version: number; athlete_model_version: number;
     coach_state_builder_version: string; coach_state: CoachStateLike; created_at: string;
   } | null;
+  diffs: {
+    training: {
+      lift_changes: Array<{ lift: string; from_est_1rm: number | null; to_est_1rm: number; from_sessions: number; to_sessions: number }>;
+      new_movements: string[];
+      sessions_logged_from: number; sessions_logged_to: number;
+    } | null;
+    belief: {
+      capability_changes: Array<{ lift: string; from: number | null; to: number | null; from_source: string; to_source: string }>;
+      position_changes: Array<{ key: string; from: string; to: string }>;
+    } | null;
+    decisions: {
+      priorities_added: string[]; priorities_removed: string[];
+      rank_changes: Array<{ focus: string; from: number; to: number }>;
+      recovery_change: { from: string; to: string } | null;
+      strength_emphasis_change: { from: string; to: string } | null;
+    } | null;
+  } | null;
   persisted: {
     latest: (ModelLike & { model: ModelLike }) | null;
     versions: Array<{ version: number; profile_version: number; created_at: string; model_hash: string }>;
@@ -269,6 +286,9 @@ export default function AdminAthleteModelPage({ session }: { session: Session })
             ))}
           </div>
 
+          {/* The three diffs — what changed in training / belief / decisions (Step 4) */}
+          <DiffsBlock diffs={data.diffs} />
+
           {/* CoachState — the judgment layer (Step 2) */}
           <CoachStateBlock
             cs={data.coach_state}
@@ -397,6 +417,68 @@ export default function AdminAthleteModelPage({ session }: { session: Session })
         </>
       )}
     </AdminSubPageLayout>
+  );
+}
+
+function DiffsBlock({ diffs }: { diffs: InspectResponse['diffs'] }) {
+  if (!diffs) return null;
+  const { training, belief, decisions } = diffs;
+  const nothing =
+    (!training || (training.lift_changes.length === 0 && training.new_movements.length === 0)) &&
+    (!belief || (belief.capability_changes.length === 0 && belief.position_changes.length === 0)) &&
+    (!decisions || (decisions.priorities_added.length === 0 && decisions.priorities_removed.length === 0 && decisions.rank_changes.length === 0 && !decisions.recovery_change && !decisions.strength_emphasis_change));
+
+  return (
+    <Section title="What changed (training → belief → decisions)">
+      {nothing && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No prior version to compare against yet (first snapshot).</div>}
+
+      {/* 1. Training */}
+      {training && (training.lift_changes.length > 0 || training.new_movements.length > 0) && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>What you did (training)</div>
+          {training.sessions_logged_from !== training.sessions_logged_to && (
+            <div style={{ fontSize: 12.5, marginBottom: 3 }}>Logged sessions: {training.sessions_logged_from} → {training.sessions_logged_to}</div>
+          )}
+          {training.lift_changes.map((c) => (
+            <div key={c.lift} style={{ fontSize: 12.5 }}>
+              {c.lift}: est 1RM {c.from_est_1rm ?? '—'} → <strong>{c.to_est_1rm}</strong> ({c.from_sessions}→{c.to_sessions} sessions)
+            </div>
+          ))}
+          {training.new_movements.length > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 3 }}>new: {training.new_movements.join(', ')}</div>
+          )}
+        </div>
+      )}
+
+      {/* 2. Belief */}
+      {belief && (belief.capability_changes.length > 0 || belief.position_changes.length > 0) && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>What we learned (belief)</div>
+          {belief.capability_changes.map((c) => (
+            <div key={c.lift} style={{ fontSize: 12.5 }}>
+              {c.lift}: {c.from ?? '—'} → <strong>{c.to ?? '—'}</strong> <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>({c.from_source}→{c.to_source})</span>
+            </div>
+          ))}
+          {belief.position_changes.map((c) => (
+            <div key={c.key} style={{ fontSize: 12.5 }}>{c.key}: <Tag text={c.from} /> → <Tag text={c.to} tone="accent" /></div>
+          ))}
+        </div>
+      )}
+
+      {/* 3. Decisions */}
+      {decisions && (decisions.priorities_added.length > 0 || decisions.priorities_removed.length > 0 || decisions.rank_changes.length > 0 || decisions.recovery_change || decisions.strength_emphasis_change) && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>What we're changing (decisions)</div>
+          {decisions.priorities_added.length > 0 && <div style={{ fontSize: 12.5 }}>+ now developing: {decisions.priorities_added.join(', ')}</div>}
+          {decisions.priorities_removed.length > 0 && <div style={{ fontSize: 12.5 }}>− no longer developing: {decisions.priorities_removed.join(', ')}</div>}
+          {decisions.rank_changes.map((c) => (
+            <div key={c.focus} style={{ fontSize: 12.5 }}>{c.focus}: priority #{c.from} → #{c.to}</div>
+          ))}
+          {decisions.recovery_change && <div style={{ fontSize: 12.5 }}>recovery: {decisions.recovery_change.from} → {decisions.recovery_change.to}</div>}
+          {decisions.strength_emphasis_change && <div style={{ fontSize: 12.5 }}>strength emphasis: {decisions.strength_emphasis_change.from} → {decisions.strength_emphasis_change.to}</div>}
+        </div>
+      )}
+    </Section>
   );
 }
 

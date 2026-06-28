@@ -49,6 +49,7 @@ import {
 } from "./athlete-model.ts";
 import { buildTrainingSummary } from "./training-summary.ts";
 import { persistAthleteModel } from "./persist-athlete-model.ts";
+import { persistTrainingSummary } from "./persist-training-summary.ts";
 
 // ============================================================
 // Payload types
@@ -529,6 +530,15 @@ export async function buildWriterPayload(
   // to NOW (current training picture).
   const todayISO = new Date().toISOString().slice(0, 10);
   const trainingSummary = await buildTrainingSummary(supa, userId, todayISO);
+  // Persist a versioned snapshot (best-effort) — powers the "what changed in
+  // training" diff. Skip empty summaries (no logs) so non-loggers don't get rows.
+  if (trainingSummary.sessions_logged > 0) {
+    try {
+      await persistTrainingSummary(supa, userId, trainingSummary);
+    } catch (err) {
+      console.warn(`[build-writer-payload] training summary persist failed for ${userId}:`, err);
+    }
+  }
   const modelContent = buildAthleteModel(profileStatic, competition, {
     asOf: asString(profile.updated_at),
     trainingSummary,
