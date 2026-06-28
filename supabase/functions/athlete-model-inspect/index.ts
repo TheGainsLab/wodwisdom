@@ -22,12 +22,15 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import {
   type AthleteModelCompetitionInput,
+  athleteModelDiff,
   buildAthleteModel,
   MODEL_BUILDER_VERSION,
   profileStaticFromRow,
   type RawProfileRow,
   THRESHOLDS_VERSION,
 } from "../_shared/athlete-model.ts";
+import { coachStateDiff } from "../_shared/coach-state.ts";
+import { trainingSummaryDiff } from "../_shared/training-summary.ts";
 import { fetchTier4Bundle } from "../_shared/fetch-tier4-bundle.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -127,8 +130,35 @@ Deno.serve(async (req) => {
       .select("version, athlete_model_version, coach_state_builder_version, coach_state, created_at")
       .eq("user_id", targetUserId)
       .order("version", { ascending: false })
-      .limit(1);
+      .limit(2);
     const latestCoachState = coachRows?.[0] ?? null;
+
+    // Latest-two training summaries (for the "what changed in training" diff).
+    const { data: tsRows } = await supa
+      .from("training_summaries")
+      .select("version, summary, created_at")
+      .eq("user_id", targetUserId)
+      .order("version", { ascending: false })
+      .limit(2);
+
+    // The THREE DIFFS — what changed in training / belief / decisions — each a
+    // pure compare of the latest two versions of that layer. null when there's
+    // no prior version to compare against yet.
+    // deno-lint-ignore no-explicit-any
+    const cs = coachRows as any[] | null;
+    // deno-lint-ignore no-explicit-any
+    const ts = tsRows as any[] | null;
+    const diffs = {
+      training: ts && ts[0]
+        ? trainingSummaryDiff(ts[1]?.summary ?? null, ts[0].summary)
+        : null,
+      belief: versions[0]
+        ? athleteModelDiff(versions[1]?.model ?? null, versions[0].model)
+        : null,
+      decisions: cs && cs[0]
+        ? coachStateDiff(cs[1]?.coach_state ?? null, cs[0].coach_state)
+        : null,
+    };
 
     return json({
       user_id: targetUserId,
@@ -137,6 +167,7 @@ Deno.serve(async (req) => {
       competition_linked: competitionLinked,
       live: live ? { model: live, profile_static: liveProfileStatic } : null,
       coach_state: latestCoachState,
+      diffs,
       persisted: {
         latest,
         // Lightweight history (no full model blob) for the version picker.

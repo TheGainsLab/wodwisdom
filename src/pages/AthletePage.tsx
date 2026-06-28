@@ -1501,7 +1501,8 @@ export default function AthletePage({ session }: { session: Session }) {
 
                 {/* Tier 4 — competition history. Sits directly under the intake
                     tiers (1–3); the feature itself is the /athletedata route.
-                    Phase B v1: admin only. */}
+                    Public to ALL athletes via ATHLETEDATA_PUBLIC_TIER (currently on);
+                    only falls back to admin-only if that flag is turned off. */}
                 {(isAdmin || ATHLETEDATA_PUBLIC_TIER) && (
                   <div className="settings-card" style={{ borderColor: competitionAthleteId ? '#2ec486' : undefined }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
