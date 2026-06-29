@@ -45,6 +45,7 @@ import { buildRagContext } from "./build-rag-context.ts";
 import {
   type AthleteModel,
   buildAthleteModel,
+  type LoggedCompetitionResult,
   profileStaticFromRow,
 } from "./athlete-model.ts";
 import { buildTrainingSummary } from "./training-summary.ts";
@@ -265,6 +266,49 @@ function sliceTier4Bundle(bundle: Tier4Bundle, includeAllResults: boolean): Comp
   return sliced;
 }
 
+/**
+ * Read the athlete's enriched Try-It throwbacks (competition_workout_results,
+ * with the catalog metadata log-throwback captured) → typed
+ * LoggedCompetitionResult[]. Best-effort: [] on any error. Most recent first,
+ * capped — this is supplementary evidence, not the backbone.
+ */
+async function fetchLoggedCompetitionResults(
+  supa: SupabaseClient,
+  userId: string,
+): Promise<LoggedCompetitionResult[]> {
+  try {
+    const { data, error } = await supa
+      .from("competition_workout_results")
+      .select(
+        "workout_name, movements, time_domain, classification, score_type, score_value, finished, worldwide_percentile, cohort_percentile, avg_power_watts, avg_w_per_kg, performed_at",
+      )
+      .eq("user_id", userId)
+      .order("performed_at", { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    return (data ?? []).map((raw) => {
+      const r = raw as Record<string, unknown>;
+      return {
+        workout_name: typeof r.workout_name === "string" && r.workout_name ? r.workout_name : "Competition workout",
+        movements: Array.isArray(r.movements) ? (r.movements as string[]) : [],
+        time_domain: (r.time_domain as string | null) ?? null,
+        classification: (r.classification as string | null) ?? null,
+        score_type: String(r.score_type ?? ""),
+        score_value: typeof r.score_value === "number" ? r.score_value : 0,
+        finished: (r.finished as boolean | null) ?? null,
+        worldwide_percentile: (r.worldwide_percentile as number | null) ?? null,
+        cohort_percentile: (r.cohort_percentile as number | null) ?? null,
+        avg_power_watts: (r.avg_power_watts as number | null) ?? null,
+        avg_w_per_kg: (r.avg_w_per_kg as number | null) ?? null,
+        performed_at: String(r.performed_at ?? ""),
+      };
+    });
+  } catch (err) {
+    console.warn(`[build-writer-payload] logged competition results fetch failed for ${userId}:`, err);
+    return [];
+  }
+}
+
 // ============================================================
 // Vocabulary fetch — display_name strings for the ENTIRE curated movements
 // catalog (no competition_count filter). The writer's allowed-movement set.
@@ -400,6 +444,12 @@ export async function buildWriterPayload(
       competition = sliceTier4Bundle(bundle, includeAllResults);
     }
   }
+
+  // 2b. Self-logged Try-It throwbacks (competition_workout_results, enriched at
+  // log time). Surfaced on the Athlete Model (below) — independent of whether the
+  // athlete linked official history — so CoachState (→ the eval) and, via
+  // CoachState, the generator read them the same way imported results are read.
+  const loggedResults = await fetchLoggedCompetitionResults(supa, userId);
 
   // 3. Vocabulary — display_name list.
   const vocabulary = await fetchVocabulary(supa);
@@ -542,6 +592,7 @@ export async function buildWriterPayload(
   const modelContent = buildAthleteModel(profileStatic, competition, {
     asOf: asString(profile.updated_at),
     trainingSummary,
+    loggedCompetitionResults: loggedResults,
   });
   let athlete_model: AthleteModel = {
     ...modelContent,

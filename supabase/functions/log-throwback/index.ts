@@ -59,12 +59,40 @@ function normalizeGender(raw: unknown): Gender | null {
  * saves). Keeps the cataloged work-calc path keyed off our own
  * competition_workout_id rather than trusting a client-passed catalog id.
  */
-async function fetchWorkoutCatalogId(competitionWorkoutId: string): Promise<string | null> {
+/** Workout identity captured from the catalog detail, stored on the row so the
+ *  eval/generator can read logged throwbacks like imported history. */
+interface WorkoutMeta {
+  workout_catalog_id: string | null;
+  workout_name: string | null;
+  movements: string[] | null;
+  time_domain: string | null;
+  classification: string | null;
+}
+
+const EMPTY_META: WorkoutMeta = {
+  workout_catalog_id: null,
+  workout_name: null,
+  movements: null,
+  time_domain: null,
+  classification: null,
+};
+
+/** Defensively pull movement display names from a catalog movements array
+ *  (entries may be {name} objects or bare strings). */
+function movementNames(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const names = raw
+    .map((m) => (typeof m === "string" ? m : (m as { name?: unknown } | null)?.name))
+    .filter((n): n is string => typeof n === "string" && n.trim() !== "");
+  return names.length ? names : null;
+}
+
+async function fetchWorkoutMeta(competitionWorkoutId: string): Promise<WorkoutMeta> {
   const baseUrl = Deno.env.get("COMPETITION_SERVICE_BASE_URL");
   const serviceKey = Deno.env.get("COMPETITION_SERVICE_KEY");
   if (!baseUrl || !serviceKey) {
-    console.warn("[log-throwback] missing COMPETITION_SERVICE_* env; skipping power");
-    return null;
+    console.warn("[log-throwback] missing COMPETITION_SERVICE_* env; skipping power + metadata");
+    return EMPTY_META;
   }
   const url = `${baseUrl.replace(/\/$/, "")}/workouts/${encodeURIComponent(competitionWorkoutId)}`;
   const controller = new AbortController();
@@ -77,14 +105,24 @@ async function fetchWorkoutCatalogId(competitionWorkoutId: string): Promise<stri
     });
     if (!resp.ok) {
       console.warn(`[log-throwback] workout detail HTTP ${resp.status} for ${competitionWorkoutId}`);
-      return null;
+      return EMPTY_META;
     }
     const json = (await resp.json().catch(() => null)) as Record<string, unknown> | null;
-    const id = json?.workout_catalog_id;
-    return typeof id === "string" && id ? id : null;
+    if (!json) return EMPTY_META;
+    // The catalog detail may be flat or nest the spec under `workout`.
+    const spec = (json.workout ?? json) as Record<string, unknown>;
+    const td = spec.time_domain as { bucket?: unknown } | null | undefined;
+    const id = json.workout_catalog_id;
+    return {
+      workout_catalog_id: typeof id === "string" && id ? id : null,
+      workout_name: typeof json.workout_name === "string" ? json.workout_name : null,
+      movements: movementNames(spec.movements),
+      time_domain: typeof td?.bucket === "string" ? td.bucket : null,
+      classification: typeof spec.classification === "string" ? spec.classification : null,
+    };
   } catch (err) {
     console.warn(`[log-throwback] workout detail fetch error: ${(err as Error).message}`);
-    return null;
+    return EMPTY_META;
   } finally {
     clearTimeout(timer);
   }
@@ -151,9 +189,11 @@ Deno.serve(async (req) => {
     const bodyMassKg = toKg(apr?.bodyweight, apr?.units);
     const gender = normalizeGender(apr?.gender);
 
-    // Resolve the catalog id from our own competition_workout_id (server-side,
-    // not client-trusted). Best-effort — null skips the power compute.
-    const workoutCatalogId = await fetchWorkoutCatalogId(competitionWorkoutId);
+    // Resolve catalog id + workout identity (name/movements/time-domain) from
+    // our own competition_workout_id (server-side, not client-trusted).
+    // Best-effort — nulls skip the power compute / leave metadata empty.
+    const meta = await fetchWorkoutMeta(competitionWorkoutId);
+    const workoutCatalogId = meta.workout_catalog_id;
 
     // Best-effort power compute via the cataloged work-calc path. Needs the
     // catalog id + a known gender (to pick the division's loads). Watts come
@@ -216,6 +256,10 @@ Deno.serve(async (req) => {
         avg_power_watts: watts,
         avg_w_per_kg: wPerKg,
         body_mass_kg: bodyMassKgUsed,
+        workout_name: meta.workout_name,
+        movements: meta.movements,
+        time_domain: meta.time_domain,
+        classification: meta.classification,
       })
       .select()
       .single();
