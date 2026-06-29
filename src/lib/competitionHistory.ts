@@ -453,12 +453,30 @@ export interface NormalizedCatalog {
  *   all_results[].division). When the catalog exposes `division`, the list is
  *   filtered to this division first so each workout appears once.
  */
+/**
+ * Canonicalize a time-domain bucket. The bundle was normalized to
+ * short/medium/long in 1.9.0, but the catalog endpoint still emits the legacy
+ * 'mid' literal — fold it (and defensively 'moderate') to 'medium' so filters
+ * and labels are consistent across both data sources.
+ */
+export function normalizeTimeDomain(bucket: string | null | undefined): string {
+  const b = (bucket ?? '').trim().toLowerCase();
+  if (b === 'mid' || b === 'moderate') return 'medium';
+  return b;
+}
+
 export function normalizeCatalog(
   workouts: CatalogWorkoutSummary[] | undefined | null,
   preferIds?: Set<string>,
   division?: number,
 ): NormalizedCatalog {
-  let raw = workouts ?? [];
+  // Canonicalize the legacy 'mid' bucket at the boundary so every downstream
+  // consumer (duration filter, card badge) sees short/medium/long.
+  let raw = (workouts ?? []).map((w) =>
+    w.time_domain
+      ? { ...w, time_domain: { ...w.time_domain, bucket: normalizeTimeDomain(w.time_domain.bucket) } }
+      : w
+  );
 
   // Filter to the athlete's division when the catalog exposes it and we know it.
   if (division != null && raw.some((w) => w.division != null)) {
