@@ -60,6 +60,9 @@ interface HistoricalResult {
   workout_name: string;
   stage?: string;
   scaled_tier?: string;
+  /** 'competed' = imported official result (default); 'logged' = a self-logged
+   *  Try-It throwback. */
+  source?: 'competed' | 'logged';
   workout?: {
     description?: string;
     time_cap_seconds?: number | null;
@@ -73,6 +76,54 @@ interface HistoricalResult {
     avg_power_watts?: number | null;
     avg_w_per_kg?: number | null;
     joules?: number | null;
+  };
+}
+
+/** A self-logged throwback row (competition_workout_results, enriched at log
+ *  time) mapped into the HistoricalResult shape so it flows through the same
+ *  stats / charts / buckets / detail as imported competition results. */
+interface ThrowbackRow {
+  workout_name: string | null;
+  movements: string[] | null;
+  time_domain: string | null;
+  score_type: string | null;
+  score_value: number | null;
+  cohort_percentile: number | null;
+  avg_power_watts: number | null;
+  avg_w_per_kg: number | null;
+  joules: number | null;
+  performed_at: string;
+}
+
+function fmtThrowbackScore(scoreType: string | null, v: number | null): string | null {
+  if (v == null) return null;
+  if (scoreType === 'time') {
+    const m = Math.floor(v / 60), s = Math.round(v % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+  if (scoreType === 'reps') return `${v} reps`;
+  if (scoreType === 'load_lbs') return `${v} lb`;
+  if (scoreType === 'distance') return `${v} m`;
+  return String(v);
+}
+
+function throwbackToHistorical(t: ThrowbackRow): HistoricalResult {
+  return {
+    year: Number((t.performed_at || '').slice(0, 4)) || 0,
+    workout_name: t.workout_name || 'Competition workout',
+    source: 'logged',
+    workout: {
+      time_domain: { bucket: t.time_domain ?? undefined },
+      movements: (t.movements ?? []).map((name) => ({ name })),
+    },
+    result: {
+      valid: true,
+      raw_score_text: fmtThrowbackScore(t.score_type, t.score_value),
+      cohort_percentile: t.cohort_percentile,
+      avg_power_watts: t.avg_power_watts,
+      avg_w_per_kg: t.avg_w_per_kg,
+      joules: t.joules,
+    },
   };
 }
 
@@ -359,7 +410,7 @@ function TimeDomainBreakdown({
 
 export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId, metconBlocks }: Props) {
   const [historical, setHistorical] = useState<HistoricalResult[]>([]);
-  const [historicalLoaded, setHistoricalLoaded] = useState(false);
+  const [throwbackHist, setThrowbackHist] = useState<HistoricalResult[]>([]);
   const [historySearch, setHistorySearch] = useState('');
   // Which chart bar (if any) is expanded into a detail card below the chart.
   const [selected, setSelected] = useState<{ source: 'program' | 'historical'; key: string } | null>(null);
@@ -367,7 +418,7 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
   // Fetch Tier-4 historical metcons when an athlete is linked. We only need
   // all_results for the per-workout power figures (bundle 1.7.0+).
   useEffect(() => {
-    if (!competitionAthleteId) { setHistorical([]); setHistoricalLoaded(true); return; }
+    if (!competitionAthleteId) { setHistorical([]); return; }
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase.functions.invoke<{ bundle: { all_results?: HistoricalResult[] }; error?: string }>(
@@ -375,12 +426,31 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
         { body: { competition_athlete_id: competitionAthleteId, include: ['all_results'] } },
       );
       if (cancelled) return;
-      if (error || !data?.bundle?.all_results) { setHistorical([]); setHistoricalLoaded(true); return; }
+      if (error || !data?.bundle?.all_results) { setHistorical([]); return; }
       setHistorical(data.bundle.all_results);
-      setHistoricalLoaded(true);
     })();
     return () => { cancelled = true; };
   }, [competitionAthleteId]);
+
+  // Self-logged Try-It throwbacks — loaded for ALL athletes (not gated on linkage;
+  // an unlinked athlete can log throwbacks too). Merged into the historical view
+  // so everything completed is visible, matching the rest of the app.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('competition_workout_results')
+        .select('workout_name, movements, time_domain, score_type, score_value, cohort_percentile, avg_power_watts, avg_w_per_kg, joules, performed_at')
+        .eq('user_id', userId)
+        .eq('source', 'throwback');
+      if (cancelled || error || !data) return;
+      setThrowbackHist((data as ThrowbackRow[]).map(throwbackToHistorical));
+    })();
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  // Official imported results + self-logged throwbacks → one historical record.
+  const allHistorical = useMemo(() => [...historical, ...throwbackHist], [historical, throwbackHist]);
 
   // ── Program stats — every logged metcon (lifetime within the 200-log fetch) ──
   const programStats = useMemo(() => {
@@ -400,9 +470,9 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
     };
   }, [metconBlocks, bodyweightKg]);
 
-  // ── Historical stats from Tier-4 (lifetime competition record) ──
+  // ── Historical stats — imported competition record + self-logged throwbacks ──
   const historicalStats = useMemo(() => {
-    const valid = historical.filter(r =>
+    const valid = allHistorical.filter(r =>
       r.result.valid && r.result.avg_power_watts != null && Number.isFinite(r.result.avg_power_watts)
     );
     let nWithPower = 0;
@@ -415,11 +485,11 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
       }
     }
     return {
-      total: historical.length,
+      total: allHistorical.length,
       nWithPower,
       avgWkg: nWithPower > 0 ? sumWkg / nWithPower : null,
     };
-  }, [historical, bodyweightKg]);
+  }, [allHistorical, bodyweightKg]);
 
   // ── Program power-duration points — one per metcon with a power read.
   // Duration is recovered exactly as joules / avg_power_watts (metcons don't
@@ -448,12 +518,13 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
 
   // ── Historical chart series — chronological, label = workout name ──
   const historicalChart = useMemo(() => {
-    return historical
+    return allHistorical
       .filter(r => r.result.valid && r.result.avg_power_watts != null)
       .map((r, i) => {
         const w = wPerKg(r.result.avg_power_watts!, r.result.avg_w_per_kg ?? null, bodyweightKg);
+        const label = r.source === 'logged' ? `${r.workout_name} (logged)` : `${r.year} ${r.workout_name}`;
         return w != null && Number.isFinite(w)
-          ? { key: `${r.year}-${r.workout_name}-${i}`, label: `${r.year} ${r.workout_name}`, value: w, bucket: r.workout?.time_domain?.bucket ?? undefined }
+          ? { key: `${r.year}-${r.workout_name}-${i}`, label, value: w, bucket: r.workout?.time_domain?.bucket ?? undefined }
           : null;
       })
       .filter((x): x is NonNullable<typeof x> => x !== null)
@@ -461,7 +532,7 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
       // with the 4-digit year, so a label sort orders by year then workout
       // (e.g. "2019 19.1" before "2019 19.5" before "2026 Event 1").
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [historical, bodyweightKg]);
+  }, [allHistorical, bodyweightKg]);
 
   // ── Per-time-domain power rollups (shared helper → can't drift from the
   //    competition-side breakdown on Athlete Data) ──
@@ -475,22 +546,22 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
   );
   const historicalBuckets = useMemo(
     () => bucketByTimeDomain(
-      historical.filter(r => r.result.valid),
+      allHistorical.filter(r => r.result.valid),
       r => r.workout?.time_domain?.bucket,
       r => wPerKg(r.result.avg_power_watts ?? null, r.result.avg_w_per_kg ?? null, bodyweightKg),
     ),
-    [historical, bodyweightKg],
+    [allHistorical, bodyweightKg],
   );
 
   // key → full HistoricalResult, mirroring historicalChart's filter+index so the
   // detail card can resolve a clicked historical bar back to its source row.
   const historicalByKey = useMemo(() => {
     const m = new Map<string, HistoricalResult>();
-    historical
+    allHistorical
       .filter(r => r.result.valid && r.result.avg_power_watts != null)
       .forEach((r, i) => { m.set(`${r.year}-${r.workout_name}-${i}`, r); });
     return m;
-  }, [historical]);
+  }, [allHistorical]);
 
   // ── Filtered history list ──
   const historyList = useMemo(() => {
@@ -559,7 +630,7 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
           const sub = [b.block_label, b.rx ? 'Rx' : null].filter(Boolean).join(' · ') || undefined;
           return <MetconDetailCard title={title} sub={sub} stats={stats} body={b.block_text} notes={b.notes} faults={b.faults} onClose={() => setSelected(null)} />;
         })()}
-        {competitionAthleteId && historicalLoaded && historicalStats.total > 0 && (
+        {historicalStats.total > 0 && (
           <>
             {/* Historical group: historical stats, then the historical chart. */}
             <div style={{ borderTop: '1px solid var(--border)', margin: '28px 0 0' }} />
@@ -605,7 +676,7 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
               if (r.result.joules != null) stats.push({ label: 'Total work', value: `${Math.round(r.result.joules / 1000)} kJ` });
               if (r.workout?.time_cap_seconds != null) stats.push({ label: 'Time cap', value: fmtSeconds(r.workout.time_cap_seconds) });
               const body = r.workout?.description?.trim() || fmtHistoricalMovements(r.workout?.movements) || undefined;
-              const sub = [String(r.year), r.stage].filter(Boolean).join(' · ');
+              const sub = [r.source === 'logged' ? 'Logged' : String(r.year), r.stage].filter(Boolean).join(' · ');
               return <MetconDetailCard title={r.workout_name} sub={sub} stats={stats} body={body} onClose={() => setSelected(null)} />;
             })()}
             </>)}
@@ -615,7 +686,7 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
         <TimeDomainBreakdown
           program={programBuckets}
           historical={historicalBuckets}
-          showHistorical={!!competitionAthleteId && historicalLoaded && historicalBuckets.some(b => b.n > 0)}
+          showHistorical={historicalBuckets.some(b => b.n > 0)}
         />
       </CollapsibleSection>
 
