@@ -541,16 +541,32 @@ export function initialCollapsedSeasons(seasonsNewestFirst: number[]): Set<numbe
   return new Set(seasonsNewestFirst);
 }
 
-/** Mean cohort_percentile across a set of the athlete's entries (skips
- *  non-finite values); null when nothing usable. Used for the collapsed
+/** The percentile to DISPLAY for an entry: the age-cohort percentile when we
+ *  have it (official results always do), else the worldwide percentile. Self-
+ *  logged throwbacks often have only worldwide — the cohort needs an age band
+ *  AND the service having an age breakdown for that workout (e.g. very old Opens
+ *  / Regionals don't) — so without this fallback they'd show "—" despite a valid
+ *  placement. null only when neither is a finite number (no placement at all). */
+export function displayPercentile(
+  result: { cohort_percentile?: number | null; worldwide_percentile?: number | null } | null | undefined,
+): number | null {
+  const c = result?.cohort_percentile;
+  if (typeof c === 'number' && Number.isFinite(c)) return c;
+  const w = result?.worldwide_percentile;
+  if (typeof w === 'number' && Number.isFinite(w)) return w;
+  return null;
+}
+
+/** Mean display percentile (cohort, falling back to worldwide) across a set of
+ *  the athlete's entries; null when nothing usable. Used for the collapsed
  *  per-season summary lines in the grid / map. */
 export function avgCohortPercentile(
   entries: ReadonlyArray<CompetitionWorkoutEntry | undefined>,
 ): number | null {
   const ps: number[] = [];
   for (const e of entries) {
-    const p = e?.result?.cohort_percentile;
-    if (typeof p === 'number' && Number.isFinite(p)) ps.push(p);
+    const p = displayPercentile(e?.result);
+    if (p != null) ps.push(p);
   }
   return ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : null;
 }
