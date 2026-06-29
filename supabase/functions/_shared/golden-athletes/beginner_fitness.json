@@ -74,7 +74,7 @@
   "competition": null,
   "expected_model": {
     "thresholds_version": "v1",
-    "model_builder_version": "v1.2",
+    "model_builder_version": "v1.3",
     "inference_version": null,
     "capabilities": {
       "back_squat": {
@@ -178,6 +178,7 @@
     },
     "derived_metrics": {},
     "competition_movements": {},
+    "logged_competition_results": [],
     "normative": {
       "snatch_to_back_squat": {
         "value": 0.422,
