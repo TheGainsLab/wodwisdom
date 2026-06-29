@@ -84,7 +84,9 @@ export default function LogResultForm({
   const [load, setLoad] = useState('');
   const [distance, setDistance] = useState('');
   const [performedAt, setPerformedAt] = useState(todayISO());
-  const [standardsMet, setStandardsMet] = useState(false);
+  // Standards are assumed enforced — the explicit "I judged it to competition
+  // standards" toggle was removed; we always record the result as standards-met.
+  const standardsMet = true;
   const [notes, setNotes] = useState('');
 
   const [saving, setSaving] = useState(false);
@@ -292,11 +294,6 @@ export default function LogResultForm({
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>Date</div>
                 <input className="lift-input" style={inputStyle} type="date" max={todayISO()} value={performedAt} onChange={(e) => setPerformedAt(e.target.value)} />
               </div>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={standardsMet} onChange={(e) => setStandardsMet(e.target.checked)} />
-                I judged it to competition standards
-              </label>
 
               <div>
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>Notes <span style={{ color: 'var(--text-muted)' }}>(optional)</span></div>
