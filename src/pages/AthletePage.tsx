@@ -1513,8 +1513,8 @@ export default function AthletePage({ session }: { session: Session }) {
                     <h2 className="settings-card-title" style={{ marginBottom: 2 }}>Competition History</h2>
                     <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
                       {competitionAthleteId
-                        ? `Linked: ${competitionAthleteLabel ?? 'your CrossFit profile'}`
-                        : 'Link your CrossFit competition profile — your Open / Quarterfinals / Games history, a completion map, and throwbacks.'}
+                        ? `Linked: ${competitionAthleteLabel ?? 'your competition profile'}`
+                        : 'Link your competition profile — your Open / Quarterfinals / Games history, a completion map, and throwbacks.'}
                     </div>
                     <button
                       type="button"
