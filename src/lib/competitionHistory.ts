@@ -287,17 +287,18 @@ export function throwbacksToEntries(
 }
 
 /**
- * Normalize the bundle's competed results merged with logged throwbacks. A
- * throwback for a workout the athlete also COMPETED in is dropped (the official
- * result wins). Everything else flows through `normalizeCompetitionHistory`.
+ * Normalize the bundle's competed results merged with logged throwbacks.
+ * EVERYTHING the athlete has completed is visible — official competition results
+ * AND self-logged attempts (incl. a re-test of a workout they competed in), so a
+ * progress story like "competed 2013, re-tested 2026" shows. Entries are tagged
+ * by `source` ('competed' | 'logged') so the grid/detail can distinguish them.
  */
 export function normalizeWithThrowbacks(
   allResults: AllResultsEntry[] | undefined | null,
   throwbackEntries: AllResultsEntry[],
 ): NormalizedCompetitionHistory {
   const competed = allResults ?? [];
-  const competedIds = new Set(competed.map((e) => e.competition_workout_id));
-  const merged = [...competed, ...throwbackEntries.filter((t) => !competedIds.has(t.competition_workout_id))];
+  const merged = [...competed, ...throwbackEntries];
   return normalizeCompetitionHistory(merged);
 }
 
