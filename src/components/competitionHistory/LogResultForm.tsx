@@ -292,7 +292,7 @@ export default function LogResultForm({
 
               <div>
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>Date</div>
-                <input className="lift-input" style={inputStyle} type="date" max={todayISO()} value={performedAt} onChange={(e) => setPerformedAt(e.target.value)} />
+                <input className="lift-input" style={{ ...inputStyle, width: '100%', maxWidth: 200 }} type="date" max={todayISO()} value={performedAt} onChange={(e) => setPerformedAt(e.target.value)} />
               </div>
 
               <div>
