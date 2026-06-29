@@ -201,7 +201,10 @@ export function normalizeCompetitionHistory(
   return {
     seasons,
     byId,
-    total: entries.length,
+    // Count UNIQUE workouts (byId is keyed by competition_workout_id), not raw
+    // entries — so a workout done twice (re-test / official + throwback) counts
+    // once. Keeps the headline count consistent with the "X of 339 done" math.
+    total: Object.keys(byId).length,
     yearsCompeted: seasons.map((s) => s.year),
     stagesSeen,
   };

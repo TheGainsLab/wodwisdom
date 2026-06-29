@@ -205,9 +205,11 @@ export default function CompetitionExplorer({
 
   const matchedCount = useMemo(() => {
     if (!matchEntry) return history.total;
-    let n = 0;
-    for (const s of history.seasons) for (const st of s.stages) for (const e of st.entries) if (matchEntry(e)) n++;
-    return n;
+    // Count UNIQUE matching workouts (a workout done twice would otherwise be
+    // double-counted, making "showing X of N" exceed N).
+    const ids = new Set<string>();
+    for (const s of history.seasons) for (const st of s.stages) for (const e of st.entries) if (matchEntry(e)) ids.add(e.competition_workout_id);
+    return ids.size;
   }, [matchEntry, history]);
 
   const scopeBtn = (s: Scope, label: string) => {
