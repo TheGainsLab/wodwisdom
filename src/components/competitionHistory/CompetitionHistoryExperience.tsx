@@ -280,7 +280,7 @@ export default function CompetitionHistoryExperience({
   const onVerify = async (idOverride?: string) => {
     const trimmed = (idOverride ?? pasteId).trim();
     if (!trimmed) {
-      setVerifyError('Enter a competitor ID.');
+      setVerifyError('Enter an athlete ID.');
       return;
     }
     if (!idOverride) setPendingSearchResult(null); // paste-ID path: no search result
@@ -427,7 +427,7 @@ export default function CompetitionHistoryExperience({
       {mode === 'unlinked' && !browseUnlinked && (
         <div>
           <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>
-            Search for your CrossFit competition profile to link it to your account.
+            Search for your competition profile to import your data and link it to your account.
             Once confirmed, this linkage is permanent.
           </p>
           <p style={{ marginBottom: 12, fontSize: 13 }}>
@@ -545,12 +545,12 @@ export default function CompetitionHistoryExperience({
 
           {/* Paste-ID fallback */}
           <details style={{ marginTop: 14 }}>
-            <summary style={{ fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>Or enter a competitor ID directly</summary>
+            <summary style={{ fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>Or enter an athlete ID directly</summary>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
               <input
                 type="text"
                 className="lift-input"
-                placeholder="Competitor ID (e.g. 153604)"
+                placeholder="Athlete ID (e.g. 153604)"
                 value={pasteId}
                 onChange={e => setPasteId(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && pasteId.trim() && !verifying) onVerify(); }}
@@ -616,18 +616,23 @@ export default function CompetitionHistoryExperience({
           <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Is this you?</h3>
           <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
             <div style={{ fontSize: 16, fontWeight: 600 }}>{pendingBundle.identity.name}</div>
+            {/* Identifying detail so the athlete can confirm it's them without an
+                external link — division / region / affiliate disambiguate names.
+                Available on the search path (pendingSearchResult); the manual-ID
+                path has none, so the line is omitted there. */}
+            {pendingSearchResult &&
+              [pendingSearchResult.division, pendingSearchResult.region, pendingSearchResult.affiliate]
+                .filter(Boolean).length > 0 && (
+              <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 4 }}>
+                {[pendingSearchResult.division, pendingSearchResult.region, pendingSearchResult.affiliate]
+                  .filter(Boolean).join(' · ')}
+              </div>
+            )}
             <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>
               {TIER_LABEL[pendingBundle.competition_summary.overall_competitive_tier]} ·{' '}
               {pendingBundle.competition_summary.seasons_competed} season{pendingBundle.competition_summary.seasons_competed === 1 ? '' : 's'} ·{' '}
               latest {pendingBundle.competition_summary.latest_percentile.toFixed(1)} pct
             </div>
-            {pendingBundle.identity.profile_url && (
-              <div style={{ fontSize: 12, marginTop: 8 }}>
-                <a href={pendingBundle.identity.profile_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
-                  View profile on games.crossfit.com →
-                </a>
-              </div>
-            )}
           </div>
 
           <div style={{
