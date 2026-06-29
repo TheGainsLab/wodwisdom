@@ -249,31 +249,35 @@ export default function CompetitionHistoryExperience({
     };
   }, [mode, linkedId]);
 
-  // Catalog (resolves a throwback's season/stage/movements) — once when linked.
+  // Catalog (resolves a throwback's season/stage/movements + powers the "done"
+  // overlay and My Workouts). User-agnostic — load ONCE on mount, regardless of
+  // linkage: unlinked athletes browse "All competition workouts" and log Try-Its
+  // too, so they need the catalog to resolve their throwbacks.
   useEffect(() => {
-    if (mode !== 'linked' || !linkedId) return;
     let cancelled = false;
     (async () => {
       const { data } = await supabase.functions.invoke<{ workouts?: CatalogWorkoutSummary[]; error?: string }>('competition-catalog', { body: {} });
       if (!cancelled && data?.workouts) setCatalogById(normalizeCatalog(data.workouts).byId);
     })();
     return () => { cancelled = true; };
-  }, [mode, linkedId]);
+  }, []);
 
-  // The athlete's logged throwbacks — refetched on link change AND after a log
-  // (throwbackToken), so a just-logged throwback merges into "Your workouts".
+  // The athlete's logged throwbacks — loaded on mount + refetched after a log
+  // (throwbackToken). NOT gated on linkage: an unlinked athlete can log Try-Its
+  // via "All competition workouts" and must see them persist. RLS already scopes
+  // the read to the current user; the explicit user_id filter is belt-and-suspenders.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (mode !== 'linked' || !linkedId) { if (!cancelled) setThrowbackRows([]); return; }
       const { data } = await supabase
         .from('competition_workout_results')
         .select('competition_workout_id, score_type, score_value, finished, cohort_percentile, worldwide_percentile, worldwide_rank, field_size, cohort_size, joules, avg_power_watts, avg_w_per_kg')
+        .eq('user_id', userId)
         .eq('source', 'throwback');
       if (!cancelled && data) setThrowbackRows(data as ThrowbackRow[]);
     })();
     return () => { cancelled = true; };
-  }, [mode, linkedId, throwbackToken]);
+  }, [throwbackToken, userId]);
 
   // Verify an athlete and move to the confirm step. `idOverride` is passed
   // when the user picked a search result; otherwise the paste-ID input drives.
