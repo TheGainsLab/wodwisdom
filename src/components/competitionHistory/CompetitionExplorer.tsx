@@ -48,6 +48,16 @@ const TIME_DOMAIN_LABEL: Record<TimeDomain, string> = {
   long: 'Long',
 };
 
+// The bundle ("My workouts") was normalized to short/medium/long in 1.9.0, but
+// the CATALOG ("All competition workouts") endpoint still emits the legacy 'mid'
+// literal — so a raw `bucket === 'medium'` check matched zero of the 339 catalog
+// workouts. Fold legacy aliases to the canonical value before comparing.
+function normalizeTimeDomain(bucket: string | null | undefined): string {
+  const b = (bucket ?? '').trim().toLowerCase();
+  if (b === 'mid' || b === 'moderate') return 'medium';
+  return b;
+}
+
 export default function CompetitionExplorer({
   history,
   userAge,
@@ -187,7 +197,7 @@ export default function CompetitionExplorer({
     if (!isFiltered) return undefined;
     return (e: CompetitionWorkoutEntry): boolean => {
       if (filter.year != null && e.year !== filter.year) return false;
-      if (filter.timeDomain && e.workout.time_domain?.bucket !== filter.timeDomain) return false;
+      if (filter.timeDomain && normalizeTimeDomain(e.workout.time_domain?.bucket) !== filter.timeDomain) return false;
       if (filter.movement && !e.workout.movements.some((m) => m.name === filter.movement)) return false;
       return true;
     };
@@ -197,7 +207,7 @@ export default function CompetitionExplorer({
     if (!isFiltered) return undefined;
     return (w: CatalogWorkoutSummary): boolean => {
       if (filter.year != null && w.season !== filter.year) return false;
-      if (filter.timeDomain && w.time_domain?.bucket !== filter.timeDomain) return false;
+      if (filter.timeDomain && normalizeTimeDomain(w.time_domain?.bucket) !== filter.timeDomain) return false;
       if (filter.movement && !w.movements.includes(filter.movement)) return false;
       return true;
     };
