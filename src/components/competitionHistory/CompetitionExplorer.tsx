@@ -16,7 +16,7 @@ import type {
   NormalizedCatalog,
   CatalogWorkoutSummary,
 } from '../../lib/competitionHistory';
-import { movementExposure, normalizeCatalog, ageBandFor, prettyMovementName } from '../../lib/competitionHistory';
+import { movementExposure, normalizeCatalog, normalizeTimeDomain, ageBandFor, prettyMovementName } from '../../lib/competitionHistory';
 import CompetitionGrid from './CompetitionGrid';
 import CompetitionMap from './CompetitionMap';
 import WorkoutDetail from './WorkoutDetail';
@@ -47,16 +47,6 @@ const TIME_DOMAIN_LABEL: Record<TimeDomain, string> = {
   medium: 'Medium',
   long: 'Long',
 };
-
-// The bundle ("My workouts") was normalized to short/medium/long in 1.9.0, but
-// the CATALOG ("All competition workouts") endpoint still emits the legacy 'mid'
-// literal — so a raw `bucket === 'medium'` check matched zero of the 339 catalog
-// workouts. Fold legacy aliases to the canonical value before comparing.
-function normalizeTimeDomain(bucket: string | null | undefined): string {
-  const b = (bucket ?? '').trim().toLowerCase();
-  if (b === 'mid' || b === 'moderate') return 'medium';
-  return b;
-}
 
 export default function CompetitionExplorer({
   history,
