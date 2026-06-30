@@ -601,17 +601,59 @@ export default function CompetitionHistoryExperience({
           <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>
             Browse real competition workouts and log your own attempts to see where you'd stack up.
           </p>
-          <CompetitionExplorer
-            history={competitionHistory}
-            userAge={userAge}
-            userBodyMassKg={userBodyMassKg}
-            canLog={canLog}
-            onThrowbackLogged={() => setThrowbackToken((t) => t + 1)}
-            scope={scope}
-            setScope={setScope}
-            filter={filter}
-            setFilter={setFilter}
-          />
+          {/* Once the athlete has logged throwbacks, surface the same analytics
+              (All Movements / Power) computed from them — no linking required.
+              Sparse with few logs, but it lets an unlinked athlete see their own
+              analysis. Summary is skipped (it leans on the linked bundle's
+              signature/identity). */}
+          {throwbackRows.length > 0 && (
+            <div style={{ display: 'flex', gap: 16, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
+              {(['map', 'movements', 'power'] as ExperienceTab[]).map((id) => {
+                const label = id === 'map' ? 'Workouts' : id === 'movements' ? 'All Movements' : 'Power';
+                const active = tab === id || (id === 'map' && tab === 'summary');
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setTab(id)}
+                    style={{
+                      padding: '8px 4px', marginBottom: -1, fontSize: 13,
+                      fontWeight: active ? 700 : 500,
+                      color: active ? 'var(--accent)' : 'var(--text-dim)',
+                      background: 'none', border: 'none',
+                      borderBottom: `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
+                      cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Workouts grid — kept mounted (display-toggled) so the catalog + logged
+              throwbacks survive tab switches. Default (incl. 'summary') = grid. */}
+          <div style={{ display: (throwbackRows.length === 0 || tab === 'map' || tab === 'summary') ? 'block' : 'none' }}>
+            <CompetitionExplorer
+              history={competitionHistory}
+              userAge={userAge}
+              userBodyMassKg={userBodyMassKg}
+              canLog={canLog}
+              onThrowbackLogged={() => setThrowbackToken((t) => t + 1)}
+              scope={scope}
+              setScope={setScope}
+              filter={filter}
+              setFilter={setFilter}
+            />
+          </div>
+
+          {throwbackRows.length > 0 && tab === 'movements' && (
+            <MovementsPanel history={competitionHistory} onPick={goToMapForMovement} />
+          )}
+          {throwbackRows.length > 0 && tab === 'power' && (
+            <PowerPanel history={competitionHistory} userKg={userBodyMassKg} />
+          )}
         </div>
       )}
 
