@@ -1153,6 +1153,44 @@ export default function AthletePage({ session }: { session: Session }) {
                   );
                 })()}
 
+                {/* Competition History — an OPTIONAL add-on, NOT a tier (it doesn't
+                    gate the eval or programmer and has no prerequisite). Sits with the
+                    eval status card, above the profile tiers. The feature itself is the
+                    /athletedata route. Public to ALL athletes via ATHLETEDATA_PUBLIC_TIER
+                    (currently on); only admin-only if that flag is turned off. */}
+                {(isAdmin || ATHLETEDATA_PUBLIC_TIER) && (
+                  <div className="settings-card" style={{ borderColor: competitionAthleteId ? '#2ec486' : undefined }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: competitionAthleteId ? '#2ec486' : 'var(--text-dim)' }}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: competitionAthleteId ? '#2ec486' : 'var(--text-muted)', marginBottom: 4 }}>
+                          Competition History · {competitionAthleteId ? 'Linked ✓' : 'Optional · Powerful · Free'}
+                        </div>
+                        <div style={{ fontSize: 15, fontWeight: 600 }}>
+                          {competitionAthleteId
+                            ? `Linked: ${competitionAthleteLabel ?? 'your competition profile'}`
+                            : 'Import your competition history'}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+                          {competitionAthleteId
+                            ? 'Your Open / Quarterfinals / Games history, a completion map, and throwbacks.'
+                            : 'Unlock a detailed analysis of your fitness over the years. No competition history? Start one, with access to every year’s workouts.'}
+                        </div>
+                        <button
+                          type="button"
+                          className="auth-btn"
+                          style={{ padding: '8px 16px', fontSize: 13, marginTop: 12 }}
+                          onClick={() => navigate('/athletedata')}
+                        >
+                          {competitionAthleteId ? 'View your competition history →' : 'Get started →'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Tier 1 — Basics */}
                 <TierCard
                   tierNumber={1}
@@ -1500,44 +1538,6 @@ export default function AthletePage({ session }: { session: Session }) {
                     ))}
                   </CollapsibleSection>
                 </TierCard>
-
-                {/* Competition History — an OPTIONAL add-on, NOT a tier (it doesn't
-                    gate the eval or programmer and has no prerequisite). Styled to
-                    match the evaluation status card above. The feature itself is the
-                    /athletedata route. Public to ALL athletes via ATHLETEDATA_PUBLIC_TIER
-                    (currently on); only admin-only if that flag is turned off. */}
-                {(isAdmin || ATHLETEDATA_PUBLIC_TIER) && (
-                  <div className="settings-card" style={{ borderColor: competitionAthleteId ? '#2ec486' : undefined }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: competitionAthleteId ? '#2ec486' : 'var(--text-dim)' }}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: competitionAthleteId ? '#2ec486' : 'var(--text-muted)', marginBottom: 4 }}>
-                          Competition History · {competitionAthleteId ? 'Linked ✓' : 'Optional · Powerful · Free'}
-                        </div>
-                        <div style={{ fontSize: 15, fontWeight: 600 }}>
-                          {competitionAthleteId
-                            ? `Linked: ${competitionAthleteLabel ?? 'your competition profile'}`
-                            : 'Import your competition history'}
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
-                          {competitionAthleteId
-                            ? 'Your Open / Quarterfinals / Games history, a completion map, and throwbacks.'
-                            : 'Unlock a detailed analysis of your fitness over the years. No competition history? Start one, with access to every year’s workouts.'}
-                        </div>
-                        <button
-                          type="button"
-                          className="auth-btn"
-                          style={{ padding: '8px 16px', fontSize: 13, marginTop: 12 }}
-                          onClick={() => navigate('/athletedata')}
-                        >
-                          {competitionAthleteId ? 'View your competition history →' : 'Get started →'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {(() => {
                   // Pure SAVE button. Running the free evaluation lives entirely in
