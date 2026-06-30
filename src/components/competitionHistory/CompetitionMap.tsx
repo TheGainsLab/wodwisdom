@@ -180,11 +180,14 @@ export default function CompetitionMap({
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-          {filledCount > 0
-            ? `${filledCount} of ${catalog.total} workouts done · ${Math.round((filledCount / catalog.total) * 100)}%`
-            : 'Browse every competition workout — tap any to try it'}
-        </span>
+        {/* Progress tracker — only once there's progress. At zero we show nothing
+            here; the section subtitle already invites the user to browse + try, so
+            a second "browse" line would be redundant (and avoids a deflating 0%). */}
+        {filledCount > 0 && (
+          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+            {filledCount} of {catalog.total} workouts done · {Math.round((filledCount / catalog.total) * 100)}%
+          </span>
+        )}
         {collapsible && (
           <button
             type="button"
