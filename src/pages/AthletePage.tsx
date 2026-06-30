@@ -983,7 +983,7 @@ export default function AthletePage({ session }: { session: Session }) {
               <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
                 <h2 className="settings-card-title" style={{ marginBottom: 8 }}>Complete your profile to unlock more</h2>
                 <ul style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.6, margin: 0, paddingLeft: 18 }}>
-                  <li><strong style={{ color: 'var(--text)' }}>Tier 1 —</strong> Tailors the AI Coach's answers to you</li>
+                  <li><strong style={{ color: 'var(--text)' }}>Tier 1 —</strong> Tell the <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Coach</span> who you are</li>
                   <li><strong style={{ color: 'var(--text)' }}>Tier 2 —</strong> Unlocks your free <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Evaluation</span></li>
                   <li><strong style={{ color: 'var(--text)' }}>Tier 3 —</strong> Subscribe to unlock <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Programming</span> built around your goals, fitness level, and schedule</li>
                 </ul>
