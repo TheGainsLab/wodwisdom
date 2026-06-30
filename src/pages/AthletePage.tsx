@@ -1174,25 +1174,26 @@ export default function AthletePage({ session }: { session: Session }) {
                   status={tierStatus.tier1}
                   defaultExpanded={false}
                 >
-                  {/* Units toggle — prominent, first choice */}
-                  <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
-                    <button
-                      type="button"
-                      style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: units === 'lbs' ? 'var(--accent)' : 'transparent', color: units === 'lbs' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
-                      onClick={() => { setUnits('lbs'); markDirty(); }}
-                    >
-                      Imperial (lbs / in)
-                    </button>
-                    <button
-                      type="button"
-                      style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: units === 'kg' ? 'var(--accent)' : 'transparent', color: units === 'kg' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
-                      onClick={() => { setUnits('kg'); markDirty(); }}
-                    >
-                      Metric (kg / cm)
-                    </button>
-                  </div>
-
                   <div className="lift-grid" style={{ marginBottom: 16 }}>
+                    <div className="lift-item">
+                      <span className="lift-label">Units</span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          type="button"
+                          className={'skill-level-btn' + (units === 'lbs' ? ' active' : '')}
+                          onClick={() => { setUnits('lbs'); markDirty(); }}
+                        >
+                          Imperial (lbs / in)
+                        </button>
+                        <button
+                          type="button"
+                          className={'skill-level-btn' + (units === 'kg' ? ' active' : '')}
+                          onClick={() => { setUnits('kg'); markDirty(); }}
+                        >
+                          Metric (kg / cm)
+                        </button>
+                      </div>
+                    </div>
                     <div className="lift-item">
                       <span className="lift-label">Age</span>
                       <input
