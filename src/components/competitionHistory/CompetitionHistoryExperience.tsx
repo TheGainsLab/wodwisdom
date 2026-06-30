@@ -431,8 +431,8 @@ export default function CompetitionHistoryExperience({
       {mode === 'unlinked' && !browseUnlinked && (
         <div>
           <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>
-            Search for your competition profile to import your data and link it to your account.
-            Once confirmed, this linkage is permanent.
+            Search for your competition profile to import your data and link it to your account.{' '}
+            <strong style={{ color: 'var(--text)' }}>Once confirmed, this linkage is permanent.</strong>
           </p>
           <p style={{ marginBottom: 12, fontSize: 13 }}>
             <button
