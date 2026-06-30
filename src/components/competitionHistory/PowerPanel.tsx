@@ -11,6 +11,7 @@
  */
 
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { CompetitionWorkoutEntry, NormalizedCompetitionHistory } from '../../lib/competitionHistory';
 import { personalizedPower, p99WPerKg } from '../../lib/competitionHistory';
 import WorkoutDetail from './WorkoutDetail';
@@ -105,7 +106,13 @@ export default function PowerPanel({
       {rows.length === 0 ? (
         <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '12px 0' }}>
           {withPower.length === 0
-            ? 'No power reads yet — the movements in these workouts don’t have a power model.'
+            ? (
+              <>
+                No personalized power yet — power needs your gender and bodyweight.{' '}
+                <Link to="/profile" style={{ color: 'var(--accent)', fontWeight: 600 }}>Complete Tier 1 of your profile →</Link>
+                {' '}(power is calculated when you log a workout, so log again after completing your profile.)
+              </>
+            )
             : 'No workouts in this time domain.'}
         </div>
       ) : (
