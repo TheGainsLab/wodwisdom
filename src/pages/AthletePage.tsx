@@ -1030,7 +1030,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                           <div>
                             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: '#2ec486', marginBottom: 4 }}>
-                              Fitness Evaluation · Ready
+                              AI Evaluation · Ready
                             </div>
                             <div style={{ fontSize: 15, fontWeight: 600 }}>Your evaluation is ready</div>
                             {when && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Last run: {when}</div>}
@@ -1085,7 +1085,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                           <div>
                             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--text-muted)', marginBottom: 4 }}>
-                              Free Fitness Evaluation · Used
+                              Free AI Evaluation · Used
                             </div>
                             <div style={{ fontSize: 15, fontWeight: 600 }}>You've used your free evaluation</div>
                             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
@@ -1102,7 +1102,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                           <div>
                             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 4 }}>
-                              Free Fitness Evaluation · Ready to run
+                              Free AI Evaluation · Ready to run
                             </div>
                             <div style={{ fontSize: 15, fontWeight: 600 }}>Your profile is ready — run your free evaluation</div>
                             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Takes 20–30 seconds. You'll get a personalized breakdown of your strengths, weaknesses, and priorities.</div>
@@ -1313,7 +1313,7 @@ export default function AthletePage({ session }: { session: Session }) {
                 <TierCard
                   tierNumber={2}
                   title="Athletic Data"
-                  unlocks="Free Fitness Evaluation"
+                  unlocks="Free AI Evaluation"
                   status={tierStatus.tier2}
                   defaultExpanded={false}
                 >
