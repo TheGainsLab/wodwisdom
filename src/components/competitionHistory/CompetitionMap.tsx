@@ -179,15 +179,11 @@ export default function CompetitionMap({
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-          {filledCount} of {catalog.total} workouts done · {Math.round((filledCount / catalog.total) * 100)}%
-        </span>
-        <span style={{ fontSize: 11, color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--surface2)', border: '1px solid var(--border)' }} />
-          done
-          <span style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--surface2)', border: '1px dashed var(--border)', opacity: 0.4, marginLeft: 6 }} />
-          not done — tap to try
+          {filledCount > 0
+            ? `${filledCount} of ${catalog.total} workouts done · ${Math.round((filledCount / catalog.total) * 100)}%`
+            : 'Browse every competition workout — tap any to try it'}
         </span>
         {collapsible && (
           <button
