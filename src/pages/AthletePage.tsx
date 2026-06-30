@@ -1125,32 +1125,10 @@ export default function AthletePage({ session }: { session: Session }) {
                       </div>
                     );
                   }
-                  // Locked — tell them what's missing
-                  const missingSections: string[] = [];
-                  if (!tierStatus.tier1.complete) missingSections.push('Basics');
-                  if (tierStatus.tier2.missing.includes('lifts')) missingSections.push('Lifts');
-                  if (tierStatus.tier2.missing.includes('skills')) missingSections.push('Skills');
-                  if (tierStatus.tier2.missing.includes('conditioning')) missingSections.push('Conditioning');
-                  return (
-                    <div className="settings-card">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--text-dim)' }}><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--text-muted)', marginBottom: 4 }}>
-                            Free Fitness Evaluation · Locked
-                          </div>
-                          <div style={{ fontSize: 15, fontWeight: 600 }}>Complete your profile to unlock</div>
-                          {missingSections.length > 0 && (
-                            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
-                              Still needed: {missingSections.join(', ')}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
+                  // Locked — render nothing. The intro card ("Complete your profile
+                  // to unlock more") + the tier cards below already tell the user
+                  // what's missing, so a separate locked eval card was redundant.
+                  return null;
                 })()}
 
                 {/* Competition History — an OPTIONAL add-on, NOT a tier (it doesn't
@@ -1197,7 +1175,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   title="Basics"
                   unlocks="Tailored answers from the AI Coach"
                   status={tierStatus.tier1}
-                  defaultExpanded={tierStatus.nextTier === 1}
+                  defaultExpanded={false}
                 >
                   {/* Units toggle — prominent, first choice */}
                   <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
@@ -1337,7 +1315,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   title="Athletic Data"
                   unlocks="Free Fitness Evaluation"
                   status={tierStatus.tier2}
-                  defaultExpanded={tierStatus.nextTier === 2}
+                  defaultExpanded={false}
                 >
                 <CollapsibleSection title={`1RM Lifts (${units})`}>
                   <p className="athlete-card-subtitle">Enter your one-rep max weights in {units}</p>
@@ -1425,7 +1403,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   title="Training Context"
                   unlocks="AI Programming tailored to your week"
                   status={tierStatus.tier3}
-                  defaultExpanded={tierStatus.nextTier === 3 && (isAdmin || hasFeature('programming'))}
+                  defaultExpanded={false}
                   locked={!isAdmin && !hasFeature('programming')}
                   lockMessage="Requires AI Programming or All Access subscription"
                   onUpgrade={() => navigate('/features/programs')}
