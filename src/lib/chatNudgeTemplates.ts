@@ -26,28 +26,28 @@ const BASICS_TEMPLATES: string[] = [
 
 // Tier 2 — generic when ≥ 2 sections are missing and relevant.
 const T2_GENERIC_TEMPLATES: string[] = [
-  `I can be more precise once you [complete your profile](${PROFILE_HREF}) — you'll also get your free fitness analysis.`,
-  `I'd tailor this more specifically with your [full profile filled in](${PROFILE_HREF}) — it unlocks your free fitness analysis too.`,
-  `This would be more personalized once your [profile is complete](${PROFILE_HREF}) — and your profile generates a free fitness analysis.`,
-  `I'd give you a sharper answer once you [finish your profile](${PROFILE_HREF}) — you'll also get your free fitness analysis.`,
+  `I can be more precise once you [complete your profile](${PROFILE_HREF}) — you'll also get your free AI Evaluation.`,
+  `I'd tailor this more specifically with your [full profile filled in](${PROFILE_HREF}) — it unlocks your free AI Evaluation too.`,
+  `This would be more personalized once your [profile is complete](${PROFILE_HREF}) — and your profile generates a free AI Evaluation.`,
+  `I'd give you a sharper answer once you [finish your profile](${PROFILE_HREF}) — you'll also get your free AI Evaluation.`,
 ];
 
 // Tier 2 — single section variants.
 const T2_SINGLE_TEMPLATES: Record<Exclude<ProfileSection, 'basics'>, string[]> = {
   lifts: [
-    `I can be more precise about load once I know your [1RMs](${PROFILE_HREF}) — your profile also generates a free fitness analysis.`,
-    `I'd tailor this better with your [strength numbers](${PROFILE_HREF}) — your profile also produces a free fitness analysis.`,
-    `This gets more specific once I have your [lifts](${PROFILE_HREF}) — and your profile unlocks a free fitness analysis.`,
+    `I can be more precise about load once I know your [1RMs](${PROFILE_HREF}) — your profile also generates a free AI Evaluation.`,
+    `I'd tailor this better with your [strength numbers](${PROFILE_HREF}) — your profile also produces a free AI Evaluation.`,
+    `This gets more specific once I have your [lifts](${PROFILE_HREF}) — and your profile unlocks a free AI Evaluation.`,
   ],
   skills: [
-    `I can be more personalized once I know your [skill levels](${PROFILE_HREF}) — your profile also generates a free fitness analysis.`,
-    `I'd tailor progressions more precisely with your [skills filled in](${PROFILE_HREF}) — your profile also produces a free fitness analysis.`,
-    `This gets more specific once I know your [skills](${PROFILE_HREF}) — and your profile unlocks a free fitness analysis.`,
+    `I can be more personalized once I know your [skill levels](${PROFILE_HREF}) — your profile also generates a free AI Evaluation.`,
+    `I'd tailor progressions more precisely with your [skills filled in](${PROFILE_HREF}) — your profile also produces a free AI Evaluation.`,
+    `This gets more specific once I know your [skills](${PROFILE_HREF}) — and your profile unlocks a free AI Evaluation.`,
   ],
   conditioning: [
-    `I can be more precise with your [conditioning benchmarks](${PROFILE_HREF}) — your profile also generates a free fitness analysis.`,
-    `I'd tailor pacing better with your [benchmark times](${PROFILE_HREF}) — your profile also produces a free fitness analysis.`,
-    `This gets more specific once I have your [conditioning numbers](${PROFILE_HREF}) — and your profile unlocks a free fitness analysis.`,
+    `I can be more precise with your [conditioning benchmarks](${PROFILE_HREF}) — your profile also generates a free AI Evaluation.`,
+    `I'd tailor pacing better with your [benchmark times](${PROFILE_HREF}) — your profile also produces a free AI Evaluation.`,
+    `This gets more specific once I have your [conditioning numbers](${PROFILE_HREF}) — and your profile unlocks a free AI Evaluation.`,
   ],
 };
 

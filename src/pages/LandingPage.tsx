@@ -305,7 +305,7 @@ export default function LandingPage() {
 
           {/* The evaluation itself */}
           <div style={{ maxWidth: 920, margin: '36px auto 0' }}>
-            <Placeholder src="/images/section2-eval.png" alt="A full GAINS fitness evaluation" label="[ Image placeholder — Full evaluation screenshot ]" />
+            <Placeholder src="/images/section2-eval.png" alt="A full GAINS AI Evaluation" label="[ Image placeholder — Full evaluation screenshot ]" />
             <p style={{ textAlign: 'center', fontSize: 18, fontWeight: 700, color: 'var(--text)', lineHeight: 1.5, margin: '20px auto 0' }}>
               And that's just the beginning.
             </p>
