@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { classifyAthlete } from '../utils/classify-athlete';
-import { calculateTDEE } from '../utils/tdee';
 import { getTierStatus, type AthleteProfileInput, type TierSection } from '../utils/tier-status';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
@@ -525,8 +524,10 @@ export default function AthletePage({ session }: { session: Session }) {
   const [analysisLoading, setAnalysisLoading] = useState<'profile' | null>(null);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
+  // TDEE override is no longer edited here (the TDEE card was removed from the
+  // profile — to be reintegrated under Nutrition later). Kept so the saved value
+  // round-trips through load/save and isn't lost.
   const [tdeeOverride, setTdeeOverride] = useState<string>('');
-  const [editingTdee, setEditingTdee] = useState(false);
   // Tier 3 — training context
   const [daysPerWeek, setDaysPerWeek] = useState<string>('');
   const [sessionLengthMinutes, setSessionLengthMinutes] = useState<string>('');
@@ -1228,81 +1229,26 @@ export default function AthletePage({ session }: { session: Session }) {
                         onChange={e => { setBodyweight(e.target.value); markDirty(); }}
                       />
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Gender</span>
-                    <button
-                      type="button"
-                      className={'skill-level-btn' + (gender === 'male' ? ' active' : '')}
-                      onClick={() => { setGender('male'); markDirty(); }}
-                    >
-                      Male
-                    </button>
-                    <button
-                      type="button"
-                      className={'skill-level-btn' + (gender === 'female' ? ' active' : '')}
-                      onClick={() => { setGender('female'); markDirty(); }}
-                    >
-                      Female
-                    </button>
-                  </div>
-
-                  {/* TDEE estimate */}
-                  {(() => {
-                    const bw = bodyweight ? parseFloat(bodyweight) : null;
-                    const ageNum = age ? parseInt(age, 10) : null;
-                    const heightNum = height ? parseFloat(height) : null;
-                    const calc = calculateTDEE({ bodyweight: bw, height: heightNum, age: ageNum, gender: gender || null, units });
-                    const effectiveTdee = tdeeOverride ? parseInt(tdeeOverride, 10) : calc?.tdee;
-                    const isOverridden = tdeeOverride !== '';
-
-                    return (
-                      <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border-light)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: editingTdee ? 10 : 0 }}>
-                          <div>
-                            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 2 }}>
-                              Estimated TDEE{isOverridden ? ' (custom)' : ''}
-                            </div>
-                            <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: effectiveTdee ? 'var(--text)' : 'var(--text-muted)' }}>
-                              {effectiveTdee ? `${effectiveTdee.toLocaleString()} cal/day` : 'Enter profile data above'}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            className="skill-level-btn"
-                            style={{ fontSize: 12 }}
-                            onClick={() => setEditingTdee(e => !e)}
-                          >
-                            {editingTdee ? 'Done' : 'Override'}
-                          </button>
-                        </div>
-                        {editingTdee && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <input
-                              className="lift-input"
-                              type="number"
-                              min="0"
-                              step="50"
-                              placeholder={calc?.tdee ? String(calc.tdee) : 'e.g. 2500'}
-                              value={tdeeOverride}
-                              onChange={e => { setTdeeOverride(e.target.value); markDirty(); }}
-                              style={{ flex: 1 }}
-                            />
-                            {isOverridden && (
-                              <button
-                                type="button"
-                                className="skill-level-btn"
-                                style={{ fontSize: 11, color: 'var(--accent)' }}
-                                onClick={() => setTdeeOverride('')}
-                              >
-                                Reset
-                              </button>
-                            )}
-                          </div>
-                        )}
+                    <div className="lift-item">
+                      <span className="lift-label">Gender</span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          type="button"
+                          className={'skill-level-btn' + (gender === 'male' ? ' active' : '')}
+                          onClick={() => { setGender('male'); markDirty(); }}
+                        >
+                          Male
+                        </button>
+                        <button
+                          type="button"
+                          className={'skill-level-btn' + (gender === 'female' ? ' active' : '')}
+                          onClick={() => { setGender('female'); markDirty(); }}
+                        >
+                          Female
+                        </button>
                       </div>
-                    );
-                  })()}
+                    </div>
+                  </div>
                 </TierCard>
 
                 {/* Tier 2 — Athletic Data */}
