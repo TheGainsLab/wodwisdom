@@ -1175,7 +1175,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   title="Basics"
                   unlocks="Tailored answers from the AI Coach"
                   status={tierStatus.tier1}
-                  defaultExpanded={tierStatus.nextTier === 1}
+                  defaultExpanded={false}
                 >
                   {/* Units toggle — prominent, first choice */}
                   <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
@@ -1315,7 +1315,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   title="Athletic Data"
                   unlocks="Free Fitness Evaluation"
                   status={tierStatus.tier2}
-                  defaultExpanded={tierStatus.nextTier === 2}
+                  defaultExpanded={false}
                 >
                 <CollapsibleSection title={`1RM Lifts (${units})`}>
                   <p className="athlete-card-subtitle">Enter your one-rep max weights in {units}</p>
@@ -1403,7 +1403,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   title="Training Context"
                   unlocks="AI Programming tailored to your week"
                   status={tierStatus.tier3}
-                  defaultExpanded={tierStatus.nextTier === 3 && (isAdmin || hasFeature('programming'))}
+                  defaultExpanded={false}
                   locked={!isAdmin && !hasFeature('programming')}
                   lockMessage="Requires AI Programming or All Access subscription"
                   onUpgrade={() => navigate('/features/programs')}
