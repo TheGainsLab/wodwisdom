@@ -35,12 +35,13 @@ export default function AthleteDataPage({ session }: { session: Session }) {
   const [linkage, setLinkage] = useState<Linkage>({ id: null, label: null });
   const [age, setAge] = useState<number | null>(null);
   const [bodyMassKg, setBodyMassKg] = useState<number | null>(null);
+  const [gender, setGender] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     supabase
       .from('athlete_profiles')
-      .select('competition_athlete_id, competition_athlete_label, age, bodyweight, units')
+      .select('competition_athlete_id, competition_athlete_label, age, bodyweight, units, gender')
       .eq('user_id', session.user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -59,6 +60,7 @@ export default function AthleteDataPage({ session }: { session: Session }) {
           if (Number.isFinite(bwRaw) && bwRaw > 0) {
             setBodyMassKg(d.units === 'kg' ? bwRaw : bwRaw * 0.45359237);
           }
+          setGender(typeof d.gender === 'string' && d.gender ? String(d.gender) : null);
         }
         setLoading(false);
       });
@@ -97,6 +99,7 @@ export default function AthleteDataPage({ session }: { session: Session }) {
               userId={session.user.id}
               userAge={age}
               userBodyMassKg={bodyMassKg}
+              needsBasics={!gender || bodyMassKg == null || age == null}
               isAdmin={isAdmin}
               canLog={canLog}
               initialLinkedId={linkage.id}
