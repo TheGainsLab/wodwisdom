@@ -105,6 +105,9 @@ interface Props {
   isAdmin: boolean;
   /** Try-It (logging results) — the paid competition_log capability. */
   canLog: boolean;
+  /** Profile is missing a Tier-1 basic (gender / bodyweight / age) needed for
+   *  personalized power + cohort percentiles → show a heads-up before they log. */
+  needsBasics?: boolean;
   initialLinkedId: string | null;
   initialLinkedLabel: string | null;
   /** Called after a successful link/unlink so the host page can refresh. */
@@ -159,6 +162,7 @@ export default function CompetitionHistoryExperience({
   userId,
   userAge,
   userBodyMassKg,
+  needsBasics,
   isAdmin,
   canLog,
   initialLinkedId,
@@ -428,6 +432,15 @@ export default function CompetitionHistoryExperience({
 
   return (
     <div className="settings-card">
+      {/* Up-front heads-up: personalized power + cohort percentiles need Tier-1
+          basics, and they're stamped at log time — so prompt BEFORE they log,
+          not only in the Power tab's empty state (which appears after logging). */}
+      {needsBasics && (
+        <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 8, background: 'var(--accent-glow)', border: '1px solid var(--accent)', fontSize: 12.5, color: 'var(--text)' }}>
+          Add your <strong>gender, bodyweight, and age</strong> to unlock personalized power and cohort percentiles on the workouts you log.{' '}
+          <a href="/profile" style={{ color: 'var(--accent)', fontWeight: 600 }}>Complete Tier 1 →</a>
+        </div>
+      )}
       {mode === 'unlinked' && !browseUnlinked && (
         <div>
           <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>
