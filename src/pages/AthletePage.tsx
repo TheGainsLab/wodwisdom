@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { classifyAthlete } from '../utils/classify-athlete';
 import { getTierStatus, type AthleteProfileInput, type TierSection } from '../utils/tier-status';
+import { clampLift, maxLift, filterTimeChars, isValidTimeStr, normalizeTimeStr } from '../utils/profileValidation';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
 import { formatMarkdown } from '../lib/formatMarkdown';
@@ -711,7 +712,7 @@ export default function AthletePage({ session }: { session: Session }) {
   };
 
   const setLift = (key: string, value: string) => {
-    const num = value === '' ? 0 : parseInt(value, 10);
+    const num = clampLift(value, units); // clamp to [0, sane cap] — no 3,000 lb squats
     if (isNaN(num)) return;
     setLifts(prev => ({ ...prev, [key]: num }));
     markDirty();
@@ -868,7 +869,14 @@ export default function AthletePage({ session }: { session: Session }) {
     for (const [key, val] of Object.entries(conditioning)) {
       if (val !== '' && val != null) {
         const b = CONDITIONING_GROUPS.flatMap(g => g.benchmarks).find(bm => bm.key === key);
-        cleanConditioning[key] = b?.isTime ? String(val) : (typeof val === 'number' ? val : parseInt(String(val), 10) || 0);
+        if (b?.isTime) {
+          // Only persist a valid time, normalized to mm:ss — drop garbage so it
+          // never reaches the coaching state / benchmark scoring.
+          const s = String(val).trim();
+          if (isValidTimeStr(s)) cleanConditioning[key] = normalizeTimeStr(s);
+        } else {
+          cleanConditioning[key] = typeof val === 'number' ? val : parseInt(String(val), 10) || 0;
+        }
       }
     }
 
@@ -1311,6 +1319,7 @@ export default function AthletePage({ session }: { session: Session }) {
                               className="lift-input"
                               type="number"
                               min="0"
+                              max={maxLift(units)}
                               step={units === 'kg' ? 2.5 : 5}
                               placeholder="0"
                               value={lifts[lift.key] || ''}
@@ -1359,19 +1368,26 @@ export default function AthletePage({ session }: { session: Session }) {
                     <div key={group.title} style={{ marginBottom: 20 }}>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
                       <div className="lift-grid">
-                        {group.benchmarks.map(bm => (
+                        {group.benchmarks.map(bm => {
+                          const rawVal = conditioning[bm.key] ?? '';
+                          const timeInvalid = !!bm.isTime && typeof rawVal === 'string' && rawVal.trim() !== '' && !isValidTimeStr(rawVal);
+                          return (
                           <div className="lift-item" key={bm.key}>
                             <span className="lift-label">{bm.label}</span>
                             <input
                               className="lift-input"
                               type={bm.isTime ? 'text' : 'number'}
+                              inputMode={bm.isTime ? 'numeric' : undefined}
                               min={bm.isTime ? undefined : 0}
+                              title={timeInvalid ? 'Use mm:ss (e.g. 6:45)' : undefined}
                               placeholder={bm.placeholder}
-                              value={conditioning[bm.key] ?? ''}
-                              onChange={e => setConditioningVal(bm.key, bm.isTime ? e.target.value.trim() : (e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0))}
+                              value={rawVal}
+                              onChange={e => setConditioningVal(bm.key, bm.isTime ? filterTimeChars(e.target.value) : (e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0))}
+                              style={timeInvalid ? { borderColor: 'var(--danger, #e5484d)' } : undefined}
                             />
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   ))}

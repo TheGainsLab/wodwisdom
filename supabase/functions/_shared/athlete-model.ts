@@ -453,8 +453,14 @@ export interface RawProfileRow {
  * inspector (which must NOT persist, so it can't go through buildWriterPayload).
  */
 export function profileStaticFromRow(row: RawProfileRow): AthleteProfileStatic {
+  // Sanity ceiling — drop absurd self-reported lifts (a 3,000 lb "squat") so they
+  // can't poison ratios/normatives. Comfortably above any real single lift.
+  const liftCap = row.units === "kg" ? 700 : 1500;
   const lifts: Record<string, number | null> = {};
-  for (const k of ALL_LIFT_KEYS) lifts[k] = pos((row.lifts ?? {})[k]);
+  for (const k of ALL_LIFT_KEYS) {
+    const v = pos((row.lifts ?? {})[k]);
+    lifts[k] = v != null && v <= liftCap ? v : null;
+  }
 
   const skills: Record<string, SkillLevelLike | null> = {};
   for (const k of ALL_SKILL_KEYS) skills[k] = asSkill((row.skills ?? {})[k]);
