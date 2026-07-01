@@ -683,16 +683,23 @@ export default function AthletePage({ session }: { session: Session }) {
 
   const markDirty = () => setIsDirty(true);
 
-  // Save the qualitative intake — persists raw answers + LLM-extracts the
-  // structured coaching_intake (own action; the extraction is a short LLM call).
+  // "Save & analyze" for Section 2 — persists the structured columns (goals +
+  // injuries, via the full profile save) AND, when there are free-text intake
+  // answers, LLM-extracts the structured coaching_intake (a short LLM call).
+  // Goals/injuries alone save without touching the extractor (no NO_ANSWERS).
   const saveIntake = async () => {
     setIntakeSaving(true); setIntakeError(''); setIntakeSaved(false);
     try {
-      const { data, error } = await supabase.functions.invoke('process-coaching-intake', {
-        body: { answers: intakeAnswers },
-      });
-      const errMsg = (data as { error?: string } | null)?.error;
-      if (error || errMsg) throw new Error(errMsg || error?.message || 'Failed to save');
+      const savedOk = await saveProfile();
+      if (!savedOk) throw new Error('Failed to save your profile');
+      const hasIntake = Object.values(intakeAnswers).some(v => v && v.trim());
+      if (hasIntake) {
+        const { data, error } = await supabase.functions.invoke('process-coaching-intake', {
+          body: { answers: intakeAnswers },
+        });
+        const errMsg = (data as { error?: string } | null)?.error;
+        if (error || errMsg) throw new Error(errMsg || error?.message || 'Failed to analyze your answers');
+      }
       setIntakeSaved(true);
     } catch (e) {
       setIntakeError(e instanceof Error ? e.message : 'Something went wrong');
@@ -1393,10 +1400,10 @@ export default function AthletePage({ session }: { session: Session }) {
                   lockMessage="Requires AI Programming or All Access subscription"
                   onUpgrade={() => navigate('/features/programs')}
                 >
+                  {/* Section 1 — how you train (hard logistics: schedule + equipment) */}
                   <div className="settings-card" style={{ padding: 16 }}>
-                    <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>Tell the AI how you train.</p>
-
-                    <div className="lift-grid" style={{ marginBottom: 16 }}>
+                    <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>How you train</p>
+                    <div className="lift-grid">
                       <div className="lift-item">
                         <span className="lift-label">Days / week <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11 }}>(3–6 days)</span></span>
                         <input
@@ -1422,38 +1429,6 @@ export default function AthletePage({ session }: { session: Session }) {
                           onChange={e => { setSessionLengthMinutes(e.target.value); markDirty(); }}
                         />
                       </div>
-                    </div>
-
-                    <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>
-                        What are your goals? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(free text)</span>
-                      </div>
-                      <textarea
-                        className="lift-input"
-                        rows={3}
-                        maxLength={500}
-                        placeholder='e.g. "Prep for the Open next year, also want to add 20 lbs to my deadlift and drop my 5K under 22 min"'
-                        value={goal}
-                        onChange={e => { setGoal(e.target.value); markDirty(); }}
-                        style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
-                      />
-                      <div style={{ fontSize: 11, color: goal.length >= 500 ? '#e5484d' : 'var(--text-muted)', textAlign: 'right', marginTop: 4 }}>
-                        {goal.length} / 500
-                      </div>
-                    </div>
-
-                    <div>
-                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>
-                        Injuries or movement constraints <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(leave blank if none)</span>
-                      </div>
-                      <textarea
-                        className="lift-input"
-                        rows={3}
-                        placeholder='e.g. "right shoulder — no overhead pressing". Leave blank if you have no constraints.'
-                        value={injuriesConstraints}
-                        onChange={e => { setInjuriesConstraints(e.target.value); markDirty(); }}
-                        style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
-                      />
                     </div>
                   </div>
 
@@ -1483,14 +1458,45 @@ export default function AthletePage({ session }: { session: Session }) {
                     ))}
                   </CollapsibleSection>
 
-                  {/* Qualitative intake — free-text / voice. Extracted server-side
-                      into the structured coaching_intake and fed to the coaching
-                      state (preferences, self-assessment, history, constraints). */}
+                  {/* Section 2 — "tell your coach about you": ALL the free-text /
+                      voice. One "Save & analyze" persists goals/injuries (via the
+                      full profile save) AND runs the intake extraction. */}
                   <div className="settings-card" style={{ padding: 16, marginTop: 16 }}>
                     <p className="athlete-card-subtitle" style={{ marginBottom: 4 }}>Tell your coach about you</p>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
                       Optional, but powerful. Tap the mic on your keyboard and just talk — the more you share, the sharper your coaching.
                     </div>
+
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>What are your goals?</div>
+                      <textarea
+                        className="lift-input"
+                        rows={3}
+                        maxLength={500}
+                        placeholder='e.g. "Prep for the Open next year, also want to add 20 lbs to my deadlift and drop my 5K under 22 min"'
+                        value={goal}
+                        onChange={e => { setGoal(e.target.value); markDirty(); setIntakeSaved(false); }}
+                        style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
+                      />
+                      <div style={{ fontSize: 11, color: goal.length >= 500 ? '#e5484d' : 'var(--text-muted)', textAlign: 'right', marginTop: 4 }}>
+                        {goal.length} / 500
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>
+                        Injuries or movement constraints <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(leave blank if none)</span>
+                      </div>
+                      <textarea
+                        className="lift-input"
+                        rows={3}
+                        placeholder='e.g. "right shoulder — no overhead pressing". Leave blank if you have no constraints.'
+                        value={injuriesConstraints}
+                        onChange={e => { setInjuriesConstraints(e.target.value); markDirty(); setIntakeSaved(false); }}
+                        style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
+                      />
+                    </div>
+
                     {INTAKE_QUESTIONS.map(q => (
                       <div key={q.key} style={{ marginBottom: 16 }}>
                         <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>{q.label}</div>
@@ -1508,10 +1514,10 @@ export default function AthletePage({ session }: { session: Session }) {
                       type="button"
                       className="auth-btn"
                       onClick={saveIntake}
-                      disabled={intakeSaving || Object.values(intakeAnswers).every(v => !v || !v.trim())}
+                      disabled={intakeSaving}
                       style={{ padding: '8px 16px', fontSize: 13 }}
                     >
-                      {intakeSaving ? 'Saving…' : intakeSaved ? 'Saved ✓' : 'Save answers'}
+                      {intakeSaving ? 'Saving…' : intakeSaved ? 'Saved ✓' : 'Save & analyze'}
                     </button>
                     {intakeError && <div className="auth-error" style={{ display: 'block', marginTop: 12 }}>{intakeError}</div>}
                   </div>
