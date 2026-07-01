@@ -253,14 +253,6 @@ const CONDITIONING_GROUPS = [
 const SKILL_LEVELS = ['none', 'beginner', 'intermediate', 'advanced'] as const;
 type SkillLevel = typeof SKILL_LEVELS[number];
 
-const SELF_PERCEPTION_LEVELS = [
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'intermediate', label: 'Intermediate' },
-  { value: 'advanced', label: 'Advanced' },
-  { value: 'competitive', label: 'Competitive' },
-  { value: 'not_sure', label: 'Not sure' },
-] as const;
-
 // Open-ended coaching-intake prompts (free-text / voice). Extracted server-side
 // (process-coaching-intake) into the structured coaching_intake object. Kept
 // distinct from Tier-3's structured goal/injuries fields to avoid duplication.
@@ -550,7 +542,6 @@ export default function AthletePage({ session }: { session: Session }) {
   const [intakeSaving, setIntakeSaving] = useState(false);
   const [intakeSaved, setIntakeSaved] = useState(false);
   const [intakeError, setIntakeError] = useState('');
-  const [selfPerceptionLevel, setSelfPerceptionLevel] = useState<string>('');
 
   const navigate = useNavigate();
   const { hasFeature, isAdmin } = useEntitlements(session.user.id);
@@ -613,7 +604,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, self_perception_level, eval_credits_remaining, competition_athlete_id, competition_athlete_label, coaching_intake_raw')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, eval_credits_remaining, competition_athlete_id, competition_athlete_label, coaching_intake_raw')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -666,7 +657,6 @@ export default function AthletePage({ session }: { session: Session }) {
           const raw = (d as { coaching_intake_raw?: Record<string, string> | null }).coaching_intake_raw;
           if (raw && typeof raw === 'object') setIntakeAnswers(raw);
         }
-        setSelfPerceptionLevel(d.self_perception_level || '');
         setEvalCreditsRemaining(typeof d.eval_credits_remaining === 'number' ? d.eval_credits_remaining : 1);
         setCompetitionAthleteId((d as any).competition_athlete_id ?? null);
         setCompetitionAthleteLabel((d as any).competition_athlete_label ?? null);
@@ -925,7 +915,6 @@ export default function AthletePage({ session }: { session: Session }) {
       session_length_minutes: sessionLengthNum && !isNaN(sessionLengthNum) ? sessionLengthNum : null,
       injuries_constraints: injuriesVal,
       goal: goal.trim() || null,
-      self_perception_level: selfPerceptionLevel || null,
       ...levels,
       updated_at: new Date().toISOString(),
     };
@@ -1010,7 +999,6 @@ export default function AthletePage({ session }: { session: Session }) {
     session_length_minutes: sessionLengthMinutes ? parseInt(sessionLengthMinutes, 10) : null,
     injuries_constraints: injuriesConstraints.trim() || 'None',
     goal: goal.trim() || null,
-    self_perception_level: selfPerceptionLevel || null,
   };
   const tierStatus = getTierStatus(tierStatusInput);
 
@@ -1451,24 +1439,6 @@ export default function AthletePage({ session }: { session: Session }) {
                       />
                       <div style={{ fontSize: 11, color: goal.length >= 500 ? '#e5484d' : 'var(--text-muted)', textAlign: 'right', marginTop: 4 }}>
                         {goal.length} / 500
-                      </div>
-                    </div>
-
-                    <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>
-                        What level do you think you are? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
-                      </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {SELF_PERCEPTION_LEVELS.map(opt => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            className={'skill-level-btn' + (selfPerceptionLevel === opt.value ? ' active' : '')}
-                            onClick={() => { setSelfPerceptionLevel(opt.value); markDirty(); }}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
                       </div>
                     </div>
 
