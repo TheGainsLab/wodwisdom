@@ -49,6 +49,7 @@ import {
   profileStaticFromRow,
 } from "./athlete-model.ts";
 import { buildTrainingSummary } from "./training-summary.ts";
+import type { CoachingIntake } from "./coaching-intake.ts";
 import { persistAthleteModel } from "./persist-athlete-model.ts";
 import { persistTrainingSummary } from "./persist-training-summary.ts";
 
@@ -365,6 +366,7 @@ interface AthleteProfileRow {
   injuries_structured: InjuryConstraints | null;
   self_perception_level: string | null;
   competition_athlete_id: string | null;
+  coaching_intake: CoachingIntake | null;
   updated_at: string | null;
 }
 
@@ -373,7 +375,7 @@ const PROFILE_COLS =
   "lifts, skills, conditioning, equipment, " +
   "days_per_week, session_length_minutes, " +
   "goal, injuries_constraints, injuries_structured, self_perception_level, " +
-  "competition_athlete_id, updated_at";
+  "competition_athlete_id, coaching_intake, updated_at";
 
 // ============================================================
 // Main entry point.
@@ -593,6 +595,7 @@ export async function buildWriterPayload(
     asOf: asString(profile.updated_at),
     trainingSummary,
     loggedCompetitionResults: loggedResults,
+    coachingIntake: profile.coaching_intake ?? null,
   });
   let athlete_model: AthleteModel = {
     ...modelContent,
