@@ -76,6 +76,9 @@ verify_jwt = false
 [functions.log-workout]
 verify_jwt = false
 
+[functions.process-coaching-intake]
+verify_jwt = false
+
 [functions.generate-program]
 verify_jwt = false
 
