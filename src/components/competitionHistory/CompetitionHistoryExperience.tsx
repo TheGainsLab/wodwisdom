@@ -437,7 +437,7 @@ export default function CompetitionHistoryExperience({
           not only in the Power tab's empty state (which appears after logging). */}
       {needsBasics && (
         <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 8, background: 'var(--accent-glow)', border: '1px solid var(--accent)', fontSize: 12.5, color: 'var(--text)' }}>
-          Add your <strong>gender, bodyweight, and age</strong> to unlock personalized power and cohort percentiles on the workouts you log.{' '}
+          <strong>Complete Tier 1</strong> to unlock personalized power and performance data on the workouts you log.{' '}
           <a href="/profile" style={{ color: 'var(--accent)', fontWeight: 600 }}>Complete Tier 1 →</a>
         </div>
       )}
