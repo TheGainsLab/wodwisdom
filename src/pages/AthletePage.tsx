@@ -260,6 +260,17 @@ const SELF_PERCEPTION_LEVELS = [
   { value: 'not_sure', label: 'Not sure' },
 ] as const;
 
+// Open-ended coaching-intake prompts (free-text / voice). Extracted server-side
+// (process-coaching-intake) into the structured coaching_intake object. Kept
+// distinct from Tier-3's structured goal/injuries fields to avoid duplication.
+const INTAKE_QUESTIONS: { key: string; label: string; placeholder: string }[] = [
+  { key: 'loved_disliked', label: 'Which exercises do you love — and which would you rather skip?', placeholder: 'e.g. "Love heavy deadlifts and rowing. Hate wall balls and thrusters — grip and lungs give out."' },
+  { key: 'strong_weak', label: 'Where do you feel strongest and weakest?', placeholder: 'e.g. "Strong on the barbell, weak on gymnastics and anything long."' },
+  { key: 'history', label: "How long have you trained consistently? What's your athletic background?", placeholder: 'e.g. "CrossFit ~4 years; before that college soccer and some powerlifting."' },
+  { key: 'past_programs', label: "What's worked — or really not worked — in past training?", placeholder: 'e.g. "High volume burns me out. Loved a strength-biased block last year."' },
+  { key: 'anything_else', label: 'Anything else you want your coach to know?', placeholder: 'Tap the mic on your keyboard and just talk — the more you share, the better.' },
+];
+
 const LEVEL_LABELS: Record<SkillLevel, string> = {
   none: 'None',
   beginner: 'Beginner',
@@ -533,6 +544,11 @@ export default function AthletePage({ session }: { session: Session }) {
   const [sessionLengthMinutes, setSessionLengthMinutes] = useState<string>('');
   const [injuriesConstraints, setInjuriesConstraints] = useState<string>('');
   const [goal, setGoal] = useState<string>('');
+  // Qualitative coaching intake (free-text / voice) — its own save (LLM extract).
+  const [intakeAnswers, setIntakeAnswers] = useState<Record<string, string>>({});
+  const [intakeSaving, setIntakeSaving] = useState(false);
+  const [intakeSaved, setIntakeSaved] = useState(false);
+  const [intakeError, setIntakeError] = useState('');
   const [selfPerceptionLevel, setSelfPerceptionLevel] = useState<string>('');
 
   const navigate = useNavigate();
@@ -596,7 +612,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, self_perception_level, eval_credits_remaining, competition_athlete_id, competition_athlete_label')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, self_perception_level, eval_credits_remaining, competition_athlete_id, competition_athlete_label, coaching_intake_raw')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -645,6 +661,10 @@ export default function AthletePage({ session }: { session: Session }) {
         // the field reads "leave blank if none" consistently on reload.
         setInjuriesConstraints(d.injuries_constraints && d.injuries_constraints !== 'None' ? d.injuries_constraints : '');
         setGoal(d.goal || '');
+        {
+          const raw = (d as { coaching_intake_raw?: Record<string, string> | null }).coaching_intake_raw;
+          if (raw && typeof raw === 'object') setIntakeAnswers(raw);
+        }
         setSelfPerceptionLevel(d.self_perception_level || '');
         setEvalCreditsRemaining(typeof d.eval_credits_remaining === 'number' ? d.eval_credits_remaining : 1);
         setCompetitionAthleteId((d as any).competition_athlete_id ?? null);
@@ -671,6 +691,24 @@ export default function AthletePage({ session }: { session: Session }) {
   useEffect(() => { loadProfile(); }, [loadProfile]);
 
   const markDirty = () => setIsDirty(true);
+
+  // Save the qualitative intake — persists raw answers + LLM-extracts the
+  // structured coaching_intake (own action; the extraction is a short LLM call).
+  const saveIntake = async () => {
+    setIntakeSaving(true); setIntakeError(''); setIntakeSaved(false);
+    try {
+      const { data, error } = await supabase.functions.invoke('process-coaching-intake', {
+        body: { answers: intakeAnswers },
+      });
+      const errMsg = (data as { error?: string } | null)?.error;
+      if (error || errMsg) throw new Error(errMsg || error?.message || 'Failed to save');
+      setIntakeSaved(true);
+    } catch (e) {
+      setIntakeError(e instanceof Error ? e.message : 'Something went wrong');
+    } finally {
+      setIntakeSaving(false);
+    }
+  };
 
   const setLift = (key: string, value: string) => {
     const num = value === '' ? 0 : parseInt(value, 10);
@@ -1458,6 +1496,39 @@ export default function AthletePage({ session }: { session: Session }) {
                       </div>
                     ))}
                   </CollapsibleSection>
+
+                  {/* Qualitative intake — free-text / voice. Extracted server-side
+                      into the structured coaching_intake and fed to the coaching
+                      state (preferences, self-assessment, history, constraints). */}
+                  <div className="settings-card" style={{ padding: 16, marginTop: 16 }}>
+                    <p className="athlete-card-subtitle" style={{ marginBottom: 4 }}>Tell your coach about you</p>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+                      Optional, but powerful. Tap the mic on your keyboard and just talk — the more you share, the sharper your coaching.
+                    </div>
+                    {INTAKE_QUESTIONS.map(q => (
+                      <div key={q.key} style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>{q.label}</div>
+                        <textarea
+                          className="lift-input"
+                          rows={3}
+                          placeholder={q.placeholder}
+                          value={intakeAnswers[q.key] ?? ''}
+                          onChange={e => { setIntakeAnswers(prev => ({ ...prev, [q.key]: e.target.value })); setIntakeSaved(false); }}
+                          style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
+                        />
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      onClick={saveIntake}
+                      disabled={intakeSaving || Object.values(intakeAnswers).every(v => !v || !v.trim())}
+                      style={{ padding: '8px 16px', fontSize: 13 }}
+                    >
+                      {intakeSaving ? 'Saving…' : intakeSaved ? 'Saved ✓' : 'Save answers'}
+                    </button>
+                    {intakeError && <div className="auth-error" style={{ display: 'block', marginTop: 12 }}>{intakeError}</div>}
+                  </div>
                 </TierCard>
 
                 {(() => {
