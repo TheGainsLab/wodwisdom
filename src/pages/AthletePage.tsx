@@ -1464,7 +1464,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   <div className="settings-card" style={{ padding: 16, marginTop: 16 }}>
                     <p className="athlete-card-subtitle" style={{ marginBottom: 4 }}>Tell your coach about you</p>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-                      Optional, but powerful. Tap the mic on your keyboard and just talk — the more you share, the sharper your coaching.
+                      Optional, but powerful. Type your answers — or tap the mic on your keyboard and just talk. The AI reads everything you share to personalize your coaching.
                     </div>
 
                     <div style={{ marginBottom: 16 }}>
