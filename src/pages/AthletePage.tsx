@@ -1417,12 +1417,12 @@ export default function AthletePage({ session }: { session: Session }) {
                         />
                       </div>
                       <div className="lift-item">
-                        <span className="lift-label">Typical session length <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11 }}>(30–120 min)</span></span>
+                        <span className="lift-label">Typical session length <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11 }}>(30–180 min)</span></span>
                         <input
                           className="lift-input"
                           type="number"
                           min="30"
-                          max="120"
+                          max="180"
                           step="5"
                           placeholder="—"
                           value={sessionLengthMinutes}
