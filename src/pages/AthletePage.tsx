@@ -1473,7 +1473,6 @@ export default function AthletePage({ session }: { session: Session }) {
                         className="lift-input"
                         rows={3}
                         maxLength={500}
-                        placeholder='e.g. "Prep for the Open next year, also want to add 20 lbs to my deadlift and drop my 5K under 22 min"'
                         value={goal}
                         onChange={e => { setGoal(e.target.value); markDirty(); setIntakeSaved(false); }}
                         style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
@@ -1490,7 +1489,6 @@ export default function AthletePage({ session }: { session: Session }) {
                       <textarea
                         className="lift-input"
                         rows={3}
-                        placeholder='e.g. "right shoulder — no overhead pressing". Leave blank if you have no constraints.'
                         value={injuriesConstraints}
                         onChange={e => { setInjuriesConstraints(e.target.value); markDirty(); setIntakeSaved(false); }}
                         style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
@@ -1503,7 +1501,6 @@ export default function AthletePage({ session }: { session: Session }) {
                         <textarea
                           className="lift-input"
                           rows={3}
-                          placeholder={q.placeholder}
                           value={intakeAnswers[q.key] ?? ''}
                           onChange={e => { setIntakeAnswers(prev => ({ ...prev, [q.key]: e.target.value })); setIntakeSaved(false); }}
                           style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
