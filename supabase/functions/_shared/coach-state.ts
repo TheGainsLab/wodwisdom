@@ -49,7 +49,9 @@ export type EvidenceKey = AthleteModelKey | (string & {});
 // source="observed" + capability_revisions). Prompt + reason codes
 // (observed_progress / observed_plateau / low_adherence) let CoachState reason
 // from that evidence.
-export const COACH_STATE_BUILDER_VERSION = "v1.4";
+// v1.5 (intake): reads athlete_model.self_report (Tier-3 qualitative intake) —
+// honors preferences, weighs self-assessment vs data, uses training age.
+export const COACH_STATE_BUILDER_VERSION = "v1.5";
 
 // ============================================================
 // Controlled vocabularies — LOCKED v1 (DATA, versioned with the schema;
