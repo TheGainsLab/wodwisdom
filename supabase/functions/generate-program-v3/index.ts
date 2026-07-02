@@ -57,6 +57,7 @@ import { reviewSafety } from "../_shared/safety-review.ts";
 import { saveProgramV3 } from "../_shared/save-program-v3.ts";
 import { attachBenchmarksToWriterOutput, type BlockLocation } from "../_shared/compute-block-benchmark.ts";
 import type { Gender } from "../_shared/compute-benchmarks.ts";
+import { MODELS } from "../_shared/model-profiles.ts";
 import {
   runStageWithLease,
   type ProgramJobRow,
@@ -68,7 +69,7 @@ import {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-const MODEL = "claude-sonnet-4-6";
+const MODEL = MODELS.sonnet;
 const MAX_SKELETON_ATTEMPTS = 3;
 // The skeleton emits up to 8k tokens of Sonnet output; 60s was too tight and a
 // slow call threw TimeoutError, hard-failing the job. The skeleton's LLM call

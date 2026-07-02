@@ -18,6 +18,8 @@
  * and we can re-extract with a better model later.
  */
 
+import { MODELS } from "./model-profiles.ts";
+
 export const COACHING_INTAKE_VERSION = "v1";
 
 export type TimeDomain = "short" | "medium" | "long";
@@ -163,7 +165,7 @@ interface ClaudeResponse {
   usage?: { input_tokens?: number; output_tokens?: number };
 }
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = MODELS.sonnet;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
 /** LLM extraction: raw answers → typed CoachingIntake (version-stamped). */

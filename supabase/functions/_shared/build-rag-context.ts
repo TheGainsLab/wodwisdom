@@ -35,6 +35,10 @@ export async function buildRagContext(
   supa: SupabaseClient,
   lifts: Record<string, number | null>,
   skills: Record<string, string | null>,
+  // Corpus scope (white-label): tenant ids whose private methodology corpus to
+  // include alongside the shared baseline. Omit = baseline only (today's
+  // behavior). Threaded to every searchChunks call.
+  corpusTenants?: string[],
 ): Promise<string> {
   if (!OPENAI_API_KEY) return "";
 
@@ -66,6 +70,7 @@ export async function buildRagContext(
           OPENAI_API_KEY,
           3,
           0.25,
+          corpusTenants,
         ),
       );
     }
@@ -78,6 +83,7 @@ export async function buildRagContext(
           OPENAI_API_KEY,
           3,
           0.25,
+          corpusTenants,
         ),
       );
     }
@@ -89,6 +95,7 @@ export async function buildRagContext(
         OPENAI_API_KEY,
         3,
         0.25,
+        corpusTenants,
       ),
     );
     queries.push(
@@ -101,6 +108,7 @@ export async function buildRagContext(
         OPENAI_API_KEY,
         2,
         0.25,
+        corpusTenants,
       ),
     );
     if (profSkills) {
@@ -112,6 +120,7 @@ export async function buildRagContext(
           OPENAI_API_KEY,
           5,
           0.3,
+          corpusTenants,
         ),
       );
     }

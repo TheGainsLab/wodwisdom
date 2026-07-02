@@ -17,8 +17,9 @@ import type { BlockPrescription, WriterOutput } from "./v2-output-schema.ts";
 import { buildEmitBlockTool } from "./v2-output-schema.ts";
 import type { SkeletonOutput } from "./v3-output-schema.ts";
 import type { WriterPayload } from "./build-writer-payload.ts";
+import { MODELS } from "./model-profiles.ts";
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = MODELS.sonnet;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 
 interface ClaudeResponse {

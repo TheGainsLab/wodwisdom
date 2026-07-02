@@ -9,9 +9,12 @@
  */
 
 import { fetchWithTimeout } from "./fetch-with-timeout.ts";
+import { MODELS } from "./model-profiles.ts";
 
-const SONNET_MODEL = "claude-sonnet-4-6";
-const HAIKU_MODEL = "claude-haiku-4-5-20251001";
+// Sourced from the central registry so a model retirement is a config change
+// (MODEL_SONNET / MODEL_HAIKU secrets) rather than editing every call site.
+const SONNET_MODEL = MODELS.sonnet;
+const HAIKU_MODEL = MODELS.haiku;
 
 const MAX_RETRIES = 2;
 const RETRY_DELAYS = [0, 3000];
