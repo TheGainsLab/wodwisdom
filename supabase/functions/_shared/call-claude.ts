@@ -9,12 +9,15 @@
  */
 
 import { fetchWithTimeout } from "./fetch-with-timeout.ts";
-import { MODELS } from "./model-profiles.ts";
+import { resolveModelProfile } from "./model-profiles.ts";
 
-// Sourced from the central registry so a model retirement is a config change
-// (MODEL_SONNET / MODEL_HAIKU secrets) rather than editing every call site.
-const SONNET_MODEL = MODELS.sonnet;
-const HAIKU_MODEL = MODELS.haiku;
+// The primary/fallback policy lives in ONE place — the "default" profile in
+// model-profiles.ts — so call-claude and the future Engine model_profile wiring
+// can't diverge. Ids are env-overridable there, so a model retirement is a
+// config change (MODEL_SONNET / MODEL_HAIKU secrets), not a call-site edit.
+const DEFAULT_PROFILE = resolveModelProfile("default");
+const SONNET_MODEL = DEFAULT_PROFILE.primary;
+const HAIKU_MODEL = DEFAULT_PROFILE.fallback ?? DEFAULT_PROFILE.primary;
 
 const MAX_RETRIES = 2;
 const RETRY_DELAYS = [0, 3000];

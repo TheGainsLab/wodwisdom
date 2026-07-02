@@ -21,10 +21,10 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  const json = (body: unknown, status = 200) =>
+  const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
     new Response(JSON.stringify(body), {
       status,
-      headers: { ...cors, "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json", ...extra },
     });
 
   try {
@@ -49,11 +49,24 @@ Deno.serve(async (req) => {
 
     // Cached, deduped fetch of the near-static catalog. The catalog is the
     // same for every user, so this collapses per-click traffic on the shared
-    // COMPETITION_SERVICE_KEY into ~1 upstream fetch per TTL window (see
-    // _shared/competition-catalog-cache.ts). Failure-soft: null -> 503.
-    const payload = await getCompetitionCatalog();
-    if (payload === null) return json({ error: "SERVICE_UNAVAILABLE" }, 503);
-    return json(payload, 200);
+    // COMPETITION_SERVICE_KEY into ~1 upstream fetch per TTL window, serves a
+    // stale copy through upstream blips, and negative-caches failures (see
+    // _shared/competition-catalog-cache.ts).
+    const result = await getCompetitionCatalog();
+    if (result.payload !== null) {
+      // Cacheable per-user (auth-gated, near-static). Shorter max-age when the
+      // payload is stale so a client refreshes sooner once upstream recovers.
+      return json(result.payload, 200, {
+        "Cache-Control": result.stale ? "private, max-age=60" : "private, max-age=3600",
+        "X-Cache": result.stale ? "stale" : "hit",
+      });
+    }
+    // Hard miss (failure, no stale copy). Pass the upstream status through so a
+    // 429 (rate-limited) is distinguishable from an outage and clients back off.
+    if (result.status === 429) {
+      return json({ error: "RATE_LIMITED" }, 429, { "Retry-After": "5" });
+    }
+    return json({ error: "SERVICE_UNAVAILABLE" }, result.status ?? 503);
   } catch (err) {
     console.error("[competition-catalog] unexpected error:", err);
     return json({ error: "INTERNAL" }, 500);

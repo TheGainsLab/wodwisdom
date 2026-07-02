@@ -3,22 +3,30 @@
  *
  * Replaces the Claude model ids hardcoded across ~30 edge functions. Two goals:
  *
- *   1. Model retirement becomes a CONFIG change, not a fleet redeploy. A retired
- *      snapshot 404s every hardcoded call site at once ("Claude API call
- *      failed"). Env overrides (Supabase function secrets) win over the pinned
- *      defaults, so a swap is: set MODEL_SONNET=<new id> and the whole fleet
- *      follows on next cold start.
+ *   1. Model retirement becomes a CONFIG change for adopted call sites, not a
+ *      code edit. A retired snapshot 404s every HARDCODED call site at once
+ *      ("Claude API call failed"). For code that reads MODELS.* / call-claude,
+ *      an env override (MODEL_SONNET / MODEL_HAIKU / MODEL_OPUS function
+ *      secret) fixes it on next cold start.
  *
  *   2. Engine extraction (docs/portfolio/ENGINE_EXTRACTION.md): the extracted
  *      Engine resolves a request/tenant `model_profile` (cost vs. quality)
- *      without touching call sites. This is the local seed of that indirection —
- *      adopt `MODELS.sonnet` / `resolveModelProfile()` instead of string
- *      literals, and the profile becomes a request parameter later.
+ *      without touching call sites. This is the local seed of that indirection.
  *
- * Phase 1 adopts this in the generation core (call-claude + the generation
- * _shared modules + generate-program-v3). Peripheral functions (nutrition,
- * chat, analyze-workout, etc.) still hold string literals and migrate
- * incrementally onto MODELS.* — see the model-pinning note.
+ * COVERAGE — this is a PARTIAL migration. Do not assume setting the env var
+ * fixes everything.
+ *   Covered: call-claude.ts (and therefore every function that calls it —
+ *   the parse-* intake functions, etc.), plus the generation _shared modules
+ *   (coaching-intake, generate-coach-state, safety-review, metcon-workcalc,
+ *   surgical-block-fix) and generate-program-v3.
+ *   NOT covered — these call the Anthropic API directly with literal model ids
+ *   and must be migrated onto MODELS.* to complete fleet coverage:
+ *     chat, generate-program (v1), generate-program-v2, nutrition-analysis,
+ *     nutrition-image-recognition, nutrition-image-complete, chat-nudge-classify,
+ *     analyze-workout, adjust-workout, summarize, training-analysis,
+ *     incorporate-movements, _shared/extract-movements-ai, _shared/generate-notices-ai.
+ *   Grep before trusting a retirement fix:
+ *     grep -rn 'claude-sonnet-4-6\|claude-haiku-4-5' supabase/functions
  */
 
 /** Concrete model ids, env-overridable. Change a snapshot here or via secret. */

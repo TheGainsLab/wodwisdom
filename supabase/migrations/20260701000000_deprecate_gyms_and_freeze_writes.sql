@@ -48,4 +48,32 @@ REVOKE INSERT, UPDATE, DELETE ON public.gyms         FROM anon, authenticated, s
 REVOKE INSERT, UPDATE, DELETE ON public.gym_members  FROM anon, authenticated, service_role;
 -- SELECT grants left untouched so admin-data reads keep working.
 
+-- 4. Loud backstop: a write trigger that raises -------------------------------
+-- REVOKE + dropped RLS policies are the freeze, but both are SILENT if bypassed:
+-- a future blanket `GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role`
+-- (a common Supabase idiom) re-opens writes with no signal, and the table owner
+-- bypasses REVOKE entirely. A BEFORE-write trigger fires for EVERY role incl.
+-- the owner, so any regrowth of the frozen gym fork (D2) fails loudly instead of
+-- silently. To intentionally thaw: DROP the triggers below.
+CREATE OR REPLACE FUNCTION public.reject_frozen_gym_write()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION
+    'gyms/gym_members are frozen (deprecated 2026-07-01, no new writes). '
+    'Gym features live in affiliate-intelligence. See migration 20260701000000.';
+END;
+$$;
+
+DROP TRIGGER IF EXISTS freeze_writes ON public.gyms;
+CREATE TRIGGER freeze_writes
+  BEFORE INSERT OR UPDATE OR DELETE ON public.gyms
+  FOR EACH ROW EXECUTE FUNCTION public.reject_frozen_gym_write();
+
+DROP TRIGGER IF EXISTS freeze_writes ON public.gym_members;
+CREATE TRIGGER freeze_writes
+  BEFORE INSERT OR UPDATE OR DELETE ON public.gym_members
+  FOR EACH ROW EXECUTE FUNCTION public.reject_frozen_gym_write();
+
 COMMIT;
