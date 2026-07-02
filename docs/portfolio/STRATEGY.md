@@ -218,12 +218,16 @@ the two altitudes healthy:
   products only.**
 - **No external Competition Data API** as a product. Weak market outside
   training + unclear rights = not worth the exposure. Not in the deck.
-- Competition History ships as **included-with-any-paid-subscription**, not a
-  standalone paid SKU and not anonymous-public (see `FLIP_THE_GATE_AUDIT.md`;
-  this resolves B1). Charging specifically for the data is the worst rights
-  posture; the same data enriching a broader paid service is defensible — and
-  its real value is retention, verified identity feeding programming, and
-  shareable "how do I stack up" moments.
+- Competition History is **free for all authenticated users — decided and
+  shipped** (`ATHLETEDATA_PUBLIC_TIER = true` on both client and server;
+  logging/placement free via `hasCompetitionLogAccess`). Free is deliberately
+  the strongest rights posture: no money ever changes hands for the data — no
+  whiff of selling someone else's results. Its value is retention, verified
+  identity feeding programming (Tier-4 already consumes it as optional intake
+  enrichment), and shareable "how do I stack up" moments. Remaining work is
+  operational, not decisional: cache the near-static catalog (H2) and address
+  the shared-service-key rate-limit bucket (H1) — more urgent, not less,
+  because free-to-all means maximum traffic on one shared key.
 - The scraper is treated as a **fragile supply line**, not a foundation:
   everything degrades gracefully without it, and the physics model + the
   first-party flywheel are the long-term substrate.
@@ -315,7 +319,7 @@ revenue line.
 | D2 | affiliate-intelligence owns "gym as a customer"; wodwisdom gym tables frozen | **Decided** (migration written) |
 | D3 | No external competition-data product; derived analytics internal-only | **Decided** |
 | D4 | AI Replicate → consented onboarding mechanism only | **Decided** |
-| D5 | Competition History = included with any paid subscription (B1) | **Recommended** — founder to confirm; H2 (catalog caching) before launch |
+| D5 | Competition History = free for all authenticated users | **Decided & shipped** — founder decision predates this doc; remaining work is H2 (catalog caching) + H1 (per-key rate limits) + dead-code cleanup (`hasAthleteDataAccess`) |
 | D6 | Sport #2 = Hyrox | **Recommended** |
 | D7 | Direct-to-gym AI programmer prioritized over brand white-label | **Decided** (innovator's-dilemma logic, §6.3) |
 | D8 | Gym-channel pricing (wedge price, seat pricing, revenue-split %) | **Open** |
