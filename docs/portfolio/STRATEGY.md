@@ -146,17 +146,20 @@ There are **two front doors**, then the ladder:
    service* for the gym, sellable to any gym with zero dependencies — likely
    the higher-converting wedge.
 1b. **Analytics wedge** ($49/mo flat) — the dashboard, for data-curious owners.
-2. **AI gym programmer** ($149/mo flat, includes analytics) — "design next
-   month's programming: your goals, your focus, your style." Onboarding:
-   *upload your last three months of programming and the AI learns how you run
-   your gym* (consented, first-party — the AI Replicate mechanism pointed at
-   the customer's own data). To the owner it is two buttons: *generate* and
-   *personalize*. Priced inside the $100–300 programming-subscription budget
-   line it displaces.
-3. **Member AI Seat** ($6/active member/mo; $5 at 100+, $4 at 200+) —
-   per-member personalization + enriched intake; one seat type covers all
-   member-level AI (Engine Class participants ARE this seat with one feature
-   on — upgrades light up features, never add charges).
+2. **AI gym programmer** ($149/mo base + $3/member/mo roster-wide, includes
+   analytics) — "design next month's programming: your goals, your focus,
+   your style." Onboarding: *upload your last three months of programming and
+   the AI learns how you run your gym* (consented, first-party — the AI
+   Replicate mechanism pointed at the customer's own data). To the owner it
+   is two buttons: *generate* and *personalize*. **All-or-nothing: every
+   member gets the personalized version** (one system on the class floor;
+   shared workout, individual loads). This is a *switch sale* — it displaces
+   the gym's programming subscription and publishing habit — de-risked by
+   shadow-mode trials. Distribution is owned-surfaces-only (member PWA, TV
+   mode, portal): the block format is the learning loop and does not export.
+3. **Member AI Seat** ($6/active member/mo; $5 at 100+, $4 at 200+) — the
+   opt-in seat for opt-in products (Engine Class participants); enriched
+   intake rides with it. Whole-gym products bill the roster instead.
 4. **Remote memberships** ($30/mo wholesale; gym retails at ≥ the retail
    price floor) — revenue with zero floor space; the denominator disappears.
 

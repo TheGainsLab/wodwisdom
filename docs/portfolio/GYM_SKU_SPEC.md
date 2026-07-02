@@ -66,12 +66,36 @@ richer and cleanly-provenanced.
 
 ---
 
-## 3. AI Gym Programmer — $149/mo flat (includes Gym Analytics)
+## 3. AI Gym Programmer — $149/mo base + roster personalization (includes Gym Analytics)
 
 **The pitch:** "Stop paying $100–300/mo for someone else's template, or burning
 your Sundays writing programming. State your month's focus; the AI writes your
 gym's programming in your style; press one more button and every member gets
 their version."
+
+**ALL-OR-NOTHING (decided):** when a gym runs the AI Programmer, *every*
+member gets the personalized version — no per-member opt-in. Rationale: one
+system on the class floor (a coach cannot run half the room on personalized
+loads and half on whiteboard Rx), the shared-workout experience is preserved
+(same blocks for everyone — cohort mode applied to the gym's own programming;
+personalization is each member's loads/scaling, not a different workout), and
+complete rosters mean complete data.
+
+**Billing consequence:** roster-based, not active-seat — **$149/mo base +
+$3/member/mo across the full roster** (proposed bands: $2.50 at 150+, $2.00 at
+250+). The per-head rate is half the opt-in seat because penetration is 100%
+and per-member COGS is low: scaling resolves `target_pct_1rm` against each
+member's numbers *deterministically* (arithmetic + the audit pipeline); AI
+spend is only substitutions/injury adaptations — cents per member-month, not
+the ~$1 of full individual generation. 120-member gym: $149 + $360 = ~$509/mo,
+every member covered.
+
+**This is a switch sale.** The gym leaves its current programming subscription
+and publishing habit. Sales mechanics: shadow-mode trial (generate privately
+alongside current programming, compare for a month), style-match onboarding
+(upload history), and the innovator's-dilemma tailwind (STRATEGY.md §6.3 —
+their current provider cannot answer with AI without destroying its own
+premise).
 
 **The gym owner gets:**
 
@@ -92,9 +116,11 @@ Analytics sell first.
 
 ## 4. Member AI Seat — $6/active member/mo ($5 at 100+, $4 at 200+)
 
-One seat type covers all member-level AI inside the gym. **Engine Class
-participants ARE Member AI Seats** with one feature on — when the gym adds the
-AI Programmer, more features light up on the same seat at no extra charge.
+The **opt-in** seat — it exists where the product is opt-in: Engine Class
+participants (and future opt-in member products). Where the product is
+whole-gym (the AI Programmer), personalization is roster-billed inside that
+SKU instead (see §3) — a member can hold both (gym programming via roster +
+an Engine Class seat) and the charges are for different products.
 
 **The member gets (on top of Engine Class features):**
 
@@ -155,9 +181,19 @@ top of retail rather than discounting it.
    not a new SKU.
 3. **Leaderboard divisions — SETTLED:** gender and modality only at launch.
    Physics-normalized (W·kg) rankings included as the differentiator.
-4. **Programmer output surface — OPEN (recommendation pending founder call):**
-   portal view + member PWA + copy/paste-friendly export (PDF/plain text) +
-   a "TV mode" screen at launch; no API integrations with incumbent gym
-   software (shallow-integration rule).
+4. **Programmer output surface — SETTLED: owned surfaces only, no exports.**
+   The block format (archetype → blocks → movements with per-member
+   `target_pct_1rm`, logging, benchmarks, embedded coach) IS the data/AI
+   learning loop; flattening it severs the loop and cannot represent
+   per-member personalization. Distribution: member PWA (full experience),
+   free read-only gym view (for Engine-Class-only gyms — the seat-conversion
+   funnel), TV mode on the gym wall, owner/coach portal views. No PDF/CSV
+   export, no API integrations with incumbent gym software. Consequence
+   embraced: the AI Programmer is a SWITCH sale (gym leaves its current
+   programming + publishing stack), de-risked by **shadow mode** — the owner
+   generates privately in the portal alongside their current programming for
+   a month, compares, then flips the floor.
 5. **Seat lifecycle — DEFAULT unless objection:** gym-activated = billable;
    auto-deactivate after 60 days of zero logging, portal nudge first.
+   (Applies to opt-in Engine Class seats; Programmer gyms are roster-billed,
+   see §3.)
