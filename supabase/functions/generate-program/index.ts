@@ -4,6 +4,7 @@
  * Client polls program-job-status for completion.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { MODELS } from "../_shared/model-profiles.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   searchChunks,
@@ -934,7 +935,7 @@ ${skeleton}`;
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-6",
+          model: MODELS.sonnet,
           max_tokens: 32000,
           stream: false,
           system: systemPrompt,

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { MODELS } from "../_shared/model-profiles.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 
@@ -241,7 +242,7 @@ Deno.serve(async (req) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
+        model: MODELS.sonnet,
         max_tokens: 1500,
         stream: false,
         system: SYSTEM_PROMPT,

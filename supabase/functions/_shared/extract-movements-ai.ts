@@ -2,6 +2,8 @@
 // Replaces regex extraction when accuracy matters (e.g. program analysis).
 // Result is keyed by workout_id — never trust array order from Claude.
 
+import { MODELS } from "./model-profiles.ts";
+
 export interface LibraryEntry {
   canonical_name: string;
   display_name: string;
@@ -124,7 +126,7 @@ export async function extractMovementsAI(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
+      model: MODELS.sonnet,
       max_tokens: 8192,
       stream: false,
       system: SYSTEM_PROMPT,
@@ -171,7 +173,7 @@ export async function extractMovementsAI(
       .map((m: { canonical: string; modality: string; load?: string }) => ({
         canonical: m.canonical,
         modality: m.modality,
-        load: (m.load?.trim() || "") ? m.load.trim() : "BW",
+        load: m.load?.trim() || "BW",
       }));
 
     const { valid, unrecognized } = validateAgainstLibrary(validated, libraryCanonicals);

@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { MODELS } from "../_shared/model-profiles.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { buildConditioningState } from "../_shared/conditioning-state.ts";
 import { fetchAndFormatProgramContext } from "../_shared/training-program.ts";
@@ -485,7 +486,7 @@ Deno.serve(async (req) => {
             "content-type": "application/json",
           },
           body: JSON.stringify({
-            model: "claude-haiku-4-5-20251001",
+            model: MODELS.haiku,
             max_tokens: 10,
             system: "Classify the user's question as either 'allow' or 'block'. Reply with ONLY that one word.\n\nallow: fitness, exercise, training, programming, coaching, nutrition, diet, recipes, meal planning, health, wellness, recovery, sleep, stress management, injury prevention, mobility, anatomy, physiology, supplements, body composition, weight management, athletic performance, competition prep, CrossFit, weightlifting, conditioning, endurance, strength, flexibility, mental health as it relates to training, questions about the user's own program or workout plan, questions about the Engine program or any named training program, energy systems, pacing, aerobic or anaerobic training.\n\nblock: anything completely unrelated to health, fitness, or wellness — homework, coding, business, legal, financial, creative writing, travel, entertainment, politics, relationships (non-health), technology (computers/software, not training technology), etc.",
             messages: [{ role: "user", content: question.substring(0, 500) }],
@@ -639,7 +640,7 @@ Deno.serve(async (req) => {
             "content-type": "application/json",
           },
           body: JSON.stringify({
-            model: "claude-haiku-4-5-20251001",
+            model: MODELS.haiku,
             max_tokens: 120,
             system:
               "You are a question classifier and query rewriter for a CrossFit / strength-science / exercise-physiology coaching app. Given the user's latest message (and last 2 conversation turns for context), output JSON with two fields.\n\n" +
@@ -785,7 +786,7 @@ Deno.serve(async (req) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
+        model: MODELS.sonnet,
         max_tokens: 1024,
         temperature: 0.3,
         stream: true,

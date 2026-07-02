@@ -13,20 +13,16 @@
  *      Engine resolves a request/tenant `model_profile` (cost vs. quality)
  *      without touching call sites. This is the local seed of that indirection.
  *
- * COVERAGE — this is a PARTIAL migration. Do not assume setting the env var
- * fixes everything.
- *   Covered: call-claude.ts (and therefore every function that calls it —
- *   the parse-* intake functions, etc.), plus the generation _shared modules
- *   (coaching-intake, generate-coach-state, safety-review, metcon-workcalc,
- *   surgical-block-fix) and generate-program-v3.
- *   NOT covered — these call the Anthropic API directly with literal model ids
- *   and must be migrated onto MODELS.* to complete fleet coverage:
- *     chat, generate-program (v1), generate-program-v2, nutrition-analysis,
- *     nutrition-image-recognition, nutrition-image-complete, chat-nudge-classify,
- *     analyze-workout, adjust-workout, summarize, training-analysis,
- *     incorporate-movements, _shared/extract-movements-ai, _shared/generate-notices-ai.
- *   Grep before trusting a retirement fix:
- *     grep -rn 'claude-sonnet-4-6\|claude-haiku-4-5' supabase/functions
+ * COVERAGE — COMPLETE. Every Claude call site across supabase/functions now reads
+ * MODELS.* / resolveModelProfile() (call-claude and its callers, the generation
+ * _shared modules, and the ~16 functions that called the Anthropic API directly:
+ * chat, generate-program(-v2), nutrition-*, chat-nudge-classify, analyze-workout,
+ * adjust-workout, summarize, training-analysis, incorporate-movements,
+ * preprocess-program, parse-injuries-constraints, _shared/extract-movements-ai,
+ * _shared/generate-notices-ai). A model retirement is a config change: set the
+ * MODEL_SONNET / MODEL_HAIKU / MODEL_OPUS secret and redeploy. Verify no literals
+ * ever creep back in:
+ *     grep -rn 'claude-sonnet-4-6\|claude-haiku-4-5' supabase/functions   # → only this file
  */
 
 /** Concrete model ids, env-overridable. Change a snapshot here or via secret. */
