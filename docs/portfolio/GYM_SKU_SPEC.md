@@ -26,8 +26,8 @@ You price it; you keep the margin."
 |---|---|
 | Class setup in the gym portal: name it, invite members (link/QR), roster view | BUILD (portal shell exists in affiliate-intelligence) |
 | Cohort-mode Engine program: one shared progression path for the whole gym, auto-generated monthly | ADAPT (retail Engine + monthly cron EXIST; cohort flag is in the Engine API contract, Phase 1) |
-| Gym leaderboard per workout + season standings | BUILD |
-| Normalized leaderboard divisions via the physics model (watts / W·kg) so a 60 kg member competes fairly with a 100 kg member | ADAPT (physics model EXISTS in data service; leaderboard surface is BUILD) |
+| Gym leaderboard per workout + season standings — divisions by **gender and modality only** (decided; no age/scaled divisions at launch) | BUILD |
+| Physics-normalized rankings via the watts / W·kg model so a 60 kg member competes fairly with a 100 kg member — the differentiator no whiteboard app has | ADAPT (physics model EXISTS in data service; leaderboard surface is BUILD) |
 | Seat management: activate/deactivate members; billing follows active seats | BUILD (wholesale grant path on the existing entitlements layer) |
 | Launch kit: suggested retail guidance ($15–25/mo or bake into dues), member-facing copy, margin math one-pager | BUILD (content, not code) |
 
@@ -39,6 +39,7 @@ You price it; you keep the margin."
 | Light intake (key numbers, a few minutes) | ADAPT (subset of retail intake) |
 | Individualized scaling — paces/loads personal to them while the *path* stays shared | ADAPT (cohort mode `ScalingResult`, Phase 1 contract) |
 | Result logging + personal trend charts | EXISTS |
+| Embedded AI coach on each training day (answers questions with the member's training as context) | EXISTS (already embedded in Engine/programmer days) |
 | Leaderboard participation | BUILD |
 
 **Explicitly NOT included** (differentiation guard vs. retail): adaptive
@@ -105,8 +106,12 @@ AI Programmer, more features light up on the same seat at no extra charge.
 | PRs, benchmarks, progress tracking | EXISTS |
 | Profile portability: member leaves the gym → converts to retail with history intact; retail user joins → links | BUILD (decided in STRATEGY.md §5; profile lives in shared core) |
 
-**Open per D8 discussion:** whether the seat includes AI Coach chat and the
-nutrition module (both EXIST in retail; see Open Questions).
+**Decided:** the seat includes the embedded, training-context-aware AI coach
+that already ships on Engine/programmer days (EXISTS). The full open-ended
+retail AI Coach stays retail-only. Nutrition arrives later as a **seat-tier
+upsell**, not a new SKU: seat pricing is a ladder (base $6 → ~$9–12 with
+nutrition when that service is ready) — upsells bump the tier on the same
+seat, never add a second charge.
 
 ---
 
@@ -139,22 +144,20 @@ top of retail rather than discounting it.
   in exchange for data consent, case study, honest feedback. Minimums waived
   during pilot terms.
 
-## Open questions (to settle before the pilot pitch deck)
+## Question log (settled 2026-07 unless marked open)
 
-1. **AI Coach chat on gym seats?** Retail entitlements bundle `ai_chat` even
-   with Engine. Recommendation: gym seats get a scoped coach ("ask about
-   today's workout"), not the full open-ended AI Coach — preserves retail
-   differentiation and caps token cost on the cheapest seat. Decide.
-2. **Nutrition on gym seats?** Exists in retail. Options: included (sweetens
-   the seat), +$2–3 add-on seat, or later. Recommendation: later — don't blur
-   the launch pitch; it's an upsell lever after the class is live.
-3. **Leaderboard divisions:** raw score, W/kg-normalized, age/gender divisions,
-   scaled/Rx — which at launch? (Physics-normalized is the differentiator no
-   whiteboard app has.)
-4. **Programmer output surface:** portal-only at launch, or export (PDF/CSV) so
-   gyms can publish into whatever they already use? (Shallow-integration rule:
-   export yes, API integrations later/never.)
-5. **Seat lifecycle:** what does "active" mean exactly — activated by the gym,
-   or activated-and-logged-something-this-month? (Billing fairness vs.
-   simplicity. Recommendation: gym-activated = billable; auto-deactivate after
-   60 days of zero logging, with a portal nudge first.)
+1. **AI Coach on gym seats — SETTLED:** the embedded, training-context-aware
+   coach on Engine/programmer days is included (it already exists). The full
+   open-ended retail AI Coach stays retail-only; a scoped version for gym
+   seats can be revisited later.
+2. **Nutrition on gym seats — SETTLED:** later; the service isn't ready.
+   Mechanism when it is: seat-tier upsell (base $6 → ~$9–12 with nutrition),
+   not a new SKU.
+3. **Leaderboard divisions — SETTLED:** gender and modality only at launch.
+   Physics-normalized (W·kg) rankings included as the differentiator.
+4. **Programmer output surface — OPEN (recommendation pending founder call):**
+   portal view + member PWA + copy/paste-friendly export (PDF/plain text) +
+   a "TV mode" screen at launch; no API integrations with incumbent gym
+   software (shallow-integration rule).
+5. **Seat lifecycle — DEFAULT unless objection:** gym-activated = billable;
+   auto-deactivate after 60 days of zero logging, portal nudge first.

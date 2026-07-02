@@ -127,9 +127,13 @@ infrastructure company — multiple revenue lines, one flywheel** — rather tha
 
 ## 5. The gym channel: revenue per square foot
 
-The pitch to a gym owner is economic, not technological: **rent rises every
-year; your only levers so far are raising prices or inventing services members
-don't value. These tools raise revenue without adding a square foot.**
+The pitch to a gym owner is economic, not technological — and it names the
+trap the industry keeps selling them into. Every standard answer to a
+struggling gym (raise prices, run more personal-training sessions, add
+nutrition coaching, do semi-private training) **scales linearly with the
+owner's hours — the ceiling is their calendar.** Our tools are the opposite
+shape: **revenue and retention that grow without consuming the owner's time,
+and (via remote members) without adding a square foot.**
 
 The product ladder (each rung an upsell on the same engine; full service
 definitions in `GYM_SKU_SPEC.md`; pricing decided — see D8/D9):
