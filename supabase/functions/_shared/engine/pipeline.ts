@@ -1,52 +1,40 @@
 /**
  * engine/pipeline.ts — the sport-agnostic generation pipeline (Engine core).
  *
- * Extracted VERBATIM from generate-program-v3 (the writer calls + audit/recovery
- * loops + benchmark helpers) so both the wodwisdom dispatcher and the standalone
- * Engine entrypoint (engine-generate) consume ONE implementation instead of
- * inlining it. Behavior is identical to the pre-extraction generate-program-v3 —
- * this is a relocation, not a rewrite (see docs/portfolio/ENGINE_EXTRACTION.md).
+ * Extracted from generate-program-v3 (writer calls + audit/surgical recovery loops
+ * + benchmark recompute) so both the wodwisdom dispatcher and the standalone Engine
+ * entrypoint (engine-generate) consume ONE implementation. Behavior is identical to
+ * the pre-extraction generate-program-v3 (docs/portfolio/ENGINE_EXTRACTION.md).
  *
  * These functions are the CONTROL PLANE: LLM I/O, audit orchestration, surgical
- * recovery, benchmark recompute. The sport-coupled CONTENT (prompts, tool
- * schemas, audit rules) is still imported directly here in v1; the domain-pack
- * seam (engine imports a pack, never the sport) is layered on top in a follow-up
- * step — see engine/domain-pack.ts. DB-coupled glue (buildWriterPayload,
+ * recovery, benchmark recompute. All SPORT-COUPLED content (prompts, tool schemas,
+ * audit rules, recovery helpers) arrives via the injected `DomainPack` — this file
+ * imports ZERO sport modules at runtime (only the pack TYPE, which is erased). A new
+ * sport is a new pack, no change here. DB-coupled glue (buildWriterPayload,
  * coach-state persistence, saveProgramV3, the program_jobs dispatcher) stays
  * surface-side in generate-program-v3.
  */
 
 import type { WriterPayload } from "../build-writer-payload.ts";
 import type { TrainingDesignInput } from "../training-design-input.ts";
-import { V3_SKELETON_SYSTEM_PROMPT } from "../v3-skeleton-prompt.ts";
-import { V2_GENERATE_PROGRAM_SYSTEM_PROMPT } from "../v2-system-prompt.ts";
-import { buildEmitSkeletonTool, type SkeletonOutput } from "../v3-output-schema.ts";
-import {
-  buildEmitWeekTool,
-  type WriterOutput,
-  type WeekPrescription,
-} from "../v2-output-schema.ts";
-import {
-  runSkeletonAudits,
-  formatSkeletonViolationsForRetry,
-  summarizeSkeletonAuditRun,
-  type SkeletonAuditResult,
-} from "../v3-skeleton-audits.ts";
-import { runAudits } from "../audit-runner.ts";
-import { clampLoadSanity } from "../programmatic-fixes.ts";
-import { surgicallyRewriteBlock, spliceBlock } from "../surgical-block-fix.ts";
-import { attachBenchmarksToWriterOutput, type BlockLocation } from "../compute-block-benchmark.ts";
+import type { SkeletonOutput } from "../v3-output-schema.ts";
+import type { WriterOutput, WeekPrescription } from "../v2-output-schema.ts";
+import type { SkeletonAuditResult } from "../v3-skeleton-audits.ts";
+import type { runAudits } from "../audit-runner.ts";
+import type { BlockLocation } from "../compute-block-benchmark.ts";
 import type { Gender } from "../compute-benchmarks.ts";
+import type { DomainPack } from "../domain-packs/types.ts";
 import { MODELS } from "../model-profiles.ts";
+
+/** Failure list shape from a hard-audit run (type-only; erased at runtime). */
+type AuditFailures = ReturnType<typeof runAudits>["failures"];
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = MODELS.sonnet;
 export const MAX_SKELETON_ATTEMPTS = 3;
-// The skeleton emits up to 8k tokens of Sonnet output; 60s was too tight and a
-// slow call threw TimeoutError, hard-failing the job. The skeleton's LLM call
-// already sits inside the MAX_SKELETON_ATTEMPTS audit-retry loop, which is the
-// ONLY multiplier on the call — keep ATTEMPTS × this timeout under the ~400s
-// edge wall-clock (3 × 120s = 360s) rather than nesting a second retry loop.
+// The skeleton emits up to 8k tokens of Sonnet output; the LLM call sits inside the
+// MAX_SKELETON_ATTEMPTS audit-retry loop (the ONLY multiplier) — keep ATTEMPTS ×
+// this timeout under the ~400s edge wall-clock (3 × 120s = 360s).
 const SKELETON_TIMEOUT_MS = 120_000;
 
 interface ClaudeContentBlock {
@@ -62,14 +50,14 @@ interface ClaudeResponse {
   usage?: { input_tokens?: number; output_tokens?: number };
 }
 
-// Stage update helper — retained as a no-op callback for the writer/audit
-// helpers below, which still take a setStage parameter. The dispatcher owns the
-// human-facing `stage` column via each stage's displayStage.
+// Stage update helper — retained as a no-op callback for the writer/audit helpers,
+// which still take a setStage parameter. The dispatcher owns the human-facing
+// `stage` column via each stage's displayStage.
 export type SetStage = (stage: string) => Promise<void> | void;
 const NO_STAGE: SetStage = () => {};
 
-// Preserve last skeleton / output on exhaustion so admin can inspect what the
-// writer produced. resultJson is picked up by the dispatcher's failure path.
+// Preserve last skeleton / failures on exhaustion so admin can inspect the writer's
+// output. resultJson is picked up by the dispatcher's failure path.
 export class SkeletonLoopExhausted extends Error {
   constructor(
     public readonly lastSkeleton: SkeletonOutput,
@@ -94,10 +82,11 @@ export class SkeletonLoopExhausted extends Error {
 // Writer calls
 // ============================================================
 
-/** Call the v3 skeleton writer. Returns parsed SkeletonOutput on success. */
+/** Call the skeleton writer for the given pack. Returns parsed SkeletonOutput. */
 export async function callSkeletonWriter(
   tdi: TrainingDesignInput,
   retryViolations: string,
+  pack: DomainPack,
 ): Promise<SkeletonOutput> {
   if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
@@ -130,8 +119,8 @@ export async function callSkeletonWriter(
       model: MODEL,
       max_tokens: 8000,
       stream: false,
-      system: V3_SKELETON_SYSTEM_PROMPT,
-      tools: [buildEmitSkeletonTool(daysPerWeek)],
+      system: pack.writer.skeletonSystemPrompt,
+      tools: [pack.writer.buildSkeletonTool(daysPerWeek)],
       tool_choice: { type: "tool", name: "emit_skeleton" },
       messages: [{ role: "user", content: userMessage }],
     }),
@@ -158,26 +147,23 @@ export async function callSkeletonWriter(
   return toolUse.input as SkeletonOutput;
 }
 
-// EVAL STOPGAP (not the long-term answer — streaming + fresh-invocation re-entry
-// is). Real logs show a week fill emitting 7.7k+ tokens of Sonnet output takes
-// 130s and a 6-day week can need >150s. No fixed total-duration timeout that ALSO
-// leaves room for a retry fits under the ~400s edge wall-clock, so: ONE attempt
-// with a single generous budget (covers a ~200s+ verbose week, still ~70s clear
-// of the wall). A transient blip now fails the run and you re-kick.
+// EVAL STOPGAP: a verbose week fill can need >150s of Sonnet output; no fixed
+// total-duration timeout that ALSO leaves room for a retry fits under the ~400s
+// edge wall-clock. ONE attempt with a generous budget; a transient blip fails the
+// run and it's re-kicked.
 const MAX_WEEK_FILL_ATTEMPTS = 1;
 const WEEK_FILL_TIMEOUT_MS = 330_000;
 
-/**
- * Fill ONE week of the program. Reuses the v2 writer prompt + an emit_week tool,
- * with the full skeleton as context, the specific week to fill, and the
- * already-generated prior weeks (so loads/volume progress across the cycle).
- */
+/** Fill ONE week of the program. Reuses the pack's week-fill prompt + emit_week
+ *  tool, with the full skeleton as context, the specific week to fill, and the
+ *  already-generated prior weeks (so loads/volume progress across the cycle). */
 export async function callWeekFill(
   payload: WriterPayload,
   skeleton: SkeletonOutput,
   weekNum: number,
   priorWeeks: WeekPrescription[],
   extraContext: string,
+  pack: DomainPack,
 ): Promise<WeekPrescription> {
   if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
@@ -205,9 +191,7 @@ export async function callWeekFill(
     ? `ALREADY-GENERATED PRIOR WEEKS (progress from these):\n${JSON.stringify(priorWeeks, null, 2)}`
     : "No prior weeks (this is week 1).";
   // The week-fill EXECUTES the skeleton — it must not reinterpret intent, so the
-  // DECISION-data is stripped from its payload: athlete_model (facts + normatives)
-  // and competition (percentiles). The skeleton already encoded all of that. The
-  // evals are stripped too (they shape STRUCTURE, not fills, and bloat every call).
+  // DECISION-data (athlete_model, competition, evals) is stripped from its payload.
   const {
     profile_evaluation: _pe,
     training_evaluation: _te,
@@ -234,8 +218,8 @@ export async function callWeekFill(
           model: MODEL,
           max_tokens: 16000,
           stream: false,
-          system: V2_GENERATE_PROGRAM_SYSTEM_PROMPT,
-          tools: [buildEmitWeekTool(daysPerWeek, units, payload.training_context.session_length_minutes)],
+          system: pack.writer.weekFillSystemPrompt,
+          tools: [pack.writer.buildWeekTool(daysPerWeek, units, payload.training_context.session_length_minutes)],
           tool_choice: { type: "tool", name: "emit_week" },
           messages: [{ role: "user", content: userMessage }],
         }),
@@ -290,6 +274,7 @@ export async function callWeekFill(
 
 export async function generateSkeletonWithAudits(
   tdi: TrainingDesignInput,
+  pack: DomainPack,
   setStage: SetStage = NO_STAGE,
 ): Promise<SkeletonOutput> {
   let retryViolations = "";
@@ -301,7 +286,7 @@ export async function generateSkeletonWithAudits(
     await setStage(`skeleton_attempt_${attempt}`);
     let skeleton: SkeletonOutput;
     try {
-      skeleton = await callSkeletonWriter(tdi, retryViolations);
+      skeleton = await callSkeletonWriter(tdi, retryViolations, pack);
     } catch (err) {
       const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
       const isTransient = err instanceof Error &&
@@ -316,15 +301,15 @@ export async function generateSkeletonWithAudits(
     }
     lastSkeleton = skeleton;
     await setStage("skeleton_auditing");
-    const auditResult = runSkeletonAudits({
+    const auditResult = pack.audits.runSkeleton({
       skeleton,
       daysPerWeek: tdi.days_per_week,
       trainingDesignInput: tdi,
     });
-    console.log(`[engine] skeleton audits: ${summarizeSkeletonAuditRun(auditResult)}`);
+    console.log(`[engine] skeleton audits: ${pack.audits.summarizeSkeleton(auditResult)}`);
     if (auditResult.passed) return skeleton;
     lastFailures = auditResult.failures;
-    retryViolations = formatSkeletonViolationsForRetry(auditResult.failures);
+    retryViolations = pack.audits.formatSkeletonViolationsForRetry(auditResult.failures);
   }
 
   if (!lastSkeleton) {
@@ -336,7 +321,7 @@ export async function generateSkeletonWithAudits(
 /** Extract (week, day, blockIdx) tuples from block-local audit failures,
  *  grouping violation messages per block. One surgical call per unique block. */
 function groupBlockLocalFailures(
-  failures: ReturnType<typeof runAudits>["failures"],
+  failures: AuditFailures,
 ): Array<{ week: number; day: number; blockIdx: number; violations: string[] }> {
   const map = new Map<string, { week: number; day: number; blockIdx: number; violations: string[] }>();
   const pattern = /Week (\d+) Day (\d+) block\[(\d+)\]/;
@@ -356,18 +341,19 @@ function groupBlockLocalFailures(
   return [...map.values()];
 }
 
-/** Apply programmatic in-place patches for any 'programmatic-fix' audit
- *  failures. Currently handles load_sanity. Output is mutated in place. */
+/** Apply programmatic in-place patches for 'programmatic-fix' audit failures.
+ *  Currently handles load_sanity. Output is mutated in place. */
 export function applyProgrammaticFixes(
   output: WriterOutput,
-  programmaticFailures: ReturnType<typeof runAudits>["failures"],
+  programmaticFailures: AuditFailures,
   payload: WriterPayload,
+  pack: DomainPack,
 ): { patched: number; log: string[] } {
   let totalPatched = 0;
   const log: string[] = [];
   for (const failure of programmaticFailures) {
     if (failure.rule === "load_sanity") {
-      const r = clampLoadSanity(output, payload.lifts);
+      const r = pack.recovery.clampLoadSanity(output, payload.lifts);
       totalPatched += r.patched;
       log.push(...r.log);
     }
@@ -379,9 +365,10 @@ export function applyProgrammaticFixes(
  *  failures. Each unique block gets ONE LLM call. Splices results back in place. */
 export async function applySurgicalFixes(
   output: WriterOutput,
-  blockLocalFailures: ReturnType<typeof runAudits>["failures"],
+  blockLocalFailures: AuditFailures,
   payload: WriterPayload,
   skeleton: SkeletonOutput,
+  pack: DomainPack,
 ): Promise<{ rewritten: number; failed: number; locations: BlockLocation[] }> {
   const groups = groupBlockLocalFailures(blockLocalFailures);
   if (groups.length === 0) return { rewritten: 0, failed: 0, locations: [] };
@@ -395,12 +382,12 @@ export async function applySurgicalFixes(
     const block = day?.blocks?.[g.blockIdx];
     if (!block) { failed++; continue; }
 
-    const corrected = await surgicallyRewriteBlock(
+    const corrected = await pack.recovery.surgicallyRewriteBlock(
       payload, skeleton, g.week, g.day, g.blockIdx, block, g.violations,
     );
     if (!corrected) { failed++; continue; }
 
-    if (spliceBlock(output, g.week, g.day, g.blockIdx, corrected)) {
+    if (pack.recovery.spliceBlock(output, g.week, g.day, g.blockIdx, corrected)) {
       rewritten++;
       locations.push({ week: g.week, day: g.day, blockIdx: g.blockIdx });
       console.log(`[engine] surgical rewrote w${g.week}d${g.day}b${g.blockIdx} (${g.violations.length} violation${g.violations.length === 1 ? "" : "s"})`);
@@ -425,8 +412,13 @@ export function resolveGender(payload: WriterPayload): Gender | null {
 }
 
 /** Run the hard audits with the standard argument set. */
-export function auditOutput(output: WriterOutput, payload: WriterPayload, skeleton: SkeletonOutput) {
-  return runAudits({
+export function auditOutput(
+  output: WriterOutput,
+  payload: WriterPayload,
+  skeleton: SkeletonOutput,
+  pack: DomainPack,
+) {
+  return pack.audits.runHard({
     output,
     daysPerWeek: payload.training_context.days_per_week,
     lifts: payload.lifts,
@@ -445,6 +437,7 @@ export async function recomputeBenchmarks(
   output: WriterOutput,
   gender: Gender | null,
   pendingFailures: BlockLocation[],
+  pack: DomainPack,
   changedLocations?: BlockLocation[],
 ): Promise<BlockLocation[]> {
   let targetLocations: BlockLocation[] | undefined;
@@ -462,7 +455,7 @@ export async function recomputeBenchmarks(
       return pendingFailures;
     }
   }
-  const stats = await attachBenchmarksToWriterOutput(output.weeks ?? [], gender, targetLocations);
+  const stats = await pack.recovery.attachBenchmarks(output.weeks ?? [], gender, targetLocations);
   const mode = targetLocations ? `targeted(n=${targetLocations.length})` : "full";
   console.log(
     `[engine] benchmarks ${mode}: computed=${stats.computed} skipped=${stats.skipped} failed=${stats.failed}`,

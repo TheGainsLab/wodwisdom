@@ -55,6 +55,7 @@ import {
   recomputeBenchmarks,
   STALL_HALT_PASSES,
 } from "../_shared/engine/pipeline.ts";
+import { getDomainPack } from "../_shared/domain-packs/registry.ts";
 import {
   runStageWithLease,
   type ProgramJobRow,
@@ -66,6 +67,9 @@ import {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const FUNCTION_NAME = "generate-program-v3";
+// wodwisdom is the first Engine consumer; it pins the CrossFit pack. The Engine
+// core is sport-agnostic — the pack supplies all sport-coupled content.
+const PACK = getDomainPack("crossfit@3");
 
 /** Transition from surgical (or benchmark_audit) into safety_review: drop the
  *  surgical cursor, persist the final output + residual failures. */
@@ -178,7 +182,7 @@ async function stageSkeleton(
   // The skeleton consumes the TrainingDesignInput CONTRACT — the FIXED plan,
   // with decision-data stripped — never the raw payload. Allocate, don't reinterpret.
   const tdi = rs.trainingDesignInput!;
-  const skeleton = await generateSkeletonWithAudits(tdi);
+  const skeleton = await generateSkeletonWithAudits(tdi, PACK);
   console.log("[generate-program-v3] skeleton passed audits");
   return {
     next: "fill_week_1",
@@ -198,7 +202,7 @@ async function stageFillWeek(
   const payload = rs.payload!;
   const skeleton = rs.skeleton!;
   const priorWeeks = rs.weeks ?? [];
-  const wk = await callWeekFill(payload, skeleton, weekNum, priorWeeks, "");
+  const wk = await callWeekFill(payload, skeleton, weekNum, priorWeeks, "", PACK);
   const weeks = [...priorWeeks, wk];
   const next: Stage = weekNum < 4 ? (`fill_week_${weekNum + 1}` as Stage) : "benchmark_audit";
   return { next, resumeState: { ...rs, weeks }, displayStage: next };
@@ -216,9 +220,9 @@ async function stageBenchmarkAudit(
 
   // Full benchmark pass (every metcon — the rate-limit-prone one) in its own
   // invocation, then the first hard audit + any programmatic patches.
-  let pendingFailures = await recomputeBenchmarks(output, gender, []);
+  let pendingFailures = await recomputeBenchmarks(output, gender, [], PACK);
 
-  let auditResult = auditOutput(output, payload, skeleton);
+  let auditResult = auditOutput(output, payload, skeleton, PACK);
   console.log(`[generate-program-v3] audits: ${summarizeAuditRun(auditResult)}`);
   if (auditResult.passed) return { next: "safety_review", resumeState: toSafety(rs, output, []), displayStage: "safety_review" };
 
@@ -226,12 +230,12 @@ async function stageBenchmarkAudit(
 
   // Programmatic patches (no LLM call).
   if (byKind["programmatic-fix"].length > 0) {
-    const patch = applyProgrammaticFixes(output, byKind["programmatic-fix"], payload);
+    const patch = applyProgrammaticFixes(output, byKind["programmatic-fix"], payload, PACK);
     if (patch.patched > 0) {
       console.log(`[generate-program-v3] programmatic patches applied: ${patch.patched}`);
       for (const line of patch.log) console.log(`  - ${line}`);
-      pendingFailures = await recomputeBenchmarks(output, gender, pendingFailures, []);
-      auditResult = auditOutput(output, payload, skeleton);
+      pendingFailures = await recomputeBenchmarks(output, gender, pendingFailures, PACK, []);
+      auditResult = auditOutput(output, payload, skeleton, PACK);
       console.log(`[generate-program-v3] audits after patch: ${summarizeAuditRun(auditResult)}`);
       if (auditResult.passed) return { next: "safety_review", resumeState: toSafety(rs, output, []), displayStage: "safety_review" };
       byKind = classifyFailuresByKind(auditResult.failures);
@@ -271,7 +275,7 @@ async function stageSurgical(
   const pass = cursor.pass + 1;
 
   // Re-derive current failures (audits are pure + cheap — no LLM).
-  let auditResult = auditOutput(output, payload, skeleton);
+  let auditResult = auditOutput(output, payload, skeleton, PACK);
   if (auditResult.passed) return { next: "safety_review", resumeState: toSafety(rs, output, []), displayStage: "safety_review" };
   let byKind = classifyFailuresByKind(auditResult.failures);
   if (byKind["block-local"].length === 0) {
@@ -281,7 +285,7 @@ async function stageSurgical(
   // ONE surgical pass this invocation (fresh wall-clock). Each block ~30s,
   // sequential. A killed pass persists nothing → the reaper redoes it from the
   // last clean state.
-  const sg = await applySurgicalFixes(output, byKind["block-local"], payload, skeleton);
+  const sg = await applySurgicalFixes(output, byKind["block-local"], payload, skeleton, PACK);
   console.log(`[generate-program-v3] surgical pass ${pass}: rewritten=${sg.rewritten} failed=${sg.failed}`);
   if (sg.rewritten === 0) {
     // LLM call(s) failed — stall, ship with residuals.
@@ -289,19 +293,19 @@ async function stageSurgical(
     return { next: "safety_review", resumeState: toSafety(rs, output, auditResult.failures), displayStage: "safety_review" };
   }
 
-  pendingFailures = await recomputeBenchmarks(output, gender, pendingFailures, sg.locations);
-  auditResult = auditOutput(output, payload, skeleton);
+  pendingFailures = await recomputeBenchmarks(output, gender, pendingFailures, PACK, sg.locations);
+  auditResult = auditOutput(output, payload, skeleton, PACK);
   console.log(`[generate-program-v3] audits after surgical pass ${pass}: ${summarizeAuditRun(auditResult)}`);
   if (auditResult.passed) return { next: "safety_review", resumeState: toSafety(rs, output, []), displayStage: "safety_review" };
   byKind = classifyFailuresByKind(auditResult.failures);
 
   // Programmatic patches may resurface between passes.
   if (byKind["programmatic-fix"].length > 0) {
-    const patch2 = applyProgrammaticFixes(output, byKind["programmatic-fix"], payload);
+    const patch2 = applyProgrammaticFixes(output, byKind["programmatic-fix"], payload, PACK);
     if (patch2.patched > 0) {
       for (const line of patch2.log) console.log(`  - ${line}`);
-      pendingFailures = await recomputeBenchmarks(output, gender, pendingFailures, []);
-      auditResult = auditOutput(output, payload, skeleton);
+      pendingFailures = await recomputeBenchmarks(output, gender, pendingFailures, PACK, []);
+      auditResult = auditOutput(output, payload, skeleton, PACK);
       if (auditResult.passed) return { next: "safety_review", resumeState: toSafety(rs, output, []), displayStage: "safety_review" };
       byKind = classifyFailuresByKind(auditResult.failures);
     }
