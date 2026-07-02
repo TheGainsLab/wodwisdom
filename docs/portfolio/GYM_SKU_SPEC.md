@@ -82,7 +82,7 @@ personalization is each member's loads/scaling, not a different workout), and
 complete rosters mean complete data.
 
 **Billing consequence:** roster-based, not active-seat — **$149/mo base +
-$3/member/mo across the full roster** (proposed bands: $2.50 at 150+, $2.00 at
+$3/member/mo across the full roster** (decided; bands: $2.50 at 150+, $2.00 at
 250+). The per-head rate is half the opt-in seat because penetration is 100%
 and per-member COGS is low: scaling resolves `target_pct_1rm` against each
 member's numbers *deterministically* (arithmetic + the audit pipeline); AI
