@@ -63,17 +63,27 @@ export async function searchChunks(
   category: string,
   openaiApiKey: string,
   matchCount: number = 4,
-  matchThreshold: number = 0.25
+  matchThreshold: number = 0.25,
+  // Corpus scope (white-label): tenant ids whose private corpus to include
+  // ALONGSIDE the shared baseline. Omit/empty = baseline only. Only sent to the
+  // RPC when non-empty, so this stays compatible with the pre-tenant function
+  // signature until the corpus_tenant_scope migration is applied.
+  tenants?: string[]
 ): Promise<RAGChunk[]> {
   try {
     const embedding = await embedQuery(query, openaiApiKey);
 
-    const { data, error } = await supa.rpc("match_chunks_filtered", {
+    const rpcArgs: Record<string, unknown> = {
       query_embedding: embedding,
       match_threshold: matchThreshold,
       match_count: matchCount,
       filter_category: category,
-    });
+    };
+    if (tenants && tenants.length > 0) {
+      rpcArgs.filter_tenants = tenants;
+    }
+
+    const { data, error } = await supa.rpc("match_chunks_filtered", rpcArgs);
 
     if (error) {
       console.error("RAG search error:", error);

@@ -31,9 +31,10 @@ import {
   type CoachStateContent,
 } from "./coach-state.ts";
 import { persistCoachState } from "./persist-coach-state.ts";
+import { MODELS } from "./model-profiles.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-const MODEL = "claude-sonnet-4-6";
+const MODEL = MODELS.sonnet;
 
 interface ClaudeResponse {
   content?: Array<{ type?: string; name?: string; input?: unknown }>;

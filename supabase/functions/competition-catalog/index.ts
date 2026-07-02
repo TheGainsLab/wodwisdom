@@ -13,18 +13,18 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { ATHLETEDATA_PUBLIC_TIER } from "../_shared/feature-flags.ts";
+import { getCompetitionCatalog } from "../_shared/competition-catalog-cache.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const CATALOG_TIMEOUT_MS = 8_000;
 
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  const json = (body: unknown, status = 200) =>
+  const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
     new Response(JSON.stringify(body), {
       status,
-      headers: { ...cors, "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json", ...extra },
     });
 
   try {
@@ -47,36 +47,26 @@ Deno.serve(async (req) => {
       if (profile?.role !== "admin") return json({ error: "FORBIDDEN" }, 403);
     }
 
-    const baseUrl = Deno.env.get("COMPETITION_SERVICE_BASE_URL");
-    const serviceKey = Deno.env.get("COMPETITION_SERVICE_KEY");
-    if (!baseUrl || !serviceKey) {
-      console.error("[competition-catalog] missing COMPETITION_SERVICE_* env");
-      return json({ error: "SERVICE_UNAVAILABLE" }, 503);
-    }
-
-    const url = `${baseUrl.replace(/\/$/, "")}/workouts`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), CATALOG_TIMEOUT_MS);
-    try {
-      const resp = await fetch(url, {
-        method: "GET",
-        headers: { "X-Service-Key": serviceKey },
-        signal: controller.signal,
+    // Cached, deduped fetch of the near-static catalog. The catalog is the
+    // same for every user, so this collapses per-click traffic on the shared
+    // COMPETITION_SERVICE_KEY into ~1 upstream fetch per TTL window, serves a
+    // stale copy through upstream blips, and negative-caches failures (see
+    // _shared/competition-catalog-cache.ts).
+    const result = await getCompetitionCatalog();
+    if (result.payload !== null) {
+      // Cacheable per-user (auth-gated, near-static). Shorter max-age when the
+      // payload is stale so a client refreshes sooner once upstream recovers.
+      return json(result.payload, 200, {
+        "Cache-Control": result.stale ? "private, max-age=60" : "private, max-age=3600",
+        "X-Cache": result.stale ? "stale" : "hit",
       });
-      let payload: unknown;
-      try {
-        payload = await resp.json();
-      } catch {
-        return json({ error: "BAD_RESPONSE" }, 502);
-      }
-      return json(payload, resp.status);
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return json({ error: "TIMEOUT" }, 504);
-      console.error("[competition-catalog] fetch error:", (err as Error).message);
-      return json({ error: "SERVICE_UNAVAILABLE" }, 503);
-    } finally {
-      clearTimeout(timer);
     }
+    // Hard miss (failure, no stale copy). Pass the upstream status through so a
+    // 429 (rate-limited) is distinguishable from an outage and clients back off.
+    if (result.status === 429) {
+      return json({ error: "RATE_LIMITED" }, 429, { "Retry-After": "5" });
+    }
+    return json({ error: "SERVICE_UNAVAILABLE" }, result.status ?? 503);
   } catch (err) {
     console.error("[competition-catalog] unexpected error:", err);
     return json({ error: "INTERNAL" }, 500);
