@@ -20,6 +20,7 @@ import type {
 import type { surgicallyRewriteBlock, spliceBlock } from "../surgical-block-fix.ts";
 import type { clampLoadSanity } from "../programmatic-fixes.ts";
 import type { attachBenchmarksToWriterOutput } from "../compute-block-benchmark.ts";
+import type { reviewSafety } from "../safety-review.ts";
 
 export interface DomainPack {
   /** Versioned id, e.g. "crossfit@3". The contract's `domain_pack` value. */
@@ -53,5 +54,10 @@ export interface DomainPack {
     spliceBlock: typeof spliceBlock;
     clampLoadSanity: typeof clampLoadSanity;
     attachBenchmarks: typeof attachBenchmarksToWriterOutput;
+  };
+
+  /** Advisory safety review (LLM; injury-contraindication prompt is sport-coupled). */
+  safety: {
+    review: typeof reviewSafety;
   };
 }

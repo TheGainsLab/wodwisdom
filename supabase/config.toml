@@ -198,3 +198,8 @@ verify_jwt = false
 
 [functions.athlete-model-inspect]
 verify_jwt = false
+
+[functions.engine-generate]
+# Standalone Engine API entrypoint. Auth is our own X-Service-Key
+# (ENGINE_SERVICE_KEY); skip Supabase's JWT gate so it reaches our handler.
+verify_jwt = false

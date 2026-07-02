@@ -25,6 +25,7 @@ import {
 import { surgicallyRewriteBlock, spliceBlock } from "../../surgical-block-fix.ts";
 import { clampLoadSanity } from "../../programmatic-fixes.ts";
 import { attachBenchmarksToWriterOutput } from "../../compute-block-benchmark.ts";
+import { reviewSafety } from "../../safety-review.ts";
 
 export const CROSSFIT_PACK: DomainPack = {
   id: "crossfit@3",
@@ -49,5 +50,8 @@ export const CROSSFIT_PACK: DomainPack = {
     spliceBlock,
     clampLoadSanity,
     attachBenchmarks: attachBenchmarksToWriterOutput,
+  },
+  safety: {
+    review: reviewSafety,
   },
 };
