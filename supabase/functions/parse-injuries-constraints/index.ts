@@ -24,13 +24,14 @@
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { MODELS } from "../_shared/model-profiles.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-const MODEL = "claude-sonnet-4-6";
+const MODEL = MODELS.sonnet;
 
 const SYSTEM_PROMPT = `You are parsing a CrossFit athlete's stated injuries and movement constraints into a structured machine-readable form for downstream program generation.
 

@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { MODELS } from "../_shared/model-profiles.ts";
 
 const SUMMARY_PROMPT = `You are a concise fitness and coaching assistant. Summarize the following answer into 2-3 bullet points that capture the most important takeaways. Use plain language a coach can scan in seconds. Return ONLY the bullet points, nothing else. Format each bullet starting with "• ".`
 
@@ -84,7 +85,7 @@ Deno.serve(async (req) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: MODELS.sonnet,
         max_tokens: 300,
         system: SUMMARY_PROMPT,
         messages: [

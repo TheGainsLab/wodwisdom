@@ -24,6 +24,7 @@
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { MODELS } from "../_shared/model-profiles.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { buildWriterPayload, type WriterPayload } from "../_shared/build-writer-payload.ts";
@@ -35,7 +36,7 @@ import { reviewSafety, type SafetyReviewResult } from "../_shared/safety-review.
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-const MODEL = "claude-sonnet-4-6";
+const MODEL = MODELS.sonnet;
 const MAX_AUDIT_ATTEMPTS = 3;
 const MAX_SAFETY_ATTEMPTS = 3;
 

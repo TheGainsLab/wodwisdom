@@ -618,7 +618,10 @@ export function auditDayCount(
  * movement weights (DB snatch, KB swing, wall ball, etc.) are NOT
  * checked here (they have no 1RM column to compare against).
  */
-const DISPLAY_TO_LIFT_KEY: Record<string, string> = {
+// Exact display-name → canonical 1RM lift key. Exported so the domain pack can
+// hand it to the Engine's cohort scaler (single source of truth — the mirror in
+// programmatic-fixes.ts is still synced manually).
+export const DISPLAY_TO_LIFT_KEY: Record<string, string> = {
   "Back Squat": "back_squat",
   "Front Squat": "front_squat",
   "Overhead Squat": "overhead_squat",

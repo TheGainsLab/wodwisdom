@@ -2,6 +2,7 @@
 // Takes analysis JSON, returns 5–8 specific observations.
 
 import type { AnalysisOutput } from "./analyzer.ts";
+import { MODELS } from "./model-profiles.ts";
 
 const SYSTEM_PROMPT = `You are a CrossFit programming analyst reviewing a training program.
 Your job is to identify the 5-8 most notable patterns in the data.
@@ -48,7 +49,7 @@ export async function generateNoticesAI(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
+      model: MODELS.sonnet,
       max_tokens: 1024,
       stream: false,
       system: SYSTEM_PROMPT,

@@ -13,6 +13,7 @@
  */
 
 import { createClient, type SupabaseClient, type User } from "https://esm.sh/@supabase/supabase-js@2";
+import { MODELS } from "../_shared/model-profiles.ts";
 import { callClaude } from "../_shared/call-claude.ts";
 import { searchChunks, deduplicateChunks, formatChunksAsContext } from "../_shared/rag.ts";
 import { buildEmitBlockTool, type BlockPrescription, type MovementPrescription } from "../_shared/v2-output-schema.ts";
@@ -23,7 +24,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
-const MODEL = "claude-sonnet-4-6";
+const MODEL = MODELS.sonnet;
 
 interface ProfileData {
   lifts?: Record<string, number> | null;

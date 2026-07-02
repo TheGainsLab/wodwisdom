@@ -4,6 +4,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { MODELS } from "../_shared/model-profiles.ts";
 import {
   searchChunks,
   deduplicateChunks,
@@ -148,7 +149,7 @@ Generate modifications to incorporate the requested movements into this program.
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
+      model: MODELS.sonnet,
       max_tokens: 8192,
       stream: false,
       system: SYSTEM_PROMPT,

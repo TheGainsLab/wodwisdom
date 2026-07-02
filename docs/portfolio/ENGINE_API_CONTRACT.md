@@ -143,3 +143,26 @@ request fails only on auth / rate limit / malformed envelope.
 4. **Idempotency keys** on `/v1/generate` so a retried batch doesn't double-generate.
 5. **`include_baseline: false`** server implementation (pure white-label) — deferred until a
    tenant actually needs corpus isolation without the baseline.
+
+---
+
+## v1 implementation notes (Phase 1, 2026-07-02)
+
+What `engine-generate` + `_shared/engine/*` actually implement vs. the spec above
+(see ENGINE_PHASE1_REPORT.md for the full report):
+
+- **Each `AthleteInput` carries a `training_design_input`** (the coaching strategy),
+  not just `payload`. Coach-state → tdi is DB-coupled (reuse-cache + persist) and
+  stays surface-side; the Engine core is the Training-Design/execution layer and
+  starts at the skeleton. So the real athlete shape is
+  `{ athlete_ref, payload, training_design_input, continuation? }`, and cohort mode
+  takes `{ shared_payload, shared_training_design_input }`.
+- **Synchronous, not 202 + jobs.** `POST engine-generate` runs the pipeline inline and
+  returns `EngineGenerateResult`. The async job model + `GET /v1/jobs` are Phase 4;
+  wodwisdom's heavy resumable path stays in `generate-program-v3`'s dispatcher.
+- **Auth is a single `ENGINE_SERVICE_KEY`** (server-to-server), not per-consumer keys.
+- **`corpus_scope` + `model_profile` are accepted but not threaded** — RAG scoping
+  happens at surface-side payload build (`buildRagContext(corpusTenants)` from the
+  Phase-1 corpus migration); the pipeline uses the default model profile. Reserved.
+- **Cohort `ScalingResult` is deterministic + persisted** to `engine_member_scaling`;
+  `needs_substitution` flags the AI-adaptation path (not resolved in v1).
