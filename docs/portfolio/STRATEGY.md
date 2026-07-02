@@ -135,6 +135,21 @@ owner's hours — the ceiling is their calendar.** Our tools are the opposite
 shape: **revenue and retention that grow without consuming the owner's time,
 and (via remote members) without adding a square foot.**
 
+**The deeper wound (the pitch's emotional core):** an affiliate's entire
+premium over a globo gym is *"somebody here knows you."* Outsourced
+programming (HWPO/Mayhem/CompTrain subscriptions) quietly hollowed that out —
+the owner has warm conversations about members' lives but **zero transparency
+into the thing members actually pay for**: how their fitness is going. It's
+nobody's fault; the owner has no instrumentation. Leaderboards are snapshots —
+"good job on toes-to-bar, Steve" feels good for a day and retains no one.
+We destroy that paradigm in three moves: **control back** (tell the AI how you
+want your gym to run; it rebuilds your programming in your voice),
+**individualization** (every member gets their version), and **transparency**
+(the individualizations and the feedback loop are surfaced TO THE OWNER —
+per-member trajectories, stalls, quiet-member signals, coaching moments).
+The AI doesn't replace the coach relationship; it **re-arms it** — the echo of
+the ClassPass line in §6: personalization that scales the relationship itself.
+
 The product ladder (each rung an upsell on the same engine; full service
 definitions in `GYM_SKU_SPEC.md`; pricing decided — see D8/D9):
 

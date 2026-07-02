@@ -105,8 +105,9 @@ premise).
 | Methodology intake B — "find your voice": guided interview for gyms that have been outsourcing | BUILD |
 | Monthly gym program generation: owner sets goals/focus → audited pipeline writes the month | ADAPT (generation pipeline EXISTS; gym-level archetypes/cohort output is Phase 1+) |
 | Intent-steering review surface: approve / regenerate-with-a-note (never QA tooling) | BUILD (thin; pattern exists in admin grading tools) |
-| Whiteboard/calendar output the gym can publish (portal view + export; shallow integrations to gym software later, if ever) | BUILD |
+| Floor distribution on owned surfaces: member PWA (their version), TV mode (Rx), coach day sheet in the portal — no exports (see Question 4) | BUILD |
 | Deterministic audit + safety review on everything generated (the moat, applied under the gym's brand) | EXISTS |
+| **Member intelligence feed — the retention surface and the paradigm-breaker:** per-member trajectories (not snapshots), PRs as they happen, stall detection, quiet-member alerts before they become cancellations, and per-member coaching talking points the coach can deliver humanly. This is the owner's transparency into the thing members actually pay for. | BUILD (the flywheel surface; data exists the moment the loop runs — athlete-model/analyzer foundations EXIST in retail) |
 
 **Prerequisite chain:** this SKU consumes the Engine API (Phase 1) + methodology
 intake (Phase 2 scoping). It is the second-generation offer; Engine Class and
