@@ -108,7 +108,38 @@ export async function runAdaptiveProgram(
     }
   }
 
-  // 4. Advisory safety review (never regenerates).
+  // 4. Save-path sanitizers — mirror generate-program-v3's finish step so the
+  //    output the caller persists is identical to what v3 would store. Strip
+  //    internal Track/week/deload markers surgical may have leaked, then drop
+  //    redundant labels on coached blocks. Always-run, deterministic, idempotent.
+  const stripped = pack.finish.stripInternalMarkers(output);
+  if (stripped.patched > 0) {
+    console.log(`[engine] stripped ${stripped.patched} internal marker(s) from labels/schemes`);
+  }
+  const labelFix = pack.finish.enforceNoLabelOnCoachedBlocks(output);
+  if (labelFix.patched > 0) {
+    console.log(`[engine] dropped ${labelFix.patched} redundant block_label(s) from coached blocks`);
+  }
+
+  // 5. Soft audits — log-only safety net (never blocks). Same check v3 runs post-save.
+  try {
+    const soft = pack.audits.runSoft({
+      output,
+      daysPerWeek: payload.training_context.days_per_week,
+      lifts: payload.lifts,
+      vocabulary: payload.vocabulary,
+    });
+    if (!soft.passed) {
+      for (const failure of soft.failures) {
+        console.warn(`[engine] SOFT AUDIT FAIL [${failure.rule}]:`);
+        for (const v of failure.violations) console.warn(`  - ${v}`);
+      }
+    }
+  } catch (softErr) {
+    console.warn("[engine] soft audit error (non-fatal):", softErr);
+  }
+
+  // 6. Advisory safety review (never regenerates).
   const safety = await pack.safety.review(
     output,
     payload.training_context.goal_text,
@@ -145,7 +176,7 @@ export async function runEngineGeneration(
     );
     // Deterministic per-member scaling — no LLM.
     const scalings: ScalingResult[] = req.athletes.map((a) =>
-      computeCohortScaling(shared.output, a)
+      computeCohortScaling(shared.output, a, pack)
     );
     return {
       mode: "cohort",

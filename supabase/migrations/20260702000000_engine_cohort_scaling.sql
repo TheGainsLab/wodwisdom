@@ -61,10 +61,28 @@ COMMENT ON TABLE public.engine_member_scaling IS
   'the F10 member intelligence feed. Deterministic scaling core; needs_substitution '
   'flags the only AI-touched movements.';
 
--- Lock down: Engine-owned, service-role only.
+-- Lock down: Engine-owned, service-role only by default.
 ALTER TABLE public.engine_cohort_programs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.engine_member_scaling  ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.engine_cohort_programs FROM anon, authenticated;
 REVOKE ALL ON public.engine_member_scaling  FROM anon, authenticated;
+
+-- Access decision (committed now, not deferred):
+--
+--  * engine_cohort_programs — stays service-role only. The shared program body is
+--    the gym's programming, not a member-facing artifact; members read only their
+--    own resolved scaling, never the shared path. No authenticated grant.
+--
+--  * engine_member_scaling — a signed-in athlete MAY read their OWN scaling row.
+--    `athlete_ref` IS the wodwisdom auth user id (the F10 join key to workout_logs),
+--    so own-rows == athlete_ref = auth.uid()::text. Writes stay service-role
+--    (engine-generate); no INSERT/UPDATE/DELETE policy is granted to authenticated.
+GRANT SELECT ON public.engine_member_scaling TO authenticated;
+DROP POLICY IF EXISTS engine_member_scaling_own_read ON public.engine_member_scaling;
+CREATE POLICY engine_member_scaling_own_read
+  ON public.engine_member_scaling
+  FOR SELECT
+  TO authenticated
+  USING (athlete_ref = auth.uid()::text);
 
 COMMIT;

@@ -23,9 +23,14 @@ import {
   summarizeSkeletonAuditRun,
 } from "../../v3-skeleton-audits.ts";
 import { surgicallyRewriteBlock, spliceBlock } from "../../surgical-block-fix.ts";
-import { clampLoadSanity } from "../../programmatic-fixes.ts";
+import {
+  clampLoadSanity,
+  stripInternalMarkers,
+  enforceNoLabelOnCoachedBlocks,
+} from "../../programmatic-fixes.ts";
 import { attachBenchmarksToWriterOutput } from "../../compute-block-benchmark.ts";
 import { reviewSafety } from "../../safety-review.ts";
+import { DISPLAY_TO_LIFT_KEY } from "../../audits.ts";
 
 export const CROSSFIT_PACK: DomainPack = {
   id: "crossfit@3",
@@ -53,5 +58,16 @@ export const CROSSFIT_PACK: DomainPack = {
   },
   safety: {
     review: reviewSafety,
+  },
+  finish: {
+    stripInternalMarkers,
+    enforceNoLabelOnCoachedBlocks,
+  },
+  scaling: {
+    // Exact display-name → 1RM lift key (the audit's canonical map). Movements
+    // not in this map get no basis_lift — never a substring-guessed wrong lift.
+    displayToLiftKey: DISPLAY_TO_LIFT_KEY,
+    // Barbell plate math: 2.5 kg / 5 lb rounding.
+    loadIncrement: (unit) => (unit === "kg" ? 2.5 : 5),
   },
 };

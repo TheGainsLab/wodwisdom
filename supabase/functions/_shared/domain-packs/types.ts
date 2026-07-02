@@ -18,7 +18,11 @@ import type {
   summarizeSkeletonAuditRun,
 } from "../v3-skeleton-audits.ts";
 import type { surgicallyRewriteBlock, spliceBlock } from "../surgical-block-fix.ts";
-import type { clampLoadSanity } from "../programmatic-fixes.ts";
+import type {
+  clampLoadSanity,
+  stripInternalMarkers,
+  enforceNoLabelOnCoachedBlocks,
+} from "../programmatic-fixes.ts";
 import type { attachBenchmarksToWriterOutput } from "../compute-block-benchmark.ts";
 import type { reviewSafety } from "../safety-review.ts";
 
@@ -59,5 +63,26 @@ export interface DomainPack {
   /** Advisory safety review (LLM; injury-contraindication prompt is sport-coupled). */
   safety: {
     review: typeof reviewSafety;
+  };
+
+  /** Always-run save-path sanitizers (the internal-marker + label vocab is
+   *  sport-coupled). The Engine runs these on every generated program before it
+   *  is persisted — identical to generate-program-v3's finish step. */
+  finish: {
+    stripInternalMarkers: typeof stripInternalMarkers;
+    enforceNoLabelOnCoachedBlocks: typeof enforceNoLabelOnCoachedBlocks;
+  };
+
+  /** Cohort scaling primitives — sport-coupled (barbell 1RM basis + plate math).
+   *  Keeps the Engine core free of any sport movement/load knowledge (no runtime
+   *  sport import). A different sport supplies its own map + increments. */
+  scaling: {
+    /** Exact display-name → canonical 1RM lift key. NO fuzzy/substring matching:
+     *  an unmapped movement resolves to no basis (never a wrong-lift guess that
+     *  could prescribe a dangerous overload). */
+    displayToLiftKey: Record<string, string>;
+    /** Load-rounding increment for a unit (barbell plate math; not barbell-only
+     *  assumed at the core — the pack owns it). */
+    loadIncrement: (unit: "lbs" | "kg") => number;
   };
 }

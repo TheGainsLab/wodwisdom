@@ -90,6 +90,31 @@ two hardest — the coaching-strategy layer and benchmark data — are *outside*
 current pack boundary. The extraction is real but incomplete for "new sport = pure
 content"; extending the pack to the coaching-strategy layer is the priority follow-up.
 
+### Pack-seam holes (Engine core still sport-coupled)
+
+Beyond the seven above, the Engine *core* still hardcodes CrossFit content that a
+Hyrox pack could not override without touching core files. Tracked for the seam
+follow-up (see the follow-up issue):
+
+- **`ruleRecap` strings** — the skeleton + week-fill user messages (`pipeline.ts`)
+  embed CrossFit programming-rule recaps inline. Hyrox needs different rules; these
+  belong in the pack (e.g. `writer.ruleRecap`), not the core message builder.
+- **Hardcoded `emit_skeleton` / `emit_week` tool names** — `pipeline.ts` names the
+  tools and matches the `tool_use` block by literal name. The pack supplies the tool
+  *schema* but not its *name*; a pack with differently-named tools breaks. Move the
+  tool name onto the pack alongside `buildSkeletonTool` / `buildWeekTool`.
+- **Slim cohort member shape** — cohort scaling only reads `lifts`, `basics`, and
+  `injuries_structured.do_not_program`, but `AthleteInput` carries the full
+  `WriterPayload` + `TrainingDesignInput` per roster member. A slim `CohortMemberInput`
+  would shrink the F7 request and clarify the contract.
+- **Recovery-loop drift** — `run-engine.ts` re-implements v3's recovery-loop *policy*
+  (already subtly diverged). Extract one shared loop so the standalone Engine and the
+  wodwisdom dispatcher can't drift.
+
+*Closed by the cohort-correctness fix (PR #547):* the `ALL_LIFT_KEYS` runtime sport
+import and the hardcoded plate increments are now pack content (`scaling.displayToLiftKey`
+/ `scaling.loadIncrement`); the cohort scaler imports no sport module.
+
 ---
 
 ## (b) Portal Phase-1 dependency coverage

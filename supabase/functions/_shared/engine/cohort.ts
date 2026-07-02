@@ -10,51 +10,37 @@
  */
 
 import type { WriterOutput } from "../v2-output-schema.ts";
-import { ALL_LIFT_KEYS } from "../tier-status.ts";
+import { normalizeGender } from "../athlete-model.ts";
+import type { DomainPack } from "../domain-packs/types.ts";
 import type { AthleteInput, ScaledMovement, ScalingResult } from "./contract.ts";
-
-/** Normalize a movement / lift name to a canonical-ish key for matching. */
-function normalize(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
-
-// Lift keys longest-first so "clean_and_jerk" wins over "clean" on a substring match.
-const LIFT_KEYS_BY_LEN = [...ALL_LIFT_KEYS].sort((a, b) => b.length - a.length);
-
-/** Resolve which member 1RM a movement scales against. Exact normalized match
- *  first, then the longest lift key that appears as a token substring. */
-function resolveBasisLift(movement: string): string | null {
-  const n = normalize(movement);
-  if ((ALL_LIFT_KEYS as readonly string[]).includes(n)) return n;
-  for (const key of LIFT_KEYS_BY_LEN) {
-    if (n === key || n.includes(key)) return key;
-  }
-  return null;
-}
-
-function roundToIncrement(weight: number, unit: "lbs" | "kg"): number {
-  const inc = unit === "kg" ? 2.5 : 5;
-  return Math.round(weight / inc) * inc;
-}
 
 /**
  * Scale the shared cohort program to one member. Deterministic; no LLM.
  * Movements with a target_pct_1rm and a resolvable member 1RM get an exact
  * resolved_weight; movements in the member's do_not_program are flagged
  * needs_substitution (the only AI-touched path, run separately).
+ *
+ * The 1RM basis and load increments come from the domain pack (sport-coupled) —
+ * the Engine core stays movement-agnostic. Basis matching is EXACT (the pack's
+ * display-name → lift-key map): an unmapped movement gets no basis and no
+ * resolved_weight, never a substring-guessed wrong lift that could overload a
+ * member. do_not_program matching mirrors the v3 auditDoNotProgram rule exactly
+ * (canonical name, trim + lowercase, whole-string equality).
  */
 export function computeCohortScaling(
   shared: WriterOutput,
   athlete: AthleteInput,
+  pack: DomainPack,
 ): ScalingResult {
   const lifts = athlete.payload.lifts ?? {};
   const unit: "lbs" | "kg" = athlete.payload.basics.units ?? "lbs";
-  const doNotProgram = (athlete.payload.training_context.injuries_structured?.do_not_program ?? [])
-    .map(normalize);
+  const displayToLiftKey = pack.scaling.displayToLiftKey;
+  const inc = pack.scaling.loadIncrement(unit);
+  const banned = new Set(
+    (athlete.payload.training_context.injuries_structured?.do_not_program ?? [])
+      .map((m) => m.trim().toLowerCase())
+      .filter(Boolean),
+  );
   const gender = athlete.payload.basics.gender ?? null;
 
   const scaled: ScaledMovement[] = [];
@@ -70,14 +56,14 @@ export function computeCohortScaling(
           const mv = movements[movementIdx];
           const pct = typeof mv.target_pct_1rm === "number" ? mv.target_pct_1rm : null;
 
-          const basis = pct != null ? resolveBasisLift(mv.movement) : null;
+          // Exact display-name match only — no substring guessing.
+          const basis = pct != null ? (displayToLiftKey[mv.movement] ?? null) : null;
           const oneRm = basis != null ? lifts[basis] : null;
           const resolvedWeight = pct != null && typeof oneRm === "number" && oneRm > 0
-            ? roundToIncrement((pct / 100) * oneRm, unit)
+            ? Math.round(((pct / 100) * oneRm) / inc) * inc
             : null;
 
-          const n = normalize(mv.movement);
-          const needsSub = doNotProgram.some((d) => d.length > 0 && (n === d || n.includes(d) || d.includes(n)));
+          const needsSub = banned.has(mv.movement.trim().toLowerCase());
           if (needsSub) substitutionsPending++;
 
           scaled.push({
@@ -104,7 +90,8 @@ export function computeCohortScaling(
     scaled_movements: scaled,
     substitutions_pending: substitutionsPending,
     // v1 leaderboard grouping is gender + modality; modality is per-workout (set at
-    // leaderboard time), so the member-level tier here is gender only.
-    tier: gender,
+    // leaderboard time), so the member-level tier here is gender only. Normalized
+    // ("men"/"women") so "male"/"Men"/"M" don't split a leaderboard bucket.
+    tier: normalizeGender(gender),
   };
 }
