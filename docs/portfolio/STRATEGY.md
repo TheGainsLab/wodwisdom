@@ -127,26 +127,63 @@ infrastructure company — multiple revenue lines, one flywheel** — rather tha
 
 ## 5. The gym channel: revenue per square foot
 
-The pitch to a gym owner is economic, not technological: **rent rises every
-year; your only levers so far are raising prices or inventing services members
-don't value. These tools raise revenue without adding a square foot.**
+The pitch to a gym owner is economic, not technological — and it names the
+trap the industry keeps selling them into. Every standard answer to a
+struggling gym (raise prices, run more personal-training sessions, add
+nutrition coaching, do semi-private training) **scales linearly with the
+owner's hours — the ceiling is their calendar.** Our tools are the opposite
+shape: **revenue and retention that grow without consuming the owner's time,
+and (via remote members) without adding a square foot.**
 
-The product ladder (each rung an upsell on the same engine):
+**The deeper wound (the pitch's emotional core):** an affiliate's entire
+premium over a globo gym is *"somebody here knows you."* Outsourced
+programming (HWPO/Mayhem/CompTrain subscriptions) quietly hollowed that out —
+the owner has warm conversations about members' lives but **zero transparency
+into the thing members actually pay for**: how their fitness is going. It's
+nobody's fault; the owner has no instrumentation. Leaderboards are snapshots —
+"good job on toes-to-bar, Steve" feels good for a day and retains no one.
+We destroy that paradigm in three moves: **control back** (tell the AI how you
+want your gym to run; it rebuilds your programming in your voice),
+**individualization** (every member gets their version), and **transparency**
+(the individualizations and the feedback loop are surfaced TO THE OWNER —
+per-member trajectories, stalls, quiet-member signals, coaching moments).
+The AI doesn't replace the coach relationship; it **re-arms it** — the echo of
+the ClassPass line in §6: personalization that scales the relationship itself.
 
-1. **Analytics wedge** — low-cost entry (~$49/mo), gets the relationship.
-2. **AI gym programmer** — "design next month's programming: your goals, your
-   focus, your style." Onboarding: *upload your last three months of
-   programming and the AI learns how you run your gym* (consented,
-   first-party — this is the AI Replicate mechanism pointed at the customer's
-   own data). To the owner it is two buttons: *generate* and *personalize*.
-3. **Per-member personalization + enriched intake** — every member gets their
-   scaled version; the intake module doubles as the gym's
-   know-your-customer layer.
-4. **Engine classes / cohort mode / revenue splits** — the gym sells a
-   dedicated Engine class (or other Engine products) inside the gym and keeps
-   a cut. Channel-partner mechanics.
-5. **Remote memberships** — revenue with zero floor space; the denominator
-   disappears.
+The product ladder (each rung an upsell on the same engine; full service
+definitions in `GYM_SKU_SPEC.md`; pricing decided — see D8/D9):
+
+There are **two front doors**, then the ladder:
+
+1a. **Engine Class** (standalone, $6/active seat/mo, $0 setup, 10-seat minimum
+   from launch) — "add a cardio class your members do whenever they want":
+   cohort-mode Engine + gym leaderboard + member logging. A *new resellable
+   service* for the gym, sellable to any gym with zero dependencies — likely
+   the higher-converting wedge.
+1b. **Analytics wedge** ($49/mo flat) — the dashboard, for data-curious owners.
+2. **AI gym programmer** ($149/mo base + $3/member/mo roster-wide, includes
+   analytics) — "design next month's programming: your goals, your focus,
+   your style." Onboarding: *upload your last three months of programming and
+   the AI learns how you run your gym* (consented, first-party — the AI
+   Replicate mechanism pointed at the customer's own data). To the owner it
+   is two buttons: *generate* and *personalize*. **All-or-nothing: every
+   member gets the personalized version** (one system on the class floor;
+   shared workout, individual loads). This is a *switch sale* — it displaces
+   the gym's programming subscription and publishing habit — de-risked by
+   shadow-mode trials. Distribution is owned-surfaces-only (member PWA, TV
+   mode, portal): the block format is the learning loop and does not export.
+3. **Member AI Seat** ($6/active member/mo; $5 at 100+, $4 at 200+) — the
+   opt-in seat for opt-in products (Engine Class participants); enriched
+   intake rides with it. Whole-gym products bill the roster instead.
+4. **Remote memberships** ($30/mo wholesale; gym retails at ≥ the retail
+   price floor) — revenue with zero floor space; the denominator disappears.
+
+**Channel mechanics: per-seat wholesale, not revenue share.** The gym buys
+seats at wholesale and prices its members freely (we provide suggested-retail
+guidance and margin math, never enforcement — except the remote-membership
+retail floor, which protects our own retail product). Billing follows *active*
+seats, never roster size — flat entry regardless of gym size is the answer to
+"there is no target gym": who activates seats tells us the market.
 
 **Displacement target:** not gym-management software — the **affiliate
 programming subscription** (Mayhem/HWPO/CompTrain-style, ~$100–300/mo, or
@@ -322,6 +359,6 @@ revenue line.
 | D5 | Competition History = free for all authenticated users | **Decided & shipped** — founder decision predates this doc; remaining work is H2 (catalog caching) + H1 (per-key rate limits) + dead-code cleanup (`hasAthleteDataAccess`) |
 | D6 | Sport #2 = Hyrox | **Recommended** |
 | D7 | Direct-to-gym AI programmer prioritized over brand white-label | **Decided** (innovator's-dilemma logic, §6.3) |
-| D8 | Gym-channel pricing (wedge price, seat pricing, revenue-split %) | **Open** |
-| D9 | Remote-membership packaging vs. retail (floor, differentiation) | **Open** |
+| D8 | Gym-channel pricing: Engine Class standalone $6/active seat ($0 setup, 10-seat min from launch); Analytics $49/mo; AI Gym Programmer $149/mo incl. analytics; Member AI Seat $6/$5/$4 by volume; per-seat wholesale (no rev-share), active-seat billing, founding-partner pilots ~50% off 6 mo for data consent + case study | **Decided 2026-07** — service definitions in `GYM_SKU_SPEC.md` |
+| D9 | Remote membership: $30/mo wholesale, gym retails at ≥ retail floor ($50/mo, $120/qtr); differentiation additive (coach relationship, gym leaderboard, community); profile portable both directions | **Decided 2026-07** |
 | D10 | Engine API commercial terms for design partners | **Open** (Phase 4) |
