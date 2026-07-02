@@ -76,4 +76,15 @@ CREATE TRIGGER freeze_writes
   BEFORE INSERT OR UPDATE OR DELETE ON public.gym_members
   FOR EACH ROW EXECUTE FUNCTION public.reject_frozen_gym_write();
 
+-- TRUNCATE bypasses row-level triggers, so cover it with statement-level ones.
+DROP TRIGGER IF EXISTS freeze_truncate ON public.gyms;
+CREATE TRIGGER freeze_truncate
+  BEFORE TRUNCATE ON public.gyms
+  FOR EACH STATEMENT EXECUTE FUNCTION public.reject_frozen_gym_write();
+
+DROP TRIGGER IF EXISTS freeze_truncate ON public.gym_members;
+CREATE TRIGGER freeze_truncate
+  BEFORE TRUNCATE ON public.gym_members
+  FOR EACH STATEMENT EXECUTE FUNCTION public.reject_frozen_gym_write();
+
 COMMIT;

@@ -50,6 +50,7 @@ BEGIN
     SELECT oid::regprocedure AS sig
     FROM pg_proc
     WHERE proname IN ('match_chunks_filtered', 'match_chunks_multi')
+      AND pronamespace = 'public'::regnamespace
   LOOP
     EXECUTE 'DROP FUNCTION ' || r.sig::text;
   END LOOP;

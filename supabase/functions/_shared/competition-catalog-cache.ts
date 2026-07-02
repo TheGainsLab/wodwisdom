@@ -115,8 +115,11 @@ async function doFetch(): Promise<FetchOutcome> {
     try {
       payload = await resp.json();
     } catch {
+      // resp.ok was true here, so resp.status is 200 — but the body is garbage.
+      // Report 502 (bad upstream response), NOT 200, so the handler doesn't
+      // return HTTP 200 with an error body that clients treat as a real catalog.
       console.warn("[competition-catalog-cache] response not valid JSON");
-      return { ok: false, status: resp.status };
+      return { ok: false, status: 502 };
     }
 
     cache = { payload, expiresAt: Date.now() + CATALOG_TTL_MS };
