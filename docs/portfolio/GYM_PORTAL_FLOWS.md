@@ -149,6 +149,21 @@ with remote badge → coach sees their training like any member's.
 
 ## Cross-cutting
 
+- **ONE PROFILE (decided 2026-07, founder call).** Athlete attributes — body
+  metrics, lifts/1RMs, gender, units, injuries, preferences — have exactly one
+  home: wodwisdom `athlete_profiles`. Every channel surface (gym intake,
+  leaderboards, remote members, the intelligence feed) READS it and, where it
+  collects data, WRITES THROUGH to it (fill gaps freely; update populated
+  fields only on explicit user edit). No channel-local copies of athlete
+  attributes. F3's intake is a thin front door to the profile, not a store.
+  Corollaries: (a) F4's W·kg normalization sources bodyweight from the profile
+  at read time; (b) *relationship* records (links, consents, seats) are
+  legitimately channel-scoped — this rule is about attributes; (c) any
+  necessary cross-project copy (e.g. the affiliate roster's member name/email)
+  is a CACHE of the profile — it needs a staleness story and a
+  deletion-propagation story (GDPR), and may never become a second write
+  target.
+
 - **Roles:** OWNER (all), COACH (floor surfaces, leaderboard moderation,
   intelligence feed; no billing/config). Invite via email.
 - **Tenancy:** everything keyed to the gym (affiliate's existing
