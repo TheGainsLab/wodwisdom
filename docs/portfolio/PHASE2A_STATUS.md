@@ -1,0 +1,75 @@
+# Phase 2a — Status Board (SINGLE SOURCE OF TRUTH)
+
+> **Protocol for both teams:** at the START of every session, `git pull origin
+> main` on wodwisdom and READ this file. At the END of every session, update
+> your section and push it (docs-only commit to main is fine). Decisions made
+> in founder chat or PR comments get recorded HERE within the same session —
+> if it isn't on this board, it isn't decided. Founder + reviewer (the
+> strategy session) arbitrates conflicts.
+>
+> Last updated: 2026-07-03 (reviewer session — initial sync point).
+
+## Decisions in force (recorded since the last doc merge)
+
+1. **ONE PROFILE** (GYM_PORTAL_FLOWS Cross-cutting): athlete attributes live
+   only in wodwisdom `athlete_profiles`; every surface reads it and writes
+   through to it. Applies to F3 intake (write-through + 2–3 optional key
+   lifts) and #551's roster builder (source from profile, not `engine_intake`).
+2. **Consent seam: the ASSERTION design is accepted** (supersedes the earlier
+   preflight idea). Enroll-first resolves gym_id; the enroll call carries a
+   `consent_version` assertion; affiliate persists it and GATES ACTIVATION on
+   it; wodwisdom records the consent row checked + gym-attributed + deduped
+   after enroll. The enroll contract (request/response incl. consent_version,
+   re-enroll semantics = returns existing seat unchanged, ENGINE_ENROLL_KEY
+   rotation procedure) must be documented in GYM_PORTAL_FLOWS F3 as part of
+   the #550 fix round.
+3. **Merge order: wodwisdom #550 → affiliate #5 → wodwisdom #551.** F5 starts
+   only after all three merge.
+4. **Repo ownership** (unchanged): wodwisdom team writes only wodwisdom;
+   affiliate team writes only affiliate; reviews cross teams; the reviewer
+   never pushes fixes to a branch it reviewed. Cross-repo PRs #5/#550 are
+   grandfathered to the wodwisdom team for fixes.
+5. **"Done" means PUSHED.** A fix round is complete when the commit is on
+   GitHub and this board is updated — not when it exists locally.
+
+## State (2026-07-03)
+
+**Merged & deployed:** Engine Phase 1 (#547) · Grants API (#549) + its
+migration/secrets/functions · retail verified · all portfolio docs current on
+main. **Affiliate merged, NOT deployed (batched):** F1 (#2), F2 (#3).
+
+| Item | State | Blocker |
+|---|---|---|
+| wodwisdom **#550** (F3 join) | Reviewed (2🔴+4🟠). Fix round WRITTEN LOCALLY, **NOT PUSHED** | Push it; fold Decision 2 contract-doc + confirm which ONE PROFILE items land here vs #551 round |
+| affiliate **#5** (enroll) | Reviewed (9 findings, report-only) | Wodwisdom team fixes after #550 push: TOCTOU, PII null-clobber, digest verifier, assertion persist+gate (Decision 2), PII-cache staleness + GDPR deletion-propagation |
+| wodwisdom **#551** (cohort wiring) | Reviewed (2🔴+4🟠). Fixes not started | After #550: swallowed-error trio, claim-first+auth on cron, poison-gym backoff, **roster → athlete_profiles (Decision 1)**, rag context, strategy-table→pack (or file to #548), continuity documented |
+| affiliate **#6** (F9 billing) | Built, checks clean | Awaiting CROSS-TEAM review by wodwisdom team (after its fix rounds) |
+| affiliate #5 base retarget + branch cleanup | Pending | Affiliate team: retarget #5 to main; delete merged f1/f2 branches |
+
+## Next action per actor (in order)
+
+**Wodwisdom team:** (1) PUSH the #550 fix commit. (2) Add the Decision-2
+contract section to GYM_PORTAL_FLOWS F3 + state which ONE PROFILE items are in
+this round vs the #551 round. (3) Fix affiliate #5 findings (incl. Decision 2
+affiliate half). (4) Fix #551 (incl. Decision 1 roster change). (5) Review
+affiliate #6. Then F5 + F4-PWA/TV + launch kit.
+
+**Affiliate team:** (1) Retarget #5 to main; delete merged branches. (2)
+Confirm the ONE PROFILE cache findings (name/email staleness + GDPR
+deletion-propagation) are in the #5 review — append if missing. (3) Build
+F4-moderation (flow spec F4). (4) Stand by for #6 review feedback.
+
+**Founder:** relay = one line per team: *"Pull wodwisdom main, read
+docs/portfolio/PHASE2A_STATUS.md, execute your section, update the board when
+done."* Deploys stay batched with you (nothing new to deploy until the fix
+rounds merge). Parallel track: lawyer packet + pilot list.
+
+**Reviewer session:** re-verify #550 on push → merge chain per Decision 3 →
+review #6 findings cross-check → F4/F5 briefs → acceptance-demo checklist.
+
+## Remaining to close Phase 2a (after the table above clears)
+
+F5 read-only view (wodwisdom) · F4 leaderboard+TV (wodwisdom) +
+F4-moderation (affiliate) · launch kit content · combined affiliate deploy
+(F1+F2+F3+F9 migrations/functions/secrets incl. WHOLESALE_CONSUMER_KEYS +
+ENGINE_ENROLL_KEY) · the end-to-end acceptance demo (GYM_PORTAL_FLOWS bottom).
