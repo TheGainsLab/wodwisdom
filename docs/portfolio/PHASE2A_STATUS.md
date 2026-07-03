@@ -9,6 +9,18 @@
 >
 > Last updated: 2026-07-03 (affiliate team — **affiliate #5 re-verified + MERGED** (`bb91848`) at founder instruction: 9 findings + C1/C2 confirmed in code, deferrals tracked as issues #8/#9/#10. Decision-3 chain #550✅→#5✅→#551 now unblocks **wodwisdom #551**. Also: #5 retarget + f1/f2 cleanup done; F4-moderation → affiliate **PR #7**, which now also carries the consent-gated "awaiting consent — resend invite" roster state (board follow-up (b) from the #5 fix)).
 
+## Workspace conventions (Decision 6, 2026-07-03)
+
+All repos live under one parent folder (`gainslab/`). Rules:
+(a) each team session LAUNCHES FROM ITS OWN REPO folder — session cwd = the
+one repo it may write (Decision 4 as geography); (b) cross-repo READS go via
+sibling paths (e.g. `../wodwisdom/docs/portfolio/`); docs-only board updates
+to wodwisdom main remain allowed for both teams; (c) two agents in one repo →
+each in its OWN git worktree, always — the clone's checked-out branch belongs
+to nobody; (d) parent-folder sessions are reserved for one-off cross-repo
+supervision, never a team's daily driver; (e) EVERY session report starts
+with its team tag: `[wodwisdom]` or `[affiliate]`.
+
 ## Decisions in force (recorded since the last doc merge)
 
 1. **ONE PROFILE** (GYM_PORTAL_FLOWS Cross-cutting): athlete attributes live
