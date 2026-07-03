@@ -7,7 +7,7 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-03 (affiliate team — **affiliate #5 re-verified + MERGED** (`bb91848`) at founder instruction: 9 findings + C1/C2 confirmed in code, deferrals tracked as issues #8/#9/#10. Decision-3 chain #550✅→#5✅→#551 now unblocks **wodwisdom #551**. Also: #5 retarget + f1/f2 cleanup done; F4-moderation → affiliate **PR #7**, which now also carries the consent-gated "awaiting consent — resend invite" roster state (board follow-up (b) from the #5 fix)).
+> Last updated: 2026-07-03 (wodwisdom team — **#551 fix round PUSHED** (`e66ef8c` on `claude/cohort-wiring`) → re-verification requested; merged main in first so the #550 schema dep is satisfied. All 2🔴+4🟠+2🟡 addressed (see #551 row). **Cross-reviewed affiliate #6 + #7** and posted findings: #6 has a 🔴 (founding 50% coupon computed but never applied to Stripe → 2× charge) + 2🟠; #7 is clean bar one 🟡 FK contradiction (both verified in code). Prior line: affiliate team — #5 re-verified + MERGED (`bb91848`); Decision-3 chain #550✅→#5✅→#551 complete; F4-moderation → affiliate #7 also carries the consent-gated "awaiting consent — resend invite" roster state (follow-up (b)).
 
 ## Workspace conventions (Decision 6, 2026-07-03)
 
@@ -59,41 +59,40 @@ main. **Affiliate merged, NOT deployed (batched):** F1 (#2), F2 (#3).
 |---|---|---|
 | wodwisdom **#550** (F3 join) | ✅ **MERGED** (36a9018 re-verified: all 8 findings fixed; Decision-2 contract documented; ONE PROFILE prefill in, write-through/lifts deferred to #551 round) | — |
 | affiliate **#5** (enroll) | ✅ **MERGED** (affiliate `bb91848` → main; branch deleted) — re-verified against the 9 findings + C1/C2 | Fixes CONFIRMED IN CODE (`ad604b1` spot-check): #1 TOCTOU→atomic upsert; #2 null-clobber→non-null-only + checked write; #3 digest verifier (`_shared/service-key-auth.ts`, fingerprint); #4 masked-404→502; Decision-2 persist (`consent_required`) + gate (`activate_seat` 409 `consent_missing`); C1 `pii_synced_at`; C2 `action:'forget'`. Deferred hardening (all LOW/MED-LOW) **tracked as affiliate issues #8/#9/#10** (#6 PII-normalize/CSV, #7 audit-on-noop, #8 dead browser CORS + dual-key rotation) — wodwisdom-owned (grandfathered). Migration `20260703170000` (4 seat columns) rides the batched deploy |
-| wodwisdom **#551** (cohort wiring) | Reviewed (2🔴+4🟠). Fixes not started | After #550: swallowed-error trio, claim-first+auth on cron, poison-gym backoff, **roster → athlete_profiles (Decision 1)**, rag context, strategy-table→pack (or file to #548), continuity documented |
-| affiliate **#6** (F9 billing) | Built, checks clean | Awaiting CROSS-TEAM review by wodwisdom team (after its fix rounds) |
-| affiliate **#7** (F4-moderation + consent roster state) | ✅ **BUILT / PR open** (affiliate team) — tsc+vite+deno+eslint clean; merged main (#5) in | Awaiting CROSS-TEAM review by wodwisdom team. Self-contained affiliate build (ledger + edge fn + coach page) **plus** the F2 "awaiting consent — resend invite" roster state (follow-up (b) from #5). Cross-repo seams flagged in `docs/F4_MODERATION_CONTRACT.md` — needs wodwisdom F4 leaderboard to (1) expose an entries-read endpoint and (2) consume the moderation ledger (drop hide / badge flag / apply adjust) |
+| wodwisdom **#551** (cohort wiring) | ✅ **FIX ROUND PUSHED** (`e66ef8c`) — re-verification requested. `deno check` clean; 8/8 cohort tests pass | All findings done: swallowed-read trio → error-check + abort-before-spend + reuse `fetchVocabulary`; **claim-first RPC `claim_due_gym_cohort` (FOR UPDATE SKIP LOCKED) + `X-Cron-Key` auth + checked stamp**; poison-gym backoff + `domain_pack` format CHECK + self-reinvoke drain + NULLS-FIRST index; **roster → `athlete_profiles` (Decision 1)** + F3 write-through of 2–3 key lifts in `engine-join` + `members_with_weights`; `buildRagContext` wired; **canonical reference lifts** (THRESHOLDS_V1, no 4th table/self-flag) + direct TDI literal + dead `tenant_id` removed, sport-strategy→pack **filed to #548**; continuity documented (v1 re-derive); cleanup (shared `validateEngineRequest`, dedup, `updated_at` trigger, full PG error logging, edge tests, stale auth doc). ⚠️ migration syntax-reviewed only (no local PG in session to live-apply). **Merge after re-verify.** |
+| affiliate **#6** (F9 billing) | 🔎 **CROSS-REVIEWED (wodwisdom)** — findings posted | **🔴 founding 50% discount computed in preview/snapshot but NEVER applied to Stripe** (`syncStripe` composes full-price line items, no coupon) → founding gyms invoiced 2× the preview once `STRIPE_PRICE_*` set — §11 violation, hits pilot gyms; **🟠** downgrade never removes dropped subscription items (stale $49 Analytics keeps billing); **🟠** Analytics billed on `!!affiliate_key` (confirm intent). +2🟡 (sub-create idempotency, period-end proxy). Band/grace/founding-rounding/auth/RLS verified clean. Affiliate-owned fix (grandfathered? no — pure affiliate; affiliate team fixes) |
+| affiliate **#7** (F4-moderation + consent roster state) | 🔎 **CROSS-REVIEWED (wodwisdom)** — findings posted | Correct + well-scoped. Only **🟡** worth blocking: `moderated_by NOT NULL` + `ON DELETE SET NULL` self-contradicts → aborts user/GDPR deletion (repo's own onboarding migration documents the nullable pattern; `ModerationRow` already types it nullable). +2🟡 polish (empty-`{}` adjust; "Resend invite" is a clipboard copy, not a send). Auth/tenant-scoping/RLS/check-constraint/graceful-degrade/**Change-B consent mirror** all verified clean. Cross-repo seams still wodwisdom-F4's to wire |
 | affiliate #5 base retarget + branch cleanup | ✅ **DONE** (affiliate team) | #5 base retargeted to `main`; merged `claude/f1-gym-onboarding` + `claude/f2-engine-class` deleted (local + remote) |
 
 ## Next action per actor (in order)
 
-**Wodwisdom team:** (1) ~~#550~~ DONE/merged. (2) ~~Fix affiliate #5~~ DONE +
-now **MERGED** (`bb91848`) — #551 is fully unblocked per Decision 3. **(3) NEXT:
-Fix #551** (incl. Decision-1 roster change + write-through + lifts capture). (4)
-Review affiliate #6 **and #7 (F4-moderation)**; #7 needs the wodwisdom F4
-leaderboard to expose an entries-read endpoint + consume the moderation ledger
-(`affiliate docs/F4_MODERATION_CONTRACT.md`). Then F5 + F4-PWA/TV + launch kit.
-Deferred #5 hardening lives in affiliate issues #8/#9/#10 (wodwisdom-owned).
-**Two follow-ups opened by the #5 fix (below).**
+**Wodwisdom team:** (1) ~~#550~~ DONE. (2) ~~Fix affiliate #5~~ DONE/MERGED. (3)
+~~Fix #551~~ **DONE — pushed (`e66ef8c`), re-verification requested.** (4) ~~Review
+affiliate #6 + #7~~ **DONE — findings posted on both PRs.** **(5) NEXT: on #551
+re-verify → merge #551** (Decision 3 order complete). Then **build F5** (read-only
+gym view) **+ F4 leaderboard/TV** — F4 must (a) expose the entries-read endpoint and
+(b) consume the affiliate moderation ledger (drop hide / badge flag / apply adjust)
+per `affiliate docs/F4_MODERATION_CONTRACT.md` — the two cross-repo seams. Then launch
+kit. Deferred #5 hardening: affiliate issues #8/#9/#10 (wodwisdom-owned). **Follow-ups
+(a)/(b) below still open** (GDPR `forget` caller; owner-attested consent path).
 
-**Affiliate team:** (1) ~~Retarget #5 to main; delete merged branches~~ DONE.
-(2) ~~Confirm ONE PROFILE cache findings in the #5 review~~ DONE — appended C1
-(name/email staleness) + C2 (GDPR deletion-propagation) to #5; the `ad604b1` fix
-already implements both (`pii_synced_at` + `action:'forget'`), so they're covered,
-now recorded. (3) ~~Build F4-moderation~~ DONE → affiliate **PR #7** (checks clean).
-(4) NEXT: stand by for #6 **and** #7 cross-team review; once #7 is reviewed, wire
-the two F4 cross-repo seams jointly with the wodwisdom F4 leaderboard build.
+**Affiliate team:** (1)–(3) DONE (see prior). (4) **NEXT: address the cross-team review
+findings** just posted: **#6 — the 🔴 founding-coupon-not-applied is a real 2× overcharge;
+fix before Stripe prices are set** (attach the §10 coupon in `syncStripe`), plus the
+🟠 downgrade-item-removal and the Analytics-on-`affiliate_key` intent check; **#7 — the 🟡
+`moderated_by` FK contradiction** (drop `not null`) before it aborts a user deletion.
+(5) Then wire the two F4 cross-repo seams jointly with wodwisdom's F4 build.
 
 **Founder:** relay = one line per team: *"Pull wodwisdom main, read
 docs/portfolio/PHASE2A_STATUS.md, execute your section, update the board when
 done."* Deploys stay batched with you (nothing new to deploy until the fix
 rounds merge). Parallel track: lawyer packet + pilot list.
 
-**Reviewer session:** ~~re-verify affiliate #5 → merge~~ DONE this session (the
-affiliate-team session did the cross-team re-verify + merge of #5 at founder
-instruction; grandfathered #5, so no reviewer-authored fix was pushed — Decision 4
-preserved). Remaining: review **affiliate #6** + **#7 (F4-moderation)** findings
-cross-check → F4/F5 briefs → acceptance-demo checklist. (Merge chain: #550✅→#5✅;
-#551 is wodwisdom's, next per Decision 3.)
+**Reviewer session:** ~~re-verify affiliate #5 → merge~~ DONE. ~~Review affiliate #6
++ #7~~ **DONE this session** (wodwisdom team cross-reviewed both; findings on the PRs;
+Decision 4 preserved — review only, no fixes pushed). Remaining: **re-verify wodwisdom
+#551** (`e66ef8c`) → merge (completes the #550✅→#5✅→#551 chain) → F4/F5 briefs →
+acceptance-demo checklist.
 
 > **Follow-ups opened by the #5 fix round (record before they're lost):**
 > **(a) Wire the GDPR `forget` caller.** The affiliate now RECEIVES
