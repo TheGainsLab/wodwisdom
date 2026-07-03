@@ -209,3 +209,8 @@ verify_jwt = false
 # own X-Service-Key (WHOLESALE_SERVICE_KEY / WHOLESALE_CONSUMER_KEYS), so skip
 # Supabase's JWT gate.
 verify_jwt = false
+
+[functions.gym-cohort-cron]
+# Task #5 — monthly regeneration of gym Engine Class cohort programs. Called by
+# pg_cron (intra-project); no custom auth, same as monthly-generation-cron.
+verify_jwt = false

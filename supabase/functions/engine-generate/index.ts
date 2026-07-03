@@ -29,6 +29,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createConsumerAuth } from "../_shared/consumer-auth.ts";
 import { runEngineGeneration } from "../_shared/engine/run-engine.ts";
+import { persistCohortResult } from "../_shared/cohort/persist-cohort-result.ts";
 import type { EngineGenerateRequest } from "../_shared/engine/contract.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -148,40 +149,12 @@ Deno.serve(async (req) => {
     if (result.mode === "cohort" && result.scalings) {
       const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
       const shared = result.programs[0];
-      const { data: prog, error: progErr } = await supa
-        .from("engine_cohort_programs")
-        .insert({
-          tenant_id: result.tenant_id,
-          domain_pack: result.domain_pack,
-          shared_output: shared.output,
-          skeleton: shared.skeleton,
-          meta: { safety: shared.safety, residual_audit_failures: shared.residual_audit_failures },
-        })
-        .select("id")
-        .single();
-      if (progErr || !prog) {
-        console.error("[engine-generate] cohort program persist failed:", progErr);
-        return json({ error: "persist_failed", detail: progErr?.message }, 500);
-      }
-      const cohortProgramId = prog.id as string;
-
-      const rows = result.scalings.map((s) => ({
-        cohort_program_id: cohortProgramId,
-        tenant_id: result.tenant_id,
-        athlete_ref: s.athlete_ref,
-        weight_unit: s.weight_unit,
-        tier: s.tier,
-        substitutions_pending: s.substitutions_pending,
-        scaled_movements: s.scaled_movements,
-      }));
-      const { error: scalingErr } = await supa.from("engine_member_scaling").insert(rows);
-      if (scalingErr) {
-        // Roll back the orphaned parent so a retry starts clean (CASCADE clears
-        // any partially-inserted scaling rows).
-        console.error("[engine-generate] member scaling persist failed:", scalingErr);
-        await supa.from("engine_cohort_programs").delete().eq("id", cohortProgramId)
-          .then(() => {}, () => {});
-        return json({ error: "persist_failed", detail: scalingErr.message }, 500);
+      let cohortProgramId: string;
+      try {
+        ({ cohort_program_id: cohortProgramId } = await persistCohortResult(supa, result));
+      } catch (persistErr) {
+        console.error("[engine-generate] cohort persist failed:", persistErr);
+        return json({ error: "persist_failed", detail: (persistErr as Error).message }, 500);
       }
 
       // Return the id + a compact summary, not the full N scaling arrays (the
