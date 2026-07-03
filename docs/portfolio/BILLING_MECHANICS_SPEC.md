@@ -93,6 +93,37 @@ Schema change: `user_entitlements` gains `source` (`retail_stripe` |
 `gym_grant` | `admin`) and `granted_by` (gym/tenant id, nullable). Existing
 rows backfill `source = retail_stripe`/`admin`.
 
+> **Implementation note — reality divergence (PR: wholesale-grants, 2026-07-02).**
+> This spec assumed `source` was a free column. It is NOT: `user_entitlements`
+> already has a `source` column holding a heterogeneous grant-**origin
+> discriminator** (Stripe subscription ids `sub_…`, `admin`, `generated`,
+> `manual`) that retail's, admin's, and the v3-migrate path's scoped-revoke
+> queries (`.eq("source", <id>)`) depend on. Repurposing it as the category enum
+> would break retail (a hard constraint). So the migration is **additive**, under
+> new names that honor the intent:
+> - **`granted_by`** (text, nullable) = the tenant/gym id — the spec's `granted_by`.
+>   NULL for retail/admin/system rows.
+> - **`source_kind`** (text, `retail_stripe`|`gym_grant`|`admin`) = the origin
+>   **category** the spec named `source`. `source` keeps its discriminator role.
+> Idempotency by `(user_id, gym_id, feature)` is a full unique index on
+> `(user_id, feature, granted_by)` — NULLs distinct, so every existing retail/admin
+> row is unaffected. Union-read already holds: both entitlement readers
+> (`_shared/entitlements.ts`, `useEntitlements.ts`) select by `(user_id, feature)`
+> ignoring source, so a `gym_grant` row grants access exactly like any other.
+> Gym-grant rows carry `source = <gym_id>` (mirrors `granted_by`, satisfying the
+> legacy `UNIQUE(user_id, feature, source)` so a member in two Engine-Class gyms
+> gets two distinct rows) alongside `source_kind = 'gym_grant'` +
+> `granted_by = <gym_id>`.
+>
+> **Engine-Class feature key decided: `engine_cohort`** (the spec placeholder,
+> confirmed). It is deliberately distinct from retail's `engine` key so a gym seat
+> unlocks the shared cohort surface (F3/F5) WITHOUT retail's adaptive
+> recalibration / full AI coach (GYM_SKU_SPEC §1 "Explicitly NOT included"). A
+> member holding both retail `engine` and gym `engine_cohort` simply has both
+> (union, no coupling). The API allowlists gym-channel features
+> (`engine_cohort`, `gym_programming`); the remote all-access bundle (F11) is
+> added when built.
+
 **Coexistence rules:**
 - Access = **union** of active entitlements regardless of source. A member
   with retail all-access AND a gym seat simply has both; no dedup, no

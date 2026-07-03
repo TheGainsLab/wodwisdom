@@ -106,6 +106,7 @@ Deno.serve(async (req) => {
                 user_id,
                 feature,
                 source: "admin",
+                source_kind: "admin",
               }, { onConflict: "user_id,feature,source" });
               if (upsertErr) return json({ error: upsertErr.message }, 500);
             }
@@ -127,6 +128,7 @@ Deno.serve(async (req) => {
               user_id,
               feature: "engine",
               source: "admin",
+              source_kind: "admin",
             }, { onConflict: "user_id,feature,source" });
             if (upsertErr) return json({ error: upsertErr.message }, 500);
           } else if (value === "revoke") {
