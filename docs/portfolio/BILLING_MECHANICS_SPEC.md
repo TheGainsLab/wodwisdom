@@ -110,10 +110,33 @@ rows backfill `source = retail_stripe`/`admin`.
 > row is unaffected. Union-read already holds: both entitlement readers
 > (`_shared/entitlements.ts`, `useEntitlements.ts`) select by `(user_id, feature)`
 > ignoring source, so a `gym_grant` row grants access exactly like any other.
-> Gym-grant rows carry `source = <gym_id>` (mirrors `granted_by`, satisfying the
+> Gym-grant rows carry `source = 'gym_' || <gym_id>` (PREFIXED — satisfies the
 > legacy `UNIQUE(user_id, feature, source)` so a member in two Engine-Class gyms
-> gets two distinct rows) alongside `source_kind = 'gym_grant'` +
-> `granted_by = <gym_id>`.
+> gets two distinct rows, AND stays out of every existing `source` reader's
+> namespace: `sub_%` retail-revoke, `manual`/`admin` classifiers) alongside
+> `source_kind = 'gym_grant'` + `granted_by = <gym_id>`. A `BEFORE INSERT` trigger
+> derives `source_kind` from `source` for any writer that doesn't set it (sub_% /
+> `backfill` → retail_stripe; `gym_%` → gym_grant; else admin), and the two admin
+> `is_paid_subscriber` classifiers (`admin_user_list_v2`, `admin_overview_stats`,
+> plus `admin-delete-users`' JS) now exclude `source_kind = 'gym_grant'` so a
+> wholesale member never reads as a paying retail subscriber.
+>
+> **`expires_at` semantics (POST):** ABSENT = don't touch a stored expiry (a retry
+> must not silently make a time-boxed grant permanent); explicit `null` = clear;
+> ISO timestamp = set. **DELETE `feature`:** absent or `"*"` = revoke ALL this
+> gym's grants for the member; a concrete feature = just that one; a non-string
+> feature is a 400 (a type bug must not escalate a scoped revoke into revoke-all).
+>
+> **Deferred, recorded here so 2a doesn't architect around their absence:**
+> - **No batch shape (v1).** One grant per call. The first consumer (F2 seat
+>   activation) is interactive/per-member. A bulk reconcile path should add a
+>   `{ gym_id, feature, user_ids: [...] }` array-upsert variant; the open design
+>   question it must resolve is partial failure (one bad `user_id` FK-fails the
+>   whole array upsert), so it is a deliberate step, not a free add.
+> - **No suspend/resume verb (§9 dunning).** The day-14 payment-failure pause
+>   uses DELETE + re-grant, accepting that a suspension is not audit-distinct from
+>   an ordinary revoke in v1. If §11 needs that distinction, F9 adds a
+>   `status`/`suspended_at` column + verb when it builds the snapshot/dunning job.
 >
 > **Engine-Class feature key decided: `engine_cohort`** (the spec placeholder,
 > confirmed). It is deliberately distinct from retail's `engine` key so a gym seat

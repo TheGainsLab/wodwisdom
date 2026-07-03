@@ -10,7 +10,8 @@
  *   POST   /wholesale/v1/grants   grant a feature to a member for a gym
  *   DELETE /wholesale/v1/grants   revoke a gym's grant(s) for a member
  *
- * Body (both): { user_id, gym_id, feature?, expires_at? }.
+ * Body (both): { user_id, gym_id, feature?, expires_at? }. user_id + gym_id are
+ * UUIDs (gym_id = the gym's affiliate community id).
  *   - gym_id is the tenant; the presented X-Service-Key must be authorized for it
  *     (admin key = any tenant; a consumer key = only its bound tenant(s)).
  *   - Idempotent by (user_id, gym_id, feature): re-POST returns the same row,
@@ -20,9 +21,26 @@
  *     source_kind='gym_grant' rows for this gym. Retail (source_kind='retail_stripe')
  *     and admin rows are never read, written, or deleted here. Access is the UNION
  *     of active entitlements across all sources (see _shared/entitlements.ts).
+ *   - expires_at (POST): ABSENT means "don't touch a stored expiry" (a retry
+ *     never silently makes a time-boxed grant permanent); explicit null CLEARS it;
+ *     an ISO timestamp SETS it.
+ *   - feature (DELETE): absent or explicit "*" = revoke ALL this gym's grants for
+ *     the member; a concrete allowlisted feature = revoke just that one. A
+ *     non-string feature is a 400 — a type bug must not escalate a scoped revoke.
  *
  * v1 scope: env-var keys (WHOLESALE_SERVICE_KEY / WHOLESALE_CONSUMER_KEYS), no
  * DB-backed key registry or rate limiting yet (the data-service pattern; Phase 4).
+ * NO BATCH SHAPE YET (deferred, review 🟡): one grant per call. The first consumer
+ * (F2 seat activation) is interactive/per-member, so this is fine; a bulk reconcile
+ * path should add a { user_ids: [...] } array-upsert variant — see spec §7. The
+ * open question a batch must resolve is partial failure (one bad user_id FK-fails
+ * the whole array upsert), so it's a deliberate design step, not a free add.
+ *
+ * NO SUSPEND/RESUME VERB (dunning, review 🔴): §9's day-14 payment-failure pause
+ * is F9's job and uses DELETE + re-grant (accepting that a suspension isn't
+ * audit-distinct from an ordinary revoke in v1) — recorded in BILLING_MECHANICS_SPEC
+ * §7/§9. If that audit distinction is needed, add a status/suspended_at column
+ * with F9, not here.
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -72,8 +90,9 @@ Deno.serve(async (req) => {
   if (!auth.configured()) return json({ error: "config_missing_wholesale_key" }, 500);
   const presentedKey = req.headers.get("x-service-key");
   if (!presentedKey) return json({ error: "forbidden" }, 401);
-  const authz = await auth.authorizeKey(presentedKey);
-  if (!authz) return json({ error: "forbidden" }, 401);
+  const authResult = await auth.authorize(presentedKey);
+  if (!authResult) return json({ error: "forbidden" }, 401);
+  const { authz, fingerprint: keyFp } = authResult;
 
   // ── Parse + validate the envelope ───────────────────────────────────────────
   let body: GrantBody;
@@ -88,8 +107,8 @@ Deno.serve(async (req) => {
   if (!UUID_RE.test(userId)) {
     return json({ error: "invalid_request", detail: "user_id must be a uuid" }, 400);
   }
-  if (!gymId) {
-    return json({ error: "invalid_request", detail: "gym_id required" }, 400);
+  if (!UUID_RE.test(gymId)) {
+    return json({ error: "invalid_request", detail: "gym_id must be a uuid" }, 400);
   }
 
   // Tenant binding — the key must be authorized for this gym (tenant).
@@ -97,46 +116,71 @@ Deno.serve(async (req) => {
     return json({ error: "tenant_forbidden", detail: "key not authorized for gym_id" }, 403);
   }
 
-  // feature: required for POST; optional for DELETE (omit = revoke all this gym's
-  // grants for the member).
-  const feature = typeof body.feature === "string" ? body.feature : "";
-  if (feature && !ALLOWED_GRANT_FEATURES.has(feature)) {
-    return json({
-      error: "invalid_request",
-      detail: `feature must be one of: ${[...ALLOWED_GRANT_FEATURES].join(", ")}`,
-    }, 400);
+  // feature: distinguish absent / explicit "*" (revoke-all, DELETE only) from a
+  // concrete allowlisted feature. A present-but-non-string feature is a 400 — a
+  // type bug must never coerce to "" and escalate a scoped revoke into revoke-all.
+  const featureRaw = body.feature;
+  let feature = "";        // "" = the revoke-all sentinel (DELETE only)
+  let revokeAll = false;
+  if (featureRaw === undefined || featureRaw === null) {
+    revokeAll = true;
+  } else if (typeof featureRaw !== "string") {
+    return json({ error: "invalid_request", detail: "feature must be a string" }, 400);
+  } else if (featureRaw === "*") {
+    revokeAll = true;
+  } else {
+    feature = featureRaw;
+    if (!ALLOWED_GRANT_FEATURES.has(feature)) {
+      return json({
+        error: "invalid_request",
+        detail: `feature must be one of: ${[...ALLOWED_GRANT_FEATURES].join(", ")}`,
+      }, 400);
+    }
   }
 
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-  const keyFp = await auth.fingerprint(presentedKey);
 
   // ── POST: grant (idempotent upsert on (user_id, feature, granted_by)) ───────
   if (req.method === "POST") {
-    if (!feature) {
-      return json({ error: "invalid_request", detail: "feature required for grant" }, 400);
+    if (revokeAll || !feature) {
+      return json({ error: "invalid_request", detail: "a concrete feature is required for grant" }, 400);
     }
+
+    // expires_at: ABSENT -> omit from the upsert (a retry must not clobber a
+    // stored expiry to NULL and silently make a time-boxed grant permanent);
+    // explicit null -> clear; ISO timestamp -> set.
+    const hasExpires = Object.prototype.hasOwnProperty.call(body, "expires_at");
+    let expiresProvided = false;
     let expiresAt: string | null = null;
-    if (body.expires_at != null) {
-      if (typeof body.expires_at !== "string" || isNaN(Date.parse(body.expires_at))) {
-        return json({ error: "invalid_request", detail: "expires_at must be an ISO timestamp" }, 400);
+    if (hasExpires) {
+      if (body.expires_at === null) {
+        expiresProvided = true;
+      } else if (typeof body.expires_at === "string" && !isNaN(Date.parse(body.expires_at))) {
+        expiresProvided = true;
+        expiresAt = new Date(body.expires_at).toISOString();
+      } else {
+        return json({ error: "invalid_request", detail: "expires_at must be an ISO timestamp or null" }, 400);
       }
-      expiresAt = new Date(body.expires_at).toISOString();
     }
+
+    const row: Record<string, unknown> = {
+      user_id: userId,
+      feature,
+      // `source` = 'gym_' || gym_id (PREFIXED): the LEGACY UNIQUE(user_id, feature,
+      // source) still applies, so two gyms granting the same feature to the same
+      // member (a member in two Engine-Class gyms — §7 revokes per gym) must differ
+      // here. The 'gym_' prefix keeps these out of every existing `source` reader's
+      // namespace ('sub_%' retail revoke, 'manual'/'admin' classifiers). granted_by
+      // is the canonical tenant column; source_kind carries the category.
+      source: `gym_${gymId}`,
+      source_kind: "gym_grant",
+      granted_by: gymId,
+    };
+    if (expiresProvided) row.expires_at = expiresAt;
 
     const { data, error } = await supa
       .from("user_entitlements")
-      .upsert({
-        user_id: userId,
-        feature,
-        // `source` = gym_id (not a constant): the LEGACY UNIQUE(user_id, feature,
-        // source) is still enforced, so two gyms granting the same feature to the
-        // same member (a member in two Engine-Class gyms — §7 revokes per gym)
-        // must differ here. It mirrors granted_by; source_kind carries the category.
-        source: gymId,
-        source_kind: "gym_grant",
-        granted_by: gymId,
-        expires_at: expiresAt,
-      }, { onConflict: "user_id,feature,granted_by" })
+      .upsert(row, { onConflict: "user_id,feature,granted_by" })
       .select("id, user_id, feature, source_kind, granted_by, granted_at, expires_at")
       .single();
 
@@ -161,7 +205,8 @@ Deno.serve(async (req) => {
     .eq("user_id", userId)
     .eq("source_kind", "gym_grant")
     .eq("granted_by", gymId);
-  if (feature) q = q.eq("feature", feature);
+  // revokeAll (feature absent or "*") -> no feature filter; else scope to the one.
+  if (!revokeAll) q = q.eq("feature", feature);
 
   const { data, error } = await q.select("id, feature");
   if (error) {

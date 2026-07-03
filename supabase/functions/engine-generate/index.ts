@@ -62,8 +62,9 @@ Deno.serve(async (req) => {
   }
   const presentedKey = req.headers.get("x-service-key");
   if (!presentedKey) return json({ error: "forbidden" }, 401);
-  const authz = await auth.authorizeKey(presentedKey);
-  if (!authz) return json({ error: "forbidden" }, 401);
+  const authResult = await auth.authorize(presentedKey);
+  if (!authResult) return json({ error: "forbidden" }, 401);
+  const authz = authResult.authz;
 
   let reqBody: EngineGenerateRequest;
   try {
@@ -131,7 +132,7 @@ Deno.serve(async (req) => {
   console.log(JSON.stringify({
     at: "engine-generate",
     event: "request",
-    key_fp: await auth.fingerprint(presentedKey),
+    key_fp: authResult.fingerprint,
     scope: authz === "*" ? "admin" : "bound",
     tenant_id: reqBody.tenant_id,
     mode: reqBody.mode,
