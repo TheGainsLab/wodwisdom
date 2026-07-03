@@ -155,6 +155,46 @@ export async function runAdaptiveProgram(
   };
 }
 
+/** Thrown by validateEngineRequest / runEngineGeneration on a bad request so both
+ *  doors (HTTP + cron) reject the same shapes. The HTTP door maps this to a 400. */
+export class EngineValidationError extends Error {
+  constructor(public detail: string) {
+    super(detail);
+    this.name = "EngineValidationError";
+  }
+}
+
+/**
+ * Mode-generic request validation — the ONE definition both the HTTP door
+ * (engine-generate) and the in-process cron share, so "empty roster" and
+ * "duplicate athlete_ref" can't be legal on one door and rejected on the other.
+ * Returns a detail string on failure, null when valid. Cohort allows an EMPTY roster
+ * (the shared class program is still generated — F5's read-only view needs it);
+ * adaptive is single-athlete.
+ */
+export function validateEngineRequest(req: EngineGenerateRequest): string | null {
+  if (!req.tenant_id || typeof req.tenant_id !== "string") return "tenant_id required";
+  if (req.mode !== "adaptive" && req.mode !== "cohort") return "mode must be adaptive|cohort";
+  if (!req.domain_pack || typeof req.domain_pack !== "string") return "domain_pack required";
+  if (!Array.isArray(req.athletes)) return "athletes[] required";
+
+  if (req.mode === "cohort") {
+    const c = req.cohort;
+    if (!c || !c.shared_payload || !c.shared_training_design_input) {
+      return "cohort mode requires cohort.shared_payload + shared_training_design_input";
+    }
+  } else if (req.athletes.length !== 1) {
+    // Adaptive: a sequential batch would blow the edge wall-clock and discard paid
+    // work — a roster goes through cohort mode.
+    return "adaptive mode is single-athlete; use cohort mode for a roster";
+  }
+
+  const refs = req.athletes.map((a) => a?.athlete_ref);
+  if (refs.some((r) => !r || typeof r !== "string")) return "each athlete needs an athlete_ref";
+  if (new Set(refs).size !== refs.length) return "duplicate athlete_ref in athletes[]";
+  return null;
+}
+
 /**
  * Run the Engine for a full request. Adaptive = one program per athlete (v1: a
  * sequential internal loop; the contract's array shape is what matters).
@@ -163,6 +203,8 @@ export async function runAdaptiveProgram(
 export async function runEngineGeneration(
   req: EngineGenerateRequest,
 ): Promise<EngineGenerateResult> {
+  const invalid = validateEngineRequest(req);
+  if (invalid) throw new EngineValidationError(invalid);
   const pack = getDomainPack(req.domain_pack);
 
   if (req.mode === "cohort") {

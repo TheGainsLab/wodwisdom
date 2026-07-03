@@ -25,7 +25,7 @@ You price it; you keep the margin."
 | Feature | Status |
 |---|---|
 | Class setup in the gym portal: name it, invite members (link/QR), roster view | BUILD (portal shell exists in affiliate-intelligence) |
-| Cohort-mode Engine program: one shared progression path for the whole gym, auto-generated monthly | ADAPT (retail Engine + monthly cron EXIST; cohort flag is in the Engine API contract, Phase 1) |
+| Cohort-mode Engine program: one shared progression path for the whole gym, auto-generated monthly | ADAPT (retail Engine + monthly cron EXIST; cohort flag is in the Engine API contract, Phase 1). **v1 caveat (#551): each month is an independent re-generation (`previous_cycle: null`) — no programmed progressive overload ACROSS months yet; cross-month continuity is tracked to #548. "Progression path" = within-month structure, not month-over-month periodization, at v1.** |
 | Gym leaderboard per workout + season standings — divisions by **gender and modality only** (decided; no age/scaled divisions at launch) | BUILD |
 | Physics-normalized rankings via the watts / W·kg model so a 60 kg member competes fairly with a 100 kg member — the differentiator no whiteboard app has | ADAPT (physics model EXISTS in data service; leaderboard surface is BUILD) |
 | Seat management: activate/deactivate members; billing follows active seats | BUILD (wholesale grant path on the existing entitlements layer) |

@@ -28,7 +28,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createConsumerAuth } from "../_shared/consumer-auth.ts";
-import { runEngineGeneration } from "../_shared/engine/run-engine.ts";
+import { runEngineGeneration, validateEngineRequest } from "../_shared/engine/run-engine.ts";
+import { persistCohortResult } from "../_shared/cohort/persist-cohort-result.ts";
 import type { EngineGenerateRequest } from "../_shared/engine/contract.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -74,47 +75,15 @@ Deno.serve(async (req) => {
   }
 
   // ── Validate the contract envelope ─────────────────────────────────────────
-  if (!reqBody.tenant_id || typeof reqBody.tenant_id !== "string") {
-    return json({ error: "invalid_request", detail: "tenant_id required" }, 400);
-  }
-  if (reqBody.mode !== "adaptive" && reqBody.mode !== "cohort") {
-    return json({ error: "invalid_request", detail: "mode must be adaptive|cohort" }, 400);
-  }
-  if (!reqBody.domain_pack || typeof reqBody.domain_pack !== "string") {
-    return json({ error: "invalid_request", detail: "domain_pack required" }, 400);
-  }
-  if (!Array.isArray(reqBody.athletes) || reqBody.athletes.length === 0) {
-    return json({ error: "invalid_request", detail: "athletes[] must be non-empty" }, 400);
-  }
+  // Mode-generic rules (empty-roster legality, dup-ref, single-athlete adaptive)
+  // live in validateEngineRequest so the HTTP door and the cron reject the SAME
+  // shapes. This door additionally enforces auth/tenant binding below.
+  const invalid = validateEngineRequest(reqBody);
+  if (invalid) return json({ error: "invalid_request", detail: invalid }, 400);
 
   // Tenant binding — a consumer key may only write its bound tenant(s).
   if (!auth.authorizes(authz, reqBody.tenant_id)) {
     return json({ error: "tenant_forbidden", detail: "key not authorized for tenant_id" }, 403);
-  }
-
-  // Every athlete needs a non-empty ref, and refs must be unique — a duplicate
-  // ref would collide on engine_member_scaling's UNIQUE(cohort_program_id,
-  // athlete_ref) and 500 AFTER the (paid) generation.
-  const refs = reqBody.athletes.map((a) => a?.athlete_ref);
-  if (refs.some((r) => !r || typeof r !== "string")) {
-    return json({ error: "invalid_request", detail: "each athlete needs an athlete_ref" }, 400);
-  }
-  if (new Set(refs).size !== refs.length) {
-    return json({ error: "invalid_request", detail: "duplicate athlete_ref in athletes[]" }, 400);
-  }
-
-  // Adaptive is single-athlete (a sequential batch would blow the edge wall-clock
-  // and discard paid work). A roster goes through cohort mode.
-  if (reqBody.mode === "adaptive" && reqBody.athletes.length > 1) {
-    return json({ error: "invalid_request", detail: "adaptive mode is single-athlete; use cohort mode for a roster" }, 400);
-  }
-
-  // Cohort needs its shared spec up front — validate before burning an LLM call.
-  if (reqBody.mode === "cohort") {
-    const c = reqBody.cohort;
-    if (!c || !c.shared_payload || !c.shared_training_design_input) {
-      return json({ error: "invalid_request", detail: "cohort mode requires cohort.shared_payload + shared_training_design_input" }, 400);
-    }
   }
 
   // Contract fields accepted but not yet threaded into the pipeline (Phase 2a).
@@ -148,40 +117,12 @@ Deno.serve(async (req) => {
     if (result.mode === "cohort" && result.scalings) {
       const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
       const shared = result.programs[0];
-      const { data: prog, error: progErr } = await supa
-        .from("engine_cohort_programs")
-        .insert({
-          tenant_id: result.tenant_id,
-          domain_pack: result.domain_pack,
-          shared_output: shared.output,
-          skeleton: shared.skeleton,
-          meta: { safety: shared.safety, residual_audit_failures: shared.residual_audit_failures },
-        })
-        .select("id")
-        .single();
-      if (progErr || !prog) {
-        console.error("[engine-generate] cohort program persist failed:", progErr);
-        return json({ error: "persist_failed", detail: progErr?.message }, 500);
-      }
-      const cohortProgramId = prog.id as string;
-
-      const rows = result.scalings.map((s) => ({
-        cohort_program_id: cohortProgramId,
-        tenant_id: result.tenant_id,
-        athlete_ref: s.athlete_ref,
-        weight_unit: s.weight_unit,
-        tier: s.tier,
-        substitutions_pending: s.substitutions_pending,
-        scaled_movements: s.scaled_movements,
-      }));
-      const { error: scalingErr } = await supa.from("engine_member_scaling").insert(rows);
-      if (scalingErr) {
-        // Roll back the orphaned parent so a retry starts clean (CASCADE clears
-        // any partially-inserted scaling rows).
-        console.error("[engine-generate] member scaling persist failed:", scalingErr);
-        await supa.from("engine_cohort_programs").delete().eq("id", cohortProgramId)
-          .then(() => {}, () => {});
-        return json({ error: "persist_failed", detail: scalingErr.message }, 500);
+      let cohortProgramId: string;
+      try {
+        ({ cohort_program_id: cohortProgramId } = await persistCohortResult(supa, result));
+      } catch (persistErr) {
+        console.error("[engine-generate] cohort persist failed:", persistErr);
+        return json({ error: "persist_failed", detail: (persistErr as Error).message }, 500);
       }
 
       // Return the id + a compact summary, not the full N scaling arrays (the
