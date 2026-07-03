@@ -52,6 +52,18 @@ member's PWA gains the gym context: Engine class workouts, gym leaderboard.
 - Edge: member leaves gym / seat deactivated → PWA reverts to whatever they
   hold personally; history stays with the member (portability decision).
 
+> **Cross-repo contract — ending the link (from #550/#5 review).** wodwisdom's
+> `member_gym_links` has `status` (`joined`|`left`) + `left_at`, but **the writer
+> that ends a link lives affiliate-side**: seat deactivation / gym cancellation
+> must also end the wodwisdom link (`status='left'`, `left_at`), via a sibling of
+> the enroll endpoint or a wodwisdom-side hook on the revoke path. Until that
+> lands, **F5 MUST key off entitlement AND link, not link alone** (below).
+> **Consent seam:** the member-join enroll call carries a **consent assertion**
+> (`consent_version`); the affiliate persists it on the seat and **gates seat
+> activation on a recorded consent**, so member PII never becomes owner-visible
+> without an accompanying consent claim (satisfies the F3 cross-cutting
+> "consent before any member data in owner surfaces" rule on both sides).
+
 ## F4 — Leaderboard & TV mode [2a]
 
 - Leaderboard per workout + season standings. Divisions: **gender and
@@ -68,6 +80,14 @@ Any member of a participating gym (joined via F3 but without an active seat)
 sees today's workout read-only in the PWA — block-formatted, logging and
 personalization visibly locked ("Ask the front desk for your version").
 The in-gym conversion funnel; zero AI cost.
+
+> **F5 view gate (decided, #550 review):** show the read-only gym view only when
+> the member has a `member_gym_links` row with `status='joined'` **AND** an active
+> `engine_cohort`-family entitlement `granted_by` that gym — never the link alone.
+> Because the link-ending writer is a cross-repo follow-up (above), keying off the
+> link alone would leave ex-members / members of cancelled gyms seeing the gym's
+> daily programming forever (a content-leak). The active entitlement is the
+> authoritative "still belongs" signal; the link supplies the gym name/context.
 
 ## F6 — Programmer onboarding: style intake [2b]
 
