@@ -7,7 +7,7 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-03 (reviewer session — #550 MERGED; #5 fixes are the active step).
+> Last updated: 2026-07-03 (wodwisdom team — #5 fix round PUSHED (affiliate `ad604b1`); awaiting reviewer re-verify + merge per Decision 3).
 
 ## Decisions in force (recorded since the last doc merge)
 
@@ -41,17 +41,17 @@ main. **Affiliate merged, NOT deployed (batched):** F1 (#2), F2 (#3).
 | Item | State | Blocker |
 |---|---|---|
 | wodwisdom **#550** (F3 join) | ✅ **MERGED** (36a9018 re-verified: all 8 findings fixed; Decision-2 contract documented; ONE PROFILE prefill in, write-through/lifts deferred to #551 round) | — |
-| affiliate **#5** (enroll) | Reviewed (9 findings) — **ACTIVE STEP** | Wodwisdom team fixes NOW: TOCTOU, PII null-clobber, digest verifier, assertion persist+gate (Decision 2), PII-cache staleness + GDPR deletion-propagation |
+| affiliate **#5** (enroll) | ✅ **FIXES PUSHED** (affiliate `ad604b1`, on `claude/f3-member-enroll`) — awaiting reviewer re-verify + merge | All 5 assigned items done: TOCTOU→atomic upsert; PII null-clobber→non-null-only refresh + checked write; digest verifier (new `_shared/service-key-auth.ts`, fingerprint logs); Decision-2 persist+gate (enroll REQUIRES/persists `consent_version`, `activate_seat` 409s `consent_missing`); PII-cache `pii_synced_at` + GDPR `action:'forget'`. Folded in #4 (masked-404→502). Migration `20260703170000` adds 4 seat columns. Deferred: #6/#7/#8 hardening + dual-key rotation |
 | wodwisdom **#551** (cohort wiring) | Reviewed (2🔴+4🟠). Fixes not started | After #550: swallowed-error trio, claim-first+auth on cron, poison-gym backoff, **roster → athlete_profiles (Decision 1)**, rag context, strategy-table→pack (or file to #548), continuity documented |
 | affiliate **#6** (F9 billing) | Built, checks clean | Awaiting CROSS-TEAM review by wodwisdom team (after its fix rounds) |
 | affiliate #5 base retarget + branch cleanup | Pending | Affiliate team: retarget #5 to main; delete merged f1/f2 branches |
 
 ## Next action per actor (in order)
 
-**Wodwisdom team:** (1) ~~#550~~ DONE/merged. (2) Fix affiliate #5 findings
-(incl. Decision-2 affiliate half: persist consent_version + gate activation).
-(3) Fix #551 (incl. Decision-1 roster change + write-through + lifts capture).
-(4) Review affiliate #6. Then F5 + F4-PWA/TV + launch kit.
+**Wodwisdom team:** (1) ~~#550~~ DONE/merged. (2) ~~Fix affiliate #5 findings~~
+DONE/pushed (affiliate `ad604b1`). **(3) NEXT: Fix #551** (incl. Decision-1
+roster change + write-through + lifts capture). (4) Review affiliate #6. Then
+F5 + F4-PWA/TV + launch kit. **Two follow-ups opened by the #5 fix (below).**
 
 **Affiliate team:** (1) Retarget #5 to main; delete merged branches. (2)
 Confirm the ONE PROFILE cache findings (name/email staleness + GDPR
@@ -63,8 +63,28 @@ docs/portfolio/PHASE2A_STATUS.md, execute your section, update the board when
 done."* Deploys stay batched with you (nothing new to deploy until the fix
 rounds merge). Parallel track: lawyer packet + pilot list.
 
-**Reviewer session:** re-verify #550 on push → merge chain per Decision 3 →
-review #6 findings cross-check → F4/F5 briefs → acceptance-demo checklist.
+**Reviewer session:** re-verify **affiliate #5 fixes** (`ad604b1`) → merge chain
+per Decision 3 (#5 → #551) → review #6 findings cross-check → F4/F5 briefs →
+acceptance-demo checklist.
+
+> **Follow-ups opened by the #5 fix round (record before they're lost):**
+> **(a) Wire the GDPR `forget` caller.** The affiliate now RECEIVES
+> `engine-enroll {action:'forget', wodwisdom_user_id}` (nulls cached seat PII,
+> tombstones `pii_forgotten_at`). Wodwisdom must CALL it from its account-deletion
+> path so erasure actually propagates — the receiving half exists, the trigger
+> does not. Sibling of the link-ending writer already noted in GYM_PORTAL_FLOWS §F3.
+> **(b) Manual-add activation now gated.** `activate_seat` returns 409
+> `consent_missing` for any seat with no `consent_version` — including seats added
+> via F2 `add_seat` (owner manual roster). This is the intended consent-before-data
+> rule, but it means the F2 manual-add→activate path now requires the member to
+> have joined+consented via F3 first. Confirm this matches the F2 UX (or add an
+> owner-attested consent path) when #551's roster builder lands.
+>
+> **Repo-hygiene note (observed this session):** the affiliate clone at
+> `~/Desktop/affiliate-intelligence` was being branch-switched live (f4-moderation)
+> while #5 was open, wiping an in-progress checkout. The #5 fixes were done in an
+> isolated `git worktree` off `origin/claude/f3-member-enroll` to avoid the
+> collision. Teams sharing one clone should use worktrees per Decision 4.
 
 ## Remaining to close Phase 2a (after the table above clears)
 
