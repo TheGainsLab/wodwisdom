@@ -39,6 +39,7 @@ const TrainingLogPage = lazy(() => import('./pages/TrainingLogPage'));
 const WorkoutAnalysisPage = lazy(() => import('./pages/WorkoutAnalysisPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const CheckoutCompletePage = lazy(() => import('./pages/CheckoutCompletePage'));
+const JoinEnginePage = lazy(() => import('./pages/JoinEnginePage'));
 
 // Programs
 const ProgramsListPage = lazy(() => import('./pages/ProgramsListPage'));
@@ -128,6 +129,8 @@ export default function App() {
           <Route path="/features/engine" element={<EngineFeaturePage />} />
           <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
           <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
+          {/* F3 member-join: reachable logged-out (inline auth keeps the token in the URL). */}
+          <Route path="/join/engine/:token" element={<JoinEnginePage session={null} />} />
           <Route path="*" element={<LandingPage />} />
         </Routes>
       </Suspense>
@@ -152,6 +155,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<HomePage session={session} />} />
+            <Route path="/join/engine/:token" element={<JoinEnginePage session={session} />} />
             <Route path="/chat" element={<ChatPage session={session} />} />
             <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
             <Route path="/workout/start" element={<StartWorkoutPage session={session} />} />
