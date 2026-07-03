@@ -82,12 +82,14 @@ Deno.serve(async (req) => {
     // than via PostgREST or/not filters so a filter quirk can't silently drop
     // the rail — a failed query just yields no rows, which would UNDER-protect.
     const { data: ents } = await supa
-      .from("user_entitlements").select("user_id, source, expires_at")
+      .from("user_entitlements").select("user_id, source, source_kind, expires_at")
       .in("user_id", ids);
     const now = Date.now();
     for (const e of ents ?? []) {
       const active = e.expires_at == null || new Date(e.expires_at).getTime() > now;
-      const paid = active && e.source !== "manual" && e.source !== "admin";
+      // gym_grant rows are wholesale seats, not retail subscribers — a gym member
+      // must not read as a paying subscriber here (would mis-protect + skew counts).
+      const paid = active && e.source !== "manual" && e.source !== "admin" && e.source_kind !== "gym_grant";
       if (paid && e.user_id && !protectedReason.has(e.user_id)) {
         protectedReason.set(e.user_id, "paid subscriber");
       }

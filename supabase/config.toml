@@ -203,3 +203,9 @@ verify_jwt = false
 # Standalone Engine API entrypoint. Auth is our own X-Service-Key
 # (ENGINE_SERVICE_KEY); skip Supabase's JWT gate so it reaches our handler.
 verify_jwt = false
+
+[functions.wholesale-grants]
+# Wholesale Grants API (BILLING_MECHANICS_SPEC §7). Server-to-server; auth is our
+# own X-Service-Key (WHOLESALE_SERVICE_KEY / WHOLESALE_CONSUMER_KEYS), so skip
+# Supabase's JWT gate.
+verify_jwt = false

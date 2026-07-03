@@ -27,61 +27,22 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { createConsumerAuth } from "../_shared/consumer-auth.ts";
 import { runEngineGeneration } from "../_shared/engine/run-engine.ts";
 import type { EngineGenerateRequest } from "../_shared/engine/contract.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ENGINE_SERVICE_KEY = Deno.env.get("ENGINE_SERVICE_KEY");
 
-// Optional per-consumer keys, JSON: { "<key>": "<tenant_id>" | ["<t1>", ...] }.
-// A consumer key may ONLY write its bound tenant(s). Parsed once at module load.
-const ENGINE_CONSUMER_KEYS: Record<string, string[]> = (() => {
-  const raw = Deno.env.get("ENGINE_CONSUMER_KEYS");
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw) as Record<string, string | string[]>;
-    const out: Record<string, string[]> = {};
-    for (const [k, v] of Object.entries(parsed)) {
-      out[k] = (Array.isArray(v) ? v : [v]).map(String);
-    }
-    return out;
-  } catch {
-    console.error("[engine-generate] ENGINE_CONSUMER_KEYS is not valid JSON; ignoring it");
-    return {};
-  }
-})();
-
-async function sha256Hex(s: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/** Constant-time string compare. Callers pass equal-length hex digests, so the
- *  length check never short-circuits on a real comparison. */
-function constantTimeEq(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let r = 0;
-  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return r === 0;
-}
-
-/** Resolve the presented key to its tenant authorization: "*" (admin/any tenant),
- *  a bound tenant list, or null (no match). Compares digests in constant time and
- *  never breaks early, so a match reveals nothing via timing. */
-async function authorizeKey(presented: string): Promise<"*" | string[] | null> {
-  const presentedHash = await sha256Hex(presented);
-  let matched: "*" | string[] | null = null;
-  if (ENGINE_SERVICE_KEY && constantTimeEq(presentedHash, await sha256Hex(ENGINE_SERVICE_KEY))) {
-    matched = "*";
-  }
-  for (const [key, tenants] of Object.entries(ENGINE_CONSUMER_KEYS)) {
-    if (constantTimeEq(presentedHash, await sha256Hex(key)) && matched !== "*") {
-      matched = tenants;
-    }
-  }
-  return matched;
-}
+// Constant-time, tenant-bound consumer-key auth (shared with wholesale-grants).
+// ENGINE_SERVICE_KEY = unrestricted internal/admin key (any tenant);
+// ENGINE_CONSUMER_KEYS = optional { key: tenant|tenant[] } map — a consumer key
+// may ONLY write its bound tenant(s). See _shared/consumer-auth.ts.
+const auth = createConsumerAuth({
+  serviceKey: Deno.env.get("ENGINE_SERVICE_KEY"),
+  consumerKeysRaw: Deno.env.get("ENGINE_CONSUMER_KEYS"),
+  label: "engine-generate",
+});
 
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -96,13 +57,14 @@ Deno.serve(async (req) => {
 
   // Auth — constant-time, tenant-bound. Admin key = any tenant; consumer key =
   // its bound tenant(s), enforced against the request's tenant_id below.
-  if (!ENGINE_SERVICE_KEY && Object.keys(ENGINE_CONSUMER_KEYS).length === 0) {
+  if (!auth.configured()) {
     return json({ error: "config_missing_engine_key" }, 500);
   }
   const presentedKey = req.headers.get("x-service-key");
   if (!presentedKey) return json({ error: "forbidden" }, 401);
-  const authz = await authorizeKey(presentedKey);
-  if (!authz) return json({ error: "forbidden" }, 401);
+  const authResult = await auth.authorize(presentedKey);
+  if (!authResult) return json({ error: "forbidden" }, 401);
+  const authz = authResult.authz;
 
   let reqBody: EngineGenerateRequest;
   try {
@@ -126,7 +88,7 @@ Deno.serve(async (req) => {
   }
 
   // Tenant binding — a consumer key may only write its bound tenant(s).
-  if (authz !== "*" && !authz.includes(reqBody.tenant_id)) {
+  if (!auth.authorizes(authz, reqBody.tenant_id)) {
     return json({ error: "tenant_forbidden", detail: "key not authorized for tenant_id" }, 403);
   }
 
@@ -170,7 +132,7 @@ Deno.serve(async (req) => {
   console.log(JSON.stringify({
     at: "engine-generate",
     event: "request",
-    key_fp: (await sha256Hex(presentedKey)).slice(0, 12),
+    key_fp: authResult.fingerprint,
     scope: authz === "*" ? "admin" : "bound",
     tenant_id: reqBody.tenant_id,
     mode: reqBody.mode,
