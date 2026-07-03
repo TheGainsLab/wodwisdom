@@ -7,7 +7,7 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-03 (affiliate team — **affiliate #5 re-verified + MERGED** (`bb91848`) at founder instruction: 9 findings + C1/C2 confirmed in code, deferrals tracked as issues #8/#9/#10. Decision-3 chain #550✅→#5✅→#551 now unblocks **wodwisdom #551**. Also: #5 retarget + f1/f2 cleanup done; F4-moderation → affiliate **PR #7** (consent-gated "awaiting consent — resend invite" roster state IN PROGRESS on #7)).
+> Last updated: 2026-07-03 (affiliate team — **affiliate #5 re-verified + MERGED** (`bb91848`) at founder instruction: 9 findings + C1/C2 confirmed in code, deferrals tracked as issues #8/#9/#10. Decision-3 chain #550✅→#5✅→#551 now unblocks **wodwisdom #551**. Also: #5 retarget + f1/f2 cleanup done; F4-moderation → affiliate **PR #7**, which now also carries the consent-gated "awaiting consent — resend invite" roster state (board follow-up (b) from the #5 fix)).
 
 ## Decisions in force (recorded since the last doc merge)
 
@@ -44,7 +44,7 @@ main. **Affiliate merged, NOT deployed (batched):** F1 (#2), F2 (#3).
 | affiliate **#5** (enroll) | ✅ **MERGED** (affiliate `bb91848` → main; branch deleted) — re-verified against the 9 findings + C1/C2 | Fixes CONFIRMED IN CODE (`ad604b1` spot-check): #1 TOCTOU→atomic upsert; #2 null-clobber→non-null-only + checked write; #3 digest verifier (`_shared/service-key-auth.ts`, fingerprint); #4 masked-404→502; Decision-2 persist (`consent_required`) + gate (`activate_seat` 409 `consent_missing`); C1 `pii_synced_at`; C2 `action:'forget'`. Deferred hardening (all LOW/MED-LOW) **tracked as affiliate issues #8/#9/#10** (#6 PII-normalize/CSV, #7 audit-on-noop, #8 dead browser CORS + dual-key rotation) — wodwisdom-owned (grandfathered). Migration `20260703170000` (4 seat columns) rides the batched deploy |
 | wodwisdom **#551** (cohort wiring) | Reviewed (2🔴+4🟠). Fixes not started | After #550: swallowed-error trio, claim-first+auth on cron, poison-gym backoff, **roster → athlete_profiles (Decision 1)**, rag context, strategy-table→pack (or file to #548), continuity documented |
 | affiliate **#6** (F9 billing) | Built, checks clean | Awaiting CROSS-TEAM review by wodwisdom team (after its fix rounds) |
-| affiliate **#7** (F4-moderation) | ✅ **BUILT / PR open** (affiliate team) — tsc+vite+deno+eslint clean | Awaiting CROSS-TEAM review by wodwisdom team. Self-contained affiliate build (ledger + edge fn + coach page); cross-repo seams flagged in `docs/F4_MODERATION_CONTRACT.md` — needs wodwisdom F4 leaderboard to (1) expose an entries-read endpoint and (2) consume the moderation ledger (drop hide / badge flag / apply adjust) |
+| affiliate **#7** (F4-moderation + consent roster state) | ✅ **BUILT / PR open** (affiliate team) — tsc+vite+deno+eslint clean; merged main (#5) in | Awaiting CROSS-TEAM review by wodwisdom team. Self-contained affiliate build (ledger + edge fn + coach page) **plus** the F2 "awaiting consent — resend invite" roster state (follow-up (b) from #5). Cross-repo seams flagged in `docs/F4_MODERATION_CONTRACT.md` — needs wodwisdom F4 leaderboard to (1) expose an entries-read endpoint and (2) consume the moderation ledger (drop hide / badge flag / apply adjust) |
 | affiliate #5 base retarget + branch cleanup | ✅ **DONE** (affiliate team) | #5 base retargeted to `main`; merged `claude/f1-gym-onboarding` + `claude/f2-engine-class` deleted (local + remote) |
 
 ## Next action per actor (in order)
@@ -90,6 +90,10 @@ cross-check → F4/F5 briefs → acceptance-demo checklist. (Merge chain: #550�
 > rule, but it means the F2 manual-add→activate path now requires the member to
 > have joined+consented via F3 first. Confirm this matches the F2 UX (or add an
 > owner-attested consent path) when #551's roster builder lands.
+> **Partly addressed (affiliate PR #7):** the F2 roster now renders these seats as
+> "Awaiting consent" with a "Resend invite" action instead of a failing Activate
+> button — the UX confusion is handled. STILL OPEN: whether owners get an
+> owner-attested consent path for manual adds (decide with #551's roster builder).
 >
 > **Repo-hygiene note (observed this session):** the affiliate clone at
 > `~/Desktop/affiliate-intelligence` was being branch-switched live (f4-moderation)
