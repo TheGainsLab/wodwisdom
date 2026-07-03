@@ -7,7 +7,7 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-03 (reviewer session — initial sync point).
+> Last updated: 2026-07-03 (reviewer session — #550 MERGED; #5 fixes are the active step).
 
 ## Decisions in force (recorded since the last doc merge)
 
@@ -40,19 +40,18 @@ main. **Affiliate merged, NOT deployed (batched):** F1 (#2), F2 (#3).
 
 | Item | State | Blocker |
 |---|---|---|
-| wodwisdom **#550** (F3 join) | Reviewed (2🔴+4🟠). Fix round WRITTEN LOCALLY, **NOT PUSHED** | Push it; fold Decision 2 contract-doc + confirm which ONE PROFILE items land here vs #551 round |
-| affiliate **#5** (enroll) | Reviewed (9 findings, report-only) | Wodwisdom team fixes after #550 push: TOCTOU, PII null-clobber, digest verifier, assertion persist+gate (Decision 2), PII-cache staleness + GDPR deletion-propagation |
+| wodwisdom **#550** (F3 join) | ✅ **MERGED** (36a9018 re-verified: all 8 findings fixed; Decision-2 contract documented; ONE PROFILE prefill in, write-through/lifts deferred to #551 round) | — |
+| affiliate **#5** (enroll) | Reviewed (9 findings) — **ACTIVE STEP** | Wodwisdom team fixes NOW: TOCTOU, PII null-clobber, digest verifier, assertion persist+gate (Decision 2), PII-cache staleness + GDPR deletion-propagation |
 | wodwisdom **#551** (cohort wiring) | Reviewed (2🔴+4🟠). Fixes not started | After #550: swallowed-error trio, claim-first+auth on cron, poison-gym backoff, **roster → athlete_profiles (Decision 1)**, rag context, strategy-table→pack (or file to #548), continuity documented |
 | affiliate **#6** (F9 billing) | Built, checks clean | Awaiting CROSS-TEAM review by wodwisdom team (after its fix rounds) |
 | affiliate #5 base retarget + branch cleanup | Pending | Affiliate team: retarget #5 to main; delete merged f1/f2 branches |
 
 ## Next action per actor (in order)
 
-**Wodwisdom team:** (1) PUSH the #550 fix commit. (2) Add the Decision-2
-contract section to GYM_PORTAL_FLOWS F3 + state which ONE PROFILE items are in
-this round vs the #551 round. (3) Fix affiliate #5 findings (incl. Decision 2
-affiliate half). (4) Fix #551 (incl. Decision 1 roster change). (5) Review
-affiliate #6. Then F5 + F4-PWA/TV + launch kit.
+**Wodwisdom team:** (1) ~~#550~~ DONE/merged. (2) Fix affiliate #5 findings
+(incl. Decision-2 affiliate half: persist consent_version + gate activation).
+(3) Fix #551 (incl. Decision-1 roster change + write-through + lifts capture).
+(4) Review affiliate #6. Then F5 + F4-PWA/TV + launch kit.
 
 **Affiliate team:** (1) Retarget #5 to main; delete merged branches. (2)
 Confirm the ONE PROFILE cache findings (name/email staleness + GDPR
