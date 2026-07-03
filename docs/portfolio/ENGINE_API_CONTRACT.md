@@ -140,6 +140,12 @@ request fails only on auth / rate limit / malformed envelope.
    "reference athlete," or a coach-set level? Affects who the shared path is written for.
 3. **Continuation in cohort mode.** Does month-N+1 re-derive the shared path, or carry the
    class forward with per-athlete adaptation creeping in? (Ties to D9 remote-membership packaging.)
+   **RESOLVED (v1, #551): re-derive.** The cohort cron sends `previous_cycle: null` every
+   month — each month is an independent generation from the (byte-identical) deterministic
+   inputs, so the only cross-month variation is LLM sampling. This is a KNOWN v1 limitation
+   (documented in ENGINE_COHORT_WIRING.md + GYM_SKU_SPEC §1): no programmed progressive
+   overload across months yet. Wiring the prior month's summary into the cohort envelope is
+   planned continuity work, tracked to #548 — not a surprise redesign.
 4. **Idempotency keys** on `/v1/generate` so a retried batch doesn't double-generate.
 5. **`include_baseline: false`** server implementation (pure white-label) — deferred until a
    tenant actually needs corpus isolation without the baseline.
@@ -160,7 +166,13 @@ What `engine-generate` + `_shared/engine/*` actually implement vs. the spec abov
 - **Synchronous, not 202 + jobs.** `POST engine-generate` runs the pipeline inline and
   returns `EngineGenerateResult`. The async job model + `GET /v1/jobs` are Phase 4;
   wodwisdom's heavy resumable path stays in `generate-program-v3`'s dispatcher.
-- **Auth is a single `ENGINE_SERVICE_KEY`** (server-to-server), not per-consumer keys.
+- **Auth is constant-time + tenant-bound (per-consumer keys landed in #549).**
+  `ENGINE_SERVICE_KEY` is the unrestricted internal/admin key (any tenant);
+  `ENGINE_CONSUMER_KEYS` is an optional `{ key: tenant | tenant[] }` map — a consumer
+  key may ONLY write its bound tenant(s), enforced against the request's `tenant_id`.
+  Keys are compared over SHA-256 digests (`_shared/consumer-auth.ts`, shared with
+  wholesale-grants). The DB-backed `consumer_keys` registry + rate limiting are still
+  Phase 4. (Do NOT hand the admin key to the portal — issue it a bound consumer key.)
 - **`corpus_scope` + `model_profile` are accepted but not threaded** — RAG scoping
   happens at surface-side payload build (`buildRagContext(corpusTenants)` from the
   Phase-1 corpus migration); the pipeline uses the default model profile. Reserved.

@@ -31,6 +31,9 @@ export async function persistCohortResult(
     .select("id")
     .single();
   if (progErr || !prog) {
+    // Full Postgres error (code/details/hint) — operators need it the first time a
+    // persist fails in production; .message alone drops the diagnostic fields.
+    console.error("[persist-cohort-result] engine_cohort_programs insert failed:", progErr);
     throw new Error(`cohort program persist failed: ${progErr?.message ?? "no row"}`);
   }
   const cohortProgramId = (prog as { id: string }).id;
@@ -44,8 +47,12 @@ export async function persistCohortResult(
     substitutions_pending: s.substitutions_pending,
     scaled_movements: s.scaled_movements,
   }));
+  // An empty roster is legal (cohort still generates the shared program for F5) — no
+  // scaling rows to write, and PostgREST rejects an empty insert payload.
+  if (rows.length === 0) return { cohort_program_id: cohortProgramId };
   const { error: scalingErr } = await supa.from("engine_member_scaling").insert(rows);
   if (scalingErr) {
+    console.error("[persist-cohort-result] engine_member_scaling insert failed:", scalingErr);
     // Roll back the orphaned parent so a retry starts clean (CASCADE clears any
     // partially-inserted scaling rows).
     await supa.from("engine_cohort_programs").delete().eq("id", cohortProgramId).then(() => {}, () => {});

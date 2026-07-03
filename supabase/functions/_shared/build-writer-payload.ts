@@ -198,7 +198,9 @@ function clampDaysPerWeek(n: number | null | undefined): 3 | 4 | 5 | 6 {
   return r as 3 | 4 | 5 | 6;
 }
 
-function asLiftValue(v: unknown): number | null {
+// Exported so the cohort roster builder resolves member 1RMs by the EXACT same rule
+// retail uses (this coercion decides prescribed weights and must not drift).
+export function asLiftValue(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
 }
 
@@ -319,12 +321,31 @@ async function fetchLoggedCompetitionResults(
 // is already guarded by the curated table + do-not-program list + safety review.
 // ============================================================
 
-export async function fetchVocabulary(supa: SupabaseClient): Promise<string[]> {
+// Retail path: soft-fails to [] on error (audit rule #7 then rejects any movement
+// string — a self-limiting degradation). The cohort cron passes { onError: "signal" }
+// so it can ABORT before a paid LLM run instead of generating against an empty vocab
+// (which would burn the surgical recovery passes). Both share this one query + coercion.
+export async function fetchVocabulary(supa: SupabaseClient): Promise<string[]>;
+export async function fetchVocabulary(
+  supa: SupabaseClient,
+  opts: { onError: "signal" },
+): Promise<{ vocabulary: string[]; error: string | null }>;
+export async function fetchVocabulary(
+  supa: SupabaseClient,
+  opts?: { onError: "signal" },
+): Promise<string[] | { vocabulary: string[]; error: string | null }> {
   const { data, error } = await supa
     .from("movements")
     .select("display_name")
     .order("display_name", { ascending: true });
 
+  const vocabulary = (data ?? [])
+    .map((row) => (row as { display_name: unknown }).display_name)
+    .filter((s): s is string => typeof s === "string" && s.trim() !== "");
+
+  if (opts?.onError === "signal") {
+    return { vocabulary, error: error ? error.message : null };
+  }
   if (error) {
     console.warn(
       "[build-writer-payload] vocabulary fetch failed; proceeding with empty list. Audit rule #7 will reject any movement strings.",
@@ -332,9 +353,7 @@ export async function fetchVocabulary(supa: SupabaseClient): Promise<string[]> {
     );
     return [];
   }
-  return (data ?? [])
-    .map((row) => (row as { display_name: unknown }).display_name)
-    .filter((s): s is string => typeof s === "string" && s.trim() !== "");
+  return vocabulary;
 }
 
 // ============================================================

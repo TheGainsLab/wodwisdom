@@ -1,8 +1,10 @@
 /**
  * cohort/build-cohort-roster.ts — the cohort roster builder.
  *
- * Turns each active gym member's light Engine intake (member_gym_links.engine_intake
- * on the wodwisdom side) into the slim `AthleteInput` the cohort scaler consumes.
+ * Turns each active gym member's attributes — sourced from the ONE PROFILE
+ * (`athlete_profiles`, Decision 1: attributes live only there, every surface reads
+ * it) — into the slim `AthleteInput` the cohort scaler consumes. The cron reads the
+ * profile and passes a CohortMemberIntake per member; this maps it.
  *
  * `computeCohortScaling` reads ONLY `payload.lifts`, `payload.basics.{units,gender}`,
  * and `training_context.injuries_structured.do_not_program` per member — so this
@@ -15,7 +17,7 @@
  * PURE + DB-FREE (unit-testable): the caller loads the intakes; this maps them.
  */
 
-import type { WriterPayload } from "../build-writer-payload.ts";
+import { asLiftValue, type WriterPayload } from "../build-writer-payload.ts";
 import { ALL_CONDITIONING_KEYS, ALL_EQUIPMENT_KEYS, ALL_LIFT_KEYS, ALL_SKILL_KEYS } from "../tier-status.ts";
 import { type AthleteModel, buildAthleteModel } from "../athlete-model.ts";
 import type { TrainingDesignInput } from "../training-design-input.ts";
@@ -36,10 +38,9 @@ export interface CohortMemberIntake {
 
 function hydrateLifts(raw: Record<string, number | null> | null | undefined): Record<string, number | null> {
   const out: Record<string, number | null> = {};
-  for (const k of ALL_LIFT_KEYS) {
-    const v = raw?.[k];
-    out[k] = typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
-  }
+  // Reuse retail's asLiftValue so a member's resolved weights follow the exact same
+  // coercion rule (zero / negative / non-finite → null).
+  for (const k of ALL_LIFT_KEYS) out[k] = asLiftValue(raw?.[k]);
   return out;
 }
 
@@ -62,7 +63,17 @@ const NULL_CONDITIONING = Object.fromEntries(ALL_CONDITIONING_KEYS.map((k) => [k
  * per-member athlete_model (deterministic in tests).
  */
 export function buildCohortRoster(members: CohortMemberIntake[], nowIso: string): AthleteInput[] {
-  return members.map((m) => {
+  // Dedupe by athlete_ref (first wins) — a duplicate ref would collide on
+  // engine_member_scaling's UNIQUE(cohort_program_id, athlete_ref) and 500 AFTER
+  // the paid generation. member_gym_links is UNIQUE(user_id, gym_id) so this is a
+  // belt-and-suspenders guard against a caller passing the same member twice.
+  const seen = new Set<string>();
+  const unique = members.filter((m) => {
+    if (!m.athlete_ref || seen.has(m.athlete_ref)) return false;
+    seen.add(m.athlete_ref);
+    return true;
+  });
+  return unique.map((m) => {
     const units: "lbs" | "kg" = m.units ?? "lbs";
     const lifts = hydrateLifts(m.lifts);
     const doNotProgram = (m.do_not_program ?? []).map((s) => String(s).trim()).filter(Boolean);

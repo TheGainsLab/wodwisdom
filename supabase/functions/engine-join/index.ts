@@ -65,6 +65,59 @@ function decodeJwtSub(token: string): { sub: string | null; email: string | null
   }
 }
 
+// Canonical lift keys F3 may capture (2–3 optional key lifts; superset accepted so
+// the intake UI can grow without a redeploy). Mirrors tier-status.ALL_LIFT_KEYS.
+const CANONICAL_LIFT_KEYS = new Set([
+  "back_squat", "front_squat", "overhead_squat", "deadlift", "snatch", "power_snatch",
+  "clean", "clean_and_jerk", "jerk", "power_clean", "push_jerk", "press", "push_press",
+  "bench_press",
+]);
+
+function asPositiveNumber(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
+}
+
+/**
+ * Merge the join's provided attributes into the member's ONE PROFILE
+ * (athlete_profiles). Only writes fields the member actually supplied (providedIntake
+ * already stripped null/""/undefined), and merges key lifts OVER stored lifts so a
+ * partial capture never clobbers a fuller retail profile. Returns a warning string
+ * on failure (non-fatal), else null.
+ */
+async function writeThroughProfile(
+  userId: string,
+  provided: Record<string, unknown>,
+): Promise<string | null> {
+  const patch: Record<string, unknown> = {};
+  const bw = asPositiveNumber(provided.bodyweight);
+  if (bw != null) patch.bodyweight = bw;
+  if (provided.gender === "male" || provided.gender === "female") patch.gender = provided.gender;
+  if (provided.units === "lbs" || provided.units === "kg") patch.units = provided.units;
+
+  // Key lifts → canonical-key 1RM map, merged over the stored lifts.
+  const rawLifts = (provided.lifts && typeof provided.lifts === "object" && !Array.isArray(provided.lifts))
+    ? provided.lifts as Record<string, unknown> : {};
+  const capturedLifts: Record<string, number> = {};
+  for (const [k, v] of Object.entries(rawLifts)) {
+    const n = asPositiveNumber(v);
+    if (n != null && CANONICAL_LIFT_KEYS.has(k)) capturedLifts[k] = n;
+  }
+
+  if (Object.keys(patch).length === 0 && Object.keys(capturedLifts).length === 0) return null;
+
+  if (Object.keys(capturedLifts).length > 0) {
+    const { data: existing, error: readErr } = await svc.from("athlete_profiles")
+      .select("lifts").eq("user_id", userId).maybeSingle();
+    if (readErr) { console.error("[engine-join] profile lifts read failed:", readErr); return "profile_read_failed"; }
+    patch.lifts = { ...((existing?.lifts as Record<string, unknown>) ?? {}), ...capturedLifts };
+  }
+
+  const { error: upErr } = await svc.from("athlete_profiles")
+    .upsert({ user_id: userId, ...patch }, { onConflict: "user_id" });
+  if (upErr) { console.error("[engine-join] profile write-through failed:", upErr); return "profile_write_failed"; }
+  return null;
+}
+
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -163,5 +216,13 @@ Deno.serve(async (req) => {
   }, { onConflict: "user_id,gym_id" });
   if (linkErr) return json({ error: "link_failed", detail: linkErr.message }, 500);
 
-  return json({ joined: true, gym_name: gymName, class_name: className, seat_status: seatStatus });
+  // 4. ONE PROFILE write-through (Decision 1): the member's attributes live only in
+  //    athlete_profiles — the single source the cohort roster (#551) AND retail read.
+  //    Merge provided fields (never regress: providedIntake already dropped blanks),
+  //    merge captured key lifts over stored lifts. Best-effort: the join itself
+  //    (roster + consent) already succeeded, so a profile write hiccup is logged, not
+  //    fatal — the member's next intake submission retries it.
+  const profileWarn = await writeThroughProfile(userId, providedIntake);
+
+  return json({ joined: true, gym_name: gymName, class_name: className, seat_status: seatStatus, ...(profileWarn ? { profile_warning: profileWarn } : {}) });
 });

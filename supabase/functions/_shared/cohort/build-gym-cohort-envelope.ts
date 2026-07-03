@@ -9,18 +9,21 @@
  * target, not any individual.
  *
  * PURE + DB-FREE (so it is unit-testable): the caller passes the movement
- * `vocabulary` (a `movements` display_name list) and a `nowIso`. It reuses the
- * real deterministic layers — `buildAthleteModel` (facts) and
- * `buildTrainingDesignInput` (the judgment→execution projection) — so the shared
- * program is generated from exactly the same input shapes as retail, not a
- * parallel path that could drift.
+ * `vocabulary` (a `movements` display_name list), a `nowIso`, and (optionally) a
+ * pre-built `rag` methodology block. It reuses the real deterministic layer —
+ * `buildAthleteModel` (facts) — so the shared program is generated from exactly the
+ * same input shapes as retail, not a parallel path that could drift.
  *
- * The class target is a REFERENCE athlete derived transparently from a reference
- * bodyweight × per-lift strength-standard multipliers, scaled by target_level —
- * a tunable method, not fabricated absolute numbers. The coaching strategy is a
- * fixed, deterministic "shared conditioning class" default (GYM_SKU_SPEC §1: the
- * Engine Class is a cardio/mixed-modal class, NOT individually adaptive), so no
- * LLM coach-state call is needed for the cohort target.
+ * The class target is a REFERENCE athlete derived from the CANONICAL strength tables
+ * (`THRESHOLDS_V1` in athlete-model.ts) scaled by target_level — one source of truth,
+ * self-consistent with the inter-lift ratios buildAthleteModel checks (so the
+ * reference athlete never ratio-flags itself). No fabricated fourth standards table.
+ *
+ * DEBT (filed to #548, with the #547 ruleRecap items): the shared-class coaching
+ * STRATEGY below (conditioning-forward, deprioritize olympic_lifting) is CrossFit
+ * coaching judgment living in the Engine-side surface. When domain_pack becomes
+ * genuinely multi-sport, this strategy belongs ON the pack (a `cohortStrategy` seam),
+ * not hardcoded here — same altitude problem as ruleRecap. Tracked, not yet moved.
  */
 
 import type { WriterPayload } from "../build-writer-payload.ts";
@@ -34,15 +37,9 @@ import {
   type AthleteModel,
   type AthleteProfileStatic,
   buildAthleteModel,
+  THRESHOLDS_V1,
 } from "../athlete-model.ts";
-import {
-  type CoachState,
-  type FocusArea,
-} from "../coach-state.ts";
-import {
-  buildTrainingDesignInput,
-  type TrainingDesignInput,
-} from "../training-design-input.ts";
+import type { TrainingDesignInput } from "../training-design-input.ts";
 
 export type CohortTargetLevel = "beginner" | "intermediate" | "advanced";
 
@@ -50,8 +47,6 @@ export type CohortTargetLevel = "beginner" | "intermediate" | "advanced";
  *  (affiliate side: equipment inventory, class days/length) — the affiliate
  *  passes these; this builder turns them into the Engine envelope. */
 export interface GymCohortConfig {
-  /** Gym tenant id (affiliate community id) — echoed as the request tenant_id. */
-  tenant_id: string;
   days_per_week: 3 | 4 | 5 | 6;
   session_length_minutes: number | null;
   /** Canonical equipment keys the gym floor has (ALL_EQUIPMENT_KEYS subset). */
@@ -68,25 +63,42 @@ export interface GymCohortConfig {
 // so the shared program's %s land sensibly; per-member scaling uses real numbers).
 const REFERENCE_BODYWEIGHT: Record<"lbs" | "kg", number> = { lbs: 170, kg: 77 };
 
-// Intermediate strength standards as bodyweight multiples (× bodyweight), scaled
-// by level below. Transparent + tunable (not fabricated absolutes).
-const LIFT_BW_MULTIPLIER: Record<string, number> = {
-  back_squat: 1.6, front_squat: 1.3, overhead_squat: 0.9, deadlift: 2.0,
-  snatch: 0.9, power_snatch: 0.78, clean: 1.2, clean_and_jerk: 1.15, jerk: 1.2,
-  power_clean: 1.08, push_jerk: 1.08, press: 0.68, push_press: 0.9, bench_press: 1.2,
-};
+// target_level scales the canonical back-squat/relative-strength bars. A pure level
+// scaler (NOT a strength-standards table) — tunable without conflicting with anything.
 const LEVEL_FACTOR: Record<CohortTargetLevel, number> = {
-  beginner: 0.72, intermediate: 1.0, advanced: 1.28,
+  beginner: 0.62, intermediate: 0.84, advanced: 1.08,
 };
 
-function referenceLifts(level: CohortTargetLevel, units: "lbs" | "kg"): Record<string, number | null> {
+/**
+ * Reference class-target 1RMs, derived from the CANONICAL tables (THRESHOLDS_V1):
+ * anchor on the back-squat relative-strength bar × level, then derive the squat/oly
+ * family from the canonical inter-lift ratios so the reference athlete is
+ * self-consistent (buildAthleteModel won't ratio-flag it). press/bench come from the
+ * relative-strength bars; lifts with no canonical anchor stay null. Exported so the
+ * cron can build the RAG methodology block from the same reference lifts.
+ */
+export function cohortReferenceLifts(
+  level: CohortTargetLevel,
+  units: "lbs" | "kg",
+): Record<string, number | null> {
   const bw = REFERENCE_BODYWEIGHT[units];
-  const factor = LEVEL_FACTOR[level];
+  const f = LEVEL_FACTOR[level];
+  const rel = THRESHOLDS_V1.relative_strength.men; // gender-neutral anchor (class target has no gender)
+  const r = THRESHOLDS_V1.ratios;
+  const round5 = (n: number) => Math.round(n / 5) * 5;
+
   const out: Record<string, number | null> = {};
-  for (const k of ALL_LIFT_KEYS) {
-    const mult = LIFT_BW_MULTIPLIER[k];
-    out[k] = mult != null ? Math.round((bw * mult * factor) / 5) * 5 : null;
-  }
+  for (const k of ALL_LIFT_KEYS) out[k] = null;
+
+  const backSquat = round5(bw * rel.back_squat * f);
+  out.back_squat = backSquat;
+  out.deadlift = round5(backSquat * r.deadlift_to_back_squat);
+  out.front_squat = round5(backSquat * r.front_squat_to_back_squat);
+  out.snatch = round5(backSquat * r.snatch_to_back_squat);
+  out.clean_and_jerk = round5(backSquat * r.clean_jerk_to_back_squat);
+  out.overhead_squat = round5((out.snatch ?? 0) * r.overhead_squat_to_snatch);
+  out.press = round5(bw * rel.press * f);
+  out.bench_press = round5(bw * rel.bench * f);
   return out;
 }
 
@@ -109,7 +121,7 @@ function referenceProfile(config: GymCohortConfig): AthleteProfileStatic {
     gender: null, // gender-neutral target; per-member scaling carries real gender
     height: null,
     units: config.units,
-    lifts: referenceLifts(config.target_level, config.units),
+    lifts: cohortReferenceLifts(config.target_level, config.units),
     skills,
     conditioning,
     equipment: equipmentMap(config.equipment),
@@ -117,52 +129,52 @@ function referenceProfile(config: GymCohortConfig): AthleteProfileStatic {
 }
 
 /**
- * The fixed, deterministic coaching strategy for a shared Engine Class: a
- * conditioning-forward, balanced-strength "keep everyone moving" posture. No
- * per-athlete judgment (the differentiation guard: the class is NOT individually
- * adaptive — GYM_SKU_SPEC §1). Confidence is "medium" — a sensible default, not
- * evidence-derived. Only allocation-relevant fields matter downstream (the tdi
- * projection drops the narrative fields), but they are filled for a valid shape.
+ * The fixed, deterministic coaching strategy for a shared Engine Class, as the
+ * execution-layer projection (TrainingDesignInput) directly — no fabricated
+ * intermediate CoachState, since none of its narrative/evidence fields survive the
+ * projection. Conditioning-forward, balanced strength kept alive; NOT individually
+ * adaptive (the differentiation guard — GYM_SKU_SPEC §1).
+ *
+ * DEBT (#548): this is CrossFit coaching judgment; it belongs on the domain pack
+ * when the Engine goes genuinely multi-sport (see file header).
  */
-function cohortCoachState(nowIso: string): CoachState {
-  const dev = (focus: FocusArea, rank: number): CoachState["priorities"][number] => ({
-    focus, rank, confidence: "medium",
-    reasons: ["supports_stated_goal", "highest_expected_roi"],
-    evidence: [],
-    athlete_facing_rationale: "A shared conditioning class develops engine across modalities.",
-    recommended_action: "Program mixed-modal conditioning with progressive aerobic and anaerobic exposure.",
-  });
+function cohortTrainingDesign(
+  config: GymCohortConfig,
+  lifts: Record<string, number | null>,
+): TrainingDesignInput {
   return {
-    coach_state_builder_version: "cohort-default-v1",
-    headline: "Build a broad, durable engine as a class.",
-    summary: "Shared Engine Class: conditioning-forward, mixed-modal, with balanced strength kept alive. Not individually adaptive — the shared path is scaled to each member's numbers.",
     priorities: [
-      dev("mixed_modal_conditioning", 1),
-      dev("aerobic_capacity", 2),
-      dev("anaerobic_capacity", 3),
+      { focus: "mixed_modal_conditioning", rank: 1, confidence: "medium" },
+      { focus: "aerobic_capacity", rank: 2, confidence: "medium" },
+      { focus: "anaerobic_capacity", rank: 3, confidence: "medium" },
     ],
-    maintain: [
-      { focus: "posterior_chain", reasons: ["already_at_standard"], athlete_facing_rationale: "Keep foundational strength alive." },
-      { focus: "upper_body_pressing", reasons: ["already_at_standard"], athlete_facing_rationale: "Maintain pressing capacity." },
-    ],
-    deprioritize: [
-      { focus: "olympic_lifting", reasons: ["recovery_budget_limited"] },
-      { focus: "skill_coordination", reasons: ["not_goal_relevant"] },
-    ],
-    recovery_posture: { stance: "standard", confidence: "medium", reasons: [] },
-    strength_emphasis: { value: "balanced", confidence: "medium", reasons: [] },
-    // Persistence-assigned fields — sentinels for the unpersisted cohort default.
-    version: 0,
-    athlete_id: "cohort-default",
-    created_at: nowIso,
+    maintain: ["posterior_chain", "upper_body_pressing"],
+    deprioritize: ["olympic_lifting", "skill_coordination"],
+    recovery_stance: "standard",
+    strength_emphasis: "balanced",
+
+    days_per_week: config.days_per_week,
+    session_length_minutes: config.session_length_minutes,
+    equipment: equipmentMap(config.equipment),
+    do_not_program: config.do_not_program,
+    vocabulary: [], // set by the caller path via the shared_payload; tdi copy filled below
+    lifts,
+    previous_cycle: null,
+
+    coach_state_version: 0,
     athlete_model_version: 0,
-    cycle_pointer: null,
   };
 }
 
 export interface BuildGymCohortEnvelopeResult {
   shared_payload: WriterPayload;
   shared_training_design_input: TrainingDesignInput;
+}
+
+export interface BuildGymCohortEnvelopeOptions {
+  /** Pre-built RAG methodology block (the cron builds it from cohortReferenceLifts
+   *  so this stays pure/DB-free). Omit = "" (tests). */
+  rag?: string;
 }
 
 /**
@@ -174,6 +186,7 @@ export function buildGymCohortEnvelope(
   config: GymCohortConfig,
   vocabulary: string[],
   nowIso: string,
+  opts: BuildGymCohortEnvelopeOptions = {},
 ): BuildGymCohortEnvelopeResult {
   const profile = referenceProfile(config);
   const modelContent = buildAthleteModel(profile, null);
@@ -212,18 +225,13 @@ export function buildGymCohortEnvelope(
     vocabulary,
     profile_evaluation: null,
     training_evaluation: null,
-    rag: "",
+    rag: opts.rag ?? "",
   };
 
-  const shared_training_design_input = buildTrainingDesignInput(cohortCoachState(nowIso), {
-    days_per_week: config.days_per_week,
-    session_length_minutes: config.session_length_minutes,
-    equipment: profile.equipment,
-    do_not_program: config.do_not_program,
-    vocabulary,
-    lifts: profile.lifts,
-    previous_cycle: null,
-  });
+  const shared_training_design_input: TrainingDesignInput = {
+    ...cohortTrainingDesign(config, profile.lifts),
+    vocabulary, // the week-fill's allowed-movement set
+  };
 
   return { shared_payload, shared_training_design_input };
 }
