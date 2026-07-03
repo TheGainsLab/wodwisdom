@@ -7,7 +7,7 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-03 (affiliate team — #5 retargeted to `main` + merged f1/f2 branches deleted; ONE PROFILE cache findings appended to #5; F4-moderation BUILT → affiliate **PR #7**. Prior same day: wodwisdom team — #5 fix round PUSHED (`ad604b1`), awaiting reviewer re-verify + merge per Decision 3).
+> Last updated: 2026-07-03 (affiliate team — **affiliate #5 re-verified + MERGED** (`bb91848`) at founder instruction: 9 findings + C1/C2 confirmed in code, deferrals tracked as issues #8/#9/#10. Decision-3 chain #550✅→#5✅→#551 now unblocks **wodwisdom #551**. Also: #5 retarget + f1/f2 cleanup done; F4-moderation → affiliate **PR #7** (consent-gated "awaiting consent — resend invite" roster state IN PROGRESS on #7)).
 
 ## Decisions in force (recorded since the last doc merge)
 
@@ -41,7 +41,7 @@ main. **Affiliate merged, NOT deployed (batched):** F1 (#2), F2 (#3).
 | Item | State | Blocker |
 |---|---|---|
 | wodwisdom **#550** (F3 join) | ✅ **MERGED** (36a9018 re-verified: all 8 findings fixed; Decision-2 contract documented; ONE PROFILE prefill in, write-through/lifts deferred to #551 round) | — |
-| affiliate **#5** (enroll) | ✅ **FIXES PUSHED** (affiliate `ad604b1`, on `claude/f3-member-enroll`) — awaiting reviewer re-verify + merge | All 5 assigned items done: TOCTOU→atomic upsert; PII null-clobber→non-null-only refresh + checked write; digest verifier (new `_shared/service-key-auth.ts`, fingerprint logs); Decision-2 persist+gate (enroll REQUIRES/persists `consent_version`, `activate_seat` 409s `consent_missing`); PII-cache `pii_synced_at` + GDPR `action:'forget'`. Folded in #4 (masked-404→502). Migration `20260703170000` adds 4 seat columns. Deferred: #6/#7/#8 hardening + dual-key rotation |
+| affiliate **#5** (enroll) | ✅ **MERGED** (affiliate `bb91848` → main; branch deleted) — re-verified against the 9 findings + C1/C2 | Fixes CONFIRMED IN CODE (`ad604b1` spot-check): #1 TOCTOU→atomic upsert; #2 null-clobber→non-null-only + checked write; #3 digest verifier (`_shared/service-key-auth.ts`, fingerprint); #4 masked-404→502; Decision-2 persist (`consent_required`) + gate (`activate_seat` 409 `consent_missing`); C1 `pii_synced_at`; C2 `action:'forget'`. Deferred hardening (all LOW/MED-LOW) **tracked as affiliate issues #8/#9/#10** (#6 PII-normalize/CSV, #7 audit-on-noop, #8 dead browser CORS + dual-key rotation) — wodwisdom-owned (grandfathered). Migration `20260703170000` (4 seat columns) rides the batched deploy |
 | wodwisdom **#551** (cohort wiring) | Reviewed (2🔴+4🟠). Fixes not started | After #550: swallowed-error trio, claim-first+auth on cron, poison-gym backoff, **roster → athlete_profiles (Decision 1)**, rag context, strategy-table→pack (or file to #548), continuity documented |
 | affiliate **#6** (F9 billing) | Built, checks clean | Awaiting CROSS-TEAM review by wodwisdom team (after its fix rounds) |
 | affiliate **#7** (F4-moderation) | ✅ **BUILT / PR open** (affiliate team) — tsc+vite+deno+eslint clean | Awaiting CROSS-TEAM review by wodwisdom team. Self-contained affiliate build (ledger + edge fn + coach page); cross-repo seams flagged in `docs/F4_MODERATION_CONTRACT.md` — needs wodwisdom F4 leaderboard to (1) expose an entries-read endpoint and (2) consume the moderation ledger (drop hide / badge flag / apply adjust) |
@@ -49,10 +49,14 @@ main. **Affiliate merged, NOT deployed (batched):** F1 (#2), F2 (#3).
 
 ## Next action per actor (in order)
 
-**Wodwisdom team:** (1) ~~#550~~ DONE/merged. (2) ~~Fix affiliate #5 findings~~
-DONE/pushed (affiliate `ad604b1`). **(3) NEXT: Fix #551** (incl. Decision-1
-roster change + write-through + lifts capture). (4) Review affiliate #6. Then
-F5 + F4-PWA/TV + launch kit. **Two follow-ups opened by the #5 fix (below).**
+**Wodwisdom team:** (1) ~~#550~~ DONE/merged. (2) ~~Fix affiliate #5~~ DONE +
+now **MERGED** (`bb91848`) — #551 is fully unblocked per Decision 3. **(3) NEXT:
+Fix #551** (incl. Decision-1 roster change + write-through + lifts capture). (4)
+Review affiliate #6 **and #7 (F4-moderation)**; #7 needs the wodwisdom F4
+leaderboard to expose an entries-read endpoint + consume the moderation ledger
+(`affiliate docs/F4_MODERATION_CONTRACT.md`). Then F5 + F4-PWA/TV + launch kit.
+Deferred #5 hardening lives in affiliate issues #8/#9/#10 (wodwisdom-owned).
+**Two follow-ups opened by the #5 fix (below).**
 
 **Affiliate team:** (1) ~~Retarget #5 to main; delete merged branches~~ DONE.
 (2) ~~Confirm ONE PROFILE cache findings in the #5 review~~ DONE — appended C1
@@ -67,9 +71,12 @@ docs/portfolio/PHASE2A_STATUS.md, execute your section, update the board when
 done."* Deploys stay batched with you (nothing new to deploy until the fix
 rounds merge). Parallel track: lawyer packet + pilot list.
 
-**Reviewer session:** re-verify **affiliate #5 fixes** (`ad604b1`) → merge chain
-per Decision 3 (#5 → #551) → review #6 findings cross-check → F4/F5 briefs →
-acceptance-demo checklist.
+**Reviewer session:** ~~re-verify affiliate #5 → merge~~ DONE this session (the
+affiliate-team session did the cross-team re-verify + merge of #5 at founder
+instruction; grandfathered #5, so no reviewer-authored fix was pushed — Decision 4
+preserved). Remaining: review **affiliate #6** + **#7 (F4-moderation)** findings
+cross-check → F4/F5 briefs → acceptance-demo checklist. (Merge chain: #550✅→#5✅;
+#551 is wodwisdom's, next per Decision 3.)
 
 > **Follow-ups opened by the #5 fix round (record before they're lost):**
 > **(a) Wire the GDPR `forget` caller.** The affiliate now RECEIVES
