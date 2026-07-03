@@ -19,7 +19,12 @@ to wodwisdom main remain allowed for both teams; (c) two agents in one repo →
 each in its OWN git worktree, always — the clone's checked-out branch belongs
 to nobody; (d) parent-folder sessions are reserved for one-off cross-repo
 supervision, never a team's daily driver; (e) EVERY session report starts
-with its team tag: `[wodwisdom]` or `[affiliate]`.
+with its team tag: `[wodwisdom]` or `[affiliate]`; (f) ONE clone per repo per
+machine — consolidate/delete stray clones outside `gainslab/` (a repo cloned
+twice on one laptop is the shared-state problem again), and `git pull` main
+before launching. Launch pattern:
+`cd gainslab/wodwisdom` → this terminal IS the wodwisdom team;
+`cd gainslab/affiliate-intelligence` → this terminal IS the affiliate team.
 
 ## Decisions in force (recorded since the last doc merge)
 
