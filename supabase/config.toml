@@ -209,3 +209,9 @@ verify_jwt = false
 # own X-Service-Key (WHOLESALE_SERVICE_KEY / WHOLESALE_CONSUMER_KEYS), so skip
 # Supabase's JWT gate.
 verify_jwt = false
+
+[functions.engine-join]
+# F3 member-join bridge (wodwisdom side). Validates the member JWT in code, then
+# calls the affiliate engine-enroll fn server-to-server. Needs AFFILIATE_ENROLL_URL
+# + ENGINE_ENROLL_KEY (shared secret, same value the affiliate holds).
+verify_jwt = false
