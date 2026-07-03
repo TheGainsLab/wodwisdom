@@ -7,7 +7,7 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-03 (wodwisdom team — #5 fix round PUSHED (affiliate `ad604b1`); awaiting reviewer re-verify + merge per Decision 3).
+> Last updated: 2026-07-03 (affiliate team — #5 retargeted to `main` + merged f1/f2 branches deleted; ONE PROFILE cache findings appended to #5; F4-moderation BUILT → affiliate **PR #7**. Prior same day: wodwisdom team — #5 fix round PUSHED (`ad604b1`), awaiting reviewer re-verify + merge per Decision 3).
 
 ## Decisions in force (recorded since the last doc merge)
 
@@ -44,7 +44,8 @@ main. **Affiliate merged, NOT deployed (batched):** F1 (#2), F2 (#3).
 | affiliate **#5** (enroll) | ✅ **FIXES PUSHED** (affiliate `ad604b1`, on `claude/f3-member-enroll`) — awaiting reviewer re-verify + merge | All 5 assigned items done: TOCTOU→atomic upsert; PII null-clobber→non-null-only refresh + checked write; digest verifier (new `_shared/service-key-auth.ts`, fingerprint logs); Decision-2 persist+gate (enroll REQUIRES/persists `consent_version`, `activate_seat` 409s `consent_missing`); PII-cache `pii_synced_at` + GDPR `action:'forget'`. Folded in #4 (masked-404→502). Migration `20260703170000` adds 4 seat columns. Deferred: #6/#7/#8 hardening + dual-key rotation |
 | wodwisdom **#551** (cohort wiring) | Reviewed (2🔴+4🟠). Fixes not started | After #550: swallowed-error trio, claim-first+auth on cron, poison-gym backoff, **roster → athlete_profiles (Decision 1)**, rag context, strategy-table→pack (or file to #548), continuity documented |
 | affiliate **#6** (F9 billing) | Built, checks clean | Awaiting CROSS-TEAM review by wodwisdom team (after its fix rounds) |
-| affiliate #5 base retarget + branch cleanup | Pending | Affiliate team: retarget #5 to main; delete merged f1/f2 branches |
+| affiliate **#7** (F4-moderation) | ✅ **BUILT / PR open** (affiliate team) — tsc+vite+deno+eslint clean | Awaiting CROSS-TEAM review by wodwisdom team. Self-contained affiliate build (ledger + edge fn + coach page); cross-repo seams flagged in `docs/F4_MODERATION_CONTRACT.md` — needs wodwisdom F4 leaderboard to (1) expose an entries-read endpoint and (2) consume the moderation ledger (drop hide / badge flag / apply adjust) |
+| affiliate #5 base retarget + branch cleanup | ✅ **DONE** (affiliate team) | #5 base retargeted to `main`; merged `claude/f1-gym-onboarding` + `claude/f2-engine-class` deleted (local + remote) |
 
 ## Next action per actor (in order)
 
@@ -53,10 +54,13 @@ DONE/pushed (affiliate `ad604b1`). **(3) NEXT: Fix #551** (incl. Decision-1
 roster change + write-through + lifts capture). (4) Review affiliate #6. Then
 F5 + F4-PWA/TV + launch kit. **Two follow-ups opened by the #5 fix (below).**
 
-**Affiliate team:** (1) Retarget #5 to main; delete merged branches. (2)
-Confirm the ONE PROFILE cache findings (name/email staleness + GDPR
-deletion-propagation) are in the #5 review — append if missing. (3) Build
-F4-moderation (flow spec F4). (4) Stand by for #6 review feedback.
+**Affiliate team:** (1) ~~Retarget #5 to main; delete merged branches~~ DONE.
+(2) ~~Confirm ONE PROFILE cache findings in the #5 review~~ DONE — appended C1
+(name/email staleness) + C2 (GDPR deletion-propagation) to #5; the `ad604b1` fix
+already implements both (`pii_synced_at` + `action:'forget'`), so they're covered,
+now recorded. (3) ~~Build F4-moderation~~ DONE → affiliate **PR #7** (checks clean).
+(4) NEXT: stand by for #6 **and** #7 cross-team review; once #7 is reviewed, wire
+the two F4 cross-repo seams jointly with the wodwisdom F4 leaderboard build.
 
 **Founder:** relay = one line per team: *"Pull wodwisdom main, read
 docs/portfolio/PHASE2A_STATUS.md, execute your section, update the board when
@@ -85,10 +89,17 @@ acceptance-demo checklist.
 > while #5 was open, wiping an in-progress checkout. The #5 fixes were done in an
 > isolated `git worktree` off `origin/claude/f3-member-enroll` to avoid the
 > collision. Teams sharing one clone should use worktrees per Decision 4.
+> **Affiliate-team follow-up (confirmed):** nothing was lost — the affiliate
+> session preserved the uncommitted #5 WIP (stashed with `-u`, parked back onto
+> `claude/f3-member-enroll`) before building F4, and has now confirmed it is fully
+> captured in `ad604b1` (same 4 files) and dropped the redundant backup stash.
+> Affiliate team will use a `git worktree` for parallel branches going forward.
 
 ## Remaining to close Phase 2a (after the table above clears)
 
-F5 read-only view (wodwisdom) · F4 leaderboard+TV (wodwisdom) +
-F4-moderation (affiliate) · launch kit content · combined affiliate deploy
+F5 read-only view (wodwisdom) · F4 leaderboard+TV (wodwisdom — must consume the
+affiliate moderation ledger per `docs/F4_MODERATION_CONTRACT.md`) +
+F4-moderation (affiliate — ✅ BUILT, PR #7; pending review + the two cross-repo
+seams) · launch kit content · combined affiliate deploy
 (F1+F2+F3+F9 migrations/functions/secrets incl. WHOLESALE_CONSUMER_KEYS +
 ENGINE_ENROLL_KEY) · the end-to-end acceptance demo (GYM_PORTAL_FLOWS bottom).
