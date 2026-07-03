@@ -211,6 +211,16 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.gym-cohort-cron]
-# Task #5 — monthly regeneration of gym Engine Class cohort programs. Called by
-# pg_cron (intra-project); no custom auth, same as monthly-generation-cron.
+# Task #5 — regeneration of gym Engine Class cohort programs. Scheduled hourly by
+# pg_cron so a fleet of gyms drains (per-gym cadence is monthly). verify_jwt=false
+# because pg_cron can't mint a Supabase JWT; the handler gates itself with an
+# X-Cron-Key header (GYM_COHORT_CRON_KEY) so a stray public POST can't trigger a
+# paid LLM run.
 verify_jwt = false
+
+[functions.engine-join]
+# F3 member-join bridge (wodwisdom side). Member JWT is verified by the gateway
+# (verify_jwt=true — no per-request GoTrue round trip; we decode the verified token
+# for the user id). Calls the affiliate engine-enroll fn server-to-server. Needs
+# AFFILIATE_ENROLL_URL + ENGINE_ENROLL_KEY (shared secret, same value the affiliate holds).
+verify_jwt = true
