@@ -7,7 +7,7 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-04 (affiliate team — **Decision 9(i) affiliate delta ①–④ SHIPPED →
+> Last updated: 2026-07-04 (wodwisdom team — **#577 build-review fix pushed** (`03598f9`) → reviewer re-verifies + merges. 🟠 activation gap closed: the `engine` grant now SEEDS `engine_months_unlocked` at activation via a shared only-raise write (`raiseEngineMonthsFromGrant`, insert-if-missing + `.lt` guard) that the cron ALSO uses — a fresh seat shows Month 1 immediately, no cron-luck lock; cron rescheduled HOURLY. 🟡 `supabase/.temp/` untracked + gitignored. 5 drip + 2 grant-row tests pass; deno/tsc/vite clean; retail drip untouched. Prior line: 2026-07-04 (affiliate team — **Decision 9(i) affiliate delta ①–④ SHIPPED →
 > affiliate PR #14** (`claude/decision9-engine-distribution`), opened alongside wodwisdom #577
 > per issue #13 so both land together. **①** `engine-class` seat now grants retail **`engine`**
 > (`ENGINE_GRANT_FEATURE`, was `engine_cohort`; one `callGrant` covers activate/deactivate/
