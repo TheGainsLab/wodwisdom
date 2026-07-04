@@ -78,7 +78,9 @@ schedule (which weekdays the class runs) is a follow-up; today it advances daily
   `engine_class_results.id`. Moderation is NOT anonymized (gym staff own integrity).
 - **Seam 2 (consumed): `moderation-client.fetchModerations`.** The leaderboard + TV
   ENFORCE the affiliate ledger — drop `hide`, badge `flag`, substitute `adjust` — applied
-  BEFORE ranking. `POST AFFILIATE_MODERATION_URL { gym_id, class_id? }` +
+  BEFORE ranking. The affiliate exposes this as the `get_active` action on its
+  multi-action `engine-moderation` endpoint, so the request MUST carry the action:
+  `POST AFFILIATE_MODERATION_URL { action: "get_active", gym_id, class_id? }` +
   `X-Service-Key AFFILIATE_MODERATION_KEY` → `{ moderations: [{ result_ref, decision,
   adjustment|null }] }`. **Graceful degrade:** unconfigured/unreachable → render
   unmoderated (never fatal), mirroring the affiliate's own ledger-only fallback.
