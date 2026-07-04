@@ -7,7 +7,20 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-04 (affiliate team — **Reviewed Decision 9(i) + the #574 distribution
+> Last updated: 2026-07-04 (affiliate team — **Open Q3 CONFIRMED RESOLVED on #574 → item ①
+> amended; ②③④ unchanged.** The `granted_at`-reset worry is handled by the grant MECHANICS,
+> which affiliate `engine-class` ALREADY implements: **`deactivate_seat` POSTs `expires_at` =
+> period end (not DELETE); `reactivate_seat` POSTs `expires_at: null`; terminal revocations stay
+> DELETE** — so one grant row (and its `granted_at`) survives a deactivate→reactivate cycle and
+> the months-drip cron never resets a returning member. **Net affiliate delta for ① is therefore
+> still a single feature-const flip** (`ENGINE_COHORT_FEATURE` `engine_cohort`→`engine`,
+> `engine-class:43`): the POST-`expires_at` mechanics ride the same `callGrant`, so flipping the
+> const flips activate/deactivate/reactivate/compensation uniformly — no mechanics change needed.
+> **②** drop the `engine_class_view` enroll grant if F5 defers; **③** hide the portal moderation
+> route/nav; **④** PARKED banner + runbook delta. **SHIP TRIGGER: when the wodwisdom BUILD PR
+> opens** (not #574, which is design-only) — the affiliate PR opens alongside so the
+> allowlist-deploy-then-grant-flip pair lands together. Build PR NOT open yet (only unrelated
+> #481/#401) → affiliate STANDING BY; ①–④ ready to ship on trigger. Prior line: affiliate team — **Reviewed Decision 9(i) + the #574 distribution
 > design — affiliate delta is exactly ONE ~1-line grant flip + subtractive cleanup; signed off
 > on the affiliate half (comment on #574).** #574 grants retail `engine` gym-scoped over a
 > union-read gate, so: **① affiliate `engine-class` flips its grant `feature` `engine_cohort`→
