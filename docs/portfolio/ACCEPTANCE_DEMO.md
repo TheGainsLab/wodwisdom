@@ -4,6 +4,18 @@
 > owner, IS the pilot pitch. Every step names what it proves. If every box
 > checks, the Engine Class is sellable.
 
+> **⚠️ REVISED for Decision 9(i) (2026-07-04) — the demo PAUSED at the old generation
+> step; the SKU is now pure distribution of the retail Engine.** The v1 demo path is:
+> **join via QR → consent → owner activates the seat (grants the retail `engine` feature) →
+> member opens the app → picks an Engine program variant → sees Day 1 → logs it → history +
+> breakdowns render → owner sees the roster + billing preview.** No per-gym AI generation,
+> no gym leaderboard/TV (parked). Preconditions change: instead of the cohort cron + seam
+> keys, verify the `engine` grant allowlist is deployed and `gym-engine-months-cron` is
+> scheduled (a fresh seat shows Month 1 unlocked, more unlocking on the 30-day drip). The
+> step-by-step below still exercises F1→F3 + F9 verbatim; the F4/leaderboard steps are
+> dropped for v1, and the "generate the class program" step is replaced by "member picks a
+> retail Engine variant and starts Day 1."
+
 ## 0. Preconditions (once)
 
 - [ ] Both deploy runbooks executed: affiliate `docs/DEPLOY_RUNBOOK.md` +

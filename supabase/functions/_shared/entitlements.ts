@@ -4,9 +4,17 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 //    must not drift). Engine Class seat -> engine_cohort (2a); Programmer roster ->
 //    gym_programming (2b). ──────────────────────────────────────────────────────────
 
-/** Features a wholesale grant may issue (BILLING_MECHANICS §7). `engine_class_view` is
- *  the FREE F5 view tier (Decision 8) — granted at F3 join, never billed. */
-export const ALLOWED_GRANT_FEATURES = ["engine_cohort", "gym_programming", "engine_class_view"] as const;
+/** Features a wholesale grant may issue (BILLING_MECHANICS §7).
+ *  - `engine` = the RETAIL Engine standalone product (Decision 9(i): Engine Class is pure
+ *    distribution — a gym seat grants the exact retail `engine` feature, gym-scoped; the
+ *    union entitlement read lights up all /engine/* surfaces with retail code untouched).
+ *    Gym-sourced `engine` grants are excluded from the paid-subscriber classifiers, so it
+ *    never inflates retail paid counts.
+ *  - `engine_cohort` = the parked cohort-class seat (kept for the 2b Programmer).
+ *  - `engine_class_view` = FREE F5 view tier (Decision 8; F5 deferred in v1 — the affiliate
+ *    stops granting it, the key stays allowlisted for a future free surface).
+ *  - `gym_programming` = 2b Programmer roster. */
+export const ALLOWED_GRANT_FEATURES = ["engine", "engine_cohort", "gym_programming", "engine_class_view"] as const;
 
 /**
  * SEAT access = the paid Engine Class seat (Decision 8): the log / leaderboard / TV

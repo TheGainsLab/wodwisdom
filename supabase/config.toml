@@ -211,11 +211,16 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.gym-cohort-cron]
-# Task #5 — regeneration of gym Engine Class cohort programs. Scheduled hourly by
-# pg_cron so a fleet of gyms drains (per-gym cadence is monthly). verify_jwt=false
-# because pg_cron can't mint a Supabase JWT; the handler gates itself with an
-# X-Cron-Key header (GYM_COHORT_CRON_KEY) so a stray public POST can't trigger a
-# paid LLM run.
+# Task #5 — regeneration of gym Engine Class cohort programs. PARKED under Decision 9(i)
+# (2b Programmer asset — unschedule the pg_cron job; code kept). verify_jwt=false;
+# X-Cron-Key (GYM_COHORT_CRON_KEY) fail-closed.
+verify_jwt = false
+
+[functions.gym-engine-months-cron]
+# Decision 9(i) — grant-based Engine months drip for gym-granted `engine` members (the
+# retail drip is Stripe-keyed). Month 1 is seeded at grant time (wholesale-grants); this
+# advances the ongoing drip — schedule HOURLY via pg_cron. verify_jwt=false; the handler
+# gates on an X-Cron-Key header (GYM_ENGINE_MONTHS_CRON_KEY), fail-closed.
 verify_jwt = false
 
 [functions.engine-join]

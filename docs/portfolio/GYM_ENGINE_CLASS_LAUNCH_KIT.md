@@ -4,14 +4,20 @@ _Content for founder review (GYM_SKU_SPEC §1 "Launch kit"). Markdown draft — 
 numbers are the wholesale/retail model already decided; the copy is a starting point
 for the owner-facing PDF + the member-facing blurb. Not code._
 
+> **Reframed for Decision 9(i): Engine Class is DISTRIBUTION of the retail Engine
+> program — same product retail sells at $30, distributed through the gym at $6/seat.**
+> v1 leads with the proven program + the distributor margin, NOT a gym leaderboard/wall
+> (those are parked). Margin math below is unchanged.
+
 ---
 
 ## The pitch (to the gym owner)
 
-**Add a cardio class your members do whenever they want — no Saturday-9am scheduling
-problem.** They log their numbers on their phone; your gym gets a live, physics-fair
-leaderboard on the wall. You set the price; you keep the margin. Zero programming work:
-the class writes itself every month.
+**Give your members the proven Engine program — the same one we sell to individuals for
+$30 — at a price you set.** They install it on their phone, pick a track, and start on
+Day 1; they get the full experience (breakdowns, history, the embedded day coach). You
+buy at $6/seat and resell for whatever you want. Zero programming work, zero content
+cost — pure distribution margin.
 
 - **$0 setup.** No install fee, no equipment purchase.
 - **$6 / active seat / month** wholesale (what you pay us). Volume breaks: **$5 at
@@ -52,21 +58,21 @@ grow (100+ → $5, 200+ → $4); your retail price doesn't have to.
 
 ## What the member gets (the blurb)
 
-> **The Engine Class — your gym's cardio program, on your phone.**
-> A new shared workout from your gym, any time you want it. Log your result, see where
-> you land on the gym leaderboard — ranked fairly by power-to-bodyweight, so a 60 kg
-> member competes head-to-head with a 100 kg member. Your numbers, your progress, your
-> gym. (Leave the gym? You keep your account and history — they're yours.)
+> **The Engine — the proven training program, on your phone, through your gym.**
+> Pick your track, start Day 1, and work through the program at your own pace — the same
+> Engine our individual members pay $30/mo for. Full workout breakdowns, your history and
+> trends, and the AI coach on every training day. (Leave the gym? Your account and history
+> are yours — they come with you.)
 
 ## Talking points for the front desk
 
-- "It's a class you never have to schedule or coach — it's always on."
-- "The leaderboard is physics-normalized, so it's actually fair — that's the hook."
-- "Members install it like an app; results log in seconds."
+- "It's the real Engine program — the same one sold direct for $30 — at our member price."
+- "They install it like an app, pick a track, and start Day 1."
+- "Breakdowns, history, an AI coach on every day — the full experience, not a stripped-down class version."
 - "You price it; most gyms run $15–$25 or bundle it into a tier."
 
-## The wall (TV mode)
+## Roadmap (not v1)
 
-Every class comes with a **gym-wall leaderboard screen** — a no-login URL you open on
-any TV or tablet at the front desk. It shows today's workout (Rx) and the live rolling
-board, refreshing on its own. It's the social proof that sells the next member.
+Gym leaderboards, physics-fair (W·kg) rankings, and a front-desk TV wall are built and
+**parked** — they return with the 2b AI Gym Programmer, where a gym genuinely shares
+programming. v1 leads with the program + the distributor margin.
