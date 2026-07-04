@@ -7,7 +7,22 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-04 (wodwisdom team — **Decision-9(i) BUILT → wodwisdom PR #577** (awaiting reviewer review). Seat unlock = grant retail `engine` gym-scoped (union gate, retail untouched); grant-row extracted to omit `granted_at` so re-grant preserves the drip clock (asserted by grant-row_test); new `gym-engine-months-cron` drips only active gym_grant `engine` rows from the original grant timestamp (min 36, only-raise, skips dual retail members); #560 group surfaces PARKED (routes/nav removed, code kept); docs rewritten as distribution. Affiliate delta = **affiliate issue #13** (grant `engine`; deactivate expires-not-deletes; drop `engine_class_view`; deploy allowlist first). deno check + 5 tests + tsc/vite clean. Prior line: 2026-07-04 (affiliate team — **Open Q3 CONFIRMED RESOLVED on #574 → item ①
+> Last updated: 2026-07-04 (affiliate team — **Decision 9(i) affiliate delta ①–④ SHIPPED →
+> affiliate PR #14** (`claude/decision9-engine-distribution`), opened alongside wodwisdom #577
+> per issue #13 so both land together. **①** `engine-class` seat now grants retail **`engine`**
+> (`ENGINE_GRANT_FEATURE`, was `engine_cohort`; one `callGrant` covers activate/deactivate/
+> reactivate). **Item 2 (Q3) needed NO code change** — deactivate already POSTs `expires_at` =
+> period-end (not DELETE) + reactivate POSTs null, so the grant row + `granted_at` survive → the
+> new `gym-engine-months-cron` won't reset a returning member (verified `engine-class:353–371`;
+> comment-only touch). **②** `engine-enroll` stops granting `engine_class_view` (F5 deferred) —
+> removed the call + helper + `free_view` field; Decision 8 revives from git (#12). **③** portal
+> `/leaderboard-moderation` route + Home nav removed (`LeaderboardModeration.tsx`/`moderation.ts`
+> kept as parked 2b assets). **④** PARKED banner on `F4_MODERATION_CONTRACT.md` + Decision-9 delta
+> on `DEPLOY_RUNBOOK.md`. Unchanged: F1/F2/F3, grants call shape, F9 billing (seat-state, not
+> grants — #6/#7 valid); revoke stays `granted_by`-scoped (a dual retail sub is safe). deno check
+> + tsc + billing tests (10) green; no new migration/fn/secret. **Deploy order:** wodwisdom
+> `engine` allowlist (#577) before this flip. #14 left OPEN for wodwisdom cross-review (Decision 4
+> symmetry) → both land at the batched deploy. Prior line: wodwisdom team — **Decision-9(i) BUILT → wodwisdom PR #577** (awaiting reviewer review). Seat unlock = grant retail `engine` gym-scoped (union gate, retail untouched); grant-row extracted to omit `granted_at` so re-grant preserves the drip clock (asserted by grant-row_test); new `gym-engine-months-cron` drips only active gym_grant `engine` rows from the original grant timestamp (min 36, only-raise, skips dual retail members); #560 group surfaces PARKED (routes/nav removed, code kept); docs rewritten as distribution. Affiliate delta = **affiliate issue #13** (grant `engine`; deactivate expires-not-deletes; drop `engine_class_view`; deploy allowlist first). deno check + 5 tests + tsc/vite clean. Prior line: 2026-07-04 (affiliate team — **Open Q3 CONFIRMED RESOLVED on #574 → item ①
 > amended; ②③④ unchanged.** The `granted_at`-reset worry is handled by the grant MECHANICS,
 > which affiliate `engine-class` ALREADY implements: **`deactivate_seat` POSTs `expires_at` =
 > period end (not DELETE); `reactivate_seat` POSTs `expires_at: null`; terminal revocations stay
