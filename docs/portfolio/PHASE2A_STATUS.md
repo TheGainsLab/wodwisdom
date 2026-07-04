@@ -7,7 +7,22 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-03 (wodwisdom team — **F5 + F4 BUILT → wodwisdom PR #560**
+> Last updated: 2026-07-03 (affiliate team — **F4_MODERATION_CONTRACT conformance
+> review of PR #560 POSTED** (comment on #560). **Verdict: both seams CONFORM — approve.**
+> Seam-1 (entries read) round-trip-verified against the real affiliate caller
+> (`engine-moderation` sends `{gym_id,class_id}`+`X-Service-Key`; `WODWISDOM_LEADERBOARD_KEY`
+> name matches both sides; `result_ref = engine_class_results.id` resolves contract
+> open-item 1). Seam-2 consumer (`moderation-client`) matches contract option B exactly;
+> re-rank + hide-drop/flag-badge resolve open-items 2–3, privacy confirmed as owner-intended.
+> **🟠 JOINT-1 (the issue-#11 headline):** wodwisdom re-ranks the **default W·kg board** by
+> `adjustment.wkg_score` and falls back to the ORIGINAL power when it's absent — so an
+> `adjust` carrying only `raw_score` is a **silent no-op on the W·kg wall**. Root cause is
+> affiliate-side (my post-#7 guard accepts raw_score OR wkg_score); wodwisdom can't derive
+> watts from a raw string. **Affiliate fix round (mine, committed): `adjust` will REQUIRE
+> `wkg_score`** + contract note; also **build the seam-2 read endpoint** (`engine-moderation
+> get_active`) so wodwisdom can consume the ledger. #560 needs no change to be correct
+> (optional: badge a wkg-less adjust `under_review`). +2🟡 minor (seam-1 single-key tenancy;
+> `workout_date:null`). Prior line: wodwisdom team — **F5 + F4 BUILT → wodwisdom PR #560**
 > (`claude/f4-f5-gym-surfaces`). The last 2a build: F5 read-only gym view (`/gym`,
 > `engine-class-view`) + F4 leaderboard/TV (`engine-class-{log,leaderboard,tv,entries}`,
 > `/gym/leaderboard`, public `/tv/:token`) + both moderation seams. Migration
@@ -155,14 +170,16 @@ removal on downgrade; 🟠 Analytics now on the `analytics_enabled` opt-in flag
 (Decision 7); #7 🟡 `moderated_by` nullable + empty-`{}` adjust rejected. Deferred:
 #6's 2🟡 (sub-create idempotency lock, period-end proxy) — low sev, not yet filed.
 (5) ~~author the combined deploy runbook~~ **DONE — `affiliate docs/DEPLOY_RUNBOOK.md`
-(`18aab46`)**, linked below; the founder executes it once F4/F5 merge. (6) **NEXT — wodwisdom F4 PR #560 IS OPEN:** run the `F4_MODERATION_CONTRACT.md`
-contract-conformance review on it (verify entries-read + ledger consumption match both
-seams exactly — shapes/auth/tenancy — flag divergence on the PR, don't adapt silently).
-**The exact seam shapes wodwisdom needs are in affiliate issue #11** (seam-1 ready now;
-seam-2 = affiliate exposes an `engine-moderation` `get_active` returning
-`{result_ref, decision, adjustment}` for `{gym_id, class_id?}`). Then **wire both seams**
-(seam-1: set `WODWISDOM_LEADERBOARD_URL/KEY`; seam-2: build the read endpoint + hand
-wodwisdom `AFFILIATE_MODERATION_URL/KEY`). wodwisdom degrades gracefully until seam-2 lands.
+(`18aab46`)**, linked below; the founder executes it once F4/F5 merge. (6) ~~run the `F4_MODERATION_CONTRACT.md` conformance review on #560~~ **DONE — posted on
+#560; verdict BOTH SEAMS CONFORM, approve.** Seam-1 round-trip-verified; seam-2 consumer
+matches option B; open-items 1–3 resolved; flagged, not silently adapted (Decision 4).
+**Fix round now queued (affiliate-side, from the review):** (a) **🟠 `adjust` must REQUIRE
+`wkg_score`** — a raw-only adjust is a silent no-op on wodwisdom's default W·kg board (the
+issue-#11 headline); tighten the `engine-moderation` guard + update the contract. (b)
+**build the seam-2 read endpoint** (`engine-moderation get_active` → `{result_ref, decision,
+adjustment}` for `{gym_id, class_id?}`) so wodwisdom can consume the ledger. Then **wire both
+seams** (seam-1: set `WODWISDOM_LEADERBOARD_URL/KEY`; seam-2: hand wodwisdom
+`AFFILIATE_MODERATION_URL/KEY`). wodwisdom degrades gracefully until seam-2 lands.
 (7) **NEW — Decision 8 (F5 free tier, Option A):** the enroll path grants a FREE
 `engine_class_view` entitlement at member join (same idempotent grants call, new
 feature key); revoke it with the gym's other grants; seat deactivation revokes ONLY
