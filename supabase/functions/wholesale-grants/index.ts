@@ -48,6 +48,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createConsumerAuth } from "../_shared/consumer-auth.ts";
 import { ALLOWED_GRANT_FEATURES } from "../_shared/entitlements.ts";
+import { buildGrantRow } from "../_shared/grant-row.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -163,20 +164,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    const row: Record<string, unknown> = {
-      user_id: userId,
-      feature,
-      // `source` = 'gym_' || gym_id (PREFIXED): the LEGACY UNIQUE(user_id, feature,
-      // source) still applies, so two gyms granting the same feature to the same
-      // member (a member in two Engine-Class gyms — §7 revokes per gym) must differ
-      // here. The 'gym_' prefix keeps these out of every existing `source` reader's
-      // namespace ('sub_%' retail revoke, 'manual'/'admin' classifiers). granted_by
-      // is the canonical tenant column; source_kind carries the category.
-      source: `gym_${gymId}`,
-      source_kind: "gym_grant",
-      granted_by: gymId,
-    };
-    if (expiresProvided) row.expires_at = expiresAt;
+    // Pure row builder (grant-row.ts) — deliberately omits granted_at so an idempotent
+    // re-grant (reactivation) preserves the ORIGINAL grant timestamp the gym months
+    // drip keys on. The 'gym_' source prefix + granted_by tenant column are set there.
+    const row = buildGrantRow({ userId, gymId, feature, expiresProvided, expiresAt });
 
     const { data, error } = await supa
       .from("user_entitlements")

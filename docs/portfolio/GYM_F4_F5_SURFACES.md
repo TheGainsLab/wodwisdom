@@ -1,5 +1,14 @@
 # F4 (leaderboard + TV) + F5 (read-only gym view) — wodwisdom build
 
+> **⚠️ PARKED for Engine Class v1 (Decision 9(i), 2026-07-04).** Engine Class became PURE
+> DISTRIBUTION of the retail Engine (a seat grants the retail `engine` feature; the member
+> gets the retail Engine surfaces, not a gym-shared workout/leaderboard). Everything below —
+> `engine-class-{view,log,leaderboard,entries,tv}`, `gym_tv_tokens`, the moderation seams,
+> `/gym` `/gym/leaderboard` `/tv/:token` — is **KEPT AS CODE but UNROUTED** (a 2b Programmer
+> asset). Routes/nav removed, `gym-cohort-cron` unscheduled. Retained as the design record
+> for that 2b work; it does NOT describe shipped Engine Class v1 — see
+> `ENGINE_CLASS_DISTRIBUTION_DESIGN.md`.
+
 _2026-07-03. The wodwisdom half of GYM_PORTAL_FLOWS §F4/§F5, built on the merged
 cohort program (#551) + the F2/F3 roster. Companion to the affiliate
 `docs/F4_MODERATION_CONTRACT.md` (the two cross-repo seams)._

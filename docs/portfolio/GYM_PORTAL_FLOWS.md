@@ -64,7 +64,13 @@ member's PWA gains the gym context: Engine class workouts, gym leaderboard.
 > without an accompanying consent claim (satisfies the F3 cross-cutting
 > "consent before any member data in owner surfaces" rule on both sides).
 
-## F4 — Leaderboard & TV mode [2a]
+## F4 — Leaderboard & TV mode [2a] — ⚠️ PARKED (Decision 9(i))
+
+> Built (#560) then **parked for Engine Class v1**: Decision 9(i) made Engine Class pure
+> distribution of the retail Engine (a seat grants the retail `engine` feature; the member
+> gets the retail Engine surfaces — see `ENGINE_CLASS_DISTRIBUTION_DESIGN.md`). The
+> leaderboard/TV code + moderation seams are kept, unrouted, as 2b Programmer assets. The
+> spec below describes the parked surface, not shipped v1.
 
 - Leaderboard per workout + season standings. Divisions: **gender and
   modality only** (decided). Toggle raw score / **W·kg physics-normalized**
@@ -74,7 +80,13 @@ member's PWA gains the gym context: Engine class workouts, gym leaderboard.
 - Coach view: today's roster of loggers, flag suspicious scores (edit/remove —
   gym owns its leaderboard integrity).
 
-## F5 — Free read-only gym view (PWA) [2a]
+## F5 — Free read-only gym view (PWA) [2a] — ⚠️ DEFERRED (Decision 9(i))
+
+> Deferred for Engine Class v1: with the seat now unlocking the retail Engine directly, the
+> v1 encounter path is join → activate → retail Engine (no free-view surface). The
+> `engine_class_view` grant (Decision 8) is no longer issued at join; the free-tier
+> mechanics revive verbatim if a free preview surface is ever built. Spec below retained.
+
 
 Any member of a participating gym (joined via F3 but without an active seat)
 sees today's workout read-only in the PWA — block-formatted, logging and

@@ -16,36 +16,46 @@
 
 ## 1. Engine Class — $6/active seat/mo · $0 setup · 10-seat minimum from launch
 
-**The pitch:** "Add a cardio class your members do whenever they want. No
-Saturday-9am scheduling problem. They log numbers; your gym gets a leaderboard.
-You price it; you keep the margin."
+> **REWRITTEN under Decision 9(i) (2026-07-04): Engine Class is PURE DISTRIBUTION of the
+> retail Engine standalone product — exact same code, no gym-specific member experience.**
+> Founder: "the gym owner becomes a distributor… the user gets access to the Engine
+> programs, chooses one and begins on day one, gets the breakdowns and history and
+> everything a retail user gets. The only difference is the way they encounter the program.
+> 5 easy sales at $6 = one hard retail sale at $30." Differentiation vs retail is
+> **channel + price, not features** (this supersedes the earlier feature-differentiation
+> framing + the cohort/leaderboard/TV group model, which is parked as a 2b Programmer asset).
+
+**The pitch:** "Give your members the proven Engine program at a price you set. They
+install it, pick a track, start Day 1 — the same product retail sells for $30, distributed
+through your gym for $6/seat. You keep the margin; we keep the program's reputation."
 
 **The gym owner gets:**
 
 | Feature | Status |
 |---|---|
-| Class setup in the gym portal: name it, invite members (link/QR), roster view | BUILD (portal shell exists in affiliate-intelligence) |
-| Cohort-mode Engine program: one shared progression path for the whole gym, auto-generated monthly | ADAPT (retail Engine + monthly cron EXIST; cohort flag is in the Engine API contract, Phase 1). **v1 caveat (#551): each month is an independent re-generation (`previous_cycle: null`) — no programmed progressive overload ACROSS months yet; cross-month continuity is tracked to #548. "Progression path" = within-month structure, not month-over-month periodization, at v1.** |
-| Gym leaderboard per workout + season standings — divisions by **gender and modality only** (decided; no age/scaled divisions at launch) | BUILD |
-| Physics-normalized rankings via the watts / W·kg model so a 60 kg member competes fairly with a 100 kg member — the differentiator no whiteboard app has | ADAPT (physics model EXISTS in data service; leaderboard surface is BUILD) |
-| Seat management: activate/deactivate members; billing follows active seats | BUILD (wholesale grant path on the existing entitlements layer) |
-| Launch kit: suggested retail guidance ($15–25/mo or bake into dues), member-facing copy, margin math one-pager | BUILD (content, not code) |
+| Class setup in the gym portal: name it, invite members (link/QR), roster view | BUILT (F1/F2) |
+| Seat management: activate/deactivate members; billing follows active seats | BUILT (F9 $6/active-seat; wholesale grant path) |
+| Distributor economics: buy at $6/seat, resell at any price (owner sets it) | — (business model, not code) |
+| Launch kit: suggested retail guidance ($15–25/mo or bake into dues), margin math one-pager | BUILT (content) |
 
-**The member gets:**
+**The member gets — the retail Engine standalone product, identical:**
 
 | Feature | Status |
 |---|---|
-| Engine workouts on their phone (installable PWA), any time | EXISTS |
-| Light intake (key numbers, a few minutes) | ADAPT (subset of retail intake) |
-| Individualized scaling — paces/loads personal to them while the *path* stays shared | ADAPT (cohort mode `ScalingResult`, Phase 1 contract) |
-| Result logging + personal trend charts | EXISTS |
-| Embedded AI coach on each training day (answers questions with the member's training as context) | EXISTS (already embedded in Engine/programmer days) |
-| Leaderboard participation | BUILD |
+| Picks an Engine program variant (`main_5day`/`main_3day`/varied) and **starts at Day 1** | EXISTS (retail Engine; a gym seat grants the retail `engine` feature) |
+| Every retail Engine surface: day pages, logging, **analytics/history/breakdowns**, day-type taxonomy, the embedded day coach | EXISTS |
+| Months unlock on the same **1-month-per-month drip** as retail — grant-based (from seat activation) since gym members have no Stripe (`gym-engine-months-cron`) | BUILT (Decision 9(i)) |
 
-**Explicitly NOT included** (differentiation guard vs. retail): adaptive
-recalibration (retail Engine's embedded AI), individually designed programming,
-full AI Coach. In-gym Engine is the shared-experience product; retail is the
-individually-adaptive product.
+**Explicitly NOT included** (retail-only, per SKU differentiation): the AI resequencer
+overlay and the full AI Coach stay retail-exclusive. Everything else a retail Engine
+subscriber gets, a seated gym member gets — same code.
+
+> **Parked for Engine Class v1 (kept as 2b Programmer assets, where classes genuinely
+> share workouts):** the gym leaderboard + season standings, the W·kg competition surface,
+> TV mode + tokens, the moderation seams, per-gym cohort generation (`gym-cohort-cron`),
+> and the `/gym` `/gym/leaderboard` `/tv` member surfaces. Not deleted — unrouted. Engine
+> is done individually, not as a group; there are no meaningful group dynamics to build on
+> for v1.
 
 ---
 

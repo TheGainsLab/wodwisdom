@@ -1,4 +1,12 @@
-# Engine Class = pure distribution of retail Engine — DESIGN PROPOSAL
+# Engine Class = pure distribution of retail Engine — DESIGN + BUILD
+
+> **STATUS: reviewer-approved (PR #574) → BUILT.** All 5 open questions answered (grant
+> `engine` only; drip; **Q3 revised — deactivate expires, not deletes**; defer F5; skip-guard
+> for dual members). Build in `claude/engine-class-distribution`: `engine` allowlisted; new
+> `gym-engine-months-cron`; `#560` group surfaces parked (routes/nav removed, code kept);
+> `grant-row.ts` + `engine-months-drip.ts` extracted + unit-tested. Affiliate delta (grant
+> `engine`, deactivate→`expires_at`, stop granting `engine_class_view`) coordinated separately.
+
 
 _2026-07-04. Decision 9(i): "the gym owner becomes a distributor… the user gets access
 to the Engine programs, chooses one and begins on day one… the exact same code. Nothing
@@ -102,10 +110,23 @@ increment, keyed on the grant instead of Stripe):
 > **Open Q2 (founder):** confirm the drip cadence (1 month / 30 days from activation) vs
 > unlock-all-at-grant. Recommend the drip — "same experience as retail" ⇒ retail drips ⇒ gym
 > drips; unlock-all would let a $6 member binge 2 years of content.
-> **Open Q3 (minor):** `granted_at` resets if a deactivated seat is reactivated (re-grant).
-> Options: accept the reset (a returning member re-drips), or persist the earliest activation.
-> Recommend accept-reset for v1 (simplest; the member keeps their logged history + day cursor
-> regardless).
+> **Q3 — RESOLVED (reviewer + affiliate, revised): deactivate EXPIRES the grant, it does
+> NOT delete it.** The affiliate review caught that "accept the reset" is wrong: because the
+> drip is only-raise, a reset `granted_at` doesn't snap a returning member back — it STALLS
+> them (seated 8 months → deactivate → reactivate → stored months stay 8, fresh clock says
+> 1,2,3… so they unlock nothing new for ~7 more months of paid seat). Fix (free, uses the
+> `expires_at` semantics wholesale-grants already ships):
+> - **deactivate** → POST `expires_at = <period end>` (not DELETE) — access ends on schedule
+>   (matches BILLING §9 "immediate for billing, end-of-period for access"); the row + its
+>   ORIGINAL `granted_at` survive.
+> - **reactivate** → POST `expires_at: null` — same row, original timestamp, drip resumes.
+> - **terminal** (member removed / gym cancelled) → DELETE as today.
+> - **cron** (this build): drips ONLY currently-active rows (`expires_at IS NULL OR > now`),
+>   keyed on the row's original `granted_at`. The deactivated gap counts toward unlocked
+>   months (a returning member comes back a bit ahead — accepted; content metering, not
+>   billing, and only-raise tolerates it). **The grant upsert must not clobber `granted_at`
+>   on re-grant — asserted by `grant-row_test.ts`** (the payload omits it, so ON CONFLICT DO
+>   UPDATE can't touch it). Affiliate owns the deactivate `expires_at`-instead-of-DELETE flip.
 
 ## Design question 3 — park the group surfaces (deletion, not new code)
 
