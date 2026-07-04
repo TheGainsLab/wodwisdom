@@ -208,6 +208,40 @@ before launching. Launch pattern:
    (later); 4. a member-facing resource ("what's going on today" — the activity
    feed + boards), on the wall or on their phones. All the built F4/TV plumbing
    (tokens, W·kg, moderation, seams) is REUSED over this content, not discarded.
+   (i) **FINAL FORM — PURE DISTRIBUTION (founder, same conversation; supersedes
+   the group-feature scope in (b)/(g)/(h) for Engine Class v1).** Founder's words:
+   "Engine is not a group program, there are no meaningful group dynamics… the
+   gym owner becomes a distributor… he pays $6/seat which he can resell for any
+   price he wants… the user gets access to the Engine programs, chooses one and
+   begins on day one. They get access to the breakdowns and history and
+   everything else that a retail user gets. It's the exact same code… Nothing
+   should be different. The only difference is the way they encounter the
+   program." Meaning:
+   — **Seat = the retail Engine standalone product, identical, same code, same
+   surfaces.** Member picks a program variant, starts day 1, gets breakdowns/
+   history/everything a retail Engine subscriber gets. No gym-specific member
+   experience. (Differentiation vs retail is CHANNEL + PRICE, not features —
+   this supersedes SKU §1's feature-differentiation framing for Engine Class.)
+   — **What stays for Engine Class v1:** F1 onboarding, F2 class/roster/seats,
+   F3 join (consent + link + activation), the grant unlock, F9 $6/active-seat
+   billing. The encounter path IS the product.
+   — **PARKED for Engine Class (kept as code, they are 2b Programmer assets
+   where classes genuinely share workouts):** the gym leaderboard
+   (engine-class-log/leaderboard/entries), TV mode + tokens, moderation seams
+   1+2, gym-cohort-cron + cohort generation, GymClassPage/GymLeaderboardPage/
+   GymTVPage, the per-program-day board concept from (g). The screen ideas in
+   (h) are LATER possibilities, not v1 scope.
+   — **Known wiring to design (the founder's "we'll get that sorted"):**
+   1. feature-key mapping — the grant must unlock exactly what the retail
+   Engine surfaces gate on (either grant the retail `engine` feature with
+   `granted_by`-scoped revocation, or teach the Engine gates to accept
+   `engine_cohort`; team proposes, reviewer checks the retail-untouched
+   invariant); 2. the Engine months-unlock drip — retail unlocks program months
+   by Stripe invoice count (`reconcile-engine-months` / `engine_months_unlocked`),
+   which gym-granted members don't have — needs a grant-based equivalent
+   (e.g. months from seat-activation date); 3. F5 free view reduces to a locked
+   preview/upsell for joined-not-activated members (or defer entirely — founder
+   call at design review).
 
 ## State (2026-07-04)
 
@@ -284,43 +318,39 @@ with **no `action`**, so the affiliate routed it to the Bearer staff path and se
 would silently degrade to unmoderated. **Fixed in wodwisdom PR #566 → reviewer verified
 the diff (one-line body change + honest docs, nothing else) + MERGED (`4d009ac`).**
 ~~The wodwisdom side of Phase 2a is DONE~~ — superseded by **Decision 9**.
-**(8) NEXT — the Decision-9 rework (the LAST 2a build item).** The gym Engine Class
-= DISTRIBUTION of the retail Engine product: a seat unlocks the retail Engine
-experience (canonical catalog, per-member progression from day 1 — Decision 9(g)),
-and the gym layer adds roster visibility + a per-program-day leaderboard + the
-screen (Decision 9(h)). PROPOSE THE DESIGN FIRST (short doc or PR description),
-reviewer sanity-checks it, then build. Scope sketch (team refines):
-(a) **Seat unlock:** `engine_cohort` (+`engine_class_view` for free tier) accepted
-wherever the PWA gates retail Engine surfaces — union semantics, retail untouched;
-exclusions per SKU §1 stand (no AI resequencer opt-in, no full AI Coach; embedded
-day coach included). Member starts the canonical program at day 1, own pace,
-existing `engineService` + Engine day pages + `engine_workout_sessions` logging.
-(b) **Leaderboard source pivot:** boards group by catalog `day_number` per gym
-("Day N board"), not calendar day. RECOMMENDED (preserves every seam unchanged):
-when a gym-linked seat member completes an Engine day, ALSO write the
-`engine_class_results` row (score/sort/watts from the session — Engine erg/pace
-data is work-calc's sweet spot); `engine-class-leaderboard`/`-entries`/`-tv`,
-result_ref, moderation, W·kg, seam-1/2 contracts all keep working with `day_num`
-= catalog day_number. Alternative (leaderboard reads `engine_workout_sessions`
-directly) breaks seam-1/result_ref — avoid.
-(c) **The screen** (`engine-class-tv` + portal): leaderboard-first + activity
-feed ("today at the gym": who trained, results, PRs) + owner roster/opt-in
-summary (portal side); today's-workout panel demoted/removed (no shared day
-exists). 2b adds Programmer output here.
-(d) **F5 free view redefinition** (was "today's shared workout read-only"): free
-members see the gym boards/activity + a LOCKED PREVIEW of the member experience
-("ask the front desk") — same gate (`engine_class_view`), same conversion job.
-(e) **PARK `gym-cohort-cron`** for this SKU (unschedule note for founder); keep
-the cohort pipeline code — it is the 2b AI Gym Programmer foundation.
-`gym_cohort_configs` generation fields go dormant; `days_per_week` may still pick
-the member's default variant (5→`main_5day`, 3→`main_3day`) at seat activation.
-(f) **Docs in the same PR:** GYM_SKU_SPEC §1, GYM_PORTAL_FLOWS F4/F5,
-GYM_F4_F5_SURFACES, ACCEPTANCE_DEMO (generation step → "seat member sees Engine
-day 1 on their phone; logs it; Day-1 board appears"), launch kit copy if touched.
+**(8) NEXT — the Decision-9(i) rework (the LAST 2a build item, now SMALL):** the
+gym Engine Class is PURE DISTRIBUTION of the retail Engine standalone product —
+"exact same code, nothing different; the only difference is how they encounter
+the program." PROPOSE THE DESIGN FIRST (short doc or PR description), reviewer
+sanity-checks it, then build. Scope:
+(a) **Seat unlock = retail Engine, identical:** the gym grant unlocks exactly
+what the retail Engine surfaces gate on — member picks a program variant, starts
+day 1, existing Engine pages/logging/history/breakdowns, zero new member UI.
+Design question 1: grant the retail `engine` feature (with `granted_by`-scoped
+revocation) vs teach Engine gates to accept `engine_cohort` — propose one;
+the retail-untouched invariant is the review bar.
+(b) **Months-unlock wiring (Decision 9(i) known-wiring 2):** retail drips program
+months by Stripe invoice count (`reconcile-engine-months` /
+`engine_months_unlocked`) — gym-granted members need a grant-based equivalent
+(e.g. months from seat-activation date). Propose in the design.
+(c) **PARK the group surfaces** (Decision 9(i)): engine-class-log/leaderboard/
+entries/tv, TV tokens, moderation seams, gym-cohort-cron + cohort generation,
+the three Gym* pages. Keep the code (2b Programmer assets); remove/hide routes +
+nav from the member PWA for v1; unschedule note for the founder (pg_cron job +
+which secrets go dormant). F5 free view reduces to a locked preview/upsell for
+joined-not-activated members (or defer — founder call at design review).
+(d) **Unchanged:** F1/F2/F3 (onboard, class+roster+seats, join/consent/activate),
+wholesale grants, $6/active-seat billing (F9). The affiliate side should need
+little to nothing — flag anything that does.
+(e) **Docs in the same PR:** GYM_SKU_SPEC §1 rewritten as distribution,
+GYM_PORTAL_FLOWS F4/F5 (parked), GYM_F4_F5_SURFACES, ACCEPTANCE_DEMO (demo
+becomes: join via QR → consent → activate seat → member picks Engine program →
+sees Day 1 → logs it → history/breakdowns render → owner sees roster + billing
+preview), launch kit copy (drop leaderboard promises for v1).
 Then reviewer review → founder deploys the delta → demo resumes. Remaining founder
 decision: whether to file the deferred v1 items (cohort continuity #548 — MOOT for
-Engine Class under Decision 9, the catalog IS the continuity; real class schedule;
-F5 personalized-scaling view). Deferred
+Engine Class under Decision 9; real class schedule — also moot for v1; F5
+personalized-scaling view — superseded). Deferred
 #5 hardening: affiliate #8/#9/#10. **Follow-ups (a)/(b) below still open** (GDPR
 `forget` caller; owner-attested consent path).
 
