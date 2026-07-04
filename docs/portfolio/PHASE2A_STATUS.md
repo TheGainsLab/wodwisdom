@@ -7,7 +7,7 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-04 (affiliate team — **F4 seam fix round BUILT → affiliate PR #12**
+> Last updated: 2026-07-04 (wodwisdom team — **affiliate PR #12 cross-reviewed → APPROVED (conforms)**; verdict on #12. `get_active` shape/auth/tenant-scoping + the `engine_class_view` enroll grant all conform. ONE finding, wodwisdom-side: my #560 `moderation-client` omitted `action:'get_active'` → seam-2 would silently degrade to unmoderated; **fixed in wodwisdom PR #566** (rides the same batched deploy; both seams then light up on key exchange). This was the LAST wodwisdom build task — Phase 2a build complete once #566 + #12 merge. Prior line: 2026-07-04 (affiliate team — **F4 seam fix round BUILT → affiliate PR #12**
 > (`claude/f4-seam2-decision8`; awaiting wodwisdom cross-review, then rides the batched
 > deploy). Three items: **(a)** adjust/W·kg — per the reviewer's REVISED addendum, NO guard
 > change (wodwisdom derives for_time / nulls other types; `wkg_score` = optional override) →
@@ -167,12 +167,16 @@ launch kit~~ **DONE → PR #560** (self-reviewed + fixed; seam-1 exposed, seam-2
 **(6) ~~fix round on #560~~ DONE — re-verified in code + MERGED (`6df6b8a`).** All
 2🔴+6🟠+🟡 + Decision 8 + JOINT-1 confirmed fixed (see #560 row). Then the batched
 deploy + the acceptance demo (`ACCEPTANCE_DEMO.md`) close Phase 2a.
-**(7) NEXT (last wodwisdom task): cross-review affiliate PR #12**
-(seam-2 `get_active` + contract note + Decision-8 enroll grant) — the affiliate left it
-open for wodwisdom's review per Decision 4; can run after (or interleaved with) the
-fix round. Check especially: `get_active` response shape against your
-`moderation-client`, tenant scoping, and that the enroll grant call sends exactly the
-`engine_class_view` key your allowlist addition accepts. Remaining founder decision:
+**(7) ~~cross-review affiliate PR #12~~ DONE — APPROVED (conforms; posted on #12).**
+`get_active` response shape matches `moderation-client`; digest auth is fail-closed;
+tenant-scoped (a class not owned by `gym_id` → empty, never another gym's rows); the
+enroll grant sends exactly `engine_class_view` (best-effort / idempotent / never-billed).
+**ONE finding, wodwisdom-side:** the #560 `moderation-client` POSTed `{gym_id, class_id}`
+with **no `action`**, so the affiliate routed it to the Bearer staff path and seam-2
+would silently degrade to unmoderated. **Fixed in wodwisdom PR #566** (`action:'get_active'`
+added; deno check clean) — rides the SAME batched deploy as #12; both seams light up once
+the URL/keys are exchanged. **Phase 2a build is COMPLETE** once #566 + #12 merge → batched
+deploy → acceptance demo. Remaining founder decision:
 whether to file the deferred v1 items (cohort continuity #548, real class schedule, F5
 personalized-scaling view). Deferred
 #5 hardening: affiliate #8/#9/#10. **Follow-ups (a)/(b) below still open** (GDPR
