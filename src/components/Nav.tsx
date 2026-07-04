@@ -14,6 +14,7 @@ export default function Nav({ isOpen, onClose }: NavProps) {
   const [hasEngine, setHasEngine] = useState(false);
   const [hasProgramming, setHasProgramming] = useState(false);
   const [hasNutrition, setHasNutrition] = useState(false);
+  const [hasGym, setHasGym] = useState(false); // member of a gym Engine Class (F4/F5)
 
   const isChatActive = location.pathname === '/chat' || location.pathname === '/history' || location.pathname === '/bookmarks';
   const isEngineActive = location.pathname.startsWith('/engine');
@@ -49,6 +50,10 @@ export default function Nav({ isOpen, onClose }: NavProps) {
             if (data.some(e => e.feature === 'programming')) setHasProgramming(true);
             if (data.some(e => e.feature === 'nutrition')) setHasNutrition(true);
           });
+        // Gym Engine Class member? (F4/F5). Show the nav entry for any joined link;
+        // the /gym surfaces themselves enforce the full gate (link + entitlement).
+        supabase.from('member_gym_links').select('id').eq('user_id', user.id).eq('status', 'joined').limit(1)
+          .then(({ data }) => { if (data && data.length > 0) setHasGym(true); });
       }
     });
   }, []);
@@ -112,6 +117,22 @@ export default function Nav({ isOpen, onClose }: NavProps) {
               </button>
             )}
           </div>
+          {hasGym && (
+            <div className="nav-group">
+              <button className={"nav-group-header " + (location.pathname.startsWith("/gym") ? "active" : "")} onClick={() => goTo("/gym")}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 4v16M18 4v16M6 12h12M4 8h2M4 16h2M18 8h2M18 16h2" /></svg>
+                Gym Class
+              </button>
+              <div className="nav-group-items">
+                <button className={"nav-link sub " + (location.pathname === "/gym" ? "active" : "")} onClick={() => goTo("/gym")}>
+                  <span className="nav-sub-dot" />Today's Class
+                </button>
+                <button className={"nav-link sub " + (location.pathname === "/gym/leaderboard" ? "active" : "")} onClick={() => goTo("/gym/leaderboard")}>
+                  <span className="nav-sub-dot" />Leaderboard
+                </button>
+              </div>
+            </div>
+          )}
           <div className="nav-group">
             {(hasProgramming || isAdmin) ? (
               <>
