@@ -44,7 +44,7 @@ export async function loadEntries(
   for (let from = 0; ; from += PAGE) {
     let q = supa
       .from("engine_class_results")
-      .select("id, user_id, week_num, day_num, modality, score_type, score_display, score_sort, avg_power_watts, rx, workout_date, created_at")
+      .select("id, user_id, week_num, day_num, modality, score_type, score_display, score_sort, avg_power_watts, total_joules, rx, workout_date, created_at")
       .eq("gym_id", gymId)
       .eq("cohort_program_id", cohortProgramId)
       .order("id", { ascending: true })
@@ -66,6 +66,7 @@ export async function loadEntries(
         score_display: row.score_display as string,
         score_sort: (row.score_sort as number | null) ?? null,
         avg_power_watts: (row.avg_power_watts as number | null) ?? null,
+        total_joules: (row.total_joules as number | null) ?? null,
         rx: !!row.rx,
         workout_date: (row.workout_date as string | null) ?? null,
         logged_at: (row.created_at as string | null) ?? null,

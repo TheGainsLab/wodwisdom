@@ -32,6 +32,8 @@ export interface LeaderboardEntry {
   score_display: string;
   score_sort: number | null; // raw ranking value, higher = better
   avg_power_watts: number | null;
+  /** Total work (J) at log time — lets a for_time `adjust` recompute corrected watts. */
+  total_joules?: number | null;
   rx: boolean;
   /** Display context for seam 1 (the affiliate moderation feed); unused by ranking. */
   workout_date?: string | null;
@@ -173,10 +175,24 @@ function prepare(
 
   let metric_value: number | null;
   if (metric === "wkg") {
+    const massKg = toKg(p.bodyweight, p.units);
     if (adj && typeof adj.wkg_score === "number" && Number.isFinite(adj.wkg_score)) {
-      metric_value = adj.wkg_score; // coach-corrected W·kg wins
+      metric_value = adj.wkg_score; // an explicit coach-corrected W·kg always wins
+    } else if (adj && typeof adj.raw_score === "string" && adj.raw_score.trim() !== "") {
+      // A raw-only adjust must NOT keep the stale original power (JOINT-1: that made a
+      // raw-only correction a silent no-op on the W·kg wall). For for_time we can
+      // recompute exactly — work is fixed, so corrected watts = total_joules /
+      // corrected_seconds. For any other type we can't, so W·kg is null (unranked here;
+      // still ranks on the raw board).
+      const corrSort = parseScoreSort(adj.raw_score, entry.score_type); // -seconds for for_time
+      if (entry.score_type === "for_time" && entry.total_joules != null && corrSort != null && corrSort < 0 &&
+          massKg != null && massKg > 0) {
+        const seconds = -corrSort;
+        metric_value = (entry.total_joules / seconds) / massKg;
+      } else {
+        metric_value = null;
+      }
     } else {
-      const massKg = toKg(p.bodyweight, p.units);
       metric_value = (entry.avg_power_watts != null && massKg != null && massKg > 0)
         ? entry.avg_power_watts / massKg
         : null;

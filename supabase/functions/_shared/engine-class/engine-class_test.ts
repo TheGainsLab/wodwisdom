@@ -139,6 +139,26 @@ Deno.test("buildWorkoutBoard: moderation — hide drops, flag badges, adjust re-
   assertEquals(wa.rows[0].score_display, "3:00");
 });
 
+Deno.test("adjust W·kg (JOINT-1): raw-only for_time adjust RECOMPUTES watts (not stale power)", () => {
+  const profiles = new Map<string, ProfileInfo>([
+    ["u1", { full_name: "Ann", leaderboard_anonymous: false, leaderboard_excluded: false, role: "user", gender: "female", bodyweight: 60, units: "kg" }],
+  ]);
+  // Logged 5:00 (300s), 240 W stored, total_joules = 240×300 = 72000. Coach corrects
+  // the time to 4:00 (240s) with raw_score only (no wkg_score).
+  const es = [entry({ result_ref: "r1", user_id: "u1", score_type: "for_time", score_sort: -300, avg_power_watts: 240, total_joules: 72000 })];
+  const mods = new Map<string, ModerationRow>([["r1", { result_ref: "r1", decision: "adjust", adjustment: { raw_score: "4:00" } }]]);
+  const [div] = buildWorkoutBoard(es, profiles, mods, "wkg", null);
+  // corrected watts = 72000/240 = 300 → W·kg = 300/60 = 5.0 (was 240/60 = 4.0)
+  assertEquals(div.rows[0].metric_value, 5);
+
+  // A raw-only adjust on a NON-for_time score can't recompute → W·kg null (unranked),
+  // never the stale power.
+  const es2 = [entry({ result_ref: "r2", user_id: "u1", score_type: "amrap", score_display: "100 reps", score_sort: 100, avg_power_watts: 240, total_joules: 72000 })];
+  const mods2 = new Map<string, ModerationRow>([["r2", { result_ref: "r2", decision: "adjust", adjustment: { raw_score: "120 reps" } }]]);
+  const [div2] = buildWorkoutBoard(es2, profiles, mods2, "wkg", null);
+  assertEquals(div2.rows[0].rnk, null);
+});
+
 Deno.test("buildSeasonStandings: points sum across workouts; 1st gets most", () => {
   const entries = [
     // workout 1:2 — Bob alone (M): 1 participant → 1 pt
