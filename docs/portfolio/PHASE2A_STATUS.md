@@ -96,6 +96,20 @@ before launching. Launch pattern:
    every affiliate gym). Founders flip specific pilot gyms true when they
    actually subscribe. (Numbered 7 because Decision 6 = the workspace conventions
    below.)
+8. **F5 free tier = base-grant-on-join (Option A)** (2026-07-04, founder, #560
+   review). F3 join issues a FREE `engine_class_view` entitlement via the existing
+   wholesale-grants call (idempotent, `granted_by` = gym). The decided F5 gate rule
+   is UNCHANGED — content still requires an active gym-granted entitlement; this
+   creates the free-tier population it gates. Mechanics: (a) wodwisdom adds
+   `engine_class_view` to the grants-API allowlist AND to the F5 view gate's
+   accepted list — VIEW gate only; log/leaderboard/TV stay `engine_cohort`
+   (in the #560 fix round, which per the review narrows that family to
+   `engine_cohort`-only otherwise); (b) affiliate grants it in the enroll path at
+   join, revokes it with the gym's other grants (member removal / gym
+   cancellation), and NEVER bills it (billing counts `engine_cohort` seats only);
+   (c) seat DEACTIVATION revokes only `engine_cohort` — the member falls back to
+   the free view (the re-conversion state), not out of the app; (d) the cohort
+   roster (gym-cohort-cron) is unchanged: `engine_cohort` only.
 
 ## State (2026-07-03)
 
@@ -126,11 +140,11 @@ launch kit~~ **DONE → PR #560** (self-reviewed + fixed; seam-1 exposed, seam-2
 (2🔴 + 6🟠 inline + a 🟡 list in the review body; see the #560 row).** Fix, push,
 report → reviewer re-verifies → merge (also fold in the affiliate's conformance
 findings, running in parallel). Then the batched deploy + the acceptance demo
-(`ACCEPTANCE_DEMO.md`) close Phase 2a. **Two decisions to get from the founder:** the
-flagged **free-tier gate** question (base-grant-on-join vs seat-only — `GYM_F4_F5_SURFACES.md`;
-reviewer's recommendation is with the founder: base-grant a distinct `engine_class_view`
-key at F3 join via the existing grants API), and whether to file the deferred v1 items
-(cohort continuity #548, real class schedule, F5 personalized-scaling view). Deferred
+(`ACCEPTANCE_DEMO.md`) close Phase 2a. **Free-tier gate: DECIDED — Decision 8 (Option
+A, base-grant `engine_class_view` at join); fold the wodwisdom half into this same fix
+round** (allowlist + F5 view gate only). Remaining founder decision: whether to file
+the deferred v1 items (cohort continuity #548, real class schedule, F5
+personalized-scaling view). Deferred
 #5 hardening: affiliate #8/#9/#10. **Follow-ups (a)/(b) below still open** (GDPR
 `forget` caller; owner-attested consent path).
 
@@ -149,6 +163,11 @@ seam-2 = affiliate exposes an `engine-moderation` `get_active` returning
 `{result_ref, decision, adjustment}` for `{gym_id, class_id?}`). Then **wire both seams**
 (seam-1: set `WODWISDOM_LEADERBOARD_URL/KEY`; seam-2: build the read endpoint + hand
 wodwisdom `AFFILIATE_MODERATION_URL/KEY`). wodwisdom degrades gracefully until seam-2 lands.
+(7) **NEW — Decision 8 (F5 free tier, Option A):** the enroll path grants a FREE
+`engine_class_view` entitlement at member join (same idempotent grants call, new
+feature key); revoke it with the gym's other grants; seat deactivation revokes ONLY
+`engine_cohort` (member falls back to free view); billing counts `engine_cohort` only —
+`engine_class_view` never bills.
 
 **Founder:** relay = one line per team: *"Pull wodwisdom main, read
 docs/portfolio/PHASE2A_STATUS.md, execute your section, update the board when
