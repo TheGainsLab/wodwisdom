@@ -139,16 +139,31 @@ before launching. Launch pattern:
    the free view (the re-conversion state), not out of the app; (d) the cohort
    roster (gym-cohort-cron) is unchanged: `engine_cohort` only.
 
-## State (2026-07-03)
+## State (2026-07-04)
 
-**Merged & deployed:** Engine Phase 1 (#547) · Grants API (#549) + its
-migration/secrets/functions · retail verified · all portfolio docs current on
-main. **Affiliate merged, NOT deployed (batched):** F1 (#2), F2 (#3), F3 (#5), F4-moderation
-(#7), F9-minimal billing (#6). **New deploy inputs for the batched affiliate deploy:**
-migrations `20260703200000` (moderation) + `20260704000000`/`20260704010000` (billing
-snapshots + `analytics_enabled`); secrets `BILLING_SNAPSHOT_KEY` and, for founding gyms,
-`STRIPE_COUPON_FOUNDING` (a percent_off=50 coupon — without it a founding gym's snapshot
-returns `founding_coupon_unconfigured` and won't sync to Stripe, by design).
+**Merged & deployed:** Engine Phase 1 (#547) · Grants API (#549) · retail verified ·
+**the ENTIRE wodwisdom deploy step (2026-07-04, founder):** migrations
+`20260703100000` (member_gym_links — first-time-applied; preflight showed #550's
+migration had never gone live) + `20260703200000` + `20260705000000`, all post-apply
+checks green (`claim_due_gym_cohort` ✓, `mint_gym_tv_token` ✓, token digest/expiry
+cols ✓, pgcrypto ✓, `engine_class_results` = own-row-SELECT-only ✓); the 8 functions
+(`engine-class-{view,log,leaderboard,entries,tv}`, `wholesale-grants`, `engine-join`,
+`gym-cohort-cron`) deployed off fresh main `e9a9fec` (upload lists verified incl.
+`_shared/entitlements.ts` + the #566 `moderation-client`); new secrets
+`WODWISDOM_LEADERBOARD_KEY` + `GYM_COHORT_CRON_KEY` set (physics pair
+`COMPETITION_SERVICE_BASE_URL`/`WORK_CALC_SERVICE_KEY` confirmed present); pg_cron
+job `gym-cohort-cron-hourly` (`7 * * * *`) active; smoke checks 401/401/403/401/
+`{"message":"no gyms due"}` all as expected.
+**Affiliate merged, NOT deployed (runbook next):** F1 (#2), F2 (#3), F3 (#5),
+F4-moderation (#7), F9-minimal billing (#6), F4-seams+Decision-8 (#12, pending merge).
+**Set during the affiliate step's key exchange (deliberately not before):**
+[WOD] `WHOLESALE_CONSUMER_KEYS` (bound to pilot `communities.id`),
+[WOD] `AFFILIATE_ENROLL_URL` + `ENGINE_ENROLL_KEY` (both sides),
+[WOD] `AFFILIATE_MODERATION_URL`/`KEY` (seam-2 — boards render unmoderated until set),
+[AFF] `WODWISDOM_LEADERBOARD_URL`/`KEY` (hand over the value minted 2026-07-04),
+plus `BILLING_SNAPSHOT_KEY` and `STRIPE_COUPON_FOUNDING` (percent_off=50 — without it
+a founding gym's snapshot returns `founding_coupon_unconfigured`, by design).
+TV tokens: mint AFTER the affiliate step via `mint_gym_tv_token('<communities.id>', …)`.
 
 | Item | State | Blocker |
 |---|---|---|
