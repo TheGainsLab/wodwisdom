@@ -7,7 +7,20 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-03 (affiliate team — **F4_MODERATION_CONTRACT conformance
+> Last updated: 2026-07-04 (affiliate team — **F4 seam fix round BUILT → affiliate PR #12**
+> (`claude/f4-seam2-decision8`; awaiting wodwisdom cross-review, then rides the batched
+> deploy). Three items: **(a)** adjust/W·kg — per the reviewer's REVISED addendum, NO guard
+> change (wodwisdom derives for_time / nulls other types; `wkg_score` = optional override) →
+> contract doc note only in `F4_MODERATION_CONTRACT.md`, post-#7 guard stands *(this supersedes
+> the prior header line below that said "adjust will REQUIRE wkg_score")*. **(b)** seam-2
+> **`engine-moderation get_active`** — s2s `X-Service-Key` (`AFFILIATE_MODERATION_KEY`,
+> digest-compare) → `{gym_id, class_id, moderations:[{result_ref, decision, adjustment|null}]}`,
+> tenant-scoped, matches #560's `moderation-client` exactly. **(c)** Decision 8 half —
+> `engine-enroll` grants the free `engine_class_view` at join (best-effort, `free_view` in the
+> response; never billed, revoked with the gym's grants). New secret `AFFILIATE_MODERATION_KEY`
+> (in `.env.example`); key exchange at deploy. deno check clean; billing tests green. Left #12
+> OPEN for wodwisdom's cross-review (symmetry with my #560 review — Decision 4). Prior line:
+> affiliate team — **F4_MODERATION_CONTRACT conformance
 > review of PR #560 POSTED** (comment on #560). **Verdict: both seams CONFORM — approve.**
 > Seam-1 (entries read) round-trip-verified against the real affiliate caller
 > (`engine-moderation` sends `{gym_id,class_id}`+`X-Service-Key`; `WODWISDOM_LEADERBOARD_KEY`
@@ -173,22 +186,24 @@ removal on downgrade; 🟠 Analytics now on the `analytics_enabled` opt-in flag
 (`18aab46`)**, linked below; the founder executes it once F4/F5 merge. (6) ~~run the `F4_MODERATION_CONTRACT.md` conformance review on #560~~ **DONE — posted on
 #560; verdict BOTH SEAMS CONFORM, approve.** Seam-1 round-trip-verified; seam-2 consumer
 matches option B; open-items 1–3 resolved; flagged, not silently adapted (Decision 4).
-**Fix round now queued (affiliate-side, from the review):** (a) **JOINT-1 resolution
-REVISED by the reviewer (comment on #560) — do NOT require `wkg_score`** (a coach cannot
-produce a W·kg figure; requiring it just moves the silent no-op into the moderation UI).
-Wodwisdom resolves raw-only adjusts in ITS fix round: for_time → derive corrected watts
-= stored `total_joules / corrected_seconds`; amrap/load/rounds_reps → NULL the W·kg
-metric (unranked + badge, never a stale rank). Affiliate (a) reduces to a **contract doc
-note**: "raw-only adjust: wodwisdom derives (for_time) or nulls (other types) the W·kg
-metric; send `wkg_score` only as an explicit override — it wins when present." Keep the
-post-#7 raw_score-OR-wkg_score guard as-is. (b)
-**build the seam-2 read endpoint** (`engine-moderation get_active` → `{result_ref, decision,
-adjustment}` for `{gym_id, class_id?}`) so wodwisdom can consume the ledger. Then **wire both
-seams** (seam-1: set `WODWISDOM_LEADERBOARD_URL/KEY`; seam-2: hand wodwisdom
-`AFFILIATE_MODERATION_URL/KEY`). wodwisdom degrades gracefully until seam-2 lands.
-(7) **NEW — Decision 8 (F5 free tier, Option A):** the enroll path grants a FREE
-`engine_class_view` entitlement at member join (same idempotent grants call, new
-feature key); revoke it with the gym's other grants; seat deactivation revokes ONLY
+**Fix round BUILT → affiliate PR #12** (`claude/f4-seam2-decision8`; awaiting wodwisdom
+cross-review, then rides the batched deploy). All three items done: **(a)** JOINT-1 —
+per the reviewer's revised addendum, NO guard change (a coach can't produce W·kg;
+wodwisdom derives for_time / nulls other types; `wkg_score` = optional override). Reduced
+to a **contract doc note** in `F4_MODERATION_CONTRACT.md`; the post-#7 raw_score-OR-wkg_score
+guard stands. *(Supersedes this session's earlier header line that said "adjust will REQUIRE
+wkg_score" — the addendum overrode it.)* **(b)** seam-2 **`engine-moderation get_active`**
+built: s2s `X-Service-Key` (`AFFILIATE_MODERATION_KEY`, digest-compare) → `{gym_id, class_id,
+moderations:[{result_ref, decision, adjustment|null}]}`, tenant-scoped, runs before the
+Bearer path; matches #560's `moderation-client` exactly. **(c)** Decision 8 half —
+`engine-enroll` grants the free `engine_class_view` at join (best-effort, `free_view` in the
+response). Open-items 1–3 marked resolved in the contract. deno check clean, billing tests
+green. **Still to do (founder deploy):** wire both seams via the secret exchange
+(`WODWISDOM_LEADERBOARD_URL/KEY` ⇄ `AFFILIATE_MODERATION_URL/KEY`); wodwisdom degrades
+gracefully until then.
+(7) ~~**Decision 8 (F5 free tier, Option A)** — affiliate half~~ **DONE (PR #12(c))** —
+`engine-enroll` grants a FREE `engine_class_view` at member join (idempotent grants call,
+best-effort); revoked with the gym's other grants; seat deactivation revokes ONLY
 `engine_cohort` (member falls back to free view); billing counts `engine_cohort` only —
 `engine_class_view` never bills.
 
