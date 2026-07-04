@@ -7,7 +7,19 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-04 (wodwisdom team — **affiliate PR #12 cross-reviewed → APPROVED (conforms)**; verdict on #12. `get_active` shape/auth/tenant-scoping + the `engine_class_view` enroll grant all conform. ONE finding, wodwisdom-side: my #560 `moderation-client` omitted `action:'get_active'` → seam-2 would silently degrade to unmoderated; **fixed in wodwisdom PR #566** (rides the same batched deploy; both seams then light up on key exchange). This was the LAST wodwisdom build task — Phase 2a build complete once #566 + #12 merge. Prior line: 2026-07-04 (affiliate team — **F4 seam fix round BUILT → affiliate PR #12**
+> Last updated: 2026-07-04 (affiliate team — **PR #12 MERGED to affiliate main**
+> (`acb5995`; branch deleted) — the seam-2 `get_active` endpoint + Decision-8 free-view
+> grant + adjust contract note are now on main. Note: `get_active` routes on
+> `body.action==='get_active'` (as documented in `F4_MODERATION_CONTRACT.md`); wodwisdom's
+> **#566** adds that field to its `moderation-client` request (the reviewer's one finding) —
+> the two are aligned, both ride the batched deploy. **Updated `affiliate docs/DEPLOY_RUNBOOK.md`
+> (`8247a93`) for the founder's end-to-end run:** added `AFFILIATE_MODERATION_KEY` ([AFF]+[WOD],
+> seam 2); noted `engine-enroll` now also grants free `engine_class_view` via `WODWISDOM_GRANTS`
+> (best-effort, `free_view:'skipped'` if unset); fixed the seam-1 URL to `engine-class-entries`;
+> rewrote §7 as the symmetric two-seam secret exchange (`WODWISDOM_LEADERBOARD_URL/KEY` ⇄
+> `AFFILIATE_MODERATION_URL/KEY`, each side degrades gracefully → no ordering dependency).
+> **Affiliate build for Phase 2a is COMPLETE; runbook is ready to execute** (once wodwisdom
+> #560+#566 merge for the [WOD] functions). Prior line: wodwisdom team — **affiliate PR #12 cross-reviewed → APPROVED (conforms)**; verdict on #12. `get_active` shape/auth/tenant-scoping + the `engine_class_view` enroll grant all conform. ONE finding, wodwisdom-side: my #560 `moderation-client` omitted `action:'get_active'` → seam-2 would silently degrade to unmoderated; **fixed in wodwisdom PR #566** (rides the same batched deploy; both seams then light up on key exchange). This was the LAST wodwisdom build task — Phase 2a build complete once #566 + #12 merge. Prior line: 2026-07-04 (affiliate team — **F4 seam fix round BUILT → affiliate PR #12**
 > (`claude/f4-seam2-decision8`; awaiting wodwisdom cross-review, then rides the batched
 > deploy). Three items: **(a)** adjust/W·kg — per the reviewer's REVISED addendum, NO guard
 > change (wodwisdom derives for_time / nulls other types; `wkg_score` = optional override) →
@@ -216,8 +228,8 @@ removal on downgrade; 🟠 Analytics now on the `analytics_enabled` opt-in flag
 (`18aab46`)**, linked below; the founder executes it once F4/F5 merge. (6) ~~run the `F4_MODERATION_CONTRACT.md` conformance review on #560~~ **DONE — posted on
 #560; verdict BOTH SEAMS CONFORM, approve.** Seam-1 round-trip-verified; seam-2 consumer
 matches option B; open-items 1–3 resolved; flagged, not silently adapted (Decision 4).
-**Fix round BUILT → affiliate PR #12** (`claude/f4-seam2-decision8`; awaiting wodwisdom
-cross-review, then rides the batched deploy). All three items done: **(a)** JOINT-1 —
+**Fix round ✅ MERGED — affiliate PR #12** (`acb5995` → main; branch deleted; cross-review
+APPROVED, wodwisdom's one client-side finding fixed in #566). All three items shipped: **(a)** JOINT-1 —
 per the reviewer's revised addendum, NO guard change (a coach can't produce W·kg;
 wodwisdom derives for_time / nulls other types; `wkg_score` = optional override). Reduced
 to a **contract doc note** in `F4_MODERATION_CONTRACT.md`; the post-#7 raw_score-OR-wkg_score
