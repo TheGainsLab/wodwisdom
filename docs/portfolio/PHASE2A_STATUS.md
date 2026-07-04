@@ -150,6 +150,46 @@ before launching. Launch pattern:
    (c) seat DEACTIVATION revokes only `engine_cohort` — the member falls back to
    the free view (the re-conversion state), not out of the app; (d) the cohort
    roster (gym-cohort-cron) is unchanged: `engine_cohort` only.
+9. **Engine Class content = THE CANONICAL RETAIL ENGINE PROGRAM, not per-gym AI
+   generation** (2026-07-04, founder, at the acceptance-demo generation step —
+   demo PAUSED here). Founder's words: "we can't have two different Engine
+   programs — the reputation of the retail program is why people will buy this.
+   The only new thing for Engine should be distribution. It works for the
+   business because 5 easy sales at $6 = one hard retail sale at $30."
+   Grounded in code: retail Engine is the canonical pre-authored 720-day library
+   (`engine_workouts` + `engine_day_types` + `engine_program_mapping`, variants
+   `main_5day`/`main_3day`/varied) — NOT per-user AI generation (the retail AI
+   resequencer is a default-off, envelope-constrained overlay). The #551-built
+   per-gym AI cohort generation (`gym-cohort-cron` → engine pipeline →
+   `engine_cohort_programs`) is OFF TARGET for this SKU: it would create a second,
+   different "Engine program" per gym. Consequences:
+   (a) **The gym class serves the canonical catalog**: "today's workout" for a gym
+   = a per-gym cursor over `engine_program_mapping` (program variant chosen from
+   `days_per_week`: 5→`main_5day`, 3→`main_3day`), advancing on the same
+   midnight-UTC calendar #560 fixed. No AI call, no per-gym generation, zero
+   marginal content cost — pure distribution margin (the founder's 5×$6 math).
+   (b) **The distribution stack is UNCHANGED and stays deployed**: seats, grants,
+   enroll/join, free view gate, W·kg leaderboard + physics, TV tokens, moderation
+   seams, billing. Only the CONTENT SOURCE of the gym surfaces changes
+   (select-workout reads the catalog via the gym cursor instead of
+   `engine_cohort_programs`; scored-block/score-type/physics mapping adapts to
+   the catalog day shape — Engine days are erg/pace work, the physics sweet spot).
+   (c) `gym-cohort-cron` + `engine_cohort_programs` + the cohort generation
+   pipeline are NOT deleted — they are the foundation of the 2b AI Gym Programmer
+   (SKU §3), where per-gym generation is the product. Park the cron (unschedule or
+   leave with no eligible work), keep the code.
+   (d) `gym_cohort_configs.equipment/goal_text/target_level` become dormant for
+   Engine Class (they steer generation, which no longer runs for this SKU); keep
+   for 2b. `days_per_week` remains live (variant selection).
+   (e) GYM_SKU_SPEC §1 wording ("cohort-mode Engine program, auto-generated
+   monthly") is superseded by this decision — update the spec docs in the rework
+   PR.
+   (f) **TV mode is LEADERBOARD-FIRST** (founder, same conversation): Engine is
+   done by members individually / in small groups on their phones, whenever —
+   the gym will rarely put the workout itself on a wall. The TV surface's job is
+   the leaderboard (community/competition); today's-workout display is secondary
+   (fine to keep as a panel, don't lead with it). A TV surface for AI Program
+   generation is a 2b idea, noted, not scoped.
 
 ## State (2026-07-04)
 
@@ -185,7 +225,20 @@ create the $5 band only if a gym nears 100 seats; code tolerates its absence),
 [WOD] `WHOLESALE_CONSUMER_KEYS` + [AFF] `WODWISDOM_GRANTS_URL/KEY` (need the demo
 gym's `communities.id` — first demo step; until set, enroll returns
 `free_view:'skipped'` and seat grants can't be issued), TV-token mint (same reason).
-**NEXT: create the demo gym (F1) → bind grants keys → mint TV token → ACCEPTANCE DEMO.**
+**Demo prep DONE (2026-07-04, founder):** demo gym = the pre-existing **CrossFit
+Southie** community (`d18ff6cf-e6af-4b82-ac3b-85eb689048bf`; grandfathered
+analytics gym, F1-marked complete, no payment method — fine for demo); flags set
+(founding_partner ✓ expires 2027-01, analytics_enabled ✓); grants key bound
+(`WODWISDOM_GRANTS_URL/KEY` [AFF] ⇄ `WHOLESALE_CONSUMER_KEYS` [WOD], digest
+pattern verified); `gym_cohort_configs` row inserted; TV token minted (⚠️ pasted
+into founder chat — REVOKE + RE-MINT before real members; SQL on the board);
+portal frontend runs locally (`npm run dev`, `.env` = affiliate URL + anon key +
+`VITE_MEMBER_APP_URL`); production PWA auto-deploys from main via Vercel (current);
+TV token verified valid via direct curl (200, `workout:null` = correct empty state).
+**ACCEPTANCE DEMO PAUSED at the generation step by Decision 9** (the per-gym AI
+generation it would have exercised is off target for this SKU — see Decision 9).
+**NEXT: wodwisdom team executes the Decision-9 rework → reviewer reviews → founder
+deploys the delta → demo resumes** (everything already deployed/bound stays valid).
 
 | Item | State | Blocker |
 |---|---|---|
@@ -212,11 +265,35 @@ enroll grant sends exactly `engine_class_view` (best-effort / idempotent / never
 with **no `action`**, so the affiliate routed it to the Bearer staff path and seam-2
 would silently degrade to unmoderated. **Fixed in wodwisdom PR #566 → reviewer verified
 the diff (one-line body change + honest docs, nothing else) + MERGED (`4d009ac`).**
-**The wodwisdom side of Phase 2a is DONE — nothing left to build or merge in this repo.**
-Last build step anywhere: **affiliate merges #12** (approved, no findings on their side)
-→ batched deploy → acceptance demo. Remaining founder decision:
-whether to file the deferred v1 items (cohort continuity #548, real class schedule, F5
-personalized-scaling view). Deferred
+~~The wodwisdom side of Phase 2a is DONE~~ — superseded by **Decision 9**.
+**(8) NEXT — the Decision-9 rework (the LAST 2a build item, small + contained):**
+the gym Engine Class must serve the **canonical retail Engine catalog**, not per-gym
+AI generation. Scope:
+(a) a per-gym cursor over `engine_program_mapping` — variant from
+`gym_cohort_configs.days_per_week` (5→`main_5day`, 3→`main_3day`), position =
+whole UTC days since the gym's class start date (reuse #560's midnight-UTC
+`daysBetween`; add a `class_start_date` column or derive from config `created_at`);
+(b) `select-workout` (or a sibling) resolves "today" to an `engine_workouts` row;
+adapt the scored-block/score-type/physics mapping to the catalog day shape —
+Engine days are erg/pace work (work-calc's sweet spot); reuse retail's Engine day
+RENDERING on GymClassPage rather than the v2-blocks renderer where the shapes
+differ;
+(c) `engine-class-log`/leaderboard/TV keep their contracts (result rows,
+result_ref, W·kg, moderation) — only the workout source changes; keep
+`(week_num, day_num)` derivable from catalog position so `engine_class_results`
+and seam-1 are unchanged;
+(d) PARK `gym-cohort-cron` for this SKU (no eligible work / unschedule note for
+founder) — do NOT delete the cohort pipeline (it is the 2b AI Gym Programmer
+foundation);
+(e) TV mode reorders LEADERBOARD-FIRST (Decision 9(f)) — board is the hero,
+today's workout a secondary panel;
+(f) update GYM_SKU_SPEC §1 + GYM_F4_F5_SURFACES + ACCEPTANCE_DEMO generation step
+to match (demo step becomes "verify today's catalog day appears", no cron
+trigger).
+Then reviewer review → founder deploys the delta → demo resumes. Remaining founder
+decision: whether to file the deferred v1 items (cohort continuity #548 — note it
+may be MOOT for Engine Class under Decision 9, the catalog IS the continuity; real
+class schedule; F5 personalized-scaling view). Deferred
 #5 hardening: affiliate #8/#9/#10. **Follow-ups (a)/(b) below still open** (GDPR
 `forget` caller; owner-attested consent path).
 
