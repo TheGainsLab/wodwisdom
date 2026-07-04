@@ -224,3 +224,29 @@ verify_jwt = false
 # for the user id). Calls the affiliate engine-enroll fn server-to-server. Needs
 # AFFILIATE_ENROLL_URL + ENGINE_ENROLL_KEY (shared secret, same value the affiliate holds).
 verify_jwt = true
+
+# ── F4/F5 gym Engine Class surfaces (GYM_PORTAL_FLOWS §F4/§F5) ────────────────
+[functions.engine-class-view]
+# F5 free read-only gym view. Member JWT verified by the gateway; the handler gates
+# on joined-link + active engine_cohort-family entitlement (gate.ts).
+verify_jwt = true
+
+[functions.engine-class-log]
+# A seat member logs their Engine Class result (F4 leaderboard raw material). Member
+# JWT; same gate as the view. Calls the data-service work-calc for W·kg.
+verify_jwt = true
+
+[functions.engine-class-leaderboard]
+# F4 gym leaderboard (per-workout + season) for a signed-in member/coach. Member JWT;
+# applies the affiliate moderation ledger (seam 2).
+verify_jwt = true
+
+[functions.engine-class-entries]
+# F4_MODERATION_CONTRACT seam 1 — the affiliate moderation page reads a gym's entries.
+# Server-to-server X-Service-Key (WODWISDOM_LEADERBOARD_KEY), so skip the JWT gate.
+verify_jwt = false
+
+[functions.engine-class-tv]
+# F4 TV mode — tokenized no-login gym-wall board. verify_jwt=false; the gym_tv_tokens
+# token in the URL is the capability.
+verify_jwt = false

@@ -40,6 +40,9 @@ const WorkoutAnalysisPage = lazy(() => import('./pages/WorkoutAnalysisPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const CheckoutCompletePage = lazy(() => import('./pages/CheckoutCompletePage'));
 const JoinEnginePage = lazy(() => import('./pages/JoinEnginePage'));
+const GymClassPage = lazy(() => import('./pages/GymClassPage'));
+const GymLeaderboardPage = lazy(() => import('./pages/GymLeaderboardPage'));
+const GymTVPage = lazy(() => import('./pages/GymTVPage'));
 
 // Programs
 const ProgramsListPage = lazy(() => import('./pages/ProgramsListPage'));
@@ -131,6 +134,8 @@ export default function App() {
           <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
           {/* F3 member-join: reachable logged-out (inline auth keeps the token in the URL). */}
           <Route path="/join/engine/:token" element={<JoinEnginePage session={null} />} />
+          {/* F4 TV mode: public gym-wall screen — the :token is the capability, no login. */}
+          <Route path="/tv/:token" element={<GymTVPage />} />
           <Route path="*" element={<LandingPage />} />
         </Routes>
       </Suspense>
@@ -147,7 +152,8 @@ const HIDE_TAB_BAR_ROUTES = ['/workout/start', '/checkout', '/checkout/complete'
 function AuthenticatedApp({ session }: { session: Session }) {
   const location = useLocation();
   const hideTabBar = HIDE_TAB_BAR_ROUTES.some(r => location.pathname === r) ||
-    location.pathname.startsWith('/features');
+    location.pathname.startsWith('/features') ||
+    location.pathname.startsWith('/tv/');
 
   return (
     <>
@@ -156,6 +162,11 @@ function AuthenticatedApp({ session }: { session: Session }) {
           <Routes>
             <Route path="/" element={<HomePage session={session} />} />
             <Route path="/join/engine/:token" element={<JoinEnginePage session={session} />} />
+            {/* F5 free read-only gym view + F4 gym leaderboard (gated in the edge fns). */}
+            <Route path="/gym" element={<GymClassPage />} />
+            <Route path="/gym/leaderboard" element={<GymLeaderboardPage />} />
+            {/* TV mode also reachable while logged in (e.g. a coach opening the wall). */}
+            <Route path="/tv/:token" element={<GymTVPage />} />
             <Route path="/chat" element={<ChatPage session={session} />} />
             <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
             <Route path="/workout/start" element={<StartWorkoutPage session={session} />} />
