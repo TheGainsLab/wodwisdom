@@ -7,7 +7,21 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-03 (affiliate team — **#6 + #7 cross-review fixes MERGED
+> Last updated: 2026-07-03 (affiliate team — **combined deploy runbook AUTHORED +
+> PUSHED**: `affiliate docs/DEPLOY_RUNBOOK.md` (`18aab46`). It was assigned earlier
+> but never actually written — now it is. Covers, in execution order: all unapplied
+> affiliate migrations (F1 `20260702130000` → F2 `20260703000000` → F3
+> `20260703170000` → F4-mod `20260703200000_leaderboard_moderation` → F9
+> `20260704000000`/`20260704010000`), with a ⚠️ note that the wodwisdom-side
+> `20260703200000_gym_cohort_configs` is a DIFFERENT file that rides the founder's
+> wodwisdom step; every secret tagged by project ([AFF] vs [WOD] — `ENGINE_ENROLL_KEY`
+> both sides, `WODWISDOM_GRANTS_KEY` bound via [WOD] `WHOLESALE_CONSUMER_KEYS` to the
+> pilot `communities.id`, `GYM_COHORT_CRON_KEY`, `ENGINE_CONSUMER_KEYS`, `STRIPE_PRICE_*`
+> + `STRIPE_COUPON_FOUNDING` incl. its refuse-to-sync note); function deploy lists for
+> both projects; the hourly `gym-cohort-cron` pg_cron/pg_net schedule (#551 drain); and
+> post-deploy verification incl. the `claim_due_gym_cohort` proc check. **F4 (wodwisdom)
+> PR not yet open — standing by to run the `F4_MODERATION_CONTRACT.md` conformance review
+> the moment it opens.** Prior line: affiliate team — **#6 + #7 cross-review fixes MERGED
 > to affiliate main**. **#6** (F9 billing): 🔴 founding 50% coupon now applied in
 > `syncStripe` (create + update reconcile) with a refuse-to-sync guard when the
 > coupon is unconfigured (never full-charge a founding gym); 🟠 stale subscription
@@ -107,7 +121,14 @@ findings on #6 + #7~~ **DONE — both FIXED + MERGED** (#6 `25ae6d8`, #7 `3c7d45
 removal on downgrade; 🟠 Analytics now on the `analytics_enabled` opt-in flag
 (Decision 7); #7 🟡 `moderated_by` nullable + empty-`{}` adjust rejected. Deferred:
 #6's 2🟡 (sub-create idempotency lock, period-end proxy) — low sev, not yet filed.
-(5) **NEXT: wire the two F4 cross-repo seams** jointly with wodwisdom's F4 build.
+(5) ~~author the combined deploy runbook~~ **DONE — `affiliate docs/DEPLOY_RUNBOOK.md`
+(`18aab46`)**, linked below; the founder executes it once F4/F5 merge. (6) **NEXT
+(blocked on wodwisdom F4 PR opening):** run the `F4_MODERATION_CONTRACT.md` contract-
+conformance review on wodwisdom's F4 PR (verify the entries-read endpoint + ledger
+consumption match both seams exactly — shapes/auth/tenancy — flag divergence on the PR,
+don't adapt silently); then **wire the two F4 cross-repo seams** (flip `engine-moderation`
+from ledger-only to live via `WODWISDOM_LEADERBOARD_URL/KEY`) jointly with the F4 build.
+Until that PR opens: standing by, board kept current.
 
 **Founder:** relay = one line per team: *"Pull wodwisdom main, read
 docs/portfolio/PHASE2A_STATUS.md, execute your section, update the board when
@@ -152,7 +173,10 @@ acceptance-demo checklist.
 
 F5 read-only view (wodwisdom) · F4 leaderboard+TV (wodwisdom — must consume the
 affiliate moderation ledger per `docs/F4_MODERATION_CONTRACT.md`) +
-F4-moderation (affiliate — ✅ BUILT, PR #7; pending review + the two cross-repo
-seams) · launch kit content · combined affiliate deploy
-(F1+F2+F3+F9 migrations/functions/secrets incl. WHOLESALE_CONSUMER_KEYS +
-ENGINE_ENROLL_KEY) · the end-to-end acceptance demo (GYM_PORTAL_FLOWS bottom).
+F4-moderation (affiliate — ✅ FIXED + MERGED, #7 `3c7d45c`; pending only the two
+cross-repo seams once wodwisdom F4 opens) · launch kit content · **combined affiliate
+deploy — runbook READY: `affiliate docs/DEPLOY_RUNBOOK.md` (`18aab46`)** (execution
+order for all migrations/functions/secrets across both projects incl.
+WHOLESALE_CONSUMER_KEYS binding + ENGINE_ENROLL_KEY + STRIPE_COUPON_FOUNDING + the
+hourly gym-cohort-cron schedule; founder runs it once F4/F5 merge) · the end-to-end
+acceptance demo (GYM_PORTAL_FLOWS bottom).
