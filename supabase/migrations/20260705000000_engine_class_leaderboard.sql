@@ -62,22 +62,24 @@ CREATE TRIGGER trg_engine_class_results_updated_at
   BEFORE UPDATE ON public.engine_class_results
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- RLS: a member reads/writes only their OWN results (drives "your results" in the
--- PWA). The cross-member leaderboard + TV + seam-1 reads run service-role in edge
--- functions (they apply privacy shaping + the moderation ledger before output).
+-- RLS: WRITES ARE SERVICE-ROLE ONLY. The sole writer is the engine-class-log edge
+-- function (service role), which enforces the gate AND computes avg_power_watts via
+-- the physics service. If members could INSERT/UPDATE directly (an own-row policy
+-- constrains only user_id, NOT gym_id / cohort_program_id / avg_power_watts /
+-- score_sort), any member could fabricate a top W·kg score or inject a row onto
+-- ANOTHER gym's board — defeating the anti-cheat and tenant isolation. So no write
+-- grant to authenticated. A member MAY read their own rows (harmless; a future
+-- "your results" view). Cross-member leaderboard/TV/seam-1 reads run service-role in
+-- the edge fns (privacy shaping + moderation ledger applied before output).
 ALTER TABLE public.engine_class_results ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.engine_class_results FROM anon;
-GRANT SELECT, INSERT, UPDATE ON public.engine_class_results TO authenticated;
+REVOKE ALL ON public.engine_class_results FROM anon, authenticated;
+GRANT SELECT ON public.engine_class_results TO authenticated;
 
 DROP POLICY IF EXISTS engine_class_results_select_own ON public.engine_class_results;
 CREATE POLICY engine_class_results_select_own ON public.engine_class_results
   FOR SELECT TO authenticated USING (user_id = auth.uid());
-DROP POLICY IF EXISTS engine_class_results_insert_own ON public.engine_class_results;
-CREATE POLICY engine_class_results_insert_own ON public.engine_class_results
-  FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
-DROP POLICY IF EXISTS engine_class_results_update_own ON public.engine_class_results;
-CREATE POLICY engine_class_results_update_own ON public.engine_class_results
-  FOR UPDATE TO authenticated USING (user_id = auth.uid());
+-- No INSERT/UPDATE/DELETE policy: service_role (the edge fn) bypasses RLS and is the
+-- only writer.
 
 COMMENT ON TABLE public.engine_class_results IS
   'F4 leaderboard entries — one logged Engine Class result per (member, cohort workout). id = the moderation result_ref (affiliate keys its ledger on it). Score of record lives here (ONE PROFILE); W·kg derived read-time from athlete_profiles.bodyweight.';

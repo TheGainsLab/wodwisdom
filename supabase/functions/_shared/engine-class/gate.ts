@@ -32,7 +32,8 @@ export async function resolveMemberGym(supa: SupabaseClient, userId: string, now
     .from("member_gym_links")
     .select("gym_id, gym_name, class_name")
     .eq("user_id", userId)
-    .eq("status", "joined");
+    .eq("status", "joined")
+    .order("joined_at", { ascending: true }); // deterministic pick for a multi-gym member
   if (linkErr) throw new Error(`member_gym_links read failed: ${linkErr.message}`);
   const joined = (links ?? []) as MemberGym[];
   if (joined.length === 0) return null;

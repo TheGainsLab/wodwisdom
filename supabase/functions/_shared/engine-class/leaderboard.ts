@@ -87,6 +87,9 @@ export function parseScoreSort(raw: string | null | undefined, scoreType: string
   const timeMatch = s.match(/^(\d+):([0-5]?\d)$/);
   if (scoreType === "for_time") {
     if (timeMatch) return -(parseInt(timeMatch[1], 10) * 60 + parseInt(timeMatch[2], 10));
+    // Looks like a time but isn't valid mm:ss (e.g. "12:99") → don't guess via
+    // parseFloat (which would read "12"); treat as unparseable.
+    if (s.includes(":")) return null;
     const secs = parseFloat(s);
     return Number.isFinite(secs) ? -secs : null;
   }
@@ -133,7 +136,7 @@ function prepare(
 
   let metric_value: number | null;
   if (metric === "wkg") {
-    if (adj && typeof adj.wkg_score === "number") {
+    if (adj && typeof adj.wkg_score === "number" && Number.isFinite(adj.wkg_score)) {
       metric_value = adj.wkg_score; // coach-corrected W·kg wins
     } else {
       const massKg = toKg(p.bodyweight, p.units);
@@ -245,7 +248,9 @@ export function buildSeasonStandings(
       .filter((x): x is Prepared => x !== null);
     const ranked = rankPrepared(prepared);
     for (const rows of ranked.values()) {
-      const n = rows.length;
+      // Only rankable (non-null metric) rows count toward participant points; null
+      // rows sort last, get award 0, and must not inflate everyone else's points.
+      const n = rows.filter((r) => r.metric_value != null).length;
       for (const r of rows) {
         const award = r.metric_value == null ? 0 : (n - r.rnk + 1);
         const cur = totals.get(r.user_id) ?? { division: r.division, display_name: r.display_name, points: 0, workouts: 0 };

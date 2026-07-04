@@ -134,4 +134,24 @@ Deno.test("parseScoreSort: for_time mm:ss → negative seconds; numeric otherwis
   assertEquals(parseScoreSort("150", "amrap"), 150);
   assertEquals(parseScoreSort("225 lb", "load"), 225);
   assertEquals(parseScoreSort("", "for_time"), null);
+  // Malformed time (seconds > 59) must NOT be mis-read as bare minutes via parseFloat.
+  assertEquals(parseScoreSort("12:99", "for_time"), null);
+});
+
+Deno.test("buildSeasonStandings: null-metric entries don't inflate participant points", () => {
+  // W·kg mode: u2 has watts (rankable), u3 has no watts (null metric) in the same
+  // division. u2 should get 1 pt (one rankable participant), not 2.
+  const profiles = new Map<string, ProfileInfo>([
+    ["u2", { full_name: "Bob", leaderboard_anonymous: false, leaderboard_excluded: false, role: "user", gender: "male", bodyweight: 80, units: "kg" }],
+    ["m2", { full_name: "Max", leaderboard_anonymous: false, leaderboard_excluded: false, role: "user", gender: "male", bodyweight: 80, units: "kg" }],
+  ]);
+  const entries = [
+    entry({ result_ref: "a", user_id: "u2", week_num: 1, day_num: 1, avg_power_watts: 320 }),
+    entry({ result_ref: "b", user_id: "m2", week_num: 1, day_num: 1, avg_power_watts: null }), // no physics → null W·kg
+  ];
+  const season = buildSeasonStandings(entries, profiles, new Map(), "wkg", null);
+  const bob = season.find((r) => r.display_name === "Bob")!;
+  assertEquals(bob.rnk, 1);
+  assertEquals(bob.points, 1); // 1 rankable participant → 1 pt (not 2)
+  assertEquals(season.find((r) => r.display_name === "Max")!.points, 0);
 });
