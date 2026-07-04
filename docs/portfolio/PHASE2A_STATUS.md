@@ -327,13 +327,21 @@ with **no `action`**, so the affiliate routed it to the Bearer staff path and se
 would silently degrade to unmoderated. **Fixed in wodwisdom PR #566 → reviewer verified
 the diff (one-line body change + honest docs, nothing else) + MERGED (`4d009ac`).**
 ~~The wodwisdom side of Phase 2a is DONE~~ — superseded by **Decision 9**.
-**(8) IN PROGRESS — Decision-9(i) rework. DESIGN PROPOSAL POSTED → awaiting reviewer
-sign-off: PR #574 (design-only) + `ENGINE_CLASS_DISTRIBUTION_DESIGN.md`.** Recommends: grant
-retail `engine` gym-scoped (1-line allowlist + affiliate flips activate_seat feature; retail
-untouched via the union gate; day-1 start is free); a new `gym-engine-months-cron` for the
-grant-based months drip (the only real build — retail drip is Stripe-keyed so gym members
-sit at months_unlocked=0); park the #560 group surfaces (routes/nav removed, code kept, cron
-unscheduled, F5 free view deferred). 5 open Qs for sign-off. BUILD FOLLOWS sign-off. Original
+**(8) IN PROGRESS — Decision-9(i) rework. DESIGN SIGNED OFF → BUILD NOW.** PR #574
+**APPROVED + MERGED** (`278f0fe`; reviewer re-verified the 4 load-bearing claims in code —
+union gate, single `engine` feature, `no_stripe_customer` early-return, day-1 default).
+**All 5 open Qs answered on the PR:** (1) grant `engine` ONLY; (2) DRIP (1mo at activation
++1/30d, only-raise, cap 36) — 9(i)-consistent, founder may veto on this board; (3) accept
+`granted_at` reset on reactivation; (4) F5 free view DEFERRED for v1 — affiliate STOPS
+granting `engine_class_view` at join (Decision 8 surface parked; key stays allowlisted;
+mechanics revive verbatim when a free tier gets a surface) — founder may veto; (5) dual
+member = later edge, skip-guard suffices. **Separate `gym-engine-months-cron` CONFIRMED
+over a branch in the retail reconciler** (retail byte-identical wins); cron build notes on
+the PR (fail-closed X-Cron-Key, idempotent only-raise, named dependency on the grant
+timestamp column). Build per the plan → reviewer reviews the build PR → founder deploys the
+delta (allowlist + cron + route removal + affiliate feature flip, deploy order: wodwisdom
+allowlist BEFORE affiliate flip) → demo resumes. Original
+brief: Original
 brief: the
 gym Engine Class is PURE DISTRIBUTION of the retail Engine standalone product —
 "exact same code, nothing different; the only difference is how they encounter
