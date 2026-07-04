@@ -7,7 +7,7 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-04 (affiliate team — **PR #12 MERGED to affiliate main**
+> Last updated: 2026-07-04 (wodwisdom team — **Decision-9(i) DESIGN PROPOSAL posted → PR #574 (design-only, no code) + `ENGINE_CLASS_DISTRIBUTION_DESIGN.md`; awaiting reviewer sign-off before build**. Recon of the retail Engine access model done: it gates on a single `engine` feature read as a UNION across sources, so granting retail `engine` gym-scoped lights up /engine/* with retail code UNTOUCHED (1-line allowlist + affiliate flips activate_seat grant); day-1 start is free (engine_current_day DEFAULT 1 + ProgramSelection). Only real build = a grant-based months-drip cron (retail drip is Stripe-keyed → gym members sit at months_unlocked=0/fully locked; the lock is dashboard-only). Group surfaces (#560) parked, not deleted. 5 open Qs for the reviewer/founder. Prior line: 2026-07-04 (affiliate team — **PR #12 MERGED to affiliate main**
 > (`acb5995`; branch deleted) — the seam-2 `get_active` endpoint + Decision-8 free-view
 > grant + adjust contract note are now on main. Note: `get_active` routes on
 > `body.action==='get_active'` (as documented in `F4_MODERATION_CONTRACT.md`); wodwisdom's
@@ -327,7 +327,14 @@ with **no `action`**, so the affiliate routed it to the Bearer staff path and se
 would silently degrade to unmoderated. **Fixed in wodwisdom PR #566 → reviewer verified
 the diff (one-line body change + honest docs, nothing else) + MERGED (`4d009ac`).**
 ~~The wodwisdom side of Phase 2a is DONE~~ — superseded by **Decision 9**.
-**(8) NEXT — the Decision-9(i) rework (the LAST 2a build item, now SMALL):** the
+**(8) IN PROGRESS — Decision-9(i) rework. DESIGN PROPOSAL POSTED → awaiting reviewer
+sign-off: PR #574 (design-only) + `ENGINE_CLASS_DISTRIBUTION_DESIGN.md`.** Recommends: grant
+retail `engine` gym-scoped (1-line allowlist + affiliate flips activate_seat feature; retail
+untouched via the union gate; day-1 start is free); a new `gym-engine-months-cron` for the
+grant-based months drip (the only real build — retail drip is Stripe-keyed so gym members
+sit at months_unlocked=0); park the #560 group surfaces (routes/nav removed, code kept, cron
+unscheduled, F5 free view deferred). 5 open Qs for sign-off. BUILD FOLLOWS sign-off. Original
+brief: the
 gym Engine Class is PURE DISTRIBUTION of the retail Engine standalone product —
 "exact same code, nothing different; the only difference is how they encounter
 the program." PROPOSE THE DESIGN FIRST (short doc or PR description), reviewer
@@ -422,9 +429,11 @@ round → merge~~ **DONE — MERGED (`6df6b8a`)** after confirming every fix in 
 (watts derivation + AMRAP divisor + fully_computed gate + unranked nulls + wkg→raw
 fallback; midnight-UTC + 409; rx-only physics; per-type adjust parsing incl. kg→lb;
 paginated `loadEntries`; seat/view gate split; digest tokens + mint RPC + ≥16 floor;
-RFT→for_time; the 🟡 batch; Decision 8 + JOINT-1). Remaining: nothing in queue —
-available to arbitrate the #12 cross-review if findings need a tiebreak, and to
-support the founder's deploy + acceptance-demo run.
+RFT→for_time; the 🟡 batch; Decision 8 + JOINT-1). **NEXT: sign off the Decision-9(i) DESIGN proposal** — wodwisdom team posted it as
+**PR #574 (design-only, no code)** + `docs/portfolio/ENGINE_CLASS_DISTRIBUTION_DESIGN.md`.
+Sanity-check the seat-unlock mapping (grant retail `engine` gym-scoped — union read, retail
+untouched), the grant-based months-drip cron (from `granted_at`, Stripe drip byte-identical),
+the parking plan, and the 5 open questions. On sign-off, wodwisdom builds the small delta.
 
 > **Follow-ups opened by the #5 fix round (record before they're lost):**
 > **(a) Wire the GDPR `forget` caller.** The affiliate now RECEIVES
