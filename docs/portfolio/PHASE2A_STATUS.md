@@ -166,16 +166,26 @@ cols ✓, pgcrypto ✓, `engine_class_results` = own-row-SELECT-only ✓); the 8
 `COMPETITION_SERVICE_BASE_URL`/`WORK_CALC_SERVICE_KEY` confirmed present); pg_cron
 job `gym-cohort-cron-hourly` (`7 * * * *`) active; smoke checks 401/401/403/401/
 `{"message":"no gyms due"}` all as expected.
-**Affiliate merged, NOT deployed (runbook next):** F1 (#2), F2 (#3), F3 (#5),
-F4-moderation (#7), F9-minimal billing (#6), F4-seams+Decision-8 (#12, pending merge).
-**Set during the affiliate step's key exchange (deliberately not before):**
-[WOD] `WHOLESALE_CONSUMER_KEYS` (bound to pilot `communities.id`),
-[WOD] `AFFILIATE_ENROLL_URL` + `ENGINE_ENROLL_KEY` (both sides),
-[WOD] `AFFILIATE_MODERATION_URL`/`KEY` (seam-2 — boards render unmoderated until set),
-[AFF] `WODWISDOM_LEADERBOARD_URL`/`KEY` (hand over the value minted 2026-07-04),
-plus `BILLING_SNAPSHOT_KEY` and `STRIPE_COUPON_FOUNDING` (percent_off=50 — without it
-a founding gym's snapshot returns `founding_coupon_unconfigured`, by design).
-TV tokens: mint AFTER the affiliate step via `mint_gym_tv_token('<communities.id>', …)`.
+**AFFILIATE DEPLOY STEP COMPLETE (2026-07-04, founder):** the 6 affiliate migrations
+applied to `gjkmxatyroyevezjzvyz` (base schema `communities`+3 pre-existed; feature
+tables verified: `gym_consents`, `engine_classes`, `engine_class_seats`,
+`engine_leaderboard_moderations`, `billing_snapshots`); the 6 functions
+(`gym-onboard`, `engine-class`, `engine-enroll`, `engine-moderation`, `gym-billing`,
+`dashboard-panels`) deployed off affiliate main `8247a93` (#12 code; both s2s fns
+carry `service-key-auth.ts`). **Key exchange DONE — digest-verified matching on both
+projects:** `ENGINE_ENROLL_KEY` ✓, `AFFILIATE_MODERATION_KEY` ✓ (seam-2 live),
+`WODWISDOM_LEADERBOARD_KEY` ✓ (seam-1 live; one mismatch caught by digest compare and
+fixed); `AFFILIATE_ENROLL_URL`/`AFFILIATE_MODERATION_URL` set on wodwisdom,
+`WODWISDOM_LEADERBOARD_URL` + `BILLING_SNAPSHOT_KEY` set on affiliate. **Stripe
+(sandbox/test mode, retail account):** `STRIPE_SECRET_KEY` (sk_test) +
+`STRIPE_PRICE_ANALYTICS` ($49) + `STRIPE_PRICE_ENGINE_6` ($6) set on affiliate.
+**Deliberately deferred (founder):** `STRIPE_PRICE_ENGINE_5` (one-price decision —
+create the $5 band only if a gym nears 100 seats; code tolerates its absence),
+`STRIPE_COUPON_FOUNDING` (billing sync for founding gyms refuses safely until set),
+[WOD] `WHOLESALE_CONSUMER_KEYS` + [AFF] `WODWISDOM_GRANTS_URL/KEY` (need the demo
+gym's `communities.id` — first demo step; until set, enroll returns
+`free_view:'skipped'` and seat grants can't be issued), TV-token mint (same reason).
+**NEXT: create the demo gym (F1) → bind grants keys → mint TV token → ACCEPTANCE DEMO.**
 
 | Item | State | Blocker |
 |---|---|---|
