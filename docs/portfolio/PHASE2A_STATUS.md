@@ -7,7 +7,7 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-04 (affiliate team — **Open Q3 CONFIRMED RESOLVED on #574 → item ①
+> Last updated: 2026-07-04 (wodwisdom team — **Decision-9(i) BUILT → wodwisdom PR #577** (awaiting reviewer review). Seat unlock = grant retail `engine` gym-scoped (union gate, retail untouched); grant-row extracted to omit `granted_at` so re-grant preserves the drip clock (asserted by grant-row_test); new `gym-engine-months-cron` drips only active gym_grant `engine` rows from the original grant timestamp (min 36, only-raise, skips dual retail members); #560 group surfaces PARKED (routes/nav removed, code kept); docs rewritten as distribution. Affiliate delta = **affiliate issue #13** (grant `engine`; deactivate expires-not-deletes; drop `engine_class_view`; deploy allowlist first). deno check + 5 tests + tsc/vite clean. Prior line: 2026-07-04 (affiliate team — **Open Q3 CONFIRMED RESOLVED on #574 → item ①
 > amended; ②③④ unchanged.** The `granted_at`-reset worry is handled by the grant MECHANICS,
 > which affiliate `engine-class` ALREADY implements: **`deactivate_seat` POSTs `expires_at` =
 > period end (not DELETE); `reactivate_seat` POSTs `expires_at: null`; terminal revocations stay
@@ -361,7 +361,19 @@ with **no `action`**, so the affiliate routed it to the Bearer staff path and se
 would silently degrade to unmoderated. **Fixed in wodwisdom PR #566 → reviewer verified
 the diff (one-line body change + honest docs, nothing else) + MERGED (`4d009ac`).**
 ~~The wodwisdom side of Phase 2a is DONE~~ — superseded by **Decision 9**.
-**(8) IN PROGRESS — Decision-9(i) rework. DESIGN SIGNED OFF → BUILD NOW.** PR #574
+**(8) ~~Decision-9(i) rework~~ BUILT → wodwisdom PR #577 (awaiting reviewer review).**
+Built per the signed-off design: `engine` added to `ALLOWED_GRANT_FEATURES`; the grant
+upsert row extracted to pure `_shared/grant-row.ts` that OMITS `granted_at` (re-grant can't
+clobber it — `grant-row_test.ts` asserts it); new `gym-engine-months-cron` (drips only
+active gym_grant `engine` rows, keyed on original `granted_at`, min(36,floor(days/30)+1),
+only-raise, skips dual retail members; pure `engine-months-drip.ts` + tests); #560 group
+surfaces PARKED (routes `/gym` `/gym/leaderboard` `/tv` + Gym Class nav removed, code kept;
+`gym-cohort-cron` marked parked); docs rewritten (SKU §1 distribution, F4/F5 parked/deferred,
+ACCEPTANCE_DEMO revised, launch kit, design-doc Q3). Affiliate delta filed as **affiliate
+issue #13** (activate_seat grants `engine`; deactivate sends `expires_at` not DELETE;
+reactivate `expires_at:null`; stop granting `engine_class_view`; deploy wodwisdom allowlist
+first). deno check + 5 unit tests + tsc + vite clean. **NEXT: reviewer reviews #577 → merge →
+founder deploys the delta → demo resumes.** _(design history:_ PR #574
 **APPROVED + MERGED** (`278f0fe`; reviewer re-verified the 4 load-bearing claims in code —
 union gate, single `engine` feature, `no_stripe_customer` early-return, day-1 default).
 **All 5 open Qs answered on the PR:** (1) grant `engine` ONLY; (2) DRIP (1mo at activation
@@ -480,7 +492,11 @@ round → merge~~ **DONE — MERGED (`6df6b8a`)** after confirming every fix in 
 (watts derivation + AMRAP divisor + fully_computed gate + unranked nulls + wkg→raw
 fallback; midnight-UTC + 409; rx-only physics; per-type adjust parsing incl. kg→lb;
 paginated `loadEntries`; seat/view gate split; digest tokens + mint RPC + ≥16 floor;
-RFT→for_time; the 🟡 batch; Decision 8 + JOINT-1). **NEXT: sign off the Decision-9(i) DESIGN proposal** — wodwisdom team posted it as
+RFT→for_time; the 🟡 batch; Decision 8 + JOINT-1). ~~sign off the Decision-9(i) DESIGN proposal~~ **DONE — APPROVED + merged (#574 `278f0fe`).**
+**NEXT: review the BUILD (wodwisdom PR #577)** — `engine` allowlist, `gym-engine-months-cron`
+(grant-based drip; verify only-raise + active-rows + original-timestamp + the grant-row test),
+the #560 parking, and the retail-untouched invariant. On sign-off → merge → founder deploys.
+_(superseded design note:_ wodwisdom team posted it as
 **PR #574 (design-only, no code)** + `docs/portfolio/ENGINE_CLASS_DISTRIBUTION_DESIGN.md`.
 Sanity-check the seat-unlock mapping (grant retail `engine` gym-scoped — union read, retail
 untouched), the grant-based months-drip cron (from `granted_at`, Stripe drip byte-identical),
