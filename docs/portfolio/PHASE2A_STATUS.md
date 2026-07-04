@@ -116,19 +116,23 @@ returns `founding_coupon_unconfigured` and won't sync to Stripe, by design).
 | affiliate **#6** (F9 billing) | ✅ **FIXED + MERGED** (affiliate `25ae6d8` → main; branch deleted) | 🔴 founding coupon: `syncStripe` now attaches `STRIPE_COUPON_FOUNDING` on create + reconciles it on update (apply/clear on founding change), and **refuses to sync a founding gym if the coupon is unconfigured** (returns `founding_coupon_unconfigured`) rather than full-charge — closes the 2× §11 divergence. 🟠 downgrade: generic pass now deletes any subscription item whose price left `desired` (Analytics-off / Engine→0 / band swap), after the adds so no last-item delete. 🟠 Analytics: new `communities.analytics_enabled` opt-in flag (migration `20260704010000`, default false) drives billing — **Decision 7**. Deferred 🟡s (sub-create idempotency lock, period-end proxy) NOT in this round — still open, low sev. New secret: `STRIPE_COUPON_FOUNDING` (add at deploy) |
 | affiliate **#7** (F4-moderation + consent roster state) | ✅ **FIXED + MERGED** (affiliate `3c7d45c` → main; branch deleted) | 🟡 `moderated_by` now nullable (dropped `not null`) so `on delete set null` is satisfiable — GDPR/account deletion no longer aborts; matches the repo's documented onboarding pattern. 🟡 `adjust` now rejects a semantically-empty `{}` (requires a corrected `raw_score`/`wkg_score`). 🟡 "Resend invite = clipboard copy" left as-is (renders only for awaiting-consent seats, can't misfire — naming nit). Auth/RLS/check-constraint/graceful-degrade/Change-B consent mirror were verified clean. Cross-repo seams still wodwisdom-F4's to wire |
 | affiliate #5 base retarget + branch cleanup | ✅ **DONE** (affiliate team) | #5 base retargeted to `main`; merged `claude/f1-gym-onboarding` + `claude/f2-engine-class` deleted (local + remote) |
-| wodwisdom **#560** (F5 + F4 leaderboard/TV) | ✅ **BUILT / PR open** (wodwisdom) — self-adversarial-reviewed + fixed (`0bd624c`); deno(5 fns)+10 tests+tsc+vite+eslint clean | The last 2a build. F5 `/gym` read-only view + seat logging; F4 per-workout+season leaderboard (gender+modality, W·kg default via work-calc ÷ live bodyweight) + tokenized `/tv/:token`. Migration `20260705000000` (`engine_class_results` service-role-write-only after the 🔴 fix + `gym_tv_tokens`). Seam 1 (entries read) exposed; seam 2 consumed with graceful-degrade. **Blocker: CROSS-TEAM review by affiliate** (they're standing by for the `F4_MODERATION_CONTRACT` conformance pass) → merge → batched deploy. ⚠️ founder decision flagged (free-tier gate). Deploy inputs: migration `20260705000000`, 5 `engine-class-*` fns, secrets `WODWISDOM_LEADERBOARD_KEY` / `AFFILIATE_MODERATION_URL`+`KEY` / `COMPETITION_SERVICE_BASE_URL`+`WORK_CALC_SERVICE_KEY`, a `gym_tv_tokens` row per pilot |
+| wodwisdom **#560** (F5 + F4 leaderboard/TV) | 🔴 **REVIEWED — FIX ROUND NEEDED** (reviewer 8-angle review posted on the PR: **2🔴 + 6🟠 inline + 🟡 list** in the review body). Architecture/spec/security verified GOOD (no IDOR, RLS correct, all decided items conformant, retail untouched) — the blockers are correctness | **2🔴:** (1) `avg_power_watts` is null for EVERY entry — upstream work-calc returns `watts:null` inline and `engine-class-log` never derives `total_joules/time`; AMRAP has no time divisor at all (`time_cap_seconds` never passed); + no raw fallback in `leaderboard.ts` → the default W·kg board renders arbitrary rank order. (2) "Today" flips at the program's `created_at` TIME-OF-DAY (UTC), not midnight — workout switches mid-afternoon, morning scores vanish, log TOCTOU. **6🟠:** physics uses Rx prescription loads, not member effort (scaled member tops W·kg board; fix = physics only for `rx:true` in v1); coach-`adjust` encoding mismatch (rounds_reps `"6+7"`→6 vs `rounds*1000+reps`; load kg vs lbs-normalized); `loadEntries` unbounded → silent 1000-row truncation (season + seam-1); gate admits `gym_programming` (cohort roster is `engine_cohort`-only; gate on that alone in v1 + share the constant); TV-token hardening (plaintext at rest, no entropy floor/expiry/rate-limit; names opt-out on an anonymous surface; `serviceKey` skips the ≥16-char floor; NO MINT PATH exists yet); `"5 RFT"` misclassified `rounds_reps` (finishers all tie, no time captured). Affiliate conformance review still to run in parallel (seam addenda for issue #11 are in the review body: `wkg_score` required for default-board adjust; seam-1 pagination; `workout_date` becomes real; R+r adjust format; tv-token mint owner). Migration still syntax-verified only |
 
 ## Next action per actor (in order)
 
 **Wodwisdom team:** (1)–(4) DONE (see prior). (5) ~~build F5 + F4 leaderboard/TV +
 launch kit~~ **DONE → PR #560** (self-reviewed + fixed; seam-1 exposed, seam-2 consumed).
-**(6) NEXT: address the affiliate's `F4_MODERATION_CONTRACT` conformance review on #560
-→ merge #560** (the last 2a build). Then the batched deploy + the acceptance demo
+**(6) NEXT: fix round on #560 — the reviewer's 8-angle review is POSTED on the PR
+(2🔴 + 6🟠 inline + a 🟡 list in the review body; see the #560 row).** Fix, push,
+report → reviewer re-verifies → merge (also fold in the affiliate's conformance
+findings, running in parallel). Then the batched deploy + the acceptance demo
 (`ACCEPTANCE_DEMO.md`) close Phase 2a. **Two decisions to get from the founder:** the
-flagged **free-tier gate** question (base-grant-on-join vs seat-only — `GYM_F4_F5_SURFACES.md`),
-and whether to file the deferred v1 items (cohort continuity #548, real class schedule,
-F5 personalized-scaling view). Deferred #5 hardening: affiliate #8/#9/#10. **Follow-ups
-(a)/(b) below still open** (GDPR `forget` caller; owner-attested consent path).
+flagged **free-tier gate** question (base-grant-on-join vs seat-only — `GYM_F4_F5_SURFACES.md`;
+reviewer's recommendation is with the founder: base-grant a distinct `engine_class_view`
+key at F3 join via the existing grants API), and whether to file the deferred v1 items
+(cohort continuity #548, real class schedule, F5 personalized-scaling view). Deferred
+#5 hardening: affiliate #8/#9/#10. **Follow-ups (a)/(b) below still open** (GDPR
+`forget` caller; owner-attested consent path).
 
 **Affiliate team:** (1)–(3) DONE (see prior). (4) ~~address the cross-team review
 findings on #6 + #7~~ **DONE — both FIXED + MERGED** (#6 `25ae6d8`, #7 `3c7d45c`):
@@ -155,11 +159,12 @@ rounds merge). Parallel track: lawyer packet + pilot list.
 + #7~~ DONE. ~~Re-verify + merge #551~~ DONE. ~~F4/F5 briefs~~ DONE (relayed).
 ~~Acceptance-demo checklist~~ **DONE — `docs/portfolio/ACCEPTANCE_DEMO.md` (#558,
 merged):** preconditions, 11-step F1→F9 demo script (doubles as the pilot pitch
-walkthrough), failure triage, pitch overlay. Remaining: **the wodwisdom F5 + F4 +
-launch-kit PR IS OPEN — #560.** It ships self-adversarial-reviewed + fixed (🔴
-service-role-write lockdown + 3🟡). Run the 8-angle review (affiliate runs the
-contract-conformance half per its section + issue #11), then merge → founder executes
-both runbooks → run the acceptance demo. That merge is the last thing gating the demo.
+walkthrough), failure triage, pitch overlay. ~~Run the 8-angle review on #560~~
+**DONE — posted on the PR** (2🔴 + 6🟠 inline + 🟡 list; all findings re-verified in
+code before posting; Decision 4 held — no fixes pushed). Remaining: **re-verify the
+#560 fix round when the wodwisdom team pushes it → merge** (fold in the affiliate's
+conformance verdict) → founder executes both runbooks → acceptance demo. That merge
+is the last thing gating the demo.
 
 > **Follow-ups opened by the #5 fix round (record before they're lost):**
 > **(a) Wire the GDPR `forget` caller.** The affiliate now RECEIVES
