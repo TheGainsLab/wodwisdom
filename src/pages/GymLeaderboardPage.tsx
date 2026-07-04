@@ -7,14 +7,14 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 interface BoardRow {
-  rnk: number; display_name: string; division: string;
+  rnk: number | null; display_name: string; division: string;
   metric_value: number | null; score_display: string; rx: boolean;
   under_review: boolean; is_viewer: boolean;
 }
 interface Division { division: string; rows: BoardRow[]; }
 interface SeasonRow { rnk: number; display_name: string; division: string; points: number; workouts: number; is_viewer: boolean; }
 interface Resp {
-  mode: 'workout' | 'season'; metric: 'wkg' | 'raw'; gym_name?: string | null;
+  mode: 'workout' | 'season'; metric: 'wkg' | 'raw'; requested_metric?: 'wkg' | 'raw'; gym_name?: string | null;
   workout?: { week_num: number; day_num: number; modality: string | null } | null;
   divisions?: Division[]; season?: SeasonRow[]; moderation_connected?: boolean;
 }
@@ -41,7 +41,11 @@ export default function GymLeaderboardPage() {
     return () => { live = false; };
   }, [mode, metric]);
 
-  const fmtMetric = (v: number | null) => v == null ? '—' : (metric === 'wkg' ? `${v.toFixed(2)} W/kg` : '');
+  // Use the EFFECTIVE metric the server returned (it falls back wkg→raw on strength
+  // days / physics outages), so the value column matches the actual ranking.
+  const effMetric = data?.metric ?? metric;
+  const fmtMetric = (v: number | null) => v == null ? '—' : (effMetric === 'wkg' ? `${v.toFixed(2)} W/kg` : '');
+  const fellBack = mode === 'workout' && data?.requested_metric === 'wkg' && data?.metric === 'raw';
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '1.5rem 1.25rem 5rem' }}>
@@ -72,6 +76,7 @@ export default function GymLeaderboardPage() {
         <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 8 }}>
           Week {data.workout.week_num} · Day {data.workout.day_num}
           {data.workout.modality ? ` · ${data.workout.modality}` : ''}
+          {fellBack && <span> · ranked by raw score (no power on this workout)</span>}
         </div>
       )}
 
@@ -84,7 +89,7 @@ export default function GymLeaderboardPage() {
           <div style={divHead}>{d.division}</div>
           {d.rows.map((r, i) => (
             <Row key={i} rnk={r.rnk} name={r.display_name} viewer={r.is_viewer} flagged={r.under_review}
-              right={metric === 'wkg' ? fmtMetric(r.metric_value) : r.score_display} rx={r.rx} />
+              right={effMetric === 'wkg' ? fmtMetric(r.metric_value) : r.score_display} rx={r.rx} />
           ))}
         </div>
       ))}
@@ -112,7 +117,7 @@ function groupSeason(rows: SeasonRow[]): Array<[string, SeasonRow[]]> {
 }
 
 function Row({ rnk, name, right, sub, viewer, flagged, rx }: {
-  rnk: number; name: string; right: string; sub?: string; viewer: boolean; flagged: boolean; rx?: boolean;
+  rnk: number | null; name: string; right: string; sub?: string; viewer: boolean; flagged: boolean; rx?: boolean;
 }) {
   return (
     <div style={{
@@ -120,7 +125,7 @@ function Row({ rnk, name, right, sub, viewer, flagged, rx }: {
       borderRadius: 8, background: viewer ? 'rgba(37,99,235,0.10)' : 'transparent',
       borderBottom: '1px solid rgba(128,128,128,0.12)',
     }}>
-      <div style={{ width: 24, textAlign: 'right', fontWeight: 700, opacity: 0.7 }}>{rnk}</div>
+      <div style={{ width: 24, textAlign: 'right', fontWeight: 700, opacity: 0.7 }}>{rnk ?? '—'}</div>
       <div style={{ flex: 1 }}>
         {name}{viewer && <span style={{ opacity: 0.5 }}> (you)</span>}
         {flagged && <span style={badge}>under review</span>}

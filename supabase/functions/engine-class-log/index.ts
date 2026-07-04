@@ -32,13 +32,21 @@ interface LogBody {
   load_unit?: unknown;    // 'lbs' | 'kg'
   score_text?: unknown;   // 'other'
   rx?: unknown;
+  // TOCTOU guard: the (week, day) the client DISPLAYED. If today's workout rolled
+  // over between page-load and submit, we 409 instead of silently attaching the score
+  // to the wrong workout's board.
+  expected_week?: unknown;
+  expected_day?: unknown;
 }
 
+const SCORE_TEXT_MAX = 64;
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null);
 
 function mmss(totalSeconds: number): string {
-  const m = Math.floor(totalSeconds / 60);
-  const s = Math.round(totalSeconds % 60);
+  // Round the TOTAL first so 89.6s → 1:30, never "1:60".
+  const t = Math.round(totalSeconds);
+  const m = Math.floor(t / 60);
+  const s = t % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
@@ -68,6 +76,17 @@ Deno.serve(async (req) => {
     if (!program) return json({ error: "no_program", detail: "no cohort program to log against yet" }, 409);
     const workout = selectTodaysWorkout(program.shared_output, program.created_at, nowIso);
     if (!workout) return json({ error: "no_workout", detail: "no class workout today" }, 409);
+
+    // TOCTOU: reject if today's workout changed since the client rendered it.
+    const expW = num(body.expected_week);
+    const expD = num(body.expected_day);
+    if (expW != null && expD != null && (expW !== workout.week_num || expD !== workout.day_num)) {
+      return json({
+        error: "workout_rolled_over",
+        detail: "today's class workout changed — reload and log against the current workout",
+        week_num: workout.week_num, day_num: workout.day_num,
+      }, 409);
+    }
 
     // Build the score from the workout's score_type.
     const rx = body.rx === undefined ? true : body.rx === true;
@@ -111,7 +130,7 @@ Deno.serve(async (req) => {
         break;
       }
       default: {
-        const txt = typeof body.score_text === "string" ? body.score_text.trim() : "";
+        const txt = typeof body.score_text === "string" ? body.score_text.trim().slice(0, SCORE_TEXT_MAX) : "";
         if (!txt) return json({ error: "invalid_request", detail: "score_text required" }, 400);
         score_display = txt;
         score_sort = null;
@@ -123,17 +142,24 @@ Deno.serve(async (req) => {
     const gender = normalizeGender(ap?.gender) ?? "men"; // default for the physics model when unknown
     const bodyMassKg = toKg(ap?.bodyweight, ap?.units) ?? undefined;
 
-    // Physics only where a metcon effort is scored (for_time / amrap) and we have the block.
+    // Physics — RX ONLY. The watts come from the Rx prescription, which describes the
+    // member's real work only when they did it Rx; a scaled entry ranks on raw score
+    // (with its rx:false badge), never Rx power credit (see physics.ts header).
     let avgWatts: number | null = null;
     let totalJoules: number | null = null;
     let bodyMassUsed: number | null = null;
-    if ((timeSeconds != null || scoreReps != null) && workout.scored_block_idx != null) {
+    const physicsType = workout.score_type === "for_time" ? "for_time"
+      : workout.score_type === "amrap" ? "amrap" : null;
+    if (rx && physicsType && workout.scored_block_idx != null) {
       const block = workout.blocks[workout.scored_block_idx];
-      const power = await computeEntryPower(block, { gender, bodyMassKg, timeSeconds, scoreReps });
+      const capSeconds = num(block.time_cap_seconds ?? undefined) ?? undefined; // AMRAP watts divisor
+      const power = await computeEntryPower(block, {
+        gender, bodyMassKg, scoreType: physicsType, timeSeconds, capSeconds, scoreReps,
+      });
       if (power) {
-        avgWatts = power.watts;
+        avgWatts = power.avg_power_watts;
         totalJoules = power.total_joules;
-        bodyMassUsed = power.body_mass_kg_used;
+        bodyMassUsed = power.body_mass_kg;
       }
     }
 

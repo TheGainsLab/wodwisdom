@@ -93,7 +93,14 @@ export function createConsumerAuth(opts: {
   consumerKeysRaw: string | undefined;
   label: string;
 }): ConsumerAuth {
-  const serviceKey = opts.serviceKey;
+  // Enforce the ≥16-char floor on the serviceKey too (parseConsumerKeys already does
+  // it for consumer keys). A fat-fingered short secret must NOT become a live all-tenant
+  // credential — drop it (fail closed) rather than trust it.
+  let serviceKey = opts.serviceKey;
+  if (serviceKey && serviceKey.length < MIN_KEY_LENGTH) {
+    console.error(`[${opts.label}] serviceKey shorter than ${MIN_KEY_LENGTH} chars; ignoring it (misconfig, not a credential)`);
+    serviceKey = undefined;
+  }
   const consumerKeys = parseConsumerKeys(opts.consumerKeysRaw, opts.label);
 
   // Precomputed digests, filled once on first authorize().

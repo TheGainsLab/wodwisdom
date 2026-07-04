@@ -47,6 +47,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createConsumerAuth } from "../_shared/consumer-auth.ts";
+import { ALLOWED_GRANT_FEATURES } from "../_shared/entitlements.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -58,11 +59,10 @@ const auth = createConsumerAuth({
 });
 
 // The gym-channel features a grant may unlock (BILLING_MECHANICS_SPEC §7 mapping).
-// Allowlisted so a leaked tenant-bound key can't mint arbitrary retail features.
-//   Engine Class seat  -> engine_cohort   (2a)
-//   Programmer roster  -> gym_programming (2b)
-// Remote-member all-access bundle (F11) is deferred; add its keys here when built.
-const ALLOWED_GRANT_FEATURES = new Set(["engine_cohort", "gym_programming"]);
+// Allowlisted so a leaked tenant-bound key can't mint arbitrary retail features. The
+// list is shared with the Engine Class gate (_shared/entitlements.ts) so issuing and
+// gating can't desync. Remote-member all-access bundle (F11) deferred.
+const ALLOWED_GRANT_FEATURES_SET = new Set<string>(ALLOWED_GRANT_FEATURES);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -130,10 +130,10 @@ Deno.serve(async (req) => {
     revokeAll = true;
   } else {
     feature = featureRaw;
-    if (!ALLOWED_GRANT_FEATURES.has(feature)) {
+    if (!ALLOWED_GRANT_FEATURES_SET.has(feature)) {
       return json({
         error: "invalid_request",
-        detail: `feature must be one of: ${[...ALLOWED_GRANT_FEATURES].join(", ")}`,
+        detail: `feature must be one of: ${[...ALLOWED_GRANT_FEATURES_SET].join(", ")}`,
       }, 400);
     }
   }

@@ -6,6 +6,10 @@ import { ATHLETEDATA_PUBLIC_TIER } from '../lib/featureFlags';
 
 interface NavProps { isOpen: boolean; onClose: () => void; }
 
+// Module-level cache: Nav mounts on ~every page, but a member's gym membership doesn't
+// change within a session — fetch the "has a joined gym link" flag once per user.
+let gymMembershipCache: { userId: string; hasGym: boolean } | null = null;
+
 export default function Nav({ isOpen, onClose }: NavProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -50,10 +54,19 @@ export default function Nav({ isOpen, onClose }: NavProps) {
             if (data.some(e => e.feature === 'programming')) setHasProgramming(true);
             if (data.some(e => e.feature === 'nutrition')) setHasNutrition(true);
           });
-        // Gym Engine Class member? (F4/F5). Show the nav entry for any joined link;
-        // the /gym surfaces themselves enforce the full gate (link + entitlement).
-        supabase.from('member_gym_links').select('id').eq('user_id', user.id).eq('status', 'joined').limit(1)
-          .then(({ data }) => { if (data && data.length > 0) setHasGym(true); });
+        // Gym Engine Class member? (F4/F5). Cached per user (Nav mounts on ~every page).
+        // The nav entry shows for any joined link; the /gym surfaces enforce the full
+        // gate (link + entitlement).
+        if (gymMembershipCache?.userId === user.id) {
+          setHasGym(gymMembershipCache.hasGym);
+        } else {
+          supabase.from('member_gym_links').select('id').eq('user_id', user.id).eq('status', 'joined').limit(1)
+            .then(({ data }) => {
+              const has = !!(data && data.length > 0);
+              gymMembershipCache = { userId: user.id, hasGym: has };
+              setHasGym(has);
+            });
+        }
       }
     });
   }, []);

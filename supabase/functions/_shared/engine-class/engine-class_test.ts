@@ -46,6 +46,30 @@ Deno.test("selectTodaysWorkout: AMRAP scheme → amrap score_type", () => {
   assertEquals(w.score_type, "amrap");
 });
 
+Deno.test("selectTodaysWorkout: 'today' flips at midnight UTC, not the created-at time-of-day", () => {
+  // Program created at 19:00 UTC. Two instants on the SAME UTC calendar date must
+  // yield the SAME workout (was: flipped at 19:00, making morning + evening differ).
+  const created = "2026-07-01T19:00:00.000Z";
+  const morning = selectTodaysWorkout(OUTPUT, created, "2026-07-02T13:00:00.000Z")!; // next UTC date
+  const evening = selectTodaysWorkout(OUTPUT, created, "2026-07-02T23:00:00.000Z")!; // same UTC date
+  assertEquals([morning.week_num, morning.day_num], [evening.week_num, evening.day_num]);
+  // And day-0 (creation date itself) is the first workout regardless of the 19:00 time.
+  const day0 = selectTodaysWorkout(OUTPUT, created, "2026-07-01T23:30:00.000Z")!;
+  assertEquals(day0.cycle_index, 0);
+});
+
+Deno.test("inferScoreType: RFT / rounds-for-time → for_time (clock-scored); EMOM → other", () => {
+  const rft = (scheme: string) => selectTodaysWorkout(
+    { weeks: [{ week_num: 1, days: [{ day_num: 1, blocks: [{ block_type: "metcon", block_scheme: scheme, movements: [{ movement: "Thruster", rep_scheme: [15] }] }] }] }] } as unknown as WriterOutput,
+    PROGRAM_START, "2026-07-01T09:00:00Z",
+  )!.score_type;
+  assertEquals(rft("5 RFT"), "for_time");
+  assertEquals(rft("5 rounds for time"), "for_time");
+  assertEquals(rft("21-15-9 for time"), "for_time");
+  assertEquals(rft("AMRAP 12"), "amrap");
+  assertEquals(rft("EMOM 10"), "other");
+});
+
 Deno.test("selectTodaysWorkout: past the cycle → HOLDS on the last workout", () => {
   const w = selectTodaysWorkout(OUTPUT, PROGRAM_START, "2026-08-15T09:00:00.000Z")!;
   assertEquals([w.week_num, w.day_num], [2, 1]); // last flattened workout
@@ -129,13 +153,37 @@ Deno.test("buildSeasonStandings: points sum across workouts; 1st gets most", () 
   assertEquals(bob.is_viewer, true);
 });
 
-Deno.test("parseScoreSort: for_time mm:ss → negative seconds; numeric otherwise", () => {
+Deno.test("parseScoreSort: adjust encodings match what the log path writes, per score_type", () => {
+  // for_time
   assertEquals(parseScoreSort("4:30", "for_time"), -270);
-  assertEquals(parseScoreSort("150", "amrap"), 150);
-  assertEquals(parseScoreSort("225 lb", "load"), 225);
+  assertEquals(parseScoreSort("12:99", "for_time"), null); // malformed time, not "12"
   assertEquals(parseScoreSort("", "for_time"), null);
-  // Malformed time (seconds > 59) must NOT be mis-read as bare minutes via parseFloat.
-  assertEquals(parseScoreSort("12:99", "for_time"), null);
+  // amrap
+  assertEquals(parseScoreSort("150", "amrap"), 150);
+  // rounds_reps — must match log's rounds*1000+reps, not parseFloat→6
+  assertEquals(parseScoreSort("6+7", "rounds_reps"), 6007);
+  assertEquals(parseScoreSort("7+0", "rounds_reps"), 7000);
+  assertEquals(parseScoreSort("6", "rounds_reps"), 6000);
+  // load — unit-aware lb normalization (log normalizes to lbs)
+  assertEquals(parseScoreSort("225 lb", "load"), 225);
+  assertEquals(parseScoreSort("225", "load"), 225);
+  assertEquals(Math.round(parseScoreSort("100 kg", "load")!), 220); // 100×2.2046
+});
+
+Deno.test("buildWorkoutBoard: a null-metric (no-watts) row on the W·kg board is UNRANKED, not arbitrarily ranked", () => {
+  const profiles = new Map<string, ProfileInfo>([
+    ["u1", { full_name: "Ann", leaderboard_anonymous: false, leaderboard_excluded: false, role: "user", gender: "female", bodyweight: 60, units: "kg" }],
+    ["u2", { full_name: "Bea", leaderboard_anonymous: false, leaderboard_excluded: false, role: "user", gender: "female", bodyweight: 60, units: "kg" }],
+  ]);
+  const es = [
+    entry({ result_ref: "r1", user_id: "u1", avg_power_watts: 240 }), // 4.0 W/kg → ranked
+    entry({ result_ref: "r2", user_id: "u2", avg_power_watts: null }), // physics failed → unranked
+  ];
+  const [div] = buildWorkoutBoard(es, profiles, new Map(), "wkg", null);
+  const ann = div.rows.find((r) => r.display_name === "Ann")!;
+  const bea = div.rows.find((r) => r.display_name === "Bea")!;
+  assertEquals(ann.rnk, 1);
+  assertEquals(bea.rnk, null); // unranked, not "2"
 });
 
 Deno.test("buildSeasonStandings: null-metric entries don't inflate participant points", () => {

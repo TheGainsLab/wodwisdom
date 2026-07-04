@@ -15,11 +15,17 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { loadLatestProgram, loadEntries, loadProfiles } from "../_shared/engine-class/queries.ts";
 import { selectTodaysWorkout } from "../_shared/engine-class/select-workout.ts";
 import { fetchModerations } from "../_shared/engine-class/moderation-client.ts";
-import { buildWorkoutBoard, type Metric } from "../_shared/engine-class/leaderboard.ts";
+import { buildWorkoutBoard, anyRanked, type Metric } from "../_shared/engine-class/leaderboard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const svc = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/** SHA-256 hex of the presented token — we store/look up only the digest. */
+async function sha256Hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -48,12 +54,15 @@ Deno.serve(async (req) => {
   try {
     const { data: tok, error: tokErr } = await svc
       .from("gym_tv_tokens")
-      .select("gym_id, label, revoked_at")
-      .eq("token", token)
+      .select("gym_id, label, revoked_at, expires_at")
+      .eq("token_digest", await sha256Hex(token))
       .maybeSingle();
     if (tokErr) return json({ error: "tv_failed", detail: tokErr.message }, 500);
-    if (!tok || (tok as { revoked_at: string | null }).revoked_at) return json({ error: "invalid_token" }, 403);
-    const gymId = (tok as { gym_id: string }).gym_id;
+    const t = tok as { gym_id: string; label: string | null; revoked_at: string | null; expires_at: string | null } | null;
+    if (!t || t.revoked_at || (t.expires_at && Date.parse(t.expires_at) < Date.now())) {
+      return json({ error: "invalid_token" }, 403);
+    }
+    const gymId = t.gym_id;
 
     // A display name for the wall (from any joined link for this gym).
     const { data: anyLink } = await svc
@@ -65,15 +74,24 @@ Deno.serve(async (req) => {
     const workout = selectTodaysWorkout(program.shared_output, program.created_at, nowIso);
     if (!workout) return json({ gym_name: anyLink?.gym_name ?? null, workout: null, divisions: [], moderation_connected: false });
 
-    const mod = await fetchModerations(gymId);
-    const entries = await loadEntries(svc, gymId, program.id, workout.week_num, workout.day_num);
+    // Moderation ledger + entries are independent — fetch concurrently.
+    const [mod, entries] = await Promise.all([
+      fetchModerations(gymId),
+      loadEntries(svc, gymId, program.id, workout.week_num, workout.day_num),
+    ]);
     const profiles = await loadProfiles(svc, entries.map((e) => e.user_id));
-    const divisions = buildWorkoutBoard(entries, profiles, mod.moderations, metric, null);
+    // TV uses SHORT names ("First L.") — the public wall is more exposure than the authed board.
+    let divisions = buildWorkoutBoard(entries, profiles, mod.moderations, metric, null, "short");
+    let effectiveMetric: Metric = metric;
+    if (metric === "wkg" && entries.length > 0 && !anyRanked(divisions)) {
+      effectiveMetric = "raw";
+      divisions = buildWorkoutBoard(entries, profiles, mod.moderations, "raw", null, "short");
+    }
 
     return json({
-      gym_name: anyLink?.gym_name ?? (tok as { label: string | null }).label ?? null,
+      gym_name: anyLink?.gym_name ?? t.label ?? null,
       class_name: anyLink?.class_name ?? null,
-      metric,
+      metric: effectiveMetric,
       workout: {
         week_num: workout.week_num,
         day_num: workout.day_num,

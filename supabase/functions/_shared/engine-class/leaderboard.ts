@@ -33,6 +33,9 @@ export interface LeaderboardEntry {
   score_sort: number | null; // raw ranking value, higher = better
   avg_power_watts: number | null;
   rx: boolean;
+  /** Display context for seam 1 (the affiliate moderation feed); unused by ranking. */
+  workout_date?: string | null;
+  logged_at?: string | null;
 }
 
 export interface ProfileInfo {
@@ -48,7 +51,9 @@ export interface ProfileInfo {
 export type Metric = "wkg" | "raw";
 
 export interface BoardRow {
-  rnk: number;
+  /** null = UNRANKED (no metric value in this metric — e.g. a physics failure on the
+   *  W·kg board). Never a silently-fabricated sequential rank. */
+  rnk: number | null;
   display_name: string;
   division: string;
   metric_value: number | null;
@@ -65,27 +70,40 @@ export interface Division {
 
 const ANON = "Anonymous Athlete";
 
-/** Opted-out OR blank name → "Anonymous Athlete" (never email — retail rule). */
-function displayName(p: ProfileInfo): string {
+export type NameStyle = "full" | "short";
+
+/** Opted-out OR blank name → "Anonymous Athlete" (never email — retail rule). `short`
+ *  (used on the public TV wall) renders "First L." — a full name on a URL that lives in
+ *  wall devices / browser histories is more exposure than an authed board warrants. */
+function displayName(p: ProfileInfo, style: NameStyle): string {
   if (p.leaderboard_anonymous) return ANON;
   const n = (p.full_name ?? "").trim();
-  return n === "" ? ANON : n;
+  if (n === "") return ANON;
+  if (style === "short") {
+    const parts = n.split(/\s+/);
+    return parts.length >= 2 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
+  }
+  return n;
 }
 
-function genderLabel(gender: string | null): string {
+export function genderLabel(gender: string | null): string {
   const g = normalizeGender(gender);
   return g === "men" ? "M" : g === "women" ? "W" : "Open";
 }
 
-/** Parse a coach-corrected raw_score into a "higher is better" sort value, by type.
- *  Best-effort: for_time "mm:ss"/"m:ss"/seconds → negative seconds; otherwise the
- *  leading number. Returns null when unparseable (caller keeps the original sort). */
+const LB_PER_KG = 2.2046226218;
+
+/** Parse a coach-corrected raw_score into a "higher is better" sort value — using the
+ *  SAME encoding engine-class-log writes for each score_type, so an adjusted entry
+ *  ranks on the same scale as the un-adjusted ones (a mismatch buried corrected
+ *  athletes). Returns null when unparseable (caller keeps the original sort). */
 export function parseScoreSort(raw: string | null | undefined, scoreType: string): number | null {
   if (typeof raw !== "string") return null;
   const s = raw.trim();
   if (s === "") return null;
-  const timeMatch = s.match(/^(\d+):([0-5]?\d)$/);
+
   if (scoreType === "for_time") {
+    const timeMatch = s.match(/^(\d+):([0-5]?\d)$/);
     if (timeMatch) return -(parseInt(timeMatch[1], 10) * 60 + parseInt(timeMatch[2], 10));
     // Looks like a time but isn't valid mm:ss (e.g. "12:99") → don't guess via
     // parseFloat (which would read "12"); treat as unparseable.
@@ -93,6 +111,24 @@ export function parseScoreSort(raw: string | null | undefined, scoreType: string
     const secs = parseFloat(s);
     return Number.isFinite(secs) ? -secs : null;
   }
+
+  if (scoreType === "rounds_reps") {
+    // log encodes rounds*1000 + reps; "6+7" must parse the same way, not parseFloat→6.
+    const m = s.match(/^(\d+)\s*\+\s*(\d+)$/);
+    if (m) return parseInt(m[1], 10) * 1000 + parseInt(m[2], 10);
+    const rOnly = s.match(/^(\d+)$/);
+    return rOnly ? parseInt(rOnly[1], 10) * 1000 : null;
+  }
+
+  if (scoreType === "load") {
+    // log normalizes to lbs; a "95 kg" correction must convert, not compare kg-vs-lb.
+    const m = s.match(/^(\d+(?:\.\d+)?)\s*(kg|lb|lbs)?$/i);
+    if (!m) return null;
+    const v = parseFloat(m[1]);
+    if (!Number.isFinite(v)) return null;
+    return (m[2] && m[2].toLowerCase() === "kg") ? v * LB_PER_KG : v;
+  }
+
   const num = parseFloat(s);
   return Number.isFinite(num) ? num : null;
 }
@@ -115,6 +151,7 @@ function prepare(
   moderations: Map<string, ModerationRow>,
   metric: Metric,
   includeModality: boolean,
+  nameStyle: NameStyle,
 ): Prepared | null {
   const p = profiles.get(entry.user_id);
   if (!p) return null;
@@ -152,13 +189,14 @@ function prepare(
     ? `${genderLabel(p.gender)} · ${entry.modality}`
     : genderLabel(p.gender);
 
-  return { user_id: entry.user_id, division, display_name: displayName(p), metric_value, score_display, rx: entry.rx, under_review };
+  return { user_id: entry.user_id, division, display_name: displayName(p, nameStyle), metric_value, score_display, rx: entry.rx, under_review };
 }
 
-interface RankedPrepared extends Prepared { rnk: number; }
+interface RankedPrepared extends Prepared { rnk: number | null; }
 
-/** Rank prepared rows within each division (metric desc; nulls last). Retains
- *  user_id (internal) so season aggregation can key on it. */
+/** Rank prepared rows within each division (metric desc; nulls last). A row with a
+ *  null metric_value is UNRANKED (rnk null) — not assigned an arbitrary sequential
+ *  number. Retains user_id (internal) so season aggregation can key on it. */
 function rankPrepared(prepared: Prepared[]): Map<string, RankedPrepared[]> {
   const byDiv = new Map<string, Prepared[]>();
   for (const pr of prepared) {
@@ -173,9 +211,17 @@ function rankPrepared(prepared: Prepared[]): Map<string, RankedPrepared[]> {
       if (b.metric_value == null) return -1;
       return b.metric_value - a.metric_value;
     });
-    out.set(division, rows.map((r, i) => ({ ...r, rnk: i + 1 })));
+    // Nulls sort last, so index+1 is the true rank for the non-null rows; null → unranked.
+    out.set(division, rows.map((r, i) => ({ ...r, rnk: r.metric_value == null ? null : i + 1 })));
   }
   return out;
+}
+
+/** True when at least one row anywhere on the board has a rank (a non-null metric).
+ *  The endpoints use this to fall back from W·kg to raw for a whole board with no
+ *  power values (e.g. a strength day, or a total physics-service outage). */
+export function anyRanked(divisions: Division[]): boolean {
+  return divisions.some((d) => d.rows.some((r) => r.rnk != null));
 }
 
 /** Per-workout board: entries are already filtered to one (week, day). Divisions =
@@ -186,9 +232,10 @@ export function buildWorkoutBoard(
   moderations: Map<string, ModerationRow>,
   metric: Metric,
   viewerId: string | null,
+  nameStyle: NameStyle = "full",
 ): Division[] {
   const prepared = entries
-    .map((e) => prepare(e, profiles, moderations, metric, true))
+    .map((e) => prepare(e, profiles, moderations, metric, true, nameStyle))
     .filter((x): x is Prepared => x !== null);
   const ranked = rankPrepared(prepared);
   const divisions: Division[] = [];
@@ -244,7 +291,7 @@ export function buildSeasonStandings(
 
   for (const workoutEntries of byWorkout.values()) {
     const prepared = workoutEntries
-      .map((e) => prepare(e, profiles, moderations, metric, false)) // season: gender only
+      .map((e) => prepare(e, profiles, moderations, metric, false, "full")) // season: gender only, full names (authed)
       .filter((x): x is Prepared => x !== null);
     const ranked = rankPrepared(prepared);
     for (const rows of ranked.values()) {
@@ -252,7 +299,7 @@ export function buildSeasonStandings(
       // rows sort last, get award 0, and must not inflate everyone else's points.
       const n = rows.filter((r) => r.metric_value != null).length;
       for (const r of rows) {
-        const award = r.metric_value == null ? 0 : (n - r.rnk + 1);
+        const award = (r.metric_value == null || r.rnk == null) ? 0 : (n - r.rnk + 1);
         const cur = totals.get(r.user_id) ?? { division: r.division, display_name: r.display_name, points: 0, workouts: 0 };
         cur.points += award;
         cur.workouts += 1;

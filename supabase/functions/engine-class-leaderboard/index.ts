@@ -19,7 +19,7 @@ import { resolveMemberGym } from "../_shared/engine-class/gate.ts";
 import { loadLatestProgram, loadEntries, loadProfiles } from "../_shared/engine-class/queries.ts";
 import { selectTodaysWorkout } from "../_shared/engine-class/select-workout.ts";
 import { fetchModerations } from "../_shared/engine-class/moderation-client.ts";
-import { buildWorkoutBoard, buildSeasonStandings, type Metric } from "../_shared/engine-class/leaderboard.ts";
+import { buildWorkoutBoard, buildSeasonStandings, anyRanked, type Metric } from "../_shared/engine-class/leaderboard.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -84,9 +84,16 @@ Deno.serve(async (req) => {
     // workout mode
     const entries = await loadEntries(svc, gym.gym_id, program.id, week, day);
     const profiles = await loadProfiles(svc, entries.map((e) => e.user_id));
-    const divisions = buildWorkoutBoard(entries, profiles, mod.moderations, metric, userId);
+    let divisions = buildWorkoutBoard(entries, profiles, mod.moderations, metric, userId);
+    // W·kg has no value on a strength day (or a full physics outage) → fall back to raw
+    // ranking rather than showing an all-unranked board.
+    let effectiveMetric: Metric = metric;
+    if (metric === "wkg" && entries.length > 0 && !anyRanked(divisions)) {
+      effectiveMetric = "raw";
+      divisions = buildWorkoutBoard(entries, profiles, mod.moderations, "raw", userId);
+    }
     return json({
-      mode, metric, gym_name: gym.gym_name, cohort_program_id: program.id,
+      mode, metric: effectiveMetric, requested_metric: metric, gym_name: gym.gym_name, cohort_program_id: program.id,
       workout: week != null && day != null ? { week_num: week, day_num: day, modality } : null,
       divisions,
       moderation_connected: mod.connected,

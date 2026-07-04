@@ -82,7 +82,8 @@ export default function GymClassPage() {
           </div>
 
           {data.can_log && data.workout.score_type !== 'other' && (
-            <LogForm scoreType={data.workout.score_type} onLogged={reload} />
+            <LogForm scoreType={data.workout.score_type}
+              week={data.workout.week_num} day={data.workout.day_num} onLogged={reload} />
           )}
         </>
       )}
@@ -90,7 +91,7 @@ export default function GymClassPage() {
   );
 }
 
-function LogForm({ scoreType, onLogged }: { scoreType: string; onLogged: () => void }) {
+function LogForm({ scoreType, week, day, onLogged }: { scoreType: string; week: number; day: number; onLogged: () => void }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -106,7 +107,9 @@ function LogForm({ scoreType, onLogged }: { scoreType: string; onLogged: () => v
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true); setErr(null); setMsg(null);
-    const body: Record<string, unknown> = { rx };
+    // expected_week/day: if today's workout rolled over since page-load, the server
+    // 409s (workout_rolled_over) rather than logging against the wrong workout.
+    const body: Record<string, unknown> = { rx, expected_week: week, expected_day: day };
     if (scoreType === 'for_time') body.time_seconds = (parseInt(minutes || '0', 10) * 60) + parseInt(seconds || '0', 10);
     else if (scoreType === 'amrap') body.score_reps = parseInt(reps || '0', 10);
     else if (scoreType === 'rounds_reps') { body.rounds = parseInt(rounds || '0', 10); body.reps = parseInt(partial || '0', 10); }
@@ -114,7 +117,7 @@ function LogForm({ scoreType, onLogged }: { scoreType: string; onLogged: () => v
 
     const { error } = await supabase.functions.invoke('engine-class-log', { body });
     setBusy(false);
-    if (error) { setErr(error.message || 'Could not log your result.'); return; }
+    if (error) { setErr(error.message || 'Could not log your result. If today\'s workout changed, reload.'); return; }
     setMsg('Result logged — you\'re on the leaderboard.');
     onLogged();
   }

@@ -9,10 +9,12 @@
  */
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ENGINE_CLASS_ACCESS_FEATURES } from "../entitlements.ts";
 
-// The engine_cohort-family features that count as "belongs to an active gym class"
-// (wholesale-grants ALLOWED_GRANT_FEATURES).
-const ENTITLEMENT_FAMILY = ["engine_cohort", "gym_programming"];
+// v1: the Engine Class SEAT grants access (engine_cohort). NOT gym_programming — a
+// Programmer-roster member isn't on the Engine Class cohort. Shared constant so the
+// gate can't drift from what wholesale-grants issues.
+const ENTITLEMENT_FAMILY = [...ENGINE_CLASS_ACCESS_FEATURES];
 
 export interface MemberGym {
   gym_id: string;

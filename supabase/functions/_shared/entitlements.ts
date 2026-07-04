@@ -1,5 +1,20 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// ── Gym-channel entitlement features (ONE definition — grant-issuing + access-gating
+//    must not drift). Engine Class seat -> engine_cohort (2a); Programmer roster ->
+//    gym_programming (2b). ──────────────────────────────────────────────────────────
+
+/** Features a wholesale grant may issue (BILLING_MECHANICS §7). */
+export const ALLOWED_GRANT_FEATURES = ["engine_cohort", "gym_programming"] as const;
+
+/**
+ * Features that grant access to a gym's ENGINE CLASS surfaces (F4/F5). v1 = the Engine
+ * Class seat ONLY. `gym_programming` does NOT put a member on the Engine Class cohort
+ * roster/scaling, so it must not grant them the Engine Class view/log/leaderboard —
+ * widen deliberately when 2b defines what a Programmer member sees on the Engine surface.
+ */
+export const ENGINE_CLASS_ACCESS_FEATURES = ["engine_cohort"] as const;
+
 /**
  * Check if a user has access to a specific feature.
  * Returns true if the user has an active entitlement OR is an admin.

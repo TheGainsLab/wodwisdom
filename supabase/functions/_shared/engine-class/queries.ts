@@ -27,7 +27,12 @@ export async function loadLatestProgram(supa: SupabaseClient, gymId: string): Pr
   return row ?? null;
 }
 
-/** Leaderboard entries for a program, optionally narrowed to one (week, day). */
+const PAGE = 1000; // PostgREST's default max-rows cap; page past it explicitly.
+
+/** Leaderboard entries for a program, optionally narrowed to one (week, day). Pages
+ *  through the full set with a stable ORDER BY id — an unordered + capped read silently
+ *  truncates (season standings compute from a random subset; the moderation feed can't
+ *  list some entries), so this loops .range() until a short page. */
 export async function loadEntries(
   supa: SupabaseClient,
   gymId: string,
@@ -35,30 +40,40 @@ export async function loadEntries(
   week?: number,
   day?: number,
 ): Promise<LeaderboardEntry[]> {
-  let q = supa
-    .from("engine_class_results")
-    .select("id, user_id, week_num, day_num, modality, score_type, score_display, score_sort, avg_power_watts, rx")
-    .eq("gym_id", gymId)
-    .eq("cohort_program_id", cohortProgramId);
-  if (typeof week === "number") q = q.eq("week_num", week);
-  if (typeof day === "number") q = q.eq("day_num", day);
-  const { data, error } = await q;
-  if (error) throw new Error(`engine_class_results read failed: ${error.message}`);
-  return (data ?? []).map((r) => {
-    const row = r as Record<string, unknown>;
-    return {
-      result_ref: row.id as string,
-      user_id: row.user_id as string,
-      week_num: row.week_num as number,
-      day_num: row.day_num as number,
-      modality: (row.modality as string | null) ?? null,
-      score_type: row.score_type as string,
-      score_display: row.score_display as string,
-      score_sort: (row.score_sort as number | null) ?? null,
-      avg_power_watts: (row.avg_power_watts as number | null) ?? null,
-      rx: !!row.rx,
-    };
-  });
+  const out: LeaderboardEntry[] = [];
+  for (let from = 0; ; from += PAGE) {
+    let q = supa
+      .from("engine_class_results")
+      .select("id, user_id, week_num, day_num, modality, score_type, score_display, score_sort, avg_power_watts, rx, workout_date, created_at")
+      .eq("gym_id", gymId)
+      .eq("cohort_program_id", cohortProgramId)
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (typeof week === "number") q = q.eq("week_num", week);
+    if (typeof day === "number") q = q.eq("day_num", day);
+    const { data, error } = await q;
+    if (error) throw new Error(`engine_class_results read failed: ${error.message}`);
+    const rows = data ?? [];
+    for (const r of rows) {
+      const row = r as Record<string, unknown>;
+      out.push({
+        result_ref: row.id as string,
+        user_id: row.user_id as string,
+        week_num: row.week_num as number,
+        day_num: row.day_num as number,
+        modality: (row.modality as string | null) ?? null,
+        score_type: row.score_type as string,
+        score_display: row.score_display as string,
+        score_sort: (row.score_sort as number | null) ?? null,
+        avg_power_watts: (row.avg_power_watts as number | null) ?? null,
+        rx: !!row.rx,
+        workout_date: (row.workout_date as string | null) ?? null,
+        logged_at: (row.created_at as string | null) ?? null,
+      });
+    }
+    if (rows.length < PAGE) break;
+  }
+  return out;
 }
 
 /** Hydrate the profile info the leaderboard needs (privacy flags + ONE PROFILE

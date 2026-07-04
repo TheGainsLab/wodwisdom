@@ -19,7 +19,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createConsumerAuth } from "../_shared/consumer-auth.ts";
 import { loadLatestProgram, loadEntries, loadProfiles } from "../_shared/engine-class/queries.ts";
-import { normalizeGender, toKg } from "../_shared/metcon-workcalc.ts";
+import { genderLabel } from "../_shared/engine-class/leaderboard.ts";
+import { toKg } from "../_shared/metcon-workcalc.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -31,11 +32,6 @@ const auth = createConsumerAuth({
   consumerKeysRaw: undefined,
   label: "engine-class-entries",
 });
-
-function genderLabel(g: string | null): string {
-  const n = normalizeGender(g);
-  return n === "men" ? "M" : n === "women" ? "W" : "Open";
-}
 
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -74,7 +70,8 @@ Deno.serve(async (req) => {
         wodwisdom_user_id: e.user_id,            // REQ — whose score
         member_name: p?.full_name ?? null,       // coach context (not anonymized)
         workout_label: `Week ${e.week_num} · Day ${e.day_num}`,
-        workout_date: null,                      // (date lives on the row; omitted from this projection)
+        workout_date: e.workout_date ?? null,
+        logged_at: e.logged_at ?? null,          // lets the affiliate flag a stale adjust (older than a re-log)
         raw_score: e.score_display,
         wkg_score: wkg != null ? Math.round(wkg * 100) / 100 : null,
         division: e.modality ? `${g} · ${e.modality}` : g,

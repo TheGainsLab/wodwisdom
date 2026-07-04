@@ -6,7 +6,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import EngineClassBlocks, { type ClassBlock } from '../components/EngineClassBlocks';
 
-interface BoardRow { rnk: number; display_name: string; metric_value: number | null; score_display: string; under_review: boolean; }
+interface BoardRow { rnk: number | null; display_name: string; metric_value: number | null; score_display: string; under_review: boolean; }
 interface Division { division: string; rows: BoardRow[]; }
 interface TVResp {
   gym_name?: string | null; class_name?: string | null; metric?: 'wkg' | 'raw';
@@ -63,16 +63,19 @@ export default function GymTVPage() {
             {data?.workout ? <EngineClassBlocks blocks={data.workout.blocks} large /> : <Dim>No workout scheduled.</Dim>}
           </div>
           <div>
-            <SectionTitle>Leaderboard · W/kg</SectionTitle>
+            <SectionTitle>Leaderboard · {data?.metric === 'raw' ? 'Score' : 'W/kg'}</SectionTitle>
+            {data?.moderation_connected === false && (
+              <div style={{ fontSize: 14, opacity: 0.45, marginBottom: 8 }}>Moderation offline — results unmoderated.</div>
+            )}
             {(data?.divisions ?? []).length === 0 && <Dim>No results logged yet.</Dim>}
             {(data?.divisions ?? []).map((d) => (
               <div key={d.division} style={{ marginBottom: '1.5rem' }}>
                 <div style={{ fontSize: 16, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.55, marginBottom: 6 }}>{d.division}</div>
                 {d.rows.slice(0, 10).map((r, i) => (
                   <div key={i} style={tvRow}>
-                    <span style={{ width: 36, fontWeight: 800, opacity: 0.6 }}>{r.rnk}</span>
+                    <span style={{ width: 36, fontWeight: 800, opacity: 0.6 }}>{r.rnk ?? '—'}</span>
                     <span style={{ flex: 1 }}>{r.display_name}{r.under_review && <span style={{ opacity: 0.5, fontSize: 15 }}> · under review</span>}</span>
-                    <span style={{ fontWeight: 700 }}>{r.metric_value != null ? `${r.metric_value.toFixed(2)}` : r.score_display}</span>
+                    <span style={{ fontWeight: 700 }}>{data?.metric !== 'raw' && r.metric_value != null ? `${r.metric_value.toFixed(2)}` : r.score_display}</span>
                   </div>
                 ))}
               </div>

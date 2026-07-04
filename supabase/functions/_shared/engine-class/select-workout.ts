@@ -34,12 +34,19 @@ export interface SelectedWorkout {
 
 const DAY_MS = 86_400_000;
 
-/** Whole UTC days from an ISO instant to another (>= 0, clamped). */
+/** Whole CALENDAR days (UTC) between two instants — both truncated to their UTC date
+ *  first, so the workout flips at a stable midnight UTC, NOT at the program's
+ *  creation time-of-day (which would switch the shared workout mid-afternoon and make
+ *  the morning + evening classes do different workouts on the same day). A gym-local
+ *  timezone column is the proper fix when gyms go global; midnight-UTC is stable within
+ *  a US training day and identical across view/log/leaderboard/TV (they share this fn). */
 function daysBetween(startIso: string, nowIso: string): number {
   const start = Date.parse(startIso);
   const now = Date.parse(nowIso);
   if (!Number.isFinite(start) || !Number.isFinite(now)) return 0;
-  return Math.max(0, Math.floor((now - start) / DAY_MS));
+  const startDay = Math.floor(start / DAY_MS); // UTC day index (epoch is UTC midnight)
+  const nowDay = Math.floor(now / DAY_MS);
+  return Math.max(0, nowDay - startDay);
 }
 
 /** Flatten weeks→days in program order. */
@@ -71,8 +78,13 @@ function inferScoreType(block: BlockPrescription | null): ScoreType {
   if (block.block_type === "strength") return "load";
   if (block.block_type === "metcon" || block.block_type === "cardio") {
     const scheme = (block.block_scheme ?? "").toLowerCase();
-    if (scheme.includes("amrap")) return "amrap";
-    if (scheme.includes("rft") || /\d+\s*rounds/.test(scheme)) return "rounds_reps";
+    // AMRAP = fixed clock, open work → scored by rep/round count.
+    if (scheme.includes("amrap") || scheme.includes("as many")) return "amrap";
+    // EMOM / "death by" / Tabata don't reduce to a single rankable metric → other.
+    if (scheme.includes("emom") || scheme.includes("every minute") || scheme.includes("tabata")) return "other";
+    // Everything else (rounds-for-time / RFT / chippers / rep ladders like 21-15-9 /
+    // "for time") is a FIXED amount of work → scored by the CLOCK. A captured time
+    // always ranks; captured rounds on fixed-round work never does (everyone ties).
     return "for_time";
   }
   return "other";

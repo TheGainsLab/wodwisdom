@@ -11,6 +11,10 @@
 
 BEGIN;
 
+-- pgcrypto provides digest() (TV-token hashing) + gen_random_uuid(). Supabase ships it
+-- in the `extensions` schema; idempotent no-op if already present.
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
 -- =============================================================================
 -- engine_class_results — one logged Engine Class result per (member, cohort
 -- workout). The leaderboard ENTRY; its id is the opaque `result_ref` the affiliate
@@ -46,10 +50,10 @@ CREATE TABLE IF NOT EXISTS public.engine_class_results (
   UNIQUE (gym_id, user_id, cohort_program_id, week_num, day_num)
 );
 
+-- One index covers both the per-workout read (full key) and the program-wide read
+-- (its (gym_id, cohort_program_id) prefix) — no separate prefix index (pure write cost).
 CREATE INDEX IF NOT EXISTS idx_engine_class_results_workout
   ON public.engine_class_results (gym_id, cohort_program_id, week_num, day_num);
-CREATE INDEX IF NOT EXISTS idx_engine_class_results_program
-  ON public.engine_class_results (gym_id, cohort_program_id);
 
 -- set_updated_at() is the shared trigger fn (repo convention).
 CREATE OR REPLACE FUNCTION set_updated_at()
@@ -87,26 +91,55 @@ COMMENT ON TABLE public.engine_class_results IS
 -- =============================================================================
 -- gym_tv_tokens — tokenized no-login access for the gym-wall TV. A token maps to a
 -- gym; the /tv page + engine-class-tv edge fn resolve it (verify_jwt=false) and
--- return today's Rx + the rolling leaderboard. Revocable.
+-- return today's Rx + the rolling leaderboard. Revocable + expirable.
+--
+-- The token is stored only as a SHA-256 DIGEST (repo key discipline, per consumer-auth)
+-- — a DB/backup leak yields digests, not working wall-URLs. The plaintext is returned
+-- ONCE at mint time and never persisted; the edge fn looks up by digest.
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS public.gym_tv_tokens (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  gym_id      text NOT NULL,
-  token       text NOT NULL UNIQUE,     -- high-entropy; the URL secret
-  label       text,                     -- e.g. "Front desk TV"
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  revoked_at  timestamptz               -- non-null = disabled
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  gym_id        text NOT NULL,
+  token_digest  text NOT NULL UNIQUE,     -- sha256(token) hex; the lookup key
+  label         text,                     -- e.g. "Front desk TV"
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  expires_at    timestamptz,              -- optional; past it the token is dead
+  revoked_at    timestamptz               -- non-null = disabled
 );
 
 CREATE INDEX IF NOT EXISTS idx_gym_tv_tokens_gym ON public.gym_tv_tokens (gym_id);
 
--- Service-role only (the TV edge fn reads it; the affiliate portal / an admin mints
--- tokens). No anon/authenticated access — the token itself is the capability.
+-- Service-role only (the TV edge fn reads it; an admin / the portal mints via the fn
+-- below). No anon/authenticated access — the token itself is the capability.
 ALTER TABLE public.gym_tv_tokens ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.gym_tv_tokens FROM anon, authenticated;
 
 COMMENT ON TABLE public.gym_tv_tokens IS
-  'Tokenized no-login access to a gym''s TV leaderboard (F4 TV mode). token = the URL capability; service-role read only.';
+  'Tokenized no-login access to a gym''s TV leaderboard (F4 TV mode). Stores sha256(token) only; plaintext returned once at mint. Service-role read only.';
+
+-- Mint a TV token: generates a high-entropy secret, stores only its digest, and
+-- RETURNS the plaintext ONCE. SECURITY DEFINER so an operator/portal calls it via RPC
+-- (service-role) without direct table write. p_ttl_days null = no expiry.
+CREATE OR REPLACE FUNCTION mint_gym_tv_token(p_gym_id text, p_label text DEFAULT NULL, p_ttl_days int DEFAULT NULL)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_token text := replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '');
+  v_digest text := encode(digest(v_token, 'sha256'), 'hex');
+BEGIN
+  INSERT INTO public.gym_tv_tokens (gym_id, token_digest, label, expires_at)
+  VALUES (p_gym_id, v_digest, p_label,
+          CASE WHEN p_ttl_days IS NULL THEN NULL ELSE now() + make_interval(days => p_ttl_days) END);
+  RETURN v_token; -- the ONLY time the plaintext exists; caller stores it in the URL
+END;
+$$;
+
+REVOKE ALL ON FUNCTION mint_gym_tv_token(text, text, int) FROM anon, authenticated;
+COMMENT ON FUNCTION mint_gym_tv_token(text, text, int) IS
+  'Mint a gym TV token (F4). Returns the plaintext ONCE; stores only its sha256 digest. Service-role only.';
 
 NOTIFY pgrst, 'reload schema';
 
