@@ -49,6 +49,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { createConsumerAuth } from "../_shared/consumer-auth.ts";
 import { ALLOWED_GRANT_FEATURES } from "../_shared/entitlements.ts";
 import { buildGrantRow } from "../_shared/grant-row.ts";
+import { raiseEngineMonthsFromGrant } from "../_shared/engine-months-drip.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -186,7 +187,21 @@ Deno.serve(async (req) => {
       at: "wholesale-grants", event: "grant", key_fp: keyFp,
       scope: authz === "*" ? "admin" : "bound", gym_id: gymId, feature, user_id: userId,
     }));
-    return json({ granted: true, entitlement: data });
+
+    // Decision 9(i): a gym `engine` grant IS the retail Engine seat. SEED the member's
+    // engine_months_unlocked to their grant-based target at activation (only-raise), so a
+    // fresh seat shows Month 1 immediately — the QR-at-the-front-desk moment can't show a
+    // fully-locked dashboard until the (hourly) cron happens to run. Best-effort: a seed
+    // failure must NOT fail the grant — the cron heals it. Same shared write the cron uses.
+    let months_seeded: number | undefined;
+    if (feature === "engine") {
+      const g = data as { granted_at: string };
+      const res = await raiseEngineMonthsFromGrant(supa, userId, g.granted_at, new Date().toISOString());
+      if (res.error) console.error("[wholesale-grants] engine months seed failed (cron will heal):", userId, res.error);
+      else months_seeded = res.target;
+    }
+
+    return json({ granted: true, entitlement: data, ...(months_seeded != null ? { months_seeded } : {}) });
   }
 
   // ── DELETE: revoke this gym's grant(s) — never retail (§7 revocation rule) ───

@@ -32,3 +32,6 @@ __pycache__/
 *.pyc
 plan.md
 PLAN.md
+
+# Supabase CLI scratch (not source)
+supabase/.temp/

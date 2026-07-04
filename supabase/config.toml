@@ -218,7 +218,8 @@ verify_jwt = false
 
 [functions.gym-engine-months-cron]
 # Decision 9(i) — grant-based Engine months drip for gym-granted `engine` members (the
-# retail drip is Stripe-keyed). Scheduled daily by pg_cron. verify_jwt=false; the handler
+# retail drip is Stripe-keyed). Month 1 is seeded at grant time (wholesale-grants); this
+# advances the ongoing drip — schedule HOURLY via pg_cron. verify_jwt=false; the handler
 # gates on an X-Cron-Key header (GYM_ENGINE_MONTHS_CRON_KEY), fail-closed.
 verify_jwt = false
 

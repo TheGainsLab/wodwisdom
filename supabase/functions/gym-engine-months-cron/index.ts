@@ -11,7 +11,9 @@
  * across re-grant — see grant-row.ts), and drips ONLY currently-active grants
  * (expires_at IS NULL OR > now) so a deactivated (expired-not-deleted) seat pauses. Skips
  * members who ALSO hold a retail_stripe `engine` row — Stripe drives those (no double
- * source). Every write is only-raise, so a double-fire is harmless.
+ * source). Uses the SAME only-raise write as the grant path (raiseEngineMonthsFromGrant),
+ * so a double-fire is harmless. Scheduled HOURLY: month 1 is already seeded at grant time
+ * (wholesale-grants), so this only advances the ongoing drip — hourly keeps every edge tight.
  *
  * AUTH: verify_jwt=false (pg_cron can't mint a JWT); fail-closed X-Cron-Key
  * (GYM_ENGINE_MONTHS_CRON_KEY), same discipline as gym-cohort-cron.
@@ -20,7 +22,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { computeUnlockedMonths } from "../_shared/engine-months-drip.ts";
+import { raiseEngineMonthsFromGrant } from "../_shared/engine-months-drip.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -65,43 +67,17 @@ Deno.serve(async (req) => {
     if (retailErr) return json({ error: "retail_read_failed", detail: retailErr.message }, 500);
     const stripeDriven = new Set((retail ?? []).map((r) => (r as { user_id: string }).user_id));
 
-    // 3. Current unlocked months per candidate (engine-join creates the row; guard for a
-    //    missing one anyway).
+    // 3. Only-raise each candidate to their grant-based target via the SHARED write the
+    //    grant path also uses (insert-if-missing + `.lt`-guarded raise). One implementation.
     const candidates = userIds.filter((u) => !stripeDriven.has(u));
     if (candidates.length === 0) return json({ message: "all candidates stripe-driven", updated: 0 });
-    const { data: profs, error: profErr } = await supa
-      .from("athlete_profiles")
-      .select("user_id, engine_months_unlocked")
-      .in("user_id", candidates);
-    if (profErr) return json({ error: "profiles_read_failed", detail: profErr.message }, 500);
-    const currentByUser = new Map(
-      (profs ?? []).map((p) => [(p as { user_id: string }).user_id, (p as { engine_months_unlocked: number | null }).engine_months_unlocked ?? 0]),
-    );
-
-    // 4. Only-raise each member to their grant-based target.
     let updated = 0;
     let created = 0;
     const failures: string[] = [];
     for (const userId of candidates) {
-      const target = computeUnlockedMonths(earliest.get(userId)!, nowIso);
-      if (!currentByUser.has(userId)) {
-        // No athlete_profiles row yet — create it with the target (rare).
-        const { error } = await supa.from("athlete_profiles").insert({
-          user_id: userId, engine_months_unlocked: target, engine_months_unlocked_last_at: nowIso,
-        });
-        if (error) failures.push(userId); else created++;
-        continue;
-      }
-      if (target <= (currentByUser.get(userId) ?? 0)) continue; // already at/above — only-raise
-      // Only-raise at the DB too (`lt` filter) so a concurrent run can't lower it.
-      const { data, error } = await supa
-        .from("athlete_profiles")
-        .update({ engine_months_unlocked: target, engine_months_unlocked_last_at: nowIso })
-        .eq("user_id", userId)
-        .lt("engine_months_unlocked", target)
-        .select("user_id");
-      if (error) failures.push(userId);
-      else if (data && data.length > 0) updated++;
+      const res = await raiseEngineMonthsFromGrant(supa, userId, earliest.get(userId)!, nowIso);
+      if (res.error) failures.push(userId);
+      else { if (res.created) created++; if (res.raised) updated++; }
     }
 
     if (failures.length > 0) console.error("[gym-engine-months-cron] write failures:", failures);

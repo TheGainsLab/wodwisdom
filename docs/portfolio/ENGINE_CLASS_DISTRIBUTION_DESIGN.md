@@ -1,11 +1,15 @@
 # Engine Class = pure distribution of retail Engine — DESIGN + BUILD
 
-> **STATUS: reviewer-approved (PR #574) → BUILT.** All 5 open questions answered (grant
-> `engine` only; drip; **Q3 revised — deactivate expires, not deletes**; defer F5; skip-guard
-> for dual members). Build in `claude/engine-class-distribution`: `engine` allowlisted; new
+> **STATUS: reviewer-approved (PR #574) → BUILT + build-review fix (PR #577).** All 5 open
+> questions answered (grant `engine` only; drip; **Q3 revised — deactivate expires, not
+> deletes**; defer F5; skip-guard for dual members). Build: `engine` allowlisted; new
 > `gym-engine-months-cron`; `#560` group surfaces parked (routes/nav removed, code kept);
-> `grant-row.ts` + `engine-months-drip.ts` extracted + unit-tested. Affiliate delta (grant
-> `engine`, deactivate→`expires_at`, stop granting `engine_class_view`) coordinated separately.
+> `grant-row.ts` + `engine-months-drip.ts` extracted + unit-tested.
+> **Build-review 🟠 fix:** the `engine` grant now SEEDS `engine_months_unlocked` at activation
+> (only-raise, via the shared `raiseEngineMonthsFromGrant` the cron also uses) so a fresh seat
+> shows Month 1 immediately — no fully-locked dashboard until the cron runs; cron scheduled
+> **HOURLY**. Affiliate delta (grant `engine`, deactivate→`expires_at`, stop granting
+> `engine_class_view`) coordinated via affiliate issue #13.
 
 
 _2026-07-04. Decision 9(i): "the gym owner becomes a distributor… the user gets access
@@ -102,7 +106,12 @@ increment, keyed on the grant instead of Stripe):
   the retail $6/month → 1 month cadence, so a gym member's drip matches a retail member's.
 - **Skip guard:** if the member ALSO holds a `retail_stripe` `engine` row, do NOT touch their
   months (let Stripe drive) — avoids a dual member unlocking faster than they paid retail.
-- Schedule: daily via pg_cron (same fail-closed `X-Cron-Key` pattern as `gym-cohort-cron`).
+- **Seed at grant time (build-review fix):** the `wholesale-grants` `engine` grant calls the
+  SAME only-raise write (`raiseEngineMonthsFromGrant`) right after activation, so Month 1 is
+  present immediately — the QR-at-the-front-desk moment never shows a fully-locked dashboard.
+  Best-effort (a seed failure never fails the grant; the cron heals it).
+- Schedule: **HOURLY** via pg_cron (fail-closed `X-Cron-Key`). Only advances the ongoing drip
+  now that Month 1 is seeded at grant; hourly keeps every subsequent edge tight and cheap.
 - **Retail-untouched:** this is a NEW function that writes only gym-granted members' rows and
   leaves all three Stripe drip paths byte-identical. It does not edit `reconcile-engine-
   months` (keeping the review bar clean).
