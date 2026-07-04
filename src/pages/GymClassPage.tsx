@@ -8,6 +8,7 @@ import EngineClassBlocks, { type ClassBlock } from '../components/EngineClassBlo
 
 interface ViewResponse {
   access: 'none' | 'gym';
+  tier?: 'free' | 'seat';
   cta?: string;
   gym_name?: string | null;
   class_name?: string | null;
@@ -84,6 +85,13 @@ export default function GymClassPage() {
           {data.can_log && data.workout.score_type !== 'other' && (
             <LogForm scoreType={data.workout.score_type}
               week={data.workout.week_num} day={data.workout.day_num} onLogged={reload} />
+          )}
+
+          {data.tier === 'free' && (
+            <div style={teaser}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Logging & the leaderboard are seat features</div>
+              <p style={{ opacity: 0.8, margin: 0 }}>Ask the front desk to activate your seat — then you can log your result and join the gym leaderboard.</p>
+            </div>
           )}
         </>
       )}

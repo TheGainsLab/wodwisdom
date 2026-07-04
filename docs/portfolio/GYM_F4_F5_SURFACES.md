@@ -17,26 +17,32 @@ cohort program (#551) + the F2/F3 roster. Companion to the affiliate
 
 ## The gate (F5, decided in the #550 review)
 
-`resolveMemberGym` (gate.ts): a member sees a gym's Engine Class surfaces ONLY with a
-`member_gym_links` row `status='joined'` **AND** an active `engine_cohort`-family
-entitlement (`engine_cohort` | `gym_programming`) `granted_by` that gym — **never the
-link alone** (ex-members / cancelled gyms would otherwise see programming forever,
-since the link-ending writer is a cross-repo follow-up). A member who does NOT pass
-gets a leak-safe teaser (no programming content) — the "ask the front desk" state.
+`gate.ts` — TWO tiers (Decision 8), both requiring `member_gym_links.status='joined'`
+AND an active gym-granted entitlement `granted_by` that gym (**never the link alone** —
+ex-members / cancelled gyms would otherwise see programming forever, since the
+link-ending writer is a cross-repo follow-up):
 
-> **⚠️ FLAGGED PRODUCT QUESTION (founder).** The gate as specified makes the
-> `engine_cohort` entitlement (granted on seat activation) the key for BOTH the free
-> read-only view and the paid seat. In the current data model there is **no distinct
-> free-tier population** — the cron scales exactly the granted+joined members, so
-> everyone who passes the gate is effectively a seat member. Consequence: the F5
-> "free view for non-seat members" funnel shows *programming content* only to entitled
-> members; non-entitled joined members see the teaser, not today's workout. Two ways
-> to resolve (pick one, record on the board):
-> **(a)** grant a free/base `engine_cohort` entitlement at F3 join (enroll side) so the
-> funnel audience can see the workout (this is the funnel GYM_SKU §1 describes); or
-> **(b)** accept that the workout is seat-only and the teaser is the funnel. This build
-> implements the gate EXACTLY as documented and does not silently pick — it renders the
-> teaser for non-gated members and the workout for gated ones.
+- **VIEW access** (F5 read-only workout): the paid seat `engine_cohort` **OR** the free
+  `engine_class_view` grant issued at F3 join. `resolveMemberGymAccess` returns the
+  held features; `engine-class-view` renders the workout for either tier and sets
+  `can_log`/`tier` from whether a seat is held.
+- **SEAT access** (`engine-class-log`, `engine-class-leaderboard`): `engine_cohort`
+  ONLY (`resolveSeatGym`). A free-tier member gets the read-only workout + a
+  "activate your seat to log + join the leaderboard" prompt; the log/leaderboard 403.
+- The cohort roster (`gym-cohort-cron`) and TV are `engine_cohort`-only, unchanged.
+
+A member with NEITHER grant sees a leak-safe teaser (no programming) — the "ask the
+front desk" state. The feature lists live in `_shared/entitlements.ts`
+(`ALLOWED_GRANT_FEATURES` / `ENGINE_CLASS_VIEW_FEATURES` / `ENGINE_CLASS_SEAT_FEATURES`),
+shared with `wholesale-grants` so issuing and gating can't drift.
+
+> **Decision 8 (RESOLVED, founder 2026-07-04).** The free-tier population is created by
+> a free `engine_class_view` grant issued at F3 join (affiliate enroll path), revoked
+> with the gym's other grants and never billed. The decided gate rule is unchanged —
+> content still requires an active gym grant. This PR implements the wodwisdom half:
+> `engine_class_view` in the grants allowlist + the VIEW gate; seat surfaces stay
+> `engine_cohort`. The affiliate half (grant at join / revoke on removal) is the enroll
+> path's to add.
 
 ## "Today's workout" mapping (gap: cohort programs have no calendar anchor)
 

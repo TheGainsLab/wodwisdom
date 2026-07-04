@@ -18,7 +18,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { decodeJwtSub } from "../_shared/engine-class/auth.ts";
-import { resolveMemberGym } from "../_shared/engine-class/gate.ts";
+import { resolveMemberGymAccess, hasSeat } from "../_shared/engine-class/gate.ts";
 import { loadLatestProgram } from "../_shared/engine-class/queries.ts";
 import { selectTodaysWorkout } from "../_shared/engine-class/select-workout.ts";
 
@@ -42,17 +42,19 @@ Deno.serve(async (req) => {
   const nowIso = new Date().toISOString();
 
   try {
-    // Gate: joined + active family entitlement. A member who does NOT pass sees only
-    // a leak-safe teaser (no programming content) — this is the "ask the front desk"
-    // conversion state. Never render the gym's programming without the entitlement
-    // (ex-members / cancelled gyms would otherwise see it forever).
-    const gym = await resolveMemberGym(svc, userId, nowIso);
-    if (!gym) {
+    // Gate (Decision 8): VIEW access = paid seat (engine_cohort) OR the free
+    // engine_class_view tier granted at join. A member with NEITHER sees only a
+    // leak-safe teaser (no programming) — never render programming without an active
+    // gym grant (ex-members / cancelled gyms would otherwise see it forever).
+    const access = await resolveMemberGymAccess(svc, userId, nowIso);
+    if (!access) {
       return json({
         access: "none",
-        cta: "Ask the front desk to activate your Engine Class seat — then today's class workout shows up here and you can log results.",
+        cta: "Ask the front desk about your gym's Engine Class — then today's class workout shows up here.",
       });
     }
+    const gym = access.gym;
+    const canLog = hasSeat(access.features); // only a paid seat may log / rank
 
     const program = await loadLatestProgram(svc, gym.gym_id);
     if (!program) {
@@ -71,10 +73,11 @@ Deno.serve(async (req) => {
     // here in v1). A seat member can log their result (F4 leaderboard input).
     return json({
       access: "gym",
+      tier: canLog ? "seat" : "free", // free = engine_class_view (read-only funnel)
       gym_name: gym.gym_name,
       class_name: gym.class_name,
       cohort_program_id: program.id,
-      can_log: true,
+      can_log: canLog,
       personalization_available: false, // v1: Rx only; scaled loads are a follow-up
       workout: {
         week_num: workout.week_num,

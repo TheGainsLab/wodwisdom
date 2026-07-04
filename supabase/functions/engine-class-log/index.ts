@@ -13,7 +13,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { decodeJwtSub } from "../_shared/engine-class/auth.ts";
-import { resolveMemberGym } from "../_shared/engine-class/gate.ts";
+import { resolveSeatGym } from "../_shared/engine-class/gate.ts";
 import { loadLatestProgram } from "../_shared/engine-class/queries.ts";
 import { selectTodaysWorkout } from "../_shared/engine-class/select-workout.ts";
 import { computeEntryPower } from "../_shared/engine-class/physics.ts";
@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
   const nowIso = new Date().toISOString();
 
   try {
-    const gym = await resolveMemberGym(svc, userId, nowIso);
+    const gym = await resolveSeatGym(svc, userId, nowIso);
     if (!gym) return json({ error: "forbidden", detail: "no active Engine Class seat for this member" }, 403);
 
     const program = await loadLatestProgram(svc, gym.gym_id);

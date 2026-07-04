@@ -4,16 +4,25 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 //    must not drift). Engine Class seat -> engine_cohort (2a); Programmer roster ->
 //    gym_programming (2b). ──────────────────────────────────────────────────────────
 
-/** Features a wholesale grant may issue (BILLING_MECHANICS §7). */
-export const ALLOWED_GRANT_FEATURES = ["engine_cohort", "gym_programming"] as const;
+/** Features a wholesale grant may issue (BILLING_MECHANICS §7). `engine_class_view` is
+ *  the FREE F5 view tier (Decision 8) — granted at F3 join, never billed. */
+export const ALLOWED_GRANT_FEATURES = ["engine_cohort", "gym_programming", "engine_class_view"] as const;
 
 /**
- * Features that grant access to a gym's ENGINE CLASS surfaces (F4/F5). v1 = the Engine
- * Class seat ONLY. `gym_programming` does NOT put a member on the Engine Class cohort
- * roster/scaling, so it must not grant them the Engine Class view/log/leaderboard —
- * widen deliberately when 2b defines what a Programmer member sees on the Engine surface.
+ * SEAT access = the paid Engine Class seat (Decision 8): the log / leaderboard / TV
+ * surfaces AND the cohort roster (gym-cohort-cron). `engine_cohort` ONLY —
+ * `gym_programming` (2b Programmer roster) isn't on the cohort roster, and
+ * `engine_class_view` is the free, non-seat tier.
  */
-export const ENGINE_CLASS_ACCESS_FEATURES = ["engine_cohort"] as const;
+export const ENGINE_CLASS_SEAT_FEATURES = ["engine_cohort"] as const;
+
+/**
+ * VIEW access = who may see the F5 read-only workout (Decision 8): the paid seat OR the
+ * free `engine_class_view` tier granted at join. This is the free-tier population the
+ * decided gate creates — content STILL requires an active gym-granted entitlement, so
+ * an ex-member (grants revoked) can't see it.
+ */
+export const ENGINE_CLASS_VIEW_FEATURES = ["engine_cohort", "engine_class_view"] as const;
 
 /**
  * Check if a user has access to a specific feature.
