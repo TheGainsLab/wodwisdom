@@ -173,10 +173,11 @@ tenant-scoped (a class not owned by `gym_id` → empty, never another gym's rows
 enroll grant sends exactly `engine_class_view` (best-effort / idempotent / never-billed).
 **ONE finding, wodwisdom-side:** the #560 `moderation-client` POSTed `{gym_id, class_id}`
 with **no `action`**, so the affiliate routed it to the Bearer staff path and seam-2
-would silently degrade to unmoderated. **Fixed in wodwisdom PR #566** (`action:'get_active'`
-added; deno check clean) — rides the SAME batched deploy as #12; both seams light up once
-the URL/keys are exchanged. **Phase 2a build is COMPLETE** once #566 + #12 merge → batched
-deploy → acceptance demo. Remaining founder decision:
+would silently degrade to unmoderated. **Fixed in wodwisdom PR #566 → reviewer verified
+the diff (one-line body change + honest docs, nothing else) + MERGED (`4d009ac`).**
+**The wodwisdom side of Phase 2a is DONE — nothing left to build or merge in this repo.**
+Last build step anywhere: **affiliate merges #12** (approved, no findings on their side)
+→ batched deploy → acceptance demo. Remaining founder decision:
 whether to file the deferred v1 items (cohort continuity #548, real class schedule, F5
 personalized-scaling view). Deferred
 #5 hardening: affiliate #8/#9/#10. **Follow-ups (a)/(b) below still open** (GDPR
