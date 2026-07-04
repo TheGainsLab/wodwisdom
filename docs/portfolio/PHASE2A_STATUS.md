@@ -170,11 +170,24 @@ report → reviewer re-verifies → merge (also fold in the affiliate's conforma
 findings, running in parallel). Then the batched deploy + the acceptance demo
 (`ACCEPTANCE_DEMO.md`) close Phase 2a. **Free-tier gate: DECIDED — Decision 8 (Option
 A, base-grant `engine_class_view` at join); fold the wodwisdom half into this same fix
-round** (allowlist + F5 view gate only). Remaining founder decision: whether to file
-the deferred v1 items (cohort continuity #548, real class schedule, F5
+round** (allowlist + F5 view gate only). **(7) NEW: cross-review affiliate PR #12**
+(seam-2 `get_active` + contract note + Decision-8 enroll grant) — the affiliate left it
+open for wodwisdom's review per Decision 4; can run after (or interleaved with) the
+fix round. Check especially: `get_active` response shape against your
+`moderation-client`, tenant scoping, and that the enroll grant call sends exactly the
+`engine_class_view` key your allowlist addition accepts. Remaining founder decision:
+whether to file the deferred v1 items (cohort continuity #548, real class schedule, F5
 personalized-scaling view). Deferred
 #5 hardening: affiliate #8/#9/#10. **Follow-ups (a)/(b) below still open** (GDPR
 `forget` caller; owner-attested consent path).
+
+> **⚠️ Deploy-order note (Decision 8, for the runbook):** affiliate `engine-enroll`
+> now calls the wodwisdom Grants API with `engine_class_view`, but wodwisdom's
+> allowlist accepts that key only after the #560 fix round deploys. Order at the
+> batched deploy: **wodwisdom functions (incl. wholesale-grants allowlist) BEFORE
+> affiliate `engine-enroll`** — the runbook already sequences wodwisdom first; this
+> makes the dependency explicit. Joins during any gap get `free_view: failed`
+> (join still succeeds); re-enroll backfills.
 
 **Affiliate team:** (1)–(3) DONE (see prior). (4) ~~address the cross-team review
 findings on #6 + #7~~ **DONE — both FIXED + MERGED** (#6 `25ae6d8`, #7 `3c7d45c`):
