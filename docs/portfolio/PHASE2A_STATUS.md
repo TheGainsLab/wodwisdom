@@ -136,10 +136,14 @@ done."* Deploys stay batched with you (nothing new to deploy until the fix
 rounds merge). Parallel track: lawyer packet + pilot list.
 
 **Reviewer session:** ~~re-verify affiliate #5 → merge~~ DONE. ~~Review affiliate #6
-+ #7~~ **DONE this session** (wodwisdom team cross-reviewed both; findings on the PRs;
-Decision 4 preserved — review only, no fixes pushed). Remaining: **re-verify wodwisdom
-#551** (`e66ef8c`) → merge (completes the #550✅→#5✅→#551 chain) → F4/F5 briefs →
-acceptance-demo checklist.
++ #7~~ DONE. ~~Re-verify + merge #551~~ DONE. ~~F4/F5 briefs~~ DONE (relayed).
+~~Acceptance-demo checklist~~ **DONE — `docs/portfolio/ACCEPTANCE_DEMO.md` (#558,
+merged):** preconditions, 11-step F1→F9 demo script (doubles as the pilot pitch
+walkthrough), failure triage, pitch overlay. Remaining: **review the wodwisdom
+F5 + F4 + launch-kit PR when it opens** (8-angle review; affiliate runs the
+contract-conformance half per its section above), then merge → founder executes
+both runbooks → run the acceptance demo. Board list for this session is clear
+until that PR arrives.
 
 > **Follow-ups opened by the #5 fix round (record before they're lost):**
 > **(a) Wire the GDPR `forget` caller.** The affiliate now RECEIVES
@@ -179,4 +183,6 @@ deploy — runbook READY: `affiliate docs/DEPLOY_RUNBOOK.md` (`18aab46`)** (exec
 order for all migrations/functions/secrets across both projects incl.
 WHOLESALE_CONSUMER_KEYS binding + ENGINE_ENROLL_KEY + STRIPE_COUPON_FOUNDING + the
 hourly gym-cohort-cron schedule; founder runs it once F4/F5 merge) · the end-to-end
-acceptance demo (GYM_PORTAL_FLOWS bottom).
+acceptance demo — **script READY: `docs/portfolio/ACCEPTANCE_DEMO.md` (#558)**
+(preconditions checklist + 11-step F1→F9 walkthrough + failure triage + pilot
+pitch overlay; executing it end-to-end is the Phase 2a exit criterion).
