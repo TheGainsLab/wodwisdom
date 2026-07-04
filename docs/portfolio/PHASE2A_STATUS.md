@@ -7,7 +7,28 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-04 (wodwisdom team — **Decision-9(i) DESIGN PROPOSAL posted → PR #574 (design-only, no code) + `ENGINE_CLASS_DISTRIBUTION_DESIGN.md`; awaiting reviewer sign-off before build**. Recon of the retail Engine access model done: it gates on a single `engine` feature read as a UNION across sources, so granting retail `engine` gym-scoped lights up /engine/* with retail code UNTOUCHED (1-line allowlist + affiliate flips activate_seat grant); day-1 start is free (engine_current_day DEFAULT 1 + ProgramSelection). Only real build = a grant-based months-drip cron (retail drip is Stripe-keyed → gym members sit at months_unlocked=0/fully locked; the lock is dashboard-only). Group surfaces (#560) parked, not deleted. 5 open Qs for the reviewer/founder. Prior line: 2026-07-04 (affiliate team — **PR #12 MERGED to affiliate main**
+> Last updated: 2026-07-04 (affiliate team — **Reviewed Decision 9(i) + the #574 distribution
+> design — affiliate delta is exactly ONE ~1-line grant flip + subtractive cleanup; signed off
+> on the affiliate half (comment on #574).** #574 grants retail `engine` gym-scoped over a
+> union-read gate, so: **① affiliate `engine-class` flips its grant `feature` `engine_cohort`→
+> `engine`** at activate/deactivate/reactivate (const `ENGINE_COHORT_FEATURE`, `engine-class:43`,
+> one `callGrant` site) once #574 is signed off AND the wodwisdom `ALLOWED_GRANT_FEATURES`
+> allowlist deploys FIRST (deploy-order — else the grant 400s). ✅ **Revocation safety CONFIRMED:**
+> #574's revoke is `granted_by`-scoped (`source_kind='gym_grant' AND granted_by=gymId`), so
+> deactivate/gym-cancel can't touch a retail `engine` sub the member also holds, and the
+> paid-subscriber classifiers exclude `gym_grant` → gym seats never inflate retail counts; the
+> seat↔`engine_cohort`↔billing coupling #6/#7 rely on stays intact. **⚠️ ONE real coordination
+> flag (Open Q3, affiliate-owned): reactivation re-grants → if `granted_at` resets, the
+> `gym-engine-months-cron` (keyed on `granted_at`) resets a returning member's unlocked months.**
+> The grant is idempotent on `(user_id, feature, granted_by)` — confirm the upsert PRESERVES the
+> original `granted_at` (or that a reset is acceptable) before this ships. **② `engine_class_view`
+> enroll grant → DROP** if the F5 free view defers (Open Q4). **③** hide the portal
+> `/leaderboard-moderation` route + Home nav (parked group surface; `engine-moderation`+seam-2 go
+> deployed-dormant, code kept as a 2b asset). **④** PARKED banner on `F4_MODERATION_CONTRACT.md`
+> + Decision-9 delta to `DEPLOY_RUNBOOK.md`. Months-drip itself is wodwisdom-side (keyed on the
+> grant timestamp, not our `activated_at`) → no affiliate seam. **No affiliate code touched yet —
+> all gated on #574 sign-off; affiliate ready to ship ①–④ as a tiny rework.** Prior line:
+> wodwisdom team — **Decision-9(i) DESIGN PROPOSAL posted → PR #574 (design-only, no code) + `ENGINE_CLASS_DISTRIBUTION_DESIGN.md`; awaiting reviewer sign-off before build**. Recon of the retail Engine access model done: it gates on a single `engine` feature read as a UNION across sources, so granting retail `engine` gym-scoped lights up /engine/* with retail code UNTOUCHED (1-line allowlist + affiliate flips activate_seat grant); day-1 start is free (engine_current_day DEFAULT 1 + ProgramSelection). Only real build = a grant-based months-drip cron (retail drip is Stripe-keyed → gym members sit at months_unlocked=0/fully locked; the lock is dashboard-only). Group surfaces (#560) parked, not deleted. 5 open Qs for the reviewer/founder. Prior line: 2026-07-04 (affiliate team — **PR #12 MERGED to affiliate main**
 > (`acb5995`; branch deleted) — the seam-2 `get_active` endpoint + Decision-8 free-view
 > grant + adjust contract note are now on main. Note: `get_active` routes on
 > `body.action==='get_active'` (as documented in `F4_MODERATION_CONTRACT.md`); wodwisdom's
