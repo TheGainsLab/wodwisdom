@@ -190,6 +190,24 @@ before launching. Launch pattern:
    the leaderboard (community/competition); today's-workout display is secondary
    (fine to keep as a panel, don't lead with it). A TV surface for AI Program
    generation is a 2b idea, noted, not scoped.
+   (g) **Member experience = THE RETAIL ENGINE EXPERIENCE, per-member progression**
+   (founder, same conversation): "in-class users should get a similar experience
+   as retail users get… the engine users should get the engine program." A gym
+   seat unlocks the retail Engine surfaces (Engine day pages, logging, trends,
+   the embedded day coach) with the member progressing through the canonical
+   catalog AT THEIR OWN PACE FROM DAY 1 — exactly like a retail Engine user —
+   not a gym-shared workout-of-the-day. (Retail-only exclusions stand per SKU §1:
+   no AI resequencer overlay, no full AI Coach.) Consequences: the gym
+   leaderboard groups by PROGRAM DAY (`day_number` — "Day 47 board": every gym
+   member who has logged Day 47, W·kg normalized, moderated), not by calendar
+   date; "today at the gym" is an ACTIVITY VIEW (who trained, results, PRs),
+   not one shared workout. No shared-day cursor needed at all.
+   (h) **The screen (TV/portal display) is the gym's window, four jobs**
+   (founder): 1. who has opted into Engine (roster/opt-in state, for the owner);
+   2. summary data; 3. AI programming output IF the gym uses the 2b Programmer
+   (later); 4. a member-facing resource ("what's going on today" — the activity
+   feed + boards), on the wall or on their phones. All the built F4/TV plumbing
+   (tokens, W·kg, moderation, seams) is REUSED over this content, not discarded.
 
 ## State (2026-07-04)
 
@@ -266,34 +284,43 @@ with **no `action`**, so the affiliate routed it to the Bearer staff path and se
 would silently degrade to unmoderated. **Fixed in wodwisdom PR #566 → reviewer verified
 the diff (one-line body change + honest docs, nothing else) + MERGED (`4d009ac`).**
 ~~The wodwisdom side of Phase 2a is DONE~~ — superseded by **Decision 9**.
-**(8) NEXT — the Decision-9 rework (the LAST 2a build item, small + contained):**
-the gym Engine Class must serve the **canonical retail Engine catalog**, not per-gym
-AI generation. Scope:
-(a) a per-gym cursor over `engine_program_mapping` — variant from
-`gym_cohort_configs.days_per_week` (5→`main_5day`, 3→`main_3day`), position =
-whole UTC days since the gym's class start date (reuse #560's midnight-UTC
-`daysBetween`; add a `class_start_date` column or derive from config `created_at`);
-(b) `select-workout` (or a sibling) resolves "today" to an `engine_workouts` row;
-adapt the scored-block/score-type/physics mapping to the catalog day shape —
-Engine days are erg/pace work (work-calc's sweet spot); reuse retail's Engine day
-RENDERING on GymClassPage rather than the v2-blocks renderer where the shapes
-differ;
-(c) `engine-class-log`/leaderboard/TV keep their contracts (result rows,
-result_ref, W·kg, moderation) — only the workout source changes; keep
-`(week_num, day_num)` derivable from catalog position so `engine_class_results`
-and seam-1 are unchanged;
-(d) PARK `gym-cohort-cron` for this SKU (no eligible work / unschedule note for
-founder) — do NOT delete the cohort pipeline (it is the 2b AI Gym Programmer
-foundation);
-(e) TV mode reorders LEADERBOARD-FIRST (Decision 9(f)) — board is the hero,
-today's workout a secondary panel;
-(f) update GYM_SKU_SPEC §1 + GYM_F4_F5_SURFACES + ACCEPTANCE_DEMO generation step
-to match (demo step becomes "verify today's catalog day appears", no cron
-trigger).
+**(8) NEXT — the Decision-9 rework (the LAST 2a build item).** The gym Engine Class
+= DISTRIBUTION of the retail Engine product: a seat unlocks the retail Engine
+experience (canonical catalog, per-member progression from day 1 — Decision 9(g)),
+and the gym layer adds roster visibility + a per-program-day leaderboard + the
+screen (Decision 9(h)). PROPOSE THE DESIGN FIRST (short doc or PR description),
+reviewer sanity-checks it, then build. Scope sketch (team refines):
+(a) **Seat unlock:** `engine_cohort` (+`engine_class_view` for free tier) accepted
+wherever the PWA gates retail Engine surfaces — union semantics, retail untouched;
+exclusions per SKU §1 stand (no AI resequencer opt-in, no full AI Coach; embedded
+day coach included). Member starts the canonical program at day 1, own pace,
+existing `engineService` + Engine day pages + `engine_workout_sessions` logging.
+(b) **Leaderboard source pivot:** boards group by catalog `day_number` per gym
+("Day N board"), not calendar day. RECOMMENDED (preserves every seam unchanged):
+when a gym-linked seat member completes an Engine day, ALSO write the
+`engine_class_results` row (score/sort/watts from the session — Engine erg/pace
+data is work-calc's sweet spot); `engine-class-leaderboard`/`-entries`/`-tv`,
+result_ref, moderation, W·kg, seam-1/2 contracts all keep working with `day_num`
+= catalog day_number. Alternative (leaderboard reads `engine_workout_sessions`
+directly) breaks seam-1/result_ref — avoid.
+(c) **The screen** (`engine-class-tv` + portal): leaderboard-first + activity
+feed ("today at the gym": who trained, results, PRs) + owner roster/opt-in
+summary (portal side); today's-workout panel demoted/removed (no shared day
+exists). 2b adds Programmer output here.
+(d) **F5 free view redefinition** (was "today's shared workout read-only"): free
+members see the gym boards/activity + a LOCKED PREVIEW of the member experience
+("ask the front desk") — same gate (`engine_class_view`), same conversion job.
+(e) **PARK `gym-cohort-cron`** for this SKU (unschedule note for founder); keep
+the cohort pipeline code — it is the 2b AI Gym Programmer foundation.
+`gym_cohort_configs` generation fields go dormant; `days_per_week` may still pick
+the member's default variant (5→`main_5day`, 3→`main_3day`) at seat activation.
+(f) **Docs in the same PR:** GYM_SKU_SPEC §1, GYM_PORTAL_FLOWS F4/F5,
+GYM_F4_F5_SURFACES, ACCEPTANCE_DEMO (generation step → "seat member sees Engine
+day 1 on their phone; logs it; Day-1 board appears"), launch kit copy if touched.
 Then reviewer review → founder deploys the delta → demo resumes. Remaining founder
-decision: whether to file the deferred v1 items (cohort continuity #548 — note it
-may be MOOT for Engine Class under Decision 9, the catalog IS the continuity; real
-class schedule; F5 personalized-scaling view). Deferred
+decision: whether to file the deferred v1 items (cohort continuity #548 — MOOT for
+Engine Class under Decision 9, the catalog IS the continuity; real class schedule;
+F5 personalized-scaling view). Deferred
 #5 hardening: affiliate #8/#9/#10. **Follow-ups (a)/(b) below still open** (GDPR
 `forget` caller; owner-attested consent path).
 
