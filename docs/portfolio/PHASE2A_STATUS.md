@@ -242,6 +242,15 @@ before launching. Launch pattern:
    (e.g. months from seat-activation date); 3. F5 free view reduces to a locked
    preview/upsell for joined-not-activated members (or defer entirely — founder
    call at design review).
+   (j) **DEFERRED — owner aggregate visibility (founder, 2026-07-04):** the gym
+   owner should eventually see some aggregate data on their members' Engine
+   activity — a gym-scoped, read-only, limited-admin/COACH-TIER role over the
+   gym's own members only. DELIBERATELY WAITING: the same permission primitive
+   is required by the 2b AI Programmer's owner surfaces and the F10 intelligence
+   feed — design it ONCE there, not twice. Do not build gym-scoped roles into
+   the Decision-9(i) rework. v1 stopgap that needs no new rights: the portal
+   roster's seat states + the F9 seat-lifecycle "last logged" signal (the 60-day
+   auto-deactivate machinery needs it anyway) + the billing preview.
 
 ## State (2026-07-04)
 
