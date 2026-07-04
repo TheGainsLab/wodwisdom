@@ -352,8 +352,18 @@ the diff (one-line body change + honest docs, nothing else) + MERGED (`4d009ac`)
 **APPROVED + MERGED** (`278f0fe`; reviewer re-verified the 4 load-bearing claims in code —
 union gate, single `engine` feature, `no_stripe_customer` early-return, day-1 default).
 **All 5 open Qs answered on the PR:** (1) grant `engine` ONLY; (2) DRIP (1mo at activation
-+1/30d, only-raise, cap 36) — 9(i)-consistent, founder may veto on this board; (3) accept
-`granted_at` reset on reactivation; (4) F5 free view DEFERRED for v1 — affiliate STOPS
++1/30d, only-raise, cap 36) — 9(i)-consistent, founder may veto on this board;
+(3) **REVISED after the affiliate's flag (second reviewer comment on #574 — supersedes
+"accept reset"):** with only-raise, a reset doesn't snap back, it STALLS a returning
+member (seated 8mo → reactivate → no new content for ~7mo). Resolution, zero new
+machinery: **seat deactivate = POST `expires_at = <period end>` (NOT DELETE)** — row +
+original grant timestamp survive, and end-of-period access matches BILLING §9 better than
+the immediate DELETE; **reactivate = POST `expires_at: null`**; terminal revocations
+(member removed / gym cancelled) stay DELETE. Cron drips only currently-active rows,
+keyed on the row's original timestamp (upsert must not clobber it — assert in a test);
+the deactivated gap counts toward months (generous-to-returners, accepted — content
+metering, not billing). Affiliate ① amends accordingly (deactivate sends expires_at
+instead of DELETE); (4) F5 free view DEFERRED for v1 — affiliate STOPS
 granting `engine_class_view` at join (Decision 8 surface parked; key stays allowlisted;
 mechanics revive verbatim when a free tier gets a surface) — founder may veto; (5) dual
 member = later edge, skip-guard suffices. **Separate `gym-engine-months-cron` CONFIRMED
@@ -362,7 +372,6 @@ the PR (fail-closed X-Cron-Key, idempotent only-raise, named dependency on the g
 timestamp column). Build per the plan → reviewer reviews the build PR → founder deploys the
 delta (allowlist + cron + route removal + affiliate feature flip, deploy order: wodwisdom
 allowlist BEFORE affiliate flip) → demo resumes. Original
-brief: Original
 brief: the
 gym Engine Class is PURE DISTRIBUTION of the retail Engine standalone product —
 "exact same code, nothing different; the only difference is how they encounter
