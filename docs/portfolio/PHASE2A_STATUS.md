@@ -376,7 +376,15 @@ with **no `action`**, so the affiliate routed it to the Bearer staff path and se
 would silently degrade to unmoderated. **Fixed in wodwisdom PR #566 → reviewer verified
 the diff (one-line body change + honest docs, nothing else) + MERGED (`4d009ac`).**
 ~~The wodwisdom side of Phase 2a is DONE~~ — superseded by **Decision 9**.
-**(8) ~~Decision-9(i) rework~~ BUILT → wodwisdom PR #577 (awaiting reviewer review).**
+**(8) ~~Decision-9(i) rework~~ ✅ MERGED (`ab31437`)** — reviewer reviewed #577 (one 🟠:
+the fresh-seat activation gap — grant time now SEEDS Month 1 via the shared
+`raiseEngineMonthsFromGrant` only-raise write, cron rescheduled HOURLY; fix re-verified
+in code: seed runs only for `feature==='engine'`, best-effort, computes from the
+returned row's ORIGINAL `granted_at`; `.temp` untracked) and MERGED. **NEXT (wodwisdom):
+cross-review affiliate #14** (Decision 4 symmetry — check the const flip flows through
+the one `callGrant` site, and that dropping `free_view` from the enroll response breaks
+nothing `engine-join` reads). Then affiliate merges #14 → founder deploys the Decision-9
+delta (block on this board) → demo resumes. Build history:
 Built per the signed-off design: `engine` added to `ALLOWED_GRANT_FEATURES`; the grant
 upsert row extracted to pure `_shared/grant-row.ts` that OMITS `granted_at` (re-grant can't
 clobber it — `grant-row_test.ts` asserts it); new `gym-engine-months-cron` (drips only
@@ -487,14 +495,28 @@ best-effort); revoked with the gym's other grants; seat deactivation revokes ONL
 `engine_cohort` (member falls back to free view); billing counts `engine_cohort` only —
 `engine_class_view` never bills.
 
-**Founder:** relay = one line per team: *"Pull wodwisdom main, read
-docs/portfolio/PHASE2A_STATUS.md, execute your section, update the board when
-done."* **#560 is MERGED — the deploy gate is now: wodwisdom team's cross-review of
-affiliate #12 → #12 merges → you execute both runbooks** (wodwisdom step first —
-see the Decision-8 deploy-order note above — incl. the two syntax-only migrations
-`20260703200000` + `20260705000000` with their post-apply verifies, the seam key
-exchange, and a `mint_gym_tv_token` call per pilot gym) → acceptance demo
-(`ACCEPTANCE_DEMO.md`). Parallel track: lawyer packet + pilot list.
+**Founder:** ~~the Phase-2a batched deploy~~ **DONE 2026-07-04** (both runbooks executed;
+seams digest-verified; Southie demo gym bound end-to-end — see State). **NEXT — the
+Decision-9 deploy delta, AFTER #14 merges (wodwisdom #577 is already merged), in this
+order:**
+1. [WOD] `cd gainslab/wodwisdom && git pull origin main`, then redeploy
+   `wholesale-grants` + deploy `gym-engine-months-cron`
+   (`supabase functions deploy wholesale-grants gym-engine-months-cron --project-ref hsiqzmbfulmfxbvbsdwz`, one per call on older CLIs).
+2. [WOD] new secret: `GYM_ENGINE_MONTHS_CRON_KEY` (openssl rand -hex 32).
+3. [WOD] SQL: schedule the months drip HOURLY
+   (`cron.schedule('gym-engine-months-hourly','23 * * * *', … net.http_post(…/gym-engine-months-cron, X-Cron-Key …)`) —
+   and UNSCHEDULE the parked cohort cron: `select cron.unschedule('gym-cohort-cron-hourly');`
+4. [AFF] `cd gainslab/affiliate-intelligence && git pull origin main`, redeploy
+   `engine-class` + `engine-enroll` (the grant flip + drop free_view) — AFTER step 1
+   (allowlist-first deploy order).
+5. Vercel auto-ships the PWA route parking on the #577 merge (nothing to do).
+6. Verify (the fresh-seat check the team flagged): activate a test seat in the portal →
+   the wodwisdom member sees `/engine` unlocked with Month 1 immediately
+   (`select engine_months_unlocked from athlete_profiles where user_id='…'` → ≥1);
+   a retail member is untouched.
+Then → the resumed acceptance demo (revised path in `ACCEPTANCE_DEMO.md`: join via QR →
+consent → activate → member picks an Engine program → Day 1 → logs → history renders →
+owner sees roster + billing preview). Parallel track: lawyer packet + pilot list.
 
 **Reviewer session:** ~~re-verify affiliate #5 → merge~~ DONE. ~~Review affiliate #6
 + #7~~ DONE. ~~Re-verify + merge #551~~ DONE. ~~F4/F5 briefs~~ DONE (relayed).
@@ -508,9 +530,10 @@ round → merge~~ **DONE — MERGED (`6df6b8a`)** after confirming every fix in 
 fallback; midnight-UTC + 409; rx-only physics; per-type adjust parsing incl. kg→lb;
 paginated `loadEntries`; seat/view gate split; digest tokens + mint RPC + ≥16 floor;
 RFT→for_time; the 🟡 batch; Decision 8 + JOINT-1). ~~sign off the Decision-9(i) DESIGN proposal~~ **DONE — APPROVED + merged (#574 `278f0fe`).**
-**NEXT: review the BUILD (wodwisdom PR #577)** — `engine` allowlist, `gym-engine-months-cron`
-(grant-based drip; verify only-raise + active-rows + original-timestamp + the grant-row test),
-the #560 parking, and the retail-untouched invariant. On sign-off → merge → founder deploys.
+~~Review the BUILD (#577)~~ **DONE — reviewed (one 🟠: fresh-seat activation gap → grant-time
+Month-1 seed + hourly cron; fix re-verified in code) + MERGED (`ab31437`).** Remaining:
+standing by for the wodwisdom cross-review of affiliate #14 (arbitrate if needed) → founder's
+Decision-9 deploy delta (block in the Founder section) → support the resumed demo.
 _(superseded design note:_ wodwisdom team posted it as
 **PR #574 (design-only, no code)** + `docs/portfolio/ENGINE_CLASS_DISTRIBUTION_DESIGN.md`.
 Sanity-check the seat-unlock mapping (grant retail `engine` gym-scoped — union read, retail
