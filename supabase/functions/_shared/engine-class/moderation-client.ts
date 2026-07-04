@@ -8,8 +8,11 @@
  * or unreachable → returns an EMPTY map + connected=false, and the board renders
  * unmoderated. NEVER fatal — a moderation-service blip must not take down the wall TV.
  *
- * The affiliate read endpoint is being designed against this caller (contract seam 2,
- * option B). Shape agreed: POST { gym_id, class_id? } with X-Service-Key →
+ * The affiliate exposes this as the `get_active` ACTION on its multi-action
+ * `engine-moderation` endpoint (contract seam 2, option B), so the request MUST carry
+ * `action: "get_active"` — without it the affiliate routes to its owner|coach Bearer
+ * path and this s2s call is rejected (→ silent unmoderated degrade). Shape:
+ * POST { action: "get_active", gym_id, class_id? } with X-Service-Key →
  * { moderations: [{ result_ref, decision, adjustment|null }] }.
  */
 
@@ -35,7 +38,7 @@ export async function fetchModerations(gymId: string, classId?: string | null): 
     const res = await fetchWithTimeout(url, {
       method: "POST",
       headers: { "X-Service-Key": key, "Content-Type": "application/json" },
-      body: JSON.stringify({ gym_id: gymId, class_id: classId ?? null }),
+      body: JSON.stringify({ action: "get_active", gym_id: gymId, class_id: classId ?? null }),
     }, MODERATION_TIMEOUT_MS);
     if (!res.ok) {
       console.warn(`[engine-class] moderation ledger read ${res.status}; rendering unmoderated`);
