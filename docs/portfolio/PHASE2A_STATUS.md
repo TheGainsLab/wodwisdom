@@ -7,7 +7,16 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-04 (wodwisdom team — **affiliate PR #14 cross-reviewed → APPROVED (conforms)**; verdict on #14. All 3 checks pass: ① `ENGINE_GRANT_FEATURE='engine'` flip flows through the single `callGrant`/`grantThenUpdate` site (activate/deactivate/reactivate + both compensation paths move together; diff = the const + its one reference); ② `engine-join` never reads `free_view` (only gym_id/gym_name/class_name/seat_status), so dropping it is safe; ③ grant call shape unchanged (only the feature value flipped). Q3 deactivate-expires/reactivate-null verified in place. Decision-9 build (wodwisdom #577) already merged (`ab31437`); this was the last wodwisdom review item. **NEXT: affiliate merges #14 → founder deploys → acceptance demo.** Prior line: 2026-07-04 (wodwisdom team — **#577 build-review fix pushed** (`03598f9`) → reviewer re-verifies + merges. 🟠 activation gap closed: the `engine` grant now SEEDS `engine_months_unlocked` at activation via a shared only-raise write (`raiseEngineMonthsFromGrant`, insert-if-missing + `.lt` guard) that the cron ALSO uses — a fresh seat shows Month 1 immediately, no cron-luck lock; cron rescheduled HOURLY. 🟡 `supabase/.temp/` untracked + gitignored. 5 drip + 2 grant-row tests pass; deno/tsc/vite clean; retail drip untouched. Prior line: 2026-07-04 (affiliate team — **Decision 9(i) affiliate delta ①–④ SHIPPED →
+> Last updated: 2026-07-04 (affiliate team — **PR #14 MERGED to affiliate main** (`01f657d`
+> squash; branch deleted) on the board's APPROVED verdict (f93b2cb). The Decision 9(i) affiliate
+> delta is now on main: seat grants retail `engine` (①), no free-view at enroll (②), portal
+> moderation route/nav parked (③), doc banners (④). wodwisdom's cross-review comment IS visible
+> on the PR itself (posted by TheGainsLab) — the PR's own record is complete, no repost needed.
+> Deploy order already satisfied: wodwisdom #577 (`engine` allowlist + months-drip) merged first
+> (`ab31437`). **Both halves of Decision 9(i) are now merged — nothing left to build.**
+> **NEXT: founder deploys the Decision-9 delta** (per `DEPLOY_RUNBOOK.md`: redeploy affiliate
+> `engine-class` + `engine-enroll` off main; [WOD] side already deployed) **→ acceptance demo
+> resumes.** No open affiliate PRs. Prior line: wodwisdom team — **affiliate PR #14 cross-reviewed → APPROVED (conforms)**; verdict on #14. All 3 checks pass: ① `ENGINE_GRANT_FEATURE='engine'` flip flows through the single `callGrant`/`grantThenUpdate` site (activate/deactivate/reactivate + both compensation paths move together; diff = the const + its one reference); ② `engine-join` never reads `free_view` (only gym_id/gym_name/class_name/seat_status), so dropping it is safe; ③ grant call shape unchanged (only the feature value flipped). Q3 deactivate-expires/reactivate-null verified in place. Decision-9 build (wodwisdom #577) already merged (`ab31437`); this was the last wodwisdom review item. **NEXT: affiliate merges #14 → founder deploys → acceptance demo.** Prior line: 2026-07-04 (wodwisdom team — **#577 build-review fix pushed** (`03598f9`) → reviewer re-verifies + merges. 🟠 activation gap closed: the `engine` grant now SEEDS `engine_months_unlocked` at activation via a shared only-raise write (`raiseEngineMonthsFromGrant`, insert-if-missing + `.lt` guard) that the cron ALSO uses — a fresh seat shows Month 1 immediately, no cron-luck lock; cron rescheduled HOURLY. 🟡 `supabase/.temp/` untracked + gitignored. 5 drip + 2 grant-row tests pass; deno/tsc/vite clean; retail drip untouched. Prior line: 2026-07-04 (affiliate team — **Decision 9(i) affiliate delta ①–④ SHIPPED →
 > affiliate PR #14** (`claude/decision9-engine-distribution`), opened alongside wodwisdom #577
 > per issue #13 so both land together. **①** `engine-class` seat now grants retail **`engine`**
 > (`ENGINE_GRANT_FEATURE`, was `engine_cohort`; one `callGrant` covers activate/deactivate/
@@ -388,9 +397,10 @@ move together (diff is literally the const + its one reference; no stray `engine
 dropping it is safe end-to-end; ③ the grant call SHAPE is unchanged (`{user_id,gym_id,feature,
 expires_at}`, only the feature value flipped). Q3 mechanics (deactivate POSTs expires_at not
 DELETE; reactivate posts null) verified in place → the wodwisdom months cron won't reset a
-returning member. **NEXT: affiliate merges #14 → founder deploys the Decision-9 delta → demo
-resumes.** The Decision-9 build is the LAST wodwisdom build item — after #14 merges + deploy,
-only the deploy + acceptance demo remain. Build history:
+returning member. ~~**NEXT: affiliate merges #14** → founder deploys the Decision-9 delta → demo
+resumes.~~ **#14 MERGED (`01f657d`, affiliate team, board-authority on the APPROVED verdict).**
+Both halves of Decision 9(i) are now on main — **only the founder's deploy + acceptance demo
+remain.** Build history:
 Built per the signed-off design: `engine` added to `ALLOWED_GRANT_FEATURES`; the grant
 upsert row extracted to pure `_shared/grant-row.ts` that OMITS `granted_at` (re-grant can't
 clobber it — `grant-row_test.ts` asserts it); new `gym-engine-months-cron` (drips only
