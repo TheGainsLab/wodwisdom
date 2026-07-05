@@ -156,10 +156,15 @@ definitions in `GYM_SKU_SPEC.md`; pricing decided — see D8/D9):
 There are **two front doors**, then the ladder:
 
 1a. **Engine Class** (standalone, $6/active seat/mo, $0 setup, 10-seat minimum
-   from launch) — "add a cardio class your members do whenever they want":
-   cohort-mode Engine + gym leaderboard + member logging. A *new resellable
-   service* for the gym, sellable to any gym with zero dependencies — likely
-   the higher-converting wedge.
+   from launch) — **pure distribution of the retail Engine program (Decision
+   9(i), 2026-07)**: the gym owner is a distributor; a seat unlocks the proven
+   retail Engine for the member (their own program, own pace, day 1), behind a
+   gym shell with no cross-sell (Decision 10). Zero marginal content cost —
+   reselling the Year of the Engine is easy revenue on equipment the gym
+   already owns. A *new resellable service*, sellable to any gym with zero
+   dependencies — the higher-converting wedge. (Group surfaces — leaderboards,
+   TV — are parked as AI-Programmer assets, where classes genuinely share
+   workouts.)
 1b. **Analytics wedge** ($49/mo flat) — the dashboard, for data-curious owners.
 2. **AI gym programmer** ($149/mo base + $3/member/mo roster-wide, includes
    analytics) — "design next month's programming: your goals, your focus,
@@ -194,6 +199,47 @@ no template subscription can offer: per-member personalization.
 output. The deterministic audit layer plus our human-in-the-loop grading is
 the QA function; the partner-facing surface is intent-steering only
 ("approve / regenerate with a note").
+
+### Affiliate Intelligence: the intelligence layer for gym owners (founder, 2026-07-05)
+
+The name is intentional. Affiliate Intelligence is a **separate site with a
+separate front end whose consumer is the gym owner**, and its purpose is
+singular: **make gyms more successful.** Gym owners are underserved by
+technology — the products available to them aren't good, and the AI they do
+use (marketing copy) is table stakes: when everyone prompts the same models
+with the same minds, nothing differential comes out. What owners actually
+care about is **acquiring people, retaining people, revenue per square foot,
+revenue per hour** — and that is what the tool set serves.
+
+Two sales framings, both true, use whichever lands: **"a service provider
+that upgrades your gym"** and **"an intelligence layer for your gym."**
+
+Two structurally novel things in the industry:
+1. **Reselling services.** No one lets a gym resell a proven consumer product
+   at wholesale. Engine Class is the proof: easy revenue on equipment they
+   already own.
+2. **The unbundled tool catalog.** Everything built for the retail user can be
+   sold to gym owners individually or collectively — implemented with their
+   people. Each is a priced value unit (the tool inventory, Decision 10(e),
+   is this catalog's source of truth):
+   - the historical dashboards — *worth something just to see how their gym
+     is doing*;
+   - a member's competition history — worth something;
+   - the gym's competition history — worth something;
+   - the AI coach chat — worth something at the individual level AND at the
+     gym level;
+   - performance measured in watts per kilogram — worth something;
+   - the AI Programmer — worth something, tweaked to serve owners: it lets an
+     owner **write their own programming with their own intention**, instead
+     of buying a template from a service that knows nothing about them.
+
+Open thread (founder): some of these tools may also be useful sold to
+individuals — to be thought through, not assumed.
+
+This subsection is the commercial frame for Decisions 9 and 10: the member
+gets the product *through* the gym (never marketed past the owner), and the
+AI suite's job is to make the owner more intelligent — which is what makes
+the relationship both higher-revenue and more agreeable.
 
 ### Remote membership is the retail↔wholesale bridge
 
