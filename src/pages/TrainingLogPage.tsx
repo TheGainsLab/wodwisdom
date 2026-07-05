@@ -452,11 +452,12 @@ function SchedulePreview({ workoutId }: { workoutId: string }) {
 
 export default function TrainingLogPage({ session }: { session: Session }) {
   const navigate = useNavigate();
-  const { hasFeature, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
-  // Calendar (Overview) is open to programming OR engine; the analytics tabs are
-  // AI-program-specific and stay gated to programming below.
+  const { hasFeature, hasEngineAccess, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
+  // Calendar (Overview) is open to programming OR Engine access (retail `engine` or the
+  // gym `gym_engine` seat); the analytics tabs are AI-program-specific and stay gated to
+  // programming below.
   const hasProgramming = isAdmin || hasFeature('programming');
-  const hasAccess = hasProgramming || hasFeature('engine');
+  const hasAccess = hasProgramming || hasEngineAccess;
 
   useEffect(() => {
     if (!entLoading && !hasAccess) {
@@ -739,7 +740,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           setSelProgramId((prev) => prev ?? programList[0].id);
         }
       }
-      if (hasFeature('engine') || isAdmin) {
+      if (hasEngineAccess) {
         const p = await loadUserProgress();
         if (p?.engine_program_version) {
           const wk = await getWorkoutsForProgram(p.engine_program_version);
@@ -765,7 +766,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       setPoolLoading(false);
       setPoolLoaded(true);
     }
-  }, [hasProgramming, hasFeature, isAdmin, session.user.id, engineSessions]);
+  }, [hasProgramming, hasEngineAccess, isAdmin, session.user.id, engineSessions]);
 
   const openAddPanel = useCallback(() => {
     setScheduleError(null);
@@ -1745,7 +1746,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                     {selectedDate >= todayStr && (() => {
                       const programTaken = !!scheduledByDate[selectedDate];
                       const engineTaken = !!engineScheduledByDate[selectedDate];
-                      const canEngine = isAdmin || hasFeature('engine');
+                      const canEngine = hasEngineAccess;
                       const programDays = programPool.filter(d => d.program_id === selProgramId);
                       const programNames = Array.from(new Map(programPool.map(d => [d.program_id, d.program_name])).entries());
                       return (

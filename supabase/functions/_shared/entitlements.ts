@@ -10,11 +10,23 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
  *    union entitlement read lights up all /engine/* surfaces with retail code untouched).
  *    Gym-sourced `engine` grants are excluded from the paid-subscriber classifiers, so it
  *    never inflates retail paid counts.
+ *  - `gym_engine` = the gym-shell Engine seat (Decision 10(a)): the FULL Engine program,
+ *    NONE of the retail surround. Same Engine gates (union with `engine` via the shared
+ *    access helper), but the client shell goes gym-variant when it's the member's only
+ *    shell feature. Supersedes `engine` as what the affiliate grants for an Engine Class
+ *    seat (the `engine` key stays allowlisted for the migration window + admin use).
  *  - `engine_cohort` = the parked cohort-class seat (kept for the 2b Programmer).
  *  - `engine_class_view` = FREE F5 view tier (Decision 8; F5 deferred in v1 — the affiliate
  *    stops granting it, the key stays allowlisted for a future free surface).
  *  - `gym_programming` = 2b Programmer roster. */
-export const ALLOWED_GRANT_FEATURES = ["engine", "engine_cohort", "gym_programming", "engine_class_view"] as const;
+export const ALLOWED_GRANT_FEATURES = ["engine", "gym_engine", "engine_cohort", "gym_programming", "engine_class_view"] as const;
+
+/** Grant features that carry the Engine months drip (Decision 10(d)): the grant-time
+ *  Month-1 seed (wholesale-grants) and the hourly advance (gym-engine-months-cron) apply
+ *  to BOTH the legacy `engine` gym grant and the `gym_engine` seat. ONE list — the two
+ *  callers must not drift. The retail Stripe drip is separate and keys on `engine` only
+ *  (retail never has `gym_engine`). */
+export const ENGINE_DRIP_FEATURES = ["engine", "gym_engine"] as const;
 
 /**
  * SEAT access = the paid Engine Class seat (Decision 8): the log / leaderboard / TV

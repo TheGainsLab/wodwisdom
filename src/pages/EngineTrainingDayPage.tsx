@@ -396,8 +396,8 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const [displayDay, setDisplayDay] = useState<number | null>(null);
   const [rocketADay, setRocketADay] = useState<number | null>(null);
   const [rocketASession, setRocketASession] = useState<EngineWorkoutSession | null>(null);
-  const { hasFeature } = useEntitlements(session.user.id);
-  const hasAccess = hasFeature('engine');
+  const { hasFeature, hasEngineAccess } = useEntitlements(session.user.id);
+  const hasAccess = hasEngineAccess;
 
   // ── Timer state ──
   const [segments, setSegments] = useState<Segment[]>([]);

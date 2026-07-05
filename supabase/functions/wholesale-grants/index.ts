@@ -47,7 +47,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createConsumerAuth } from "../_shared/consumer-auth.ts";
-import { ALLOWED_GRANT_FEATURES } from "../_shared/entitlements.ts";
+import { ALLOWED_GRANT_FEATURES, ENGINE_DRIP_FEATURES } from "../_shared/entitlements.ts";
 import { buildGrantRow } from "../_shared/grant-row.ts";
 import { raiseEngineMonthsFromGrant } from "../_shared/engine-months-drip.ts";
 
@@ -188,13 +188,15 @@ Deno.serve(async (req) => {
       scope: authz === "*" ? "admin" : "bound", gym_id: gymId, feature, user_id: userId,
     }));
 
-    // Decision 9(i): a gym `engine` grant IS the retail Engine seat. SEED the member's
-    // engine_months_unlocked to their grant-based target at activation (only-raise), so a
-    // fresh seat shows Month 1 immediately — the QR-at-the-front-desk moment can't show a
-    // fully-locked dashboard until the (hourly) cron happens to run. Best-effort: a seed
-    // failure must NOT fail the grant — the cron heals it. Same shared write the cron uses.
+    // Decision 9(i): a gym `engine` grant IS the retail Engine seat — and Decision 10(d)
+    // extends the same drip to the `gym_engine` seat (ENGINE_DRIP_FEATURES). SEED the
+    // member's engine_months_unlocked to their grant-based target at activation
+    // (only-raise), so a fresh seat shows Month 1 immediately — the QR-at-the-front-desk
+    // moment can't show a fully-locked dashboard until the (hourly) cron happens to run.
+    // Best-effort: a seed failure must NOT fail the grant — the cron heals it. Same
+    // shared write the cron uses.
     let months_seeded: number | undefined;
-    if (feature === "engine") {
+    if ((ENGINE_DRIP_FEATURES as readonly string[]).includes(feature)) {
       const g = data as { granted_at: string };
       const res = await raiseEngineMonthsFromGrant(supa, userId, g.granted_at, new Date().toISOString());
       if (res.error) console.error("[wholesale-grants] engine months seed failed (cron will heal):", userId, res.error);

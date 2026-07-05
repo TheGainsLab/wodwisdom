@@ -353,18 +353,30 @@ Deno.serve(async (req) => {
       supa.from("profiles").select("role").eq("id", user.id).single(),
       supa.from("user_entitlements").select("feature")
         .eq("user_id", user.id)
-        .in("feature", ["ai_chat", "engine", "programming"])
+        .in("feature", ["ai_chat", "engine", "gym_engine", "programming"])
         .or("expires_at.is.null,expires_at.gt." + new Date().toISOString()),
     ]);
 
     const features = new Set((entitlements || []).map((e: { feature: string }) => e.feature));
     const isAdmin = profile?.role === "admin";
-    const isFreeTier = !isAdmin && !features.has("ai_chat");
+
+    // Body is parsed BEFORE the tier is decided: the embedded Engine day-coach
+    // (requests scoped to a day via engine_program_day) is part of the Engine product
+    // (Decision 10(b)), so its tier follows Engine access — retail `engine` OR the gym
+    // `gym_engine` seat — not `ai_chat`. This applies ONLY to day-scoped requests; a
+    // request without engine_program_day (the standalone coach) is tiered exactly as
+    // before, so a gym-shell member still has no /chat tier.
+    const { question, history = [], source_filter, workout_id, engine_program_day, engine_modality, engine_units } = await req.json();
+    const isEngineDayRequest = typeof engine_program_day === "number" && engine_program_day > 0;
+    const engineDayCoachAccess = isEngineDayRequest && (features.has("engine") || features.has("gym_engine"));
+
+    const isFreeTier = !isAdmin && !features.has("ai_chat") && !engineDayCoachAccess;
     type UserTier = "free_trial" | "coach_standalone" | "engine" | "ai_programming" | "all_access";
+    const hasEngineTier = features.has("engine") || engineDayCoachAccess;
     const userTier: UserTier =
       isAdmin ? "all_access" :
-      features.has("engine") && features.has("programming") ? "all_access" :
-      features.has("engine") ? "engine" :
+      hasEngineTier && features.has("programming") ? "all_access" :
+      hasEngineTier ? "engine" :
       features.has("programming") ? "ai_programming" :
       features.has("ai_chat") ? "coach_standalone" :
       "free_trial";
@@ -412,7 +424,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { question, history = [], source_filter, workout_id, engine_program_day, engine_modality, engine_units } = await req.json();
     console.log(`[chat] tier: ${userTier}, hasProfile: ${!!athleteProfile}, engineDay: ${athleteProfile?.engine_current_day || "n/a"}, engineProgramDay: ${engine_program_day ?? "n/a"}`);
 
     // Engine coaching mode: the Engine review page scopes the coach to a

@@ -74,7 +74,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
   const [completedDays, setCompletedDays] = useState<Set<number>>(new Set());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [showSwitcher, setShowSwitcher] = useState(false);
-  const { hasFeature, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
+  const { hasFeature, hasEngineAccess, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
 
   const load = async () => {
     setLoading(true);
@@ -107,7 +107,7 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
 
   // ── No subscription → show paywall ──
 
-  const hasAccess = hasFeature('engine');
+  const hasAccess = hasEngineAccess;
 
   if (entLoading) {
     return (

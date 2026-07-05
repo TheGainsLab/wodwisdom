@@ -216,7 +216,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
           </Routes>
         </Suspense>
       </ErrorBoundary>
-      {!hideTabBar && <BottomTabBar />}
+      {!hideTabBar && <BottomTabBar userId={session.user.id} />}
       <InstallPrompt />
     </>
   );
