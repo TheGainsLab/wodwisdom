@@ -7,7 +7,7 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-05 (wodwisdom team — **Decision 10 FOUNDER SIGN-OFF received (all 5 open questions decided; recorded on #582) → gym-shell BUILD pushed** (`claude/gym-shell-engine-design-9c9n4n`). Decisions: ① `/profile` **OUT hard** — no member-facing lifts editor even as fast-follow; the profile feeds the evaluator→generator, which would navigate the athlete around the owner ("backdoor"); athlete data flows through the gym (F3 intake); the evaluator, if it ever reaches members, is owner-granted. ② Day-coach **first-class Engine but strictly day-scoped** — the `chat` fn tiers `engine_program_day` requests by Engine access (engine|gym_engine), standalone `/chat` untouched. ③ Branding v1 = **gym name only** (from `member_gym_links`), more later. ④ Dual-holder rule **confirmed**: `gym_engine` + any retail purchase ⇒ full retail shell (verified in code: every Stripe plan expands into {ai_chat, programming, engine, nutrition} — `stripe-webhook` PLAN_ENTITLEMENTS — so the 4-feature exclusion set covers plan grants). ⑤ Parked features **confirmed** no shell treatment. Build delta: `gym_engine` allowlisted + shared `ENGINE_DRIP_FEATURES` (seed+cron generalized); `hasEngineAccess` + `isGymShell` in `useEntitlements` (+ pure `deriveIsGymShell` shared with Nav); gates swapped (4 Engine pages, TrainingLog ×3, ProgramsList, HomePage, ProfileBanner); chrome branched (HomePage gym home, Nav, BottomTabBar — bar now waits for entitlements so the retail bar never flashes); `chat`-fn day tier. NEXT: review+merge the build → founder deploys → affiliate const flip + test-grant feature UPDATE (`engine`→`gym_engine`, preserving granted_at+months) → E2E (gym member sees gym shell; retail unchanged; day-coach works for both). Prior line: **Decision 10 gym-shell DESIGN PROPOSAL posted → PR #582 (design-only) + `GYM_SHELL_DESIGN.md` + `GYM_TOOL_INVENTORY.md`**. Full gate recon done: mechanism = a distinct `gym_engine` feature; one shared `hasEngineAccess` helper (engine|gym_engine); `isGymShell` in `useEntitlements` branching the 3 chrome leak spots (HomePage/Nav/BottomTabBar); a `chat`-fn day-coach tier fix (embedded coach IN per 10(b) but throttled today); months seed+cron generalized to `gym_engine`; allowlist + affiliate const flip + one test-grant migration. IN/OUT table + 5 flagged surfaces (esp. `/profile` lifts editor). Tool inventory companion for the à-la-carte menu (10(e)). Prior line: 2026-07-04 (affiliate team — **PR #14 MERGED to affiliate main** (`01f657d`
+> Last updated: 2026-07-05 (wodwisdom team — **Decision 10 SHIPPED + E2E VERIFIED LIVE.** Build **#583 MERGED** (`3a7bd1d` squash) → founder deployed (Vercel + `chat`/`wholesale-grants`/`gym-engine-months-cron` off main; second run verified — first deploy pre-merge shipped old code, caught via the cron's missing `entitlements.ts` asset) → **test grant migrated** (feature UPDATE `engine`→`gym_engine`, `granted_at` preserved, user `917ea5e1…`). **E2E PASSED**: gym member sees the CrossFit Southie gym shell (gym-name home, Engine+Settings only, zero cross-sell); retail member unchanged; day-coach first-class with FULL Engine context (day type, position, equipment, athlete bodyweight). **Bonus find: #584 MERGED+DEPLOYED** (`b18982f`) — the E2E exposed a pre-existing SILENT retail bug: `buildEngineCoachingContext` fetched catalog workouts by `day_number` alone, so once AI-sequencer `gen:` rows landed in `engine_workouts`, `maybeSingle()` errored → discarded → EMPTY Engine context for EVERY program user (retail free-tier throttle masked it). Fix = mirror the client's `program_type='main_5day'` filter (2 lookups); `engine_coach_cache` flushed (held context-less chip answers). **REMAINING (last item): affiliate const flip** `engine`→`gym_engine` in `engine-class` + redeploy — until then new activations/reactivations grant `engine` (retail shell). Prior line: **Decision 10 FOUNDER SIGN-OFF received (all 5 open questions decided; recorded on #582) → gym-shell BUILD pushed** (`claude/gym-shell-engine-design-9c9n4n`). Decisions: ① `/profile` **OUT hard** — no member-facing lifts editor even as fast-follow; the profile feeds the evaluator→generator, which would navigate the athlete around the owner ("backdoor"); athlete data flows through the gym (F3 intake); the evaluator, if it ever reaches members, is owner-granted. ② Day-coach **first-class Engine but strictly day-scoped** — the `chat` fn tiers `engine_program_day` requests by Engine access (engine|gym_engine), standalone `/chat` untouched. ③ Branding v1 = **gym name only** (from `member_gym_links`), more later. ④ Dual-holder rule **confirmed**: `gym_engine` + any retail purchase ⇒ full retail shell (verified in code: every Stripe plan expands into {ai_chat, programming, engine, nutrition} — `stripe-webhook` PLAN_ENTITLEMENTS — so the 4-feature exclusion set covers plan grants). ⑤ Parked features **confirmed** no shell treatment. Build delta: `gym_engine` allowlisted + shared `ENGINE_DRIP_FEATURES` (seed+cron generalized); `hasEngineAccess` + `isGymShell` in `useEntitlements` (+ pure `deriveIsGymShell` shared with Nav); gates swapped (4 Engine pages, TrainingLog ×3, ProgramsList, HomePage, ProfileBanner); chrome branched (HomePage gym home, Nav, BottomTabBar — bar now waits for entitlements so the retail bar never flashes); `chat`-fn day tier. NEXT: review+merge the build → founder deploys → affiliate const flip + test-grant feature UPDATE (`engine`→`gym_engine`, preserving granted_at+months) → E2E (gym member sees gym shell; retail unchanged; day-coach works for both). Prior line: **Decision 10 gym-shell DESIGN PROPOSAL posted → PR #582 (design-only) + `GYM_SHELL_DESIGN.md` + `GYM_TOOL_INVENTORY.md`**. Full gate recon done: mechanism = a distinct `gym_engine` feature; one shared `hasEngineAccess` helper (engine|gym_engine); `isGymShell` in `useEntitlements` branching the 3 chrome leak spots (HomePage/Nav/BottomTabBar); a `chat`-fn day-coach tier fix (embedded coach IN per 10(b) but throttled today); months seed+cron generalized to `gym_engine`; allowlist + affiliate const flip + one test-grant migration. IN/OUT table + 5 flagged surfaces (esp. `/profile` lifts editor). Tool inventory companion for the à-la-carte menu (10(e)). Prior line: 2026-07-04 (affiliate team — **PR #14 MERGED to affiliate main** (`01f657d`
 > squash; branch deleted) on the board's APPROVED verdict (f93b2cb). The Decision 9(i) affiliate
 > delta is now on main: seat grants retail `engine` (①), no free-view at enroll (②), portal
 > moderation route/nav parked (③), doc banners (④). wodwisdom's cross-review comment IS visible
@@ -468,8 +468,15 @@ returning member. ~~**NEXT: affiliate merges #14** → founder deploys the Decis
 resumes.~~ **#14 MERGED (`01f657d`, affiliate team, board-authority on the APPROVED verdict).**
 Both halves of Decision 9(i) are now on main — ~~only the founder's deploy + acceptance demo
 remain~~ **deploy DONE + core loop VERIFIED LIVE (see State).**
-**(9) IN PROGRESS — Decision 10 SIGNED OFF (founder, 2026-07-05; all 5 open questions decided,
-recorded on #582) → BUILD PUSHED to `claude/gym-shell-engine-design-9c9n4n`; awaiting review.**
+**(9) SHIPPED + E2E VERIFIED (2026-07-05) — Decision 10 gym shell LIVE.** #583 merged (`3a7bd1d`)
++ deployed (Vercel + 3 fns); test grant migrated (`engine`→`gym_engine` feature UPDATE, granted_at
+preserved); E2E passed: gym member = CrossFit Southie shell (Engine+Settings only, zero cross-sell),
+retail unchanged, day-coach first-class with full Engine context. Bonus: #584 merged+deployed
+(`b18982f`) — E2E exposed a pre-existing silent retail bug (day-coach catalog lookups unscoped by
+`program_type` → empty context for ALL program users since `gen:` sequencer rows landed); fixed by
+mirroring the client's `main_5day` filter; `engine_coach_cache` flushed. **LAST ITEM: affiliate
+const flip** `engine`→`gym_engine` in `engine-class` + redeploy.
+Sign-off record (decided by founder, on #582):
 Decisions: `/profile` OUT hard (no member lifts editor — backdoor principle: athlete data flows
 through the owner, never around them); day-coach first-class Engine, strictly day-scoped
 (`engine_program_day` requests tier on engine|gym_engine; `/chat` untouched); branding v1 =
@@ -633,15 +640,17 @@ Then → the resumed acceptance demo (revised path in `ACCEPTANCE_DEMO.md`: join
 consent → activate → member picks an Engine program → Day 1 → logs → history renders →
 owner sees roster + billing preview). Parallel track: lawyer packet + pilot list.
 
-**Reviewer session:** **NEXT: review the Decision-10 gym-shell BUILD** (branch
-`claude/gym-shell-engine-design-9c9n4n`; design sign-off is DONE — founder decided all 5 open
-questions, recorded on #582). Check: the `hasEngineAccess`/`isGymShell` derivations in
-`useEntitlements` (+ `deriveIsGymShell` reuse in Nav); the gate swaps (4 Engine pages,
-TrainingLog ×3, ProgramsList, HomePage, ProfileBanner `gym_engine`); the 3 chrome branches
-(HomePage gym home + gym-name header, Nav group hiding, BottomTabBar gym tabs + no-flash
-loading gate); the `chat`-fn day-scoped tier (must NOT open standalone `/chat` to
-non-`ai_chat` members); `ENGINE_DRIP_FEATURES` in seed+cron (retail Stripe paths byte-identical).
-On merge: founder deploys → affiliate const flip + test-grant migration → E2E.
+**Reviewer session:** **NEXT: post-hoc review of the shipped Decision-10 delta** (#583 `3a7bd1d`
++ #584 `b18982f`, both squash-merged on founder authority mid-E2E and already deployed + verified
+live — findings land as follow-up fixes, not blockers). Highest-blast-radius spots: the `chat`-fn
+tier reorder (body parsed pre-tier; day-scoped requests must NOT open standalone `/chat` to
+non-`ai_chat` members); BottomTabBar's no-flash loading gate (delays first paint by one entitlement
+fetch for ALL users — the one deliberate retail-visible tradeoff); `deriveIsGymShell` reuse in Nav
+vs the hook; `ENGINE_DRIP_FEATURES` in seed+cron (retail Stripe paths must stay byte-identical);
+the #584 `program_type='main_5day'` scoping (note: coach context describes the CATALOG day, not a
+member's sequencer override — pre-bug behavior, flagged as possible follow-up). Also queued:
+disposition of design PR #582 (merge-as-docs vs close; recommend merge — the tool inventory is the
+à-la-carte menu foundation).
 >
 > _(history:_  ~~re-verify affiliate #5 → merge~~ DONE. ~~Review affiliate #6
 + #7~~ DONE. ~~Re-verify + merge #551~~ DONE. ~~F4/F5 briefs~~ DONE (relayed).
