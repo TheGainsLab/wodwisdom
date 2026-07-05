@@ -191,9 +191,14 @@ async function buildEngineCoachingContext(
     { data: upcomingMappings },
     { data: timeTrials },
   ] = await Promise.all([
+    // The 720-day catalog is program_type='main_5day' (every variant maps into it —
+    // same filter the client uses). Without it, AI-sequencer rows (program_type
+    // 'gen:<uuid>') sharing this day_number make maybeSingle() error → null → the
+    // whole context silently comes back empty.
     supa
       .from("engine_workouts")
       .select("day_type, phase")
+      .eq("program_type", "main_5day")
       .eq("day_number", mapping.engine_workout_day_number)
       .maybeSingle(),
     supa
@@ -241,6 +246,7 @@ async function buildEngineCoachingContext(
     const { data: upcomingWorkouts } = await supa
       .from("engine_workouts")
       .select("day_number, day_type")
+      .eq("program_type", "main_5day")
       .in("day_number", upcomingDayNumbers);
 
     const dayTypeIds = Array.from(
