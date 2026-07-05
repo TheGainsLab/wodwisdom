@@ -50,6 +50,17 @@ through your gym for $6/seat. You keep the margin; we keep the program's reputat
 overlay and the full AI Coach stay retail-exclusive. Everything else a retail Engine
 subscriber gets, a seated gym member gets — same code.
 
+> **Decision 10 (2026-07-05, founder-signed): "same Engine, different SHELL."** A seat now
+> grants the distinct **`gym_engine`** feature (supersedes granting retail `engine`). The
+> member gets the FULL Engine program (all variants, day pages, logging, own analytics/
+> history, taxonomy, leaderboard) inside an Engine-only, gym-branded shell (gym name v1) with
+> **zero retail surround**: no cross-sell tiles/nav/tabs, no All-Access CTA, no `/chat`, no
+> athlete-data, and **no `/profile`** — the profile feeds the evaluator/generator, which
+> would navigate the athlete around the owner; athlete data flows through the gym (F3
+> intake), never around it. The **embedded day-coach is first-class Engine** (the `chat` fn
+> tiers day-scoped requests by Engine access, not `ai_chat`) but ONLY inside Engine days.
+> A member who also holds any retail feature keeps the full retail shell (union; retail wins).
+
 > **Parked for Engine Class v1 (kept as 2b Programmer assets, where classes genuinely
 > share workouts):** the gym leaderboard + season standings, the W·kg competition surface,
 > TV mode + tokens, the moderation seams, per-gym cohort generation (`gym-cohort-cron`),
