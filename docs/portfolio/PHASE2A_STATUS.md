@@ -354,10 +354,35 @@ into founder chat — REVOKE + RE-MINT before real members; SQL on the board);
 portal frontend runs locally (`npm run dev`, `.env` = affiliate URL + anon key +
 `VITE_MEMBER_APP_URL`); production PWA auto-deploys from main via Vercel (current);
 TV token verified valid via direct curl (200, `workout:null` = correct empty state).
-**ACCEPTANCE DEMO PAUSED at the generation step by Decision 9** (the per-gym AI
-generation it would have exercised is off target for this SKU — see Decision 9).
-**NEXT: wodwisdom team executes the Decision-9 rework → reviewer reviews → founder
-deploys the delta → demo resumes** (everything already deployed/bound stays valid).
+~~ACCEPTANCE DEMO PAUSED by Decision 9~~ → **RESUMED + the core loop VERIFIED LIVE
+(2026-07-05, founder):** Decision-9 delta deployed (wodwisdom `wholesale-grants` +
+`gym-engine-months-cron` off `41385e9`; `GYM_ENGINE_MONTHS_CRON_KEY` set;
+`gym-engine-months-hourly` scheduled `23 * * * *` and `gym-cohort-cron-hourly`
+UNSCHEDULED — retail crons untouched; affiliate `engine-class` + `engine-enroll`
+off `01f657d`, allowlist-first order held). Then the live end-to-end: F2 class
+created (Southie Engine Test, DRAFT, founding minimum-waived badge ✓, pricing
+guidance ✓, invite link/QR ✓) → F3 member join in a private window (auth redirect
+with `next=` ✓, consent v-placeholder recorded ✓, intake ✓, "You're on the roster"
+with gym name ✓) → owner ACTIVATED the seat → **grant row landed (`feature='engine'`,
+`granted_by`=Southie, no expiry) and `engine_months_unlocked=1` seeded 26ms later in
+the SAME request** (the #577 activation-gap fix proven live) → member's PWA shows
+the full retail Engine experience. **Engine Class v1 is LIVE end-to-end.**
+**COPY/UX PUNCH LIST from the live run (small, post-demo; owner: wodwisdom for the
+join page, affiliate for the portal):** (1) F2 helper copy still says "one SHARED
+cardio program" + step-3 "they see the class workout" — Decision-9 wording is
+"members get the Engine program"; schedule-label field is near-vestigial, consider
+dropping; (2) join intake: sex → two tappable buttons (not a dropdown) and drop the
+"(for fair leaderboard divisions)" label; bodyweight → clearly optional or removed;
+add the gym's name + light branding to the intake screen (the confirmation screen
+already shows it); (3) member consent copy still mentions "your gym's leaderboard"
+(parked) — and remains LEGAL-TBD (lawyer critical path, version-pinned so swap is
+clean). **OPEN — Decision 9(k) candidate (founder thinking):** retail upsell tiles
+(AI Program / Nutrition / All Access) show to gym-seat members ("exact same code").
+Options: (a) leave (upsells are products the gym doesn't sell; new revenue, no
+cannibalization) — reviewer-recommended v1 default; (b) suppress for gym-granted
+members (source-aware UI — costs revenue + complexity); (c) 2b: gym-attributed
+conversions (owner gets credit/visibility when their members upgrade — pairs with
+9(j)). Recommendation: (a) now, (c) in 2b, never (b).
 
 | Item | State | Blocker |
 |---|---|---|
