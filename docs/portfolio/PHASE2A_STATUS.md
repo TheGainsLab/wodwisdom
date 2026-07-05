@@ -322,7 +322,11 @@ before launching. Launch pattern:
    principled edit); the home/nav render a GYM VARIANT for `gym_engine`-only
    members (Engine-focused, gym-branded, NO cross-sell tiles). A member who also
    holds retail keeps the full retail shell (union; retail wins).
-   (b) **Excluded from base `gym_engine`** (founder): AI Coach / chat; the
+   (b) **Excluded from base `gym_engine`** (founder): the STANDALONE open-ended
+   AI Coach / chat surface — but **the context-aware AI coach EMBEDDED in an
+   Engine training day STAYS IN** (founder, 2026-07-05: it's accessed only
+   through a training day and exists to help that day — consistent with the
+   original SKU §1 seat definition); the
    athlete-data & profile-evaluation tooling (competition history, percentiles);
    "the tools" generally. These become **à-la-carte add-ons — separate pricing
    conversation and plan** (NOT scoped now). **CONFIRMED by founder (2026-07-05):
