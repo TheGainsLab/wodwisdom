@@ -325,10 +325,12 @@ before launching. Launch pattern:
    (b) **Excluded from base `gym_engine`** (founder): AI Coach / chat; the
    athlete-data & profile-evaluation tooling (competition history, percentiles);
    "the tools" generally. These become **à-la-carte add-ons — separate pricing
-   conversation and plan** (NOT scoped now). ⚠️ Reviewer's interpretation to
-   confirm at design review: the member's OWN Engine training log/history stays
-   IN (it's part of the Engine program per 9(i)); "historical data" = the
-   athlete-data/competition analysis surfaces.
+   conversation and plan** (NOT scoped now). **CONFIRMED by founder (2026-07-05):
+   "Athlete Data" = the user COMPETITION-HISTORY feature** (linking competition
+   results, percentiles, the profile evaluation built on them) — that whole
+   surface is OUT of base `gym_engine`. The member's OWN Engine training
+   log/history (sessions, trends, breakdowns inside the program) is part of the
+   Engine product per 9(i) and stays IN.
    (c) **Timing:** testing mode, no existing users harmed; ship the shell BEFORE
    real pilot members onboard (the upsell tiles are owner-relationship damage).
    Design-proposal-first (the #574 pattern): wodwisdom proposes the surface
