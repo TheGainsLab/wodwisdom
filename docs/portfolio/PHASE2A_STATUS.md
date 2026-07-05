@@ -7,7 +7,7 @@
 > if it isn't on this board, it isn't decided. Founder + reviewer (the
 > strategy session) arbitrates conflicts.
 >
-> Last updated: 2026-07-04 (affiliate team — **PR #14 MERGED to affiliate main** (`01f657d`
+> Last updated: 2026-07-05 (wodwisdom team — **Decision 10 gym-shell DESIGN PROPOSAL posted → PR #582 (design-only) + `GYM_SHELL_DESIGN.md` + `GYM_TOOL_INVENTORY.md`; awaiting reviewer sign-off before build**. Full gate recon done: mechanism = a distinct `gym_engine` feature; one shared `hasEngineAccess` helper (engine|gym_engine); `isGymShell` in `useEntitlements` branching the 3 chrome leak spots (HomePage/Nav/BottomTabBar); a `chat`-fn day-coach tier fix (embedded coach IN per 10(b) but throttled today); months seed+cron generalized to `gym_engine`; allowlist + affiliate const flip + one test-grant migration. IN/OUT table + 5 flagged surfaces (esp. `/profile` lifts editor). Tool inventory companion for the à-la-carte menu (10(e)). Prior line: 2026-07-04 (affiliate team — **PR #14 MERGED to affiliate main** (`01f657d`
 > squash; branch deleted) on the board's APPROVED verdict (f93b2cb). The Decision 9(i) affiliate
 > delta is now on main: seat grants retail `engine` (①), no free-view at enroll (②), portal
 > moderation route/nav parked (③), doc banners (④). wodwisdom's cross-review comment IS visible
@@ -468,7 +468,15 @@ returning member. ~~**NEXT: affiliate merges #14** → founder deploys the Decis
 resumes.~~ **#14 MERGED (`01f657d`, affiliate team, board-authority on the APPROVED verdict).**
 Both halves of Decision 9(i) are now on main — ~~only the founder's deploy + acceptance demo
 remain~~ **deploy DONE + core loop VERIFIED LIVE (see State).**
-**(9) NEXT — Decision 10 DESIGN PROPOSAL (the gym shell + `gym_engine` entitlement):**
+**(9) IN PROGRESS — Decision 10 DESIGN PROPOSAL POSTED → awaiting reviewer sign-off: PR #582
+(design-only) + `GYM_SHELL_DESIGN.md` + `GYM_TOOL_INVENTORY.md`.** Recommends: a distinct
+`gym_engine` feature (not source-sniffing); ONE shared `hasEngineAccess` helper (engine|gym_engine)
+at ~5 Engine gate sites; `isGymShell` in `useEntitlements` branching HomePage/Nav/BottomTabBar
+(the 4 leak spots); a `chat`-fn day-coach tier fix (the embedded coach is IN per 10(b) but would
+be throttled today); generalize the months seed+cron to `gym_engine`; allowlist + affiliate const
+flip + test-grant migration. IN/OUT table + 5 flagged-ambiguous surfaces (esp. `/profile` lifts
+editor). Tool inventory = every tool→entitlement→IN/OUT/à-la-carte. BUILD FOLLOWS sign-off.
+Original brief: same pattern as #574 — propose before building. The proposal must enumerate:
 same pattern as #574 — propose before building. The proposal must enumerate:
 (a) the shared Engine gate helper (`engine` OR `gym_engine`) and every retail Engine
 surface it covers — this is the ONE principled retail edit, keep it to a single helper;
@@ -620,7 +628,9 @@ Then → the resumed acceptance demo (revised path in `ACCEPTANCE_DEMO.md`: join
 consent → activate → member picks an Engine program → Day 1 → logs → history renders →
 owner sees roster + billing preview). Parallel track: lawyer packet + pilot list.
 
-**Reviewer session:** ~~re-verify affiliate #5 → merge~~ DONE. ~~Review affiliate #6
+**Reviewer session:** **NEXT: sign off the Decision-10 gym-shell DESIGN — PR #582 (design-only)** + `GYM_SHELL_DESIGN.md` + `GYM_TOOL_INVENTORY.md`. Check the `gym_engine` mechanism, the shared `hasEngineAccess` helper + the ~5 gate sites, the IN/OUT list + the 5 flagged surfaces (esp. `/profile` lifts editor + the day-coach `chat`-fn tier), the isGymShell chrome branch, and the months generalization. On sign-off, wodwisdom builds the delta.
+>
+> _(history:_  ~~re-verify affiliate #5 → merge~~ DONE. ~~Review affiliate #6
 + #7~~ DONE. ~~Re-verify + merge #551~~ DONE. ~~F4/F5 briefs~~ DONE (relayed).
 ~~Acceptance-demo checklist~~ **DONE — `docs/portfolio/ACCEPTANCE_DEMO.md` (#558,
 merged):** preconditions, 11-step F1→F9 demo script (doubles as the pilot pitch
