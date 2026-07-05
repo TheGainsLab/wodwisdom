@@ -2,7 +2,9 @@
  * gym-engine-months-cron — the grant-based Engine months drip (Decision 9(i)).
  *
  * Engine Class is pure distribution of the retail Engine: a gym seat grants the retail
- * `engine` feature. But the retail month drip is hard-keyed to Stripe, so a gym-granted
+ * `engine` feature — and per Decision 10 the affiliate now grants the distinct
+ * `gym_engine` seat instead; BOTH drip (shared ENGINE_DRIP_FEATURES list, one cadence).
+ * But the retail month drip is hard-keyed to Stripe, so a gym-granted
  * member (no stripe_customer_id) would sit at engine_months_unlocked=0 with every day
  * locked. This cron drips their months off the GRANT timestamp instead — 1 month at
  * activation, +1 per 30 days, only-raise, cap 36 — mirroring the retail $6/month cadence.
@@ -23,11 +25,14 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { raiseEngineMonthsFromGrant } from "../_shared/engine-months-drip.ts";
+import { ENGINE_DRIP_FEATURES } from "../_shared/entitlements.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const CRON_KEY = Deno.env.get("GYM_ENGINE_MONTHS_CRON_KEY");
-const ENGINE_FEATURE = "engine";
+// The retail Stripe skip-guard: Stripe only ever drives the retail `engine` feature
+// (retail never holds `gym_engine`), so the skip check stays on the literal.
+const RETAIL_ENGINE_FEATURE = "engine";
 
 Deno.serve(async (req) => {
   if (!CRON_KEY) return json({ error: "config_missing", detail: "GYM_ENGINE_MONTHS_CRON_KEY not set" }, 500);
@@ -37,11 +42,12 @@ Deno.serve(async (req) => {
   const nowIso = new Date().toISOString();
 
   try {
-    // 1. Active gym-grant `engine` rows (expires_at null or in the future).
+    // 1. Active gym-grant Engine rows — `engine` (legacy 9(i)) OR `gym_engine`
+    //    (Decision 10), the shared ENGINE_DRIP_FEATURES list (expires_at null or future).
     const { data: grants, error: grantErr } = await supa
       .from("user_entitlements")
       .select("user_id, granted_at")
-      .eq("feature", ENGINE_FEATURE)
+      .in("feature", [...ENGINE_DRIP_FEATURES])
       .eq("source_kind", "gym_grant")
       .or("expires_at.is.null,expires_at.gt." + nowIso);
     if (grantErr) return json({ error: "grants_read_failed", detail: grantErr.message }, 500);
@@ -60,7 +66,7 @@ Deno.serve(async (req) => {
     const { data: retail, error: retailErr } = await supa
       .from("user_entitlements")
       .select("user_id")
-      .eq("feature", ENGINE_FEATURE)
+      .eq("feature", RETAIL_ENGINE_FEATURE)
       .eq("source_kind", "retail_stripe")
       .in("user_id", userIds)
       .or("expires_at.is.null,expires_at.gt." + nowIso);

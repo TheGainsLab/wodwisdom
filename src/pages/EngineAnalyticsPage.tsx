@@ -207,8 +207,8 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
   const [sessions, setSessions] = useState<EngineWorkoutSession[]>([]);
   const [baselines, setBaselines] = useState<EngineTimeTrial[]>([]);
   const [allTrials, setAllTrials] = useState<EngineTimeTrial[]>([]);
-  const { hasFeature } = useEntitlements(session.user.id);
-  const hasAccess = hasFeature('engine');
+  const { hasFeature, hasEngineAccess } = useEntitlements(session.user.id);
+  const hasAccess = hasEngineAccess;
 
   // View-level state
   const [selModality, setSelModality] = useState('');

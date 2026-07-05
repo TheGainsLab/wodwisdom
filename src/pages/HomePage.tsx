@@ -19,20 +19,40 @@ import { MessageSquare, Trophy, Flame, Dumbbell, Apple, User, ChevronRight, Lock
  */
 export default function HomePage({ session }: { session: Session }) {
   const navigate = useNavigate();
-  const { hasFeature, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
+  const { hasFeature, hasEngineAccess, isGymShell, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
   const [navOpen, setNavOpen] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
   const [hasEvaluation, setHasEvaluation] = useState(false);
   const [hasProgram, setHasProgram] = useState(false);
   const [hasCompetitionLink, setHasCompetitionLink] = useState(false);
+  const [gymName, setGymName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const hasProgramming = isAdmin || hasFeature('programming');
-  const hasEngine = isAdmin || hasFeature('engine');
+  const hasEngine = hasEngineAccess;
   const hasNutrition = isAdmin || hasFeature('nutrition');
   // Show the All Access bundle CTA to anyone missing at least one paid module
-  // (hidden for all-access users + admin).
+  // (hidden for all-access users + admin — and NEVER in the gym shell, which renders
+  // its own branch below with zero cross-sell).
   const showAllAccess = !isAdmin && !(hasProgramming && hasEngine && hasNutrition);
+
+  // Decision 10(c) gym branding v1: the member's gym name in the home header.
+  useEffect(() => {
+    if (!isGymShell) return;
+    let cancelled = false;
+    supabase
+      .from('member_gym_links')
+      .select('gym_name')
+      .eq('user_id', session.user.id)
+      .eq('status', 'joined')
+      .order('joined_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setGymName((data as { gym_name: string | null } | null)?.gym_name ?? null);
+      });
+    return () => { cancelled = true; };
+  }, [isGymShell, session.user.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,13 +128,41 @@ export default function HomePage({ session }: { session: Session }) {
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>Home</h1>
+          <h1>{isGymShell && gymName ? gymName : 'Home'}</h1>
         </header>
 
         <div className="page-body">
           <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {loading || entLoading ? (
               <div className="page-loading"><div className="loading-pulse" /></div>
+            ) : isGymShell ? (
+              /* ── Decision 10(c): the gym shell home — the member's Engine program and
+                 nothing that cross-sells. No tiles for other products, no locked/checkout
+                 states, no All-Access CTA, no profile/athlete-data entry. ── */
+              <>
+                <button type="button" className="settings-card" style={{ textAlign: 'left', cursor: 'pointer', borderColor: 'var(--accent)' }} onClick={() => navigate('/engine')}>
+                  <h2 className="settings-card-title" style={{ marginBottom: 4, color: 'var(--text)' }}>Your Engine training</h2>
+                  <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 14 }}>
+                    {gymName ? `Your conditioning program with ${gymName}.` : 'Your conditioning program.'} Open your dashboard, start a session, and log your results.
+                  </div>
+                  <span className="auth-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13 }}>
+                    Open Engine <ChevronRight size={16} />
+                  </span>
+                </button>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
+                  <button type="button" className="settings-card" style={{ textAlign: 'left', cursor: 'pointer', padding: 16 }} onClick={() => navigate('/engine')}>
+                    <div style={{ color: 'var(--accent)', marginBottom: 8 }}><Flame size={20} /></div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>Engine</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Year of the Engine</div>
+                  </button>
+                  <button type="button" className="settings-card" style={{ textAlign: 'left', cursor: 'pointer', padding: 16 }} onClick={() => navigate('/settings')}>
+                    <div style={{ color: 'var(--accent)', marginBottom: 8 }}><Settings size={20} /></div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>Settings</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Account & sign out</div>
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 {primary && (

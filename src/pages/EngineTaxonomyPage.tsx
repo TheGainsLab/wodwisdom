@@ -93,8 +93,8 @@ export default function EngineTaxonomyPage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dayTypes, setDayTypes] = useState<EngineDayType[]>([]);
-  const { hasFeature } = useEntitlements(session.user.id);
-  const hasAccess = hasFeature('engine');
+  const { hasFeature, hasEngineAccess } = useEntitlements(session.user.id);
+  const hasAccess = hasEngineAccess;
 
   useEffect(() => {
     (async () => {

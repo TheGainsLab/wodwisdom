@@ -23,8 +23,8 @@ export default function ProgramsListPage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
   const [hasEvaluation, setHasEvaluation] = useState(false);
-  const { hasFeature, isAdmin } = useEntitlements(session.user.id);
-  const hasEngine = hasFeature('engine');
+  const { hasFeature, hasEngineAccess, isAdmin } = useEntitlements(session.user.id);
+  const hasEngine = hasEngineAccess;
   const hasProgramming = hasFeature('programming');
 
   useEffect(() => {

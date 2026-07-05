@@ -1,18 +1,44 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useEntitlements } from '../hooks/useEntitlements';
 
-const tabs = [
-  {
-    key: 'home',
-    label: 'Home',
-    path: '/',
-    match: (p: string) => p === '/',
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-        <polyline points="9 22 9 12 15 12 15 22" />
-      </svg>
-    ),
-  },
+interface Tab {
+  key: string;
+  label: string;
+  path: string;
+  match: (p: string) => boolean;
+  icon: React.ReactNode;
+}
+
+const homeTab: Tab = {
+  key: 'home',
+  label: 'Home',
+  path: '/',
+  match: (p: string) => p === '/',
+  icon: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
+    </svg>
+  ),
+};
+
+const engineTab: Tab = {
+  key: 'engine',
+  label: 'Engine',
+  path: '/engine',
+  match: (p: string) => p.startsWith('/engine'),
+  icon: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 2c1 3 2.5 3.5 3.5 4.5A5 5 0 0 1 17 10c0 2.76-2.24 5-5 5s-5-2.24-5-5c0-1.33.52-2.54 1.37-3.44C9.37 5.56 11 5 12 2z" />
+      <path d="M12 15v7" />
+      <path d="M8 22h8" />
+    </svg>
+  ),
+};
+
+// The full retail bar (unchanged).
+const retailTabs: Tab[] = [
+  homeTab,
   {
     key: 'coach',
     label: 'Coach',
@@ -24,19 +50,7 @@ const tabs = [
       </svg>
     ),
   },
-  {
-    key: 'engine',
-    label: 'Engine',
-    path: '/engine',
-    match: (p: string) => p.startsWith('/engine'),
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 2c1 3 2.5 3.5 3.5 4.5A5 5 0 0 1 17 10c0 2.76-2.24 5-5 5s-5-2.24-5-5c0-1.33.52-2.54 1.37-3.44C9.37 5.56 11 5 12 2z" />
-        <path d="M12 15v7" />
-        <path d="M8 22h8" />
-      </svg>
-    ),
-  },
+  engineTab,
   {
     key: 'training',
     label: 'Training',
@@ -69,9 +83,35 @@ const tabs = [
   },
 ];
 
-export default function BottomTabBar() {
+// Decision 10(c): the gym-shell bar — the Engine program and nothing that cross-sells
+// (no Coach, no Training, no Nutrition). Settings stays (account/billing/sign-out).
+const gymTabs: Tab[] = [
+  homeTab,
+  engineTab,
+  {
+    key: 'settings',
+    label: 'Settings',
+    path: '/settings',
+    match: (p: string) => p === '/settings',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </svg>
+    ),
+  },
+];
+
+export default function BottomTabBar({ userId }: { userId: string }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isGymShell, loading } = useEntitlements(userId);
+
+  // Don't paint the retail bar before entitlements resolve — a gym-shell member must
+  // never see (or tap) the Coach/Training/Nutrition tabs, even for a frame.
+  if (loading) return null;
+
+  const tabs = isGymShell ? gymTabs : retailTabs;
 
   return (
     <nav className="bottom-tab-bar">
