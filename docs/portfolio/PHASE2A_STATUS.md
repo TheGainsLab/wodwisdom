@@ -309,6 +309,42 @@ before launching. Launch pattern:
    the Decision-9(i) rework. v1 stopgap that needs no new rights: the portal
    roster's seat states + the F9 seat-lifecycle "last logged" signal (the 60-day
    auto-deactivate machinery needs it anyway) + the billing preview.
+10. **GYM SHELL + `gym_engine` ENTITLEMENT** (2026-07-05, founder, after the live
+   E2E run surfaced retail upsell tiles to a gym member). Refines 9(i): "same
+   Engine, different SHELL." A gym-sourced member gets **everything Engine** —
+   program picker (all variants), day pages, logging, their own training
+   history/breakdowns/trends — but NOT the retail surround, because the surround
+   competes with the gym's business (the gym already provides the coach, the
+   program, the relationship; we never market past the owner).
+   (a) **Mechanism: a distinct `gym_engine` feature** (NOT source-sniffing UI).
+   Engine surfaces accept `engine` OR `gym_engine` via ONE shared gate helper —
+   a deliberate, founder-approved softening of the retail-untouched bar (minimal,
+   principled edit); the home/nav render a GYM VARIANT for `gym_engine`-only
+   members (Engine-focused, gym-branded, NO cross-sell tiles). A member who also
+   holds retail keeps the full retail shell (union; retail wins).
+   (b) **Excluded from base `gym_engine`** (founder): AI Coach / chat; the
+   athlete-data & profile-evaluation tooling (competition history, percentiles);
+   "the tools" generally. These become **à-la-carte add-ons — separate pricing
+   conversation and plan** (NOT scoped now). ⚠️ Reviewer's interpretation to
+   confirm at design review: the member's OWN Engine training log/history stays
+   IN (it's part of the Engine program per 9(i)); "historical data" = the
+   athlete-data/competition analysis surfaces.
+   (c) **Timing:** testing mode, no existing users harmed; ship the shell BEFORE
+   real pilot members onboard (the upsell tiles are owner-relationship damage).
+   Design-proposal-first (the #574 pattern): wodwisdom proposes the surface
+   in/out list + the gate helper + the home variant; reviewer signs off; build.
+   Affiliate delta = flip the grant const `engine`→`gym_engine` AFTER the
+   wodwisdom allowlist+gates deploy (same ordering as Decision 9), and migrate
+   the one test member's grant.
+   (d) **AI-for-the-owner is the 2b thesis** (founder): the way to make the gym
+   relationship higher-revenue and more agreeable is arming the owner, not
+   selling past them — everything the AI knows flows to the member THROUGH the
+   gym (intelligence feed / 9(j) aggregates / AI Programmer / 9(k)-c attributed
+   upgrades all serve this).
+   (e) **Follow-up deliverable: a TOOL INVENTORY** — after the revised Engine
+   ships, enumerate exactly what tools/features exist across the product (the
+   à-la-carte menu foundation + the in/out lines for (b)). Wodwisdom team
+   produces; reviewer reviews; founder prices.
 
 ## State (2026-07-04)
 
@@ -424,8 +460,27 @@ expires_at}`, only the feature value flipped). Q3 mechanics (deactivate POSTs ex
 DELETE; reactivate posts null) verified in place → the wodwisdom months cron won't reset a
 returning member. ~~**NEXT: affiliate merges #14** → founder deploys the Decision-9 delta → demo
 resumes.~~ **#14 MERGED (`01f657d`, affiliate team, board-authority on the APPROVED verdict).**
-Both halves of Decision 9(i) are now on main — **only the founder's deploy + acceptance demo
-remain.** Build history:
+Both halves of Decision 9(i) are now on main — ~~only the founder's deploy + acceptance demo
+remain~~ **deploy DONE + core loop VERIFIED LIVE (see State).**
+**(9) NEXT — Decision 10 DESIGN PROPOSAL (the gym shell + `gym_engine` entitlement):**
+same pattern as #574 — propose before building. The proposal must enumerate:
+(a) the shared Engine gate helper (`engine` OR `gym_engine`) and every retail Engine
+surface it covers — this is the ONE principled retail edit, keep it to a single helper;
+(b) the IN/OUT surface list for a `gym_engine`-only member — IN: full Engine program
+experience (picker/all variants, day pages, logging, own training history/breakdowns/
+trends); OUT: AI Coach/chat, athlete-data + profile-evaluation tooling, cross-sell
+tiles/nav (AI Program, Nutrition, All Access), anything that markets past the gym —
+flag every ambiguous surface for the design review rather than deciding silently;
+(c) the gym-variant home/nav for `gym_engine`-only members (Engine-focused,
+gym-branded; retail shell wins for dual holders — union);
+(d) the months-drip + Month-1 seed generalized to cover `gym_engine` (the cron and
+seed currently key on `feature==='engine'`);
+(e) allowlist + migration note (flip the affiliate const `engine`→`gym_engine` AFTER
+the wodwisdom deploy; migrate the one existing test grant);
+(f) the TOOL INVENTORY (Decision 10(e)) as a companion doc — every tool/feature in
+the product with its current entitlement, the à-la-carte candidates marked.
+Reviewer signs off → build → review → founder deploys → re-run the E2E check
+(gym member sees the gym shell; retail member unchanged). Prior items:
 Built per the signed-off design: `engine` added to `ALLOWED_GRANT_FEATURES`; the grant
 upsert row extracted to pure `_shared/grant-row.ts` that OMITS `granted_at` (re-grant can't
 clobber it — `grant-row_test.ts` asserts it); new `gym-engine-months-cron` (drips only
