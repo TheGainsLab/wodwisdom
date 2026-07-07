@@ -12,10 +12,16 @@
  *
  * Auto-heal fires generate-next-month ONLY when the case is unambiguous:
  *   - active Stripe subscription with >= 1 paid invoice on a supported cadence,
+ *   - the next month is DUE: >= 28 days since the last delivered month (dated
+ *     by that month's profile evaluation). Lifetime paid-vs-delivered alone
+ *     can't distinguish a dropped renewal from a subscription that predates
+ *     first delivery — the cadence guard means phantom pre-delivery debt is
+ *     never "healed" as a catch-up burst (found the hard way in the July '26
+ *     dry run: a subscriber 3 "months" behind who was actually current),
  *   - profile is generation-ready (getTierStatus().canRunPrograms),
  *   - no generation job already pending/processing for the user,
- *   - at most ONE month per user per run (drip — the next daily run advances
- *     again if still behind; never a catch-up burst).
+ *   - at most ONE month per user per run (drip — with the cadence guard this
+ *     bounds delivery to one month per ~28 days per user, ever).
  * Anything ambiguous is flagged, not fired. Every run inserts an audit row into
  * programming_reconciliations, so the sweep can't itself become a silent system.
  *
@@ -190,7 +196,32 @@ async function reconcileOne(
 
   if (delivered >= entitled) return "healthy";
 
-  // --- Gap found. Guards before auto-heal (ambiguity → flag, never fire):
+  // --- Cadence guard: paid-behind is only healable when the NEXT month is
+  // actually due — >= 28 days since the last month was DELIVERED (the month-N
+  // evaluation is written during month-N generation; programs has no
+  // updated_at). This separates "webhook dropped a renewal" (heal) from
+  // "subscription predates first delivery" (phantom debt — a customer who
+  // paid for months before ever generating must NOT get a catch-up burst;
+  // they get their normal one-month cadence anchored to last delivery).
+  // Also makes bursts structurally impossible: one month per ~28 days, ever.
+  if (delivered > 0) {
+    const { data: lastEval } = await supa
+      .from("profile_evaluations")
+      .select("created_at")
+      .eq("user_id", userId)
+      .eq("month_number", delivered)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const lastDeliveredAt = lastEval?.created_at ?? latest?.created_at ?? null;
+    if (lastDeliveredAt && Date.now() - Date.parse(lastDeliveredAt) < 28 * MS_PER_DAY) {
+      // Current on cadence; the paid-ahead surplus (if any) is intentional
+      // slack, not a defect — report healthy so the daily audit stays quiet.
+      return "healthy";
+    }
+  }
+
+  // --- Gap found and due. Guards before auto-heal (ambiguity → flag, never fire):
   // A generation already in flight will close the gap on its own; firing again
   // would double-generate the same month.
   const { count: inFlight } = await supa
