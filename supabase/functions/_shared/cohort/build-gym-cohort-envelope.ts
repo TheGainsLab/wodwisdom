@@ -40,8 +40,22 @@ import {
   THRESHOLDS_V1,
 } from "../athlete-model.ts";
 import type { TrainingDesignInput } from "../training-design-input.ts";
+import { FOCUS_AREAS, type FocusArea } from "../coach-state.ts";
 
 export type CohortTargetLevel = "beginner" | "intermediate" | "advanced";
+
+/**
+ * The owner's coaching strategy (gym_cohort_configs.strategy jsonb) — the
+ * priority sliders. Keys are FOCUS_AREAS; values 0–10. Replaces the old
+ * hardcoded Engine-Class strategy as the "what should this cycle emphasize"
+ * input (the slot retail fills with CoachState). Written via SQL today; the
+ * portal brief form writes the same shape when it ships.
+ */
+export interface CohortStrategy {
+  sliders?: Record<string, number> | null;
+  strength_emphasis?: TrainingDesignInput["strength_emphasis"] | null;
+  recovery_stance?: TrainingDesignInput["recovery_stance"] | null;
+}
 
 /** The minimal gym-level cohort spec. Assembled from the gym's class config
  *  (affiliate side: equipment inventory, class days/length) — the affiliate
@@ -57,6 +71,8 @@ export interface GymCohortConfig {
   units: "lbs" | "kg";
   /** Optional class intent, shown to the writer as the goal. */
   goal_text?: string | null;
+  /** Owner coaching strategy (sliders). null/absent = main-program default. */
+  strategy?: CohortStrategy | null;
 }
 
 // Reference bodyweight for the class target (only used to derive reference loads
@@ -128,30 +144,87 @@ function referenceProfile(config: GymCohortConfig): AthleteProfileStatic {
   };
 }
 
-/**
- * The fixed, deterministic coaching strategy for a shared Engine Class, as the
- * execution-layer projection (TrainingDesignInput) directly — no fabricated
- * intermediate CoachState, since none of its narrative/evidence fields survive the
- * projection. Conditioning-forward, balanced strength kept alive; NOT individually
- * adaptive (the differentiation guard — GYM_SKU_SPEC §1).
- *
- * DEBT (#548): this is CrossFit coaching judgment; it belongs on the domain pack
- * when the Engine goes genuinely multi-sport (see file header).
- */
+// ── The owner-strategy → design-input mapping (the priority sliders) ─────────
+//
+// The old hardcoded strategy here was the Engine-Class recipe (conditioning-
+// forward, deprioritize olympic_lifting) — written for the shelved conditioning
+// product and confirmed wrong for a gym MAIN program by the first real
+// generation (2026-07-07). The owner's sliders now fill this slot; when no
+// strategy is set, MAIN_PROGRAM_DEFAULT applies (a general CrossFit class
+// posture, NOT the Engine recipe).
+//
+// DEBT (#548) still applies: the default + slider bands are CrossFit coaching
+// judgment; they belong on the domain pack when the Engine goes multi-sport.
+
+type Priorities = TrainingDesignInput["priorities"];
+
+/** Slider bands: ≥7 develop (ranked by value), 4–6 maintain, ≤3 deprioritize.
+ *  Axes the owner didn't rate are omitted entirely (neutral — incidental
+ *  exposure allowed, no dedicated dose). At most 4 priorities: the skeleton
+ *  allocates by rank and a 6-day week can't develop more than that honestly —
+ *  overflow demotes to maintain. */
+export function mapSlidersToDesign(
+  sliders: Record<string, number>,
+): Pick<TrainingDesignInput, "priorities" | "maintain" | "deprioritize"> | null {
+  const MAX_PRIORITIES = 4;
+  const rated = FOCUS_AREAS
+    .map((f) => ({ focus: f, value: sliders[f] }))
+    .filter((e): e is { focus: FocusArea; value: number } =>
+      typeof e.value === "number" && Number.isFinite(e.value));
+  if (rated.length === 0) return null;
+
+  const develop = rated.filter((e) => e.value >= 7)
+    .sort((a, b) => b.value - a.value); // ties keep FOCUS_AREAS order (stable sort)
+  // Owner rated axes but pushed none past 7 — develop the top 2 anyway (a cycle
+  // with zero priorities has nothing to allocate).
+  const chosen = develop.length > 0 ? develop : rated.sort((a, b) => b.value - a.value).slice(0, 2);
+
+  const priorities: Priorities = chosen.slice(0, MAX_PRIORITIES)
+    .map((e, i) => ({ focus: e.focus, rank: i + 1, confidence: "high" as const }));
+  const prioritized = new Set(priorities.map((p) => p.focus));
+  const maintain = rated
+    .filter((e) => !prioritized.has(e.focus) && e.value >= 4)
+    .map((e) => e.focus);
+  const deprioritize = rated
+    .filter((e) => !prioritized.has(e.focus) && e.value <= 3)
+    .map((e) => e.focus);
+  return { priorities, maintain, deprioritize };
+}
+
+/** Default posture for a gym main program when the owner hasn't set sliders:
+ *  broad GPP — mixed-modal first, real strength work, gymnastics alive,
+ *  nothing deprioritized. (Deliberately NOT the old Engine recipe.) */
+const MAIN_PROGRAM_DEFAULT: Pick<TrainingDesignInput, "priorities" | "maintain" | "deprioritize"> = {
+  priorities: [
+    { focus: "mixed_modal_conditioning", rank: 1, confidence: "medium" },
+    { focus: "powerlifting_strength", rank: 2, confidence: "medium" },
+    { focus: "gymnastics_pulling", rank: 3, confidence: "medium" },
+  ],
+  maintain: [
+    "olympic_lifting",
+    "posterior_chain",
+    "upper_body_pressing",
+    "gymnastics_pressing",
+    "midline",
+    "aerobic_capacity",
+    "anaerobic_capacity",
+  ],
+  deprioritize: [],
+};
+
 function cohortTrainingDesign(
   config: GymCohortConfig,
   lifts: Record<string, number | null>,
 ): TrainingDesignInput {
+  const fromSliders = config.strategy?.sliders
+    ? mapSlidersToDesign(config.strategy.sliders)
+    : null;
+  const intent = fromSliders ?? MAIN_PROGRAM_DEFAULT;
+
   return {
-    priorities: [
-      { focus: "mixed_modal_conditioning", rank: 1, confidence: "medium" },
-      { focus: "aerobic_capacity", rank: 2, confidence: "medium" },
-      { focus: "anaerobic_capacity", rank: 3, confidence: "medium" },
-    ],
-    maintain: ["posterior_chain", "upper_body_pressing"],
-    deprioritize: ["olympic_lifting", "skill_coordination"],
-    recovery_stance: "standard",
-    strength_emphasis: "balanced",
+    ...intent,
+    recovery_stance: config.strategy?.recovery_stance ?? "standard",
+    strength_emphasis: config.strategy?.strength_emphasis ?? "balanced",
 
     days_per_week: config.days_per_week,
     session_length_minutes: config.session_length_minutes,

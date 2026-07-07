@@ -41,6 +41,7 @@ import {
   type GymCohortConfig,
 } from "../_shared/cohort/build-gym-cohort-envelope.ts";
 import { buildCohortRoster, type CohortMemberIntake } from "../_shared/cohort/build-cohort-roster.ts";
+import type { CohortStrategy } from "../_shared/cohort/build-gym-cohort-envelope.ts";
 import { GYM_FIRST_STAGE, type GymResumeState, gymSelfRetrigger } from "../_shared/gym-dispatcher.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -62,6 +63,7 @@ interface ConfigRow {
   do_not_program: string[];
   units: "lbs" | "kg";
   goal_text: string | null;
+  strategy: CohortStrategy | null;
   attempt_count: number;
 }
 
@@ -179,6 +181,7 @@ Deno.serve(async (req) => {
       do_not_program: cfg.do_not_program,
       units: cfg.units,
       goal_text: cfg.goal_text,
+      strategy: cfg.strategy,
     };
 
     const envelope = buildGymCohortEnvelope(gymConfig, vocabulary, nowIso, { rag });

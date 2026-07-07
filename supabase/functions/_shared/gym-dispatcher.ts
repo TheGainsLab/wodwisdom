@@ -84,6 +84,9 @@ export interface GymResumeState {
   surgical?: SurgicalCursor;
   residualFailures?: unknown[];
   safety?: { safe: boolean; reasoning: string; errored: boolean };
+  /** Session-time-budget audit findings the skeleton retries couldn't clear
+   *  (heuristic estimates — surfaced to the owner, never block generation). */
+  budgetWarnings?: string[];
   startedAtMs?: number;
 }
 
