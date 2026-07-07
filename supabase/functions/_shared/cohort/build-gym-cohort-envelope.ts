@@ -160,9 +160,16 @@ type Priorities = TrainingDesignInput["priorities"];
 
 /** Slider bands: ≥7 develop (ranked by value), 4–6 maintain, ≤3 deprioritize.
  *  Axes the owner didn't rate are omitted entirely (neutral — incidental
- *  exposure allowed, no dedicated dose). At most 4 priorities: the skeleton
- *  allocates by rank and a 6-day week can't develop more than that honestly —
- *  overflow demotes to maintain. */
+ *  exposure allowed, no dedicated dose). Values are clamped to 0–10 (the
+ *  column's documented contract, enforced in the one reader). At most 4
+ *  priorities: the skeleton allocates by rank and a 6-day week can't develop
+ *  more than that honestly — overflow demotes to maintain.
+ *
+ *  Fallbacks when no axis reaches 7: develop the top 2 of the MAINTAIN band
+ *  (4–6) — never the deprioritize band; sliders of 1–3 mean "de-emphasize",
+ *  and promoting them would invert the owner's intent. If the owner ONLY
+ *  rated axes ≤3 ("back off these, neutral otherwise"), keep the main-program
+ *  default posture minus those axes, with the lows honored as deprioritize. */
 export function mapSlidersToDesign(
   sliders: Record<string, number>,
 ): Pick<TrainingDesignInput, "priorities" | "maintain" | "deprioritize"> | null {
@@ -170,14 +177,30 @@ export function mapSlidersToDesign(
   const rated = FOCUS_AREAS
     .map((f) => ({ focus: f, value: sliders[f] }))
     .filter((e): e is { focus: FocusArea; value: number } =>
-      typeof e.value === "number" && Number.isFinite(e.value));
+      typeof e.value === "number" && Number.isFinite(e.value))
+    .map((e) => ({ focus: e.focus, value: Math.min(10, Math.max(0, e.value)) }));
   if (rated.length === 0) return null;
 
-  const develop = rated.filter((e) => e.value >= 7)
-    .sort((a, b) => b.value - a.value); // ties keep FOCUS_AREAS order (stable sort)
-  // Owner rated axes but pushed none past 7 — develop the top 2 anyway (a cycle
-  // with zero priorities has nothing to allocate).
-  const chosen = develop.length > 0 ? develop : rated.sort((a, b) => b.value - a.value).slice(0, 2);
+  const byValueDesc = (a: { value: number }, b: { value: number }) => b.value - a.value;
+  const develop = rated.filter((e) => e.value >= 7).sort(byValueDesc); // ties keep FOCUS_AREAS order (stable sort)
+  const mid = rated.filter((e) => e.value >= 4 && e.value < 7);
+  const low = rated.filter((e) => e.value <= 3);
+
+  // No axis pushed past 7: a cycle still needs something to allocate — develop
+  // the top of the maintain band. NEVER promote the deprioritize band.
+  const chosen = develop.length > 0 ? develop : [...mid].sort(byValueDesc).slice(0, 2);
+
+  if (chosen.length === 0) {
+    // Owner only said "de-emphasize these": default posture minus those axes.
+    const lowSet = new Set(low.map((e) => e.focus));
+    return {
+      priorities: MAIN_PROGRAM_DEFAULT.priorities
+        .filter((p) => !lowSet.has(p.focus))
+        .map((p, i) => ({ ...p, rank: i + 1 })),
+      maintain: MAIN_PROGRAM_DEFAULT.maintain.filter((f) => !lowSet.has(f)),
+      deprioritize: low.map((e) => e.focus),
+    };
+  }
 
   const priorities: Priorities = chosen.slice(0, MAX_PRIORITIES)
     .map((e, i) => ({ focus: e.focus, rank: i + 1, confidence: "high" as const }));
@@ -185,8 +208,8 @@ export function mapSlidersToDesign(
   const maintain = rated
     .filter((e) => !prioritized.has(e.focus) && e.value >= 4)
     .map((e) => e.focus);
-  const deprioritize = rated
-    .filter((e) => !prioritized.has(e.focus) && e.value <= 3)
+  const deprioritize = low
+    .filter((e) => !prioritized.has(e.focus))
     .map((e) => e.focus);
   return { priorities, maintain, deprioritize };
 }

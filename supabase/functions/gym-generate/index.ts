@@ -35,6 +35,7 @@ import type { WriterOutput } from "../_shared/v2-output-schema.ts";
 import { classifyFailuresByKind, summarizeAuditRun } from "../_shared/audit-runner.ts";
 import { getDomainPack } from "../_shared/domain-packs/registry.ts";
 import type { SkeletonOutput } from "../_shared/v3-output-schema.ts";
+import { auditSessionBudget, budgetRetryMessage } from "../_shared/gym-session-budget.ts";
 import {
   applyProgrammaticFixes,
   applySurgicalFixes,
@@ -71,90 +72,9 @@ function toSafety(rs: GymResumeState, output: WriterOutput, residualFailures: un
 
 // ============================================================
 // Session-time budget audit (gym-local — a CLASS runs on a clock).
-//
-// The first real generation (2026-07-07) proved the prompt's session-length
-// guidance is advisory-only: with a 60-min budget it emitted 75-85 min days
-// (28-min-cap chippers after 5×5 + skills EMOM + accessory). The structural
-// audits never sum a day's time, so nothing pushed back. This audit does:
-// estimate each skeleton day's minutes from its block list, and make the
-// writer retry any day that blows the budget. Estimates are deliberately
-// coach-conservative heuristics; unresolved findings after the retry budget
-// are surfaced as warnings (owner review desk material), never a hard fail —
-// a heuristic must not brick generation.
-//
-// Kept gym-local (not in the shared pack audits) so retail behavior is
-// untouched; when it's proven here it can graduate to the pack (DEBT #548
-// altitude).
+// Estimator + audit live in _shared/gym-session-budget.ts (pure, unit-tested);
+// this file owns the retry policy around them.
 // ============================================================
-
-type SkeletonDay = SkeletonOutput["weeks"][number]["days"][number];
-
-const FIXED_BLOCK_MINUTES: Record<string, number> = {
-  "warm-up": 8,
-  "mobility": 5,
-  "skills": 10,
-  "accessory": 12,
-  "active-recovery": 8,
-  "cool-down": 5,
-};
-
-function estimateStrengthMinutes(scheme: string | null | undefined): number {
-  // "5x5 @75%" → 5 working sets ≈ 2.5 min each (set + rest) + warm-up sets.
-  const m = (scheme ?? "").match(/(\d+)\s*x\s*\d+/i);
-  const sets = m ? parseInt(m[1], 10) : 4;
-  return Math.round(sets * 2.5 + 4);
-}
-
-function estimateMetconMinutes(focus: string | null | undefined): number {
-  const text = (focus ?? "").toLowerCase();
-  // The skeleton usually states a range ("long aerobic chipper 20-25 min") — take the top.
-  const range = text.match(/(\d+)\s*(?:[-–—]\s*(\d+))?\s*min/);
-  if (range) return parseInt(range[2] ?? range[1], 10);
-  if (text.includes("long")) return 22;
-  if (text.includes("short")) return 8;
-  return 14;
-}
-
-function estimateDayMinutes(day: SkeletonDay): { total: number; parts: string[] } {
-  let total = 0;
-  const parts: string[] = [];
-  for (const bt of day.block_types ?? []) {
-    let min: number;
-    if (bt === "strength") min = estimateStrengthMinutes(day.strength_scheme);
-    else if (bt === "metcon") min = estimateMetconMinutes(day.metcon_focus);
-    else min = FIXED_BLOCK_MINUTES[bt] ?? 8;
-    total += min;
-    parts.push(`${bt}≈${min}`);
-  }
-  return { total, parts };
-}
-
-const BUDGET_SLACK_MINUTES = 5;
-
-function auditSessionBudget(skeleton: SkeletonOutput, budgetMinutes: number): string[] {
-  const violations: string[] = [];
-  for (const week of skeleton.weeks ?? []) {
-    for (const day of week.days ?? []) {
-      const { total, parts } = estimateDayMinutes(day);
-      if (total > budgetMinutes + BUDGET_SLACK_MINUTES) {
-        violations.push(
-          `Week ${week.week_num} Day ${day.day_num}: estimated ${total} min (${parts.join(", ")}) exceeds the ${budgetMinutes}-min class session.`,
-        );
-      }
-    }
-  }
-  return violations;
-}
-
-function budgetRetryMessage(violations: string[], budgetMinutes: number): string {
-  return [
-    "Your previous skeleton failed the SESSION-TIME BUDGET audit. These class days do not fit the session length. Fix ALL of them and emit a corrected skeleton via the emit_skeleton tool — do NOT explain.",
-    "",
-    ...violations.map((v) => `  - ${v}`),
-    "",
-    `Every day must fit a ${budgetMinutes}-minute CLASS including warm-up and cool-down. To fix: use FEWER middle blocks per day (a class day carries ONE primary focus piece — do not stack a skills block AND a full strength block AND an accessory block AND a long metcon on the same day), and keep metcon_focus time domains ≤ ${Math.max(8, Math.round(budgetMinutes / 4))} min on days that also have a strength block.`,
-  ].join("\n");
-}
 
 /** Extra writer attempts dedicated to the budget audit (structural audits keep
  *  their own loop inside generateSkeletonWithAudits). */
@@ -170,36 +90,52 @@ async function generateSkeletonWithinBudget(
   const budget = tdi.session_length_minutes;
   if (budget == null || budget <= 0) return { skeleton, budgetWarnings: [] };
 
-  let violations = auditSessionBudget(skeleton, budget);
-  for (let attempt = 1; attempt <= BUDGET_RETRIES && violations.length > 0; attempt++) {
+  // Best-so-far pair: a retry is adopted only if it strictly reduces the
+  // violation count, so a regressing candidate can't worsen what ships.
+  let best = { skeleton, violations: auditSessionBudget(skeleton, budget) };
+  for (let attempt = 1; attempt <= BUDGET_RETRIES && best.violations.length > 0; attempt++) {
     console.log(
-      `[gym-generate] session-budget audit: ${violations.length} day(s) over ${budget} min; retry ${attempt}/${BUDGET_RETRIES}`,
+      `[gym-generate] session-budget audit: ${best.violations.length} day(s) over ${budget} min; retry ${attempt}/${BUDGET_RETRIES}`,
     );
-    const candidate = await callSkeletonWriter(tdi, budgetRetryMessage(violations, budget), pack);
+    // Budget findings never hard-fail the job — a transient LLM error on a
+    // retry (429/5xx/timeout) is just a failed attempt; a structurally-valid
+    // skeleton is already in hand.
+    let candidate: SkeletonOutput;
+    try {
+      candidate = await callSkeletonWriter(tdi, budgetRetryMessage(best.violations, budget), pack);
+    } catch (err) {
+      console.warn(`[gym-generate] budget-retry writer call failed (attempt ${attempt}); keeping prior skeleton:`, err);
+      continue;
+    }
     const structural = pack.audits.runSkeleton({
       skeleton: candidate,
       daysPerWeek: tdi.days_per_week,
       trainingDesignInput: tdi,
     });
     if (!structural.passed) {
-      // A budget retry must never trade a time problem for a structural one —
-      // keep the last structurally-valid skeleton and try again.
+      // A budget retry must never trade a time problem for a structural one.
       console.warn(
         `[gym-generate] budget-retry skeleton failed structural audits (${pack.audits.summarizeSkeleton(structural)}); keeping prior skeleton`,
       );
       continue;
     }
-    skeleton = candidate;
-    violations = auditSessionBudget(skeleton, budget);
+    const candidateViolations = auditSessionBudget(candidate, budget);
+    if (candidateViolations.length < best.violations.length) {
+      best = { skeleton: candidate, violations: candidateViolations };
+    } else {
+      console.log(
+        `[gym-generate] budget-retry did not improve (${candidateViolations.length} vs ${best.violations.length} violations); keeping prior skeleton`,
+      );
+    }
   }
 
-  if (violations.length > 0) {
+  if (best.violations.length > 0) {
     console.warn(`[gym-generate] session-budget audit unresolved after ${BUDGET_RETRIES} retries — shipping with warnings:`);
-    for (const v of violations) console.warn(`  - ${v}`);
+    for (const v of best.violations) console.warn(`  - ${v}`);
   } else {
     console.log(`[gym-generate] session-budget audit: all days fit ${budget} min`);
   }
-  return { skeleton, budgetWarnings: violations };
+  return { skeleton: best.skeleton, budgetWarnings: best.violations };
 }
 
 // ============================================================
