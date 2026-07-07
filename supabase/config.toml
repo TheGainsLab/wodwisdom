@@ -255,3 +255,8 @@ verify_jwt = false
 # F4 TV mode — tokenized no-login gym-wall board. verify_jwt=false; the gym_tv_tokens
 # token in the URL is the capability.
 verify_jwt = false
+
+[functions.reconcile-programming-months]
+# Daily paid-vs-delivered sweep (auto-heal + audit). Called by pg_cron —
+# same no-JWT posture and key-drift rationale as monthly-generation-cron.
+verify_jwt = false
