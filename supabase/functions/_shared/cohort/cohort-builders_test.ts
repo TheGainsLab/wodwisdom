@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/cohort/cohort-builders_test.ts --allow-env --no-check
 import { assertEquals, assert } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { buildGymCohortEnvelope, type GymCohortConfig } from "./build-gym-cohort-envelope.ts";
+import { buildGymCohortEnvelope, mapSlidersToDesign, type GymCohortConfig } from "./build-gym-cohort-envelope.ts";
 import { buildCohortRoster } from "./build-cohort-roster.ts";
 import { computeCohortScaling } from "../engine/cohort.ts";
 import { getDomainPack } from "../domain-packs/registry.ts";
@@ -132,4 +132,97 @@ Deno.test("end-to-end deterministic scaling: envelope + roster + computeCohortSc
   const sn = scaling.scaled_movements.find((m) => m.movement === "Snatch")!;
   assertEquals(sn.needs_substitution, true); // in the member's do_not_program
   assertEquals(scaling.substitutions_pending, 1);
+});
+
+// ── mapSlidersToDesign (owner strategy sliders → design intent) ───────────────
+
+Deno.test("mapSlidersToDesign: bands map to develop/maintain/deprioritize, ranked by value", () => {
+  const d = mapSlidersToDesign({
+    powerlifting_strength: 9,
+    mixed_modal_conditioning: 8,
+    olympic_lifting: 5,
+    skill_coordination: 2,
+  })!;
+  assertEquals(d.priorities.map((p) => p.focus), ["powerlifting_strength", "mixed_modal_conditioning"]);
+  assertEquals(d.priorities.map((p) => p.rank), [1, 2]);
+  assertEquals(d.priorities[0].confidence, "high");
+  assertEquals(d.maintain, ["olympic_lifting"]);
+  assertEquals(d.deprioritize, ["skill_coordination"]);
+});
+
+Deno.test("mapSlidersToDesign: >4 develop sliders — overflow demotes to maintain", () => {
+  const d = mapSlidersToDesign({
+    olympic_lifting: 10,
+    powerlifting_strength: 9,
+    posterior_chain: 8,
+    upper_body_pressing: 8,
+    gymnastics_pulling: 7,
+  })!;
+  assertEquals(d.priorities.length, 4);
+  assertEquals(d.priorities[0].focus, "olympic_lifting");
+  // The 5th develop-band axis is not dropped — it demotes to maintain.
+  assertEquals(d.maintain, ["gymnastics_pulling"]);
+  assertEquals(d.deprioritize, []);
+});
+
+Deno.test("mapSlidersToDesign: no axis ≥7 — top of the MAINTAIN band develops, never the low band", () => {
+  const d = mapSlidersToDesign({
+    mixed_modal_conditioning: 6,
+    posterior_chain: 5,
+    aerobic_capacity: 4,
+    skill_coordination: 2,
+  })!;
+  assertEquals(d.priorities.map((p) => p.focus), ["mixed_modal_conditioning", "posterior_chain"]);
+  assertEquals(d.maintain, ["aerobic_capacity"]);
+  assertEquals(d.deprioritize, ["skill_coordination"]);
+});
+
+Deno.test("mapSlidersToDesign: ONLY low sliders — default posture minus those axes, lows honored", () => {
+  // The intent-inversion bug from review: "de-emphasize these two" must never
+  // become "develop these two".
+  const d = mapSlidersToDesign({ skill_coordination: 2, olympic_lifting: 1 })!;
+  const prioritized = d.priorities.map((p) => p.focus);
+  assert(!prioritized.includes("skill_coordination"), "low slider must not be developed");
+  assert(!prioritized.includes("olympic_lifting"), "low slider must not be developed");
+  assert(!d.maintain.includes("olympic_lifting"), "low slider must not be maintained either");
+  assertEquals(d.deprioritize.sort(), ["olympic_lifting", "skill_coordination"].sort());
+  assert(d.priorities.length > 0, "default priorities still allocate the cycle");
+});
+
+Deno.test("mapSlidersToDesign: empty/garbage input", () => {
+  assertEquals(mapSlidersToDesign({}), null);
+  assertEquals(mapSlidersToDesign({ not_a_focus: 9 }), null);
+  // Out-of-range values clamp to the 0-10 contract instead of misbehaving.
+  const d = mapSlidersToDesign({ powerlifting_strength: 100, midline: -5 })!;
+  assertEquals(d.priorities.map((p) => p.focus), ["powerlifting_strength"]);
+  assertEquals(d.deprioritize, ["midline"]);
+});
+
+Deno.test("buildGymCohortEnvelope: strategy sliders steer the tdi; null strategy = main-program default", () => {
+  const withSliders = buildGymCohortEnvelope(
+    { ...CONFIG, strategy: { sliders: { olympic_lifting: 9, powerlifting_strength: 8 } } },
+    VOCAB, NOW,
+  ).shared_training_design_input;
+  assertEquals(withSliders.priorities[0].focus, "olympic_lifting");
+  assertEquals(withSliders.priorities[0].confidence, "high");
+
+  const defaulted = buildGymCohortEnvelope(CONFIG, VOCAB, NOW).shared_training_design_input;
+  assertEquals(defaulted.priorities[0].focus, "mixed_modal_conditioning");
+  // The Engine-era recipe is dead: nothing is deprioritized by default.
+  assertEquals(defaulted.deprioritize, []);
+});
+
+Deno.test("mapSlidersToDesign: lows covering ALL default priorities — promote from remaining maintain", () => {
+  const d = mapSlidersToDesign({
+    mixed_modal_conditioning: 2,
+    powerlifting_strength: 1,
+    gymnastics_pulling: 3,
+  })!;
+  // The default develop axes are all low-rated — something else must develop.
+  assert(d.priorities.length > 0, "a cycle needs something to allocate");
+  const prioritized = new Set(d.priorities.map((p) => p.focus));
+  assert(!prioritized.has("mixed_modal_conditioning") && !prioritized.has("powerlifting_strength") && !prioritized.has("gymnastics_pulling"));
+  // Promoted axes moved out of maintain (no axis in two lists).
+  for (const p of d.priorities) assert(!d.maintain.includes(p.focus));
+  assertEquals(d.deprioritize.length, 3);
 });

@@ -34,10 +34,13 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import type { WriterOutput } from "../_shared/v2-output-schema.ts";
 import { classifyFailuresByKind, summarizeAuditRun } from "../_shared/audit-runner.ts";
 import { getDomainPack } from "../_shared/domain-packs/registry.ts";
+import type { SkeletonOutput } from "../_shared/v3-output-schema.ts";
+import { auditSessionBudget, budgetRetryMessage } from "../_shared/gym-session-budget.ts";
 import {
   applyProgrammaticFixes,
   applySurgicalFixes,
   auditOutput,
+  callSkeletonWriter,
   callWeekFill,
   generateSkeletonWithAudits,
   recomputeBenchmarks,
@@ -68,6 +71,74 @@ function toSafety(rs: GymResumeState, output: WriterOutput, residualFailures: un
 }
 
 // ============================================================
+// Session-time budget audit (gym-local — a CLASS runs on a clock).
+// Estimator + audit live in _shared/gym-session-budget.ts (pure, unit-tested);
+// this file owns the retry policy around them.
+// ============================================================
+
+/** Extra writer attempts dedicated to the budget audit (structural audits keep
+ *  their own loop inside generateSkeletonWithAudits). */
+const BUDGET_RETRIES = 2;
+
+async function generateSkeletonWithinBudget(
+  rs: GymResumeState,
+  pack: ReturnType<typeof getDomainPack>,
+): Promise<{ skeleton: SkeletonOutput; budgetWarnings: string[] }> {
+  const tdi = rs.tdi!;
+  let skeleton = await generateSkeletonWithAudits(tdi, pack);
+
+  const budget = tdi.session_length_minutes;
+  if (budget == null || budget <= 0) return { skeleton, budgetWarnings: [] };
+
+  // Best-so-far pair: a retry is adopted only if it strictly reduces the
+  // violation count, so a regressing candidate can't worsen what ships.
+  let best = { skeleton, violations: auditSessionBudget(skeleton, budget) };
+  for (let attempt = 1; attempt <= BUDGET_RETRIES && best.violations.length > 0; attempt++) {
+    console.log(
+      `[gym-generate] session-budget audit: ${best.violations.length} day(s) over ${budget} min; retry ${attempt}/${BUDGET_RETRIES}`,
+    );
+    // Budget findings never hard-fail the job — a transient LLM error on a
+    // retry (429/5xx/timeout) is just a failed attempt; a structurally-valid
+    // skeleton is already in hand.
+    let candidate: SkeletonOutput;
+    try {
+      candidate = await callSkeletonWriter(tdi, budgetRetryMessage(best.violations, budget), pack);
+    } catch (err) {
+      console.warn(`[gym-generate] budget-retry writer call failed (attempt ${attempt}); keeping prior skeleton:`, err);
+      continue;
+    }
+    const structural = pack.audits.runSkeleton({
+      skeleton: candidate,
+      daysPerWeek: tdi.days_per_week,
+      trainingDesignInput: tdi,
+    });
+    if (!structural.passed) {
+      // A budget retry must never trade a time problem for a structural one.
+      console.warn(
+        `[gym-generate] budget-retry skeleton failed structural audits (${pack.audits.summarizeSkeleton(structural)}); keeping prior skeleton`,
+      );
+      continue;
+    }
+    const candidateViolations = auditSessionBudget(candidate, budget);
+    if (candidateViolations.length < best.violations.length) {
+      best = { skeleton: candidate, violations: candidateViolations };
+    } else {
+      console.log(
+        `[gym-generate] budget-retry did not improve (${candidateViolations.length} vs ${best.violations.length} violations); keeping prior skeleton`,
+      );
+    }
+  }
+
+  if (best.violations.length > 0) {
+    console.warn(`[gym-generate] session-budget audit unresolved after ${BUDGET_RETRIES} retries — shipping with warnings:`);
+    for (const v of best.violations) console.warn(`  - ${v}`);
+  } else {
+    console.log(`[gym-generate] session-budget audit: all days fit ${budget} min`);
+  }
+  return { skeleton: best.skeleton, budgetWarnings: best.violations };
+}
+
+// ============================================================
 // Stages — ports of generate-program-v3's stages onto the cohort envelope.
 // ============================================================
 
@@ -76,11 +147,11 @@ async function stageSkeleton(
   rs: GymResumeState,
 ): Promise<GymStageOutcome> {
   const pack = getDomainPack(rs.domain_pack);
-  const skeleton = await generateSkeletonWithAudits(rs.tdi!, pack);
+  const { skeleton, budgetWarnings } = await generateSkeletonWithinBudget(rs, pack);
   console.log(`[gym-generate] skeleton passed audits (gym ${rs.gym_id})`);
   return {
     next: "fill_week_1",
-    resumeState: { ...rs, skeleton, weeks: [] },
+    resumeState: { ...rs, skeleton, weeks: [], budgetWarnings },
     displayStage: "skeleton_done",
     // Mirror to skeleton_json — the owner review desk's artifact.
     extraPatch: { skeleton_json: skeleton },
@@ -342,6 +413,7 @@ async function stageSaving(
         members_scaled: roster.length,
         safety,
         residual_audit_failures: rs.residualFailures ?? [],
+        session_budget_warnings: rs.budgetWarnings ?? [],
         elapsed_ms: elapsedMs,
       },
     },
