@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
+import { raiseEngineMonthsFromGrant } from "../_shared/engine-months-drip.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -177,6 +178,18 @@ serve(async (req) => {
             }, { onConflict: "user_id,feature,source" });
           }
 
+          // Seed Engine month 1 at grant time (mirrors the gym-grant path).
+          // The invoice.payment_succeeded +1 races this handler — it looks
+          // the user up by stripe_customer_id, which is only stored HERE —
+          // and historically dropped first months (July '26 engine audit:
+          // 8 paying subscribers at 0 months, fully locked catalog). Only-
+          // raise, so an invoice event that did land first is untouched.
+          if (features.includes("engine")) {
+            const nowIso = new Date().toISOString();
+            const seed = await raiseEngineMonthsFromGrant(supa, userId, nowIso, nowIso);
+            if (seed.error) console.error("[webhook] engine month-1 seed failed:", seed.error);
+          }
+
         } else {
           // No account yet — write to pending_subscriptions
           await supa.from("pending_subscriptions").upsert({
@@ -258,10 +271,40 @@ serve(async (req) => {
         // truth for Engine content access.
         console.log(`[webhook] Subscription payment: customer=${customerId}, subscription=${subscriptionId}, billing_reason=${invoice.billing_reason}`);
 
-        // Find user
+        // Find user — by stripe_customer_id, then by the Stripe customer's
+        // email. The customer id is only written by checkout.session.completed,
+        // and Stripe does not order invoice.payment_succeeded after it: on a
+        // first payment this lookup historically found nobody and the unlock/
+        // generation was silently dropped (July '26 engine audit). The email
+        // fallback closes the race for users with accounts (and backfills the
+        // customer id); account-less checkouts flow through
+        // pending_subscriptions and are trued up by the daily reconcilers.
+        let payUserId: string | null = null;
         const { data: payProfiles } = await supa.from("profiles").select("id").eq("stripe_customer_id", customerId).limit(1);
-        if (!payProfiles || payProfiles.length === 0) break;
-        const payUserId = payProfiles[0].id;
+        if (payProfiles && payProfiles.length > 0) {
+          payUserId = payProfiles[0].id;
+        } else {
+          try {
+            const custResp = await fetchWithTimeout(`https://api.stripe.com/v1/customers/${customerId}`, {
+              headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+            }, 15_000);
+            if (custResp.ok) {
+              const cust = await custResp.json();
+              if (cust?.email) {
+                const { data: byEmail } = await supa.from("profiles").select("id").eq("email", cust.email).limit(1);
+                if (byEmail && byEmail.length > 0) {
+                  payUserId = byEmail[0].id;
+                  await supa.from("profiles").update({ stripe_customer_id: customerId }).eq("id", payUserId);
+                  console.log(`[webhook] invoice ${invoice.id}: matched user by email fallback, backfilled stripe_customer_id`);
+                }
+              }
+            }
+          } catch { /* fall through to break */ }
+        }
+        if (!payUserId) {
+          console.warn(`[webhook] invoice ${invoice.id}: no user found for customer ${customerId} (by id or email) — relying on daily reconcilers`);
+          break;
+        }
 
         // Check what entitlements the user has
         const { data: payEntitlements } = await supa
