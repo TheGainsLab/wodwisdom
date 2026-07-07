@@ -193,13 +193,22 @@ export function mapSlidersToDesign(
   if (chosen.length === 0) {
     // Owner only said "de-emphasize these": default posture minus those axes.
     const lowSet = new Set(low.map((e) => e.focus));
-    return {
-      priorities: MAIN_PROGRAM_DEFAULT.priorities
-        .filter((p) => !lowSet.has(p.focus))
-        .map((p, i) => ({ ...p, rank: i + 1 })),
-      maintain: MAIN_PROGRAM_DEFAULT.maintain.filter((f) => !lowSet.has(f)),
-      deprioritize: low.map((e) => e.focus),
-    };
+    let priorities: Priorities = MAIN_PROGRAM_DEFAULT.priorities
+      .filter((p) => !lowSet.has(p.focus))
+      .map((p, i) => ({ ...p, rank: i + 1 }));
+    let maintain = MAIN_PROGRAM_DEFAULT.maintain.filter((f) => !lowSet.has(f));
+    if (priorities.length === 0) {
+      // Lows covered every default priority — promote from what remains of the
+      // default maintain list (a cycle needs something to allocate). If the
+      // owner low-rated literally every axis, empty priorities stand: that
+      // degenerate input means "de-emphasize everything" and the skeleton
+      // audits tolerate a no-develop cycle.
+      priorities = maintain.slice(0, 2)
+        .map((focus, i) => ({ focus, rank: i + 1, confidence: "medium" as const }));
+      const promoted = new Set(priorities.map((p) => p.focus));
+      maintain = maintain.filter((f) => !promoted.has(f));
+    }
+    return { priorities, maintain, deprioritize: low.map((e) => e.focus) };
   }
 
   const priorities: Priorities = chosen.slice(0, MAX_PRIORITIES)

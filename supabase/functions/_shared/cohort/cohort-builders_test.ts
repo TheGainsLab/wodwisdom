@@ -211,3 +211,18 @@ Deno.test("buildGymCohortEnvelope: strategy sliders steer the tdi; null strategy
   // The Engine-era recipe is dead: nothing is deprioritized by default.
   assertEquals(defaulted.deprioritize, []);
 });
+
+Deno.test("mapSlidersToDesign: lows covering ALL default priorities — promote from remaining maintain", () => {
+  const d = mapSlidersToDesign({
+    mixed_modal_conditioning: 2,
+    powerlifting_strength: 1,
+    gymnastics_pulling: 3,
+  })!;
+  // The default develop axes are all low-rated — something else must develop.
+  assert(d.priorities.length > 0, "a cycle needs something to allocate");
+  const prioritized = new Set(d.priorities.map((p) => p.focus));
+  assert(!prioritized.has("mixed_modal_conditioning") && !prioritized.has("powerlifting_strength") && !prioritized.has("gymnastics_pulling"));
+  // Promoted axes moved out of maintain (no axis in two lists).
+  for (const p of d.priorities) assert(!d.maintain.includes(p.focus));
+  assertEquals(d.deprioritize.length, 3);
+});
