@@ -213,7 +213,7 @@ verify_jwt = false
 [functions.gym-cohort-cron]
 # Task #5 — KICKOFF for staged gym cohort generation (creates a gym_program_jobs
 # row + fires gym-generate; no longer runs the pipeline in-process — see the
-# 20260707000000 migration). verify_jwt=false; X-Cron-Key (GYM_COHORT_CRON_KEY)
+# 20260707200000 migration). verify_jwt=false; X-Cron-Key (GYM_COHORT_CRON_KEY)
 # fail-closed.
 verify_jwt = false
 

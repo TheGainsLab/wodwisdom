@@ -3,7 +3,7 @@
  *
  * RESUMABLE PER-STAGE DISPATCHER for the gym path — the mirror of
  * generate-program-v3's fix, on gym_program_jobs (see gym-dispatcher.ts and the
- * 20260707000000 migration for why: the old synchronous cohort run could never
+ * 20260707200000 migration for why: the old synchronous cohort run could never
  * finish inside the platform wall-clock).
  *
  * Stages: skeleton → fill_week_1..4 → benchmark_audit →

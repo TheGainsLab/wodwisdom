@@ -102,6 +102,11 @@ Deno.serve(async (req) => {
     .limit(1);
   if (activeErr) return json({ error: "active_job_check_failed", detail: activeErr.message }, 500);
   if ((activeJobs ?? []).length > 0) {
+    // Skip this gym but KEEP DRAINING — a job parked at awaiting_approval for
+    // days must not throttle the whole fleet to one gym per hourly tick. The
+    // claim already stamped this gym's last_attempt_at, so the re-invoke picks
+    // the NEXT most-due gym, not this one again.
+    void selfReinvoke(req);
     return json({ message: "job already in flight", gym_id: cfg.gym_id, job_id: activeJobs![0].id, status: activeJobs![0].status });
   }
 
