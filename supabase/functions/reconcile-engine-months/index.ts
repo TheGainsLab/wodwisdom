@@ -1,9 +1,23 @@
 /**
- * One-shot reconciler: ensures every Engine subscriber's
+ * Daily reconciler (the Engine suspenders): ensures every Engine subscriber's
  * engine_months_unlocked matches what their Stripe subscription entitles
- * them to. Built to clean up the deploy-gap fallout where the webhook
- * was silently dropping unlocks and the cron was bouncing off the
- * updated_at-reset bug.
+ * them to. Originally a one-shot built to clean up the deploy-gap fallout
+ * where the webhook was silently dropping unlocks; now scheduled daily via
+ * pg_cron because the gap it cleans up is structural, not historical —
+ * monthly retail Engine subscribers are otherwise delivered ONLY by the
+ * invoice.payment_succeeded webhook's +1, and a dropped webhook is a paid
+ * month of catalog access that silently never unlocks. (Quarterly retail is
+ * already reconciled daily by monthly-generation-cron; gym-granted members
+ * by gym-engine-months-cron. This closes the monthly-retail path.)
+ *
+ * Unlike the programming sweep, no cadence guard is needed: catch-up here is
+ * CORRECT. Months unlocked are cumulative catalog access already paid for —
+ * raising 2 → 5 in one go hands over what was bought, not a burst of
+ * time-anchored content. The write is only-raise and idempotent.
+ *
+ * Every run inserts an audit row into programming_reconciliations with
+ * kind='engine', so this sweep can't fail silently either: no row = the cron
+ * didn't run.
  *
  * Per-user logic:
  *   1. Fetch the user's active Stripe subscription.
@@ -47,8 +61,9 @@ interface Report {
 }
 
 // No custom auth check inside the function. Gating is by `verify_jwt = false`
-// in config.toml + the function URL being unpublished. This is a one-shot
-// admin tool — after the reconciliation runs, the function can be deleted.
+// in config.toml + the URL only being called by pg_cron (same posture and
+// key-drift rationale as monthly-generation-cron). Worst-case abuse is
+// triggering an only-raise reconciliation toward what was already paid for.
 Deno.serve(async (_req) => {
   const req = _req;
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -89,13 +104,41 @@ Deno.serve(async (_req) => {
       }
     }
 
-    return jsonResp({
+    // Classify the per-user reports for the audit row (mirrors the
+    // programming sweep's healthy/healed/flagged buckets):
+    //   already_correct:*            → healthy (no-op)
+    //   monthly:* / quarterly:*      → healed (raised, or would-raise on dry run)
+    //   everything else              → flagged (no customer/sub/invoices, odd interval)
+    const healed = report.filter((r) => /^(monthly|quarterly):/.test(r.reason));
+    const flaggedRows = report.filter(
+      (r) => !/^(monthly|quarterly):/.test(r.reason) && !r.reason.startsWith("already_correct"),
+    );
+    const healthy = report.filter((r) => r.reason.startsWith("already_correct")).length;
+
+    // Audit row (kind='engine') — the sweep must never be silent. A failed
+    // insert surfaces as a 500 so the cron run history shows it.
+    const { error: auditErr } = await supa.from("programming_reconciliations").insert({
+      kind: "engine",
       dry_run: dryRun,
-      processed: entitlements.length,
-      adjusted: report.filter((r) => r.before !== r.after).length,
-      report,
+      checked: entitlements.length,
+      healthy,
+      healed,
+      flagged: flaggedRows,
       errors,
     });
+
+    return jsonResp(
+      {
+        dry_run: dryRun,
+        processed: entitlements.length,
+        adjusted: report.filter((r) => r.before !== r.after).length,
+        healthy,
+        healed,
+        flagged: flaggedRows,
+        errors,
+      },
+      auditErr ? 500 : 200,
+    );
   } catch (e) {
     return jsonResp({ error: (e as Error).message }, 500);
   }

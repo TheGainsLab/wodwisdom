@@ -260,3 +260,8 @@ verify_jwt = false
 # Daily paid-vs-delivered sweep (auto-heal + audit). Called by pg_cron —
 # same no-JWT posture and key-drift rationale as monthly-generation-cron.
 verify_jwt = false
+
+[functions.reconcile-engine-months]
+# Daily engine paid-vs-unlocked sweep (only-raise, audited). Called by pg_cron —
+# same no-JWT posture and key-drift rationale as monthly-generation-cron.
+verify_jwt = false
