@@ -1,31 +1,38 @@
 /**
- * gym-cohort-cron — regeneration of gym Engine Class cohort programs (task #5).
+ * gym-cohort-cron — KICKOFF for gym cohort program generation (task #5, staged).
  *
  * Scheduled HOURLY by pg_cron so a fleet of gyms drains (the PER-GYM cadence is
  * monthly — regenerate when last_generated_at is null or 30d+ old). Each invocation
- * processes ONE gym (cohort generation is ~200s of LLM), then fire-and-forget
- * re-invokes itself so a burst of due gyms drains within a tick while each run stays
- * under the edge wall-clock.
+ * kicks off ONE gym, then fire-and-forget re-invokes itself so a burst of due gyms
+ * drains within a tick.
  *
- * Per invocation, for the most-due eligible gym (claimed atomically):
+ * STAGED (2026-07-07): this endpoint no longer runs the pipeline in-process. The
+ * synchronous run needed ~8min of LLM while the platform wall-clock kills an
+ * invocation at ~200s, so it could NEVER complete (verified in production: six
+ * historical attempts, every one killed mid-run, zero programs persisted). It now
+ * does only the cheap DB work and hands off to the resumable per-stage worker
+ * (gym-generate + gym_program_jobs — the mirror of generate-program-v3's
+ * dispatcher). Per invocation, for the most-due eligible gym (claimed atomically):
  *   1. builds the cohort envelope (buildGymCohortEnvelope) from its gym_cohort_configs
  *      row + the movement vocabulary + a RAG methodology block,
  *   2. builds the roster (buildCohortRoster) from its active members' ONE PROFILE
  *      (athlete_profiles — Decision 1), NOT a per-surface intake copy,
- *   3. runs the Engine cohort pipeline in-process, persists via persistCohortResult,
- *   4. stamps success (last_generated_at) — or records a backoff on failure.
+ *   3. creates a gym_program_jobs row (resume_state seeded with envelope + roster)
+ *      and fires the worker's first stage; returns immediately with the job id.
  *
- * SAFETY: every DB read is error-checked and ABORTS before the paid LLM run — a
+ * The success stamp (last_generated_at) moved to the worker's saving stage — only a
+ * PERSISTED program counts as generated. Failure backoff is written by the worker's
+ * fail path (gym-dispatcher); kickoff-time read failures still back off here.
+ *
+ * SAFETY: every DB read is error-checked and ABORTS before any job is created — a
  * failed read costs one retry, never a broken program stamped success + locked 30d.
  *
  * AUTH: verify_jwt=false (pg_cron can't mint a Supabase JWT), so the handler gates
  * itself on an X-Cron-Key header (GYM_COHORT_CRON_KEY). Unlike job-reaper, a stray
- * POST here is a paid LLM run + a duplicate program, so the endpoint is NOT open.
+ * POST here starts a paid LLM job, so the endpoint is NOT open.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { runEngineGeneration } from "../_shared/engine/run-engine.ts";
-import { persistCohortResult } from "../_shared/cohort/persist-cohort-result.ts";
 import { fetchVocabulary } from "../_shared/build-writer-payload.ts";
 import { buildRagContext } from "../_shared/build-rag-context.ts";
 import {
@@ -34,7 +41,7 @@ import {
   type GymCohortConfig,
 } from "../_shared/cohort/build-gym-cohort-envelope.ts";
 import { buildCohortRoster, type CohortMemberIntake } from "../_shared/cohort/build-cohort-roster.ts";
-import type { EngineGenerateRequest } from "../_shared/engine/contract.ts";
+import { GYM_FIRST_STAGE, type GymResumeState, gymSelfRetrigger } from "../_shared/gym-dispatcher.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -83,6 +90,20 @@ Deno.serve(async (req) => {
   const claimedRows = (claimed ?? []) as ConfigRow[];
   if (claimedRows.length === 0) return json({ message: "no gyms due" });
   const cfg = claimedRows[0];
+
+  // ── In-flight guard: one active job per gym. A job outliving the 15-min claim
+  //    window (long generation, or parked at awaiting_approval for owner review)
+  //    must not spawn a duplicate when the gym becomes claimable again. ─────────
+  const { data: activeJobs, error: activeErr } = await supa
+    .from("gym_program_jobs")
+    .select("id, status")
+    .eq("gym_id", cfg.gym_id)
+    .in("status", ["processing", "awaiting_approval"])
+    .limit(1);
+  if (activeErr) return json({ error: "active_job_check_failed", detail: activeErr.message }, 500);
+  if ((activeJobs ?? []).length > 0) {
+    return json({ message: "job already in flight", gym_id: cfg.gym_id, job_id: activeJobs![0].id, status: activeJobs![0].status });
+  }
 
   try {
     // ── Vocabulary — abort on a real read error (empty vocab burns 12 LLM passes). ─
@@ -158,45 +179,49 @@ Deno.serve(async (req) => {
     const envelope = buildGymCohortEnvelope(gymConfig, vocabulary, nowIso, { rag });
     const roster = buildCohortRoster(members, nowIso); // may be empty (shared program still generated, for F5)
 
-    const engineReq: EngineGenerateRequest = {
-      tenant_id: cfg.gym_id,
-      mode: "cohort",
+    // ── Create the staged job (resume_state carries everything the worker's
+    //    stages need — no DB re-reads mid-pipeline) and fire stage 1. ────────────
+    const initialResume: GymResumeState = {
+      gym_id: cfg.gym_id,
       domain_pack: cfg.domain_pack,
-      athletes: roster,
-      cohort: {
-        shared_payload: envelope.shared_payload,
-        shared_training_design_input: envelope.shared_training_design_input,
-      },
+      payload: envelope.shared_payload,
+      tdi: envelope.shared_training_design_input,
+      roster,
+      startedAtMs: Date.now(),
     };
+    const { data: job, error: jobErr } = await supa
+      .from("gym_program_jobs")
+      .insert({
+        gym_id: cfg.gym_id,
+        status: "processing",
+        stage: GYM_FIRST_STAGE,
+        next_stage: GYM_FIRST_STAGE,
+        resume_state: initialResume,
+        // Owner-review gate stays OFF until the portal review desk exists —
+        // flipping this to true parks the job at awaiting_approval post-skeleton.
+        pause_after_skeleton: false,
+      })
+      .select("id")
+      .single();
+    if (jobErr || !job) throw new ReadError("gym_program_jobs", jobErr?.message ?? "insert returned no row");
 
-    const result = await runEngineGeneration(engineReq);
-    const { cohort_program_id } = await persistCohortResult(supa, result);
-
-    // ── Stamp success: reset the backoff so the gym waits a full cadence. ────────
-    const { error: stampErr } = await supa
-      .from("gym_cohort_configs")
-      .update({ last_generated_at: nowIso, attempt_count: 0, next_attempt_at: null })
-      .eq("gym_id", cfg.gym_id);
-    if (stampErr) {
-      // The generation succeeded + persisted; a failed stamp only risks an early
-      // re-gen after the claim window — log loudly, don't fail the response.
-      console.error("[gym-cohort-cron] success stamp failed:", cfg.gym_id, stampErr.message);
-    }
+    await gymSelfRetrigger(job.id as string);
 
     // ── Drain: re-invoke for the next due gym (fire-and-forget, one gym/tick budget). ─
     void selfReinvoke(req);
 
     return json({
-      generated: true,
+      started: true,
       gym_id: cfg.gym_id,
-      cohort_program_id,
+      job_id: job.id,
       members_scaled: roster.length,
       members_with_weights: membersWithWeights,
-      safety: result.programs[0]?.safety,
+      watch: "select status, next_stage, error from gym_program_jobs where id = '" + job.id + "'",
     });
   } catch (e) {
     // Record a backoff so a persistently-failing gym rotates to the back of the
-    // queue instead of starving the fleet head-of-line every tick.
+    // queue instead of starving the fleet head-of-line every tick. (Failures
+    // AFTER kickoff are the worker's — gym-dispatcher writes this same backoff.)
     const backoffMs = Math.min(BACKOFF_BASE_MS * 2 ** Math.max(0, cfg.attempt_count - 1), BACKOFF_CAP_MS);
     const nextAttemptIso = new Date(Date.now() + backoffMs).toISOString();
     await supa
@@ -205,13 +230,13 @@ Deno.serve(async (req) => {
       .eq("gym_id", cfg.gym_id)
       .then(() => {}, (err) => console.error("[gym-cohort-cron] backoff write failed:", err));
 
-    const stage = e instanceof ReadError ? "read_failed" : "generation_failed";
+    const stage = e instanceof ReadError ? "read_failed" : "kickoff_failed";
     console.error("[gym-cohort-cron]", stage, cfg.gym_id, e);
     return json({ error: stage, gym_id: cfg.gym_id, detail: (e as Error).message, next_attempt_at: nextAttemptIso }, 500);
   }
 });
 
-/** A DB read failed — abort BEFORE any paid LLM work. */
+/** A DB read/write failed — abort BEFORE any paid LLM work is started. */
 class ReadError extends Error {
   constructor(table: string, detail: string) {
     super(`${table} read failed: ${detail}`);
