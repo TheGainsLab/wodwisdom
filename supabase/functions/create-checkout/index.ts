@@ -65,6 +65,11 @@ serve(async (req) => {
     const params: Record<string, string> = {
       "mode": "subscription",
       "payment_method_types[0]": "card",
+      // Explicit (not just relying on Stripe's default): a 100%-off coupon
+      // (e.g. a winback promo code) makes the first invoice $0, but this is a
+      // recurring subscription — a card MUST still be collected so renewal
+      // charges have something to bill against.
+      "payment_method_collection": "always",
       "line_items[0][price]": priceId,
       "line_items[0][quantity]": "1",
       "success_url": successUrl,
