@@ -283,9 +283,8 @@ export default function ProgramsFeaturePage() {
                 <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'monthly' ? 'var(--accent)' : 'transparent', color: interval === 'monthly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('monthly')}>Monthly</button>
                 <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'quarterly' ? 'var(--accent)' : 'transparent', color: interval === 'quarterly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('quarterly')}>Quarterly</button>
               </div>
-              <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+              <div style={{ display: 'flex', marginTop: 16 }}>
                 <button className="feature-cta" onClick={buyProgramming} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
-                <Link to="/pricing" className="feature-cta-secondary">Back to Pricing</Link>
               </div>
               <p style={{ marginTop: 16, fontStyle: 'italic' }}>
                 The program that follows you.
