@@ -148,6 +148,7 @@ function WeaknessesCard() {
 
 export default function ProgramsFeaturePage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [interval, setInterval] = useState<'monthly' | 'quarterly'>('monthly');
 
   const buyProgramming = async () => {
     setCheckoutLoading(true);
@@ -155,7 +156,7 @@ export default function ProgramsFeaturePage() {
       const resp = await fetch(CHECKOUT_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: 'programming', interval: 'monthly' }),
+        body: JSON.stringify({ plan: 'programming', interval }),
       });
       const data = await resp.json();
       if (data.url) { window.location.href = data.url; return; }
@@ -274,10 +275,14 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3>AI Programming — $29.99/mo</h3>
+              <h3>AI Programming — {interval === 'monthly' ? '$29.99/mo' : '$74.99/qtr'}</h3>
               <p>
                 Includes AI Coach and Nutrition.
               </p>
+              <div style={{ display: 'flex', maxWidth: 280, margin: '16px 0 0', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'monthly' ? 'var(--accent)' : 'transparent', color: interval === 'monthly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('monthly')}>Monthly</button>
+                <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'quarterly' ? 'var(--accent)' : 'transparent', color: interval === 'quarterly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('quarterly')}>Quarterly</button>
+              </div>
               <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
                 <button className="feature-cta" onClick={buyProgramming} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
                 <Link to="/pricing" className="feature-cta-secondary">Back to Pricing</Link>
