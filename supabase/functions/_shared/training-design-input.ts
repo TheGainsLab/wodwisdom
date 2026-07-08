@@ -65,6 +65,11 @@ export interface TrainingDesignInput {
   vocabulary: string[];
   lifts: Record<string, number | null>;
   previous_cycle: PreviousCycleSummary | null;
+  /** GROUP-CLASS ONLY (crossfit_class pack): the owner's weekly focus split —
+   *  how many days carry a strength vs a skills focus block. Optional +
+   *  additive: no retail path sets it, and packs other than crossfit_class
+   *  ignore it. */
+  class_focus_split?: { strength_days: number; skills_days: number } | null;
 
   // ── Provenance pins (what this design was built on) ──
   coach_state_version: number;
