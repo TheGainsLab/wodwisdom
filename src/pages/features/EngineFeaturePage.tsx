@@ -106,6 +106,7 @@ function ProgramsLibrary() {
 
 export default function EngineFeaturePage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [interval, setInterval] = useState<'monthly' | 'quarterly'>('monthly');
 
   const buyEngine = async () => {
     setCheckoutLoading(true);
@@ -113,7 +114,7 @@ export default function EngineFeaturePage() {
       const resp = await fetch(CHECKOUT_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: 'engine', interval: 'monthly' }),
+        body: JSON.stringify({ plan: 'engine', interval }),
       });
       const data = await resp.json();
       if (data.url) { window.location.href = data.url; return; }
@@ -262,10 +263,14 @@ export default function EngineFeaturePage() {
 
       {/* Footer CTA */}
       <section className="feature-footer-cta">
-        <h2>Year of the Engine — $29.99/mo</h2>
+        <h2>Year of the Engine — {interval === 'monthly' ? '$29.99/mo' : '$74.99/qtr'}</h2>
         <p className="feature-footer-details">
           AI Coach included. Machine learning calibration. Pacing coach. Full conditioning analytics.
         </p>
+        <div style={{ display: 'flex', maxWidth: 280, margin: '0 auto 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+          <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'monthly' ? 'var(--accent)' : 'transparent', color: interval === 'monthly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('monthly')}>Monthly</button>
+          <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'quarterly' ? 'var(--accent)' : 'transparent', color: interval === 'quarterly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('quarterly')}>Quarterly</button>
+        </div>
         <div className="feature-footer-actions">
           <button className="feature-cta" onClick={buyEngine} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
           <Link to="/#pricing" className="feature-cta-secondary">Back to Pricing</Link>
