@@ -217,6 +217,12 @@ verify_jwt = false
 # fail-closed.
 verify_jwt = false
 
+[functions.gym-cohort-config]
+# The affiliate portal's door to a gym's cohort program spec (the owner brief
+# seam — gym_cohort_configs' intended write path). Server-to-server; auth is our
+# own X-Service-Key (the WHOLESALE key family, tenant-bound), so skip the JWT gate.
+verify_jwt = false
+
 [functions.gym-generate]
 # Staged gym cohort generation worker (mirror of generate-program-v3's per-stage
 # dispatcher, on gym_program_jobs). Auth is our own: resume = service-role bearer
