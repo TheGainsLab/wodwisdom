@@ -8,11 +8,13 @@
 
 import type { DomainPack } from "./types.ts";
 import { CROSSFIT_PACK } from "./crossfit/index.ts";
+import { CROSSFIT_CLASS_PACK } from "./crossfit-class/index.ts";
 
 export const DEFAULT_DOMAIN_PACK_ID = "crossfit@3";
 
 const PACKS: Record<string, DomainPack> = {
   [CROSSFIT_PACK.id]: CROSSFIT_PACK,
+  [CROSSFIT_CLASS_PACK.id]: CROSSFIT_CLASS_PACK,
 };
 
 /** Resolve a pack id (e.g. "crossfit@3"). Throws on unknown id so a caller never

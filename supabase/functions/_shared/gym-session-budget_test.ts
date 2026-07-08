@@ -36,27 +36,46 @@ function day(blockTypes: string[], opts: { scheme?: string; metcon?: string } = 
   } as any;
 }
 
-Deno.test("estimateDayMinutes: sums the block list", () => {
-  // The shape of the run that started all this: warm-up 8 + skills 10 +
-  // 5x5 strength 17 + accessory 12 + long metcon 22 + cool-down 5 = 74.
+Deno.test("estimateDayMinutes: sums the block list; cool-down is off the clock", () => {
+  // The 6-block personal-training day that started all this: warm-up 10 +
+  // skills 15 + 5x5 strength 17 + accessory 12 + long metcon 22 + cool-down 0
+  // (owner decision: cool-down not counted) = 76.
   const { total } = estimateDayMinutes(
     day(["warm-up", "skills", "strength", "accessory", "metcon", "cool-down"], {
       scheme: "5x5 @75%",
       metcon: "long aerobic chipper 18-22 min",
     }),
   );
-  assertEquals(total, 74);
+  assertEquals(total, 76);
+});
+
+Deno.test("estimateDayMinutes: the class day template fits a 60-min hour", () => {
+  // Owner's class template: warm-up 10 + ONE focus + metcon + (uncounted) cool-down.
+  const strengthDay = estimateDayMinutes(
+    day(["warm-up", "strength", "metcon", "cool-down"], {
+      scheme: "5x5 @75%",
+      metcon: "medium mixed triplet 18 min",
+    }),
+  );
+  assertEquals(strengthDay.total, 45); // 10 + 17 + 18 + 0
+
+  const skillsDay = estimateDayMinutes(
+    day(["warm-up", "skills", "metcon", "cool-down"], {
+      metcon: "long aerobic intervals 25 min",
+    }),
+  );
+  assertEquals(skillsDay.total, 50); // 10 + 15 + 25 + 0
 });
 
 Deno.test("auditSessionBudget: flags over-budget days with location, passes fitting days", () => {
   const overDay = day(["warm-up", "skills", "strength", "accessory", "metcon", "cool-down"], {
     scheme: "5x5 @75%",
     metcon: "long aerobic chipper 20-25 min",
-  });
+  }); // 10+15+17+12+25+0 = 79
   const fitDay = day(["warm-up", "strength", "metcon", "cool-down"], {
     scheme: "5x5 @75%",
     metcon: "medium couplet 12 min",
-  }); // 8+17+12+5 = 42
+  }); // 10+17+12+0 = 39
   const skeleton = {
     month_plan: {},
     weeks: [{ week_num: 1, weekly_intent: "build", days: [overDay, { ...fitDay, day_num: 2 }] }],

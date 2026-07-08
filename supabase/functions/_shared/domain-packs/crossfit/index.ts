@@ -42,6 +42,17 @@ export const CROSSFIT_PACK: DomainPack = {
     buildSkeletonTool: (daysPerWeek) => buildEmitSkeletonTool(daysPerWeek),
     buildWeekTool: (daysPerWeek, units, sessionLen) =>
       buildEmitWeekTool(daysPerWeek, units, sessionLen),
+    // BYTE-FOR-BYTE the recap that lived in pipeline.callSkeletonWriter before
+    // the pack seam — retail behavior is unchanged by the move.
+    skeletonRuleRecap: (daysPerWeek) => [
+      "=== KEY RULES (re-check before emit) ===",
+      `- Output exactly 4 weeks × ${daysPerWeek} days. day_num is 1..${daysPerWeek}.`,
+      "- Every training day includes strength + accessory + metcon block types. Skills 2–4 days per week.",
+      "- Emit STRUCTURE ONLY — no sets / reps / weight / movement names. Those are filled in subsequent per-week calls.",
+      "- primary_lift uses canonical display names (Back Squat, Deadlift, Snatch, Clean and Jerk, etc.) or a complex description.",
+      "- ALLOCATE the given priorities/maintain/deprioritize — never invent, promote, or drop one. Every priority must appear in the structure; no block built around a deprioritized focus.",
+      "- Honor do_not_program when picking primary_lift / metcon_focus / skill_focus.",
+    ].join("\n"),
   },
   audits: {
     runHard: runAudits,

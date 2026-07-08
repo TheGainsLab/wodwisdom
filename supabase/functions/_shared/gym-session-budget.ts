@@ -22,13 +22,16 @@ import type { SkeletonOutput } from "./v3-output-schema.ts";
 
 export type SkeletonDay = SkeletonOutput["weeks"][number]["days"][number];
 
+// Owner decisions (2026-07-07): warm-up is daily and on the clock (~10);
+// skills is a real FOCUS piece when present (~15, not a 10-min EMOM tack-on);
+// cool-down happens but is NOT counted against the class hour.
 export const FIXED_BLOCK_MINUTES: Record<string, number> = {
-  "warm-up": 8,
+  "warm-up": 10,
   "mobility": 5,
-  "skills": 10,
+  "skills": 15,
   "accessory": 12,
   "active-recovery": 8,
-  "cool-down": 5,
+  "cool-down": 0,
 };
 
 /** "5x5 @75%" → 5 working sets ≈ 2.5 min each (set + rest) + warm-up sets. */

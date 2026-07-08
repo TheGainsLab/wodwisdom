@@ -55,6 +55,10 @@ export interface CohortStrategy {
   sliders?: Record<string, number> | null;
   strength_emphasis?: TrainingDesignInput["strength_emphasis"] | null;
   recovery_stance?: TrainingDesignInput["recovery_stance"] | null;
+  /** Owner's weekly focus split for the class day template (crossfit_class
+   *  pack): how many days carry a skills focus block instead of strength.
+   *  Absent = pack default (2 skills days on a 5-6 day week, 1 below). */
+  focus_split?: { skills_days?: number | null } | null;
 }
 
 /** The minimal gym-level cohort spec. Assembled from the gym's class config
@@ -253,10 +257,21 @@ function cohortTrainingDesign(
     : null;
   const intent = fromSliders ?? MAIN_PROGRAM_DEFAULT;
 
+  // Owner's weekly strength/skills focus split (class day template). Clamped
+  // to leave at least one strength day; consumed only by the class pack.
+  const requestedSkills = config.strategy?.focus_split?.skills_days;
+  const skillsDays = typeof requestedSkills === "number" && Number.isFinite(requestedSkills)
+    ? Math.min(Math.max(0, Math.round(requestedSkills)), config.days_per_week - 1)
+    : (config.days_per_week >= 5 ? 2 : 1);
+
   return {
     ...intent,
     recovery_stance: config.strategy?.recovery_stance ?? "standard",
     strength_emphasis: config.strategy?.strength_emphasis ?? "balanced",
+    class_focus_split: {
+      strength_days: config.days_per_week - skillsDays,
+      skills_days: skillsDays,
+    },
 
     days_per_week: config.days_per_week,
     session_length_minutes: config.session_length_minutes,
