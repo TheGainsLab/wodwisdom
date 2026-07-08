@@ -64,7 +64,9 @@ serve(async (req) => {
 
     const params: Record<string, string> = {
       "mode": "subscription",
-      "allow_promotion_codes": "true",
+      // Promo codes are monthly-only — quarterly is already the discounted
+      // tier, so stacking a promo code on top of it is not offered.
+      "allow_promotion_codes": isQuarterly ? "false" : "true",
       "payment_method_types[0]": "card",
       "line_items[0][price]": priceId,
       "line_items[0][quantity]": "1",

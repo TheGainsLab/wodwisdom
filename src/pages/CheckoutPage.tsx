@@ -394,7 +394,7 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
                 ) : (
                   <>
                     <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Choose your plan</h2>
-                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 20 }}>All plans include a free trial. You'll complete payment on Stripe's secure page.</p>
+                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 20 }}>You'll complete payment on Stripe's secure page.</p>
                   </>
                 )}
 
