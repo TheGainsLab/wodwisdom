@@ -25,6 +25,7 @@ import type {
 } from "../programmatic-fixes.ts";
 import type { attachBenchmarksToWriterOutput } from "../compute-block-benchmark.ts";
 import type { reviewSafety } from "../safety-review.ts";
+import type { TrainingDesignInput } from "../training-design-input.ts";
 
 export interface DomainPack {
   /** Versioned id, e.g. "crossfit@3". The contract's `domain_pack` value. */
@@ -40,6 +41,12 @@ export interface DomainPack {
     weekFillSystemPrompt: string;
     buildSkeletonTool: (daysPerWeek: number) => unknown;
     buildWeekTool: (daysPerWeek: number, units: "lbs" | "kg", sessionLen: number | null) => unknown;
+    /** The skeleton call's KEY-RULES recap (day-composition template). Moved
+     *  from a pipeline hardcode to the pack so a variant pack can supply a
+     *  different day shape (e.g. the 60-min class template) without touching
+     *  the Engine core. The crossfit pack returns the pre-seam string
+     *  byte-for-byte. */
+    skeletonRuleRecap: (daysPerWeek: number, tdi: TrainingDesignInput) => string;
   };
 
   /** Deterministic audit rules (sport-specific logic lives inside these). */

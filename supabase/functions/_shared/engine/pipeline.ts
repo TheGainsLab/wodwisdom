@@ -92,15 +92,9 @@ export async function callSkeletonWriter(
 
   const daysPerWeek = tdi.days_per_week;
 
-  const ruleRecap = [
-    "=== KEY RULES (re-check before emit) ===",
-    `- Output exactly 4 weeks × ${daysPerWeek} days. day_num is 1..${daysPerWeek}.`,
-    "- Every training day includes strength + accessory + metcon block types. Skills 2–4 days per week.",
-    "- Emit STRUCTURE ONLY — no sets / reps / weight / movement names. Those are filled in subsequent per-week calls.",
-    "- primary_lift uses canonical display names (Back Squat, Deadlift, Snatch, Clean and Jerk, etc.) or a complex description.",
-    "- ALLOCATE the given priorities/maintain/deprioritize — never invent, promote, or drop one. Every priority must appear in the structure; no block built around a deprioritized focus.",
-    "- Honor do_not_program when picking primary_lift / metcon_focus / skill_focus.",
-  ].join("\n");
+  // Day-composition template is pack-supplied (the crossfit pack returns the
+  // pre-seam string byte-for-byte; a variant pack supplies e.g. the class shape).
+  const ruleRecap = pack.writer.skeletonRuleRecap(daysPerWeek, tdi);
 
   const inputBlock = `TRAINING DESIGN INPUT (JSON — the FIXED plan to allocate):\n${JSON.stringify(tdi, null, 2)}`;
   const userMessage = retryViolations

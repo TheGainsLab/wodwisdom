@@ -8,6 +8,7 @@ const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
 
 export default function NutritionFeaturePage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [interval, setInterval] = useState<'monthly' | 'quarterly'>('monthly');
 
   const buyNutrition = async () => {
     setCheckoutLoading(true);
@@ -15,7 +16,7 @@ export default function NutritionFeaturePage() {
       const resp = await fetch(CHECKOUT_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: 'nutrition', interval: 'monthly' }),
+        body: JSON.stringify({ plan: 'nutrition', interval }),
       });
       const data = await resp.json();
       if (data.url) { window.location.href = data.url; return; }
@@ -117,10 +118,14 @@ export default function NutritionFeaturePage() {
 
       {/* Footer CTA */}
       <section className="feature-footer-cta">
-        <h2>AI Nutrition — $7.99/mo</h2>
+        <h2>AI Nutrition — {interval === 'monthly' ? '$7.99/mo' : '$17.99/qtr'}</h2>
         <p className="feature-footer-details">
           Photo logging, barcode scanner, millions of foods, restaurant and brand menus, meal templates, and macro tracking — a complete nutrition app.
         </p>
+        <div style={{ display: 'flex', maxWidth: 280, margin: '0 auto 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+          <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'monthly' ? 'var(--accent)' : 'transparent', color: interval === 'monthly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('monthly')}>Monthly</button>
+          <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'quarterly' ? 'var(--accent)' : 'transparent', color: interval === 'quarterly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('quarterly')}>Quarterly</button>
+        </div>
         <div className="feature-footer-actions">
           <button className="feature-cta" onClick={buyNutrition} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
         </div>

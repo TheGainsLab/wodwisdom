@@ -211,9 +211,29 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.gym-cohort-cron]
-# Task #5 — regeneration of gym Engine Class cohort programs. PARKED under Decision 9(i)
-# (2b Programmer asset — unschedule the pg_cron job; code kept). verify_jwt=false;
-# X-Cron-Key (GYM_COHORT_CRON_KEY) fail-closed.
+# Task #5 — KICKOFF for staged gym cohort generation (creates a gym_program_jobs
+# row + fires gym-generate; no longer runs the pipeline in-process — see the
+# 20260707200000 migration). verify_jwt=false; X-Cron-Key (GYM_COHORT_CRON_KEY)
+# fail-closed.
+verify_jwt = false
+
+[functions.gym-cohort-config]
+# The affiliate portal's door to a gym's cohort program spec (the owner brief
+# seam — gym_cohort_configs' intended write path). Server-to-server; auth is our
+# own X-Service-Key (the WHOLESALE key family, tenant-bound), so skip the JWT gate.
+verify_jwt = false
+
+[functions.gym-generate]
+# Staged gym cohort generation worker (mirror of generate-program-v3's per-stage
+# dispatcher, on gym_program_jobs). Auth is our own: resume = service-role bearer
+# (self-retrigger/reaper); approve = service-role bearer or X-Cron-Key. Skip
+# Supabase's JWT gate so those reach the handler.
+verify_jwt = false
+
+[functions.gym-job-reaper]
+# Sweep for vanished gym-generate stage workers (mirror of job-reaper on
+# gym_program_jobs). Schedule via pg_cron every ~2 min. Same open-endpoint
+# rationale as job-reaper: the sweep only touches expired leases.
 verify_jwt = false
 
 [functions.gym-engine-months-cron]

@@ -64,9 +64,6 @@ serve(async (req) => {
 
     const params: Record<string, string> = {
       "mode": "subscription",
-      // Promo codes are monthly-only — quarterly is already the discounted
-      // tier, so stacking a promo code on top of it is not offered.
-      "allow_promotion_codes": isQuarterly ? "false" : "true",
       "payment_method_types[0]": "card",
       "line_items[0][price]": priceId,
       "line_items[0][quantity]": "1",
@@ -75,6 +72,11 @@ serve(async (req) => {
       "metadata[plan]": plan,
       "subscription_data[metadata][plan]": plan,
     };
+
+    // Promo codes are only offered on monthly plans; quarterly is already discounted.
+    if (!isQuarterly) {
+      params["allow_promotion_codes"] = "true";
+    }
 
     // If authenticated, pre-fill email and attach user ID
     if (userEmail) {
