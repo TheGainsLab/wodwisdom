@@ -273,7 +273,6 @@ export default function EngineFeaturePage() {
         </div>
         <div className="feature-footer-actions">
           <button className="feature-cta" onClick={buyEngine} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
-          <Link to="/#pricing" className="feature-cta-secondary">Back to Pricing</Link>
         </div>
       </section>
 
