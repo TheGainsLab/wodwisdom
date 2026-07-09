@@ -208,7 +208,7 @@ export default function ProgramsFeaturePage() {
               </p>
               <WeaknessesCard />
               <p style={{ marginTop: 28 }}>
-                Those gaps become your program. The AI takes your profile and goals and turns them into work on your calendar — Olympic lifts, gymnastics, aerobic engine. Nothing gets ignored.
+                Those gaps become your program. Your coach takes your profile and goals and turns them into work on your calendar — Olympic lifts, gymnastics, aerobic engine. Nothing gets ignored.
               </p>
               <img src="/images/Program-week.png" alt="A week of programming targeting your weaknesses" className="feature-img" style={{ maxWidth: 560 }} />
             </div>
@@ -224,7 +224,7 @@ export default function ProgramsFeaturePage() {
               <h3 style={{ textAlign: 'center' }}>Inside a Training Day</h3>
               <p>Every day breaks down into blocks — warm-up to cooldown — each with loads, targets, and coaching cues.</p>
               <img src="/images/Training-Day-Image.png" alt="A full training day — warm-up, skills, strength, accessory, metcon, and cool-down" className="feature-img" style={{ maxWidth: 560 }} />
-              <p style={{ marginTop: 24 }}>Need to adjust? Edit lets you make changes manually. Or use AI Edit — just tell the coach what you need: &ldquo;I want to go a little heavier&rdquo; or &ldquo;My rower broke — substitute something else?&rdquo; The AI rebuilds that piece of the session around your request.</p>
+              <p style={{ marginTop: 24 }}>Need to adjust? Edit makes changes manually. Or use AI Edit — just tell the coach what you need: &ldquo;I want to go a little heavier&rdquo; or &ldquo;My rower broke — substitute something else?&rdquo; The coach rebuilds that piece of the session around your request.</p>
             </div>
           </div>
         </div>
@@ -236,14 +236,14 @@ export default function ProgramsFeaturePage() {
           <div className="feature-row">
             <div className="feature-text">
               <h3 style={{ textAlign: 'center' }}>Coach, Every Block</h3>
-              <p>Tap any block and the coach explains the why — not just what to do, but what adaptation you're chasing and how it fits into your bigger picture.</p>
+              <p>Tap any block and the coach explains the why — not just what to do, but what adaptation you're chasing and how it fits your bigger picture.</p>
               <TrainingIntentCard />
-              <p style={{ marginTop: 24 }}>Every session opens with intent. You know what you're training, why it matters, and how it connects to your goals — before you move a single rep.</p>
+              <p style={{ marginTop: 24 }}>Every session opens with intent. You know what you're training, why it matters, and how it connects to your goals — before your warm-up starts.</p>
               <p style={{ marginTop: 24 }}>Need a game plan? Tap the Metcon and the coach gives you pacing, target times, and where the leaks usually happen.</p>
               <MetconBlockCard />
               <p style={{ marginTop: 24 }}>Tap any movement and get specific cues — tied to your history and your faults. Not generic advice. Your coach knows your numbers, your weaknesses, and what you're working on.</p>
               <TaskGuidanceCard />
-              <p style={{ marginTop: 24 }}>And when you have a question, the coach answers in context. It sees your profile, your history, today's workout, and your strengths and weaknesses — so the answer is specific to you.</p>
+              <p style={{ marginTop: 24 }}>And when you have a question, the coach answers with everything in view — your profile, your history, today's workout, your strengths and weaknesses. The answer is specific to you.</p>
               <img src="/images/AI-Coach-Image.png" alt="The AI coach answering a question in the context of your training day" className="feature-img" style={{ maxWidth: 560 }} />
             </div>
           </div>
@@ -255,15 +255,12 @@ export default function ProgramsFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Step 5 — Ongoing</h3>
+              <h3 style={{ textAlign: 'center' }}>It never stops adapting.</h3>
               <p>
-                AI is with you every time you train.
+                Log your results and the program adapts. Flag weaknesses and it adjusts. Demonstrate proficiency and the challenges increase.
               </p>
               <p>
-                Log your results and the program adapts. Flag weaknesses and the AI adjusts. Demonstrate proficiency and the challenges increase. Update your profile anytime.
-              </p>
-              <p>
-                Every month, AI evaluates your performance and updates your evaluation, then generates another month of training. Your evaluation history tells the story of your progress.
+                Every month, your coach re-evaluates your performance, updates your evaluation, and writes your next month of training. Your evaluation history tells the story of your progress.
               </p>
             </div>
           </div>
@@ -277,7 +274,7 @@ export default function ProgramsFeaturePage() {
             <div className="feature-text">
               <h3>AI Programming — {interval === 'monthly' ? '$29.99/mo' : '$74.99/qtr'}</h3>
               <p>
-                Includes AI Coach and Nutrition.
+                Includes your AI Coach, full analytics, and competition rankings.
               </p>
               <div style={{ display: 'flex', maxWidth: 280, margin: '16px 0 0', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
                 <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'monthly' ? 'var(--accent)' : 'transparent', color: interval === 'monthly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('monthly')}>Monthly</button>
