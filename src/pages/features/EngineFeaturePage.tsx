@@ -146,7 +146,6 @@ export default function EngineFeaturePage() {
 
       {/* Hero */}
       <section className="feature-hero">
-        <span className="feature-hero-badge">Engine</span>
         <h1 className="feature-hero-title">Year of the Engine</h1>
         <p className="feature-hero-sub">The conditioning program that follows you.</p>
         <p className="feature-hero-body">
