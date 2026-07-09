@@ -57,7 +57,7 @@ function ProgramsLibrary() {
       <div className="feature-container">
         <h2 className="feature-section-title" style={{ textAlign: 'center', marginBottom: 8 }}>8 programs. One subscription.</h2>
         <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 15, marginBottom: 32, maxWidth: 540, margin: '0 auto 32px' }}>
-          Every Engine subscription includes access to all programs. Switch anytime — your performance data carries over.
+          Each program arranges the 20 frameworks toward a different goal. Pick the one that fits — and switch anytime. Your performance data carries over, so your coach never starts from scratch.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 600, margin: '0 auto' }}>
           {ENGINE_PROGRAMS.map((prog, i) => {
@@ -153,7 +153,7 @@ export default function EngineFeaturePage() {
           Your engine isn't one thing. It's aerobic capacity. Anaerobic power. Efficiency. Repeatability.
         </p>
         <p className="feature-hero-body">
-          Year of the Engine uses 20 distinct training frameworks, each targeting a specific adaptation. Machine learning calibrates every session precisely, so every single interval is personalized to you.
+          Year of the Engine runs 20 distinct training frameworks, each targeting a specific adaptation — and your coach calibrates every interval to you.
         </p>
       </section>
 
@@ -167,8 +167,8 @@ export default function EngineFeaturePage() {
                 Day 24. Max Aerobic Power. Goal: 68.4 calories.
               </p>
               <p>
-                Once the clock starts, the app becomes your pacing coach. Goals, countdowns, and round
-                context stay front and center through fatigue—so you execute the plan and get the stimulus you need.
+                Once the clock starts, the app becomes your pacer. Goals, countdowns, and round
+                context stay front and center through fatigue — so you execute the plan and get the stimulus you need.
               </p>
               <img src="/images/pacing-coach.png" alt="Pacing Coach — real-time interval targets and progress tracking" className="feature-img" />
             </div>
@@ -202,7 +202,7 @@ export default function EngineFeaturePage() {
             <div className="feature-text">
               <h3 style={{ textAlign: 'center' }}>Your engine has a fingerprint.</h3>
               <p>
-                Unmatched detail into how your Engine works, and how it recovers. Ask your coach (or your AI Coach — it's included for Engine athletes) how to use this data in metcons.
+                See how your engine produces power — and how it recovers. Bring the data to your coach, or ask the AI Coach directly: it's included for every Engine athlete.
               </p>
               <img src="/images/work-rest-ratio.png" alt="Work to rest ratio analytics" className="feature-img" />
             </div>
@@ -216,9 +216,9 @@ export default function EngineFeaturePage() {
         <div className="feature-container">
           <div className="feature-row reverse">
             <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Track output across frameworks</h3>
+              <h3 style={{ textAlign: 'center' }}>Track output across energy systems</h3>
               <p>
-                See exactly how your performance varies across energy systems and track improvement in each one independently.
+                See exactly how your performance varies across energy systems — and watch each one improve independently.
               </p>
               <img src="/images/comparison.png" alt="Output comparison across training types" className="feature-img" />
             </div>
@@ -234,7 +234,7 @@ export default function EngineFeaturePage() {
             <div className="feature-text">
               <h3 style={{ textAlign: 'center' }}>Heart rate doesn't lie.</h3>
               <p>
-                HR analytics—avg HR, peak HR, efficiency, load—give you the data to train smarter, not just harder.
+                HR analytics — avg, peak, efficiency, load — so you know what a session cost you.
               </p>
             </div>
             <img src="/images/HR-analytics.png" alt="HR Analytics — average heart rate by day type" className="feature-img" />
@@ -249,7 +249,7 @@ export default function EngineFeaturePage() {
             <div className="feature-text">
               <h3 style={{ textAlign: 'center' }}>See what the AI sees</h3>
               <p>
-                Track your training distribution across energy systems — the same data the AI uses to update your training.
+                Track your training distribution across energy systems — the same data the AI uses to update your program.
               </p>
               <img src="/images/sessions.png" alt="Sessions by day type analytics" className="feature-img" />
             </div>
