@@ -249,5 +249,5 @@ Deno.serve(async (req) => {
     return json({ discarded: true, job_id: job.id });
   }
 
-  return json({ error: "invalid_request", detail: "action must be start|status|approve|discard" }, 400);
+  return json({ error: "invalid_request", detail: "action must be start|status|program|approve|discard" }, 400);
 });
