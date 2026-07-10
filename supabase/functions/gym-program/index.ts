@@ -169,11 +169,16 @@ Deno.serve(async (req) => {
     if (!res) return json({ error: "approve_failed", detail: "gym-generate unreachable" }, 502);
     if (!res.ok) {
       const out = await res.json().catch(() => ({})) as Record<string, unknown>;
-      // Forward the delegate's own 4xx (e.g. 409 not_awaiting_approval when the
-      // reaper/another actor moved the job) so the desk can distinguish "already
-      // handled" from "the worker is down" (502).
-      const status = res.status >= 400 && res.status < 500 ? res.status : 502;
-      return json({ error: out.error ?? "approve_failed", detail: out.detail ?? null }, status);
+      // Forward ONLY the meaningful 409 (not_awaiting_approval — the reaper or
+      // another actor moved the job) so the desk can say "already handled".
+      // Everything else — including a 401 from a misconfigured service bearer —
+      // is our own server problem, not the owner's; collapse to 502 so the desk
+      // never tells the owner their credentials are bad.
+      if (res.status === 409) {
+        return json({ error: out.error ?? "not_awaiting_approval", detail: out.detail ?? null }, 409);
+      }
+      console.error("[gym-program] approve delegate failed", res.status, out.error);
+      return json({ error: "approve_failed", detail: "generation service error" }, 502);
     }
     console.log(JSON.stringify({ at: "gym-program", event: "approve", key_fp: authResult.fingerprint, gym_id: gymId, job_id: job.id }));
     return json({ approved: true, job_id: job.id }, 202);
@@ -189,13 +194,21 @@ Deno.serve(async (req) => {
     }
     // NULL the fencing token, not just the status. The worker's heartbeat and
     // final commit are gated on claim_token (NOT on status) — so a status-only
-    // flip lets an in-flight stage commit straight over the discard (skeleton →
-    // reappears at awaiting_approval; saving → publishes a discarded program).
-    // Nulling claim_token makes the live stage's heartbeat fail (superseded →
-    // it bails) and its commitGated match 0 rows (no-op); status='failed' then
-    // stops the NEXT stage's claim (claim_gym_program_stage requires
-    // status='processing'). Compare-and-swap on ACTIVE so two concurrent
-    // discards can't both act.
+    // flip lets an in-flight stage commit straight over the discard (a discarded
+    // skeleton would reappear at awaiting_approval). Nulling claim_token makes
+    // the live stage's heartbeat fail (superseded → it bails) and its
+    // commitGated match 0 rows (no-op); status='failed' then stops the NEXT
+    // stage's claim (claim_gym_program_stage requires status='processing').
+    // Compare-and-swap on ACTIVE so two concurrent discards can't both act.
+    //
+    // NOTE on the saving stage specifically: this does NOT un-publish. If the
+    // saving stage is already mid-body, persistCohortResult has already inserted
+    // the engine_cohort_programs row (the publish happens in the stage body,
+    // before the gated commit). What the fencing DOES guarantee is that the
+    // discarded job never stamps its own cohort_program_id / flips to complete —
+    // and the member-facing read (loadLatestProgram) surfaces only the program
+    // of the newest COMPLETE job, so a discarded-mid-save program never goes
+    // live. The unsigned-publish guarantee lives at that read gate, not here.
     const { data: updated, error: updErr } = await supa
       .from("gym_program_jobs")
       .update({
