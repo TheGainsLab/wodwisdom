@@ -28,6 +28,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createConsumerAuth } from "../_shared/consumer-auth.ts";
+import { loadLatestProgram } from "../_shared/engine-class/queries.ts";
 import {
   ACTIVE_JOB_STATUSES,
   GymJobConflictError,
@@ -100,6 +101,20 @@ Deno.serve(async (req) => {
     const { data, error } = await latestJob();
     if (error) return json({ error: "read_failed", detail: error.message }, 500);
     return json({ job: data ?? null });
+  }
+
+  // ── program ─────────────────────────────────────────────────────────────────
+  // The gym's live written program (the desk's "read what you authored" view).
+  // loadLatestProgram is the FENCED read — the newest COMPLETE job's program, so
+  // a discarded/mid-flight draft never shows here. Fetched on demand (the full
+  // shared_output is large — the poll loop uses `status`, not this).
+  if (action === "program") {
+    try {
+      const program = await loadLatestProgram(supa, gymId);
+      return json({ program });
+    } catch (e) {
+      return json({ error: "read_failed", detail: e instanceof Error ? e.message : "unknown" }, 500);
+    }
   }
 
   // ── start ─────────────────────────────────────────────────────────────────
@@ -234,5 +249,5 @@ Deno.serve(async (req) => {
     return json({ discarded: true, job_id: job.id });
   }
 
-  return json({ error: "invalid_request", detail: "action must be start|status|approve|discard" }, 400);
+  return json({ error: "invalid_request", detail: "action must be start|status|program|approve|discard" }, 400);
 });
