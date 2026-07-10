@@ -28,7 +28,13 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createConsumerAuth } from "../_shared/consumer-auth.ts";
-import { GymJobReadError, type GymJobConfig, startGymJob } from "../_shared/cohort/start-gym-job.ts";
+import {
+  ACTIVE_JOB_STATUSES,
+  GymJobConflictError,
+  GymJobReadError,
+  type GymJobConfig,
+  startGymJob,
+} from "../_shared/cohort/start-gym-job.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -44,7 +50,7 @@ const CONFIG_COLS =
   "gym_id, domain_pack, days_per_week, session_length_minutes, equipment, target_level, do_not_program, units, goal_text, strategy";
 const JOB_COLS =
   "id, status, stage, next_stage, skeleton_json, error, cohort_program_id, result_json, created_at, updated_at";
-const ACTIVE = ["processing", "awaiting_approval"];
+const ACTIVE = [...ACTIVE_JOB_STATUSES];
 
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -124,9 +130,20 @@ Deno.serve(async (req) => {
         pauseAfterSkeleton: true,
         nowIso: new Date().toISOString(),
       });
+      // Stamp the gym's claim marker so the hourly cron defers to this
+      // owner-initiated draft (the active-job guard already blocks a duplicate;
+      // this also keeps the cron from racing a fresh start within its window).
+      await supa
+        .from("gym_cohort_configs")
+        .update({ last_attempt_at: new Date().toISOString() })
+        .eq("gym_id", gymId)
+        .then(() => {}, () => {});
       console.log(JSON.stringify({ at: "gym-program", event: "start", key_fp: authResult.fingerprint, gym_id: gymId, job_id: result.job_id }));
-      return json({ started: true, job_id: result.job_id, members_scaled: result.members_scaled }, 202);
+      return json({ started: true, job_id: result.job_id, members_scaled: result.members_scaled, members_with_weights: result.members_with_weights }, 202);
     } catch (e) {
+      if (e instanceof GymJobConflictError) {
+        return json({ error: "job_in_flight", detail: e.message }, 409);
+      }
       const kind = e instanceof GymJobReadError ? "read_failed" : "start_failed";
       console.error("[gym-program] start", kind, gymId, e);
       return json({ error: kind, detail: (e as Error).message }, 500);
@@ -149,9 +166,14 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ approve_job_id: job.id }),
       signal: AbortSignal.timeout(10_000),
     }).catch(() => null);
-    if (!res || !res.ok) {
-      const detail = res ? await res.text().catch(() => "") : "gym-generate unreachable";
-      return json({ error: "approve_failed", detail: detail.slice(0, 300) }, 502);
+    if (!res) return json({ error: "approve_failed", detail: "gym-generate unreachable" }, 502);
+    if (!res.ok) {
+      const out = await res.json().catch(() => ({})) as Record<string, unknown>;
+      // Forward the delegate's own 4xx (e.g. 409 not_awaiting_approval when the
+      // reaper/another actor moved the job) so the desk can distinguish "already
+      // handled" from "the worker is down" (502).
+      const status = res.status >= 400 && res.status < 500 ? res.status : 502;
+      return json({ error: out.error ?? "approve_failed", detail: out.detail ?? null }, status);
     }
     console.log(JSON.stringify({ at: "gym-program", event: "approve", key_fp: authResult.fingerprint, gym_id: gymId, job_id: job.id }));
     return json({ approved: true, job_id: job.id }, 202);
@@ -165,15 +187,36 @@ Deno.serve(async (req) => {
     if (!ACTIVE.includes(job.status)) {
       return json({ message: "nothing to discard", status: job.status });
     }
-    // A skeleton parked for review is safe to cancel outright. A still-processing
-    // job can't be truly killed mid-LLM, but flipping status stops the worker's
-    // next token-gated commit and clears the in-flight guard so a fresh start
-    // proceeds. (The worker checks status==='processing' before each stage.)
-    const { error: updErr } = await supa
+    // NULL the fencing token, not just the status. The worker's heartbeat and
+    // final commit are gated on claim_token (NOT on status) — so a status-only
+    // flip lets an in-flight stage commit straight over the discard (skeleton →
+    // reappears at awaiting_approval; saving → publishes a discarded program).
+    // Nulling claim_token makes the live stage's heartbeat fail (superseded →
+    // it bails) and its commitGated match 0 rows (no-op); status='failed' then
+    // stops the NEXT stage's claim (claim_gym_program_stage requires
+    // status='processing'). Compare-and-swap on ACTIVE so two concurrent
+    // discards can't both act.
+    const { data: updated, error: updErr } = await supa
       .from("gym_program_jobs")
-      .update({ status: "failed", error: "discarded by owner", next_stage: null, stage: null, updated_at: new Date().toISOString() })
-      .eq("id", job.id);
+      .update({
+        status: "failed",
+        error: "discarded by owner",
+        next_stage: null,
+        stage: null,
+        claim_token: null,
+        locked_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", job.id)
+      .in("status", ACTIVE)
+      .select("id");
     if (updErr) return json({ error: "discard_failed", detail: updErr.message }, 500);
+    if (!updated || updated.length === 0) {
+      // Job left ACTIVE between our read and write (completed, or another
+      // discard won). Nothing to do — report the current state.
+      const { data: now } = await latestJob();
+      return json({ message: "already resolved", status: now?.status ?? "unknown" });
+    }
     console.log(JSON.stringify({ at: "gym-program", event: "discard", key_fp: authResult.fingerprint, gym_id: gymId, job_id: job.id }));
     return json({ discarded: true, job_id: job.id });
   }

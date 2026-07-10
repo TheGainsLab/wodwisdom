@@ -34,7 +34,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { CohortStrategy } from "../_shared/cohort/build-gym-cohort-envelope.ts";
-import { GymJobReadError, startGymJob } from "../_shared/cohort/start-gym-job.ts";
+import { GymJobConflictError, GymJobReadError, startGymJob } from "../_shared/cohort/start-gym-job.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -118,6 +118,12 @@ Deno.serve(async (req) => {
       watch: "select status, next_stage, error from gym_program_jobs where id = '" + result.job_id + "'",
     });
   } catch (e) {
+    // A portal `start` won the UNIQUE active-index between our guard and insert
+    // — not a failure, just "already in flight". Skip cleanly, no backoff.
+    if (e instanceof GymJobConflictError) {
+      void selfReinvoke(req);
+      return json({ message: "job already in flight (raced portal start)", gym_id: cfg.gym_id });
+    }
     // Record a backoff so a persistently-failing gym rotates to the back of the
     // queue instead of starving the fleet head-of-line every tick. (Failures
     // AFTER kickoff are the worker's — gym-dispatcher writes this same backoff.)

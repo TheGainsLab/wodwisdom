@@ -40,11 +40,27 @@ export interface GymJobConfig {
   strategy: CohortStrategy | null;
 }
 
+/** The two job states that count as "a draft in flight" — a gym may have at
+ *  most one. Enforced at the DB by a UNIQUE partial index
+ *  (idx_gym_program_jobs_gym_active); the app checks are a courtesy that give a
+ *  clean 409 before the insert. Shared so the cron and the portal door agree. */
+export const ACTIVE_JOB_STATUSES = ["processing", "awaiting_approval"] as const;
+
 /** A DB read/write failed — abort BEFORE any paid LLM work is started. */
 export class GymJobReadError extends Error {
   constructor(table: string, detail: string) {
     super(`${table} read failed: ${detail}`);
     this.name = "GymJobReadError";
+  }
+}
+
+/** The gym already has an active job — the UNIQUE active-index rejected the
+ *  insert (23505). The DB is the real guard against a portal start racing the
+ *  cron (or another start); the pre-checks can both read empty. */
+export class GymJobConflictError extends Error {
+  constructor() {
+    super("a generation is already in flight for this gym");
+    this.name = "GymJobConflictError";
   }
 }
 
@@ -160,7 +176,15 @@ export async function startGymJob(
     })
     .select("id")
     .single();
-  if (jobErr || !job) throw new GymJobReadError("gym_program_jobs", jobErr?.message ?? "insert returned no row");
+  if (jobErr) {
+    // The UNIQUE active-index is the real one-active-job guard (a racing start
+    // or cron both pass their pre-check, then one insert loses here).
+    if (jobErr.code === "23505" || /duplicate key|unique/i.test(jobErr.message ?? "")) {
+      throw new GymJobConflictError();
+    }
+    throw new GymJobReadError("gym_program_jobs", jobErr.message);
+  }
+  if (!job) throw new GymJobReadError("gym_program_jobs", "insert returned no row");
 
   await gymSelfRetrigger(job.id as string);
 

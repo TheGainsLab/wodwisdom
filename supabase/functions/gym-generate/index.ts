@@ -153,8 +153,15 @@ async function stageSkeleton(
     next: "fill_week_1",
     resumeState: { ...rs, skeleton, weeks: [], budgetWarnings },
     displayStage: "skeleton_done",
-    // Mirror to skeleton_json — the owner review desk's artifact.
-    extraPatch: { skeleton_json: skeleton },
+    // Mirror to skeleton_json + surface the budget findings in result_json — the
+    // review desk polls `status` (which excludes resume_state), so a paused job
+    // must expose the over-budget days HERE for the owner to weigh before
+    // approving. The saving stage overwrites result_json with the full result
+    // (which also carries session_budget_warnings), so this stays consistent.
+    extraPatch: {
+      skeleton_json: skeleton,
+      result_json: { session_budget_warnings: budgetWarnings },
+    },
     // The owner-review gate (thesis layer 1). False on shakedown runs.
     pause: job.pause_after_skeleton,
   };
