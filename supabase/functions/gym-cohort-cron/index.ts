@@ -33,16 +33,8 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { fetchVocabulary } from "../_shared/build-writer-payload.ts";
-import { buildRagContext } from "../_shared/build-rag-context.ts";
-import {
-  buildGymCohortEnvelope,
-  cohortReferenceLifts,
-  type GymCohortConfig,
-} from "../_shared/cohort/build-gym-cohort-envelope.ts";
-import { buildCohortRoster, type CohortMemberIntake } from "../_shared/cohort/build-cohort-roster.ts";
 import type { CohortStrategy } from "../_shared/cohort/build-gym-cohort-envelope.ts";
-import { GYM_FIRST_STAGE, type GymResumeState, gymSelfRetrigger } from "../_shared/gym-dispatcher.ts";
+import { GymJobConflictError, GymJobReadError, startGymJob } from "../_shared/cohort/start-gym-job.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -65,10 +57,6 @@ interface ConfigRow {
   goal_text: string | null;
   strategy: CohortStrategy | null;
   attempt_count: number;
-}
-
-interface InjuryConstraints {
-  do_not_program?: string[] | null;
 }
 
 Deno.serve(async (req) => {
@@ -113,107 +101,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // ── Vocabulary — abort on a real read error (empty vocab burns 12 LLM passes). ─
-    const { vocabulary, error: vocabErr } = await fetchVocabulary(supa, { onError: "signal" });
-    if (vocabErr) throw new ReadError("movements", vocabErr);
-
-    // ── Roster = members who joined this gym AND hold an active engine_cohort grant,
-    //    with attributes sourced from the ONE PROFILE (athlete_profiles — Decision 1). ─
-    const { data: grants, error: grantErr } = await supa
-      .from("user_entitlements")
-      .select("user_id")
-      .eq("feature", "engine_cohort")
-      .eq("granted_by", cfg.gym_id)
-      .or("expires_at.is.null,expires_at.gt." + nowIso);
-    if (grantErr) throw new ReadError("user_entitlements", grantErr.message);
-    const grantedIds = new Set((grants ?? []).map((g) => (g as { user_id: string }).user_id));
-
-    let members: CohortMemberIntake[] = [];
-    let membersWithWeights = 0;
-    if (grantedIds.size > 0) {
-      const { data: links, error: linkErr } = await supa
-        .from("member_gym_links")
-        .select("user_id")
-        .eq("gym_id", cfg.gym_id)
-        .eq("status", "joined")
-        .in("user_id", [...grantedIds]);
-      if (linkErr) throw new ReadError("member_gym_links", linkErr.message);
-      const rosterIds = (links ?? [])
-        .map((l) => (l as { user_id: string }).user_id)
-        .filter((id) => grantedIds.has(id));
-
-      if (rosterIds.length > 0) {
-        // ONE PROFILE: athlete attributes come from athlete_profiles, not a copy.
-        const { data: profiles, error: profErr } = await supa
-          .from("athlete_profiles")
-          .select("user_id, gender, bodyweight, units, lifts, injuries_structured")
-          .in("user_id", rosterIds);
-        if (profErr) throw new ReadError("athlete_profiles", profErr.message);
-        const byUser = new Map(
-          (profiles ?? []).map((p) => [(p as { user_id: string }).user_id, p as Record<string, unknown>]),
-        );
-
-        members = rosterIds.map((userId) => {
-          const p = byUser.get(userId);
-          const lifts = (p?.lifts as Record<string, number | null> | null) ?? null;
-          if (lifts && Object.values(lifts).some((v) => typeof v === "number" && v > 0)) membersWithWeights++;
-          const injuries = p?.injuries_structured as InjuryConstraints | null;
-          return {
-            athlete_ref: userId,
-            gender: (p?.gender as string | null) ?? null,
-            bodyweight: (p?.bodyweight as number | null) ?? null,
-            units: (p?.units as "lbs" | "kg" | null) ?? cfg.units,
-            lifts,
-            do_not_program: injuries?.do_not_program ?? null,
-          };
-        });
-      }
-    }
-
-    // ── RAG methodology block for the reference class target (parity with retail). ─
-    const rag = await buildRagContext(supa, cohortReferenceLifts(cfg.target_level, cfg.units), {});
-
-    const gymConfig: GymCohortConfig = {
-      days_per_week: cfg.days_per_week,
-      session_length_minutes: cfg.session_length_minutes,
-      equipment: cfg.equipment,
-      target_level: cfg.target_level,
-      do_not_program: cfg.do_not_program,
-      units: cfg.units,
-      goal_text: cfg.goal_text,
-      strategy: cfg.strategy,
-    };
-
-    const envelope = buildGymCohortEnvelope(gymConfig, vocabulary, nowIso, { rag });
-    const roster = buildCohortRoster(members, nowIso); // may be empty (shared program still generated, for F5)
-
-    // ── Create the staged job (resume_state carries everything the worker's
-    //    stages need — no DB re-reads mid-pipeline) and fire stage 1. ────────────
-    const initialResume: GymResumeState = {
-      gym_id: cfg.gym_id,
-      domain_pack: cfg.domain_pack,
-      payload: envelope.shared_payload,
-      tdi: envelope.shared_training_design_input,
-      roster,
-      startedAtMs: Date.now(),
-    };
-    const { data: job, error: jobErr } = await supa
-      .from("gym_program_jobs")
-      .insert({
-        gym_id: cfg.gym_id,
-        status: "processing",
-        stage: GYM_FIRST_STAGE,
-        next_stage: GYM_FIRST_STAGE,
-        resume_state: initialResume,
-        // Owner-review gate stays OFF until the portal review desk exists —
-        // flipping this to true parks the job at awaiting_approval post-skeleton.
-        pause_after_skeleton: false,
-      })
-      .select("id")
-      .single();
-    if (jobErr || !job) throw new ReadError("gym_program_jobs", jobErr?.message ?? "insert returned no row");
-
-    await gymSelfRetrigger(job.id as string);
+    // Scheduled generation runs straight through (no owner-review pause) — the
+    // review desk's on-demand start (gym-program) is the paused path. Shared
+    // kickoff so the two can't drift.
+    const result = await startGymJob(supa, cfg, { pauseAfterSkeleton: false, nowIso });
 
     // ── Drain: re-invoke for the next due gym (fire-and-forget, one gym/tick budget). ─
     void selfReinvoke(req);
@@ -221,12 +112,18 @@ Deno.serve(async (req) => {
     return json({
       started: true,
       gym_id: cfg.gym_id,
-      job_id: job.id,
-      members_scaled: roster.length,
-      members_with_weights: membersWithWeights,
-      watch: "select status, next_stage, error from gym_program_jobs where id = '" + job.id + "'",
+      job_id: result.job_id,
+      members_scaled: result.members_scaled,
+      members_with_weights: result.members_with_weights,
+      watch: "select status, next_stage, error from gym_program_jobs where id = '" + result.job_id + "'",
     });
   } catch (e) {
+    // A portal `start` won the UNIQUE active-index between our guard and insert
+    // — not a failure, just "already in flight". Skip cleanly, no backoff.
+    if (e instanceof GymJobConflictError) {
+      void selfReinvoke(req);
+      return json({ message: "job already in flight (raced portal start)", gym_id: cfg.gym_id });
+    }
     // Record a backoff so a persistently-failing gym rotates to the back of the
     // queue instead of starving the fleet head-of-line every tick. (Failures
     // AFTER kickoff are the worker's — gym-dispatcher writes this same backoff.)
@@ -238,19 +135,11 @@ Deno.serve(async (req) => {
       .eq("gym_id", cfg.gym_id)
       .then(() => {}, (err) => console.error("[gym-cohort-cron] backoff write failed:", err));
 
-    const stage = e instanceof ReadError ? "read_failed" : "kickoff_failed";
+    const stage = e instanceof GymJobReadError ? "read_failed" : "kickoff_failed";
     console.error("[gym-cohort-cron]", stage, cfg.gym_id, e);
     return json({ error: stage, gym_id: cfg.gym_id, detail: (e as Error).message, next_attempt_at: nextAttemptIso }, 500);
   }
 });
-
-/** A DB read/write failed — abort BEFORE any paid LLM work is started. */
-class ReadError extends Error {
-  constructor(table: string, detail: string) {
-    super(`${table} read failed: ${detail}`);
-    this.name = "ReadError";
-  }
-}
 
 /** Fire-and-forget self re-invoke so a burst of due gyms drains within a tick. */
 function selfReinvoke(req: Request): void {
