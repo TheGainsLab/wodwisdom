@@ -18,8 +18,18 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
  *  - `engine_cohort` = the parked cohort-class seat (kept for the 2b Programmer).
  *  - `engine_class_view` = FREE F5 view tier (Decision 8; F5 deferred in v1 — the affiliate
  *    stops granting it, the key stays allowlisted for a future free surface).
- *  - `gym_programming` = 2b Programmer roster. */
-export const ALLOWED_GRANT_FEATURES = ["engine", "gym_engine", "engine_cohort", "gym_programming", "engine_class_view"] as const;
+ *  - `gym_programming` = 2b Programmer roster.
+ *  - `nutrition` = the RETAIL Nutrition product distributed through the gym channel
+ *    (Nutrition service, the Engine-Class pattern for nutrition). A gym seat grants the
+ *    exact retail `nutrition` feature, gym-scoped (granted_by = gym_id); the union
+ *    entitlement read lights up /nutrition + /nutrition/calendar with retail code
+ *    untouched (the nutrition edge fns are auth-only). Gym-sourced grants are
+ *    source_kind='gym_grant', so — like gym `engine` — they never inflate retail paid
+ *    counts. v1 uses the plain retail `nutrition` key (retail-branded member experience);
+ *    a gym-branded `gym_nutrition` shell variant is a future enhancement, mirroring how
+ *    `gym_engine` relates to `engine`. Nutrition has NO months-drip (flat while the seat
+ *    is active), so it is intentionally absent from ENGINE_DRIP_FEATURES / seat lists. */
+export const ALLOWED_GRANT_FEATURES = ["engine", "gym_engine", "engine_cohort", "gym_programming", "engine_class_view", "nutrition"] as const;
 
 /** Grant features that carry the Engine months drip (Decision 10(d)): the grant-time
  *  Month-1 seed (wholesale-grants) and the hourly advance (gym-engine-months-cron) apply
