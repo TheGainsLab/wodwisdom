@@ -28,6 +28,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createConsumerAuth } from "../_shared/consumer-auth.ts";
 import { ALLOWED_GRANT_FEATURES } from "../_shared/entitlements.ts";
+import { classifyRevoke, pollStatus } from "../_shared/gym-seat-state.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -134,14 +135,16 @@ Deno.serve(async (req) => {
       if (readErr) return json({ error: "read_failed", detail: readErr.message }, 500);
       if (!grant) return json({ error: "not_found" }, 404);
 
+      const decision = classifyRevoke(grant.status as string, grant.claimed_user_id as string | null);
+
       // Idempotent: already revoked/unbound -> report done.
-      if (grant.status === "revoked" || grant.status === "unbound") {
-        return json({ revoked: true, already: true, status: grant.status });
+      if (decision.kind === "already_done") {
+        return json({ revoked: true, already: true, status: decision.status });
       }
 
       // If claimed, remove ONLY this gym's grant of this feature for the bound user
       // (never retail, never another gym — same scoping as wholesale-grants DELETE).
-      if (grant.status === "claimed" && grant.claimed_user_id) {
+      if (decision.kind === "remove_entitlement") {
         const { error: delErr } = await supa
           .from("user_entitlements").delete()
           .eq("user_id", grant.claimed_user_id)
@@ -190,11 +193,10 @@ Deno.serve(async (req) => {
     const nowMs = Date.now();
     const toExpire: string[] = [];
     const statuses = (rows ?? []).map((r) => {
-      let status = r.status as string;
-      if (status === "pending" && new Date(r.expires_at as string).getTime() < nowMs) {
-        status = "expired";
-        toExpire.push(r.token as string);
-      }
+      // pollStatus maps claimed->active and folds in expiry (IDENTITY_MODEL §4). Track
+      // pending grants that just lapsed so we persist the flip below.
+      const status = pollStatus(r.status as string, r.expires_at as string, nowMs);
+      if ((r.status as string) === "pending" && status === "expired") toExpire.push(r.token as string);
       return { token: r.token as string, status, consent: r.consent as string };
     });
     if (toExpire.length > 0) {
