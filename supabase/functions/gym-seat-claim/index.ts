@@ -223,8 +223,12 @@ async function recordConsentAndLink(
   let warn: string | null = null;
   const { error: consentErr } = await svc.from("member_consents").upsert({
     user_id: userId, consent_type: consentTypeFor(feature), version: CONSENT_VERSION, gym_id: gymId,
-    status: consentValue, accepted_at: new Date().toISOString(),
-    payload: { user_agent: userAgent, source: "gym-seat-claim" },
+    status: consentValue,
+    // accepted_at is deliberately ABSENT: the insert takes the column DEFAULT now(),
+    // and on a re-decision the DO UPDATE can't touch an absent column — the FIRST
+    // decision time survives for dispute audits (the F3 migration's requirement).
+    // The LATEST decision time rides in payload.decided_at alongside status.
+    payload: { user_agent: userAgent, source: "gym-seat-claim", decided_at: new Date().toISOString() },
   }, { onConflict: "user_id,consent_type,version,gym_id" });
   if (consentErr) { console.error("[gym-seat-claim] consent write failed:", consentErr); warn = "consent_write_failed"; }
 
