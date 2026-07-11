@@ -1574,7 +1574,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   </div>
 
                   <CollapsibleSection title="Equipment">
-                    <p className="athlete-card-subtitle">Uncheck any equipment you don't have or don't want programmed.</p>
+                    <p className="athlete-card-subtitle">Uncheck any equipment you don't have or don't want programmed — we'll remove every movement that needs it (e.g. unchecking the rower means no rowing).</p>
                     {EQUIPMENT_GROUPS.map(group => (
                       <div key={group.title} style={{ marginBottom: 20 }}>
                         <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
@@ -1624,8 +1624,14 @@ export default function AthletePage({ session }: { session: Session }) {
                     </div>
 
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 4 }}>
                         Injuries or movement constraints <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(leave blank if none)</span>
+                      </div>
+                      {/* 3.1 health-data consent (GDPR Art. 9). DRAFT — founder/legal to approve
+                          wording before merge. Reflects current truth: injury data is not shared
+                          with gyms (owner-feed exclusion, §3.2); revisit if Part B adds an opt-in. */}
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 8 }}>
+                        This is health information. We use it only to tailor your programming — the movements we'll avoid for you — and never share it with your gym. Clear this field or delete your account to remove it at any time.
                       </div>
                       <textarea
                         className="lift-input"
