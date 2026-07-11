@@ -210,6 +210,18 @@ verify_jwt = false
 # Supabase's JWT gate.
 verify_jwt = false
 
+[functions.gym-seat-grant]
+# Token-keyed seat grant seam (identity model Phase 2). Server-to-server; the
+# WHOLESALE consumer-key family (tenant-bound), so skip Supabase's JWT gate. Deployed
+# ALONGSIDE wholesale-grants (the old user-id path) through the migration window.
+verify_jwt = false
+
+[functions.gym-seat-claim]
+# The member claims a seat token (identity model Phase 2). Member JWT verified by the
+# gateway (verify_jwt=true — we decode the sub); binds the pending grant as a gym_grant
+# entitlement + records versioned consent. No admin account-minting (member is present).
+verify_jwt = true
+
 [functions.gym-cohort-cron]
 # Task #5 — KICKOFF for staged gym cohort generation (creates a gym_program_jobs
 # row + fires gym-generate; no longer runs the pipeline in-process — see the
