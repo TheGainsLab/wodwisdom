@@ -18,7 +18,8 @@ import { supabase } from '../lib/supabase';
 // Consent copy — v1, versioned (the server records the version; bump both together).
 // Two service-contextual variants. "will be able to see" (not "can see"): nothing
 // consumes consent until the member feed ships (IDENTITY_MODEL §6).
-const CONSENT_COPY_VERSION = 'gymclaim-v1-2026-07-11';
+// (Exported so the doc-constant survives noUnusedLocals — nothing imports it yet.)
+export const CONSENT_COPY_VERSION = 'gymclaim-v1-2026-07-11';
 function serviceLabel(feature: string): string {
   if (feature === 'nutrition') return 'Nutrition';
   return 'Engine';
