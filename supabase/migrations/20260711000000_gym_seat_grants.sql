@@ -44,6 +44,11 @@ create table if not exists gym_seat_grants (
   -- enforced in the edge function.
   feature text not null,
 
+  -- Optional display context the affiliate may send at create so the claim page can
+  -- say "CrossFit Southie is giving you Nutrition." The GYM's own name is not member
+  -- PII, so it may cross; NULL falls back to "your gym" on the page.
+  gym_name text,
+
   status gym_seat_grant_status not null default 'pending',
 
   -- Pending TTL = 30 days (IDENTITY_MODEL §5.1). A pending grant past this is

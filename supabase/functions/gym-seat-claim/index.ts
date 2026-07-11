@@ -70,11 +70,32 @@ Deno.serve(async (req) => {
   const userId = decodeJwtSub(authHeader.replace("Bearer ", ""));
   if (!userId) return json({ error: "unauthorized" }, 401);
 
-  let body: { token?: unknown; consent_accepted?: unknown };
+  let body: { token?: unknown; consent_accepted?: unknown; peek?: unknown };
   try { body = await req.json() as typeof body; } catch { return json({ error: "invalid_json" }, 400); }
 
   const token = typeof body.token === "string" ? body.token : "";
   if (!TOKEN_RE.test(token)) return json({ error: "invalid_request", detail: "token invalid" }, 400);
+
+  // ── peek: what is this token, without binding? Drives the claim page's "CrossFit
+  //    Southie is giving you Nutrition" header + early expiry/used feedback. No consent
+  //    needed. Reports a claimable flag so the page can show the right state. ──────
+  if (body.peek === true) {
+    const { data: g, error } = await svc
+      .from("gym_seat_grants")
+      .select("feature, gym_name, status, expires_at, claimed_user_id")
+      .eq("token", token).maybeSingle();
+    if (error) return json({ error: "read_failed", detail: error.message }, 500);
+    if (!g) return json({ error: "not_found" }, 404);
+    const isExpired = g.status === "expired" ||
+      (g.status === "pending" && new Date(g.expires_at as string).getTime() < Date.now());
+    const alreadyByMe = g.status === "claimed" && g.claimed_user_id === userId;
+    const claimable = g.status === "pending" && !isExpired;
+    return json({
+      feature: g.feature, gym_name: g.gym_name ?? null,
+      status: isExpired ? "expired" : g.status,
+      claimable, already_claimed_by_me: alreadyByMe,
+    });
+  }
   // Consent is a required explicit decision (true = share, false = decline). Declining
   // still claims the service — consent is orthogonal, never a gate (IDENTITY_MODEL §4/§6).
   if (typeof body.consent_accepted !== "boolean") {

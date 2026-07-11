@@ -46,7 +46,7 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{20,128}$/;
 const PENDING_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days (IDENTITY_MODEL §5.1)
 
 const GRANT_COLS =
-  "id, token, gym_id, feature, status, expires_at, claimed_user_id, claimed_at, consent";
+  "id, token, gym_id, feature, gym_name, status, expires_at, claimed_user_id, claimed_at, consent";
 
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
   if (!authResult) return json({ error: "forbidden" }, 401);
   const { authz, fingerprint: keyFp } = authResult;
 
-  let body: { gym_id?: unknown; action?: unknown; token?: unknown; feature?: unknown; tokens?: unknown };
+  let body: { gym_id?: unknown; action?: unknown; token?: unknown; feature?: unknown; tokens?: unknown; gym_name?: unknown };
   try {
     body = await req.json() as typeof body;
   } catch {
@@ -89,13 +89,16 @@ Deno.serve(async (req) => {
       return json({ error: "invalid_request", detail: `feature must be one of: ${[...ALLOWED_FEATURES].join(", ")}` }, 400);
     }
 
+    // Optional display context (the gym's own name — not member PII; §1.5).
+    const gymName = typeof body.gym_name === "string" ? body.gym_name.slice(0, 120) : null;
+
     // Idempotent by token. Insert; on unique conflict, return the existing row (only
     // if it belongs to this gym — a token collision across gyms is a hard error).
     const nowMs = Date.now();
     const expiresAt = new Date(nowMs + PENDING_TTL_MS).toISOString();
     const { data: inserted, error: insErr } = await supa
       .from("gym_seat_grants")
-      .insert({ token, gym_id: gymId, feature, expires_at: expiresAt })
+      .insert({ token, gym_id: gymId, feature, gym_name: gymName, expires_at: expiresAt })
       .select(GRANT_COLS)
       .maybeSingle();
 

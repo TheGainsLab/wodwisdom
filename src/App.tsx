@@ -40,6 +40,7 @@ const WorkoutAnalysisPage = lazy(() => import('./pages/WorkoutAnalysisPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const CheckoutCompletePage = lazy(() => import('./pages/CheckoutCompletePage'));
 const JoinEnginePage = lazy(() => import('./pages/JoinEnginePage'));
+const ClaimSeatPage = lazy(() => import('./pages/ClaimSeatPage'));
 // PARKED (Decision 9(i)): the F4/F5 gym leaderboard + TV + read-only view are unrouted
 // for Engine Class v1 (pure distribution — a seat unlocks the retail Engine surfaces).
 // The page components are kept as 2b Programmer assets; not imported/routed here.
@@ -134,6 +135,7 @@ export default function App() {
           <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
           {/* F3 member-join: reachable logged-out (inline auth keeps the token in the URL). */}
           <Route path="/join/engine/:token" element={<JoinEnginePage session={null} />} />
+          <Route path="/claim/:token" element={<ClaimSeatPage session={null} />} />
           <Route path="*" element={<LandingPage />} />
         </Routes>
       </Suspense>
@@ -159,6 +161,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
           <Routes>
             <Route path="/" element={<HomePage session={session} />} />
             <Route path="/join/engine/:token" element={<JoinEnginePage session={session} />} />
+            <Route path="/claim/:token" element={<ClaimSeatPage session={session} />} />
             {/* PARKED (Decision 9(i)): /gym, /gym/leaderboard, /tv/:token removed for v1. */}
             <Route path="/chat" element={<ChatPage session={session} />} />
             <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
