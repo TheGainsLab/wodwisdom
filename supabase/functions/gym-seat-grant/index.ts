@@ -124,42 +124,52 @@ Deno.serve(async (req) => {
     const token = typeof body.token === "string" ? body.token : "";
     if (!TOKEN_RE.test(token)) return json({ error: "invalid_request", detail: "token must be a 20–128 char url-safe string" }, 400);
 
-    const { data: grant, error: readErr } = await supa
-      .from("gym_seat_grants").select(GRANT_COLS).eq("token", token).eq("gym_id", gymId).maybeSingle();
-    if (readErr) return json({ error: "read_failed", detail: readErr.message }, 500);
-    if (!grant) return json({ error: "not_found" }, 404);
+    // Read → (delete entitlement if claimed) → CAS the status flip FROM THE STATUS WE
+    // READ. Without the CAS, a claim landing between the read (pending — delete branch
+    // skipped) and the update would bind an entitlement that survives under a row
+    // marked 'revoked'. On a lost CAS we re-read and redo, so the claimed branch runs.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { data: grant, error: readErr } = await supa
+        .from("gym_seat_grants").select(GRANT_COLS).eq("token", token).eq("gym_id", gymId).maybeSingle();
+      if (readErr) return json({ error: "read_failed", detail: readErr.message }, 500);
+      if (!grant) return json({ error: "not_found" }, 404);
 
-    // Idempotent: already revoked/unbound -> report done.
-    if (grant.status === "revoked" || grant.status === "unbound") {
-      return json({ revoked: true, already: true, status: grant.status });
-    }
-
-    // If claimed, remove ONLY this gym's grant of this feature for the bound user
-    // (never retail, never another gym — same scoping as wholesale-grants DELETE).
-    if (grant.status === "claimed" && grant.claimed_user_id) {
-      const { error: delErr } = await supa
-        .from("user_entitlements").delete()
-        .eq("user_id", grant.claimed_user_id)
-        .eq("source_kind", "gym_grant")
-        .eq("granted_by", gymId)
-        .eq("feature", grant.feature);
-      if (delErr) {
-        console.error("[gym-seat-grant] entitlement delete failed:", delErr);
-        return json({ error: "revoke_failed", detail: delErr.message }, 500);
+      // Idempotent: already revoked/unbound -> report done.
+      if (grant.status === "revoked" || grant.status === "unbound") {
+        return json({ revoked: true, already: true, status: grant.status });
       }
-      // NOTE: member_gym_links is per-(user,gym), not per-service; a member may hold
-      // other services from this gym, so revoking one seat does NOT end the link.
-      // Ending the link when a member has no remaining gym services is a later refinement.
+
+      // If claimed, remove ONLY this gym's grant of this feature for the bound user
+      // (never retail, never another gym — same scoping as wholesale-grants DELETE).
+      if (grant.status === "claimed" && grant.claimed_user_id) {
+        const { error: delErr } = await supa
+          .from("user_entitlements").delete()
+          .eq("user_id", grant.claimed_user_id)
+          .eq("source_kind", "gym_grant")
+          .eq("granted_by", gymId)
+          .eq("feature", grant.feature);
+        if (delErr) {
+          console.error("[gym-seat-grant] entitlement delete failed:", delErr);
+          return json({ error: "revoke_failed", detail: delErr.message }, 500);
+        }
+        // NOTE: member_gym_links is per-(user,gym), not per-service; a member may hold
+        // other services from this gym, so revoking one seat does NOT end the link.
+        // Ending the link when a member has no remaining gym services is a later refinement.
+      }
+
+      const { data: updRows, error: updErr } = await supa
+        .from("gym_seat_grants")
+        .update({ status: "revoked", updated_at: new Date().toISOString() })
+        .eq("id", grant.id).eq("status", grant.status)
+        .select("id");
+      if (updErr) return json({ error: "revoke_failed", detail: updErr.message }, 500);
+      if (updRows && updRows.length > 0) {
+        console.log(JSON.stringify({ at: "gym-seat-grant", event: "revoke", key_fp: keyFp, gym_id: gymId, feature: grant.feature }));
+        return json({ revoked: true, was: grant.status });
+      }
+      // Status moved under us (a claim landed mid-revoke) — loop re-reads and redoes.
     }
-
-    const { error: updErr } = await supa
-      .from("gym_seat_grants")
-      .update({ status: "revoked", updated_at: new Date().toISOString() })
-      .eq("id", grant.id);
-    if (updErr) return json({ error: "revoke_failed", detail: updErr.message }, 500);
-
-    console.log(JSON.stringify({ at: "gym-seat-grant", event: "revoke", key_fp: keyFp, gym_id: gymId, feature: grant.feature }));
-    return json({ revoked: true, was: grant.status });
+    return json({ error: "conflict", detail: "grant state kept changing during revoke — retry" }, 409);
   }
 
   // ── status (the poll) ─────────────────────────────────────────────────────
