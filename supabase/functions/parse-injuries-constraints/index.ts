@@ -233,13 +233,20 @@ Deno.serve(async (req) => {
       .eq("user_id", userId);
     if (updateErr) throw new Error(`Profile update: ${updateErr.message}`);
 
+    // Return the hash so the client can bind an athlete confirmation
+    // (injuries_avoidance_confirmed.confirmed_against_hash) to the exact text
+    // this parse ran against (handoff 1.1 show-back).
     return new Response(
-      JSON.stringify({ ok: true, structured }),
+      JSON.stringify({ ok: true, structured, hash: newHash }),
       { status: 200, headers: { ...cors, "Content-Type": "application/json" } },
     );
   } catch (err) {
-    console.error("[parse-injuries-constraints]", err);
     const message = err instanceof Error ? err.message : "unknown error";
+    // Structured tag for log-based monitoring (in lieu of a dedicated alert channel:
+    // a persistent failure here is almost always a global Claude/model issue that
+    // also fails program generation, which is monitored via job failures). Queryable
+    // in fn Logs by `tag`.
+    console.error(JSON.stringify({ tag: "injury_parse_failed", at: "parse-injuries-constraints", error: message }));
     return new Response(
       JSON.stringify({ error: "PARSE_FAILED", message }),
       { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } },

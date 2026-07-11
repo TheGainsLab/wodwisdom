@@ -253,6 +253,15 @@ const CONDITIONING_GROUPS = [
 const SKILL_LEVELS = ['none', 'beginner', 'intermediate', 'advanced'] as const;
 type SkillLevel = typeof SKILL_LEVELS[number];
 
+// SHA-256 hex, byte-identical to parse-injuries-constraints.sha256Hex and the
+// generation guard's hash. Lets the client bind an injury confirmation to the exact
+// text WITHOUT calling the LLM parser — so a parser outage never leaves an
+// edited-text athlete with no path to confirm (handoff 1.1/1.2).
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 // Open-ended coaching-intake prompts (free-text / voice). Extracted server-side
 // (process-coaching-intake) into the structured coaching_intake object. Kept
 // distinct from Tier-3's structured goal/injuries fields to avoid duplication.
@@ -537,6 +546,20 @@ export default function AthletePage({ session }: { session: Session }) {
   const [sessionLengthMinutes, setSessionLengthMinutes] = useState<string>('');
   const [injuriesConstraints, setInjuriesConstraints] = useState<string>('');
   const [goal, setGoal] = useState<string>('');
+  // Injury show-back confirmation (handoff 1.1). When a save re-parses non-empty
+  // injuries text into a do-not-program list, we surface it against the athlete's
+  // own words for sign-off BEFORE it becomes the active safety filter. `hash` binds
+  // the confirmation to the exact text this parse ran against.
+  const [injuryShowback, setInjuryShowback] = useState<
+    { verbatim: string; list: string[]; hash: string } | null
+  >(null);
+  const [injuryAddInput, setInjuryAddInput] = useState('');
+  const [injuryConfirmSaving, setInjuryConfirmSaving] = useState(false);
+  const [injuryConfirmError, setInjuryConfirmError] = useState('');
+  const [injuryConfirmedNote, setInjuryConfirmedNote] = useState(false);
+  // True when the show-back is the one-time existing-user migration (T6) rather
+  // than a fresh post-save parse — drives the top-of-page banner.
+  const [injuryMigrationPrompt, setInjuryMigrationPrompt] = useState(false);
   // Qualitative coaching intake (free-text / voice) — its own save (LLM extract).
   const [intakeAnswers, setIntakeAnswers] = useState<Record<string, string>>({});
   const [intakeSaving, setIntakeSaving] = useState(false);
@@ -604,7 +627,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, eval_credits_remaining, competition_athlete_id, competition_athlete_label, coaching_intake_raw')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, eval_credits_remaining, competition_athlete_id, competition_athlete_label, coaching_intake_raw, injuries_structured, injuries_constraints_hash, injuries_avoidance_confirmed')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -653,6 +676,32 @@ export default function AthletePage({ session }: { session: Session }) {
         // the field reads "leave blank if none" consistently on reload.
         setInjuriesConstraints(d.injuries_constraints && d.injuries_constraints !== 'None' ? d.injuries_constraints : '');
         setGoal(d.goal || '');
+        // Existing-user migration show-back (handoff 1.5 / T6): an athlete with
+        // non-empty injuries text but no VALID confirmation (missing, or confirmed
+        // against older text) is proactively prompted to sign off — BEFORE the
+        // generation guard is enforced, so nobody hits the block cold. Same panel
+        // and write path as the post-save show-back; the list is pre-populated
+        // from the existing raw parse as a PENDING proposal (never auto-confirmed).
+        {
+          const dm = d as {
+            injuries_structured?: { do_not_program?: string[] } | null;
+            injuries_constraints_hash?: string | null;
+            injuries_avoidance_confirmed?: { confirmed_against_hash?: string } | null;
+          };
+          const injText = (d.injuries_constraints ?? '').trim();
+          const hasInjuries = injText !== '' && !/^(none|no|nothing|no injuries|n\/a)$/i.test(injText);
+          const conf = dm.injuries_avoidance_confirmed ?? null;
+          const confValid = !!conf && !!dm.injuries_constraints_hash &&
+            conf.confirmed_against_hash === dm.injuries_constraints_hash;
+          if (hasInjuries && !confValid) {
+            setInjuryShowback({
+              verbatim: injText,
+              list: dm.injuries_structured?.do_not_program ?? [],
+              hash: dm.injuries_constraints_hash ?? '',
+            });
+            setInjuryMigrationPrompt(true);
+          }
+        }
         {
           const raw = (d as { coaching_intake_raw?: Record<string, string> | null }).coaching_intake_raw;
           if (raw && typeof raw === 'object') setIntakeAnswers(raw);
@@ -967,18 +1016,101 @@ export default function AthletePage({ session }: { session: Session }) {
     if (isNewUser) setIsNewUser(false);
     setIsDirty(false);
 
-    // Fire-and-forget: parse the (possibly updated) injuries text into a
-    // structured form so the v2 writer + safety review can consult a
-    // canonical do-not-program list instead of re-parsing prose every
-    // retry. The edge fn hash-checks internally; if the text hasn't
-    // changed since the last parse it returns quickly.
-    void supabase.functions
-      .invoke('parse-injuries-constraints', { body: {} })
-      .catch((err) => {
-        console.warn('[parse-injuries-constraints] async parse failed:', err);
-      });
+    // Parse the (possibly updated) injuries text into a structured do-not-program
+    // list. The edge fn hash-checks internally, so an unchanged text returns a
+    // `skipped` no-op. When it returns a fresh non-empty list, drive the show-back
+    // (handoff 1.1): the athlete confirms it against their own words before it
+    // becomes the active safety filter. Runs after save returns so the save UX
+    // isn't blocked on the LLM parse; the panel pops when the parse completes.
+    // Bounded retry on transient failure (T2); on PERSISTENT failure, drop into the
+    // manual add-avoidances panel — confirmation there is LLM-independent (local
+    // hash), so a parser outage never leaves the athlete unable to confirm.
+    void (async () => {
+      const maxAttempts = 3;
+      let lastErr = '';
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const { data, error } = await supabase.functions.invoke('parse-injuries-constraints', { body: {} });
+          const errMsg = (data as { error?: string } | null)?.error;
+          if (error || errMsg) {
+            lastErr = errMsg || error?.message || 'parse failed';
+            if (attempt < maxAttempts) { await new Promise(r => setTimeout(r, attempt * 800)); continue; }
+            break;
+          }
+          const structured = (data as { structured?: { do_not_program?: string[] }; hash?: string } | null);
+          const list = structured?.structured?.do_not_program ?? [];
+          const hash = structured?.hash ?? '';
+          // Only confirm when there's something to protect. Empty list (no injuries /
+          // cleared) needs no sign-off — the generation guard only gates non-empty text.
+          if (list.length > 0 && hash) {
+            setInjuryConfirmError('');
+            setInjuryConfirmedNote(false);
+            setInjuryMigrationPrompt(false); // a fresh post-save parse supersedes the migration prompt
+            setInjuryShowback({ verbatim: injuriesVal, list, hash });
+          }
+          return; // success (including the legitimately-empty case)
+        } catch (err) {
+          lastErr = err instanceof Error ? err.message : String(err);
+          if (attempt < maxAttempts) { await new Promise(r => setTimeout(r, attempt * 800)); continue; }
+        }
+      }
+      // Persistent failure after retries. Structured tag for log-based monitoring
+      // (no dedicated alert channel — see docs). Manual fallback keeps the path open:
+      // empty list to build by hand, confirmed via the local-hash path.
+      console.error(JSON.stringify({ tag: 'injury_parse_failed', at: 'AthletePage.saveProfile', error: lastErr }));
+      setInjuryConfirmError("We couldn't process your injury notes — review and confirm the movements to avoid below.");
+      setInjuryShowback({ verbatim: injuriesVal, list: [], hash: '' });
+    })();
 
     return true;
+  };
+
+  // Show-back editing (handoff 1.1): the athlete's final list may differ from the
+  // raw parse — remove a false positive, add something the parse missed.
+  const removeInjuryMovement = (m: string) =>
+    setInjuryShowback(prev => (prev ? { ...prev, list: prev.list.filter(x => x !== m) } : prev));
+  const addInjuryMovement = () => {
+    const v = injuryAddInput.trim();
+    if (!v) return;
+    setInjuryShowback(prev =>
+      prev && !prev.list.some(x => x.toLowerCase() === v.toLowerCase())
+        ? { ...prev, list: [...prev.list, v] }
+        : prev,
+    );
+    setInjuryAddInput('');
+  };
+
+  // Confirm: write the athlete-signed avoidance list as the ACTIVE safety filter,
+  // bound to the exact current text. The hash is computed LOCALLY from the athlete's
+  // own words (sha256Hex) — never via the LLM parser — so confirmation works even
+  // during a parse-service outage (the guard hashes the same current text, so they
+  // match). This is the always-available path the manual fallback depends on.
+  const confirmInjuryAvoidances = async () => {
+    if (!injuryShowback) return;
+    setInjuryConfirmSaving(true);
+    setInjuryConfirmError('');
+    try {
+      const hash = await sha256Hex(injuryShowback.verbatim.trim());
+      const { error } = await supabase
+        .from('athlete_profiles')
+        .update({
+          injuries_avoidance_confirmed: {
+            do_not_program: injuryShowback.list,
+            confirmed_at: new Date().toISOString(),
+            confirmed_against_hash: hash,
+          },
+        })
+        .eq('user_id', session.user.id);
+      if (error) throw new Error(error.message);
+      setInjuryShowback(null);
+      setInjuryAddInput('');
+      setInjuryMigrationPrompt(false);
+      setInjuryConfirmedNote(true);
+    } catch (e) {
+      setInjuryConfirmError(e instanceof Error ? e.message : 'Could not save your confirmation');
+    } finally {
+      setInjuryConfirmSaving(false);
+    }
   };
 
   // Live tier status, computed from current form state (not yet saved values).
@@ -1021,6 +1153,15 @@ export default function AthletePage({ session }: { session: Session }) {
         </header>
         <div className="page-body">
           <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {injuryMigrationPrompt && injuryShowback && (
+              <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
+                <h2 className="settings-card-title" style={{ marginBottom: 6 }}>Confirm your injury avoidances</h2>
+                <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5, margin: 0 }}>
+                  We now ask you to sign off on the movements we'll keep out of your programming.
+                  Scroll to the <strong>Injuries or movement constraints</strong> field below to review and confirm — it takes a few seconds.
+                </p>
+              </div>
+            )}
             {isNewUser && (
               <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
                 <h2 className="settings-card-title" style={{ marginBottom: 8 }}>Complete your profile to unlock more</h2>
@@ -1493,7 +1634,66 @@ export default function AthletePage({ session }: { session: Session }) {
                         onChange={e => { setInjuriesConstraints(e.target.value); markDirty(); setIntakeSaved(false); }}
                         style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
                       />
+                      {injuryConfirmedNote && !injuryShowback && (
+                        <div style={{ marginTop: 8, fontSize: 12, color: '#2ec486' }}>
+                          ✓ Avoidances confirmed — we'll keep these out of your programming.
+                        </div>
+                      )}
                     </div>
+
+                    {/* Show-back confirmation (handoff 1.1): sign off on the avoidance
+                        list, shown against your own words, before it goes active. */}
+                    {injuryShowback && (
+                      <div style={{ marginBottom: 16, padding: 14, borderRadius: 8, border: '1px solid var(--accent)', background: 'var(--accent-glow)' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>
+                          Confirm the movements we'll avoid
+                        </div>
+                        {injuryConfirmError && (
+                          <div style={{ fontSize: 12, color: '#e5484d', marginBottom: 8 }}>{injuryConfirmError}</div>
+                        )}
+                        {injuryShowback.verbatim && injuryShowback.verbatim !== 'None' && (
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, fontStyle: 'italic' }}>
+                            You wrote: “{injuryShowback.verbatim}”
+                          </div>
+                        )}
+                        <div style={{ fontSize: 12, color: 'var(--text)', marginBottom: 6 }}>
+                          Based on that, we'll avoid programming{injuryShowback.list.length === 0 ? ' — nothing yet, add anything we should skip:' : ':'}
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                          {injuryShowback.list.map(m => (
+                            <span key={m} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: 'var(--surface2)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text)' }}>
+                              {m}
+                              <button
+                                type="button"
+                                onClick={() => removeInjuryMovement(m)}
+                                aria-label={`Remove ${m}`}
+                                style={{ border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}
+                              >×</button>
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                          <input
+                            className="lift-input"
+                            value={injuryAddInput}
+                            onChange={e => setInjuryAddInput(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addInjuryMovement(); } }}
+                            placeholder="Add a movement to avoid"
+                            style={{ flex: 1, fontFamily: 'inherit' }}
+                          />
+                          <button type="button" className="auth-btn" onClick={addInjuryMovement} style={{ padding: '8px 14px', fontSize: 13 }}>Add</button>
+                        </div>
+                        <button
+                          type="button"
+                          className="auth-btn"
+                          onClick={confirmInjuryAvoidances}
+                          disabled={injuryConfirmSaving}
+                          style={{ padding: '8px 16px', fontSize: 13, background: '#2ec486', color: 'white' }}
+                        >
+                          {injuryConfirmSaving ? 'Confirming…' : 'Confirm these avoidances'}
+                        </button>
+                      </div>
+                    )}
 
                     {INTAKE_QUESTIONS.map(q => (
                       <div key={q.key} style={{ marginBottom: 16 }}>

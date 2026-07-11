@@ -67,6 +67,76 @@ import {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const FUNCTION_NAME = "generate-program-v3";
+
+// Injury-confirmation generation guard (handoff 1.3). FLAG-GATED enforcement:
+// stays observability-only (logs a would-block) until the show-back UI (1.1) and
+// the existing-user one-time show-back (1.5 / ticket T6) ship — otherwise every
+// existing injury-having user would be blocked with no way to confirm. Flip
+// INJURY_CONFIRMATION_ENFORCED=true once those land.
+const INJURY_CONFIRMATION_ENFORCED =
+  Deno.env.get("INJURY_CONFIRMATION_ENFORCED") === "true";
+// Mirrors the "no injuries" sentinels in parse-injuries-constraints.
+const NO_INJURY_RE = /^(none|no|nothing|no injuries|n\/a)$/i;
+
+/** SHA-256 hex of `text`. Byte-identical to parse-injuries-constraints.sha256Hex and
+ *  the client's confirm hash, so a confirmation's confirmed_against_hash computed on
+ *  any of the three matches here. */
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Generation guard (handoff 1.3): an athlete with non-empty injuries text but no
+ * VALID confirmation must not silently generate with missing/partial injury
+ * protection. A confirmation is valid only for the CURRENT text. We hash the current
+ * text OURSELVES rather than trust injuries_constraints_hash (which only a successful
+ * parse updates) — so an edited-but-unparsed note reads as unconfirmed even if the
+ * parse refresh failed, closing the silent-stale-protection gap and making the guard
+ * independent of parse-service health. When enforced and the check fails, THROW — the
+ * dispatcher marks the job failed (no reaper re-roll) and the message surfaces to the
+ * athlete via program-job-status.
+ */
+async function enforceInjuryConfirmationGuard(
+  supa: SupabaseClient,
+  userId: string,
+): Promise<void> {
+  const { data, error } = await supa
+    .from("athlete_profiles")
+    .select("injuries_constraints, injuries_avoidance_confirmed")
+    .eq("user_id", userId)
+    .maybeSingle<{
+      injuries_constraints: string | null;
+      injuries_avoidance_confirmed: { confirmed_against_hash?: string } | null;
+    }>();
+  // Best-effort read: a guard-read failure must not brick generation — the payload
+  // read applies the same confirmed-or-fallback rule regardless. Log and proceed.
+  if (error) {
+    console.warn("[generate-program-v3] injury guard read failed (skipping guard):", error.message);
+    return;
+  }
+
+  const text = (data?.injuries_constraints ?? "").trim();
+  const hasInjuries = text !== "" && !NO_INJURY_RE.test(text);
+  if (!hasInjuries) return;
+
+  const confirmed = data?.injuries_avoidance_confirmed ?? null;
+  const currentHash = await sha256Hex(text);
+  const confirmationValid =
+    confirmed != null && confirmed.confirmed_against_hash === currentHash;
+  if (confirmationValid) return;
+
+  if (INJURY_CONFIRMATION_ENFORCED) {
+    throw new Error(
+      "Your injury notes need review before we generate your program. Open your " +
+        "profile and confirm the movements we'll avoid, then try again.",
+    );
+  }
+  console.warn(
+    `[generate-program-v3] injury guard WOULD BLOCK user ${userId} (non-empty injuries, ` +
+      "no valid confirmation) — enforcement off (rollout window before 1.1/T6)",
+  );
+}
 // wodwisdom is the first Engine consumer; it pins the CrossFit pack. The Engine
 // core is sport-agnostic — the pack supplies all sport-coupled content.
 const PACK = getDomainPack("crossfit@3");
@@ -91,10 +161,12 @@ async function stagePayloadBuilding(
   const monthNumber = rs.continuation.monthNumber;
 
   // Ensure free-text injuries are parsed into injuries_structured.do_not_program
-  // BEFORE building the payload (hash-guarded no-op when current; soft-fails so a
-  // parse hiccup never blocks generation).
+  // BEFORE building the payload (hash-guarded no-op when current). No longer blind:
+  // check the response so a parse HTTP failure is visible rather than silently
+  // proceeding on a stale/null list. The parse refresh itself stays non-fatal — the
+  // confirmation guard below is the actual gate.
   try {
-    await fetch(`${SUPABASE_URL}/functions/v1/parse-injuries-constraints`, {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/parse-injuries-constraints`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -104,9 +176,25 @@ async function stagePayloadBuilding(
       body: "{}",
       signal: AbortSignal.timeout(30_000),
     });
+    if (!resp.ok) {
+      // Structured tag for log-based monitoring (no dedicated alert channel — a
+      // persistent parse failure is almost always a global Claude/model issue that
+      // also fails generation itself). Queryable in fn Logs by tag.
+      console.error(JSON.stringify({
+        tag: "injury_parse_failed", at: "generate-program-v3.refresh",
+        user_id: userId, http_status: resp.status,
+      }));
+    }
   } catch (e) {
-    console.warn("[generate-program-v3] injuries parse refresh failed (non-fatal):", e);
+    console.error(JSON.stringify({
+      tag: "injury_parse_failed", at: "generate-program-v3.refresh",
+      user_id: userId, error: e instanceof Error ? e.message : String(e),
+    }));
   }
+
+  // Guard (handoff 1.3): block generation past a non-empty-but-unconfirmed injury
+  // note. Flag-gated — observability-only until 1.1/T6 ship (see the helper).
+  await enforceInjuryConfirmationGuard(supa, userId);
 
   const payload = await buildWriterPayload(supa, userId, {
     includeAllResults: false,
@@ -445,6 +533,28 @@ async function stageSaving(
         monthNumber,
       });
       console.log(`[generate-program-v3] saved program ${programId} (month ${monthNumber})`);
+
+      // Per-generation avoidance record (handoff 1.5 / T6): persist the effective
+      // avoidance list that gated THIS cycle, WITH T5 provenance tags — the
+      // defensible artifact. Best-effort: a log-write failure must never fail a
+      // program that saved. Idempotent via the (program_id, month_number) unique.
+      const avoid = payload.training_context.injuries_structured;
+      if (avoid) {
+        const { error: avErr } = await supa
+          .from("program_generation_avoidances")
+          .upsert({
+            program_id: programId,
+            user_id: userId,
+            month_number: monthNumber,
+            avoidances: {
+              do_not_program: avoid.do_not_program,
+              blocked_by: avoid.blocked_by ?? {},
+            },
+          }, { onConflict: "program_id,month_number", ignoreDuplicates: true });
+        if (avErr) {
+          console.warn("[generate-program-v3] avoidance record write failed (non-fatal):", avErr.message);
+        }
+      }
     } catch (saveErr) {
       // Undo the marker so a legitimate retry can proceed; delete a fresh shell
       // so a failed first-cycle save doesn't leave an empty program behind.
