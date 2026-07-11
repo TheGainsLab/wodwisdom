@@ -14,9 +14,16 @@
  * Auth: verify_jwt=true (gateway verifies the member JWT; we decode the sub).
  * Body: { token, consent_accepted: boolean }.
  *
- * Idempotent: same user re-claiming is a no-op success (consent is refreshed); a
+ * Idempotent: same user re-claiming re-runs the full bind (entitlement upsert,
+ * consent, link — all idempotent), so a retry after a partial failure heals; a
  * DIFFERENT user presenting an already-claimed token is refused (single-use — the
  * accepted possession-is-identity boundary, §5.1).
+ *
+ * Write order is CAS-FIRST: the grant row is compare-and-swapped pending→claimed
+ * BEFORE any entitlement write. A racer who loses the CAS therefore never writes an
+ * entitlement at all — the alternative (bind first, delete on loss) is unsafe because
+ * the idempotent upsert may have touched a grant the loser already held legitimately
+ * via another token, and deleting it would strip real access.
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -127,21 +134,46 @@ Deno.serve(async (req) => {
       .eq("id", grant.id).eq("status", "pending").then(() => {}, () => {});
     return json({ error: "expired", detail: "this claim link has expired — ask your gym to resend it" }, 410);
   }
-  if (grant.status === "claimed") {
-    if (grant.claimed_user_id === userId) {
-      // Idempotent re-claim by the same member: refresh consent, report success.
-      await recordConsentAndLink(userId, gymIdStr, feature, consentValue, req.headers.get("user-agent"));
-      await svc.from("gym_seat_grants")
-        .update({ consent: consentValue, updated_at: new Date().toISOString() }).eq("id", grant.id)
-        .then(() => {}, () => {});
-      return json({ claimed: true, already: true, feature, consent: consentValue });
-    }
+  if (grant.status === "claimed" && grant.claimed_user_id !== userId) {
     // Single-use: a different account already claimed this token.
     return json({ error: "already_claimed", detail: "this seat has already been claimed" }, 409);
   }
 
-  // ── Bind: write the gym_grant entitlement for the caller (no expiry — a claimed
-  //    seat has no cutoff; deactivation sets one later). Idempotent upsert. ──────
+  // `already` = this member re-presenting a token they own. The re-claim does NOT
+  // short-circuit: it re-runs the full idempotent bind below, so a retry after a
+  // post-CAS failure (entitlement/consent write died) heals instead of stranding.
+  const already = grant.status === "claimed";
+
+  if (grant.status === "pending") {
+    // ── CAS pending→claimed FIRST (before any entitlement write), so two concurrent
+    //    claims can't both bind and the loser never leaves a stray entitlement. ─────
+    const { data: claimedRows, error: claimErr } = await svc
+      .from("gym_seat_grants")
+      .update({
+        status: "claimed", claimed_user_id: userId, claimed_at: new Date().toISOString(),
+        consent: consentValue, updated_at: new Date().toISOString(),
+      })
+      .eq("id", grant.id).eq("status", "pending")
+      .select("id");
+    if (claimErr) return json({ error: "claim_failed", detail: claimErr.message }, 500);
+    if (!claimedRows || claimedRows.length === 0) {
+      // Another write won between our read and CAS. Re-read to report honestly — and
+      // if the winner was a concurrent request from THIS member, fall through to the
+      // idempotent bind rather than refusing our own seat.
+      const { data: now } = await svc.from("gym_seat_grants")
+        .select("claimed_user_id, status").eq("id", grant.id).maybeSingle();
+      if (now?.claimed_user_id !== userId) {
+        if (now?.status === "revoked" || now?.status === "unbound") {
+          return json({ error: "not_claimable", detail: `this seat is ${now.status}`, status: now.status }, 409);
+        }
+        return json({ error: "already_claimed", detail: "this seat has already been claimed" }, 409);
+      }
+    }
+  }
+
+  // ── Bind (owner-only: the grant row is claimed by this member — CAS won, re-claim,
+  //    or lost-to-self). Write the gym_grant entitlement (no expiry — a claimed seat
+  //    has no cutoff; deactivation sets one later). Idempotent upsert. ──────────────
   const row = buildGrantRow({ userId, gymId: gymIdStr, feature, expiresProvided: false, expiresAt: null });
   const { data: ent, error: grantErr } = await svc
     .from("user_entitlements")
@@ -149,26 +181,17 @@ Deno.serve(async (req) => {
     .select("granted_at")
     .single();
   if (grantErr) {
+    // The grant row is already claimed by this member, so the page's retry lands in
+    // the re-claim path above and re-runs this bind — self-healing, never stranded.
     console.error("[gym-seat-claim] entitlement upsert failed:", grantErr);
     return json({ error: "claim_failed", detail: grantErr.message }, 500);
   }
 
-  // Compare-and-swap the grant to claimed ONLY from pending, so two concurrent claims
-  // can't both bind (the loser sees 0 rows updated and re-reads).
-  const { data: claimedRows, error: claimErr } = await svc
-    .from("gym_seat_grants")
-    .update({
-      status: "claimed", claimed_user_id: userId, claimed_at: new Date().toISOString(),
-      consent: consentValue, updated_at: new Date().toISOString(),
-    })
-    .eq("id", grant.id).eq("status", "pending")
-    .select("id");
-  if (claimErr) return json({ error: "claim_failed", detail: claimErr.message }, 500);
-  if (!claimedRows || claimedRows.length === 0) {
-    // Another claim won between our read and write. Re-read to report honestly.
-    const { data: now } = await svc.from("gym_seat_grants").select("claimed_user_id, status").eq("id", grant.id).maybeSingle();
-    if (now?.claimed_user_id === userId) return json({ claimed: true, already: true, feature, consent: consentValue });
-    return json({ error: "already_claimed", detail: "this seat has already been claimed" }, 409);
+  if (already) {
+    // Re-claim: refresh the grant row's consent mirror (a fresh claim wrote it in the CAS).
+    await svc.from("gym_seat_grants")
+      .update({ consent: consentValue, updated_at: new Date().toISOString() }).eq("id", grant.id)
+      .then(() => {}, () => {});
   }
 
   // Consent (versioned, gym-attributed) + gym link. If this fails after the bind, the
@@ -183,8 +206,13 @@ Deno.serve(async (req) => {
     if (seed.error) console.error("[gym-seat-claim] engine months seed failed (cron heals):", userId, seed.error);
   }
 
-  console.log(JSON.stringify({ at: "gym-seat-claim", event: "claim", gym_id: gymIdStr, feature, consent: consentValue }));
-  return json({ claimed: true, feature, consent: consentValue, ...(consentWarn ? { warning: consentWarn } : {}) });
+  if (!already) {
+    console.log(JSON.stringify({ at: "gym-seat-claim", event: "claim", gym_id: gymIdStr, feature, consent: consentValue }));
+  }
+  return json({
+    claimed: true, ...(already ? { already: true } : {}), feature, consent: consentValue,
+    ...(consentWarn ? { warning: consentWarn } : {}),
+  });
 });
 
 /** Record the versioned consent decision (mutable — upsert updates status on
