@@ -1627,9 +1627,9 @@ export default function AthletePage({ session }: { session: Session }) {
                       <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 4 }}>
                         Injuries or movement constraints <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(leave blank if none)</span>
                       </div>
-                      {/* 3.1 health-data consent (GDPR Art. 9). DRAFT — founder/legal to approve
-                          wording before merge. Reflects current truth: injury data is not shared
-                          with gyms (owner-feed exclusion, §3.2); revisit if Part B adds an opt-in. */}
+                      {/* 3.1 health-data consent (GDPR Art. 9). Wording founder-approved 2026-07-11.
+                          Reflects current truth: injury data is not shared with gyms (owner-feed
+                          exclusion, §3.2); revisit this copy if Part B adds an owner-feed opt-in. */}
                       <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 8 }}>
                         This is health information. We use it only to tailor your programming — the movements we'll avoid for you — and never share it with your gym. Clear this field or delete your account to remove it at any time.
                       </div>
