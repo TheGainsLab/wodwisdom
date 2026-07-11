@@ -71,6 +71,26 @@ export interface InjuryConstraints {
   summary: string;
   do_not_program: string[];
   suggested_subs: { instead_of: string; use: string }[];
+  /**
+   * Provenance for each entry in `do_not_program` (handoff Priority 2), derived at
+   * merge time — NOT persisted. Injury blocks are bodily (liftable only via the
+   * athlete's confirmation flow); equipment blocks are situational (a future
+   * "full gym this week" toggle may lift them). A consumer that lifts blocks MUST
+   * consult this map and never clear `injury`/`both` movements. Absent on the raw
+   * parse output; populated by build-writer-payload after the equipment merge.
+   */
+  blocked_by?: Record<string, "equipment" | "injury" | "both">;
+}
+
+/**
+ * The athlete-confirmed avoidance gate (handoff 1.1). Stored on
+ * athlete_profiles.injuries_avoidance_confirmed; valid only for the exact text it
+ * was confirmed against (confirmed_against_hash === injuries_constraints_hash).
+ */
+export interface AvoidanceConfirmed {
+  do_not_program: string[];
+  confirmed_at: string;
+  confirmed_against_hash: string;
 }
 
 export interface TrainingContextPayload {
@@ -383,6 +403,8 @@ interface AthleteProfileRow {
   goal: string | null;
   injuries_constraints: string | null;
   injuries_structured: InjuryConstraints | null;
+  injuries_constraints_hash: string | null;
+  injuries_avoidance_confirmed: AvoidanceConfirmed | null;
   self_perception_level: string | null;
   competition_athlete_id: string | null;
   coaching_intake: CoachingIntake | null;
@@ -393,7 +415,8 @@ const PROFILE_COLS =
   "age, height, bodyweight, gender, units, " +
   "lifts, skills, conditioning, equipment, " +
   "days_per_week, session_length_minutes, " +
-  "goal, injuries_constraints, injuries_structured, self_perception_level, " +
+  "goal, injuries_constraints, injuries_structured, " +
+  "injuries_constraints_hash, injuries_avoidance_confirmed, self_perception_level, " +
   "competition_athlete_id, coaching_intake, updated_at";
 
 // ============================================================
@@ -582,11 +605,40 @@ export async function buildWriterPayload(
     do_not_program: [],
     suggested_subs: [],
   };
+
+  // The ACTIVE injury avoidances = the athlete-CONFIRMED list (handoff 1.1), valid
+  // only for the current text (confirmed_against_hash === injuries_constraints_hash).
+  // ROLLOUT SAFETY (T4 before T3/T6): when there is no valid confirmation yet — every
+  // existing user, until they complete the one-time show-back — fall back to the raw
+  // parsed list so protection is NEVER dropped. Once the confirmation flow + generation
+  // guard land, a valid confirmation takes precedence and the guard blocks the
+  // unconfirmed-non-empty path upstream.
+  const confirmed = profile.injuries_avoidance_confirmed ?? null;
+  const confirmationValid =
+    confirmed != null &&
+    profile.injuries_constraints_hash != null &&
+    confirmed.confirmed_against_hash === profile.injuries_constraints_hash;
+  const injuryBlocked = confirmationValid
+    ? confirmed!.do_not_program
+    : baseInjuriesStructured.do_not_program;
+
+  // Merge injury + equipment blocks WITHOUT flattening away the source (handoff
+  // Priority 2). Both sets are distinct here, so blocked_by is derived at merge —
+  // no stored column. A future equipment toggle consults blocked_by and must never
+  // lift 'injury'/'both' movements.
+  const injurySet = new Set(injuryBlocked);
+  const equipSet = new Set(equipmentBlocked);
+  const mergedDoNotProgram = Array.from(new Set([...injurySet, ...equipSet])).sort();
+  const blockedBy: Record<string, "equipment" | "injury" | "both"> = {};
+  for (const m of mergedDoNotProgram) {
+    const inj = injurySet.has(m);
+    const eq = equipSet.has(m);
+    blockedBy[m] = inj && eq ? "both" : inj ? "injury" : "equipment";
+  }
   const mergedInjuriesStructured: InjuryConstraints = {
     ...baseInjuriesStructured,
-    do_not_program: Array.from(
-      new Set([...baseInjuriesStructured.do_not_program, ...equipmentBlocked]),
-    ).sort(),
+    do_not_program: mergedDoNotProgram,
+    blocked_by: blockedBy,
   };
 
   // 7. Athlete Model (coaching-state Step 1) — compute the deterministic
