@@ -7,10 +7,8 @@
  * Inputs are GYM-LEVEL ONLY (Decision 11, docs/portfolio/PRODUCT_BOUNDARIES.md):
  * the gym's config drives generation; NO member data is read. The per-member
  * scaling roster (grants→links→athlete_profiles) was removed under Decision 11
- * R1/R2 — the retail profile is retail-only, and per-member scaling returns (if
- * ever) as affiliate-side membership-slot inputs, never from profiles.
- * resume_state.roster is always empty, a legal state end-to-end: the shared
- * program generates; persist-cohort-result writes no scaling rows.
+ * R1/R2 — the retail profile is retail-only. Caller-supplied athlete inputs are
+ * the Engine API's business (engine-generate); the gym program has none.
  *
  * Does the cheap DB work (vocabulary, RAG), builds the envelope, inserts the
  * gym_program_jobs row, and fires the worker's first stage. Returns the job id.
@@ -72,11 +70,6 @@ export class GymJobConflictError extends Error {
 
 export interface StartGymJobResult {
   job_id: string;
-  /** Always 0 since Decision 11 removed per-member scaling. Kept (as literal 0)
-   *  for portal seam compatibility; remove on both sides in the class sweep. */
-  members_scaled: number;
-  /** Always 0 — see members_scaled. */
-  members_with_weights: number;
 }
 
 export async function startGymJob(
@@ -114,7 +107,6 @@ export async function startGymJob(
     domain_pack: cfg.domain_pack,
     payload: envelope.shared_payload,
     tdi: envelope.shared_training_design_input,
-    roster: [], // Decision 11: per-member scaling removed; empty is supported end-to-end.
     startedAtMs: Date.now(),
   };
   const { data: job, error: jobErr } = await supa
@@ -143,5 +135,5 @@ export async function startGymJob(
 
   await gymSelfRetrigger(job.id as string);
 
-  return { job_id: job.id as string, members_scaled: 0, members_with_weights: 0 };
+  return { job_id: job.id as string };
 }

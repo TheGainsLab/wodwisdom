@@ -32,7 +32,6 @@ import type { WriterPayload } from "./build-writer-payload.ts";
 import type { TrainingDesignInput } from "./training-design-input.ts";
 import type { SkeletonOutput } from "./v3-output-schema.ts";
 import type { WeekPrescription, WriterOutput } from "./v2-output-schema.ts";
-import type { AthleteInput } from "./engine/contract.ts";
 import {
   HEARTBEAT_MS,
   LEASE_SECONDS,
@@ -62,7 +61,7 @@ export const GYM_FIRST_STAGE: GymStage = "skeleton";
 
 // ============================================================
 // Resume state — everything a stage needs to pick the job back up. The cron
-// seeds payload/tdi/roster at kickoff (all DB reads happen there, before any
+// seeds payload/tdi at kickoff (all DB reads happen there, before any
 // paid LLM work — preserving the old cron's abort-before-spend discipline).
 // ============================================================
 
@@ -73,8 +72,6 @@ export interface GymResumeState {
   payload?: WriterPayload;
   /** The cohort envelope's coaching strategy projection. */
   tdi?: TrainingDesignInput;
-  /** The scaling roster (may be empty — shared program still generates). */
-  roster?: AthleteInput[];
   /** Also mirrored to gym_program_jobs.skeleton_json for the review desk. */
   skeleton?: SkeletonOutput;
   /** Accumulated one per fill_week_N stage. */

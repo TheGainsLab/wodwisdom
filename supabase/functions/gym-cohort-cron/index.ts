@@ -113,8 +113,6 @@ Deno.serve(async (req) => {
       started: true,
       gym_id: cfg.gym_id,
       job_id: result.job_id,
-      members_scaled: result.members_scaled,
-      members_with_weights: result.members_with_weights,
       watch: "select status, next_stage, error from gym_program_jobs where id = '" + result.job_id + "'",
     });
   } catch (e) {

@@ -13,7 +13,7 @@
  * Every stage's actual work is the SAME Engine pipeline code the synchronous
  * path used (generateSkeletonWithAudits, callWeekFill, auditOutput,
  * applyProgrammaticFixes/applySurgicalFixes, recomputeBenchmarks,
- * computeCohortScaling, persistCohortResult) — the stage functions are ports of
+ * persistCohortResult) — the stage functions are ports of
  * generate-program-v3's stages with retail's payload/tdi swapped for the cohort
  * envelope the cron seeds into resume_state. Nothing in the pipeline itself
  * changes.
@@ -47,7 +47,6 @@ import {
   resolveGender,
   STALL_HALT_PASSES,
 } from "../_shared/engine/pipeline.ts";
-import { computeCohortScaling } from "../_shared/engine/cohort.ts";
 import type { EngineGenerateResult } from "../_shared/engine/contract.ts";
 import { persistCohortResult } from "../_shared/cohort/persist-cohort-result.ts";
 import {
@@ -330,7 +329,6 @@ async function stageSaving(
   const pack = getDomainPack(rs.domain_pack);
   const output = rs.output!;
   const skeleton = rs.skeleton!;
-  const roster = rs.roster ?? [];
   const safety = rs.safety ?? { safe: true, reasoning: "", errored: true };
 
   // Save-path sanitizers — the same always-run finish steps as run-engine/v3.
@@ -378,7 +376,9 @@ async function stageSaving(
         residual_audit_failures: rs.residualFailures ?? [],
         safety,
       }],
-      scalings: roster.map((a) => computeCohortScaling(output, a, pack)),
+      // Decision 11: the gym program has no per-member scaling (gym-level inputs
+      // only). Caller-supplied rosters live in the Engine API (engine-generate).
+      scalings: [],
     };
     try {
       const persisted = await persistCohortResult(supa, result);
@@ -407,7 +407,7 @@ async function stageSaving(
 
   const elapsedMs = rs.startedAtMs ? Date.now() - rs.startedAtMs : null;
   console.log(
-    `[gym-generate] complete: gym ${rs.gym_id} program ${cohortProgramId} members_scaled=${roster.length} elapsed=${elapsedMs}ms safe=${safety.safe}`,
+    `[gym-generate] complete: gym ${rs.gym_id} program ${cohortProgramId} elapsed=${elapsedMs}ms safe=${safety.safe}`,
   );
 
   return {
@@ -417,7 +417,6 @@ async function stageSaving(
       cohortProgramId,
       resultJson: {
         cohort_program_id: cohortProgramId,
-        members_scaled: roster.length,
         safety,
         residual_audit_failures: rs.residualFailures ?? [],
         session_budget_warnings: rs.budgetWarnings ?? [],
