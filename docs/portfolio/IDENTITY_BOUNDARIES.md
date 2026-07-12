@@ -62,3 +62,57 @@ possession is the handoff (IDENTITY_MODEL §5.1); identity is never exchanged.
   imports, portal) is built entirely from affiliate-native objects; its only
   foreign artifact is the token it minted itself, and its only wodwisdom API
   surface is gym-seat-grant create / status / revoke.
+
+---
+
+# Decision 12a — The membership model (founder, 2026-07-12, later the same day)
+
+> Think of it like a member of CrossFit Southie. You have a membership to the
+> gym. You get the gym's program, and you can add on Engine or Nutrition and
+> maybe future services. Why would you ever need an account elsewhere?
+>
+> You check your Southie app. From there you see the day's training and you see
+> your access to Engine. You click through. You see your access to Nutrition.
+> ALL of that happens on the Southie side.
+
+That is the decision; the rest is consequence. It completes Decision 12 by
+settling where the member EXPERIENCE lives, not just the identity.
+
+## The rules
+
+- **The member's one and only login is their gym membership** (affiliate-native
+  auth). The design test for every future proposal: *would a Southie member
+  need an account anywhere but their gym?* If yes, the design is wrong.
+- **The wodwisdom PWA never serves affiliate members.** Not de-branded, not
+  gym-shelled, not behind a neutral domain — gym members simply never arrive.
+  The wodwisdom user base is retail customers, and now literally nothing else.
+- **No wodwisdom account exists for a gym member.** Decision 12's third
+  sentence stops being a policy and becomes physics: there is nothing for the
+  affiliate to know about.
+- **Delivery is headless B2B.** The affiliate platform calls tenant-keyed
+  wodwisdom service APIs (the `engine-generate` pattern — tenant + explicit
+  inputs in, results out) and renders everything inside the gym's member app.
+- **Member service data lives affiliate-side.** Workout logs, nutrition logs —
+  the gym's member's data, in the gym's platform. wodwisdom AI services are
+  called statelessly per request and store nothing about gym members.
+- **The gym's member app is also the delivery surface for the gym's own
+  generated program** (Decision 11 product 3): the day's training a member sees
+  IS the owner's program. Engine and Nutrition are add-on doors beside it.
+
+## Accepted trade (taken knowingly)
+
+A member who leaves their gym has no wodwisdom account to convert — retail
+requires a fresh signup with no history carryover. Cleaner separation over
+funnel continuity.
+
+## Superseded by 12a (retire for gym-member use; wodwisdom-side sweep)
+
+- `gym-seat-claim` + the `/claim/:token` page + claim-link delivery (the P2a
+  account-binding flow — its seam discipline lives on in the B2B APIs).
+- The gym shell (Decision 10(a) gym variant) and gym-member `gym_engine` /
+  `nutrition` entitlements + the gym months-drip.
+- The affiliate-side claim-link UX shipped in identity Phase 4 (the roster,
+  seat model, and portal survive; the link-delivery mechanics retire).
+
+Retirement is phased behind the affiliate member app — nothing is deleted
+before the replacement delivery path works end to end.
