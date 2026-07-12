@@ -47,7 +47,7 @@ export type CohortTargetLevel = "beginner" | "intermediate" | "advanced";
 /**
  * The owner's coaching strategy (gym_cohort_configs.strategy jsonb) — the
  * priority sliders. Keys are FOCUS_AREAS; values 0–10. Replaces the old
- * hardcoded Engine-Class strategy as the "what should this cycle emphasize"
+ * hardcoded legacy strategy as the "what should this cycle emphasize"
  * input (the slot retail fills with CoachState). Written via SQL today; the
  * portal brief form writes the same shape when it ships.
  */
@@ -150,7 +150,7 @@ function referenceProfile(config: GymCohortConfig): AthleteProfileStatic {
 
 // ── The owner-strategy → design-input mapping (the priority sliders) ─────────
 //
-// The old hardcoded strategy here was the Engine-Class recipe (conditioning-
+// The old hardcoded strategy here was the legacy gym recipe (conditioning-
 // forward, deprioritize olympic_lifting) — written for the shelved conditioning
 // product and confirmed wrong for a gym MAIN program by the first real
 // generation (2026-07-07). The owner's sliders now fill this slot; when no
@@ -332,10 +332,10 @@ export function buildGymCohortEnvelope(
     training_context: {
       days_per_week: config.days_per_week,
       session_length_minutes: config.session_length_minutes,
-      goal_text: config.goal_text ?? "Shared gym Engine Class — build a broad, durable engine.",
+      goal_text: config.goal_text ?? "Shared gym program — build a broad, durable engine.",
       injuries_constraints_text: null,
       injuries_structured: config.do_not_program.length > 0
-        ? { summary: "Class-level movement exclusions.", do_not_program: config.do_not_program, suggested_subs: [] }
+        ? { summary: "Gym-level movement exclusions.", do_not_program: config.do_not_program, suggested_subs: [] }
         : null,
       self_perception_level: config.target_level,
     },
