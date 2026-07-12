@@ -1,9 +1,9 @@
 /**
  * consumer-auth — the constant-time, tenant-bound consumer-key authorizer.
  *
- * Extracted from engine-generate so the Wholesale Grants API (and any future
+ * Extracted from engine-generate so the gym seat-grant seam (and any future
  * server-to-server surface) reuses ONE implementation instead of copying a
- * third variant (BILLING_MECHANICS_SPEC §7 / ENGINE_API_CONTRACT.md auth).
+ * third variant (the consumer-key auth pattern; see ENGINE_API_CONTRACT.md).
  *
  * Shape: an admin/service key authorizes ANY tenant ("*"); optional per-consumer
  * keys (a JSON `{ key: tenant | tenant[] }` map) authorize ONLY their bound
