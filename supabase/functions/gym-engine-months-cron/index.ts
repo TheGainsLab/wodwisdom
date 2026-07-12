@@ -1,7 +1,7 @@
 /**
  * gym-engine-months-cron — the grant-based Engine months drip (Decision 9(i)).
  *
- * Engine Class is pure distribution of the retail Engine: a gym seat grants the retail
+ * A gym seat is pure distribution of the retail Engine: the seat grants the retail
  * `engine` feature — and per Decision 10 the affiliate now grants the distinct
  * `gym_engine` seat instead; BOTH drip (shared ENGINE_DRIP_FEATURES list, one cadence).
  * But the retail month drip is hard-keyed to Stripe, so a gym-granted

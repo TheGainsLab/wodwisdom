@@ -1,8 +1,8 @@
 // Shared movement-line formatter for prescription display. Mirrors the proven logic
 // in ProgramDetailPage (formatRepPrescription + v3BlocksToProse's fmt): calories take
 // precedence, uniform rep-schemes collapse to sets×reps, and distance movements drop
-// reps so a "Row" doesn't render "250 reps · 250m". Used by the gym Engine Class
-// surfaces (EngineClassBlocks) so they don't re-introduce that display bug.
+// reps so a "Row" doesn't render "250 reps · 250m". Shared so every prescription
+// surface renders movement lines the same way.
 
 export interface DisplayMovement {
   movement: string;
