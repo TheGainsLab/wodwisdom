@@ -1,5 +1,8 @@
 # Decision 11 — Product Boundaries (founder, 2026-07-12)
 
+> Companion: **Decision 12 — Identity Boundaries** ([IDENTITY_BOUNDARIES.md](./IDENTITY_BOUNDARIES.md))
+> governs identity across the seam; read them together.
+
 Three products. One generator. Hard boundaries between them.
 
 This decision SUPERSEDES the cross-surface scope of Decision 1 ("ONE PROFILE —
