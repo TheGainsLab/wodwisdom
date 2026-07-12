@@ -1,4 +1,4 @@
--- Wholesale Grants API — user_entitlements source_kind/granted_by (BILLING_MECHANICS_SPEC §7).
+-- Wholesale Grants API — user_entitlements source_kind/granted_by (gym-grant entitlements).
 --
 -- REALITY DIVERGENCE FROM SPEC §7 (documented, not improvised):
 --   Spec §7 assumed `source` was a free column and proposed making it the
