@@ -98,6 +98,11 @@ settling where the member EXPERIENCE lives, not just the identity.
 - **The gym's member app is also the delivery surface for the gym's own
   generated program** (Decision 11 product 3): the day's training a member sees
   IS the owner's program. Engine and Nutrition are add-on doors beside it.
+- **The generation rule (founder, 2026-07-12, closing the recurring error):**
+  wodwisdom GENERATES; everything generated LIVES ON THE PLATFORM; wodwisdom is
+  NEVER in the member's runtime path. Programs are delivered at approval;
+  Engine arrives in generated blocks; scoring math ships with the block. A
+  member's app reads the platform's own database, always.
 
 ## Accepted trade (taken knowingly)
 
