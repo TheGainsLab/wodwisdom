@@ -47,14 +47,12 @@ export default function ClaimSeatPage({ session }: { session: Session | null }) 
   return <Shell><ClaimFlow initialToken={token} /></Shell>;
 }
 
+// Deliberately UNBRANDED: a gym member must never see the service provider's brand
+// (IDENTITY_MODEL North Star §2). The content leads with the GYM's name (the peek's
+// gym_name → "<Gym> is giving you <Service>"); this shell is a neutral container only.
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ maxWidth: 440, margin: '0 auto', padding: '2rem 1.25rem', minHeight: '100vh' }}>
-      <div style={{ marginBottom: '1.5rem' }}>
-        <div style={{ fontSize: 13, letterSpacing: 1, textTransform: 'uppercase', opacity: 0.6 }}>
-          The Gains Lab
-        </div>
-      </div>
       {children}
     </div>
   );
