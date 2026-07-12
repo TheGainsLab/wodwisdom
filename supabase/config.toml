@@ -211,6 +211,13 @@ verify_jwt = false
 # DEPLOYED wholesale-grants function alive until the affiliate has switched to this seam.
 verify_jwt = false
 
+[functions.gym-services]
+# The generation seam (SERVICE_API_CONTRACT v2 / Decision 12a): the affiliate
+# backend requests generated Engine blocks at block boundaries. Server-to-server;
+# WHOLESALE consumer-key family (tenant-bound), so skip Supabase's JWT gate.
+# Zero member identity; nothing stored.
+verify_jwt = false
+
 [functions.gym-seat-claim]
 # The member claims a seat token (identity model Phase 2). Member JWT verified by the
 # gateway (verify_jwt=true — we decode the sub); binds the pending grant as a gym_grant
