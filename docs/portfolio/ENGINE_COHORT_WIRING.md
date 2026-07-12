@@ -1,3 +1,8 @@
+> **⚠️ PARTIALLY SUPERSEDED (Decision 11, 2026-07-12).** Engine Class is not a
+> product: the class surfaces, join flow (F3), rosters, leaderboards, and TV
+> described here were removed. Gym program generation and the per-seat token flow
+> remain. Authoritative boundaries: [PRODUCT_BOUNDARIES.md](./PRODUCT_BOUNDARIES.md).
+
 # Gym Cohort Program Wiring (task #5)
 
 _2026-07-03. How a gym's Engine Class program is generated monthly. Wodwisdom-side

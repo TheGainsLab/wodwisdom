@@ -1,3 +1,7 @@
+> **⚠️ SUPERSEDED (Decision 11, 2026-07-12).** Engine Class is not a product. This
+> document describes removed machinery and is retained as a historical record only.
+> The authoritative product boundaries live in [PRODUCT_BOUNDARIES.md](./PRODUCT_BOUNDARIES.md).
+
 # Engine Class = pure distribution of retail Engine — DESIGN + BUILD
 
 > **STATUS: reviewer-approved (PR #574) → BUILT + build-review fix (PR #577).** All 5 open

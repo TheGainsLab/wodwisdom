@@ -85,12 +85,32 @@ Kept deliberately:
 - `gym-generate`'s scaling/persist plumbing — generic, no-ops on the empty
   roster; prune with the seam fields.
 
-## Deploy/cleanup checklist (outside this repo)
+## Second tranche (executed 2026-07-12; all affiliates are test users, so no
+## migration window was needed)
 
-- Do NOT undeploy the `wholesale-grants` / `engine-join` Supabase functions
-  until the affiliate has fully switched to the gym-seat-grant token seam.
-- Affiliate portal: stop reading `members_scaled` (now always 0); retire its
-  side of the class machinery (rosters, invites, moderation, TV tokens).
-- Data cleanup (separate, destructive migrations — founder sign-off each):
-  `engine_member_scaling` table, `member_gym_links.engine_intake` column,
-  stored `engine_cohort`/`engine_class_view` entitlement rows, `gym_tv_tokens`.
+- Seam fields `members_scaled` / `members_with_weights` REMOVED from the
+  kickoff result, portal response, cron log, and job result JSON — not kept
+  as 0. The roster field left `GymResumeState`; `gym-generate` persists with
+  empty scalings.
+- Claim/revoke/poll transition logic extracted to the pure, unit-tested
+  `_shared/seat-grant-state.ts` (19 tests) — both seat functions consume it.
+  The status poll now filters implausible tokens and documents the POLL
+  CONTRACT: `claimed` = the member owns the seat and the bind converges, NOT
+  a guarantee the entitlement row exists at that instant.
+- Data cleanup migration `20260712000000_decision11_class_cleanup.sql`
+  (destructive, founder-approved): drops `engine_class_results` +
+  `gym_tv_tokens`, drops `member_gym_links.engine_intake`, deletes stored
+  `engine_cohort`/`engine_class_view` entitlement + seat-grant rows.
+  **KEPT: `engine_member_scaling` and `engine_cohort_programs`** — they are
+  the Engine API's output tables (`engine-generate`, where CALLERS supply
+  athletes as explicit inputs — the R2-compliant path), not class machinery.
+- Class-era portfolio docs carry SUPERSEDED banners pointing here.
+
+## Still outside this repo
+
+- Undeploy the dead Supabase functions (`wholesale-grants`, `engine-join`,
+  `engine-class-*`) — safe immediately; all affiliates are test users.
+- Run the cleanup migration (SQL-editor-ready) before the first production
+  affiliate.
+- Affiliate repo: switch to the gym-seat-grant token seam; drop its
+  `members_scaled` read; retire its side of the class machinery.
