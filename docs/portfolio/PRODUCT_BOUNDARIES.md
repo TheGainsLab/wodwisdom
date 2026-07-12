@@ -58,19 +58,39 @@ cohort scaling, no class leaderboard/TV, no class join flow.
   `members_with_weights` remain in the kickoff result as literal 0 for seam
   compatibility with the portal; remove them (both sides) in the class sweep.
 
-## Slated for the class sweep (pending confirmation, not yet done)
+## The class sweep (founder-confirmed DELETE; executed 2026-07-12)
 
-- `engine-class-log/-leaderboard/-tv/-view/-entries` functions + parked pages
-  (Decision 9(i) assets) — delete vs park: RECOMMEND DELETE (git history is the
-  archive; parked-but-deployed code is how superseded doctrine propagates).
-- `engine-join` + `/join/engine/:token` + `member_gym_links.engine_intake` —
-  class-era join door; fold into the Phase 5 old-path retirement (live-traffic
-  timing is the founder's call).
-- `engine_cohort` / `engine_class_view` in `ALLOWED_GRANT_FEATURES`.
-- `buildCohortRoster` / `engine_member_scaling` / roster plumbing in
-  `gym-generate` once the seam fields go.
-- Cross-repo: the affiliate portal's use of `members_scaled` (if any) and its
-  side of the class machinery.
+Removed from the repo (git history is the archive):
 
-`member_gym_links` itself SURVIVES — it is the product-agnostic membership link
-(P2a claim, gym branding) — only the class intake riding on it dies.
+- `engine-class-log/-leaderboard/-tv/-view/-entries` functions, the
+  `_shared/engine-class/` module, and the parked pages (`GymClassPage`,
+  `GymLeaderboardPage`, `GymTVPage`).
+- `engine-join` + `JoinEnginePage`. `/join/engine/:token` keeps a dead-link
+  stub ("this invite link has been replaced — ask your gym for a new invite")
+  so outstanding invite links fail with a message, not a blank landing.
+- `wholesale-grants` (the user-id grant path P2a replaced).
+- `engine_cohort` / `engine_class_view` grant features +
+  `ENGINE_CLASS_SEAT_FEATURES` / `ENGINE_CLASS_VIEW_FEATURES`.
+- `buildCohortRoster` + its tests. `loadLatestProgram` was MOVED to
+  `_shared/cohort/load-latest-program.ts` — it serves the gym program
+  generation product (the portal review desk), not Engine Class.
+
+Kept deliberately:
+
+- `member_gym_links` — the product-agnostic membership link (P2a claim, gym
+  branding). Only the class intake (`engine_intake`) lost its writers/readers;
+  the column awaits a data-cleanup migration.
+- Engine-core cohort mode (`_shared/engine/`) — generic generator contract;
+  the gym program runs it with an empty roster.
+- `gym-generate`'s scaling/persist plumbing — generic, no-ops on the empty
+  roster; prune with the seam fields.
+
+## Deploy/cleanup checklist (outside this repo)
+
+- Do NOT undeploy the `wholesale-grants` / `engine-join` Supabase functions
+  until the affiliate has fully switched to the gym-seat-grant token seam.
+- Affiliate portal: stop reading `members_scaled` (now always 0); retire its
+  side of the class machinery (rosters, invites, moderation, TV tokens).
+- Data cleanup (separate, destructive migrations — founder sign-off each):
+  `engine_member_scaling` table, `member_gym_links.engine_intake` column,
+  stored `engine_cohort`/`engine_class_view` entitlement rows, `gym_tv_tokens`.

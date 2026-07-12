@@ -204,16 +204,11 @@ verify_jwt = false
 # (ENGINE_SERVICE_KEY); skip Supabase's JWT gate so it reaches our handler.
 verify_jwt = false
 
-[functions.wholesale-grants]
-# Wholesale Grants API (BILLING_MECHANICS_SPEC §7). Server-to-server; auth is our
-# own X-Service-Key (WHOLESALE_SERVICE_KEY / WHOLESALE_CONSUMER_KEYS), so skip
-# Supabase's JWT gate.
-verify_jwt = false
-
 [functions.gym-seat-grant]
 # Token-keyed seat grant seam (identity model Phase 2). Server-to-server; the
-# WHOLESALE consumer-key family (tenant-bound), so skip Supabase's JWT gate. Deployed
-# ALONGSIDE wholesale-grants (the old user-id path) through the migration window.
+# WHOLESALE consumer-key family (tenant-bound), so skip Supabase's JWT gate. The old
+# user-id wholesale-grants path was removed in the Decision 11 class sweep — keep the
+# DEPLOYED wholesale-grants function alive until the affiliate has switched to this seam.
 verify_jwt = false
 
 [functions.gym-seat-claim]
@@ -256,42 +251,9 @@ verify_jwt = false
 
 [functions.gym-engine-months-cron]
 # Decision 9(i) — grant-based Engine months drip for gym-granted `engine` members (the
-# retail drip is Stripe-keyed). Month 1 is seeded at grant time (wholesale-grants); this
+# retail drip is Stripe-keyed). Month 1 is seeded at grant time (gym-seat-claim); this
 # advances the ongoing drip — schedule HOURLY via pg_cron. verify_jwt=false; the handler
 # gates on an X-Cron-Key header (GYM_ENGINE_MONTHS_CRON_KEY), fail-closed.
-verify_jwt = false
-
-[functions.engine-join]
-# F3 member-join bridge (wodwisdom side). Member JWT is verified by the gateway
-# (verify_jwt=true — no per-request GoTrue round trip; we decode the verified token
-# for the user id). Calls the affiliate engine-enroll fn server-to-server. Needs
-# AFFILIATE_ENROLL_URL + ENGINE_ENROLL_KEY (shared secret, same value the affiliate holds).
-verify_jwt = true
-
-# ── F4/F5 gym Engine Class surfaces (GYM_PORTAL_FLOWS §F4/§F5) ────────────────
-[functions.engine-class-view]
-# F5 free read-only gym view. Member JWT verified by the gateway; the handler gates
-# on joined-link + active engine_cohort-family entitlement (gate.ts).
-verify_jwt = true
-
-[functions.engine-class-log]
-# A seat member logs their Engine Class result (F4 leaderboard raw material). Member
-# JWT; same gate as the view. Calls the data-service work-calc for W·kg.
-verify_jwt = true
-
-[functions.engine-class-leaderboard]
-# F4 gym leaderboard (per-workout + season) for a signed-in member/coach. Member JWT;
-# applies the affiliate moderation ledger (seam 2).
-verify_jwt = true
-
-[functions.engine-class-entries]
-# F4_MODERATION_CONTRACT seam 1 — the affiliate moderation page reads a gym's entries.
-# Server-to-server X-Service-Key (WODWISDOM_LEADERBOARD_KEY), so skip the JWT gate.
-verify_jwt = false
-
-[functions.engine-class-tv]
-# F4 TV mode — tokenized no-login gym-wall board. verify_jwt=false; the gym_tv_tokens
-# token in the URL is the capability.
 verify_jwt = false
 
 [functions.reconcile-programming-months]

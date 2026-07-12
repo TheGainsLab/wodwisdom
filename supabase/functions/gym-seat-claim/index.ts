@@ -48,7 +48,7 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{20,128}$/;
  *  §6). Injuries/health is always a SEPARATE type (future), never bundled here. */
 function consentTypeFor(feature: string): string {
   if (feature === "nutrition") return "member_nutrition_data";
-  return "member_engine_data"; // engine / gym_engine / engine_cohort / engine_class_view
+  return "member_engine_data"; // engine / gym_engine (Decision 11: class features removed)
 }
 
 /** Decode a Supabase JWT payload. Signature verified upstream (verify_jwt=true). */
