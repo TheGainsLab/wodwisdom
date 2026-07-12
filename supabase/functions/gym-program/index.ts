@@ -28,7 +28,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createConsumerAuth } from "../_shared/consumer-auth.ts";
-import { loadLatestProgram } from "../_shared/engine-class/queries.ts";
+import { loadLatestProgram } from "../_shared/cohort/load-latest-program.ts";
 import {
   ACTIVE_JOB_STATUSES,
   GymJobConflictError,

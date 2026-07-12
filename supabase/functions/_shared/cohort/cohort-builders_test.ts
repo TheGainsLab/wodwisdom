@@ -1,10 +1,6 @@
 // deno test supabase/functions/_shared/cohort/cohort-builders_test.ts --allow-env --no-check
 import { assertEquals, assert } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { buildGymCohortEnvelope, mapSlidersToDesign, type GymCohortConfig } from "./build-gym-cohort-envelope.ts";
-import { buildCohortRoster } from "./build-cohort-roster.ts";
-import { computeCohortScaling } from "../engine/cohort.ts";
-import { getDomainPack } from "../domain-packs/registry.ts";
-import type { WriterOutput } from "../v2-output-schema.ts";
 
 const NOW = "2026-07-03T00:00:00.000Z";
 const VOCAB = ["Back Squat", "Snatch", "Row (Calories)"];
@@ -53,88 +49,6 @@ Deno.test("reference lifts are self-consistent with the canonical inter-lift rat
   assert(Math.abs((deadlift! / back_squat!) - 1.30) < 0.02, "deadlift:back_squat ≈ canonical 1.30");
   assert(Math.abs((clean_and_jerk! / back_squat!) - 0.80) < 0.02, "C&J:back_squat ≈ canonical 0.80");
 });
-
-Deno.test("buildCohortRoster: maps intake to slim AthleteInput", () => {
-  const roster = buildCohortRoster([
-    { athlete_ref: "u1", gender: "female", units: "lbs", lifts: { back_squat: 205 }, do_not_program: ["Snatch"] },
-  ], NOW);
-  assertEquals(roster.length, 1);
-  assertEquals(roster[0].athlete_ref, "u1");
-  assertEquals(roster[0].payload.lifts.back_squat, 205);
-  assertEquals(roster[0].payload.basics.gender, "female");
-  assertEquals(roster[0].payload.training_context.injuries_structured?.do_not_program, ["Snatch"]);
-});
-
-Deno.test("buildCohortRoster: empty roster → empty AthleteInput[] (F5 shared-program path)", () => {
-  assertEquals(buildCohortRoster([], NOW), []);
-});
-
-Deno.test("buildCohortRoster: lift coercion drops zero/negative/non-finite 1RMs (asLiftValue parity)", () => {
-  const [m] = buildCohortRoster([{
-    athlete_ref: "u1",
-    lifts: {
-      back_squat: 300,          // valid
-      deadlift: 0,              // zero → null
-      snatch: -50,              // negative → null
-      clean: Number.NaN,        // non-finite → null
-      press: Number.POSITIVE_INFINITY, // non-finite → null
-    } as Record<string, number>,
-  }], NOW);
-  assertEquals(m.payload.lifts.back_squat, 300);
-  assertEquals(m.payload.lifts.deadlift, null);
-  assertEquals(m.payload.lifts.snatch, null);
-  assertEquals(m.payload.lifts.clean, null);
-  assertEquals(m.payload.lifts.press, null);
-});
-
-Deno.test("buildCohortRoster: dedupes duplicate athlete_ref (first wins) — no UNIQUE collision", () => {
-  const roster = buildCohortRoster([
-    { athlete_ref: "u1", lifts: { back_squat: 200 } },
-    { athlete_ref: "u1", lifts: { back_squat: 999 } },
-    { athlete_ref: "u2", lifts: { back_squat: 150 } },
-  ], NOW);
-  assertEquals(roster.length, 2);
-  assertEquals(roster[0].payload.lifts.back_squat, 200); // first wins
-  assertEquals(roster[1].athlete_ref, "u2");
-});
-
-Deno.test("end-to-end deterministic scaling: envelope + roster + computeCohortScaling", () => {
-  const pack = getDomainPack("crossfit@3");
-  // A tiny shared program (what the LLM would produce) — one strength block.
-  const shared = {
-    month_plan: { summary: "test" },
-    weeks: [{
-      week_num: 1,
-      days: [{
-        day_num: 1,
-        blocks: [{
-          movements: [
-            { movement: "Back Squat", target_pct_1rm: 70 },
-            { movement: "Snatch", target_pct_1rm: 65 },
-          ],
-        }],
-      }],
-    }],
-  } as unknown as WriterOutput;
-
-  const [member] = buildCohortRoster([
-    { athlete_ref: "u1", units: "lbs", lifts: { back_squat: 300 }, do_not_program: ["Snatch"] },
-  ], NOW);
-
-  const scaling = computeCohortScaling(shared, member, pack);
-
-  const bs = scaling.scaled_movements.find((m) => m.movement === "Back Squat")!;
-  // round(0.70 × 300 / 5) × 5 = 210
-  assertEquals(bs.resolved_weight, 210);
-  assertEquals(bs.basis_lift, "back_squat");
-  assertEquals(bs.needs_substitution, false);
-
-  const sn = scaling.scaled_movements.find((m) => m.movement === "Snatch")!;
-  assertEquals(sn.needs_substitution, true); // in the member's do_not_program
-  assertEquals(scaling.substitutions_pending, 1);
-});
-
-// ── mapSlidersToDesign (owner strategy sliders → design intent) ───────────────
 
 Deno.test("mapSlidersToDesign: bands map to develop/maintain/deprioritize, ranked by value", () => {
   const d = mapSlidersToDesign({
