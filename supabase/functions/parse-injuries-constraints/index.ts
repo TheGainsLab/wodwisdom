@@ -1,9 +1,15 @@
 /**
  * parse-injuries-constraints/index.ts
  *
- * Async pre-pass that converts an athlete's free-text injuries_constraints
- * field into a structured machine-readable form. Runs after profile save
- * (fire-and-forget from the client). Result stored on athlete_profiles:
+ * Async pre-pass that converts the athlete's free-text avoid-list field
+ * ("Exercises you'd prefer we avoid" — a PREFERENCE question; we never ask why)
+ * into a structured machine-readable form. Runs after profile save
+ * (fire-and-forget from the client). Result stored on athlete_profiles
+ * (columns keep their historical injuries_* names):
+ *
+ * PRIVACY INVARIANT: if the athlete volunteers a reason ("bad shoulder", "torn
+ * ACL"), it stays in the raw field only. Every emitted field — summary included —
+ * names movements/patterns, never reasons, conditions, or body descriptions.
  *
  *   injuries_structured: jsonb
  *     {
@@ -33,24 +39,26 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = MODELS.sonnet;
 
-const SYSTEM_PROMPT = `You are parsing a CrossFit athlete's stated injuries and movement constraints into a structured machine-readable form for downstream program generation.
+const SYSTEM_PROMPT = `You are parsing a CrossFit athlete's free-text list of exercises they prefer to avoid into a structured machine-readable form for downstream program generation. The athlete was asked only WHICH movements to avoid — never why.
+
+PRIVACY RULE (overrides everything below): the athlete may volunteer a reason anyway — an injury, a condition, a body complaint. NEVER repeat, paraphrase, or hint at a reason in ANY emitted field. Every field names movements or movement patterns only. "Avoiding overhead pressing movements." is a valid summary; "Avoiding overhead work due to a shoulder injury." is not.
 
 Read the text carefully and emit three fields via the emit_injury_constraints tool:
 
-1. summary — one sentence capturing the constraint(s). Coach voice, plain English. If text is empty or says no injuries / nothing, return "No injury constraints."
+1. summary — one sentence naming the movements/patterns being avoided. Coach voice, plain English, movements only (see PRIVACY RULE). If text is empty or says none / nothing, return "No injury constraints."
 
-2. do_not_program — list of canonical CrossFit movement names the athlete should NOT be programmed. Use display-name conventions (Title Case, hyphenated where appropriate). Be EXPLICIT and EXHAUSTIVE: if the text says "no overhead pressing", enumerate every overhead movement (Snatch, Power Snatch, Squat Snatch, Hang Snatch, Jerk, Push Jerk, Split Jerk, Push Press, Strict Press, Press, HSPU, Strict HSPU, Deficit HSPU, Wall-Facing HSPU, Handstand Walk, Overhead Squat, Thruster, Wall Ball, Bar Muscle-Ups, Muscle-Ups). If text mentions a body region (knee, low back, shoulder), enumerate movements that load that region. Err on the side of LISTING MORE rather than fewer.
+2. do_not_program — list of canonical CrossFit movement names the athlete should NOT be programmed. Use display-name conventions (Title Case, hyphenated where appropriate). Be EXPLICIT and EXHAUSTIVE: if the text says "no overhead pressing", enumerate every overhead movement (Snatch, Power Snatch, Squat Snatch, Hang Snatch, Jerk, Push Jerk, Split Jerk, Push Press, Strict Press, Press, HSPU, Strict HSPU, Deficit HSPU, Wall-Facing HSPU, Handstand Walk, Overhead Squat, Thruster, Wall Ball, Bar Muscle-Ups, Muscle-Ups). If the text volunteers a body region (knee, low back, shoulder), enumerate movements that load that region — honor the intent without recording the reason. Err on the side of LISTING MORE rather than fewer.
 
-3. suggested_subs — optional list of common substitutions for the most-frequent contraindicated movements. Each entry: { instead_of: "Snatch", use: "Sumo Deadlift High Pull (chest-height)" }. Use canonical names. Limit to ~5–10 high-value subs (don't enumerate every possible sub).
+3. suggested_subs — optional list of common substitutions for the most-frequent excluded movements. Each entry: { instead_of: "Snatch", use: "Sumo Deadlift High Pull (chest-height)" }. Use canonical names. Limit to ~5–10 high-value subs (don't enumerate every possible sub).
 
 Edge cases:
-- Empty text or "none" / "no injuries" → do_not_program: [], suggested_subs: [], summary: "No injury constraints."
-- "Tweaked my back yesterday, taking it easy" → list spinal-loading movements; suggested_subs with lower-impact alternatives.
-- Vague text ("bad shoulder") → still list overhead + heavy pressing; better to over-list than miss something.`;
+- Empty text or "none" / "nothing" → do_not_program: [], suggested_subs: [], summary: "No injury constraints."
+- "Tweaked my back yesterday, taking it easy" → list spinal-loading movements; suggested_subs with lower-impact alternatives; summary names the movements only.
+- Vague text ("bad shoulder") → still list overhead + heavy pressing; better to over-list than miss something; summary names the movements only.`;
 
 const EMIT_INJURY_CONSTRAINTS_TOOL = {
   name: "emit_injury_constraints",
-  description: "Emit the structured form of the athlete's free-text injuries/constraints.",
+  description: "Emit the structured form of the athlete's free-text avoid-list.",
   input_schema: {
     type: "object",
     properties: {
@@ -58,7 +66,7 @@ const EMIT_INJURY_CONSTRAINTS_TOOL = {
         type: "string",
         minLength: 1,
         maxLength: 400,
-        description: "One-sentence summary of the constraint(s). Coach voice.",
+        description: "One-sentence summary naming the avoided movements/patterns ONLY — never reasons, conditions, or body descriptions. Coach voice.",
       },
       do_not_program: {
         type: "array",
@@ -127,7 +135,7 @@ async function callParser(text: string): Promise<StructuredInjuries> {
       system: SYSTEM_PROMPT,
       tools: [EMIT_INJURY_CONSTRAINTS_TOOL],
       tool_choice: { type: "tool", name: "emit_injury_constraints" },
-      messages: [{ role: "user", content: `ATHLETE INJURIES TEXT:\n${text}` }],
+      messages: [{ role: "user", content: `ATHLETE AVOID-LIST TEXT:\n${text}` }],
     }),
     signal: AbortSignal.timeout(45_000),
   });

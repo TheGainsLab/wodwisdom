@@ -1155,10 +1155,10 @@ export default function AthletePage({ session }: { session: Session }) {
           <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {injuryMigrationPrompt && injuryShowback && (
               <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
-                <h2 className="settings-card-title" style={{ marginBottom: 6 }}>Confirm your injury avoidances</h2>
+                <h2 className="settings-card-title" style={{ marginBottom: 6 }}>Confirm your avoidances</h2>
                 <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5, margin: 0 }}>
                   We now ask you to sign off on the movements we'll keep out of your programming.
-                  Scroll to the <strong>Injuries or movement constraints</strong> field below to review and confirm — it takes a few seconds.
+                  Scroll to the <strong>Exercises you'd prefer we avoid</strong> field below to review and confirm — it takes a few seconds.
                 </p>
               </div>
             )}
@@ -1574,7 +1574,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   </div>
 
                   <CollapsibleSection title="Equipment">
-                    <p className="athlete-card-subtitle">Uncheck any equipment you don't have or don't want programmed.</p>
+                    <p className="athlete-card-subtitle">Uncheck any equipment you don't have or don't want programmed — we'll remove every movement that needs it (e.g. unchecking the rower means no rowing).</p>
                     {EQUIPMENT_GROUPS.map(group => (
                       <div key={group.title} style={{ marginBottom: 20 }}>
                         <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
@@ -1625,8 +1625,13 @@ export default function AthletePage({ session }: { session: Session }) {
 
                     <div style={{ marginBottom: 16 }}>
                       <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>
-                        Injuries or movement constraints <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(leave blank if none)</span>
+                        Exercises you'd prefer we avoid <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional — leave blank if none)</span>
                       </div>
+                      {/* Deliberately a PREFERENCE, not a health question (founder decision
+                          2026-07-12, supersedes the 3.1 consent line): we never ask WHY, so the
+                          field solicits no Art. 9 health data and needs no consent notice. If a
+                          user volunteers a reason anyway, it stays in this raw field only — the
+                          parser emits movement names, never reasons. */}
                       <textarea
                         className="lift-input"
                         rows={3}
