@@ -29,6 +29,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { SEAT_TOKEN_RE, decideClaim, peekView, type SeatGrantState } from "../_shared/seat-grant-state.ts";
 import { buildGrantRow } from "../_shared/grant-row.ts";
 import { ENGINE_DRIP_FEATURES } from "../_shared/entitlements.ts";
 import { raiseEngineMonthsFromGrant } from "../_shared/engine-months-drip.ts";
@@ -41,8 +42,6 @@ const svc = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 // legal-copy swap can't cause a client-pinned-version skew (engine-join's discipline).
 // Bump this string when the claim-page consent copy changes (IDENTITY_MODEL §6).
 const CONSENT_VERSION = "gymclaim-v1-2026-07-11";
-
-const TOKEN_RE = /^[A-Za-z0-9_-]{20,128}$/;
 
 /** Map a granted feature to its per-service data-sharing consent type (IDENTITY_MODEL
  *  §6). Injuries/health is always a SEPARATE type (future), never bundled here. */
@@ -81,7 +80,7 @@ Deno.serve(async (req) => {
   try { body = await req.json() as typeof body; } catch { return json({ error: "invalid_json" }, 400); }
 
   const token = typeof body.token === "string" ? body.token : "";
-  if (!TOKEN_RE.test(token)) return json({ error: "invalid_request", detail: "token invalid" }, 400);
+  if (!SEAT_TOKEN_RE.test(token)) return json({ error: "invalid_request", detail: "token invalid" }, 400);
 
   // ── peek: what is this token, without binding? Drives the claim page's "CrossFit
   //    Southie is giving you Nutrition" header + early expiry/used feedback. No consent
@@ -93,15 +92,8 @@ Deno.serve(async (req) => {
       .eq("token", token).maybeSingle();
     if (error) return json({ error: "read_failed", detail: error.message }, 500);
     if (!g) return json({ error: "not_found" }, 404);
-    const isExpired = g.status === "expired" ||
-      (g.status === "pending" && new Date(g.expires_at as string).getTime() < Date.now());
-    const alreadyByMe = g.status === "claimed" && g.claimed_user_id === userId;
-    const claimable = g.status === "pending" && !isExpired;
-    return json({
-      feature: g.feature, gym_name: g.gym_name ?? null,
-      status: isExpired ? "expired" : g.status,
-      claimable, already_claimed_by_me: alreadyByMe,
-    });
+    const view = peekView(g as unknown as SeatGrantState, userId, Date.now());
+    return json({ feature: g.feature, gym_name: g.gym_name ?? null, ...view });
   }
   // Consent is a required explicit decision (true = share, false = decline). Declining
   // still claims the service — consent is orthogonal, never a gate (IDENTITY_MODEL §4/§6).
@@ -122,29 +114,31 @@ Deno.serve(async (req) => {
   const gymIdStr = String(grant.gym_id);
   const feature = grant.feature as string;
 
-  // Terminal / conflicting states.
-  if (grant.status === "revoked" || grant.status === "unbound") {
-    return json({ error: "not_claimable", detail: `this seat is ${grant.status}`, status: grant.status }, 409);
+  // Every transition edge is decided by the shared, unit-tested state machine
+  // (_shared/seat-grant-state.ts); this handler only performs the I/O it orders.
+  const decision = decideClaim(grant as unknown as SeatGrantState, userId, Date.now());
+  if (decision.kind === "not_claimable") {
+    return json({ error: "not_claimable", detail: `this seat is ${decision.status}`, status: decision.status }, 409);
   }
-  const expired = grant.status === "expired" ||
-    (grant.status === "pending" && new Date(grant.expires_at as string).getTime() < Date.now());
-  if (expired) {
-    // Persist the expiry lazily (mirror the poll) — best-effort.
-    await svc.from("gym_seat_grants").update({ status: "expired", updated_at: new Date().toISOString() })
-      .eq("id", grant.id).eq("status", "pending").then(() => {}, () => {});
+  if (decision.kind === "expired") {
+    if (decision.persistLazyExpiry) {
+      // Persist the expiry lazily (mirror the poll) — best-effort.
+      await svc.from("gym_seat_grants").update({ status: "expired", updated_at: new Date().toISOString() })
+        .eq("id", grant.id).eq("status", "pending").then(() => {}, () => {});
+    }
     return json({ error: "expired", detail: "this claim link has expired — ask your gym to resend it" }, 410);
   }
-  if (grant.status === "claimed" && grant.claimed_user_id !== userId) {
+  if (decision.kind === "already_claimed_other") {
     // Single-use: a different account already claimed this token.
     return json({ error: "already_claimed", detail: "this seat has already been claimed" }, 409);
   }
 
-  // `already` = this member re-presenting a token they own. The re-claim does NOT
-  // short-circuit: it re-runs the full idempotent bind below, so a retry after a
-  // post-CAS failure (entitlement/consent write died) heals instead of stranding.
-  const already = grant.status === "claimed";
+  // decision.kind === "bind". `already` = this member re-presenting a token they own.
+  // The re-claim does NOT short-circuit: it re-runs the full idempotent bind below, so
+  // a retry after a post-CAS failure (entitlement/consent write died) heals.
+  const already = decision.already;
 
-  if (grant.status === "pending") {
+  if (decision.needsCas) {
     // ── CAS pending→claimed FIRST (before any entitlement write), so two concurrent
     //    claims can't both bind and the loser never leaves a stray entitlement. ─────
     const { data: claimedRows, error: claimErr } = await svc

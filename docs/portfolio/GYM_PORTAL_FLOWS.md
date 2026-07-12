@@ -1,3 +1,8 @@
+> **⚠️ PARTIALLY SUPERSEDED (Decision 11, 2026-07-12).** Engine Class is not a
+> product: the class surfaces, join flow (F3), rosters, leaderboards, and TV
+> described here were removed. Gym program generation and the per-seat token flow
+> remain. Authoritative boundaries: [PRODUCT_BOUNDARIES.md](./PRODUCT_BOUNDARIES.md).
+
 # Gym Portal — Flow Spec (v1)
 
 > The build blueprint for rebuilding `affiliate-intelligence` as the gym

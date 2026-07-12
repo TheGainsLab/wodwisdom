@@ -27,6 +27,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createConsumerAuth } from "../_shared/consumer-auth.ts";
+import { SEAT_TOKEN_RE, decideRevoke, pollStatus, type SeatGrantState } from "../_shared/seat-grant-state.ts";
 import { ALLOWED_GRANT_FEATURES } from "../_shared/entitlements.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -40,9 +41,6 @@ const auth = createConsumerAuth({
 
 const ALLOWED_FEATURES = new Set<string>(ALLOWED_GRANT_FEATURES);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// A token is opaque; bound the length so a junk body can't blow up a query. ≥128-bit
-// handles are 22+ chars (base64url) or 32 (hex/UUID-no-dash) — accept a generous range.
-const TOKEN_RE = /^[A-Za-z0-9_-]{20,128}$/;
 const PENDING_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days (IDENTITY_MODEL §5.1)
 
 const GRANT_COLS =
@@ -83,7 +81,7 @@ Deno.serve(async (req) => {
   // ── create ────────────────────────────────────────────────────────────────
   if (action === "create") {
     const token = typeof body.token === "string" ? body.token : "";
-    if (!TOKEN_RE.test(token)) return json({ error: "invalid_request", detail: "token must be a 20–128 char url-safe string" }, 400);
+    if (!SEAT_TOKEN_RE.test(token)) return json({ error: "invalid_request", detail: "token must be a 20–128 char url-safe string" }, 400);
     const feature = typeof body.feature === "string" ? body.feature : "";
     if (!ALLOWED_FEATURES.has(feature)) {
       return json({ error: "invalid_request", detail: `feature must be one of: ${[...ALLOWED_FEATURES].join(", ")}` }, 400);
@@ -122,7 +120,7 @@ Deno.serve(async (req) => {
   // ── revoke ──────────────────────────────────────────────────────────────────
   if (action === "revoke") {
     const token = typeof body.token === "string" ? body.token : "";
-    if (!TOKEN_RE.test(token)) return json({ error: "invalid_request", detail: "token must be a 20–128 char url-safe string" }, 400);
+    if (!SEAT_TOKEN_RE.test(token)) return json({ error: "invalid_request", detail: "token must be a 20–128 char url-safe string" }, 400);
 
     // Read → (delete entitlement if claimed) → CAS the status flip FROM THE STATUS WE
     // READ. Without the CAS, a claim landing between the read (pending — delete branch
@@ -134,17 +132,19 @@ Deno.serve(async (req) => {
       if (readErr) return json({ error: "read_failed", detail: readErr.message }, 500);
       if (!grant) return json({ error: "not_found" }, 404);
 
-      // Idempotent: already revoked/unbound -> report done.
-      if (grant.status === "revoked" || grant.status === "unbound") {
-        return json({ revoked: true, already: true, status: grant.status });
+      // Decided by the shared, unit-tested state machine (_shared/seat-grant-state.ts).
+      const decision = decideRevoke(grant as unknown as SeatGrantState);
+      if (decision.kind === "already") {
+        // Idempotent: already revoked/unbound -> report done.
+        return json({ revoked: true, already: true, status: decision.status });
       }
 
       // If claimed, remove ONLY this gym's grant of this feature for the bound user
-      // (never retail, never another gym — same scoping as wholesale-grants DELETE).
-      if (grant.status === "claimed" && grant.claimed_user_id) {
+      // (never retail, never another gym — the scoped delete).
+      if (decision.deleteEntitlementFor) {
         const { error: delErr } = await supa
           .from("user_entitlements").delete()
-          .eq("user_id", grant.claimed_user_id)
+          .eq("user_id", decision.deleteEntitlementFor)
           .eq("source_kind", "gym_grant")
           .eq("granted_by", gymId)
           .eq("feature", grant.feature);
@@ -173,29 +173,37 @@ Deno.serve(async (req) => {
   }
 
   // ── status (the poll) ─────────────────────────────────────────────────────
+  //
+  // POLL CONTRACT: 'claimed' means the member OWNS the seat and the bind
+  // converges — NOT that the entitlement row necessarily exists at this instant.
+  // The claim CAS assigns ownership atomically; the entitlement/consent writes
+  // follow and self-heal on the member's next visit if a post-CAS write failed.
+  // Affiliates may bill on 'claimed'; they must not assume instantaneous access.
   if (action === "status") {
-    const tokens = Array.isArray(body.tokens) ? body.tokens.filter((t): t is string => typeof t === "string") : [];
-    if (tokens.length === 0) return json({ error: "invalid_request", detail: "tokens must be a non-empty array" }, 400);
-    if (tokens.length > 500) return json({ error: "invalid_request", detail: "at most 500 tokens per poll" }, 400);
+    // Filter to plausible tokens: a string SEAT_TOKEN_RE rejects could never have
+    // been created, so it reports 'unknown' below without touching the query.
+    const rawTokens = Array.isArray(body.tokens) ? body.tokens.filter((t): t is string => typeof t === "string") : [];
+    if (rawTokens.length === 0) return json({ error: "invalid_request", detail: "tokens must be a non-empty array" }, 400);
+    if (rawTokens.length > 500) return json({ error: "invalid_request", detail: "at most 500 tokens per poll" }, 400);
+    const tokens = rawTokens.filter((t) => SEAT_TOKEN_RE.test(t));
 
-    const { data: rows, error } = await supa
-      .from("gym_seat_grants")
-      .select("token, status, consent, expires_at")
-      .eq("gym_id", gymId)
-      .in("token", tokens);
+    const { data: rows, error } = tokens.length > 0
+      ? await supa
+        .from("gym_seat_grants")
+        .select("token, status, consent, expires_at")
+        .eq("gym_id", gymId)
+        .in("token", tokens)
+      : { data: [], error: null };
     if (error) return json({ error: "read_failed", detail: error.message }, 500);
 
     // Lazily flip expired pending grants (report + persist), so a lapsed claim window
-    // shows as 'expired' not 'pending'.
+    // shows as 'expired' not 'pending'. The mapping is the shared state machine's.
     const nowMs = Date.now();
     const toExpire: string[] = [];
     const statuses = (rows ?? []).map((r) => {
-      let status = r.status as string;
-      if (status === "pending" && new Date(r.expires_at as string).getTime() < nowMs) {
-        status = "expired";
-        toExpire.push(r.token as string);
-      }
-      return { token: r.token as string, status, consent: r.consent as string };
+      const view = pollStatus({ status: r.status as string, expires_at: r.expires_at as string | null }, nowMs);
+      if (view.lazyExpire) toExpire.push(r.token as string);
+      return { token: r.token as string, status: view.status, consent: r.consent as string };
     });
     if (toExpire.length > 0) {
       await supa.from("gym_seat_grants")
@@ -207,7 +215,7 @@ Deno.serve(async (req) => {
     // Tokens the caller asked about that we don't have -> 'unknown' (so the affiliate
     // can distinguish "never created" from a real state).
     const known = new Set(statuses.map((s) => s.token));
-    for (const t of tokens) if (!known.has(t)) statuses.push({ token: t, status: "unknown", consent: "not_yet" });
+    for (const t of rawTokens) if (!known.has(t)) statuses.push({ token: t, status: "unknown", consent: "not_yet" });
 
     return json({ statuses });
   }

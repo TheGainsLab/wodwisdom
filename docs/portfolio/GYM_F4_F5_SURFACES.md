@@ -1,3 +1,7 @@
+> **⚠️ SUPERSEDED (Decision 11, 2026-07-12).** Engine Class is not a product. This
+> document describes removed machinery and is retained as a historical record only.
+> The authoritative product boundaries live in [PRODUCT_BOUNDARIES.md](./PRODUCT_BOUNDARIES.md).
+
 # F4 (leaderboard + TV) + F5 (read-only gym view) — wodwisdom build
 
 > **⚠️ PARKED for Engine Class v1 (Decision 9(i), 2026-07-04).** Engine Class became PURE

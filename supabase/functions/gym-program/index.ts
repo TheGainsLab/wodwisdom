@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
         .eq("gym_id", gymId)
         .then(() => {}, () => {});
       console.log(JSON.stringify({ at: "gym-program", event: "start", key_fp: authResult.fingerprint, gym_id: gymId, job_id: result.job_id }));
-      return json({ started: true, job_id: result.job_id, members_scaled: result.members_scaled, members_with_weights: result.members_with_weights }, 202);
+      return json({ started: true, job_id: result.job_id }, 202);
     } catch (e) {
       if (e instanceof GymJobConflictError) {
         return json({ error: "job_in_flight", detail: e.message }, 409);

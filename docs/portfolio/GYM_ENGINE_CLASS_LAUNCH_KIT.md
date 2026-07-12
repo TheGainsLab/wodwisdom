@@ -1,3 +1,7 @@
+> **⚠️ SUPERSEDED (Decision 11, 2026-07-12).** Engine Class is not a product. This
+> document describes removed machinery and is retained as a historical record only.
+> The authoritative product boundaries live in [PRODUCT_BOUNDARIES.md](./PRODUCT_BOUNDARIES.md).
+
 # Engine Class — Launch Kit (owner one-pager)
 
 _Content for founder review (GYM_SKU_SPEC §1 "Launch kit"). Markdown draft — the
