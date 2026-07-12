@@ -1155,10 +1155,10 @@ export default function AthletePage({ session }: { session: Session }) {
           <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {injuryMigrationPrompt && injuryShowback && (
               <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
-                <h2 className="settings-card-title" style={{ marginBottom: 6 }}>Confirm your injury avoidances</h2>
+                <h2 className="settings-card-title" style={{ marginBottom: 6 }}>Confirm your avoidances</h2>
                 <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5, margin: 0 }}>
                   We now ask you to sign off on the movements we'll keep out of your programming.
-                  Scroll to the <strong>Injuries or movement constraints</strong> field below to review and confirm — it takes a few seconds.
+                  Scroll to the <strong>Exercises you'd prefer we avoid</strong> field below to review and confirm — it takes a few seconds.
                 </p>
               </div>
             )}
@@ -1624,15 +1624,14 @@ export default function AthletePage({ session }: { session: Session }) {
                     </div>
 
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 4 }}>
-                        Injuries or movement constraints <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(leave blank if none)</span>
+                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>
+                        Exercises you'd prefer we avoid <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional — leave blank if none)</span>
                       </div>
-                      {/* 3.1 health-data consent (GDPR Art. 9). Wording founder-approved 2026-07-11.
-                          Reflects current truth: injury data is not shared with gyms (owner-feed
-                          exclusion, §3.2); revisit this copy if Part B adds an owner-feed opt-in. */}
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 8 }}>
-                        This is health information. We use it only to tailor your programming — the movements we'll avoid for you — and never share it with your gym. Clear this field or delete your account to remove it at any time.
-                      </div>
+                      {/* Deliberately a PREFERENCE, not a health question (founder decision
+                          2026-07-12, supersedes the 3.1 consent line): we never ask WHY, so the
+                          field solicits no Art. 9 health data and needs no consent notice. If a
+                          user volunteers a reason anyway, it stays in this raw field only — the
+                          parser emits movement names, never reasons. */}
                       <textarea
                         className="lift-input"
                         rows={3}
