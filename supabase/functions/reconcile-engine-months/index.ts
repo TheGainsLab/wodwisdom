@@ -7,8 +7,8 @@
  * monthly retail Engine subscribers are otherwise delivered ONLY by the
  * invoice.payment_succeeded webhook's +1, and a dropped webhook is a paid
  * month of catalog access that silently never unlocks. (Quarterly retail is
- * already reconciled daily by monthly-generation-cron; gym-granted members
- * by gym-engine-months-cron. This closes the monthly-retail path.)
+ * already reconciled daily by monthly-generation-cron. This closes the
+ * monthly-retail path. Gym members are affiliate-side per Decision 12a.)
  *
  * Unlike the programming sweep, no cadence guard is needed: catch-up here is
  * CORRECT. Months unlocked are cumulative catalog access already paid for —

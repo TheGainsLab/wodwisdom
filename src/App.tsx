@@ -39,19 +39,21 @@ const TrainingLogPage = lazy(() => import('./pages/TrainingLogPage'));
 const WorkoutAnalysisPage = lazy(() => import('./pages/WorkoutAnalysisPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const CheckoutCompletePage = lazy(() => import('./pages/CheckoutCompletePage'));
-const ClaimSeatPage = lazy(() => import('./pages/ClaimSeatPage'));
 // REMOVED (Decision 11 class sweep): the Engine Class pages (F4/F5 leaderboard/TV/view,
-// JoinEnginePage) are deleted — Engine Class is not a product. /join/engine/:token keeps
-// a dead-link stub below so old invite links fail with a message, not a blank landing.
+// JoinEnginePage) are deleted — Engine Class is not a product. REMOVED (Decision 12a,
+// Phase C): ClaimSeatPage + the claim flow — gym members live on their gym's member app
+// and never hold a wodwisdom account. Both old link shapes get the dead-link stub below.
 
-// A retired gym invite link (pre-Decision 11 engine-join flow). The replacement is the
-// seat-token claim at /claim/:token (gym-seat-claim).
+// A retired gym link (the pre-Decision-11 engine-join flow and the pre-Decision-12a
+// /claim/:token seat claim). Members now sign into their GYM's member app — the gym
+// issues that login link from its portal roster.
 function RetiredInviteNotice() {
   return (
     <div style={{ maxWidth: 440, margin: '0 auto', padding: '2rem 1.25rem' }}>
-      <h1 style={{ fontSize: 22, margin: '0 0 0.5rem' }}>This invite link has been replaced</h1>
+      <h1 style={{ fontSize: 22, margin: '0 0 0.5rem' }}>This link has been replaced</h1>
       <p style={{ opacity: 0.8 }}>
-        Ask your gym to send you a new invite — they can issue one from their dashboard.
+        Your gym now has its own member app. Ask your gym for a fresh app login link —
+        they can issue one from their dashboard.
       </p>
     </div>
   );
@@ -145,9 +147,9 @@ export default function App() {
           <Route path="/features/engine" element={<EngineFeaturePage />} />
           <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
           <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
-          {/* Dead-link stub for the retired F3 join flow (Decision 11). */}
+          {/* Dead-link stubs for the retired gym flows (Decisions 11 / 12a). */}
           <Route path="/join/engine/:token" element={<RetiredInviteNotice />} />
-          <Route path="/claim/:token" element={<ClaimSeatPage session={null} />} />
+          <Route path="/claim/:token" element={<RetiredInviteNotice />} />
           <Route path="*" element={<LandingPage />} />
         </Routes>
       </Suspense>
@@ -173,7 +175,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
           <Routes>
             <Route path="/" element={<HomePage session={session} />} />
             <Route path="/join/engine/:token" element={<RetiredInviteNotice />} />
-            <Route path="/claim/:token" element={<ClaimSeatPage session={session} />} />
+            <Route path="/claim/:token" element={<RetiredInviteNotice />} />
             {/* REMOVED (Decision 11): the /gym, /gym/leaderboard, /tv/:token class surfaces are deleted. */}
             <Route path="/chat" element={<ChatPage session={session} />} />
             <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
@@ -231,7 +233,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
           </Routes>
         </Suspense>
       </ErrorBoundary>
-      {!hideTabBar && <BottomTabBar userId={session.user.id} />}
+      {!hideTabBar && <BottomTabBar />}
       <InstallPrompt />
     </>
   );

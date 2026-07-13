@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import GainsLogo from './GainsLogo';
 import { ATHLETEDATA_PUBLIC_TIER } from '../lib/featureFlags';
-import { deriveIsGymShell } from '../hooks/useEntitlements';
 
 interface NavProps { isOpen: boolean; onClose: () => void; }
 
@@ -13,13 +12,9 @@ export default function Nav({ isOpen, onClose }: NavProps) {
   const goTo = (path: string) => { navigate(path); onClose(); };
   const [isAdmin, setIsAdmin] = useState(false);
   const [features, setFeatures] = useState<Set<string>>(new Set());
-  // Engine nav lights up for retail `engine` OR the gym `gym_engine` seat (Decision 10(a)).
-  const hasEngine = features.has('engine') || features.has('gym_engine');
+  const hasEngine = features.has('engine');
   const hasProgramming = features.has('programming');
   const hasNutrition = features.has('nutrition');
-  // Decision 10(c): gym-shell members get an Engine-only nav — no Coach / Training /
-  // Nutrition groups, no Profile (OUT per 10(b)). Same derivation as useEntitlements.
-  const isGymShell = deriveIsGymShell(features, isAdmin);
 
   const isChatActive = location.pathname === '/chat' || location.pathname === '/history' || location.pathname === '/bookmarks';
   const isEngineActive = location.pathname.startsWith('/engine');
@@ -53,8 +48,6 @@ export default function Nav({ isOpen, onClose }: NavProps) {
             if (!data) return;
             setFeatures(new Set(data.map(e => e.feature)));
           });
-        // Decision 9(i): a gym Engine seat grants the retail `engine` feature, so a seated
-        // member just gets the normal Engine nav above — no gym-specific nav entry.
       }
     });
   }, []);
@@ -72,7 +65,6 @@ export default function Nav({ isOpen, onClose }: NavProps) {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
             Home
           </button>
-          {!isGymShell && (
           <div className="nav-group">
             <button className={"nav-group-header " + (isChatActive ? "active" : "")} onClick={() => setChatExpanded(!chatExpanded)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
@@ -93,7 +85,6 @@ export default function Nav({ isOpen, onClose }: NavProps) {
               </div>
             )}
           </div>
-          )}
           <div className="nav-group">
             {(hasEngine || isAdmin) ? (
               <>
@@ -120,9 +111,6 @@ export default function Nav({ isOpen, onClose }: NavProps) {
               </button>
             )}
           </div>
-          {/* PARKED (Decision 9(i)): the "Gym Class" nav group is removed — a gym Engine
-              seat now lights up the Engine nav above (Decision 10: the `gym_engine` seat). */}
-          {!isGymShell && (
           <div className="nav-group">
             {(hasProgramming || isAdmin) ? (
               <>
@@ -149,8 +137,6 @@ export default function Nav({ isOpen, onClose }: NavProps) {
               </button>
             )}
           </div>
-          )}
-          {!isGymShell && (
           <div className="nav-group">
             {(hasNutrition || isAdmin) ? (
               <>
@@ -177,20 +163,15 @@ export default function Nav({ isOpen, onClose }: NavProps) {
               </button>
             )}
           </div>
-          )}
-          {/* Profile — promoted into the top section (moved out of the footer).
-              Hidden in the gym shell: /profile is OUT per Decision 10(b) — athlete
-              information flows through the gym owner, never around them. */}
-          {!isGymShell && (
+          {/* Profile — promoted into the top section (moved out of the footer). */}
           <button className={"nav-link " + (location.pathname === "/profile" ? "active" : "")} onClick={() => goTo("/profile")}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
             Profile
           </button>
-          )}
           {/* Athlete Data — admin-only today; opens to all authenticated users
               when ATHLETEDATA_PUBLIC_TIER flips. Page itself enforces the
               same gate and server-side edge functions mirror it. */}
-          {(isAdmin || (ATHLETEDATA_PUBLIC_TIER && !isGymShell)) && (
+          {(isAdmin || ATHLETEDATA_PUBLIC_TIER) && (
             <button className={"nav-link " + (location.pathname === "/athletedata" ? "active" : "")} onClick={() => goTo("/athletedata")}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="6" /><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" /></svg>
               Athlete Data

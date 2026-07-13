@@ -20,7 +20,7 @@
  * sequencer — the AI self-sequencer runs from explicit inputs in a later rev;
  * the deterministic catalog is the v1 progression, same as retail default).
  *
- * Auth: the tenant-bound wholesale consumer-key family (same as gym-seat-grant).
+ * Auth: the tenant-bound wholesale consumer-key family (_shared/consumer-auth.ts).
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
