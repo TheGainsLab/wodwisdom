@@ -40,13 +40,11 @@ export default function ProfileBanner({ userId }: Props) {
         return;
       }
 
-      // 2. Has any active entitlement? (`gym_engine` counts — a gym-seat member must
-      // never be nudged toward /profile, which is OUT of the gym shell per Decision 10.)
+      // 2. Has any active entitlement?
       const hasAnyPaid = isAdmin
         || hasFeature('ai_chat')
         || hasFeature('programming')
         || hasFeature('engine')
-        || hasFeature('gym_engine')
         || hasFeature('nutrition');
       if (hasAnyPaid) {
         if (!cancelled) { setShouldShow(false); setChecking(false); }

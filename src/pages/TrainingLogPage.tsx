@@ -453,9 +453,8 @@ function SchedulePreview({ workoutId }: { workoutId: string }) {
 export default function TrainingLogPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const { hasFeature, hasEngineAccess, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
-  // Calendar (Overview) is open to programming OR Engine access (retail `engine` or the
-  // gym `gym_engine` seat); the analytics tabs are AI-program-specific and stay gated to
-  // programming below.
+  // Calendar (Overview) is open to programming OR Engine access; the analytics tabs
+  // are AI-program-specific and stay gated to programming below.
   const hasProgramming = isAdmin || hasFeature('programming');
   const hasAccess = hasProgramming || hasEngineAccess;
 

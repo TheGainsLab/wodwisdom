@@ -204,25 +204,12 @@ verify_jwt = false
 # (ENGINE_SERVICE_KEY); skip Supabase's JWT gate so it reaches our handler.
 verify_jwt = false
 
-[functions.gym-seat-grant]
-# Token-keyed seat grant seam (identity model Phase 2). Server-to-server; the
-# WHOLESALE consumer-key family (tenant-bound), so skip Supabase's JWT gate. The old
-# user-id wholesale-grants path was removed in the Decision 11 class sweep — keep the
-# DEPLOYED wholesale-grants function alive until the affiliate has switched to this seam.
-verify_jwt = false
-
 [functions.gym-services]
 # The generation seam (SERVICE_API_CONTRACT v2 / Decision 12a): the affiliate
 # backend requests generated Engine blocks at block boundaries. Server-to-server;
 # WHOLESALE consumer-key family (tenant-bound), so skip Supabase's JWT gate.
 # Zero member identity; nothing stored.
 verify_jwt = false
-
-[functions.gym-seat-claim]
-# The member claims a seat token (identity model Phase 2). Member JWT verified by the
-# gateway (verify_jwt=true — we decode the sub); binds the pending grant as a gym_grant
-# entitlement + records versioned consent. No admin account-minting (member is present).
-verify_jwt = true
 
 [functions.gym-cohort-cron]
 # Task #5 — KICKOFF for staged gym cohort generation (creates a gym_program_jobs
@@ -254,13 +241,6 @@ verify_jwt = false
 # Sweep for vanished gym-generate stage workers (mirror of job-reaper on
 # gym_program_jobs). Schedule via pg_cron every ~2 min. Same open-endpoint
 # rationale as job-reaper: the sweep only touches expired leases.
-verify_jwt = false
-
-[functions.gym-engine-months-cron]
-# Decision 9(i) — grant-based Engine months drip for gym-granted `engine` members (the
-# retail drip is Stripe-keyed). Month 1 is seeded at grant time (gym-seat-claim); this
-# advances the ongoing drip — schedule HOURLY via pg_cron. verify_jwt=false; the handler
-# gates on an X-Cron-Key header (GYM_ENGINE_MONTHS_CRON_KEY), fail-closed.
 verify_jwt = false
 
 [functions.reconcile-programming-months]
