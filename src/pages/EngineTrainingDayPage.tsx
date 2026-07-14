@@ -30,7 +30,7 @@ import FiberSpectrum from '../components/engine/FiberSpectrum';
 import { localDateString } from '../lib/localDate';
 import EnginePaywall from '../components/engine/EnginePaywall';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertTriangle, Share2 } from 'lucide-react';
+import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertTriangle, Share2, Lock } from 'lucide-react';
 
 // ── Types & Constants ────────────────────────────────────────────────
 
@@ -394,6 +394,11 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   // Athlete-facing day number (1,2,3… in program order). Resolved from the
   // mapping; dayNumber (the route param) stays the catalog identity.
   const [displayDay, setDisplayDay] = useState<number | null>(null);
+  // Month fence: this day's month (from the program mapping — it owns month
+  // truth, not day/20) vs the user's paid entitlement. The route param is an
+  // open entry point, so the fence must live here, not just on the dashboard.
+  const [dayMonth, setDayMonth] = useState<number | null>(null);
+  const [monthsUnlocked, setMonthsUnlocked] = useState<number>(1);
   const [rocketADay, setRocketADay] = useState<number | null>(null);
   const [rocketASession, setRocketASession] = useState<EngineWorkoutSession | null>(null);
   const { hasFeature, hasEngineAccess } = useEntitlements(session.user.id);
@@ -431,15 +436,16 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         ]);
         setWorkout(wk);
         setCurrentDay(progress?.engine_current_day ?? 1);
+        setMonthsUnlocked(progress?.engine_months_unlocked ?? 1);
         const version = progress?.engine_program_version ?? 'main_5day';
         setProgramVersion(version);
         setPreviousSession(!!prevSession);
 
-        // Resolve the athlete-facing day number for this catalog day.
+        // Resolve the athlete-facing day number + month for this catalog day.
         const mapping = await getProgramMapping(version);
-        setDisplayDay(
-          mapping.find((m) => m.engine_workout_day_number === dayNumber)?.program_sequence_order ?? dayNumber,
-        );
+        const mapRow = mapping.find((m) => m.engine_workout_day_number === dayNumber);
+        setDisplayDay(mapRow?.program_sequence_order ?? dayNumber);
+        setDayMonth(mapRow?.month ?? null);
 
         // Load workout history for this day type
         if (wk?.day_type) {
@@ -736,6 +742,8 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   };
 
   // ── Derived ──
+  // Month fence: locked when this day's mapped month exceeds paid entitlement.
+  const monthLocked = dayMonth != null && dayMonth > monthsUnlocked;
   const seg = segments[segIndex] ?? null;
   const segProgress = seg ? 1 - (timeLeft / seg.duration) : 0;
   const totalDur = totalSegmentDuration(segments);
@@ -1794,7 +1802,25 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         </header>
 
         {!hasAccess && stage !== 'loading' && <EnginePaywall hasFeature={hasFeature} />}
-        {hasAccess && stage === 'loading' && !workout && (
+        {hasAccess && monthLocked && (
+          <div className="engine-page">
+            <div className="engine-empty">
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                <Lock size={28} style={{ color: 'var(--text-muted)' }} />
+              </div>
+              <div className="engine-empty-title">Month {dayMonth} is locked</div>
+              <div className="engine-empty-desc">
+                Day {displayDay ?? dayNumber} is part of Month {dayMonth}. You have {monthsUnlocked}{' '}
+                {monthsUnlocked === 1 ? 'month' : 'months'} unlocked — the next month unlocks with your next
+                monthly payment.
+              </div>
+              <button className="engine-btn engine-btn-primary" onClick={() => navigate('/engine')}>
+                Back to Engine
+              </button>
+            </div>
+          </div>
+        )}
+        {hasAccess && !monthLocked && stage === 'loading' && !workout && (
           <div className="engine-page">
             <div className="engine-empty">
               <div className="engine-empty-title">Workout not found</div>
@@ -1805,15 +1831,15 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
             </div>
           </div>
         )}
-        {hasAccess && stage === 'loading' && workout === null && !dayParam && (
+        {hasAccess && !monthLocked && stage === 'loading' && workout === null && !dayParam && (
           <div className="page-loading"><div className="loading-pulse" /></div>
         )}
-        {hasAccess && stage === 'equipment' && renderEquipment()}
-        {hasAccess && stage === 'preview' && renderPreview()}
-        {hasAccess && stage === 'ready' && renderReady()}
-        {hasAccess && stage === 'active' && renderActive()}
-        {hasAccess && stage === 'logging' && renderLogging()}
-        {hasAccess && stage === 'complete' && renderComplete()}
+        {hasAccess && !monthLocked && stage === 'equipment' && renderEquipment()}
+        {hasAccess && !monthLocked && stage === 'preview' && renderPreview()}
+        {hasAccess && !monthLocked && stage === 'ready' && renderReady()}
+        {hasAccess && !monthLocked && stage === 'active' && renderActive()}
+        {hasAccess && !monthLocked && stage === 'logging' && renderLogging()}
+        {hasAccess && !monthLocked && stage === 'complete' && renderComplete()}
       </div>
     </div>
   );

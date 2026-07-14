@@ -57,10 +57,13 @@ function getDayStatus(
   dayMonth: number,
   monthsUnlocked: number,
 ): DayStatus {
+  // Month lock wins over everything: a locked month's days are never playable,
+  // even when the current-day pointer has advanced into that month (a lapsed
+  // subscriber or a user at their payment ceiling).
+  if (dayMonth > monthsUnlocked) return 'locked';
   if (completedDays.has(dayNumber)) return 'completed';
   if (dayNumber === currentDay) return 'current';
-  if (dayMonth <= monthsUnlocked) return 'available';
-  return 'locked';
+  return 'available';
 }
 
 // ── Component ────────────────────────────────────────────────────────
@@ -192,6 +195,11 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
   const pct = totalDays > 0 ? Math.round((completedCount / totalDays) * 100) : 0;
   const monthMap = groupByMonth(workouts);
   const months = Array.from(monthMap.keys()).sort((a, b) => a - b).filter(m => m <= monthsUnlocked);
+
+  // Month of the current day (mapping month, not day/20). When the pointer sits
+  // in a month beyond the user's entitlement, the start button becomes a lock.
+  const currentDayMonth = workouts.find((w) => w.day_number === currentDay)?.month ?? 1;
+  const currentDayLocked = currentDayMonth > monthsUnlocked;
 
   // Month-level data (when drilled in)
   const monthDays = selectedMonth != null ? (monthMap.get(selectedMonth) ?? []) : [];
@@ -331,14 +339,29 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                 </div>
               </div>
 
-              {/* Start button */}
-              <button
-                className="engine-btn engine-btn-primary"
-                onClick={() => navigate(`/engine/training/${currentDay}`)}
-                style={{ width: '100%' }}
-              >
-                <Play size={18} /> Start Day {currentSeq}
-              </button>
+              {/* Start button — locked when the pointer sits in a month beyond entitlement */}
+              {currentDayLocked ? (
+                <div
+                  className="engine-card"
+                  style={{ width: '100%', textAlign: 'center', padding: '16px 20px', borderStyle: 'dashed' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontWeight: 700 }}>
+                    <Lock size={16} /> Day {currentSeq} is in Month {currentDayMonth}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6 }}>
+                    You have {monthsUnlocked} {monthsUnlocked === 1 ? 'month' : 'months'} unlocked. Month {currentDayMonth} unlocks
+                    with your next monthly payment.
+                  </div>
+                </div>
+              ) : (
+                <button
+                  className="engine-btn engine-btn-primary"
+                  onClick={() => navigate(`/engine/training/${currentDay}`)}
+                  style={{ width: '100%' }}
+                >
+                  <Play size={18} /> Start Day {currentSeq}
+                </button>
+              )}
 
               {/* Analytics button */}
               <button
