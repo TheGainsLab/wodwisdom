@@ -108,7 +108,8 @@ Deno.serve(async (_req) => {
     // programming sweep's healthy/healed/flagged buckets):
     //   already_correct:*            → healthy (no-op)
     //   monthly:* / quarterly:*      → healed (raised, or would-raise on dry run)
-    //   everything else              → flagged (no customer/sub/invoices, odd interval)
+    //   everything else              → flagged (no customer/sub/invoices, odd
+    //                                  interval, over_entitled — unlocked above paid)
     const healed = report.filter((r) => /^(monthly|quarterly):/.test(r.reason));
     const flaggedRows = report.filter(
       (r) => !/^(monthly|quarterly):/.test(r.reason) && !r.reason.startsWith("already_correct"),
@@ -223,12 +224,20 @@ async function reconcileOne(
   entitled = Math.min(entitled, ENGINE_MONTHS_CAP);
 
   if (entitled <= currentUnlocked) {
+    // over_entitled: unlocked exceeds what Stripe says was paid for. The sweep
+    // never lowers (deliberate grandfathers/comps exist), but it must not
+    // report this as healthy either — the reason lands in the flagged bucket
+    // so over-entitlement (e.g. a tampered value) is visible in the daily audit.
+    const reason =
+      entitled < currentUnlocked
+        ? `over_entitled:${isMonthly ? "monthly" : "quarterly"}:inv=${paidInvoiceCount}:entitled=${entitled}:current=${currentUnlocked}`
+        : `already_correct:${isMonthly ? "monthly" : "quarterly"}:inv=${paidInvoiceCount}:entitled=${entitled}`;
     return {
       user_id: userId,
       email: profile.email,
       before: currentUnlocked,
       after: currentUnlocked,
-      reason: `already_correct:${isMonthly ? "monthly" : "quarterly"}:inv=${paidInvoiceCount}:entitled=${entitled}`,
+      reason,
     };
   }
 
