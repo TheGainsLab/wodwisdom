@@ -85,10 +85,14 @@ Deno.serve(async (req) => {
 
   try {
     const nowIso = new Date().toISOString();
+    // retail_stripe only: manual/admin/gym grants have nothing in Stripe to
+    // reconcile against — including them just flags no_stripe_customer noise
+    // every night (July '26 ops audit: a test account permanently flagged).
     const { data: ents } = await supa
       .from("user_entitlements")
       .select("user_id")
       .eq("feature", "programming")
+      .eq("source_kind", "retail_stripe")
       .or(`expires_at.is.null,expires_at.gt.${nowIso}`);
     const users = Array.from(new Set((ents ?? []).map((e) => e.user_id as string)));
     checked = users.length;
@@ -145,7 +149,23 @@ async function reconcileOne(
   if (!subsResp.ok) throw new Error(`stripe subs ${subsResp.status}`);
   const sub = (await subsResp.json()).data?.[0];
   if (!sub) {
-    return { user_id: userId, email, reason: "no_active_subscription" };
+    // Distinguish "card bounced, Stripe retrying" (send a card nudge) from
+    // "no subscription at all" (investigate) — mirrors reconcile-engine-months.
+    // Best-effort: on lookup failure keep the generic reason.
+    let reason = "no_active_subscription";
+    try {
+      const allResp = await fetchWithTimeout(
+        `https://api.stripe.com/v1/subscriptions?customer=${profile.stripe_customer_id}&status=all&limit=10`,
+        { headers: { Authorization: STRIPE_AUTH } },
+        15_000,
+      );
+      if (allResp.ok) {
+        const subs = (await allResp.json()).data ?? [];
+        if (subs.some((s: { status: string }) => s.status === "past_due")) reason = "past_due:dunning";
+        else if (subs.some((s: { status: string }) => s.status === "trialing")) reason = "trialing";
+      }
+    } catch { /* keep generic reason */ }
+    return { user_id: userId, email, reason };
   }
 
   const recurring = sub.items?.data?.[0]?.price?.recurring ?? {};

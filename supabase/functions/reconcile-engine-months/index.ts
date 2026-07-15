@@ -80,12 +80,16 @@ Deno.serve(async (_req) => {
   const errors: Array<{ user_id: string; error: string }> = [];
 
   try {
-    // Pull every active engine entitlement.
+    // Pull every active RETAIL engine entitlement. manual/admin grants and gym
+    // seats have nothing in Stripe to reconcile against (gym members are
+    // affiliate-side per Decision 12a; their months come from the grant drip) —
+    // including them only flags no_stripe_customer noise every night.
     const nowIso = new Date().toISOString();
     let entQuery = supa
       .from("user_entitlements")
       .select("user_id")
       .eq("feature", "engine")
+      .eq("source_kind", "retail_stripe")
       .or(`expires_at.is.null,expires_at.gt.${nowIso}`);
     if (userIdFilter) entQuery = entQuery.in("user_id", [...userIdFilter]);
     const { data: entitlements } = await entQuery;
