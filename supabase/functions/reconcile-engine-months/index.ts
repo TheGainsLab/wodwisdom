@@ -109,7 +109,8 @@ Deno.serve(async (_req) => {
     //   already_correct:*            → healthy (no-op)
     //   monthly:* / quarterly:*      → healed (raised, or would-raise on dry run)
     //   everything else              → flagged (no customer/sub/invoices, odd
-    //                                  interval, over_entitled — unlocked above paid)
+    //                                  interval, over_entitled — unlocked above
+    //                                  paid, past_due:dunning — card retrying)
     const healed = report.filter((r) => /^(monthly|quarterly):/.test(r.reason));
     const flaggedRows = report.filter(
       (r) => !/^(monthly|quarterly):/.test(r.reason) && !r.reason.startsWith("already_correct"),
@@ -177,7 +178,26 @@ async function reconcileOne(
   const subsData = await subsResp.json();
   const sub = subsData.data?.[0];
   if (!sub) {
-    return { user_id: userId, email: profile.email, before: currentUnlocked, after: currentUnlocked, reason: "no_active_subscription" };
+    // No ACTIVE sub — but "card bounced, Stripe is retrying" and "no
+    // subscription at all" are different situations for the operator (July
+    // '26 ops audit: both flagged users were past_due dunning cases, not
+    // freeloaders). Look at non-active statuses to report a precise reason.
+    // Never raises months either way. Best-effort: on lookup failure keep the
+    // generic reason rather than failing the user's reconciliation.
+    let reason = "no_active_subscription";
+    try {
+      const allResp = await fetchWithTimeout(
+        `https://api.stripe.com/v1/subscriptions?customer=${profile.stripe_customer_id}&status=all&limit=10`,
+        { headers: { Authorization: STRIPE_AUTH } },
+        15_000,
+      );
+      if (allResp.ok) {
+        const subs = (await allResp.json()).data ?? [];
+        if (subs.some((s: { status: string }) => s.status === "past_due")) reason = "past_due:dunning";
+        else if (subs.some((s: { status: string }) => s.status === "trialing")) reason = "trialing";
+      }
+    } catch { /* keep generic reason */ }
+    return { user_id: userId, email: profile.email, before: currentUnlocked, after: currentUnlocked, reason };
   }
 
   const recurring = sub.items?.data?.[0]?.price?.recurring ?? {};
