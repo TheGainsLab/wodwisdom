@@ -281,11 +281,17 @@ async function reconcileOne(
     return { user_id: userId, email, reason: "would_heal", delivered, entitled };
   }
 
-  // Fire-and-forget like the cron/webhook: generate-next-month keeps running
-  // server-side after the 30s wait; tomorrow's run verifies the gap closed
-  // (and the in-flight guard keeps today's job from being double-fired).
+  // Fire generate-next-month and READ THE VERDICT when one arrives within the
+  // wait. The July '26 incident: heals were pure fire-and-forget, so instant
+  // rejections (a 429 from an orphaned evaluation after an Anthropic-credit
+  // outage) were reported as "healed" every night for a week while three
+  // paying subscribers stayed stuck. A non-ok response is now flagged as
+  // heal_rejected with the status + error, so the audit tells the truth.
+  // A timeout is still not a failure (the call outlives our wait; tomorrow's
+  // sweep verifies), and generate-next-month's orphan-resume path means a
+  // half-finished month completes on the next attempt instead of deadlocking.
   try {
-    await fetchWithTimeout(
+    const resp = await fetchWithTimeout(
       `${SUPABASE_URL}/functions/v1/generate-next-month`,
       {
         method: "POST",
@@ -298,6 +304,17 @@ async function reconcileOne(
       },
       30_000,
     );
+    if (!resp.ok) {
+      const errBody = await resp.json().catch(() => ({}));
+      const detail = String(errBody?.error ?? "").slice(0, 120);
+      return {
+        user_id: userId,
+        email,
+        reason: `heal_rejected:${resp.status}${detail ? `:${detail}` : ""}`,
+        delivered,
+        entitled,
+      };
+    }
   } catch (_e) {
     // Timeout ≠ failure here (the call outlives our wait); the audit row plus
     // tomorrow's sweep are the real verification.
