@@ -266,6 +266,19 @@ export default function AdminPage({ session }: { session: Session }) {
                   <StatCard label="30 Days" value={overviewStats.active_30d} />
                   <StatCard label="Total Users" value={overviewStats.total_users} />
                 </div>
+                <div style={{ marginTop: 12 }}>
+                  <button
+                    onClick={() => navigate('/admin/activity')}
+                    style={{
+                      background: 'var(--accent-glow)', color: 'var(--accent)',
+                      border: '1px solid var(--border)', borderRadius: 8,
+                      padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      fontFamily: "'Outfit', sans-serif",
+                    }}
+                  >
+                    Activity Feed →
+                  </button>
+                </div>
 
                 <SectionHeader>Signups</SectionHeader>
                 <div className="admin-stats-grid">
