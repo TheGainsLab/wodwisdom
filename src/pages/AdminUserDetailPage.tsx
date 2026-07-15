@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
+import { TimelineRow, type TimelineEvent } from '../components/admin/timelineEvents';
 
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB
@@ -623,6 +624,7 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
   const [adherence, setAdherence] = useState<AdherenceRow[] | null>(null);
   const [liftProgress, setLiftProgress] = useState<LiftProgress[] | null>(null);
   const [skillVolume, setSkillVolume] = useState<SkillVolume[] | null>(null);
+  const [recentActivity, setRecentActivity] = useState<TimelineEvent[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -630,17 +632,19 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
     (async () => {
       setLoading(true);
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-      const [{ data: result, error: err }, { data: adh }, { data: lifts }, { data: skills }] = await Promise.all([
+      const [{ data: result, error: err }, { data: adh }, { data: lifts }, { data: skills }, { data: timeline }] = await Promise.all([
         supabase.rpc('admin_user_detail', { target_user_id: id, tz }),
         supabase.rpc('admin_user_adherence', { target_user_id: id }),
         supabase.rpc('admin_user_lift_progress', { target_user_id: id }),
         supabase.rpc('admin_user_skill_volume', { target_user_id: id }),
+        supabase.rpc('admin_user_timeline', { target_user_id: id, p_limit: 12 }),
       ]);
       if (err) { setError(err.message); setLoading(false); return; }
       setData(result);
       setAdherence((adh as AdherenceRow[]) ?? []);
       setLiftProgress((lifts as LiftProgress[]) ?? []);
       setSkillVolume((skills as SkillVolume[]) ?? []);
+      setRecentActivity((timeline?.events as TimelineEvent[]) ?? []);
       setLoading(false);
     })();
   }, [id]);
@@ -709,6 +713,30 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                       ))}
                     </div>
                   </>
+                )}
+
+                {/* Recent Activity — preview of the unified timeline */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 32, marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', margin: 0 }}>
+                    Recent Activity
+                  </h3>
+                  <button
+                    onClick={() => navigate(`/admin/users/${id}/timeline`)}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", padding: 0 }}
+                  >
+                    Full timeline →
+                  </button>
+                </div>
+                {recentActivity.length > 0 ? (
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '2px 14px' }}>
+                    {recentActivity.map((ev, i) => (
+                      <TimelineRow key={`${ev.type}-${ev.event_at}-${i}`} ev={ev} userId={id!} onNavigate={navigate} compact />
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 16, color: 'var(--text-muted)', fontSize: 13 }}>
+                    No activity recorded yet.
+                  </div>
                 )}
 
                 {/* Profile Completeness */}
