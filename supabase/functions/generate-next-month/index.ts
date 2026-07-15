@@ -137,6 +137,16 @@ Deno.serve(async (req) => {
     // 2. Rate limit — only for normal v3 APPEND (guards against the cron firing
     //    the same month twice). Migration/first-gen intentionally create a fresh
     //    v3 program + fresh eval, so they skip this.
+    //
+    //    ORPHAN RESUME: an eval for targetMonth that is complete but still
+    //    invisible means a prior attempt finished the evaluation and then died
+    //    before program generation succeeded (July '26 incident: the Anthropic
+    //    account ran out of credits mid-pipeline; the orphaned evals then made
+    //    this guard 429 every nightly reconciler retry, deadlocking paying
+    //    subscribers out of their months indefinitely). That exact state is not
+    //    a double-fire — it's a half-finished month. Resume it: reuse the eval,
+    //    skip straight to generation.
+    let resumeEvalId: string | null = null;
     if (mode === "append") {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -156,44 +166,85 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (latestEval && latestEval.month_number >= targetMonth) {
-          return new Response(
-            JSON.stringify({ error: "Evaluation already generated for this month" }),
-            { status: 429, headers: { ...cors, "Content-Type": "application/json" } }
-          );
+          if (latestEval.month_number === targetMonth) {
+            const { data: orphan } = await supa
+              .from("profile_evaluations")
+              .select("id, status, visible")
+              .eq("user_id", userId)
+              .eq("month_number", targetMonth)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            const { count: inFlight } = await supa
+              .from("program_jobs")
+              .select("id", { count: "exact", head: true })
+              .eq("user_id", userId)
+              .in("status", ["pending", "processing"]);
+            let clearedFailedEval = false;
+            if ((inFlight ?? 0) === 0) {
+              if (orphan?.status === "complete" && orphan.visible !== true) {
+                resumeEvalId = orphan.id;
+                console.log(`[generate-next-month] user=${userId} resuming orphaned month ${targetMonth} (eval ${resumeEvalId})`);
+              } else if (orphan?.status === "failed") {
+                // A failed eval produced nothing and would 429-block this month
+                // forever. Clear it and run the full pipeline fresh.
+                await supa.from("profile_evaluations").delete().eq("id", orphan.id);
+                clearedFailedEval = true;
+                console.log(`[generate-next-month] user=${userId} cleared failed eval for month ${targetMonth}; regenerating`);
+              }
+            }
+            if (!resumeEvalId && !clearedFailedEval) {
+              return new Response(
+                JSON.stringify({ error: "Evaluation already generated for this month" }),
+                { status: 429, headers: { ...cors, "Content-Type": "application/json" } }
+              );
+            }
+          } else {
+            return new Response(
+              JSON.stringify({ error: "Evaluation already generated for this month" }),
+              { status: 429, headers: { ...cors, "Content-Type": "application/json" } }
+            );
+          }
         }
       }
     }
 
-    // 3. Run profile analysis with month context.
+    // 3. Run profile analysis with month context — unless resuming an orphaned
+    //    month, whose evaluation is already complete (re-running would trip the
+    //    eval-credit/duplication paths for work that's already done).
     //    Continuation/migration evals are created visible=false (month >= 2) and
     //    flipped visible by generate-program-v3 on success.
-    const evalUrl = `${SUPABASE_URL}/functions/v1/profile-analysis`;
-    const evalResp = await fetch(evalUrl, {
-      method: "POST",
-      headers: subHeaders(),
-      body: JSON.stringify({
-        month_number: targetMonth,
-        program_id: appendToProgramId,
-      }),
-    });
+    let evaluationId: string | null = resumeEvalId;
+    if (!resumeEvalId) {
+      const evalUrl = `${SUPABASE_URL}/functions/v1/profile-analysis`;
+      const evalResp = await fetch(evalUrl, {
+        method: "POST",
+        headers: subHeaders(),
+        body: JSON.stringify({
+          month_number: targetMonth,
+          program_id: appendToProgramId,
+        }),
+      });
 
-    if (!evalResp.ok) {
-      const err = await evalResp.json().catch(() => ({}));
-      console.error("[generate-next-month] Profile analysis failed:", err);
-      return new Response(
-        JSON.stringify({ error: "Failed to generate monthly evaluation" }),
-        { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
-      );
+      if (!evalResp.ok) {
+        const err = await evalResp.json().catch(() => ({}));
+        console.error("[generate-next-month] Profile analysis failed:", err);
+        return new Response(
+          JSON.stringify({ error: "Failed to generate monthly evaluation" }),
+          { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
+        );
+      }
+
+      const evalData = await evalResp.json();
+      evaluationId = evalData.evaluation_id;
+      console.log(`[generate-next-month] Profile evaluation kicked off (month ${targetMonth}, id ${evaluationId})`);
     }
-
-    const evalData = await evalResp.json();
-    const evaluationId = evalData.evaluation_id;
-    console.log(`[generate-next-month] Profile evaluation kicked off (month ${targetMonth}, id ${evaluationId})`);
 
     // profile-analysis is an async job. Poll the row DIRECTLY via the service
     // client (not profile-analysis-status, which only accepts user tokens) — the
     // rest of the pipeline expects a completed analysis before generation runs.
-    if (evaluationId) {
+    // (Skipped on resume: the orphaned eval is already complete.)
+    if (evaluationId && !resumeEvalId) {
       const maxWaitMs = 3 * 60 * 1000;
       const pollMs = 4000;
       const startWait = Date.now();
@@ -225,23 +276,27 @@ Deno.serve(async (req) => {
     }
 
     // 4. Run training and nutrition analysis in parallel (best-effort).
-    const analysisBody = JSON.stringify({ month_number: targetMonth, program_id: appendToProgramId });
-    const [trainingResult, nutritionResult] = await Promise.allSettled([
-      fetch(`${SUPABASE_URL}/functions/v1/training-analysis`, {
-        method: "POST",
-        headers: subHeaders(),
-        body: analysisBody,
-      }).then(r => r.json()),
-      fetch(`${SUPABASE_URL}/functions/v1/nutrition-analysis`, {
-        method: "POST",
-        headers: subHeaders(),
-        body: analysisBody,
-      }).then(r => r.json()),
-    ]);
+    //    Skipped on resume — the original attempt already wrote them; re-running
+    //    would duplicate this month's rows.
+    if (!resumeEvalId) {
+      const analysisBody = JSON.stringify({ month_number: targetMonth, program_id: appendToProgramId });
+      const [trainingResult, nutritionResult] = await Promise.allSettled([
+        fetch(`${SUPABASE_URL}/functions/v1/training-analysis`, {
+          method: "POST",
+          headers: subHeaders(),
+          body: analysisBody,
+        }).then(r => r.json()),
+        fetch(`${SUPABASE_URL}/functions/v1/nutrition-analysis`, {
+          method: "POST",
+          headers: subHeaders(),
+          body: analysisBody,
+        }).then(r => r.json()),
+      ]);
 
-    const trainingOk = trainingResult.status === "fulfilled" && trainingResult.value?.analysis;
-    const nutritionOk = nutritionResult.status === "fulfilled" && nutritionResult.value?.analysis;
-    console.log(`[generate-next-month] Training: ${trainingOk ? 'saved' : 'none'}, Nutrition: ${nutritionOk ? 'saved' : 'none'}`);
+      const trainingOk = trainingResult.status === "fulfilled" && trainingResult.value?.analysis;
+      const nutritionOk = nutritionResult.status === "fulfilled" && nutritionResult.value?.analysis;
+      console.log(`[generate-next-month] Training: ${trainingOk ? 'saved' : 'none'}, Nutrition: ${nutritionOk ? 'saved' : 'none'}`);
+    }
 
     // 5. Trigger program generation (v3) with month context.
     //    generate-program-v3 appends the month and, on completion, flips this
@@ -269,13 +324,18 @@ Deno.serve(async (req) => {
       // all written above) so a retry doesn't leave orphans, create duplicates,
       // or trip the rate-limit on a phantom prior eval. Guarded on a defined
       // evaluationId (an undefined .eq("id", undefined) is a malformed delete).
-      if (evaluationId) {
-        await supa.from("profile_evaluations").delete().eq("id", evaluationId).then(() => {}, () => {});
+      // On RESUME, leave everything in place — the orphaned eval is the anchor
+      // the next resume attempt needs; deleting it would restart the whole
+      // pipeline from scratch instead.
+      if (!resumeEvalId) {
+        if (evaluationId) {
+          await supa.from("profile_evaluations").delete().eq("id", evaluationId).then(() => {}, () => {});
+        }
+        await Promise.allSettled([
+          supa.from("training_evaluations").delete().eq("user_id", userId).eq("month_number", targetMonth),
+          supa.from("nutrition_evaluations").delete().eq("user_id", userId).eq("month_number", targetMonth),
+        ]);
       }
-      await Promise.allSettled([
-        supa.from("training_evaluations").delete().eq("user_id", userId).eq("month_number", targetMonth),
-        supa.from("nutrition_evaluations").delete().eq("user_id", userId).eq("month_number", targetMonth),
-      ]);
       return new Response(
         JSON.stringify({ error: "Failed to start program generation" }),
         { status: 500, headers: { ...cors, "Content-Type": "application/json" } }
@@ -291,6 +351,7 @@ Deno.serve(async (req) => {
         month_number: targetMonth,
         mode,
         evaluation_id: evaluationId,
+        resumed: !!resumeEvalId,
       }),
       { status: 202, headers: { ...cors, "Content-Type": "application/json" } }
     );

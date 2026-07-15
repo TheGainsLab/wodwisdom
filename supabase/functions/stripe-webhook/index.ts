@@ -258,6 +258,24 @@ serve(async (req) => {
             }
 
           }
+        } else if (["incomplete_expired", "unpaid", "canceled"].includes(status)) {
+          // Terminal statuses: revoke entitlements sourced from this
+          // subscription. incomplete_expired (first payment never landed) and
+          // unpaid (dunning exhausted, per Stripe revenue-recovery settings)
+          // arrive ONLY via this event — customer.subscription.deleted never
+          // fires for them, so before this branch existed those users kept
+          // access forever (July '26 ops audit). canceled normally arrives via
+          // the deleted handler; handling it here too is idempotent insurance.
+          // past_due is deliberately NOT revoked — Stripe is still retrying
+          // the card and the subscriber is expected to recover.
+          const { data: profiles } = await supa.from("profiles").select("id").eq("stripe_customer_id", customerId).limit(1);
+          if (profiles && profiles.length > 0) {
+            console.log(`[webhook] Subscription ${subscriptionId} → ${status}; revoking its entitlements for user ${profiles[0].id}`);
+            await supa.from("user_entitlements")
+              .delete()
+              .eq("user_id", profiles[0].id)
+              .eq("source", subscriptionId);
+          }
         }
         break;
       }

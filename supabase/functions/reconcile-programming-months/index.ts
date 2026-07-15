@@ -85,10 +85,14 @@ Deno.serve(async (req) => {
 
   try {
     const nowIso = new Date().toISOString();
+    // retail_stripe only: manual/admin/gym grants have nothing in Stripe to
+    // reconcile against — including them just flags no_stripe_customer noise
+    // every night (July '26 ops audit: a test account permanently flagged).
     const { data: ents } = await supa
       .from("user_entitlements")
       .select("user_id")
       .eq("feature", "programming")
+      .eq("source_kind", "retail_stripe")
       .or(`expires_at.is.null,expires_at.gt.${nowIso}`);
     const users = Array.from(new Set((ents ?? []).map((e) => e.user_id as string)));
     checked = users.length;
@@ -145,7 +149,23 @@ async function reconcileOne(
   if (!subsResp.ok) throw new Error(`stripe subs ${subsResp.status}`);
   const sub = (await subsResp.json()).data?.[0];
   if (!sub) {
-    return { user_id: userId, email, reason: "no_active_subscription" };
+    // Distinguish "card bounced, Stripe retrying" (send a card nudge) from
+    // "no subscription at all" (investigate) — mirrors reconcile-engine-months.
+    // Best-effort: on lookup failure keep the generic reason.
+    let reason = "no_active_subscription";
+    try {
+      const allResp = await fetchWithTimeout(
+        `https://api.stripe.com/v1/subscriptions?customer=${profile.stripe_customer_id}&status=all&limit=10`,
+        { headers: { Authorization: STRIPE_AUTH } },
+        15_000,
+      );
+      if (allResp.ok) {
+        const subs = (await allResp.json()).data ?? [];
+        if (subs.some((s: { status: string }) => s.status === "past_due")) reason = "past_due:dunning";
+        else if (subs.some((s: { status: string }) => s.status === "trialing")) reason = "trialing";
+      }
+    } catch { /* keep generic reason */ }
+    return { user_id: userId, email, reason };
   }
 
   const recurring = sub.items?.data?.[0]?.price?.recurring ?? {};
@@ -261,11 +281,17 @@ async function reconcileOne(
     return { user_id: userId, email, reason: "would_heal", delivered, entitled };
   }
 
-  // Fire-and-forget like the cron/webhook: generate-next-month keeps running
-  // server-side after the 30s wait; tomorrow's run verifies the gap closed
-  // (and the in-flight guard keeps today's job from being double-fired).
+  // Fire generate-next-month and READ THE VERDICT when one arrives within the
+  // wait. The July '26 incident: heals were pure fire-and-forget, so instant
+  // rejections (a 429 from an orphaned evaluation after an Anthropic-credit
+  // outage) were reported as "healed" every night for a week while three
+  // paying subscribers stayed stuck. A non-ok response is now flagged as
+  // heal_rejected with the status + error, so the audit tells the truth.
+  // A timeout is still not a failure (the call outlives our wait; tomorrow's
+  // sweep verifies), and generate-next-month's orphan-resume path means a
+  // half-finished month completes on the next attempt instead of deadlocking.
   try {
-    await fetchWithTimeout(
+    const resp = await fetchWithTimeout(
       `${SUPABASE_URL}/functions/v1/generate-next-month`,
       {
         method: "POST",
@@ -278,6 +304,17 @@ async function reconcileOne(
       },
       30_000,
     );
+    if (!resp.ok) {
+      const errBody = await resp.json().catch(() => ({}));
+      const detail = String(errBody?.error ?? "").slice(0, 120);
+      return {
+        user_id: userId,
+        email,
+        reason: `heal_rejected:${resp.status}${detail ? `:${detail}` : ""}`,
+        delivered,
+        entitled,
+      };
+    }
   } catch (_e) {
     // Timeout ≠ failure here (the call outlives our wait); the audit row plus
     // tomorrow's sweep are the real verification.
