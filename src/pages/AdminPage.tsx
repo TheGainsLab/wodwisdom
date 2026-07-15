@@ -7,6 +7,17 @@ import Nav from '../components/Nav';
 type Tab = 'overview' | 'engagement' | 'users';
 type SubscriberFilter = 'all' | 'subscribers' | 'non_subscribers';
 type CompetitionFilter = 'all' | 'linked' | 'not_linked';
+type UserSort = 'last_active' | 'signup_date' | 'question_count' | 'engine_sessions_count' | 'workouts_logged' | 'nutrition_days_logged' | 'total_tokens';
+
+const USER_SORTS: { key: UserSort; label: string; kind: 'date' | 'number' }[] = [
+  { key: 'last_active', label: 'Last active', kind: 'date' },
+  { key: 'signup_date', label: 'Newest signup', kind: 'date' },
+  { key: 'question_count', label: 'Questions', kind: 'number' },
+  { key: 'engine_sessions_count', label: 'Engine sessions', kind: 'number' },
+  { key: 'workouts_logged', label: 'Workouts', kind: 'number' },
+  { key: 'nutrition_days_logged', label: 'Nutrition days', kind: 'number' },
+  { key: 'total_tokens', label: 'Tokens', kind: 'number' },
+];
 
 // ── Shared Components ──
 
@@ -71,6 +82,7 @@ export default function AdminPage({ session }: { session: Session }) {
   // Users data
   const [users, setUsers] = useState<any[]>([]);
   const [userSearch, setUserSearch] = useState('');
+  const [userSort, setUserSort] = useState<UserSort>('last_active');
   const [subscriberFilter, setSubscriberFilter] = useState<SubscriberFilter>('all');
   const [competitionFilter, setCompetitionFilter] = useState<CompetitionFilter>('all');
   const [dupNamesOnly, setDupNamesOnly] = useState(false);
@@ -223,6 +235,16 @@ export default function AdminPage({ session }: { session: Session }) {
       ) return false;
     }
     return true;
+  }).sort((a, b) => {
+    // Descending; the RPC's default order is last_active DESC, so re-sorting
+    // by it here is a no-op unless another sort was chosen and reverted.
+    const spec = USER_SORTS.find(s => s.key === userSort)!;
+    if (spec.kind === 'date') {
+      const av = a[userSort] ? new Date(a[userSort]).getTime() : 0;
+      const bv = b[userSort] ? new Date(b[userSort]).getTime() : 0;
+      return bv - av;
+    }
+    return Number(b[userSort] ?? 0) - Number(a[userSort] ?? 0);
   });
 
   const maxTrend = featureUsage?.chat_by_day
@@ -266,7 +288,7 @@ export default function AdminPage({ session }: { session: Session }) {
                   <StatCard label="30 Days" value={overviewStats.active_30d} />
                   <StatCard label="Total Users" value={overviewStats.total_users} />
                 </div>
-                <div style={{ marginTop: 12 }}>
+                <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
                   <button
                     onClick={() => navigate('/admin/activity')}
                     style={{
@@ -277,6 +299,17 @@ export default function AdminPage({ session }: { session: Session }) {
                     }}
                   >
                     Activity Feed →
+                  </button>
+                  <button
+                    onClick={() => navigate('/admin/ops')}
+                    style={{
+                      background: 'var(--accent-glow)', color: 'var(--accent)',
+                      border: '1px solid var(--border)', borderRadius: 8,
+                      padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      fontFamily: "'Outfit', sans-serif",
+                    }}
+                  >
+                    Ops Health →
                   </button>
                 </div>
 
@@ -398,6 +431,24 @@ export default function AdminPage({ session }: { session: Session }) {
                       color: 'var(--text)', fontFamily: "'Outfit', sans-serif",
                     }}
                   />
+                </div>
+
+                {/* Sort */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Sort by</span>
+                  <select
+                    value={userSort}
+                    onChange={e => setUserSort(e.target.value as UserSort)}
+                    style={{
+                      background: 'var(--surface)', color: 'var(--text)',
+                      border: '1px solid var(--border)', borderRadius: 6,
+                      padding: '6px 10px', fontSize: 12, fontFamily: "'Outfit', sans-serif",
+                    }}
+                  >
+                    {USER_SORTS.map(s => (
+                      <option key={s.key} value={s.key}>{s.label}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Subscriber filter */}

@@ -20,6 +20,7 @@ export const TIMELINE_GROUPS: { key: string; label: string; types: string[] }[] 
   { key: 'workouts', label: 'Workouts', types: ['workout_log'] },
   { key: 'nutrition', label: 'Nutrition', types: ['nutrition_day'] },
   { key: 'programs', label: 'Programs', types: ['program_created'] },
+  { key: 'checkout', label: 'Checkout', types: ['checkout'] },
   { key: 'email', label: 'Email', types: ['email'] },
 ];
 
@@ -32,6 +33,7 @@ const DOT_COLORS: Record<string, string> = {
   workouts: '#2dd4bf',
   nutrition: '#f472b6',
   programs: '#38bdf8',
+  checkout: '#fb923c',
   email: '#f87171',
 };
 
@@ -60,6 +62,9 @@ export function eventTitle(ev: TimelineEvent): string {
     case 'workout_log': return 'Logged a workout';
     case 'nutrition_day': return 'Logged nutrition';
     case 'program_created': return 'Program generated';
+    case 'checkout': return d.status === 'completed'
+      ? `Checkout completed: ${d.plan ?? '?'}`
+      : `Opened checkout: ${d.plan ?? '?'} (not completed)`;
     case 'entitlement': return `Access granted: ${d.feature ?? '?'}`;
     case 'email': return `Email sent: ${d.subject ?? d.template_key ?? ''}`;
     default: return ev.type;
@@ -87,6 +92,8 @@ export function eventDetail(ev: TimelineEvent): string {
       return `${d.day ?? ''} · ${d.entries ?? 0} entries · ${d.calories ?? 0} cal`;
     case 'program_created':
       return d.name ?? '';
+    case 'checkout':
+      return d.interval ?? '';
     case 'entitlement': {
       const parts = [d.source_kind, d.expires_at ? `expires ${new Date(d.expires_at).toLocaleDateString()}` : null];
       return parts.filter(Boolean).join(' · ');

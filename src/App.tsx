@@ -27,6 +27,7 @@ const AdminEngineResequencePage = lazy(() => import('./pages/AdminEngineResequen
 const AdminChatPage = lazy(() => import('./pages/AdminChatPage'));
 const AdminUserTimelinePage = lazy(() => import('./pages/AdminUserTimelinePage'));
 const AdminActivityFeedPage = lazy(() => import('./pages/AdminActivityFeedPage'));
+const AdminOpsPage = lazy(() => import('./pages/AdminOpsPage'));
 const AdminRatingsPage = lazy(() => import('./pages/AdminRatingsPage'));
 const AdminWorkoutLogsPage = lazy(() => import('./pages/AdminWorkoutLogsPage'));
 const AdminWorkoutLogDetailPage = lazy(() => import('./pages/AdminWorkoutLogDetailPage'));
@@ -201,6 +202,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/admin" element={<AdminPage session={session} />} />
             <Route path="/admin/ratings" element={<AdminRatingsPage session={session} />} />
             <Route path="/admin/activity" element={<AdminActivityFeedPage session={session} />} />
+            <Route path="/admin/ops" element={<AdminOpsPage session={session} />} />
             <Route path="/admin/users/:id" element={<AdminUserDetailPage session={session} />} />
             <Route path="/admin/users/:id/timeline" element={<AdminUserTimelinePage session={session} />} />
             <Route path="/admin/users/:id/athlete-profile" element={<AdminAthleteProfilePage session={session} />} />
