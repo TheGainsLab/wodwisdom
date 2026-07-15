@@ -139,6 +139,22 @@ serve(async (req) => {
         const customerId = session.customer;
         const subscriptionId = session.subscription;
 
+        // Checkout breadcrumb: mark the attempt recorded by create-checkout as
+        // completed (and backfill email for account-less checkouts). Best-effort;
+        // never blocks entitlement granting.
+        try {
+          await supa
+            .from("checkout_attempts")
+            .update({
+              status: "completed",
+              completed_at: new Date().toISOString(),
+              ...(email ? { email } : {}),
+            })
+            .eq("stripe_session_id", session.id);
+        } catch (e) {
+          console.error("[webhook] failed to mark checkout attempt completed:", e);
+        }
+
         if (!subscriptionId) {
           break;
         }
@@ -156,6 +172,14 @@ serve(async (req) => {
         if (profiles && profiles.length > 0) {
           const userId = profiles[0].id;
           const source = subscriptionId;
+
+          // Backfill the checkout breadcrumb's user_id for account-less
+          // checkouts (create-checkout had no auth header to resolve one).
+          await supa
+            .from("checkout_attempts")
+            .update({ user_id: userId })
+            .eq("stripe_session_id", session.id)
+            .is("user_id", null);
 
           // Store stripe_customer_id on profiles
           await supa.from("profiles").update({

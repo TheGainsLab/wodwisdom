@@ -104,6 +104,22 @@ serve(async (req) => {
     const session = await resp.json();
     if (session.error) throw new Error(session.error.message);
 
+    // Checkout breadcrumb: record the attempt so the admin panel can see who
+    // opened checkout and never paid (the completed webhook flips status).
+    // Best-effort — a logging failure must never block the checkout itself.
+    try {
+      const supa = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
+      await supa.from("checkout_attempts").insert({
+        user_id: userId ?? null,
+        email: userEmail ?? null,
+        plan,
+        billing_interval: isQuarterly ? "quarterly" : "monthly",
+        stripe_session_id: session.id,
+      });
+    } catch (e) {
+      console.error("[create-checkout] failed to record checkout attempt:", e);
+    }
+
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
