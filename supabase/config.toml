@@ -252,3 +252,9 @@ verify_jwt = false
 # Daily engine paid-vs-unlocked sweep (only-raise, audited). Called by pg_cron —
 # same no-JWT posture and key-drift rationale as monthly-generation-cron.
 verify_jwt = false
+
+[functions.classify-chat-questions]
+# Nightly AI labeling of chat questions (chat_question_insights). Called by
+# pg_cron — same no-JWT posture and key-drift rationale as the reconcilers;
+# responses carry counts/ids/labels only, never chat content.
+verify_jwt = false
