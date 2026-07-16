@@ -252,14 +252,24 @@ serve(async (req) => {
           // Identity = user_id when known, else the email create-checkout saw.
           const identity = (q: any) => (userId ? q.eq("user_id", userId) : q.eq("email", to));
 
-          // Already a customer? (Any completed checkout for this identity —
-          // e.g. they bought via a later session while this one aged out.)
+          // Already a customer? Two checks: a completed checkout for this
+          // identity (bought via a later session while this one aged out), OR
+          // any live entitlement (checkout_attempts only records sessions
+          // since July '26 — long-time subscribers have no completed row, and
+          // one browsing an upgrade must not get a win-a-prospect email).
           const { count: completedCount } = await identity(
             supa.from("checkout_attempts")
               .select("id", { count: "exact", head: true })
               .eq("status", "completed"),
           );
           if ((completedCount ?? 0) > 0) break;
+          if (userId) {
+            const { count: entitled } = await supa
+              .from("user_entitlements")
+              .select("user_id", { count: "exact", head: true })
+              .eq("user_id", userId);
+            if ((entitled ?? 0) > 0) break;
+          }
 
           // Dedup: another expired attempt in the last 7 days already carried
           // the recovery email (their sessions expire minutes apart; the first
