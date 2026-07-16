@@ -65,7 +65,12 @@ serve(async (req) => {
 
     const params: Record<string, string> = {
       "mode": "subscription",
-      "payment_method_types[0]": "card",
+      // No payment_method_types: Stripe's DYNAMIC payment methods pick what
+      // each buyer sees from the dashboard's payment-method configuration,
+      // their locale/currency, and subscription support (non-recurring
+      // methods are filtered out automatically). Was hardcoded to card-only,
+      // which showed overseas buyers — half the July '26 checkout traffic —
+      // a US-shaped page; the dashboard config is the control panel now.
       // Explicit (not just relying on Stripe's default): a 100%-off coupon
       // (e.g. a winback promo code) makes the first invoice $0, but this is a
       // recurring subscription — a card MUST still be collected so renewal
