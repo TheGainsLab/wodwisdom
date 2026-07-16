@@ -79,6 +79,19 @@ export default function AdminPage({ session }: { session: Session }) {
   const [featureUsage, setFeatureUsage] = useState<any>(null);
   const [engagementPeriod, setEngagementPeriod] = useState(30);
 
+  // AI Chat Insights (classified questions) — own window so the all-time
+  // taxonomy mix stays available regardless of the engagement period.
+  const [chatInsights, setChatInsights] = useState<any>(null);
+  const [insightsPeriod, setInsightsPeriod] = useState<number | null>(null); // null = all time
+
+  useEffect(() => {
+    if (activeTab !== 'engagement' || role !== 'admin') return;
+    supabase.rpc('admin_chat_insights', { days_back: insightsPeriod })
+      .then(({ data, error: err }) => {
+        if (!err) setChatInsights(data);
+      });
+  }, [activeTab, insightsPeriod, role]);
+
   // Users data
   const [users, setUsers] = useState<any[]>([]);
   const [userSearch, setUserSearch] = useState('');
@@ -372,6 +385,90 @@ export default function AdminPage({ session }: { session: Session }) {
                     View Chat Ratings →
                   </button>
                 </div>
+
+                {/* AI Chat Insights — classified question labels */}
+                {chatInsights && (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 32, marginBottom: 12 }}>
+                      <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--accent)', margin: 0 }}>
+                        AI Chat Insights
+                      </h3>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {([[null, 'All'], [90, '90d'], [30, '30d'], [7, '7d']] as const).map(([d, label]) => (
+                          <button
+                            key={label}
+                            className={'source-btn ' + (insightsPeriod === d ? 'active' : '')}
+                            onClick={() => setInsightsPeriod(d)}
+                            style={{ fontSize: 11, padding: '4px 10px' }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                        {chatInsights.total_classified} classified
+                        {chatInsights.unclassified > 0 && ` · ${chatInsights.unclassified} pending`}
+                      </span>
+                    </div>
+
+                    {/* Topic distribution */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
+                      {(chatInsights.topics ?? []).map((t: any) => {
+                        const total = Math.max(chatInsights.total_classified, 1);
+                        const pct = (t.n / total) * 100;
+                        return (
+                          <div key={t.topic} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 11, color: 'var(--text-dim)', width: 88, flexShrink: 0, textTransform: 'capitalize' }}>{t.topic}</span>
+                            <div className="admin-trend-bar" style={{ width: Math.max(2, pct * 2.4) }} />
+                            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--text-dim)' }}>
+                              {t.n} <span style={{ color: 'var(--text-muted)' }}>({pct.toFixed(1)}%)</span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Signal counts */}
+                    <div className="admin-stats-grid">
+                      <StatCard label="Feature Requests" value={(chatInsights.intents ?? []).find((i: any) => i.intent === 'feature_request')?.n ?? 0} />
+                      <StatCard label="Complaints" value={(chatInsights.intents ?? []).find((i: any) => i.intent === 'complaint')?.n ?? 0} />
+                      <StatCard label="Review Worthy" value={chatInsights.review_worthy_n ?? 0} />
+                      <StatCard label="Buying Intent" value={chatInsights.buying_intent_n ?? 0} />
+                    </div>
+
+                    {/* Feature request + review feeds */}
+                    {([
+                      ['Latest Feature Requests', chatInsights.feature_requests],
+                      ['Review Queue', chatInsights.review_queue],
+                    ] as const).map(([title, rows]) => (rows ?? []).length > 0 && (
+                      <div key={title} style={{ marginTop: 14 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 6 }}>
+                          {title}
+                        </div>
+                        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '2px 12px' }}>
+                          {(rows as any[]).map((r, i) => (
+                            <button
+                              key={i}
+                              onClick={() => navigate(`/admin/users/${r.user_id}/chat`)}
+                              style={{
+                                display: 'flex', alignItems: 'baseline', gap: 10, width: '100%',
+                                padding: '7px 0', textAlign: 'left', background: 'none', border: 'none',
+                                borderBottom: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit',
+                              }}
+                            >
+                              <span style={{ flex: 1, fontSize: 12, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {r.question}
+                              </span>
+                              <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>
+                                {new Date(r.asked_at).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
 
                 {/* Daily trend */}
                 {featureUsage.chat_by_day && featureUsage.chat_by_day.length > 0 && (
