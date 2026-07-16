@@ -7,8 +7,19 @@
  * identity in any request or response; nothing is stored here.
  *
  * Action: engine_generate_block
- *   { gym_id, prefs?, athlete?: { baseline }, history?: [...], memo? }
+ *   { gym_id, program?, prefs?, athlete?: { baseline }, history?: [...], memo? }
  *   → { block: { label, days: [ResolvedEngineDay…] }, memo }
+ *   `program` picks one of the authored engine_programs (default main_5day);
+ *   every program is an ordered mapping (engine_program_mapping: sequence →
+ *   catalog day, with its own month splits) over the main_5day catalog. The
+ *   memo is { v: 1, program, next_seq } — legacy next_day memos migrate
+ *   forward as next_seq (identity for main_5day).
+ *
+ * Action: engine_programs
+ *   { gym_id } → { programs: [{ id, name, description, days_per_week,
+ *   total_days, total_months }] } — the choice catalog, fetched by the
+ *   affiliate at CHOICE moments only (a generation-adjacent moment; never
+ *   per view).
  *
  * Action: nutrition_evaluate (SERVICE_API_CONTRACT §2.3 — batch/stateless)
  *   { gym_id, attrs: { bodyweight, height, age, gender, units },
@@ -19,15 +30,13 @@
  *   daily totals in, coach-voice analysis out, nothing stored. The affiliate
  *   frequency-caps it and owns the stored result.
  *
- * v1 semantics: the block is the next calendar month of the authored 720-day
- * Engine catalog (program main_5day), each day expanded into its concrete
- * segment timeline with pace FRACTIONS + scoring_params (the member app
- * multiplies by its locally stored baseline — engine_ratio_v1). `memo` v1 is
- * `{ v: 1, program: 'main_5day', next_day: N }`; bootstrap (memo null) starts
- * at day 1, whose opening days establish the time-trial baseline. `athlete` /
- * `history` are ACCEPTED and currently unused (reserved for the adaptive
- * sequencer — the AI self-sequencer runs from explicit inputs in a later rev;
- * the deterministic catalog is the v1 progression, same as retail default).
+ * Semantics: the block is the next mapped month of the chosen program, each
+ * day expanded into its concrete segment timeline with pace FRACTIONS +
+ * scoring_params (the member app multiplies by its locally stored baseline —
+ * engine_ratio_v1). Bootstrap (memo null) starts at sequence 1. Day refs are
+ * sequence-keyed and program-scoped ('{program}:d{seq}'; main_5day keeps its
+ * legacy bare 'd{N}' — identity mapping). `athlete` / `history` are ACCEPTED
+ * and currently unused (reserved for the adaptive sequencer — a later rev).
  *
  * Auth: the tenant-bound wholesale consumer-key family (_shared/consumer-auth.ts).
  */
@@ -122,19 +131,23 @@ async function runNutritionEvaluate(attrs: EvalAttrs, targets: Record<string, nu
 interface Memo {
   v: number;
   program: string;
-  next_day: number;
+  next_seq: number;
 }
 
-function parseMemo(raw: unknown): Memo | { error: string } {
-  if (raw === null || raw === undefined) return { v: 1, program: PROGRAM, next_day: 1 };
+function parseMemo(raw: unknown, program: string): Memo | { error: string } {
+  if (raw === null || raw === undefined) return { v: 1, program, next_seq: 1 };
   if (typeof raw !== "object") return { error: "memo must be an object or null" };
   const m = raw as Record<string, unknown>;
-  const nextDay = typeof m.next_day === "number" ? m.next_day : NaN;
-  if (!Number.isInteger(nextDay) || nextDay < 1) return { error: "memo.next_day invalid" };
-  if (nextDay > CATALOG_MAX_DAY) return { error: "progression_complete" };
-  // Migrate-forward on receipt (contract §3): unknown fields ignored, version
-  // normalized. v1 is the only version.
-  return { v: 1, program: PROGRAM, next_day: nextDay };
+  // Migrate-forward (contract §3): legacy memos carried next_day; for
+  // main_5day the mapping is the identity, so next_day IS next_seq.
+  const nextSeq = typeof m.next_seq === "number" ? m.next_seq
+    : typeof m.next_day === "number" ? m.next_day : NaN;
+  if (!Number.isInteger(nextSeq) || nextSeq < 1) return { error: "memo.next_seq invalid" };
+  if (nextSeq > CATALOG_MAX_DAY) return { error: "progression_complete" };
+  // The memo's program wins over the request's when both present — a stored
+  // memo belongs to the progression it came from.
+  const memoProgram = typeof m.program === "string" && m.program ? m.program : program;
+  return { v: 1, program: memoProgram, next_seq: nextSeq };
 }
 
 Deno.serve(async (req) => {
@@ -162,6 +175,18 @@ Deno.serve(async (req) => {
   }
 
   const action = typeof body.action === "string" ? body.action : "";
+
+  // ── engine_programs — the choice catalog (choice moments only) ──
+  if (action === "engine_programs") {
+    const supaList = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const { data, error } = await supaList
+      .from("engine_programs")
+      .select("id, name, description, days_per_week, total_days, total_months")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
+    if (error) return json({ error: "read_failed", detail: error.message }, 500);
+    return json({ programs: data ?? [] });
+  }
 
   // ── nutrition_evaluate — stateless: explicit inputs → analysis, no reads ──
   if (action === "nutrition_evaluate") {
@@ -206,10 +231,11 @@ Deno.serve(async (req) => {
   }
 
   if (action !== "engine_generate_block") {
-    return json({ error: "invalid_request", detail: "action must be engine_generate_block or nutrition_evaluate" }, 400);
+    return json({ error: "invalid_request", detail: "action must be engine_generate_block, engine_programs, or nutrition_evaluate" }, 400);
   }
 
-  const memo = parseMemo(body.memo);
+  const requestedProgram = typeof body.program === "string" && body.program ? body.program : PROGRAM;
+  const memo = parseMemo(body.memo, requestedProgram);
   if ("error" in memo) {
     if (memo.error === "progression_complete") {
       return json({ error: "progression_complete", detail: "the member has completed the full catalog" }, 409);
@@ -219,27 +245,51 @@ Deno.serve(async (req) => {
 
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-  // The next catalog slice: everything remaining in the month `next_day` sits in.
+  // Validate the program against the authored registry.
+  const { data: progRow, error: progErr } = await supa
+    .from("engine_programs")
+    .select("id, total_days")
+    .eq("id", memo.program)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (progErr) return json({ error: "read_failed", detail: progErr.message }, 500);
+  if (!progRow) return json({ error: "invalid_request", detail: `unknown program '${memo.program}'` }, 400);
+  if (memo.next_seq > (progRow as { total_days: number }).total_days) {
+    return json({ error: "progression_complete", detail: "the member has completed this program" }, 409);
+  }
+
+  // The program's mapping owns sequence order AND month splits: probe the
+  // month at next_seq, then take everything remaining in that month.
   const { data: probe, error: probeErr } = await supa
-    .from("engine_workouts")
+    .from("engine_program_mapping")
     .select("month")
-    .eq("program_type", PROGRAM)
-    .eq("day_number", memo.next_day)
+    .eq("engine_program_id", memo.program)
+    .eq("program_sequence_order", memo.next_seq)
     .maybeSingle();
   if (probeErr) return json({ error: "read_failed", detail: probeErr.message }, 500);
-  if (!probe) return json({ error: "progression_complete", detail: "no catalog day at position" }, 409);
-  const month = (probe as { month: number | null }).month ?? 1;
+  if (!probe) return json({ error: "progression_complete", detail: "no mapped day at position" }, 409);
+  const month = (probe as { month: number }).month;
 
+  const { data: mapRows, error: mapErr } = await supa
+    .from("engine_program_mapping")
+    .select("program_sequence_order, engine_workout_day_number")
+    .eq("engine_program_id", memo.program)
+    .eq("month", month)
+    .gte("program_sequence_order", memo.next_seq)
+    .order("program_sequence_order", { ascending: true });
+  if (mapErr) return json({ error: "read_failed", detail: mapErr.message }, 500);
+  const mapping = (mapRows ?? []) as { program_sequence_order: number; engine_workout_day_number: number }[];
+  if (mapping.length === 0) return json({ error: "progression_complete", detail: "no days in slice" }, 409);
+
+  const dayNumbers = [...new Set(mapping.map((m) => m.engine_workout_day_number))];
   const { data: rows, error: daysErr } = await supa
     .from("engine_workouts")
     .select("day_number, day_type, phase, month, block_count, set_rest_seconds, block_1_params, block_2_params, block_3_params, block_4_params, total_duration_minutes")
     .eq("program_type", PROGRAM)
-    .eq("month", month)
-    .gte("day_number", memo.next_day)
-    .order("day_number", { ascending: true });
+    .in("day_number", dayNumbers);
   if (daysErr) return json({ error: "read_failed", detail: daysErr.message }, 500);
-  const days = (rows ?? []) as unknown as CatalogEngineDay[];
-  if (days.length === 0) return json({ error: "progression_complete", detail: "no days in slice" }, 409);
+  const byDayNumber = new Map(
+    ((rows ?? []) as unknown as CatalogEngineDay[]).map((d) => [d.day_number, d]));
 
   // Day-type display metadata (names + coaching intent).
   const { data: typeRows, error: typesErr } = await supa
@@ -251,16 +301,28 @@ Deno.serve(async (req) => {
       .map((t) => [t.id, { title: t.name, coaching_intent: t.coaching_intent }]),
   );
 
-  const resolved = days.map((d) =>
-    resolveEngineDay(d, meta.get(d.day_type) ?? { title: d.day_type, coaching_intent: null }));
+  // Resolve in SEQUENCE order. Refs are sequence-keyed and program-scoped so
+  // repeated catalog days inside a mapped program stay distinct and programs
+  // never collide in the member's log history. main_5day keeps its legacy
+  // bare 'd{N}' refs (identity mapping — existing member state stays valid).
+  const resolved = [];
+  for (const m of mapping) {
+    const d = byDayNumber.get(m.engine_workout_day_number);
+    if (!d) return json({ error: "read_failed", detail: `catalog day ${m.engine_workout_day_number} missing` }, 500);
+    const r = resolveEngineDay(d, meta.get(d.day_type) ?? { title: d.day_type, coaching_intent: null });
+    r.ref = memo.program === PROGRAM
+      ? `d${m.program_sequence_order}`
+      : `${memo.program}:d${m.program_sequence_order}`;
+    resolved.push(r);
+  }
 
-  const lastDay = days[days.length - 1].day_number;
+  const lastSeq = mapping[mapping.length - 1].program_sequence_order;
   console.log(JSON.stringify({
     at: "gym-services", event: "engine_generate_block", gym_id: gymId,
-    month, from: memo.next_day, days: resolved.length,
+    program: memo.program, month, from: memo.next_seq, days: resolved.length,
   }));
   return json({
     block: { label: `Month ${month}`, month, days: resolved },
-    memo: { v: 1, program: PROGRAM, next_day: lastDay + 1 },
+    memo: { v: 1, program: memo.program, next_seq: lastSeq + 1 },
   });
 });
