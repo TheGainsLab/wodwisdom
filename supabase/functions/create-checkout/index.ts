@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, ALLOWED_ORIGINS } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
+import { ALERT_EMAIL, buildIntentAlertEmail, sendViaResend } from "../_shared/checkout-emails.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -116,6 +117,33 @@ serve(async (req) => {
         billing_interval: isQuarterly ? "quarterly" : "monthly",
         stripe_session_id: session.id,
       });
+
+      // High-intent alert: this identity just opened its SECOND checkout in
+      // 24h without completing one — the same-day founder signal (a personal
+      // note now beats the automated recovery email at the 24h expiry).
+      // Fires only when the count is EXACTLY 2, so a six-session burst alerts
+      // once. Anonymous checkouts (no auth header) have no identity to count.
+      if (userId || userEmail) {
+        const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+        let recentQ = supa.from("checkout_attempts")
+          .select("plan, status")
+          .gte("created_at", since);
+        recentQ = userId ? recentQ.eq("user_id", userId) : recentQ.eq("email", userEmail!);
+        const { data: recent } = await recentQ;
+        const attempts = (recent ?? []) as { plan: string; status: string }[];
+        const anyCompleted = attempts.some((a) => a.status === "completed");
+        if (attempts.length === 2 && !anyCompleted) {
+          const plans = [...new Set(attempts.map((a) => a.plan))];
+          const { subject, html } = buildIntentAlertEmail({
+            email: userEmail ?? null,
+            userId: userId ?? null,
+            plans,
+            attemptCount: attempts.length,
+          });
+          const messageId = await sendViaResend(ALERT_EMAIL, subject, html);
+          console.log(`[create-checkout] high-intent alert ${messageId ? "sent" : "FAILED"} for ${userEmail ?? userId}`);
+        }
+      }
     } catch (e) {
       console.error("[create-checkout] failed to record checkout attempt:", e);
     }
@@ -124,7 +152,7 @@ serve(async (req) => {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), {
+    return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 500,
       headers: { ...cors, "Content-Type": "application/json" },
     });

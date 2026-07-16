@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import { raiseEngineMonthsFromGrant } from "../_shared/engine-months-drip.ts";
+import { buildRecoveryEmail, logEmailSend, sendViaResend } from "../_shared/checkout-emails.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -223,6 +224,62 @@ serve(async (req) => {
             plan,
             entitlements: features,
           }, { onConflict: "stripe_subscription_id" });
+        }
+        break;
+      }
+
+      case "checkout.session.expired": {
+        // Abandonment made explicit: the session opened 24h ago and was never
+        // paid. Mark the breadcrumb, then send ONE recovery email per identity
+        // per 7 days (an abandoner usually leaves several sessions behind —
+        // mrs.hart1122 left six). All best-effort; a failure here must never
+        // 4xx back to Stripe.
+        const session = event.data.object;
+        try {
+          const { data: attempt } = await supa
+            .from("checkout_attempts")
+            .update({ status: "expired", expired_at: new Date().toISOString() })
+            .eq("stripe_session_id", session.id)
+            .neq("status", "completed")
+            .select("user_id, email, plan")
+            .maybeSingle();
+
+          const plan = attempt?.plan ?? session.metadata?.plan ?? null;
+          const userId = attempt?.user_id ?? session.metadata?.user_id ?? null;
+          const to = attempt?.email ?? session.customer_email ?? session.customer_details?.email ?? null;
+          if (!to || !plan) break;
+
+          // Identity = user_id when known, else the email create-checkout saw.
+          const identity = (q: any) => (userId ? q.eq("user_id", userId) : q.eq("email", to));
+
+          // Already a customer? (Any completed checkout for this identity —
+          // e.g. they bought via a later session while this one aged out.)
+          const { count: completedCount } = await identity(
+            supa.from("checkout_attempts")
+              .select("id", { count: "exact", head: true })
+              .eq("status", "completed"),
+          );
+          if ((completedCount ?? 0) > 0) break;
+
+          // Dedup: another expired attempt in the last 7 days already carried
+          // the recovery email (their sessions expire minutes apart; the first
+          // one processed wins).
+          const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+          const { count: priorExpired } = await identity(
+            supa.from("checkout_attempts")
+              .select("id", { count: "exact", head: true })
+              .eq("status", "expired")
+              .gte("expired_at", since)
+              .neq("stripe_session_id", session.id),
+          );
+          if ((priorExpired ?? 0) > 0) break;
+
+          const { subject, html } = buildRecoveryEmail(plan);
+          const messageId = await sendViaResend(to, subject, html);
+          await logEmailSend(supa, userId, "checkout_recovery", subject, messageId);
+          console.log(`[webhook] recovery email ${messageId ? "sent" : "FAILED"} to ${to} (plan=${plan})`);
+        } catch (e) {
+          console.error("[webhook] checkout.session.expired handling failed:", e);
         }
         break;
       }
