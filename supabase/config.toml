@@ -211,6 +211,14 @@ verify_jwt = false
 # Zero member identity; nothing stored.
 verify_jwt = false
 
+[functions.gym-coach]
+# The STAFF coach seam: the retail AI Coach's methodology brain for affiliate
+# gym owners (program-brief seam family — owners are staff; the generation rule
+# protects the MEMBER runtime path only). Server-to-server; WHOLESALE
+# consumer-key family (tenant-bound), so skip Supabase's JWT gate.
+# Stateless: transcripts live on the affiliate side.
+verify_jwt = false
+
 [functions.gym-cohort-cron]
 # Task #5 — KICKOFF for staged gym cohort generation (creates a gym_program_jobs
 # row + fires gym-generate; no longer runs the pipeline in-process — see the
