@@ -50,7 +50,7 @@ TARGETS = list(RATES.keys())
 API = "https://api.stripe.com/v1"
 
 
-def stripe_call(key: str, method: str, path: str, params: dict | None = None):
+def stripe_call(key: str, method: str, path: str, params=None):
     data = urllib.parse.urlencode(params or {}).encode() if params else None
     req = urllib.request.Request(
         f"{API}{path}", data=data, method=method,
