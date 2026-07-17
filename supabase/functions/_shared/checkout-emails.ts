@@ -38,6 +38,24 @@ export function planName(plan: string | null | undefined): string {
   return (plan && PLAN_NAMES[plan]) || plan || "your plan";
 }
 
+// Recovery links go to the plan's FEATURE page, not /checkout — the checkout
+// route needs a signed-in session, and recovery clicks usually arrive in an
+// email client's browser with no session (verified: first live recipient
+// landed on the homepage). Feature pages sell the plan AND check out
+// anonymously; the webhook matches the purchase back to the account by email.
+const PLAN_LINKS: Record<string, string> = {
+  coach: "/features/coaching",
+  nutrition: "/features/nutrition",
+  coach_nutrition: "/features/nutrition",
+  programming: "/features/programs",
+  engine: "/features/engine",
+  all_access: "/features",
+};
+
+export function planLink(plan: string | null | undefined): string {
+  return SITE + ((plan && PLAN_LINKS[plan]) || "/features");
+}
+
 /** POST one email through Resend. Returns the message id, or null on failure
  *  (logged, never thrown — checkout emails are always best-effort). */
 export async function sendViaResend(
@@ -110,7 +128,7 @@ export function buildRecoveryEmail(plan: string): { subject: string; html: strin
   const html = WRAP(
     `<p>Hey — saw you were checking out <strong>${name}</strong> and didn't finish signing up. No pressure; just wanted to make sure nothing got in your way.</p>` +
     `<p>One thing that trips people up: if the payment page asks you to <em>"confirm it's you"</em> with a code sent to a phone number, that's Stripe's saved-info feature (Link) — not us. You can skip it entirely by clicking <strong>"Pay without Link"</strong> at the bottom of that box and entering your card normally.</p>` +
-    `<p><a href="${SITE}/checkout" style="display:inline-block;background:#0074d4;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Pick up where you left off</a></p>` +
+    `<p><a href="${planLink(plan)}" style="display:inline-block;background:#0074d4;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Pick up where you left off</a></p>` +
     `<p>Questions about the program? Just reply to this email — it comes straight to me.</p>`,
   );
   return { subject, html };
