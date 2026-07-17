@@ -180,7 +180,7 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "What's included with every plan?",
-    a: 'Your AI coach, full analytics, and competition rankings.',
+    a: 'Your AI coach, full nutrition tracking, full analytics, and competition rankings.',
   },
   {
     q: 'What is All Access?',

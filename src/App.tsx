@@ -150,6 +150,11 @@ export default function App() {
           <Route path="/features/engine" element={<EngineFeaturePage />} />
           <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
           <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
+          {/* Signed-out /checkout (email links, bookmarks): the plans page
+              needs a session, so land on the features hub — its checkout
+              works anonymously — instead of silently falling to the landing
+              page (the July '26 recovery-email leak). */}
+          <Route path="/checkout" element={<Navigate to="/features" replace />} />
           {/* Dead-link stubs for the retired gym flows (Decisions 11 / 12a). */}
           <Route path="/join/engine/:token" element={<RetiredInviteNotice />} />
           <Route path="/claim/:token" element={<RetiredInviteNotice />} />
