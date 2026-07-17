@@ -47,10 +47,22 @@ RATES = {
 }
 TARGETS = list(RATES.keys())
 
+# Only the products the current checkout sells (create-checkout's six plans).
+# The account carries ~90 legacy prices (MoonClerk imports, retired programs,
+# test products) that no new checkout can reach — skip them.
+PRODUCT_ALLOWLIST = {
+    "AI Coach",
+    "AI Nutrition",
+    "AI Coach + AI Nutrition",
+    "AI Programming",
+    "AI Year of the Engine",
+    "All Access",
+}
+
 API = "https://api.stripe.com/v1"
 
 
-def stripe_call(key: str, method: str, path: str, params: dict | None = None):
+def stripe_call(key: str, method: str, path: str, params=None):
     data = urllib.parse.urlencode(params or {}).encode() if params else None
     req = urllib.request.Request(
         f"{API}{path}", data=data, method=method,
@@ -80,6 +92,7 @@ def main() -> None:
     if not prices:
         sys.exit("No active recurring prices found.")
 
+    skipped = 0
     for p in prices:
         if p["currency"] != "usd":
             continue
@@ -91,6 +104,9 @@ def main() -> None:
                 prod_name = stripe_call(key, "GET", f"/products/{prod}").get("name", prod)
             except Exception:
                 pass
+        if prod_name not in PRODUCT_ALLOWLIST:
+            skipped += 1
+            continue
         usd = p["unit_amount"]
         interval = p["recurring"]["interval"]
         count = p["recurring"].get("interval_count", 1)
@@ -119,6 +135,8 @@ def main() -> None:
             stripe_call(key, "POST", f"/prices/{p['id']}", params)
             print("  APPLIED")
 
+    if skipped:
+        print(f"\n({skipped} legacy/off-catalog prices skipped — not sold by the current checkout)")
     if not args.apply:
         print("\nDry run — re-run with --apply to write these to Stripe.")
 
