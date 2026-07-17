@@ -75,6 +75,24 @@ function renderFreeLimit(firstName: string | null): string {
   );
 }
 
+// ── Sweep 3: evaluation follow-up ───────────────────────────────────────────
+
+const EVAL_FOLLOWUP_SUBJECT = "Your evaluation, and what to do with it";
+
+function renderEvalFollowup(firstName: string | null): string {
+  return wrap(
+    `<p>${hi(firstName)}</p>` +
+    `<p>A few days ago our AI took an honest look at your fitness — your lifting, your skills, and your engine. ${link("/profile", "It's still there in your account")} whenever you want to re-read it.</p>` +
+    `<p>Here's the question that matters: what happens with it now? An assessment you don't act on is just interesting reading. The whole reason we built the evaluation is that it feeds directly into training:</p>` +
+    `<p><strong>If your engine was the flag</strong> — ${link("/features/engine", "Year of the Engine")} turns that into 8 conditioning programs with targets calibrated to <em>your</em> baseline, recalibrated as you improve.</p>` +
+    `<p><strong>If lifting or skills need the work</strong> — ${link("/features/programs", "AI Programming")} builds your whole program around exactly those gaps, and rebuilds it monthly based on what you log.</p>` +
+    `<p><strong>If the honest answer is "more than one thing"</strong> — ${link("/features", "All Access")} is both programs under one subscription: your conditioning and your strength and skills, trained at the same time. At $49.99/mo it's the best value on the board — everything for less than two plans.</p>` +
+    `<p>Each plan is $29.99/mo on its own, and every plan includes the unlimited AI Coach and full nutrition tracking. Whichever fits, it starts from the evaluation you already did. The work of knowing where you stand is done. The next step is training on it.</p>` +
+    button("/features", "Pick your plan") +
+    `<p>-Matt</p>`,
+  );
+}
+
 // ── The sweep runner ────────────────────────────────────────────────────────
 
 interface Candidate { user_id: string; email: string; full_name: string | null }
@@ -115,12 +133,14 @@ Deno.serve(async (req) => {
 
   const welcome = await runSweep(supa, "welcome_nudge_candidates", "welcome_nudge", WELCOME_SUBJECT, renderWelcome);
   const freeLimit = await runSweep(supa, "free_limit_candidates", "free_limit_nudge", FREE_LIMIT_SUBJECT, renderFreeLimit);
+  const evalFollowup = await runSweep(supa, "eval_followup_candidates", "eval_followup", EVAL_FOLLOWUP_SUBJECT, renderEvalFollowup);
 
   console.log(
     `[lifecycle-nudges] welcome: ${welcome.sent}/${welcome.candidates} sent` +
-    ` | free_limit: ${freeLimit.sent}/${freeLimit.candidates} sent`,
+    ` | free_limit: ${freeLimit.sent}/${freeLimit.candidates} sent` +
+    ` | eval_followup: ${evalFollowup.sent}/${evalFollowup.candidates} sent`,
   );
-  return new Response(JSON.stringify({ welcome, free_limit: freeLimit }), {
+  return new Response(JSON.stringify({ welcome, free_limit: freeLimit, eval_followup: evalFollowup }), {
     headers: { "Content-Type": "application/json" },
   });
 });

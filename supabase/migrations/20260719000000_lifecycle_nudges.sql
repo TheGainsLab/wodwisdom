@@ -84,3 +84,40 @@ $$;
 REVOKE ALL ON FUNCTION public.free_limit_candidates(int) FROM public;
 REVOKE ALL ON FUNCTION public.free_limit_candidates(int) FROM anon;
 REVOKE ALL ON FUNCTION public.free_limit_candidates(int) FROM authenticated;
+
+-- Sweep #3: evaluation follow-up. Completed the free profile evaluation
+-- 2–7 days ago (room to act on their own; historical base invisible) and
+-- then stalled — no entitlement, no checkout (checkout-openers belong to
+-- the recovery funnel). One funnel step warmer than the welcome sweep;
+-- welcome → (does eval) → this is a legitimate days-apart sequence.
+
+CREATE OR REPLACE FUNCTION public.eval_followup_candidates(p_limit int DEFAULT 25)
+RETURNS TABLE (user_id uuid, email text, full_name text)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT p.id, p.email, p.full_name
+  FROM profiles p
+  WHERE p.email IS NOT NULL
+    AND COALESCE(p.role, 'user') <> 'admin'
+    AND (
+      SELECT MAX(pe.created_at) FROM profile_evaluations pe WHERE pe.user_id = p.id
+    ) BETWEEN now() - interval '7 days' AND now() - interval '2 days'
+    AND NOT EXISTS (
+      SELECT 1 FROM user_entitlements ue
+      WHERE ue.user_id = p.id
+        AND (ue.expires_at IS NULL OR ue.expires_at > now())
+    )
+    AND NOT EXISTS (SELECT 1 FROM checkout_attempts ca WHERE ca.user_id = p.id)
+    AND NOT EXISTS (
+      SELECT 1 FROM email_sends es
+      WHERE es.user_id = p.id AND es.template_key = 'eval_followup'
+    )
+  ORDER BY (SELECT MAX(pe.created_at) FROM profile_evaluations pe WHERE pe.user_id = p.id) ASC
+  LIMIT p_limit;
+$$;
+
+REVOKE ALL ON FUNCTION public.eval_followup_candidates(int) FROM public;
+REVOKE ALL ON FUNCTION public.eval_followup_candidates(int) FROM anon;
+REVOKE ALL ON FUNCTION public.eval_followup_candidates(int) FROM authenticated;
