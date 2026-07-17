@@ -1,30 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
 
-const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
-const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
-
 export default function NutritionFeaturePage() {
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [interval, setInterval] = useState<'monthly' | 'quarterly'>('monthly');
-
-  const buyNutrition = async () => {
-    setCheckoutLoading(true);
-    try {
-      const resp = await fetch(CHECKOUT_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: 'nutrition', interval }),
-      });
-      const data = await resp.json();
-      if (data.url) { window.location.href = data.url; return; }
-      if (data.error) alert(data.error);
-    } catch { alert('Failed to start checkout'); }
-    finally { setCheckoutLoading(false); }
-  };
-
   useEffect(() => {
     document.body.classList.add('feature-body');
     return () => document.body.classList.remove('feature-body');
@@ -116,24 +95,22 @@ export default function NutritionFeaturePage() {
         </div>
       </section>
 
-      {/* Footer CTA */}
+      {/* Footer CTA — Nutrition is an INCLUDED feature, not a standalone SKU
+          (July '26 repositioning: it ships with every training plan and as a
+          gym product; it is no longer sold alone). */}
       <section className="feature-footer-cta">
-        <h2>AI Nutrition — {interval === 'monthly' ? '$7.99/mo' : '$17.99/qtr'}</h2>
+        <h2>Included with every training plan</h2>
         <p className="feature-footer-details">
-          Photo logging, barcode scanner, millions of foods, restaurant and brand menus, meal templates, and macro tracking — a complete nutrition app.
+          Photo logging, barcode scanner, millions of foods, restaurant and brand menus, meal
+          templates, and macro tracking — the complete nutrition app comes free with AI
+          Programming, Year of the Engine, and All Access.
         </p>
-        <div style={{ display: 'flex', maxWidth: 280, margin: '0 auto 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-          <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'monthly' ? 'var(--accent)' : 'transparent', color: interval === 'monthly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('monthly')}>Monthly</button>
-          <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'quarterly' ? 'var(--accent)' : 'transparent', color: interval === 'quarterly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('quarterly')}>Quarterly</button>
-        </div>
-        <div className="feature-footer-actions">
-          <button className="feature-cta" onClick={buyNutrition} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
+        <div className="feature-footer-actions" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button className="feature-cta" onClick={() => { window.location.href = '/features/engine'; }}>Year of the Engine</button>
+          <button className="feature-cta" onClick={() => { window.location.href = '/features/programs'; }}>AI Programming</button>
         </div>
         <p style={{ maxWidth: 540, margin: '24px auto 0', color: 'var(--text-dim)', fontSize: 14, lineHeight: 1.6 }}>
-          Already training with us? AI Nutrition is included free with{' '}
-          <Link to="/features/programs" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>AI Programming</Link>,{' '}
-          <Link to="/features/engine" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>Year of the Engine</Link>, and{' '}
-          <Link to="/#pricing" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>All Access</Link>.
+          Compare plans on the <a href="/#pricing" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>pricing page</a>.
         </p>
       </section>
 

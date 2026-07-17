@@ -37,27 +37,19 @@ const FEATURE_NEXT_STEPS: { feature: string; label: string; path: string; descri
   { feature: 'ai_chat', label: 'Talk to Your AI Coach', path: '/chat', description: 'Ask your first coaching question — training, recovery, programming, anything' },
 ];
 
-const PLANS: { key: PlanKey; name: string; monthly: string; quarterly: string; features: string[]; badge?: string; featured?: boolean }[] = [
+// July '26 repositioning: the ladder is the three TRAINING plans (each with
+// Coach + Nutrition included) plus a quietly-available standalone Coach.
+// Standalone Nutrition and Coach+Nutrition are retired from NEW sales —
+// existing subscribers keep them (PLAN_FEATURES still knows every key), the
+// browse list just no longer offers them.
+const PLANS: { key: PlanKey; name: string; monthly: string; quarterly: string; features: string[]; badge?: string; featured?: boolean; compact?: boolean }[] = [
   {
-    key: 'coach',
-    name: 'AI Coach',
-    monthly: '$7.99',
-    quarterly: '$17.99',
-    features: ['Unlimited coaching questions', 'Full source library', 'Bookmarks & summaries', 'Workout reviews'],
-  },
-  {
-    key: 'nutrition',
-    name: 'AI Nutrition',
-    monthly: '$7.99',
-    quarterly: '$17.99',
-    features: ['Photo-based meal logging', 'Barcode scanner', 'Millions of foods & restaurant menus', 'Meal templates & favorites'],
-  },
-  {
-    key: 'coach_nutrition',
-    name: 'AI Coach + AI Nutrition',
-    monthly: '$11.99',
-    quarterly: '$29.99',
-    features: ['Everything in AI Coach', 'Everything in AI Nutrition', 'Save vs buying separately'],
+    key: 'engine',
+    name: 'Year of the Engine',
+    monthly: '$29.99',
+    quarterly: '$74.99',
+    badge: 'Includes AI Coach & Nutrition',
+    features: ['20 distinct training frameworks', 'Machine-learning calibrated targets', 'Real-time pacing coach', 'An AI coach that knows your training data'],
   },
   {
     key: 'programming',
@@ -68,21 +60,21 @@ const PLANS: { key: PlanKey; name: string; monthly: string; quarterly: string; f
     features: ['Personalized program generation', 'AI profile evaluation', 'Program analysis & modifications', 'Session-by-session coaching cues'],
   },
   {
-    key: 'engine',
-    name: 'Year of the Engine',
-    monthly: '$29.99',
-    quarterly: '$74.99',
-    badge: 'Includes AI Coach & Nutrition',
-    features: ['20 distinct training frameworks', 'Machine-learning calibrated targets', 'Real-time pacing coach', 'Conditioning analytics & heatmaps'],
-  },
-  {
     key: 'all_access',
     name: 'All Access',
     monthly: '$49.99',
     quarterly: '$119.99',
     badge: 'Best value',
     featured: true,
-    features: ['Everything in AI Coach', 'AI Programming', 'Year of the Engine', 'All future features included'],
+    features: ['AI Programming', 'Year of the Engine', 'AI Coach & full Nutrition tracking', 'All future features included'],
+  },
+  {
+    key: 'coach',
+    name: 'AI Coach',
+    monthly: '$7.99',
+    quarterly: '$17.99',
+    compact: true,
+    features: ['Just want the coach? Unlimited questions, grounded in the methodology and your training history.'],
   },
 ];
 
@@ -417,6 +409,38 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
                 {visiblePlans.map(plan => {
                   const owned = alreadyHas(plan.key);
                   const isPreviewing = previewLoading && selectedPlan === plan.key;
+                  if (plan.compact) {
+                    // Demoted standalone (AI Coach): available, not promoted.
+                    return (
+                      <div
+                        key={plan.key}
+                        onClick={() => !loading && !previewLoading && !owned && selectPlan(plan.key)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          background: 'var(--surface)', border: '1px solid var(--border)',
+                          borderRadius: 12, padding: '14px 16px', marginTop: 4,
+                          cursor: owned ? 'default' : 'pointer', opacity: owned ? 0.5 : 1,
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ fontSize: 15, fontWeight: 700 }}>{plan.name}</span>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginLeft: 8 }}>
+                            {interval === 'monthly' ? `${plan.monthly}/mo` : `${plan.quarterly}/qtr`}
+                          </span>
+                          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-dim)' }}>{plan.features[0]}</p>
+                        </div>
+                        <button
+                          type="button"
+                          className="auth-btn"
+                          disabled={!!loading || previewLoading || owned}
+                          style={{ padding: '8px 16px', flexShrink: 0 }}
+                          onClick={(e) => { e.stopPropagation(); if (!loading && !previewLoading && !owned) selectPlan(plan.key); }}
+                        >
+                          {owned ? 'Current' : loading === plan.key ? '…' : 'Subscribe'}
+                        </button>
+                      </div>
+                    );
+                  }
                   return (
                     <div
                       key={plan.key}
