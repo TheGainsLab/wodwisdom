@@ -219,6 +219,13 @@ verify_jwt = false
 # Stateless: transcripts live on the affiliate side.
 verify_jwt = false
 
+[functions.welcome-nudge]
+# Lifecycle automation #1: the daily "free stuff in your account" email for
+# confirmed-but-inactive signups (36h–7d old, zero activity, zero prior
+# emails). pg_cron can't mint a JWT; gated on X-Cron-Key
+# (WELCOME_NUDGE_CRON_KEY), fail-closed.
+verify_jwt = false
+
 [functions.gym-cohort-cron]
 # Task #5 — KICKOFF for staged gym cohort generation (creates a gym_program_jobs
 # row + fires gym-generate; no longer runs the pipeline in-process — see the
