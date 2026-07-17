@@ -41,3 +41,46 @@ $$;
 REVOKE ALL ON FUNCTION public.welcome_nudge_candidates(int) FROM public;
 REVOKE ALL ON FUNCTION public.welcome_nudge_candidates(int) FROM anon;
 REVOKE ALL ON FUNCTION public.welcome_nudge_candidates(int) FROM authenticated;
+
+-- Sweep #2: free-limit nudge. Users who asked their 3rd (final) free AI
+-- Coach question RECENTLY and hold no entitlement — the highest-intent
+-- moment in the funnel (actively using the product when it said no).
+--   - >= 3 chat messages AND the latest within the past 7 days: a user
+--     blocked at the limit can't create new rows, so old limit-hitters from
+--     the historical base have stale MAX(created_at) and never match
+--   - no ACTIVE entitlement (subscribed-since-limit users are skipped)
+--   - one-shot via email_sends template_key = 'free_limit_nudge' (other
+--     templates — e.g. the welcome nudge — don't block this one)
+
+CREATE OR REPLACE FUNCTION public.free_limit_candidates(p_limit int DEFAULT 25)
+RETURNS TABLE (user_id uuid, email text, full_name text)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT p.id, p.email, p.full_name
+  FROM profiles p
+  WHERE p.email IS NOT NULL
+    AND COALESCE(p.role, 'user') <> 'admin'
+    AND (
+      SELECT COUNT(*) FROM chat_messages cm WHERE cm.user_id = p.id
+    ) >= 3
+    AND (
+      SELECT MAX(cm.created_at) FROM chat_messages cm WHERE cm.user_id = p.id
+    ) >= now() - interval '7 days'
+    AND NOT EXISTS (
+      SELECT 1 FROM user_entitlements ue
+      WHERE ue.user_id = p.id
+        AND (ue.expires_at IS NULL OR ue.expires_at > now())
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM email_sends es
+      WHERE es.user_id = p.id AND es.template_key = 'free_limit_nudge'
+    )
+  ORDER BY (SELECT MAX(cm.created_at) FROM chat_messages cm WHERE cm.user_id = p.id) ASC
+  LIMIT p_limit;
+$$;
+
+REVOKE ALL ON FUNCTION public.free_limit_candidates(int) FROM public;
+REVOKE ALL ON FUNCTION public.free_limit_candidates(int) FROM anon;
+REVOKE ALL ON FUNCTION public.free_limit_candidates(int) FROM authenticated;
