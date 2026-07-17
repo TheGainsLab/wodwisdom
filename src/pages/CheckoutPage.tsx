@@ -360,7 +360,7 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
 
                 <button
                   className="auth-btn"
-                  onClick={() => navigate(-1 as any)}
+                  onClick={() => navigate(-1)}
                   style={{ width: '100%', background: 'var(--surface2)', color: 'var(--text)' }}
                 >
                   Go Back
