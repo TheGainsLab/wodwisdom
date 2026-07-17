@@ -433,7 +433,7 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
                           type="button"
                           className="auth-btn"
                           disabled={!!loading || previewLoading || owned}
-                          style={{ padding: '8px 16px', flexShrink: 0 }}
+                          style={{ width: 'auto', padding: '8px 16px', flexShrink: 0, marginTop: 0 }}
                           onClick={(e) => { e.stopPropagation(); if (!loading && !previewLoading && !owned) selectPlan(plan.key); }}
                         >
                           {owned ? 'Current' : loading === plan.key ? '…' : 'Subscribe'}

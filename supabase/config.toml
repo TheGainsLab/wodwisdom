@@ -219,6 +219,26 @@ verify_jwt = false
 # Stateless: transcripts live on the affiliate side.
 verify_jwt = false
 
+[functions.lifecycle-nudges]
+# The daily lifecycle-email sweep: welcome nudge (confirmed-but-inactive
+# signups) + free-limit nudge (3rd free Coach question, no entitlement).
+# One cron job, one secret, N sweeps. pg_cron can't mint a JWT; gated on
+# X-Cron-Key (LIFECYCLE_CRON_KEY), fail-closed.
+verify_jwt = false
+
+[functions.email-unsubscribe]
+# The opt-out endpoint behind every automated email's unsubscribe link
+# (CAN-SPAM). Public GET; auth is the HMAC token in the link itself
+# (signed under LIFECYCLE_CRON_KEY), so skip the JWT gate.
+verify_jwt = false
+
+[functions.weekly-digest]
+# The founder's Monday email: the week's funnel (signups, evals, checkout
+# conversion, abandoner worklist, lifecycle-email performance, thumbs-down
+# ratings, quiet subscribers). X-Cron-Key = LIFECYCLE_CRON_KEY (shared with
+# lifecycle-nudges), fail-closed.
+verify_jwt = false
+
 [functions.gym-cohort-cron]
 # Task #5 — KICKOFF for staged gym cohort generation (creates a gym_program_jobs
 # row + fires gym-generate; no longer runs the pipeline in-process — see the
