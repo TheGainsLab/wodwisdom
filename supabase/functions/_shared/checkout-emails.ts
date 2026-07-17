@@ -1,20 +1,15 @@
 /**
- * checkout-emails — the abandoned-checkout email pair (July 2026 funnel work).
+ * checkout-emails — shared outbound-email infrastructure (July '26).
  *
- * Two sends, both born from the mrs.hart1122 incident (six live checkout
- * sessions, zero payment attempts — blocked at Stripe Link's "confirm it's
- * you" OTP wall):
+ * Grew from the abandoned-checkout pair (recovery email + founder alert)
+ * into the shared module every automated sender uses: the Resend send +
+ * email_sends logging, the HTML chrome (wrap/link/button), escaping,
+ * first-name extraction, and the CAN-SPAM footer (postal address +
+ * per-recipient unsubscribe link backed by an HMAC token the
+ * email-unsubscribe endpoint verifies).
  *
- *   1. Recovery email to the prospect — fired by stripe-webhook when a
- *      checkout.session.expired event lands (24h after the session opened).
- *      Includes the "Pay without Link" tip permanently.
- *   2. High-intent alert to the founder — fired by create-checkout the moment
- *      an identity opens its SECOND checkout within 24h. Same-day signal, not
- *      a day-late one.
- *
- * Sends ride the existing Resend integration (RESEND_API_KEY; the
- * admin-send-email pattern) and are logged to email_sends when the user is
- * known, so they show on the admin user detail page and dedup naturally.
+ * Senders: stripe-webhook (recovery), create-checkout (founder alert),
+ * lifecycle-nudges (welcome / free-limit / eval sweeps), weekly-digest.
  */
 
 // deno-lint-ignore-file no-explicit-any
@@ -23,7 +18,17 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("ADMIN_FROM_EMAIL") || "coach@thegainslab.com";
 const ALERT_EMAIL = Deno.env.get("ADMIN_ALERT_EMAIL") || FROM_EMAIL;
 const SENDER_NAME = "The Gains Lab";
-const SITE = "https://www.thegainslab.com";
+export const SITE = "https://www.thegainslab.com";
+
+// CAN-SPAM requires a physical postal address in commercial email. Set the
+// BUSINESS_POSTAL_ADDRESS function secret to the real address (PO box or
+// registered-agent address is fine).
+const POSTAL_ADDRESS = Deno.env.get("BUSINESS_POSTAL_ADDRESS") || "The Gains Lab, United States";
+
+// Unsubscribe tokens: HMAC-SHA256(user_id) under LIFECYCLE_CRON_KEY (the
+// lifecycle secret doubles as the signing key — one secret to manage). If
+// the secret is unset, links can't be minted and senders omit them.
+const UNSUB_SECRET = Deno.env.get("LIFECYCLE_CRON_KEY");
 
 export const PLAN_NAMES: Record<string, string> = {
   coach: "AI Coach",
@@ -40,9 +45,8 @@ export function planName(plan: string | null | undefined): string {
 
 // Recovery links go to the plan's FEATURE page, not /checkout — the checkout
 // route needs a signed-in session, and recovery clicks usually arrive in an
-// email client's browser with no session (verified: first live recipient
-// landed on the homepage). Feature pages sell the plan AND check out
-// anonymously; the webhook matches the purchase back to the account by email.
+// email client's browser with no session. Feature pages sell the plan AND
+// check out anonymously; the webhook matches the purchase back by email.
 const PLAN_LINKS: Record<string, string> = {
   coach: "/features/coaching",
   nutrition: "/features/nutrition",
@@ -56,8 +60,84 @@ export function planLink(plan: string | null | undefined): string {
   return SITE + ((plan && PLAN_LINKS[plan]) || "/features");
 }
 
+// ── Escaping & names ────────────────────────────────────────────────────────
+
+/** Escape user-controlled strings before interpolating into email HTML. */
+export function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** First name from a full_name, HTML-escaped; null when unusable. */
+export function firstNameOf(fullName: string | null | undefined): string | null {
+  const first = fullName?.trim().split(/\s+/)[0];
+  return first ? escapeHtml(first) : null;
+}
+
+// ── HMAC unsubscribe tokens ─────────────────────────────────────────────────
+
+async function hmacHex(value: string): Promise<string | null> {
+  if (!UNSUB_SECRET) return null;
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(UNSUB_SECRET),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+  );
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
+  return [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Per-recipient unsubscribe URL, or null when no user / no secret. */
+export async function unsubscribeUrl(userId: string | null): Promise<string | null> {
+  if (!userId) return null;
+  const token = await hmacHex(userId);
+  if (!token) return null;
+  const base = Deno.env.get("SUPABASE_URL");
+  if (!base) return null;
+  return `${base}/functions/v1/email-unsubscribe?u=${userId}&t=${token}`;
+}
+
+/** Verify an unsubscribe token minted by unsubscribeUrl. */
+export async function verifyUnsubscribeToken(userId: string, token: string): Promise<boolean> {
+  const expected = await hmacHex(userId);
+  if (!expected || expected.length !== token.length) return false;
+  let r = 0;
+  for (let i = 0; i < expected.length; i++) r |= expected.charCodeAt(i) ^ token.charCodeAt(i);
+  return r === 0;
+}
+
+// ── HTML chrome ─────────────────────────────────────────────────────────────
+
+export const emailLink = (path: string, label: string) =>
+  `<a href="${SITE}${path}" style="color:#0074d4;text-decoration:none;font-weight:600">${label}</a>`;
+
+export const emailButton = (path: string, label: string) =>
+  `<p><a href="${SITE}${path}" style="display:inline-block;background:#0074d4;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">${label}</a></p>`;
+
+/**
+ * The shared email shell: brand footer with the CAN-SPAM postal address and,
+ * when provided, the recipient's unsubscribe link.
+ */
+export function emailWrap(inner: string, opts: { unsubUrl?: string | null; maxWidth?: number } = {}): string {
+  const width = opts.maxWidth ?? 560;
+  const unsub = opts.unsubUrl
+    ? ` · <a href="${opts.unsubUrl}" style="color:#9a9890">unsubscribe</a>`
+    : "";
+  return (
+    `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:${width}px;margin:0 auto;padding:24px;color:#1a1a1a;font-size:15px;line-height:1.6">` +
+    inner +
+    `<p style="color:#9a9890;font-size:12px;margin-top:28px">${SENDER_NAME} · <a href="${SITE}" style="color:#9a9890">${SITE.replace("https://", "")}</a>${unsub}<br>${escapeHtml(POSTAL_ADDRESS)}</p>` +
+    `</div>`
+  );
+}
+
+// ── Send + log ──────────────────────────────────────────────────────────────
+
 /** POST one email through Resend. Returns the message id, or null on failure
- *  (logged, never thrown — checkout emails are always best-effort). */
+ *  (logged, never thrown — automated emails are always best-effort). */
 export async function sendViaResend(
   to: string,
   subject: string,
@@ -95,8 +175,10 @@ export async function sendViaResend(
   }
 }
 
-/** Log a send to email_sends (admin user page history + dedup). user_id is
- *  NOT NULL there, so account-less sends are simply not logged. */
+/** Log a send to email_sends (admin user page history, timeline, dedup).
+ *  user_id is NOT NULL there, so account-less sends are simply not logged.
+ *  Failed sends log with status='failed' — candidate RPCs ignore those rows,
+ *  so a transient failure retries on the next run instead of suppressing. */
 export async function logEmailSend(
   supa: any,
   userId: string | null,
@@ -118,18 +200,18 @@ export async function logEmailSend(
   }
 }
 
-const WRAP = (inner: string) =>
-  `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1a1a1a;font-size:15px;line-height:1.6">${inner}<p style="color:#9a9890;font-size:12px;margin-top:28px">The Gains Lab · <a href="${SITE}" style="color:#9a9890">${SITE.replace("https://", "")}</a></p></div>`;
+// ── The checkout emails themselves ──────────────────────────────────────────
 
 /** The prospect-facing recovery email (checkout.session.expired). */
-export function buildRecoveryEmail(plan: string): { subject: string; html: string } {
+export function buildRecoveryEmail(plan: string, unsubUrl: string | null = null): { subject: string; html: string } {
   const name = planName(plan);
   const subject = `Still thinking about ${name}?`;
-  const html = WRAP(
+  const html = emailWrap(
     `<p>Hey — saw you were checking out <strong>${name}</strong> and didn't finish signing up. No pressure; just wanted to make sure nothing got in your way.</p>` +
     `<p>One thing that trips people up: if the payment page asks you to <em>"confirm it's you"</em> with a code sent to a phone number, that's Stripe's saved-info feature (Link) — not us. You can skip it entirely by clicking <strong>"Pay without Link"</strong> at the bottom of that box and entering your card normally.</p>` +
     `<p><a href="${planLink(plan)}" style="display:inline-block;background:#0074d4;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Pick up where you left off</a></p>` +
     `<p>Questions about the program? Just reply to this email — it comes straight to me.</p>`,
+    { unsubUrl },
   );
   return { subject, html };
 }
@@ -141,13 +223,13 @@ export function buildIntentAlertEmail(args: {
   plans: string[];
   attemptCount: number;
 }): { subject: string; html: string } {
-  const who = args.email ?? args.userId ?? "unknown";
-  const plansLine = args.plans.map(planName).join(", ") || "unknown plan";
-  const subject = `High-intent checkout: ${who} (${plansLine})`;
+  const who = args.email ? escapeHtml(args.email) : (args.userId ?? "unknown");
+  const plansLine = args.plans.map(planName).map(escapeHtml).join(", ") || "unknown plan";
+  const subject = `High-intent checkout: ${args.email ?? args.userId ?? "unknown"} (${args.plans.map(planName).join(", ") || "unknown plan"})`;
   const timelineLink = args.userId
     ? `<p><a href="${SITE}/admin/users/${args.userId}/timeline">Open their admin timeline →</a></p>`
     : "";
-  const html = WRAP(
+  const html = emailWrap(
     `<p><strong>${who}</strong> has opened checkout <strong>${args.attemptCount}×</strong> in the last 24 hours without completing.</p>` +
     `<p>Plans viewed: ${plansLine}.</p>` +
     timelineLink +

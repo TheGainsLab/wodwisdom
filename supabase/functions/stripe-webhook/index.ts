@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import { raiseEngineMonthsFromGrant } from "../_shared/engine-months-drip.ts";
-import { buildRecoveryEmail, logEmailSend, sendViaResend } from "../_shared/checkout-emails.ts";
+import { buildRecoveryEmail, logEmailSend, sendViaResend, unsubscribeUrl } from "../_shared/checkout-emails.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -284,7 +284,14 @@ serve(async (req) => {
           );
           if ((priorExpired ?? 0) > 0) break;
 
-          const { subject, html } = buildRecoveryEmail(plan);
+          // Honor the unsubscribe flag (recovery is commercial email too).
+          if (userId) {
+            const { data: prof } = await supa
+              .from("profiles").select("email_opt_out").eq("id", userId).maybeSingle();
+            if (prof?.email_opt_out) break;
+          }
+
+          const { subject, html } = buildRecoveryEmail(plan, await unsubscribeUrl(userId));
           const messageId = await sendViaResend(to, subject, html);
           await logEmailSend(supa, userId, "checkout_recovery", subject, messageId);
           console.log(`[webhook] recovery email ${messageId ? "sent" : "FAILED"} to ${to} (plan=${plan})`);

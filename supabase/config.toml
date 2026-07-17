@@ -226,6 +226,12 @@ verify_jwt = false
 # X-Cron-Key (LIFECYCLE_CRON_KEY), fail-closed.
 verify_jwt = false
 
+[functions.email-unsubscribe]
+# The opt-out endpoint behind every automated email's unsubscribe link
+# (CAN-SPAM). Public GET; auth is the HMAC token in the link itself
+# (signed under LIFECYCLE_CRON_KEY), so skip the JWT gate.
+verify_jwt = false
+
 [functions.weekly-digest]
 # The founder's Monday email: the week's funnel (signups, evals, checkout
 # conversion, abandoner worklist, lifecycle-email performance, thumbs-down
