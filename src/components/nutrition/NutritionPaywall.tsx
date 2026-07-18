@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { track } from '../../lib/appEvents';
 import { Apple } from 'lucide-react';
 
 interface Props {
@@ -35,6 +37,8 @@ const PLAN_FEATURES: Record<string, string[]> = {
 };
 
 export default function NutritionPaywall({ hasFeature }: Props) {
+  // Stage D: which locked doors get knocked on.
+  useEffect(() => { track('paywall_hit', { feature: 'nutrition' }); }, []);
   const navigate = useNavigate();
 
   const has = (f: string) => hasFeature ? hasFeature(f) : false;

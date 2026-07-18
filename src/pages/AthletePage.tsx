@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { track } from '../lib/appEvents';
 import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -58,6 +59,8 @@ const EVAL_SECTION_LABEL: React.CSSProperties = {
  *  green strengths (bulleted), red weaknesses (numbered), synthesizing prose,
  *  numbered recommendations. */
 function StructuredEvalView({ e }: { e: SafeEvaluation }) {
+  // Stage D: does the eval have a shelf life (re-reads)?
+  useEffect(() => { track('eval_viewed'); }, []);
   return (
     <div style={{ fontSize: 13, lineHeight: 1.5 }}>
       {e.headline_takeaway && (
@@ -507,6 +510,8 @@ function TierCard({
 }
 
 export default function AthletePage({ session }: { session: Session }) {
+  // Stage D: the eval funnel's missing middle (opened the profile page).
+  useEffect(() => { track('profile_started'); }, []);
   const [navOpen, setNavOpen] = useState(false);
   const [age, setAge] = useState<string>('');
   const [height, setHeight] = useState<string>('');

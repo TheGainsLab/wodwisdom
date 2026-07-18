@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { track } from '../../lib/appEvents';
 import { Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { OfflineMessage } from '../OfflineBanner';
@@ -44,6 +45,8 @@ export default function FoodSearchPanel({
   onShowAllFavorites: () => void;
   logError: string;
 }) {
+  // Stage D: which logging methods earn their keep.
+  useEffect(() => { track('nutrition_method', { method: 'search' }); }, []);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);

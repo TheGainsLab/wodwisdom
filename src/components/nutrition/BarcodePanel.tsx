@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { track } from '../../lib/appEvents';
 import { ScanBarcode, Loader2, Camera } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import BarcodeScannerView from './BarcodeScannerView';
@@ -12,6 +13,8 @@ export default function BarcodePanel({
   dateStr: string;
   onLogged: () => void;
 }) {
+  // Stage D: which logging methods earn their keep.
+  useEffect(() => { track('nutrition_method', { method: 'barcode' }); }, []);
   const [barcodeValue, setBarcodeValue] = useState('');
   const [barcodeLoading, setBarcodeLoading] = useState(false);
   const [barcodeResult, setBarcodeResult] = useState<any>(null);

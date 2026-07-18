@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { track } from '../../lib/appEvents';
 import {
   cardFilename,
   cardShareText,
@@ -42,6 +43,8 @@ export default function ShareCardModal({
   cacheId: string;
   onClose: () => void;
 }) {
+  // Stage D: word-of-mouth machinery usage.
+  useEffect(() => { track('share_used', { kind: 'competition' }); }, []);
   const captureRef = useRef<HTMLDivElement>(null);
   const cacheRef = useRef<Map<string, Blob>>(new Map());
   const [format, setFormat] = useState<ShareCardFormat>(defaultFormat);

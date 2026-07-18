@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { captureAcquisition } from './lib/acquisition';
+import { track, routePattern } from './lib/appEvents';
 import BottomTabBar from './components/BottomTabBar';
 import InstallPrompt from './components/InstallPrompt';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -185,6 +186,10 @@ const HIDE_TAB_BAR_ROUTES = ['/workout/start', '/checkout', '/checkout/complete'
 
 function AuthenticatedApp({ session }: { session: Session }) {
   const location = useLocation();
+  // Stage D: page_view per route change (pattern only, ids stripped).
+  useEffect(() => {
+    track('page_view', { path: routePattern(location.pathname) });
+  }, [location.pathname]);
   const hideTabBar = HIDE_TAB_BAR_ROUTES.some(r => location.pathname === r) ||
     location.pathname.startsWith('/features');
 

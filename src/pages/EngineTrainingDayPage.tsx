@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { track } from '../lib/appEvents';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import Nav from '../components/Nav';
@@ -473,6 +474,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
         if (wk) {
           setStage('equipment');
+          track('workout_viewed', { kind: 'engine' });
         } else {
           setStage('loading'); // will show not-found
         }
@@ -518,7 +520,8 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         if (prev <= 1) {
           const nextIdx = segIndexRef.current + 1;
           if (nextIdx >= segmentsRef.current.length) {
-            setStage('logging');
+            track('log_started', { kind: 'engine' });
+    setStage('logging');
             return 0;
           }
           segIndexRef.current = nextIdx;
@@ -607,6 +610,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
   const handleBeginCountdown = () => {
     setIsPaused(false);
+    track('timer_started', { kind: 'engine' });
     setStage('active');
   };
 

@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { track } from '../../lib/appEvents';
 import { Camera, Check, Loader2, Pencil } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import FoodDetailSheet from './FoodDetailSheet';
@@ -35,6 +36,8 @@ export default function PhotoPanel({
   dateStr: string;
   onLogged: () => void;
 }) {
+  // Stage D: which logging methods earn their keep.
+  useEffect(() => { track('nutrition_method', { method: 'photo' }); }, []);
   const [imageProcessing, setImageProcessing] = useState(false);
   const [imageResults, setImageResults] = useState<ImageFoodResult[]>([]);
   const [imageLogging, setImageLogging] = useState(false);
