@@ -141,6 +141,14 @@ Deno.serve(async (req) => {
   }
 
   const stats = data as DigestStats;
+
+  // Reporting foundation: persist the snapshot BEFORE sending — the trend
+  // history must survive even if Resend hiccups.
+  await supa.from("digest_runs").insert({ stats }).then(
+    () => {},
+    (e: unknown) => console.error("[weekly-digest] snapshot insert failed:", e),
+  );
+
   const subject = `Weekly digest: ${stats.checkouts.completed} sale${stats.checkouts.completed === 1 ? "" : "s"}, ${stats.signups_7d} signup${stats.signups_7d === 1 ? "" : "s"}, ${stats.abandoners_total} abandoner${stats.abandoners_total === 1 ? "" : "s"}`;
   const messageId = await sendViaResend(ALERT_EMAIL, subject, renderDigest(stats));
 

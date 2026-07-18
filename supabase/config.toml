@@ -232,6 +232,11 @@ verify_jwt = false
 # (signed under LIFECYCLE_CRON_KEY), so skip the JWT gate.
 verify_jwt = false
 
+[functions.monthly-report]
+# The founder's 1st-of-month revenue email from the billing_events ledger.
+# X-Cron-Key = LIFECYCLE_CRON_KEY (shared gate), fail-closed.
+verify_jwt = false
+
 [functions.weekly-digest]
 # The founder's Monday email: the week's funnel (signups, evals, checkout
 # conversion, abandoner worklist, lifecycle-email performance, thumbs-down
