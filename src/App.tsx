@@ -2,6 +2,7 @@ import { useEffect, useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
+import { captureAcquisition } from './lib/acquisition';
 import BottomTabBar from './components/BottomTabBar';
 import InstallPrompt from './components/InstallPrompt';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -103,6 +104,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // First-touch acquisition capture (UTM/referrer → localStorage → signup
+    // metadata). Runs every load; first touch wins inside.
+    captureAcquisition();
+
     const syncTimezone = (userId: string) => {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (!tz) return;
@@ -120,6 +125,12 @@ export default function App() {
       if (session) {
         supabase.rpc('claim_my_pending_subscription').then(() => {}, () => {});
         syncTimezone(session.user.id);
+        // PWA install stamp: standalone display-mode means the app is
+        // running from the home screen (covers iOS manual installs, where
+        // no appinstalled event exists). Idempotent — first install wins.
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+          supabase.rpc('mark_pwa_installed').then(() => {}, () => {});
+        }
       }
     }).catch(() => {
       setLoading(false);

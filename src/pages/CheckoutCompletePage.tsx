@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { getAcquisition } from '../lib/acquisition';
 import GainsLogo from '../components/GainsLogo';
 import TurnstileWidget, { TURNSTILE_ENABLED } from '../components/TurnstileWidget';
 
@@ -74,7 +75,7 @@ export default function CheckoutCompletePage() {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: fullName }, captchaToken },
+        options: { data: { full_name: fullName, acquisition: getAcquisition() }, captchaToken },
       });
       if (error) throw error;
       setSignupSuccess(true);

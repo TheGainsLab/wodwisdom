@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -41,6 +42,9 @@ export default function InstallPrompt() {
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
       setDeferredPrompt(null);
+      // Capture item B: stamp the install (first install wins; iOS manual
+      // installs are covered by standalone-mode detection in App.tsx).
+      supabase.rpc('mark_pwa_installed').then(() => {}, () => {});
     }
   };
 
