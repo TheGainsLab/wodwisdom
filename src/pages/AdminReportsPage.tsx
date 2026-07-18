@@ -70,6 +70,7 @@ export default function AdminReportsPage({ session }: { session: Session }) {
   const [health, setHealth] = useState<HealthRow[]>([]);
   const [cohorts, setCohorts] = useState<CohortRow[]>([]);
   const [revenue, setRevenue] = useState<Record<string, any> | null>(null);
+  const [behavior, setBehavior] = useState<Record<string, any> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -80,18 +81,20 @@ export default function AdminReportsPage({ session }: { session: Session }) {
       setAdminCheck(allowed ? 'allowed' : 'denied');
       if (!allowed) return;
 
-      const [r1, r2, r3, r4] = await Promise.all([
+      const [r1, r2, r3, r4, r5] = await Promise.all([
         supabase.rpc('admin_report_digest_history', { p_limit: 12 }),
         supabase.rpc('admin_report_subscriber_health'),
         supabase.rpc('admin_report_cohorts', { p_weeks: 8 }),
         supabase.rpc('admin_report_monthly_revenue'),
+        supabase.rpc('admin_report_behavior'),
       ]);
-      const firstError = r1.error ?? r2.error ?? r3.error ?? r4.error;
+      const firstError = r1.error ?? r2.error ?? r3.error ?? r4.error ?? r5.error;
       if (firstError) setError(firstError.message);
       setRuns((r1.data as DigestRun[]) ?? []);
       setHealth((r2.data as HealthRow[]) ?? []);
       setCohorts((r3.data as CohortRow[]) ?? []);
       setRevenue((r4.data as Record<string, any>) ?? null);
+      setBehavior((r5.data as Record<string, any>) ?? null);
     })();
   }, [session.user.id]);
 
@@ -189,6 +192,41 @@ export default function AdminReportsPage({ session }: { session: Session }) {
                       ))}
                     </tbody>
                   </table>
+                </Section>
+
+                <Section title="Behavior — last 7 days" sub="From the in-app event log (stage D, capturing from Jul 18, 2026). Counts grow as events flow; zeros before the first deploy are expected.">
+                  {behavior ? (
+                    <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                      <tbody>
+                        <tr><td style={tdStyle}>Events / users seen</td><td style={tdStyle}><strong>{behavior.events_total ?? 0}</strong> events from <strong>{behavior.users_seen ?? 0}</strong> users</td></tr>
+                        <tr><td style={tdStyle}>Engine funnel</td><td style={tdStyle}>
+                          viewed <strong>{behavior.engine_funnel?.viewed ?? 0}</strong>
+                          {' → '}timer <strong>{behavior.engine_funnel?.timer_started ?? 0}</strong>
+                          {' → '}log form <strong>{behavior.engine_funnel?.log_started ?? 0}</strong>
+                          {' → '}logged <strong>{behavior.engine_funnel?.logged ?? 0}</strong>
+                        </td></tr>
+                        <tr><td style={tdStyle}>Nutrition methods</td><td style={tdStyle}>{kv(behavior.nutrition_methods)}</td></tr>
+                        <tr><td style={tdStyle}>Paywall hits</td><td style={tdStyle}>{kv(behavior.paywall_hits)}</td></tr>
+                        <tr><td style={tdStyle}>Billing portal opened</td><td style={{ ...tdStyle, whiteSpace: 'normal' }}>
+                          {Array.isArray(behavior.billing_portal) && behavior.billing_portal.length > 0
+                            ? behavior.billing_portal.join(', ')
+                            : 'nobody — good'}
+                        </td></tr>
+                        <tr><td style={tdStyle}>Client errors</td><td style={{ ...tdStyle, whiteSpace: 'normal' }}>
+                          {behavior.client_errors?.count ?? 0}
+                          {Array.isArray(behavior.client_errors?.recent) && behavior.client_errors.recent.length > 0 && (
+                            <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>
+                              {' — '}{behavior.client_errors.recent.map((e: any) => `${e.path}: ${e.msg}`).join(' · ')}
+                            </span>
+                          )}
+                        </td></tr>
+                        <tr><td style={tdStyle}>Top routes</td><td style={{ ...tdStyle, whiteSpace: 'normal' }}>{kv(behavior.top_routes)}</td></tr>
+                        <tr><td style={tdStyle}>Also</td><td style={tdStyle}>
+                          eval re-reads {behavior.other?.eval_viewed ?? 0} · profile opens {behavior.other?.profile_started ?? 0} · shares {behavior.other?.share_used ?? 0} · install prompts {behavior.other?.install_prompts ?? 0}
+                        </td></tr>
+                      </tbody>
+                    </table>
+                  ) : <p style={{ fontSize: 13, color: 'var(--text-dim)' }}>Loading…</p>}
                 </Section>
 
                 <Section title={`Revenue — ${revenue?.month ?? 'last month'}`} sub="From the billing ledger (began Jul 18, 2026 — August is the first full month).">
