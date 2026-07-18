@@ -24,12 +24,18 @@ const CRON_KEY = Deno.env.get("LIFECYCLE_CRON_KEY");
 
 interface DigestStats {
   signups_7d: number;
+  acquisition: Record<string, number>;
   evals_7d: number;
   checkouts: { opened: number; people: number; completed: number; by_plan: Record<string, number> };
+  recovery_wins: number;
   abandoners_total: number;
   abandoners: { email: string; plans: string[] }[];
   emails: { template: string; sent: number; opened: number; failed: number }[];
+  chat_insights: { topics: Record<string, number>; feature_requests: number; complaints: number; buying_intent: number };
   thumbs_down_7d: number;
+  opt_outs_total: number;
+  pwa: { installed_total: number; installed_7d: number };
+  active_users: { this_week: number; prior_week: number };
   engagement: {
     not_logging_total: number;
     not_logging: string[];
@@ -38,14 +44,21 @@ interface DigestStats {
   };
 }
 
+const kvLine = (obj: Record<string, number>) =>
+  Object.entries(obj)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${escapeHtml(k)} ×${n}`)
+    .join(" · ") || "—";
+
 const td = `style="padding:6px 10px;border-bottom:1px solid #eee;text-align:left;font-size:14px"`;
 const th = `style="padding:6px 10px;border-bottom:2px solid #ddd;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#888"`;
 
 function renderDigest(s: DigestStats): string {
-  const planLine = Object.entries(s.checkouts.by_plan)
-    .sort((a, b) => b[1] - a[1])
-    .map(([p, n]) => `${escapeHtml(p)} ×${n}`)
-    .join(" · ") || "—";
+  const planLine = kvLine(s.checkouts.by_plan);
+  const acqLine = kvLine(s.acquisition);
+  const topicsLine = kvLine(s.chat_insights.topics);
+  const trend = s.active_users.this_week - s.active_users.prior_week;
+  const trendArrow = trend > 0 ? `▲ +${trend}` : trend < 0 ? `▼ ${trend}` : "→ flat";
 
   const abandonerRows = s.abandoners.length
     ? s.abandoners.map((a) =>
@@ -78,12 +91,21 @@ function renderDigest(s: DigestStats): string {
 
     `<h3 style="margin:20px 0 8px;font-size:15px">Funnel</h3>` +
     `<table style="border-collapse:collapse;width:100%">` +
+    `<tr><td ${td}>Active users (any logging)</td><td ${td}><strong>${s.active_users.this_week}</strong> vs ${s.active_users.prior_week} last week (${trendArrow})</td></tr>` +
     `<tr><td ${td}>New signups</td><td ${td}><strong>${s.signups_7d}</strong></td></tr>` +
+    `<tr><td ${td}>…from</td><td ${td}>${acqLine}</td></tr>` +
     `<tr><td ${td}>Evaluations completed</td><td ${td}><strong>${s.evals_7d}</strong></td></tr>` +
     `<tr><td ${td}>Checkout: people / opens</td><td ${td}><strong>${s.checkouts.people}</strong> people · ${s.checkouts.opened} sessions</td></tr>` +
-    `<tr><td ${td}>Purchases (closed this week)</td><td ${td}><strong>${s.checkouts.completed}</strong></td></tr>` +
+    `<tr><td ${td}>Purchases (closed this week)</td><td ${td}><strong>${s.checkouts.completed}</strong>${s.recovery_wins > 0 ? ` · <span style="color:#2ec486">${s.recovery_wins} followed a recovery email</span>` : ""}</td></tr>` +
     `<tr><td ${td}>Plans viewed</td><td ${td}>${planLine}</td></tr>` +
+    `<tr><td ${td}>PWA installs</td><td ${td}><strong>${s.pwa.installed_7d}</strong> this week · ${s.pwa.installed_total} total</td></tr>` +
     `</table>` +
+
+    `<h3 style="margin:24px 0 8px;font-size:15px">What people ask the Coach</h3>` +
+    `<p style="margin:0">Topics: ${topicsLine}</p>` +
+    `<p style="margin:6px 0 0;font-size:13px;color:#5a584f">` +
+    `${s.chat_insights.buying_intent} with buying intent · ${s.chat_insights.feature_requests} feature requests · ${s.chat_insights.complaints} complaints` +
+    `</p>` +
 
     `<h3 style="margin:24px 0 8px;font-size:15px">Abandoners${abandonerNote} — outreach list</h3>` +
     `<table style="border-collapse:collapse;width:100%">` +
@@ -95,7 +117,8 @@ function renderDigest(s: DigestStats): string {
     `<tr><th ${th}>Template</th><th ${th}>Sent</th><th ${th}>Opened</th></tr>${emailRows}</table>` +
 
     `<h3 style="margin:24px 0 8px;font-size:15px">Watch items</h3>` +
-    `<p>👎 Coach ratings this week: <strong>${s.thumbs_down_7d}</strong>${s.thumbs_down_7d > 0 ? ` — <a href="${SITE}/admin/ratings" style="color:#0074d4">review them</a>` : ""}</p>` +
+    `<p>👎 Coach ratings this week: <strong>${s.thumbs_down_7d}</strong>${s.thumbs_down_7d > 0 ? ` — <a href="${SITE}/admin/ratings" style="color:#0074d4">review them</a>` : ""}` +
+    ` · Email opt-outs (all time): <strong>${s.opt_outs_total}</strong></p>` +
     `<p><strong>Signing in but not logging</strong> (engaged, nothing recorded in 14d — the logging nudge works this group): <strong>${s.engagement.not_logging_total}</strong><br><span style="font-size:13px;color:#5a584f">${notLoggingLine}</span></p>` +
     `<p><strong>Ghosting</strong> (no sign-ins in 14d either — actually gone): <strong>${s.engagement.ghosting_total}</strong><br><span style="font-size:13px;color:#5a584f">${ghostingLine}</span></p>`,
     { maxWidth: 640 },
