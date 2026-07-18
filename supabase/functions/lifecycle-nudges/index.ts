@@ -100,6 +100,26 @@ function renderEvalFollowup(firstName: string | null, unsubUrl: string | null): 
   );
 }
 
+// ── Sweep 4: logging nudge ──────────────────────────────────────────────────
+// The everywhere-problem (founder): users who train but never log. Targets
+// entitled Engine/Programming users who signed in this week but haven't
+// logged a session in 14+ days — engaged, just not recording. The pitch is
+// coaching, not nagging: this product's targets literally adapt to logs.
+
+const LOGGING_SUBJECT = "Your training only counts if the engine sees it";
+
+function renderLoggingNudge(firstName: string | null, unsubUrl: string | null): string {
+  return emailWrap(
+    `<p>${hi(firstName)}</p>` +
+    `<p>You've been in the app lately — good. But I don't see results logged from recent sessions, and in this system that matters more than bookkeeping: <strong>your targets calibrate off what you log.</strong> No logs, no adaptation — the program slowly turns into a generic template, which is exactly what you're not paying for.</p>` +
+    `<p>It doesn't need to be precise. A rough time or output after each session is enough for the engine to work with.</p>` +
+    emailButton("/training-log", "Log your last session") +
+    `<p>And if something about logging is slowing you down — too many steps, wrong units, anything — reply and tell me. I'll fix it.</p>` +
+    `<p>-Matt</p>`,
+    { unsubUrl },
+  );
+}
+
 // ── The sweep runner ────────────────────────────────────────────────────────
 
 interface Candidate { user_id: string; email: string; full_name: string | null }
@@ -139,8 +159,9 @@ Deno.serve(async (req) => {
   const welcome = await runSweep(supa, "welcome_nudge_candidates", "welcome_nudge", WELCOME_SUBJECT, renderWelcome);
   const freeLimit = await runSweep(supa, "free_limit_candidates", "free_limit_nudge", FREE_LIMIT_SUBJECT, renderFreeLimit);
   const evalFollowup = await runSweep(supa, "eval_followup_candidates", "eval_followup", EVAL_FOLLOWUP_SUBJECT, renderEvalFollowup);
+  const logging = await runSweep(supa, "logging_nudge_candidates", "logging_nudge", LOGGING_SUBJECT, renderLoggingNudge);
 
-  const results = { welcome, free_limit: freeLimit, eval_followup: evalFollowup };
+  const results = { welcome, free_limit: freeLimit, eval_followup: evalFollowup, logging };
   const errors = Object.values(results).map((r) => r.error).filter(Boolean) as string[];
 
   // A broken sweep must be LOUD: alert the founder and return non-200 so the
@@ -157,6 +178,7 @@ Deno.serve(async (req) => {
     `[lifecycle-nudges] welcome: ${welcome.sent}/${welcome.candidates} sent` +
     ` | free_limit: ${freeLimit.sent}/${freeLimit.candidates} sent` +
     ` | eval_followup: ${evalFollowup.sent}/${evalFollowup.candidates} sent` +
+    ` | logging: ${logging.sent}/${logging.candidates} sent` +
     (errors.length ? ` | ERRORS: ${errors.join("; ")}` : ""),
   );
   return new Response(JSON.stringify(results), {
