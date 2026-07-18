@@ -30,7 +30,12 @@ interface DigestStats {
   abandoners: { email: string; plans: string[] }[];
   emails: { template: string; sent: number; opened: number; failed: number }[];
   thumbs_down_7d: number;
-  quiet: { total: number; sample: string[] };
+  engagement: {
+    not_logging_total: number;
+    not_logging: string[];
+    ghosting_total: number;
+    ghosting: string[];
+  };
 }
 
 const td = `style="padding:6px 10px;border-bottom:1px solid #eee;text-align:left;font-size:14px"`;
@@ -59,10 +64,13 @@ function renderDigest(s: DigestStats): string {
       }).join("")
     : `<tr><td ${td} colspan="3">No sends this week</td></tr>`;
 
-  const quietLine = s.quiet.total === 0
-    ? "None — every subscriber trained in the last 14 days 💪"
-    : s.quiet.sample.map(escapeHtml).join(", ") +
-      (s.quiet.total > s.quiet.sample.length ? ` … and ${s.quiet.total - s.quiet.sample.length} more` : "");
+  const sampleLine = (total: number, sample: string[], noneText: string) =>
+    total === 0
+      ? noneText
+      : sample.map(escapeHtml).join(", ") +
+        (total > sample.length ? ` … and ${total - sample.length} more` : "");
+  const notLoggingLine = sampleLine(s.engagement.not_logging_total, s.engagement.not_logging, "None");
+  const ghostingLine = sampleLine(s.engagement.ghosting_total, s.engagement.ghosting, "None — everyone quiet is at least signing in");
 
   return emailWrap(
     `<h2 style="margin:0 0 4px">The Gains Lab — weekly digest</h2>` +
@@ -88,7 +96,8 @@ function renderDigest(s: DigestStats): string {
 
     `<h3 style="margin:24px 0 8px;font-size:15px">Watch items</h3>` +
     `<p>👎 Coach ratings this week: <strong>${s.thumbs_down_7d}</strong>${s.thumbs_down_7d > 0 ? ` — <a href="${SITE}/admin/ratings" style="color:#0074d4">review them</a>` : ""}</p>` +
-    `<p>Quiet subscribers (no training logged in 14 days): <strong>${s.quiet.total}</strong><br><span style="font-size:13px;color:#5a584f">${quietLine}</span></p>`,
+    `<p><strong>Signing in but not logging</strong> (engaged, nothing recorded in 14d — the logging nudge works this group): <strong>${s.engagement.not_logging_total}</strong><br><span style="font-size:13px;color:#5a584f">${notLoggingLine}</span></p>` +
+    `<p><strong>Ghosting</strong> (no sign-ins in 14d either — actually gone): <strong>${s.engagement.ghosting_total}</strong><br><span style="font-size:13px;color:#5a584f">${ghostingLine}</span></p>`,
     { maxWidth: 640 },
   );
 }

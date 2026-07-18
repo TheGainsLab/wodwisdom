@@ -2,7 +2,53 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import { raiseEngineMonthsFromGrant } from "../_shared/engine-months-drip.ts";
-import { buildRecoveryEmail, logEmailSend, sendViaResend, unsubscribeUrl } from "../_shared/checkout-emails.ts";
+import { ALERT_EMAIL, buildRecoveryEmail, emailWrap, escapeHtml, logEmailSend, sendViaResend, unsubscribeUrl } from "../_shared/checkout-emails.ts";
+
+// ── Billing-events ledger (capture item A) ──────────────────────────────────
+// Append-only record of billing lifecycle moments; best-effort — a ledger
+// write must never fail the webhook's real work.
+
+interface BillingEventRow {
+  user_id?: string | null;
+  email?: string | null;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  event_type: "purchased" | "canceled" | "payment_churn" | "payment_failed" | "refunded" | "dispute" | "plan_changed";
+  plan?: string | null;
+  currency?: string | null;
+  amount_cents?: number | null;
+  tenure_days?: number | null;
+  // deno-lint-ignore no-explicit-any
+  details?: Record<string, any>;
+}
+
+// deno-lint-ignore no-explicit-any
+async function recordBillingEvent(supa: any, row: BillingEventRow): Promise<void> {
+  try {
+    await supa.from("billing_events").insert({ details: {}, ...row });
+  } catch (e) {
+    console.error("[webhook] billing_events insert failed:", e);
+  }
+}
+
+/** Resolve (user_id, email) from a Stripe customer id, best-effort. */
+// deno-lint-ignore no-explicit-any
+async function resolveByCustomer(supa: any, customerId: string | null): Promise<{ user_id: string | null; email: string | null }> {
+  if (!customerId) return { user_id: null, email: null };
+  const { data } = await supa.from("profiles").select("id, email").eq("stripe_customer_id", customerId).limit(1);
+  return data && data.length > 0
+    ? { user_id: data[0].id, email: data[0].email }
+    : { user_id: null, email: null };
+}
+
+/** One-line founder alert (billing events he'd want same-day). Best-effort. */
+async function alertFounder(subject: string, lines: string[]): Promise<void> {
+  try {
+    await sendViaResend(ALERT_EMAIL, subject, emailWrap(lines.map((l) => `<p>${l}</p>`).join("")));
+  } catch (e) {
+    console.error("[webhook] founder alert failed:", e);
+  }
+}
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -155,6 +201,17 @@ serve(async (req) => {
         } catch (e) {
           console.error("[webhook] failed to mark checkout attempt completed:", e);
         }
+
+        // Ledger: the purchase, WITH the currency it actually billed in —
+        // the multi-currency rollout's scoreboard.
+        await recordBillingEvent(supa, {
+          user_id: session.metadata?.user_id ?? null, email,
+          stripe_customer_id: customerId, stripe_subscription_id: subscriptionId,
+          event_type: "purchased",
+          plan: session.metadata?.plan ?? null,
+          currency: session.currency ?? null,
+          amount_cents: session.amount_total ?? null,
+        });
 
         if (!subscriptionId) {
           break;
@@ -312,6 +369,18 @@ serve(async (req) => {
           const { plan, features } = await getSubscriptionEntitlements(subscriptionId);
           console.log(`Subscription updated: plan=${plan}, features=${features.join(",")}`);
 
+          // Ledger: a price/items change on a live subscription = plan change.
+          if (event.data.previous_attributes?.items) {
+            const who = await resolveByCustomer(supa, customerId);
+            await recordBillingEvent(supa, {
+              user_id: who.user_id, email: who.email,
+              stripe_customer_id: customerId, stripe_subscription_id: subscriptionId,
+              event_type: "plan_changed", plan,
+              currency: sub.currency ?? null,
+              amount_cents: sub.items?.data?.[0]?.price?.unit_amount ?? null,
+            });
+          }
+
           const { data: profiles } = await supa.from("profiles").select("id").eq("stripe_customer_id", customerId).limit(1);
           if (profiles && profiles.length > 0) {
             const userId = profiles[0].id;
@@ -342,13 +411,30 @@ serve(async (req) => {
           // the deleted handler; handling it here too is idempotent insurance.
           // past_due is deliberately NOT revoked — Stripe is still retrying
           // the card and the subscriber is expected to recover.
-          const { data: profiles } = await supa.from("profiles").select("id").eq("stripe_customer_id", customerId).limit(1);
+          const { data: profiles } = await supa.from("profiles").select("id, email").eq("stripe_customer_id", customerId).limit(1);
           if (profiles && profiles.length > 0) {
             console.log(`[webhook] Subscription ${subscriptionId} → ${status}; revoking its entitlements for user ${profiles[0].id}`);
             await supa.from("user_entitlements")
               .delete()
               .eq("user_id", profiles[0].id)
               .eq("source", subscriptionId);
+          }
+          // Ledger: unpaid/incomplete_expired = INVOLUNTARY churn (the card
+          // died, not the intent). 'canceled' is skipped here — the deleted
+          // handler records that one.
+          if (status !== "canceled") {
+            await recordBillingEvent(supa, {
+              user_id: profiles?.[0]?.id ?? null, email: profiles?.[0]?.email ?? null,
+              stripe_customer_id: customerId, stripe_subscription_id: subscriptionId,
+              event_type: "payment_churn",
+              plan: sub.metadata?.plan ?? sub.items?.data?.[0]?.price?.metadata?.plan ?? null,
+              currency: sub.currency ?? null,
+              details: { terminal_status: status },
+            });
+            await alertFounder(
+              `Involuntary churn: ${profiles?.[0]?.email ?? customerId}`,
+              [`Subscription went <strong>${escapeHtml(status)}</strong> for <strong>${escapeHtml(profiles?.[0]?.email ?? String(customerId))}</strong> — payment never recovered. Access revoked.`],
+            );
           }
         }
         break;
@@ -362,7 +448,7 @@ serve(async (req) => {
         // Subscription cancelled — remove entitlements
 
         // Find user by stripe_customer_id
-        const { data: profiles } = await supa.from("profiles").select("id").eq("stripe_customer_id", customerId).limit(1);
+        const { data: profiles } = await supa.from("profiles").select("id, email").eq("stripe_customer_id", customerId).limit(1);
         if (profiles && profiles.length > 0) {
           // Remove all entitlements granted by this subscription
           await supa.from("user_entitlements")
@@ -371,6 +457,85 @@ serve(async (req) => {
             .eq("source", subscriptionId);
 
         }
+
+        // Ledger: the churn record (previously this death went unrecorded).
+        const tenureDays = sub.created ? Math.round((Date.now() / 1000 - sub.created) / 86400) : null;
+        const plan = sub.metadata?.plan ?? sub.items?.data?.[0]?.price?.metadata?.plan ?? null;
+        const who = profiles?.[0] ?? { id: null, email: null };
+        await recordBillingEvent(supa, {
+          user_id: who.id, email: who.email,
+          stripe_customer_id: customerId, stripe_subscription_id: subscriptionId,
+          event_type: "canceled", plan,
+          currency: sub.currency ?? null,
+          amount_cents: sub.items?.data?.[0]?.price?.unit_amount ?? null,
+          tenure_days: tenureDays,
+          details: { cancellation_reason: sub.cancellation_details?.reason ?? null, feedback: sub.cancellation_details?.feedback ?? null },
+        });
+        await alertFounder(
+          `Cancellation: ${who.email ?? customerId} (${plan ?? "unknown plan"})`,
+          [
+            `<strong>${escapeHtml(who.email ?? String(customerId))}</strong> canceled <strong>${escapeHtml(plan ?? "unknown plan")}</strong>${tenureDays != null ? ` after ${tenureDays} days` : ""}.`,
+            sub.cancellation_details?.feedback ? `Stripe exit feedback: ${escapeHtml(String(sub.cancellation_details.feedback))}` : "No exit feedback captured.",
+          ],
+        );
+        break;
+      }
+
+      case "invoice.payment_failed": {
+        // Involuntary churn starts here — previously invisible until
+        // entitlements were revoked days later.
+        const invoice = event.data.object;
+        if (!invoice.subscription) break;
+        const who = await resolveByCustomer(supa, invoice.customer);
+        await recordBillingEvent(supa, {
+          user_id: who.user_id, email: who.email ?? invoice.customer_email ?? null,
+          stripe_customer_id: invoice.customer, stripe_subscription_id: invoice.subscription,
+          event_type: "payment_failed",
+          currency: invoice.currency ?? null,
+          amount_cents: invoice.amount_due ?? null,
+          details: { attempt_count: invoice.attempt_count ?? null, next_attempt: invoice.next_payment_attempt ?? null },
+        });
+        // Alert on the FIRST failure only — Stripe's retries handle the rest.
+        if ((invoice.attempt_count ?? 1) === 1) {
+          await alertFounder(
+            `Payment failed: ${who.email ?? invoice.customer_email ?? invoice.customer}`,
+            [
+              `Renewal payment failed for <strong>${escapeHtml(who.email ?? invoice.customer_email ?? String(invoice.customer))}</strong> (${((invoice.amount_due ?? 0) / 100).toFixed(2)} ${String(invoice.currency ?? "usd").toUpperCase()}).`,
+              `Stripe will retry per your revenue-recovery settings${invoice.next_payment_attempt ? "; next attempt is scheduled" : ""}. If dunning emails are enabled, the customer has been notified.`,
+            ],
+          );
+        }
+        break;
+      }
+
+      case "charge.dispute.created": {
+        const dispute = event.data.object;
+        // The dispute object has no customer field — it lives on the charge.
+        let disputeCustomer: string | null = null;
+        if (dispute.charge) {
+          try {
+            const r = await fetchWithTimeout(`https://api.stripe.com/v1/charges/${dispute.charge}`, {
+              headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+            }, 15_000);
+            if (r.ok) disputeCustomer = (await r.json())?.customer ?? null;
+          } catch { /* record without customer */ }
+        }
+        const who = await resolveByCustomer(supa, disputeCustomer);
+        await recordBillingEvent(supa, {
+          user_id: who.user_id, email: who.email,
+          stripe_customer_id: disputeCustomer,
+          event_type: "dispute",
+          currency: dispute.currency ?? null,
+          amount_cents: dispute.amount ?? null,
+          details: { reason: dispute.reason ?? null, status: dispute.status ?? null, charge: dispute.charge ?? null },
+        });
+        await alertFounder(
+          `⚠️ Chargeback opened: ${who.email ?? "unknown customer"}`,
+          [
+            `A dispute was opened for ${((dispute.amount ?? 0) / 100).toFixed(2)} ${String(dispute.currency ?? "usd").toUpperCase()} (reason: ${escapeHtml(dispute.reason ?? "unknown")}).`,
+            `Respond in the Stripe dashboard — disputes have deadlines.`,
+          ],
+        );
         break;
       }
 
@@ -536,6 +701,21 @@ serve(async (req) => {
         const refundUserId = refundProfiles[0].id;
 
         console.log(`[webhook] Refund: customer=${customerId}, user=${refundUserId}, charge=${charge.id}, amount_refunded=${charge.amount_refunded}`);
+
+        // Ledger + alert (refunds were previously only a log line).
+        const { data: refundProfile } = await supa.from("profiles").select("email").eq("id", refundUserId).maybeSingle();
+        await recordBillingEvent(supa, {
+          user_id: refundUserId, email: refundProfile?.email ?? null,
+          stripe_customer_id: customerId,
+          event_type: "refunded",
+          currency: charge.currency ?? null,
+          amount_cents: charge.amount_refunded ?? null,
+          details: { charge: charge.id },
+        });
+        await alertFounder(
+          `Refund: ${refundProfile?.email ?? customerId}`,
+          [`Refunded ${((charge.amount_refunded ?? 0) / 100).toFixed(2)} ${String(charge.currency ?? "usd").toUpperCase()} to <strong>${escapeHtml(refundProfile?.email ?? String(customerId))}</strong>.`],
+        );
 
         // Only decrement if the user currently has an active Engine
         // entitlement. Refund-after-cancel cases: the entitlement is already
