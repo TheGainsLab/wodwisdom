@@ -111,11 +111,18 @@ export async function verifyUnsubscribeToken(userId: string, token: string): Pro
 
 // ── HTML chrome ─────────────────────────────────────────────────────────────
 
-export const emailLink = (path: string, label: string) =>
-  `<a href="${SITE}${path}" style="color:#0074d4;text-decoration:none;font-weight:600">${label}</a>`;
+/** UTM-tag a site path so clicks (and any signup/purchase they lead to)
+ *  attribute back to the specific email template that sent them. */
+export function tagged(path: string, campaign: string): string {
+  const sep = path.includes("?") ? "&" : "?";
+  return `${SITE}${path}${sep}utm_source=gainslab_email&utm_medium=email&utm_campaign=${campaign}`;
+}
 
-export const emailButton = (path: string, label: string) =>
-  `<p><a href="${SITE}${path}" style="display:inline-block;background:#0074d4;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">${label}</a></p>`;
+export const emailLink = (path: string, label: string, campaign = "email") =>
+  `<a href="${tagged(path, campaign)}" style="color:#0074d4;text-decoration:none;font-weight:600">${label}</a>`;
+
+export const emailButton = (path: string, label: string, campaign = "email") =>
+  `<p><a href="${tagged(path, campaign)}" style="display:inline-block;background:#0074d4;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">${label}</a></p>`;
 
 /**
  * The shared email shell: brand footer with the CAN-SPAM postal address and,
@@ -209,7 +216,7 @@ export function buildRecoveryEmail(plan: string, unsubUrl: string | null = null)
   const html = emailWrap(
     `<p>Hey — saw you were checking out <strong>${name}</strong> and didn't finish signing up. No pressure; just wanted to make sure nothing got in your way.</p>` +
     `<p>One thing that trips people up: if the payment page asks you to <em>"confirm it's you"</em> with a code sent to a phone number, that's Stripe's saved-info feature (Link) — not us. You can skip it entirely by clicking <strong>"Pay without Link"</strong> at the bottom of that box and entering your card normally.</p>` +
-    `<p><a href="${planLink(plan)}" style="display:inline-block;background:#0074d4;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Pick up where you left off</a></p>` +
+    `<p><a href="${planLink(plan)}?utm_source=gainslab_email&utm_medium=email&utm_campaign=checkout_recovery" style="display:inline-block;background:#0074d4;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Pick up where you left off</a></p>` +
     `<p>Questions about the program? Just reply to this email — it comes straight to me.</p>`,
     { unsubUrl },
   );

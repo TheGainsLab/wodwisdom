@@ -50,12 +50,12 @@ function renderWelcome(firstName: string | null, unsubUrl: string | null): strin
   return emailWrap(
     `<p>${hi(firstName)}</p>` +
     `<p>Thanks for creating an account. Before anything else — there's real value already sitting in it, free:</p>` +
-    `<p><strong>Your Athlete History</strong> — Done the Open? ${emailLink("/athletedata", "Link your history")} for a detailed breakdown of your performance. Retest, or try new workouts. No history? Every workout and every data feature is still yours. Start building a history!</p>` +
-    `<p><strong>Your Free Fitness Evaluation</strong> — ${emailLink("/profile", "Complete your profile")} (5 minutes) and our AI candidly analyzes your fitness: strengths, weaknesses, and training priorities. It's yours to keep — share it with your coach or build your next training block on it.</p>` +
-    `<p><strong>AI Coach</strong> — ${emailLink("/chat", "3 free questions")}, answered by an AI trained on our methodology. Complete your profile and evaluation first and the answers get personal.</p>` +
+    `<p><strong>Your Athlete History</strong> — Done the Open? ${emailLink("/athletedata", "Link your history", "welcome_nudge")} for a detailed breakdown of your performance. Retest, or try new workouts. No history? Every workout and every data feature is still yours. Start building a history!</p>` +
+    `<p><strong>Your Free Fitness Evaluation</strong> — ${emailLink("/profile", "Complete your profile", "welcome_nudge")} (5 minutes) and our AI candidly analyzes your fitness: strengths, weaknesses, and training priorities. It's yours to keep — share it with your coach or build your next training block on it.</p>` +
+    `<p><strong>AI Coach</strong> — ${emailLink("/chat", "3 free questions", "welcome_nudge")}, answered by an AI trained on our methodology. Complete your profile and evaluation first and the answers get personal.</p>` +
     `<p>All of that is free, already available in your account.</p>` +
-    `<p><strong>When you want more:</strong> ${emailLink("/features/engine", "Year of the Engine")} gives you 8 conditioning programs with personalized targets every training day and analytics we believe no other platform matches. ${emailLink("/features/programs", "AI Programming")} builds fully individualized training — every block, warmup to cooldown — and evolves monthly based on what you actually log. Like a high-level coach, at a fraction of the price. Both include the AI Coach and full nutrition tracking.</p>` +
-    emailButton("/profile", "Start with the evaluation — 5 minutes") +
+    `<p><strong>When you want more:</strong> ${emailLink("/features/engine", "Year of the Engine", "welcome_nudge")} gives you 8 conditioning programs with personalized targets every training day and analytics we believe no other platform matches. ${emailLink("/features/programs", "AI Programming", "welcome_nudge")} builds fully individualized training — every block, warmup to cooldown — and evolves monthly based on what you actually log. Like a high-level coach, at a fraction of the price. Both include the AI Coach and full nutrition tracking.</p>` +
+    emailButton("/profile", "Start with the evaluation — 5 minutes", "welcome_nudge") +
     `<p>Looking forward to working with you.</p>` +
     `<p>-Matt</p>`,
     { unsubUrl },
@@ -70,12 +70,12 @@ function renderFreeLimit(firstName: string | null, unsubUrl: string | null): str
   return emailWrap(
     `<p>${hi(firstName)}</p>` +
     `<p>You've asked your three free AI Coach questions. That's what they were there for — I hope the answers were useful.</p>` +
-    `<p>Here's the thing about this coach: its answers are only as good as what it knows about <em>you</em>. ${emailLink("/profile", "Complete your profile and free evaluation")}, and it stops giving general advice — it answers with your lifts, your conditioning, and your goals in the room.</p>` +
+    `<p>Here's the thing about this coach: its answers are only as good as what it knows about <em>you</em>. ${emailLink("/profile", "Complete your profile and free evaluation", "free_limit_nudge")}, and it stops giving general advice — it answers with your lifts, your conditioning, and your goals in the room.</p>` +
     `<p>And inside a training plan, it sees everything: your program, your baselines, today's session. Ask "how should I pace this?" and it's talking about <em>your</em> workout — pacing computed from <em>your</em> time trial — not a generic template. That's the version of the Coach no general-purpose AI can be.</p>` +
-    `<p><strong>${emailLink("/features/engine", "Year of the Engine")}</strong> or <strong>${emailLink("/features/programs", "AI Programming")}</strong> — $29.99/mo each, both with the unlimited Coach and full nutrition tracking included.</p>` +
-    `<p style="font-size:13px;color:#5a584f">(Just want unlimited questions with your profile, without a program? The ${emailLink("/features/coaching", "standalone Coach")} is $7.99/mo.)</p>` +
+    `<p><strong>${emailLink("/features/engine", "Year of the Engine", "free_limit_nudge")}</strong> or <strong>${emailLink("/features/programs", "AI Programming", "free_limit_nudge")}</strong> — $29.99/mo each, both with the unlimited Coach and full nutrition tracking included.</p>` +
+    `<p style="font-size:13px;color:#5a584f">(Just want unlimited questions with your profile, without a program? The ${emailLink("/features/coaching", "standalone Coach", "free_limit_nudge")} is $7.99/mo.)</p>` +
     `<p>Whatever you asked about this week — that's exactly the kind of thing it's built for, every day.</p>` +
-    emailButton("/features", "See the plans") +
+    emailButton("/features", "See the plans", "free_limit_nudge") +
     `<p>-Matt</p>`,
     { unsubUrl },
   );
@@ -88,13 +88,13 @@ const EVAL_FOLLOWUP_SUBJECT = "Your evaluation, and what to do with it";
 function renderEvalFollowup(firstName: string | null, unsubUrl: string | null): string {
   return emailWrap(
     `<p>${hi(firstName)}</p>` +
-    `<p>A few days ago our AI took an honest look at your fitness — your lifting, your skills, and your engine. ${emailLink("/profile", "It's still there in your account")} whenever you want to re-read it.</p>` +
+    `<p>A few days ago our AI took an honest look at your fitness — your lifting, your skills, and your engine. ${emailLink("/profile", "It's still there in your account", "eval_followup")} whenever you want to re-read it.</p>` +
     `<p>Here's the question that matters: what happens with it now? An assessment you don't act on is just interesting reading. The whole reason we built the evaluation is that it feeds directly into training:</p>` +
-    `<p><strong>If your engine was the flag</strong> — ${emailLink("/features/engine", "Year of the Engine")} turns that into 8 conditioning programs with targets calibrated to <em>your</em> baseline, recalibrated as you improve.</p>` +
-    `<p><strong>If lifting or skills need the work</strong> — ${emailLink("/features/programs", "AI Programming")} builds your whole program around exactly those gaps, and rebuilds it monthly based on what you log.</p>` +
-    `<p><strong>If the honest answer is "more than one thing"</strong> — ${emailLink("/features", "All Access")} is both programs under one subscription: your conditioning and your strength and skills, trained at the same time. At $49.99/mo it's the best value on the board — everything for less than two plans.</p>` +
+    `<p><strong>If your engine was the flag</strong> — ${emailLink("/features/engine", "Year of the Engine", "eval_followup")} turns that into 8 conditioning programs with targets calibrated to <em>your</em> baseline, recalibrated as you improve.</p>` +
+    `<p><strong>If lifting or skills need the work</strong> — ${emailLink("/features/programs", "AI Programming", "eval_followup")} builds your whole program around exactly those gaps, and rebuilds it monthly based on what you log.</p>` +
+    `<p><strong>If the honest answer is "more than one thing"</strong> — ${emailLink("/features", "All Access", "eval_followup")} is both programs under one subscription: your conditioning and your strength and skills, trained at the same time. At $49.99/mo it's the best value on the board — everything for less than two plans.</p>` +
     `<p>Each plan is $29.99/mo on its own, and every plan includes the unlimited AI Coach and full nutrition tracking. Whichever fits, it starts from the evaluation you already did. The work of knowing where you stand is done. The next step is training on it.</p>` +
-    emailButton("/features", "Pick your plan") +
+    emailButton("/features", "Pick your plan", "eval_followup") +
     `<p>-Matt</p>`,
     { unsubUrl },
   );
@@ -113,7 +113,7 @@ function renderLoggingNudge(firstName: string | null, unsubUrl: string | null): 
     `<p>${hi(firstName)}</p>` +
     `<p>You've been in the app lately — good. But I don't see results logged from recent sessions, and in this system that matters more than bookkeeping: <strong>your targets calibrate off what you log.</strong> No logs, no adaptation — the program slowly turns into a generic template, which is exactly what you're not paying for.</p>` +
     `<p>It doesn't need to be precise. A rough time or output after each session is enough for the engine to work with.</p>` +
-    emailButton("/training-log", "Log your last session") +
+    emailButton("/training-log", "Log your last session", "logging_nudge") +
     `<p>And if something about logging is slowing you down — too many steps, wrong units, anything — reply and tell me. I'll fix it.</p>` +
     `<p>-Matt</p>`,
     { unsubUrl },
