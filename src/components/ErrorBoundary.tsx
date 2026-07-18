@@ -18,6 +18,11 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    // Stage D: silent breakage made visible.
+    try {
+      import('../lib/appEvents').then(({ track, routePattern }) =>
+        track('client_error', { path: routePattern(window.location.pathname), msg: String(error.message ?? error).slice(0, 200) }));
+    } catch { /* never compound a crash */ }
     console.error('[ErrorBoundary]', error, info.componentStack);
   }
 

@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { track } from '../../lib/appEvents';
 import { Zap, TrendingUp, Timer, BarChart3, Dumbbell, Clock } from 'lucide-react';
 
 interface Props {
@@ -36,6 +38,8 @@ const FEATURES = [
 ];
 
 export default function EnginePaywall({ hasFeature }: Props) {
+  // Stage D: which locked doors get knocked on.
+  useEffect(() => { track('paywall_hit', { feature: 'engine' }); }, []);
   const navigate = useNavigate();
 
   const has = (f: string) => hasFeature ? hasFeature(f) : false;

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { track } from '../lib/appEvents';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -40,6 +41,7 @@ export default function InstallPrompt() {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
+    track('install_prompt', { outcome });
     if (outcome === 'accepted') {
       setDeferredPrompt(null);
       // Capture item B: stamp the install (first install wins; iOS manual
@@ -49,6 +51,7 @@ export default function InstallPrompt() {
   };
 
   const handleDismiss = () => {
+    track('install_prompt', { outcome: 'dismissed' });
     setDismissed(true);
     setDeferredPrompt(null);
     setShowIOSPrompt(false);

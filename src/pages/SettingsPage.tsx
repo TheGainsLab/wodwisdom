@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { track } from '../lib/appEvents';
 import Nav from '../components/Nav';
 import { cacheGet, cacheSet, profileKey, entitlementsKey } from '../lib/offlineCache';
 
@@ -69,6 +70,7 @@ export default function SettingsPage({ session }: { session: Session }) {
   const openBillingPortal = async () => {
     setPortalLoading(true);
     try {
+      track('billing_portal_opened');
       const { data, error } = await supabase.functions.invoke('create-portal-session', {
         body: {},
       });

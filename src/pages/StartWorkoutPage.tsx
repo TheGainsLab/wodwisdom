@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { track } from '../lib/appEvents';
 import { localDateString } from '../lib/localDate';
 import Nav from '../components/Nav';
 import { BlockContent } from '../components/WorkoutBlocksDisplay';
@@ -334,6 +335,8 @@ export default function StartWorkoutPage({ session, sourceStateProp, onExit, onD
   // day page can host it inline.
   embedded?: boolean;
 }) {
+  // Stage D: logging-flow entry (submission is derivable from workout_logs).
+  useEffect(() => { track('log_started', { kind: 'workout' }); }, []);
   const navigate = useNavigate();
   const location = useLocation();
   const [navOpen, setNavOpen] = useState(false);
