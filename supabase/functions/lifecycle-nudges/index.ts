@@ -159,7 +159,14 @@ Deno.serve(async (req) => {
   const welcome = await runSweep(supa, "welcome_nudge_candidates", "welcome_nudge", WELCOME_SUBJECT, renderWelcome);
   const freeLimit = await runSweep(supa, "free_limit_candidates", "free_limit_nudge", FREE_LIMIT_SUBJECT, renderFreeLimit);
   const evalFollowup = await runSweep(supa, "eval_followup_candidates", "eval_followup", EVAL_FOLLOWUP_SUBJECT, renderEvalFollowup);
-  const logging = await runSweep(supa, "logging_nudge_candidates", "logging_nudge", LOGGING_SUBJECT, renderLoggingNudge);
+  // Sweep #4 emails SUBSCRIBERS — a different relationship than prospect
+  // nudges (founder distinction, 2026-07-18: OK emailing users, undecided on
+  // emailing paying customers). Dormant until ENABLE_SUBSCRIBER_NUDGES is
+  // set to 'true' (function secret) and the function redeployed.
+  const subscriberNudgesOn = Deno.env.get("ENABLE_SUBSCRIBER_NUDGES") === "true";
+  const logging = subscriberNudgesOn
+    ? await runSweep(supa, "logging_nudge_candidates", "logging_nudge", LOGGING_SUBJECT, renderLoggingNudge)
+    : { candidates: 0, sent: 0, failed: 0 } as SweepResult;
 
   const results = { welcome, free_limit: freeLimit, eval_followup: evalFollowup, logging };
   const errors = Object.values(results).map((r) => r.error).filter(Boolean) as string[];
