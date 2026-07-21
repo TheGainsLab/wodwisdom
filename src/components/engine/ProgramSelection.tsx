@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Zap, Activity, Shuffle, Loader2, Check } from 'lucide-react';
+import { Zap, Activity, Shuffle, Loader2, Check, RotateCcw } from 'lucide-react';
 import {
   loadPrograms,
   saveProgramVersion,
   switchProgram,
+  restartProgram,
   type EngineProgram,
 } from '../../lib/engineService';
 
@@ -25,7 +26,21 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [confirmRestart, setConfirmRestart] = useState(false);
   const isSwitching = currentProgram != null;
+
+  const restart = async () => {
+    if (!currentProgram) return;
+    setSaving(true);
+    try {
+      await restartProgram(currentProgram);
+      onSelected(currentProgram);
+    } catch {
+      // user can retry
+    }
+    setSaving(false);
+    setConfirmRestart(false);
+  };
 
   useEffect(() => {
     loadPrograms()
@@ -157,6 +172,59 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
               );
             })}
           </div>
+
+          {/* Restart current program — the "start over" affordance users kept
+              asking the AI Coach for. Archive semantics: history and PRs are
+              kept; program progress and pacing calibration reset. */}
+          {isSwitching && (
+            <>
+              <hr className="engine-divider" />
+              {!confirmRestart ? (
+                <button
+                  className="engine-btn engine-btn-secondary"
+                  onClick={() => setConfirmRestart(true)}
+                  disabled={saving}
+                  style={{ width: '100%', color: '#ffffff' }}
+                >
+                  <RotateCcw size={16} /> Restart current program from Day 1
+                </button>
+              ) : (
+                <div style={{
+                  padding: '12px 14px',
+                  background: 'rgba(250,204,21,.08)',
+                  border: '1px solid rgba(250,204,21,.35)',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: 'var(--text)',
+                }}>
+                  <strong>Start over from Day 1?</strong> Your completed days
+                  and pacing calibration are archived — Day 1's time trial sets
+                  a fresh baseline, and the program treats you like a new
+                  athlete. Your training history, PRs, and analytics are kept.
+                  Unlocked months are not affected.
+                  <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                    <button
+                      className="engine-btn engine-btn-primary engine-btn-sm"
+                      onClick={restart}
+                      disabled={saving}
+                      style={{ fontSize: 13 }}
+                    >
+                      {saving ? <Loader2 size={14} className="spin" /> : 'Yes, restart from Day 1'}
+                    </button>
+                    <button
+                      className="engine-btn engine-btn-secondary engine-btn-sm"
+                      onClick={() => setConfirmRestart(false)}
+                      disabled={saving}
+                      style={{ fontSize: 13 }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
