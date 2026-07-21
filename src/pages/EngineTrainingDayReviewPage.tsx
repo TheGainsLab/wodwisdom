@@ -23,7 +23,7 @@ interface CoachMessage {
   streaming?: boolean;
 }
 
-function CoachChat({ engineProgramDay, autoQuestion, modality, units }: { engineProgramDay: number; autoQuestion?: string; modality?: string; units?: string }) {
+function CoachChat({ engineProgramDay, autoQuestion, modality, units, targetPace }: { engineProgramDay: number; autoQuestion?: string; modality?: string; units?: string; targetPace?: number | null }) {
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -53,6 +53,10 @@ function CoachChat({ engineProgramDay, autoQuestion, modality, units }: { engine
           engine_program_day: engineProgramDay,
           engine_modality: modality,
           engine_units: units,
+          // The app-computed target the athlete sees on screen — the coach
+          // treats it as authoritative instead of re-deriving pace from the
+          // raw baseline (which contradicted the UI).
+          engine_target_pace: targetPace ?? undefined,
         }),
       });
 
@@ -104,7 +108,7 @@ function CoachChat({ engineProgramDay, autoQuestion, modality, units }: { engine
       setMessages((prev) => [...prev, { role: 'assistant', content: 'Failed to connect.' }]);
     }
     setIsLoading(false);
-  }, [input, isLoading, messages, engineProgramDay, modality, units]);
+  }, [input, isLoading, messages, engineProgramDay, modality, units, targetPace]);
 
   // Quick-action entry (Warm-up / Pace this from the start page): auto-ask once.
   useEffect(() => {
@@ -198,10 +202,11 @@ export default function EngineTrainingDayReviewPage({ session: _session }: { ses
   const { dayNumber } = useParams<{ dayNumber: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const navState = location.state as { autoQuestion?: string; modality?: string; units?: string } | null;
+  const navState = location.state as { autoQuestion?: string; modality?: string; units?: string; targetPace?: number | null } | null;
   const autoQuestion = navState?.autoQuestion;
   const selectedModality = navState?.modality;
   const selectedUnits = navState?.units;
+  const targetPace = navState?.targetPace ?? null;
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [programVersion, setProgramVersion] = useState<string | null>(null);
@@ -330,7 +335,7 @@ export default function EngineTrainingDayReviewPage({ session: _session }: { ses
                   </div>
                 ) : null}
 
-                <CoachChat engineProgramDay={programDay} autoQuestion={autoQuestion} modality={selectedModality} units={selectedUnits} />
+                <CoachChat engineProgramDay={programDay} autoQuestion={autoQuestion} modality={selectedModality} units={selectedUnits} targetPace={targetPace} />
               </>
             )}
           </div>

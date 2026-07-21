@@ -619,6 +619,61 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
     setStage('logging');
   };
 
+  // Weighted target pace across all work segments (matches mobile app) — the
+  // number the save flow records as target_pace AND the number handed to the
+  // AI Coach as today's authoritative target. One implementation for both, so
+  // the coach can never disagree with the app (the July '26 21-22-vs-18
+  // pacing contradiction). Pre-workout callers pass generateSegments(workout)
+  // since the live segment state doesn't exist until the workout starts.
+  const computeTargetPace = (segs: Segment[]): number | null => {
+    if (!workout) return null;
+    const baselineRpm = baseline?.calculated_rpm ?? 0;
+    let targetPace: number | null = null;
+    if (baselineRpm > 0) {
+      const workSegs = segs.filter(s => s.type === 'work');
+      if (workSegs.length > 0) {
+        let totalTargetPace = 0;
+        let totalTargetDuration = 0;
+
+        for (const seg of workSegs) {
+          // Find the block params for this segment's block
+          const raw = [workout.block_1_params, workout.block_2_params, workout.block_3_params, workout.block_4_params][seg.blockIndex];
+          const bp = raw as unknown as BlockParams | null;
+          if (!bp) continue;
+
+          const paceRange = seg.label === 'Flux'
+            ? (bp.fluxPaceRange ?? bp.paceRange)
+            : bp.paceRange;
+
+          const isMaxEffort = paceRange === 'max_effort' || seg.label === 'BURST' || seg.label === 'Max Effort';
+
+          if (!isMaxEffort && Array.isArray(paceRange) && paceRange.length >= 2) {
+            let intensityMult = (paceRange[0] + paceRange[1]) / 2;
+            // Apply rolling average ratio adjustment (matches mobile app).
+            // AI-generated days own intensity, so the multiplier is 1 for them.
+            intensityMult *= effectiveRollingMult(workout, performanceMetrics);
+            const segTarget = baselineRpm * intensityMult;
+            totalTargetPace += segTarget * seg.duration;
+            totalTargetDuration += seg.duration;
+          }
+        }
+
+        if (totalTargetDuration > 0) {
+          targetPace = totalTargetPace / totalTargetDuration;
+        }
+      } else if (workout.base_intensity_percent) {
+        // Fallback for workouts with no segments
+        targetPace = baselineRpm * (workout.base_intensity_percent / 100);
+      }
+    }
+
+    // Rocket Races B: override target pace with the preceding A's actual pace
+    if (workout.day_type === 'rocket_races_b' && rocketASession?.actual_pace) {
+      targetPace = rocketASession.actual_pace;
+    }
+    return targetPace;
+  };
+
   const handleSave = async () => {
     if (!workout) return;
     setSaving(true);
@@ -629,52 +684,8 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
       const rpm = isRateUnit(selectedUnit)
         ? output
         : (durationMin > 0 ? output / durationMin : 0);
-      const baselineRpm = baseline?.calculated_rpm ?? 0;
 
-      // Weighted target pace across all work segments (matches mobile app)
-      let targetPace: number | null = null;
-      if (baselineRpm > 0) {
-        const workSegs = segments.filter(s => s.type === 'work');
-        if (workSegs.length > 0) {
-          let totalTargetPace = 0;
-          let totalTargetDuration = 0;
-
-          for (const seg of workSegs) {
-            // Find the block params for this segment's block
-            const raw = [workout.block_1_params, workout.block_2_params, workout.block_3_params, workout.block_4_params][seg.blockIndex];
-            const bp = raw as unknown as BlockParams | null;
-            if (!bp) continue;
-
-            const paceRange = seg.label === 'Flux'
-              ? (bp.fluxPaceRange ?? bp.paceRange)
-              : bp.paceRange;
-
-            const isMaxEffort = paceRange === 'max_effort' || seg.label === 'BURST' || seg.label === 'Max Effort';
-
-            if (!isMaxEffort && Array.isArray(paceRange) && paceRange.length >= 2) {
-              let intensityMult = (paceRange[0] + paceRange[1]) / 2;
-              // Apply rolling average ratio adjustment (matches mobile app).
-              // AI-generated days own intensity, so the multiplier is 1 for them.
-              intensityMult *= effectiveRollingMult(workout, performanceMetrics);
-              const segTarget = baselineRpm * intensityMult;
-              totalTargetPace += segTarget * seg.duration;
-              totalTargetDuration += seg.duration;
-            }
-          }
-
-          if (totalTargetDuration > 0) {
-            targetPace = totalTargetPace / totalTargetDuration;
-          }
-        } else if (workout.base_intensity_percent) {
-          // Fallback for workouts with no segments
-          targetPace = baselineRpm * (workout.base_intensity_percent / 100);
-        }
-      }
-
-      // Rocket Races B: override target pace with the preceding A's actual pace
-      if (workout.day_type === 'rocket_races_b' && rocketASession?.actual_pace) {
-        targetPace = rocketASession.actual_pace;
-      }
+      const targetPace = computeTargetPace(segments);
 
       const perfRatio = targetPace && targetPace > 0 && rpm > 0 ? rpm / targetPace : null;
 
@@ -1353,14 +1364,14 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
                       className="engine-btn engine-btn-secondary"
-                      onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { autoQuestion: 'Can you please suggest a warmup for today?', modality, units: selectedUnit } })}
+                      onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { autoQuestion: 'Can you please suggest a warmup for today?', modality, units: selectedUnit, targetPace: workout ? computeTargetPace(generateSegments(workout)) : null } })}
                       style={{ flex: 1, color: '#ffffff' }}
                     >
                       Warm-up
                     </button>
                     <button
                       className="engine-btn engine-btn-secondary"
-                      onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { autoQuestion: 'How should I pace this?', modality, units: selectedUnit } })}
+                      onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { autoQuestion: 'How should I pace this?', modality, units: selectedUnit, targetPace: workout ? computeTargetPace(generateSegments(workout)) : null } })}
                       style={{ flex: 1, color: '#ffffff' }}
                     >
                       Pace this
@@ -1368,7 +1379,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   </div>
                   <button
                     className="engine-btn engine-btn-secondary"
-                    onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { modality, units: selectedUnit } })}
+                    onClick={() => navigate(`/engine/training/${dayNumber}/review`, { state: { modality, units: selectedUnit, targetPace: workout ? computeTargetPace(generateSegments(workout)) : null } })}
                     style={{ width: '100%', marginTop: 8, color: '#ffffff' }}
                   >
                     AI Coach
