@@ -50,6 +50,57 @@ async function alertFounder(subject: string, lines: string[]): Promise<void> {
   }
 }
 
+// ── Churn-alert dossier ─────────────────────────────────────────────────────
+// A bare "subscription went unpaid for cus_xxx" tells the founder nothing.
+// These helpers assemble who / plan+products / subscribed+tenure / admin link
+// from data already on hand (profiles row, entitlement rows captured before
+// revocation, sub.created off the event payload — accurate for every
+// subscription regardless of our ledger's age). No extra Stripe calls.
+
+const ADMIN_BASE_URL = "https://www.thegainslab.com";
+
+/** "14 months" / "23 days" from a Stripe sub.created unix timestamp. */
+function tenureLabel(subCreatedSec: number | null | undefined): string | null {
+  if (typeof subCreatedSec !== "number" || !isFinite(subCreatedSec)) return null;
+  const days = Math.max(0, (Date.now() / 1000 - subCreatedSec) / 86400);
+  if (days < 60) return `${Math.round(days)} days`;
+  return `${Math.round(days / 30.4)} months`;
+}
+
+function churnDossierLines(opts: {
+  name: string | null;
+  email: string | null;
+  userId: string | null;
+  plan: string | null;
+  features: string[];
+  subCreatedSec: number | null;
+}): string[] {
+  const lines: string[] = [];
+  const who = opts.name
+    ? `<strong>${escapeHtml(opts.name)}</strong> (${escapeHtml(opts.email ?? "no email")})`
+    : `<strong>${escapeHtml(opts.email ?? "unknown user")}</strong>`;
+  lines.push(who);
+  lines.push(
+    `Plan: <strong>${escapeHtml(opts.plan ?? "unknown")}</strong>` +
+      (opts.features.length > 0
+        ? ` — products: ${escapeHtml(opts.features.map((f) => f.replace(/_/g, " ")).join(", "))}`
+        : ""),
+  );
+  if (typeof opts.subCreatedSec === "number" && isFinite(opts.subCreatedSec)) {
+    const since = new Date(opts.subCreatedSec * 1000).toLocaleDateString("en-US", {
+      year: "numeric", month: "short", day: "numeric",
+    });
+    const tenure = tenureLabel(opts.subCreatedSec);
+    lines.push(`Subscribed: ${since}${tenure ? ` (${tenure})` : ""}`);
+  }
+  if (opts.userId) {
+    lines.push(`<a href="${ADMIN_BASE_URL}/admin/users/${opts.userId}">Open in admin</a> — timeline, entitlements, and the email composer for a win-back note.`);
+  } else {
+    lines.push("No matching app account found for this Stripe customer.");
+  }
+  return lines;
+}
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
@@ -431,30 +482,77 @@ serve(async (req) => {
           // the deleted handler; handling it here too is idempotent insurance.
           // past_due is deliberately NOT revoked — Stripe is still retrying
           // the card and the subscriber is expected to recover.
-          const { data: profiles } = await supa.from("profiles").select("id, email").eq("stripe_customer_id", customerId).limit(1);
+          const { data: profiles } = await supa.from("profiles").select("id, email, full_name").eq("stripe_customer_id", customerId).limit(1);
+          // Capture the products BEFORE revocation deletes the rows — they
+          // feed the churn dossier below.
+          let revokedFeatures: string[] = [];
           if (profiles && profiles.length > 0) {
+            const { data: ents } = await supa
+              .from("user_entitlements")
+              .select("feature")
+              .eq("user_id", profiles[0].id)
+              .eq("source", subscriptionId);
+            revokedFeatures = (ents ?? []).map((e: { feature: string }) => e.feature);
             console.log(`[webhook] Subscription ${subscriptionId} → ${status}; revoking its entitlements for user ${profiles[0].id}`);
             await supa.from("user_entitlements")
               .delete()
               .eq("user_id", profiles[0].id)
               .eq("source", subscriptionId);
           }
-          // Ledger: unpaid/incomplete_expired = INVOLUNTARY churn (the card
-          // died, not the intent). 'canceled' is skipped here — the deleted
-          // handler records that one.
-          if (status !== "canceled") {
-            await recordBillingEvent(supa, {
-              user_id: profiles?.[0]?.id ?? null, email: profiles?.[0]?.email ?? null,
-              stripe_customer_id: customerId, stripe_subscription_id: subscriptionId,
-              event_type: "payment_churn",
-              plan: sub.metadata?.plan ?? sub.items?.data?.[0]?.price?.metadata?.plan ?? null,
-              currency: sub.currency ?? null,
-              details: { terminal_status: status },
-            });
-            await alertFounder(
-              `Involuntary churn: ${profiles?.[0]?.email ?? customerId}`,
-              [`Subscription went <strong>${escapeHtml(status)}</strong> for <strong>${escapeHtml(profiles?.[0]?.email ?? String(customerId))}</strong> — payment never recovered. Access revoked.`],
-            );
+
+          // Ledger + alert: unpaid/incomplete_expired = INVOLUNTARY churn (the
+          // card died, not the intent). 'canceled' is skipped here — the
+          // deleted handler records that one.
+          //
+          // TRANSITION GUARD (July '26 zombie-noise incident): only when this
+          // event actually MOVED the subscription to the terminal status —
+          // previous_attributes carries the changed fields. Long-dead subs
+          // re-emit updated events for incidental reasons (payment method
+          // detached, invoice voided, revenue-recovery sweeps), and each one
+          // was recorded as fresh churn + a founder email for users who
+          // expired months ago. Revocation above still runs on every event
+          // (idempotent cleanup); reporting only fires on the transition.
+          const becameTerminal =
+            typeof event.data.previous_attributes?.status === "string" &&
+            event.data.previous_attributes.status !== status;
+          if (status !== "canceled" && becameTerminal) {
+            // Dedupe: at most one payment_churn row per subscription, so an
+            // edge-case double transition can't double-count in reports.
+            const { data: priorChurn } = await supa
+              .from("billing_events")
+              .select("id")
+              .eq("stripe_subscription_id", subscriptionId)
+              .eq("event_type", "payment_churn")
+              .limit(1);
+            if (!priorChurn || priorChurn.length === 0) {
+              const plan = sub.metadata?.plan ?? sub.items?.data?.[0]?.price?.metadata?.plan ?? null;
+              const tenureDays = sub.created ? Math.round((Date.now() / 1000 - sub.created) / 86400) : null;
+              await recordBillingEvent(supa, {
+                user_id: profiles?.[0]?.id ?? null, email: profiles?.[0]?.email ?? null,
+                stripe_customer_id: customerId, stripe_subscription_id: subscriptionId,
+                event_type: "payment_churn",
+                plan,
+                currency: sub.currency ?? null,
+                tenure_days: tenureDays,
+                details: { terminal_status: status, previous_status: event.data.previous_attributes.status },
+              });
+              const who = profiles?.[0] ?? null;
+              const tenure = tenureLabel(sub.created ?? null);
+              await alertFounder(
+                `Involuntary churn: ${who?.full_name ?? who?.email ?? customerId}${plan ? ` — ${plan}` : ""}${tenure ? `, ${tenure}` : ""}`,
+                [
+                  `Subscription went <strong>${escapeHtml(status)}</strong> — payment never recovered. Access revoked.`,
+                  ...churnDossierLines({
+                    name: who?.full_name ?? null,
+                    email: who?.email ?? null,
+                    userId: who?.id ?? null,
+                    plan,
+                    features: revokedFeatures,
+                    subCreatedSec: sub.created ?? null,
+                  }),
+                ],
+              );
+            }
           }
         }
         break;
@@ -467,9 +565,17 @@ serve(async (req) => {
 
         // Subscription cancelled — remove entitlements
 
-        // Find user by stripe_customer_id
-        const { data: profiles } = await supa.from("profiles").select("id, email").eq("stripe_customer_id", customerId).limit(1);
+        // Find user by stripe_customer_id; capture products BEFORE the
+        // revocation deletes the rows (they feed the churn dossier).
+        const { data: profiles } = await supa.from("profiles").select("id, email, full_name").eq("stripe_customer_id", customerId).limit(1);
+        let canceledFeatures: string[] = [];
         if (profiles && profiles.length > 0) {
+          const { data: ents } = await supa
+            .from("user_entitlements")
+            .select("feature")
+            .eq("user_id", profiles[0].id)
+            .eq("source", subscriptionId);
+          canceledFeatures = (ents ?? []).map((e: { feature: string }) => e.feature);
           // Remove all entitlements granted by this subscription
           await supa.from("user_entitlements")
             .delete()
@@ -481,7 +587,7 @@ serve(async (req) => {
         // Ledger: the churn record (previously this death went unrecorded).
         const tenureDays = sub.created ? Math.round((Date.now() / 1000 - sub.created) / 86400) : null;
         const plan = sub.metadata?.plan ?? sub.items?.data?.[0]?.price?.metadata?.plan ?? null;
-        const who = profiles?.[0] ?? { id: null, email: null };
+        const who = profiles?.[0] ?? { id: null, email: null, full_name: null };
         await recordBillingEvent(supa, {
           user_id: who.id, email: who.email,
           stripe_customer_id: customerId, stripe_subscription_id: subscriptionId,
@@ -491,10 +597,19 @@ serve(async (req) => {
           tenure_days: tenureDays,
           details: { cancellation_reason: sub.cancellation_details?.reason ?? null, feedback: sub.cancellation_details?.feedback ?? null },
         });
+        const tenure = tenureLabel(sub.created ?? null);
         await alertFounder(
-          `Cancellation: ${who.email ?? customerId} (${plan ?? "unknown plan"})`,
+          `Cancellation: ${who.full_name ?? who.email ?? customerId} (${plan ?? "unknown plan"}${tenure ? `, ${tenure}` : ""})`,
           [
-            `<strong>${escapeHtml(who.email ?? String(customerId))}</strong> canceled <strong>${escapeHtml(plan ?? "unknown plan")}</strong>${tenureDays != null ? ` after ${tenureDays} days` : ""}.`,
+            `Canceled <strong>${escapeHtml(plan ?? "unknown plan")}</strong>.`,
+            ...churnDossierLines({
+              name: who.full_name ?? null,
+              email: who.email ?? null,
+              userId: who.id ?? null,
+              plan,
+              features: canceledFeatures,
+              subCreatedSec: sub.created ?? null,
+            }),
             sub.cancellation_details?.feedback ? `Stripe exit feedback: ${escapeHtml(String(sub.cancellation_details.feedback))}` : "No exit feedback captured.",
           ],
         );
