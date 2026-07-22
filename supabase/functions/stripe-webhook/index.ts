@@ -244,20 +244,25 @@ serve(async (req) => {
             stripe_customer_id: customerId,
           }).eq("id", userId);
 
-          // Remove any existing entitlements from previous subscriptions
-          // (handles plan changes — old entitlements cleared, new ones granted)
+          // Remove any existing entitlements from PREVIOUS subscriptions
+          // (handles plan changes — old entitlements cleared, new ones granted).
+          // THIS subscription's rows are kept so a webhook retry can't reset
+          // their granted_at.
           await supa.from("user_entitlements")
             .delete()
             .eq("user_id", userId)
-            .like("source", "sub_%");
+            .like("source", "sub_%")
+            .neq("source", subscriptionId);
 
-          // Grant entitlements for this plan
+          // Grant entitlements for this plan. ignoreDuplicates: an existing
+          // row keeps its original granted_at (webhook retries must not
+          // re-stamp the grant date).
           for (const feature of features) {
             await supa.from("user_entitlements").upsert({
               user_id: userId,
               feature,
               source,
-            }, { onConflict: "user_id,feature,source" });
+            }, { onConflict: "user_id,feature,source", ignoreDuplicates: true });
           }
 
           // Seed Engine month 1 at grant time (mirrors the gym-grant path).
@@ -381,23 +386,38 @@ serve(async (req) => {
             });
           }
 
+          // An unresolvable plan must be a no-op, never a wipe: reconciling
+          // against an empty feature set would revoke everything the user paid
+          // for because a metadata lookup hiccuped.
+          if (features.length === 0) {
+            console.error(`[webhook] subscription.updated: no features resolved for plan=${plan}; skipping entitlement reconcile`);
+            break;
+          }
+
           const { data: profiles } = await supa.from("profiles").select("id").eq("stripe_customer_id", customerId).limit(1);
           if (profiles && profiles.length > 0) {
             const userId = profiles[0].id;
 
-            // Clear old entitlements from this subscription
+            // RECONCILE, don't wipe-and-rewrite. subscription.updated fires on
+            // every renewal cycle; the old delete-all + re-insert reset every
+            // row's granted_at monthly, so "granted" really meant "last
+            // renewal" (July '26: misled three separate billing analyses).
+            // Targeted delete removes only features no longer in the plan;
+            // ignoreDuplicates leaves existing rows — and their original
+            // granted_at — untouched. Plan changes still reconcile exactly;
+            // renewals become true no-ops on the rows.
             await supa.from("user_entitlements")
               .delete()
               .eq("user_id", userId)
-              .eq("source", subscriptionId);
+              .eq("source", subscriptionId)
+              .not("feature", "in", `(${features.map((f) => `"${f}"`).join(",")})`);
 
-            // Grant new entitlements
             for (const feature of features) {
               await supa.from("user_entitlements").upsert({
                 user_id: userId,
                 feature,
                 source: subscriptionId,
-              }, { onConflict: "user_id,feature,source" });
+              }, { onConflict: "user_id,feature,source", ignoreDuplicates: true });
             }
 
           }

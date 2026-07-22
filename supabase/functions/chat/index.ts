@@ -172,6 +172,11 @@ async function buildEngineCoachingContext(
   engineProgramDay: number,
   selectedModality: string | null,
   selectedUnits: string | null,
+  // The app's computed target pace for today (client passes what it displays).
+  // Authoritative when present — the model must coach TO it, never re-derive
+  // pacing from the raw baseline (July '26: coach said 21-22 cal/min against
+  // an on-screen target of 18 because it only had the baseline to work from).
+  targetPace: number | null,
 ): Promise<string> {
   // Mapping row for the requested day
   const { data: mapping } = await supa
@@ -197,7 +202,7 @@ async function buildEngineCoachingContext(
     // whole context silently comes back empty.
     supa
       .from("engine_workouts")
-      .select("day_type, phase")
+      .select("day_type, phase, block_count, set_rest_seconds, base_intensity_percent, block_1_params, block_2_params, block_3_params, block_4_params")
       .eq("program_type", "main_5day")
       .eq("day_number", mapping.engine_workout_day_number)
       .maybeSingle(),
@@ -278,11 +283,36 @@ async function buildEngineCoachingContext(
   parts.push("\nTODAY'S SESSION:");
   if (dayTypeRow?.name) parts.push(`Day type: ${dayTypeRow.name}`);
   if (dayTypeRow?.coaching_intent) parts.push("", dayTypeRow.coaching_intent);
+
+  // Session structure from the catalog block params, so "how should I pace
+  // this?" is grounded in what the session actually looks like.
+  const blockParams = [workout.block_1_params, workout.block_2_params, workout.block_3_params, workout.block_4_params]
+    .slice(0, workout.block_count ?? 4)
+    .filter((bp): bp is Record<string, unknown> => bp != null);
+  if (blockParams.length > 0) {
+    parts.push(`\nSESSION STRUCTURE (${blockParams.length} block${blockParams.length > 1 ? "s" : ""}${workout.base_intensity_percent != null ? `, base intensity ${workout.base_intensity_percent}%` : ""}${workout.set_rest_seconds != null ? `, ${workout.set_rest_seconds}s between blocks` : ""}):`);
+    blockParams.forEach((bp, i) => parts.push(`Block ${i + 1}: ${JSON.stringify(bp)}`));
+  }
+
   if (selectedModality) {
     const modLabel = selectedModality.replace(/_/g, " ");
     parts.push(
       `\nSELECTED EQUIPMENT FOR TODAY: ${modLabel}${selectedUnits ? ` (measured in ${selectedUnits})` : ""}. ` +
-        `Tailor pacing and warm-up advice to THIS equipment — do not hedge across modalities, and use this modality's time-trial baseline for pace targets.`,
+        `Tailor pacing and warm-up advice to THIS equipment — do not hedge across modalities.`,
+    );
+  }
+
+  if (targetPace != null) {
+    parts.push(
+      `\nTODAY'S TARGET PACE (computed by the app from this athlete's baseline, today's intended intensity, and their recent performance — AUTHORITATIVE): ` +
+        `${Number(targetPace.toFixed(2))}${selectedUnits ? ` ${selectedUnits}/min` : " per minute"} for the work intervals. ` +
+        `This is the number on the athlete's screen. Coach TO this target — never derive a different pacing number from the raw time-trial baseline. ` +
+        `Use the baseline only for color (e.g. what fraction of their max this represents). ` +
+        `If the athlete questions the target, explain how it is derived (baseline scaled to today's intended intensity, adjusted by recent performance) rather than proposing a different number.`,
+    );
+  } else if (selectedModality) {
+    parts.push(
+      `\nNo computed target pace is available for this exchange. If asked about pacing, reason from this modality's time-trial baseline scaled DOWN to today's intended intensity (never prescribe baseline pace for sub-maximal work), and tell the athlete the app shows their exact personalized target on the training day screen.`,
     );
   }
 
@@ -371,8 +401,16 @@ Deno.serve(async (req) => {
     // (Decision 10(b)), so its tier follows Engine access — not `ai_chat`. This applies
     // ONLY to day-scoped requests; a request without engine_program_day (the standalone
     // coach) is tiered exactly as before.
-    const { question, history = [], source_filter, workout_id, engine_program_day, engine_modality, engine_units } = await req.json();
+    const { question, history = [], source_filter, workout_id, engine_program_day, engine_modality, engine_units, engine_target_pace } = await req.json();
     const isEngineDayRequest = typeof engine_program_day === "number" && engine_program_day > 0;
+    // The app-computed target pace for the scoped engine day (what the athlete
+    // sees on screen). Client-supplied; bounds-checked and only ever used as
+    // coaching context text. See buildEngineCoachingContext.
+    const engineTargetPace =
+      typeof engine_target_pace === "number" && isFinite(engine_target_pace) &&
+      engine_target_pace > 0 && engine_target_pace < 10000
+        ? engine_target_pace
+        : null;
     const engineDayCoachAccess = isEngineDayRequest && features.has("engine");
 
     const isFreeTier = !isAdmin && !features.has("ai_chat") && !engineDayCoachAccess;
@@ -448,8 +486,14 @@ Deno.serve(async (req) => {
     // instantly (skip all RAG/LLM work) and don't charge a quota slot for it.
     // history includes the current question (frontend sends [...messages, userMsg]),
     // so a fresh chip tap has length 1; a real follow-up has length >= 3.
-    const cacheKey = (engineCoachingMode && (history?.length ?? 0) <= 1)
+    // Target-aware key: the answer for a pacing chip embeds the computed
+    // target, so a changed target (new baseline / rolling adjustment) must
+    // miss the old cache row and regenerate rather than serve a stale number.
+    const chipKey = (engineCoachingMode && (history?.length ?? 0) <= 1)
       ? (ENGINE_CHIP_KEYS[(question || "").trim().toLowerCase()] ?? null)
+      : null;
+    const cacheKey = chipKey
+      ? (engineTargetPace != null ? `${chipKey}@${engineTargetPace.toFixed(1)}` : chipKey)
       : null;
     const cacheModality = typeof engine_modality === "string" ? engine_modality : "";
     const cacheUnits = typeof engine_units === "string" ? engine_units : "";
@@ -583,6 +627,7 @@ Deno.serve(async (req) => {
           engine_program_day,
           typeof engine_modality === "string" ? engine_modality : null,
           typeof engine_units === "string" ? engine_units : null,
+          engineTargetPace,
         );
       } catch (err) {
         console.error("[chat] Engine coaching context failed:", err);

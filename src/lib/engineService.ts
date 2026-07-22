@@ -386,6 +386,20 @@ async function applyDayOverrides(result: EngineWorkout[], version: string): Prom
  *   every completed session across every program the user has touched —
  *   used by analytics so the training history stays continuous.
  */
+/**
+ * ISO timestamp of the most recent "restart from Day 1" of this program, or
+ * null if never restarted. Sessions created before this moment are archived:
+ * excluded from program progress, kept for PRs/analytics/leaderboard.
+ */
+export async function getProgramRestartAt(programId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('athlete_profiles')
+    .select('engine_restarts')
+    .maybeSingle();
+  const map = (data?.engine_restarts ?? {}) as Record<string, string>;
+  return map[programId] ?? null;
+}
+
 export async function loadCompletedSessions(
   programId?: string
 ): Promise<EngineWorkoutSession[]> {
@@ -397,6 +411,8 @@ export async function loadCompletedSessions(
 
   if (programId) {
     query = query.eq('program_version', programId);
+    const restartAt = await getProgramRestartAt(programId);
+    if (restartAt) query = query.gt('created_at', restartAt);
   }
 
   const { data, error } = await query;
@@ -486,13 +502,24 @@ export async function isPersonalBestSession(session: EngineWorkoutSession): Prom
 export async function getWorkoutSessionByDay(
   programDayNumber: number
 ): Promise<EngineWorkoutSession | null> {
-  const { data, error } = await supabase
+  // Respect a program restart: pre-restart sessions are archived and must not
+  // count as "already done this day" (or feed Rocket Races pairing).
+  const { data: prof } = await supabase
+    .from('athlete_profiles')
+    .select('engine_program_version, engine_restarts')
+    .maybeSingle();
+  const restartMap = (prof?.engine_restarts ?? {}) as Record<string, string>;
+  const restartAt = prof?.engine_program_version ? restartMap[prof.engine_program_version] ?? null : null;
+
+  let query = supabase
     .from('engine_workout_sessions')
     .select('*')
     .eq('program_day_number', programDayNumber)
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
+  if (restartAt) query = query.gt('created_at', restartAt);
+
+  const { data, error } = await query.maybeSingle();
 
   if (error) throw error;
   return data;
@@ -751,8 +778,11 @@ export async function switchProgram(newProgramId: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  // Highest completed program_day_number in the new program, if any.
-  const { data: maxRow } = await supabase
+  // Highest completed program_day_number in the new program, if any —
+  // ignoring sessions archived by a restart of that program, so switching
+  // away and back doesn't resurrect the pre-restart position.
+  const restartAt = await getProgramRestartAt(newProgramId);
+  let maxQuery = supabase
     .from('engine_workout_sessions')
     .select('program_day_number')
     .eq('user_id', user.id)
@@ -760,8 +790,9 @@ export async function switchProgram(newProgramId: string): Promise<void> {
     .eq('completed', true)
     .not('program_day_number', 'is', null)
     .order('program_day_number', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
+  if (restartAt) maxQuery = maxQuery.gt('created_at', restartAt);
+  const { data: maxRow } = await maxQuery.maybeSingle();
 
   const maxCompleted = maxRow?.program_day_number ?? 0;
 
@@ -809,4 +840,58 @@ export async function advanceCurrentDay(newDay: number): Promise<void> {
     .eq('user_id', user.id);
 
   if (error) throw error;
+}
+
+/**
+ * Restart a program from Day 1 — a full "start over" as the athlete
+ * experiences it, without destroying their record:
+ *   - Stamps engine_restarts[programId] = now: sessions before this moment
+ *     are ARCHIVED — excluded from program progress (dashboard, prior-session
+ *     checks, Rocket Races pairing, switchProgram's resume point) but kept in
+ *     engine_workout_sessions for PRs, analytics, and the leaderboard.
+ *   - Resets the current-day pointer to 1.
+ *   - Clears pacing calibration (performance metrics; current time-trial
+ *     flags) so Day 1's time trial sets a genuinely fresh baseline — the
+ *     coach and targets treat them like a new athlete.
+ *   - Clears the program's AI day overrides (same hygiene as switchProgram):
+ *     they were generated against the old position.
+ * What this does NOT touch: engine_months_unlocked (paid access is not a
+ * progress concept) and historical session rows.
+ */
+export async function restartProgram(programId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: prof } = await supabase
+    .from('athlete_profiles')
+    .select('engine_restarts')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  const restarts = { ...((prof?.engine_restarts ?? {}) as Record<string, string>) };
+  restarts[programId] = new Date().toISOString();
+
+  const { error } = await supabase
+    .from('athlete_profiles')
+    .update({ engine_restarts: restarts, engine_current_day: 1 })
+    .eq('user_id', user.id);
+  if (error) throw error;
+
+  // Fresh pacing calibration: rolling metrics go, old time trials stop being
+  // "current" (rows remain for history/analytics).
+  await supabase
+    .from('engine_user_performance_metrics')
+    .delete()
+    .eq('user_id', user.id);
+  await supabase
+    .from('engine_time_trials')
+    .update({ is_current: false })
+    .eq('user_id', user.id)
+    .eq('is_current', true);
+
+  // Stale AI overrides for this program (mirrors switchProgram).
+  await supabase
+    .from('engine_user_day_overrides')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('program_version', programId);
 }
