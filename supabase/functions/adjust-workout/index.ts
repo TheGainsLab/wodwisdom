@@ -17,7 +17,12 @@ import { MODELS } from "../_shared/model-profiles.ts";
 import { callClaude } from "../_shared/call-claude.ts";
 import { searchChunks, deduplicateChunks, formatChunksAsContext } from "../_shared/rag.ts";
 import { buildEmitBlockTool, type BlockPrescription, type MovementPrescription } from "../_shared/v2-output-schema.ts";
-import { fetchVocabulary } from "../_shared/build-writer-payload.ts";
+import {
+  computeMergedAvoidance,
+  fetchVocabulary,
+  type AvoidanceConfirmed,
+  type InjuryConstraints,
+} from "../_shared/build-writer-payload.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -33,7 +38,14 @@ interface ProfileData {
   equipment?: Record<string, boolean> | null;
   bodyweight?: number | null;
   units?: string | null;
+  injuries_constraints?: string | null;
+  injuries_structured?: InjuryConstraints | null;
+  injuries_constraints_hash?: string | null;
+  injuries_avoidance_confirmed?: AvoidanceConfirmed | null;
 }
+
+/** The four columns the avoidance merge reads, appended to both paths' profile selects. */
+const AVOIDANCE_COLS = "injuries_constraints, injuries_structured, injuries_constraints_hash, injuries_avoidance_confirmed";
 
 function formatProfile(profile: ProfileData): string {
   const parts: string[] = [];
@@ -59,6 +71,13 @@ function formatProfile(profile: ProfileData): string {
       .map(([k]) => k.replace(/_/g, " "));
     if (unavailable.length > 0) parts.push("Equipment NOT available — " + unavailable.join(", "));
   }
+  // Injury + equipment avoidances, via the same merge program generation uses.
+  const { injuries_structured } = computeMergedAvoidance(profile);
+  if (injuries_structured.do_not_program.length > 0) {
+    parts.push("Do NOT program (injury/equipment) — " + injuries_structured.do_not_program.join(", "));
+  }
+  const injuryNotes = (profile.injuries_constraints ?? "").trim();
+  if (injuryNotes) parts.push("Injury notes (athlete's own words) — " + injuryNotes);
   return parts.join("\n") || "No profile data.";
 }
 
@@ -77,6 +96,7 @@ You have access to:
 - CrossFit methodology reference material
 
 Rules:
+- NEVER program a movement from the athlete's "Do NOT program" list, and never one that conflicts with their injury notes. If the request asks for one, substitute a safe alternative that preserves the stimulus and say so in the rationale. Safety outranks the literal request.
 - Modify only the blocks that need to change. Leave unchanged blocks exactly as they are.
 - When substituting movements, pick alternatives that preserve the intended stimulus.
 - Prescribe weights using the athlete's 1RMs where applicable. Use M/F Rx format (e.g. 185/125).
@@ -132,7 +152,7 @@ async function handleDayAdjust(
 
   const { data: profile } = await supa
     .from("athlete_profiles")
-    .select("lifts, skills, conditioning, equipment, bodyweight, units")
+    .select(`lifts, skills, conditioning, equipment, bodyweight, units, ${AVOIDANCE_COLS}`)
     .eq("user_id", user.id)
     .single();
   const profileStr = profile ? formatProfile(profile as ProfileData) : "No profile data.";
@@ -182,13 +202,15 @@ You will receive:
   - The block as it currently stands (its prescription)
   - The other blocks in the same day (context only — do NOT change them)
   - The athlete's request
-  - Slim athlete context (units, key 1RMs, equipment NOT available)
+  - Slim athlete context (units, key 1RMs, equipment NOT available, and — when the
+    athlete has constraints on file — a do_not_program movement list and injury_notes)
   - The movement vocabulary you must draw from
 
 You will emit: ONE revised block via the \`emit_block\` tool, matching the BlockPrescription schema.
 
 RULES (honor every one):
 - Satisfy the athlete's request. If it would compromise safety (loads above 1RM without a max-effort scheme, mixing two monostructural cardio modalities in a metcon, programming an unavailable-equipment or do-not-program movement), adapt to honor safety over the literal ask.
+- The \`do_not_program\` list in the athlete context is ABSOLUTE — never emit any movement on it, even if the athlete asks for it by name; substitute the closest safe alternative that preserves the stimulus. \`injury_notes\` are the athlete's own words — honor them even for movements the list doesn't name.
 - Preserve the block's intent and time domain UNLESS the athlete explicitly asks to change it. A weight tweak keeps the scheme; "make it longer" changes the work volume, not the movement character.
 - Keep the same block_type unless the request clearly requires otherwise.
 - All weights in the athlete's units. Plate math: lbs → nearest 5, kg → nearest 2.5. Prescribed barbell weight ≤ the relevant 1RM unless the scheme is an explicit max attempt.
@@ -298,7 +320,7 @@ async function handleBlockPropose(
     .order("sort_order");
 
   const [{ data: profile }, vocabulary] = await Promise.all([
-    supa.from("athlete_profiles").select("lifts, skills, conditioning, equipment, bodyweight, units").eq("user_id", user.id).single(),
+    supa.from("athlete_profiles").select(`lifts, skills, conditioning, equipment, bodyweight, units, ${AVOIDANCE_COLS}`).eq("user_id", user.id).single(),
     fetchVocabulary(supa),
   ]);
   const prof = (profile ?? {}) as ProfileData;
@@ -306,7 +328,21 @@ async function handleBlockPropose(
   const equipmentUnavailable = prof.equipment
     ? Object.entries(prof.equipment).filter(([, v]) => v === false).map(([k]) => k.replace(/_/g, " "))
     : [];
-  const slimAthlete = { units, lifts: prof.lifts ?? {}, equipment_not_available: equipmentUnavailable, vocabulary };
+  // Same avoidance merge as program generation — confirmed-list hash gate,
+  // parsed-list fallback, equipment expansion. Keys are omitted entirely for
+  // constraint-free athletes so their prompts are unchanged.
+  const avoidance = computeMergedAvoidance(prof);
+  const injuryNotes = (prof.injuries_constraints ?? "").trim();
+  const slimAthlete = {
+    units,
+    lifts: prof.lifts ?? {},
+    equipment_not_available: equipmentUnavailable,
+    ...(avoidance.injuries_structured.do_not_program.length > 0
+      ? { do_not_program: avoidance.injuries_structured.do_not_program }
+      : {}),
+    ...(injuryNotes ? { injury_notes: injuryNotes } : {}),
+    vocabulary,
+  };
 
   const userMessage = buildBlockUserMessage(original, siblingRows ?? [], userRequest.trim(), slimAthlete);
 

@@ -257,6 +257,69 @@ function asUnits(v: unknown): "lbs" | "kg" | null {
 }
 
 // ============================================================
+// Do-not-program merge — the ONE precedence rule for movements the AI
+// must never prescribe. Shared by program generation (buildWriterPayload)
+// and AI-Edit (adjust-workout) so the two paths cannot drift.
+// ============================================================
+
+/**
+ * Normalize equipment and merge every avoidance source into one canonical
+ * `InjuryConstraints` with per-movement provenance:
+ *
+ *   1. Injury blocks — the athlete-CONFIRMED avoidance list (handoff 1.1)
+ *      when it is valid for the current constraint text
+ *      (confirmed_against_hash === injuries_constraints_hash). ROLLOUT
+ *      SAFETY (T4 before T3/T6): with no valid confirmation — every
+ *      existing user until they complete the one-time show-back — fall
+ *      back to the raw parsed list so protection is NEVER dropped.
+ *   2. Equipment blocks — the static movement expansion of missing
+ *      equipment (boolean map → movement list).
+ *   3. Union of both, `blocked_by` derived at merge (handoff Priority 2),
+ *      NOT persisted. Injury blocks are bodily (liftable only via the
+ *      confirmation flow); equipment blocks are situational (a future
+ *      "full gym this week" toggle may lift them). A consumer that lifts
+ *      blocks MUST consult blocked_by and never clear `injury`/`both`.
+ */
+export function computeMergedAvoidance(profile: {
+  equipment?: Record<string, unknown> | null;
+  injuries_structured?: InjuryConstraints | null;
+  injuries_constraints_hash?: string | null;
+  injuries_avoidance_confirmed?: AvoidanceConfirmed | null;
+}): { equipment: Record<string, boolean>; injuries_structured: InjuryConstraints } {
+  const equipment: Record<string, boolean> = {};
+  for (const k of ALL_EQUIPMENT_KEYS) {
+    equipment[k] = asEquipmentValue((profile.equipment ?? {})[k]);
+  }
+  const equipmentBlocked = computeEquipmentBlockedMovements(equipment);
+
+  const base: InjuryConstraints = profile.injuries_structured ?? {
+    summary: "No injury constraints.",
+    do_not_program: [],
+    suggested_subs: [],
+  };
+  const confirmed = profile.injuries_avoidance_confirmed ?? null;
+  const confirmationValid =
+    confirmed != null &&
+    profile.injuries_constraints_hash != null &&
+    confirmed.confirmed_against_hash === profile.injuries_constraints_hash;
+  const injuryBlocked = confirmationValid ? confirmed!.do_not_program : base.do_not_program;
+
+  const injurySet = new Set(injuryBlocked);
+  const equipSet = new Set(equipmentBlocked);
+  const mergedDoNotProgram = Array.from(new Set([...injurySet, ...equipSet])).sort();
+  const blockedBy: Record<string, "equipment" | "injury" | "both"> = {};
+  for (const m of mergedDoNotProgram) {
+    const inj = injurySet.has(m);
+    const eq = equipSet.has(m);
+    blockedBy[m] = inj && eq ? "both" : inj ? "injury" : "equipment";
+  }
+  return {
+    equipment,
+    injuries_structured: { ...base, do_not_program: mergedDoNotProgram, blocked_by: blockedBy },
+  };
+}
+
+// ============================================================
 // Tier 4 bundle slicer — drops character_affinity + identity; passes
 // everything else through. NonNullable fallbacks return empty
 // structures so the writer reads stable shapes regardless of which
@@ -589,57 +652,12 @@ export async function buildWriterPayload(
     conditioning[k] = asConditioningValue((profile.conditioning ?? {})[k]);
   }
 
-  const equipment: Record<string, boolean> = {};
-  for (const k of ALL_EQUIPMENT_KEYS) {
-    equipment[k] = asEquipmentValue((profile.equipment ?? {})[k]);
-  }
-
-  // Merge equipment-blocked movements into injuries_structured.do_not_program
-  // so the writer sees one canonical filter regardless of source. The
-  // equipment list is purely static (boolean → static movement list); the
-  // injury list (if present) was parsed by the parse-injuries-constraints
-  // edge function.
-  const equipmentBlocked = computeEquipmentBlockedMovements(equipment);
-  const baseInjuriesStructured: InjuryConstraints = profile.injuries_structured ?? {
-    summary: "No injury constraints.",
-    do_not_program: [],
-    suggested_subs: [],
-  };
-
-  // The ACTIVE injury avoidances = the athlete-CONFIRMED list (handoff 1.1), valid
-  // only for the current text (confirmed_against_hash === injuries_constraints_hash).
-  // ROLLOUT SAFETY (T4 before T3/T6): when there is no valid confirmation yet — every
-  // existing user, until they complete the one-time show-back — fall back to the raw
-  // parsed list so protection is NEVER dropped. Once the confirmation flow + generation
-  // guard land, a valid confirmation takes precedence and the guard blocks the
-  // unconfirmed-non-empty path upstream.
-  const confirmed = profile.injuries_avoidance_confirmed ?? null;
-  const confirmationValid =
-    confirmed != null &&
-    profile.injuries_constraints_hash != null &&
-    confirmed.confirmed_against_hash === profile.injuries_constraints_hash;
-  const injuryBlocked = confirmationValid
-    ? confirmed!.do_not_program
-    : baseInjuriesStructured.do_not_program;
-
-  // Merge injury + equipment blocks WITHOUT flattening away the source (handoff
-  // Priority 2). Both sets are distinct here, so blocked_by is derived at merge —
-  // no stored column. A future equipment toggle consults blocked_by and must never
-  // lift 'injury'/'both' movements.
-  const injurySet = new Set(injuryBlocked);
-  const equipSet = new Set(equipmentBlocked);
-  const mergedDoNotProgram = Array.from(new Set([...injurySet, ...equipSet])).sort();
-  const blockedBy: Record<string, "equipment" | "injury" | "both"> = {};
-  for (const m of mergedDoNotProgram) {
-    const inj = injurySet.has(m);
-    const eq = equipSet.has(m);
-    blockedBy[m] = inj && eq ? "both" : inj ? "injury" : "equipment";
-  }
-  const mergedInjuriesStructured: InjuryConstraints = {
-    ...baseInjuriesStructured,
-    do_not_program: mergedDoNotProgram,
-    blocked_by: blockedBy,
-  };
+  // Equipment normalization + the do-not-program merge live in
+  // computeMergedAvoidance — shared with AI-Edit (adjust-workout) so the
+  // generate and edit paths enforce the identical avoidance rule. See the
+  // helper's doc for the confirmed-list hash gate and blocked_by provenance.
+  const { equipment, injuries_structured: mergedInjuriesStructured } =
+    computeMergedAvoidance(profile);
 
   // 7. Athlete Model (coaching-state Step 1) — compute the deterministic
   // fact-sheet, persist an immutable version (append-only-on-change), and
