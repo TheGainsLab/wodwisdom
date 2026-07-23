@@ -834,7 +834,8 @@ Deno.serve(async (req) => {
               '1. "type" — one of:\n' +
               '   - "methodology": explains a concept, principle, or mechanism. Personal data does not change the answer. Examples: "what\'s Zone 2", "explain carbohydrate metabolism", "why do we do Fran", "explain a devour day".\n' +
               '   - "personal_programming": asks for guidance specific to themselves — their lifts, their programming, a workout for them, pacing for their session. Examples: "what should I squat tomorrow", "give me a workout", "how should I pace this 5k", "rate my workout yesterday".\n' +
-              '   - "meta": about the AI itself, the app, product capabilities, or small talk. Examples: "who are you", "what can you do", "can you build programs", "hey", "where is my history".\n\n' +
+              '   - "meta": SOLELY about the AI itself, the app, product capabilities, or small talk — with no personal-training content at all. Examples: "who are you", "what can you do", "can you build programs", "hey", "where is my history page".\n' +
+              '     NOT meta — first-person training questions that mention the product: "can you build ME a program" (they want it done → personal_programming), "how has MY training been" → personal_programming, "what does my history show" → personal_programming.\n\n' +
               '2. "search_query" — a clean standalone search query string for the topical RAG lookup. For "meta" questions, output null. For others: topical keywords and phrases, no conversational filler. Fold in relevant topical context from recent conversation. Strip irrelevant specifics (exact numbers, names, dates) unless they are the topic itself. Preserve proper nouns that ARE the topic (day type names like "devour", program names like "Year of the Engine", named benchmarks).\n\n' +
               "TIEBREAKER for ambiguous questions: personal_programming > methodology > meta.\n\n" +
               "OUTPUT: ONLY valid JSON, one object, no prose, no code fences. Examples:\n" +
@@ -880,11 +881,14 @@ Deno.serve(async (req) => {
     const competitorId = (athleteProfile?.competition_athlete_id as string | null) ?? null;
     // Engine athlete card: user-level Engine context (position, baselines,
     // conditioning state) for Engine-tier athletes in every NON-day-scoped
-    // mode. Day-scoped requests get the full dossier instead; meta questions
-    // skip it as noise; non-Engine users never build it (prompt unchanged).
+    // mode — INCLUDING meta-routed questions: the router misclassifies some
+    // first-person questions as meta, and the card (cheap parallel indexed
+    // lookups) is what keeps those answers grounded. Day-scoped requests get
+    // the full dossier instead; non-Engine users never build it (prompt
+    // unchanged). The expensive meta skips (embedding, RAG, competition
+    // fetch) stay — those are latency, not grounding.
     const shouldBuildEngineCard =
       !engineCoachingMode &&
-      !isMeta &&
       (userTier === "engine" || userTier === "all_access") &&
       !!athleteProfile?.engine_program_version;
     const [embData, recentTraining, programContext, competitionBundle, engineAthleteCard] = await Promise.all([
@@ -1016,13 +1020,11 @@ Deno.serve(async (req) => {
             ? "\n\nUSER TIER: AI Programming subscriber. Ground answers in their current program structure and training. They already have AI Nutrition bundled.\nProducts available to mention (only per the guidance-moment rules): Year of the Engine, All Access."
             : "\n\nUSER TIER: All Access subscriber. The user has everything — Engine, AI Programming, AI Nutrition, AI Coach.\nProducts available to mention: NONE. Mention no products under any circumstances."
           ) +
-          // Athlete profile — injected for everything except pure meta
-          // questions, where the profile is noise. Scoped requests
-          // (workout_id / engine_program_day) always get profile.
-          (questionType === "meta" && !workoutContext && !engineCoachingMode
-            ? ""
-            : buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units, athleteProfile?.gender)
-          ) +
+          // Athlete profile — ALWAYS injected, meta included. It's ~200
+          // tokens of insurance: when the router misroutes a real personal
+          // question as meta, the answer still knows who the athlete is.
+          // True meta questions just ignore it.
+          buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units, athleteProfile?.gender) +
           // Engine program context — the full day-scoped dossier when the
           // request scopes to a day, else the user-level athlete card for
           // Engine-tier users (exactly one of these is ever non-empty).
