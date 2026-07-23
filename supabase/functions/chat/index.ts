@@ -385,7 +385,7 @@ async function buildEngineAthleteCard(
   programVersion: string,
   currentDay: number | null,
 ): Promise<string> {
-  const [{ data: mapping }, { data: timeTrials }, { data: pref }] = await Promise.all([
+  const [{ data: mapping }, { data: timeTrials }, { data: pref }, { data: recentModalities }] = await Promise.all([
     currentDay
       ? supa
           .from("engine_program_mapping")
@@ -405,6 +405,15 @@ async function buildEngineAthleteCard(
       .eq("user_id", userId)
       .eq("modality", "last_selected")
       .maybeSingle(),
+    // Machine distribution for multi-machine athletes (last ~90 days of
+    // completed sessions; counted in code — PostgREST has no GROUP BY).
+    supa
+      .from("engine_workout_sessions")
+      .select("modality")
+      .eq("user_id", userId)
+      .eq("completed", true)
+      .gte("created_at", new Date(Date.now() - 90 * 864e5).toISOString())
+      .limit(200),
   ]);
 
   // Day type of the next session, when resolvable from the catalog.
@@ -432,8 +441,24 @@ async function buildEngineAthleteCard(
       `Position: next session is Day ${currentDay}${mapping ? ` (Month ${mapping.month}, Week ${mapping.week_number ?? "?"})` : ""}${nextDayType ? ` — ${nextDayType}` : ""}.`,
     );
   }
+  // Equipment: usage distribution when they train on several machines, a
+  // single anchor when they don't. Either way, a named machine in the
+  // question always wins.
+  const modalityCounts = new Map<string, number>();
+  for (const s of recentModalities ?? []) {
+    if (s.modality) modalityCounts.set(s.modality, (modalityCounts.get(s.modality) ?? 0) + 1);
+  }
   const usualModality = pref?.secondary_unit ? String(pref.secondary_unit).replace(/_/g, " ") : null;
-  if (usualModality) {
+  if (modalityCounts.size > 1) {
+    const dist = [...modalityCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([m, n]) => `${m.replace(/_/g, " ")} (${n} session${n === 1 ? "" : "s"})`)
+      .join(", ");
+    parts.push(
+      `Equipment (last 90 days): ${dist}.${usualModality ? ` Most recent selection: ${usualModality}.` : ""} ` +
+        `For equipment-specific answers, use the machine the athlete names; if they don't name one, prefer the most recent selection and say which machine you're assuming.`,
+    );
+  } else if (usualModality) {
     parts.push(
       `Usual equipment: ${usualModality}${pref?.primary_unit ? ` (measured in ${pref.primary_unit})` : ""}. Anchor equipment-specific answers to THIS machine unless the athlete names a different one.`,
     );
