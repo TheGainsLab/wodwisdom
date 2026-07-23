@@ -360,6 +360,106 @@ async function buildEngineCoachingContext(
   return parts.join("\n");
 }
 
+/**
+ * Compact USER-LEVEL Engine card for non-day-scoped chat (general chat and
+ * the workout-scoped day coach).
+ *
+ * July '26 context audit: when day scoping shipped, the per-user Engine
+ * injection was removed entirely — but 43% of chat questions are Engine
+ * questions and most arrive through the general tab, so Engine athletes were
+ * getting "incomplete" answers: the model saw raw session lines in the
+ * 14-day history with none of the interpretive layer (position, baselines,
+ * rolling ratios, conditioning state) the day-scoped dossier carries.
+ *
+ * This card restores the user-level half of that dossier. Day-specific
+ * pieces (today's session structure, the computed target pace) deliberately
+ * stay on the training-day page, where they mean something — the card's
+ * closing instruction tells the model to route "exact today numbers" there.
+ *
+ * Non-Engine users: the caller's gate means this never runs for them —
+ * their prompts are byte-for-byte unchanged.
+ */
+async function buildEngineAthleteCard(
+  supa: SupabaseClient,
+  userId: string,
+  programVersion: string,
+  currentDay: number | null,
+): Promise<string> {
+  const [{ data: mapping }, { data: timeTrials }, { data: pref }] = await Promise.all([
+    currentDay
+      ? supa
+          .from("engine_program_mapping")
+          .select("engine_workout_day_number, month, week_number")
+          .eq("engine_program_id", programVersion)
+          .eq("program_sequence_order", currentDay)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supa
+      .from("engine_time_trials")
+      .select("modality, total_output, calculated_rpm, units, date")
+      .eq("user_id", userId)
+      .eq("is_current", true),
+    supa
+      .from("engine_user_modality_preferences")
+      .select("primary_unit, secondary_unit")
+      .eq("user_id", userId)
+      .eq("modality", "last_selected")
+      .maybeSingle(),
+  ]);
+
+  // Day type of the next session, when resolvable from the catalog.
+  let nextDayType = "";
+  if (mapping) {
+    const { data: w } = await supa
+      .from("engine_workouts")
+      .select("day_type")
+      .eq("program_type", "main_5day")
+      .eq("day_number", mapping.engine_workout_day_number)
+      .maybeSingle();
+    if (w?.day_type) {
+      const { data: dt } = await supa
+        .from("engine_day_types")
+        .select("name")
+        .eq("id", w.day_type)
+        .maybeSingle();
+      nextDayType = dt?.name ?? (w.day_type as string).replace(/_/g, " ");
+    }
+  }
+
+  const parts: string[] = ["\n\nENGINE ATHLETE CONTEXT (Year of the Engine subscriber):"];
+  if (currentDay) {
+    parts.push(
+      `Position: next session is Day ${currentDay}${mapping ? ` (Month ${mapping.month}, Week ${mapping.week_number ?? "?"})` : ""}${nextDayType ? ` — ${nextDayType}` : ""}.`,
+    );
+  }
+  const usualModality = pref?.secondary_unit ? String(pref.secondary_unit).replace(/_/g, " ") : null;
+  if (usualModality) {
+    parts.push(
+      `Usual equipment: ${usualModality}${pref?.primary_unit ? ` (measured in ${pref.primary_unit})` : ""}. Anchor equipment-specific answers to THIS machine unless the athlete names a different one.`,
+    );
+  }
+  if (timeTrials && timeTrials.length > 0) {
+    parts.push("Current time-trial baselines:");
+    for (const tt of timeTrials) {
+      const bits: string[] = [(tt.modality as string).replace(/_/g, " ")];
+      if (tt.total_output != null) bits.push(`${tt.total_output} ${tt.units ?? ""}`.trim());
+      if (tt.calculated_rpm != null) bits.push(`rpm ${Number(tt.calculated_rpm).toFixed(2)}`);
+      if (tt.date) bits.push(`(set ${tt.date})`);
+      parts.push(`- ${bits.join(" — ")}`);
+    }
+  }
+  try {
+    const conditioning = await buildConditioningState(supa, userId);
+    if (conditioning) parts.push(conditioning);
+  } catch (err) {
+    console.error("[chat] buildConditioningState (athlete card) failed:", err);
+  }
+  parts.push(
+    "Use this to ground Engine questions — trends, readiness, baselines, summaries and insights on recent sessions. Exact pacing targets for a specific training day are computed on that day's screen; for \"what's my target today\" questions, give your best read from the baselines and trends, and point the athlete to the training day page for the precise number.",
+  );
+  return parts.join("\n");
+}
+
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -753,7 +853,16 @@ Deno.serve(async (req) => {
     // tier included. Fetched in parallel below (zero added latency); skipped for
     // meta questions where it's noise.
     const competitorId = (athleteProfile?.competition_athlete_id as string | null) ?? null;
-    const [embData, recentTraining, programContext, competitionBundle] = await Promise.all([
+    // Engine athlete card: user-level Engine context (position, baselines,
+    // conditioning state) for Engine-tier athletes in every NON-day-scoped
+    // mode. Day-scoped requests get the full dossier instead; meta questions
+    // skip it as noise; non-Engine users never build it (prompt unchanged).
+    const shouldBuildEngineCard =
+      !engineCoachingMode &&
+      !isMeta &&
+      (userTier === "engine" || userTier === "all_access") &&
+      !!athleteProfile?.engine_program_version;
+    const [embData, recentTraining, programContext, competitionBundle, engineAthleteCard] = await Promise.all([
       isMeta
         ? Promise.resolve(null)
         : fetchWithTimeout("https://api.openai.com/v1/embeddings", {
@@ -775,6 +884,17 @@ Deno.serve(async (req) => {
             return null;
           })
         : Promise.resolve(null),
+      shouldBuildEngineCard
+        ? buildEngineAthleteCard(
+            supa,
+            user.id,
+            athleteProfile.engine_program_version,
+            (athleteProfile?.engine_current_day as number | null) ?? null,
+          ).catch((e) => {
+            console.error("[chat] engine athlete card failed:", e);
+            return "";
+          })
+        : Promise.resolve(""),
     ]);
     const queryEmb = embData?.data?.[0]?.embedding;
     const competitionContext = competitionBundle ? buildCompetitionContext(competitionBundle) : "";
@@ -878,8 +998,11 @@ Deno.serve(async (req) => {
             ? ""
             : buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units, athleteProfile?.gender)
           ) +
-          // Engine program context (if applicable)
+          // Engine program context — the full day-scoped dossier when the
+          // request scopes to a day, else the user-level athlete card for
+          // Engine-tier users (exactly one of these is ever non-empty).
           engineContext +
+          engineAthleteCard +
           // AI Program context (if applicable)
           aiProgramContext +
           // Linked competition history (Tier 4) — grounds performance/competition answers
