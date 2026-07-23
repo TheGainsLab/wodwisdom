@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import { raiseEngineMonthsFromGrant } from "../_shared/engine-months-drip.ts";
-import { ALERT_EMAIL, buildRecoveryEmail, emailWrap, escapeHtml, logEmailSend, sendViaResend, unsubscribeUrl } from "../_shared/checkout-emails.ts";
+import { ALERT_EMAIL, buildCancelScheduledEmail, buildCancelUnscheduledEmail, buildGoodbyeEmail, buildRecoveryEmail, emailWrap, escapeHtml, logEmailSend, sendViaResend, unsubscribeUrl } from "../_shared/checkout-emails.ts";
 
 // ── Billing-events ledger (capture item A) ──────────────────────────────────
 // Append-only record of billing lifecycle moments; best-effort — a ledger
@@ -13,7 +13,7 @@ interface BillingEventRow {
   email?: string | null;
   stripe_customer_id?: string | null;
   stripe_subscription_id?: string | null;
-  event_type: "purchased" | "canceled" | "payment_churn" | "payment_failed" | "refunded" | "dispute" | "plan_changed";
+  event_type: "purchased" | "canceled" | "payment_churn" | "payment_failed" | "refunded" | "dispute" | "plan_changed" | "cancel_scheduled" | "cancel_unscheduled";
   plan?: string | null;
   currency?: string | null;
   amount_cents?: number | null;
@@ -420,6 +420,76 @@ serve(async (req) => {
         const subscriptionId = sub.id;
         const status = sub.status;
 
+        // ── Cancellation intent: cancel_at_period_end flipped ──────────────
+        // The earliest churn signal there is (weeks of warning). Guarded on
+        // previous_attributes so it fires exactly once per flip — incidental
+        // updates on a scheduled-cancel sub never re-alert (the zombie
+        // lesson). Both directions: true = scheduled, false = a save.
+        const prevAttrs = event.data.previous_attributes ?? {};
+        if ("cancel_at_period_end" in prevAttrs && prevAttrs.cancel_at_period_end !== sub.cancel_at_period_end) {
+          const scheduled = sub.cancel_at_period_end === true;
+          const { data: cWho } = await supa.from("profiles").select("id, email, full_name").eq("stripe_customer_id", customerId).limit(1);
+          const cw = cWho?.[0] ?? null;
+          const cPlan = sub.metadata?.plan ?? sub.items?.data?.[0]?.price?.metadata?.plan ?? null;
+          const lapseSec = (sub.cancel_at as number | null) ?? (sub.current_period_end as number | null) ?? null;
+          const feedback = sub.cancellation_details?.feedback ?? null;
+          const comment = sub.cancellation_details?.comment ?? null;
+
+          await recordBillingEvent(supa, {
+            user_id: cw?.id ?? null, email: cw?.email ?? null,
+            stripe_customer_id: customerId, stripe_subscription_id: subscriptionId,
+            event_type: scheduled ? "cancel_scheduled" : "cancel_unscheduled",
+            plan: cPlan,
+            currency: sub.currency ?? null,
+            tenure_days: sub.created ? Math.round((Date.now() / 1000 - sub.created) / 86400) : null,
+            details: { cancel_at: lapseSec, feedback, comment },
+          });
+
+          // Founder alert with the dossier + lapse date + any exit feedback.
+          let cFeatures: string[] = [];
+          if (cw) {
+            const { data: ents } = await supa
+              .from("user_entitlements").select("feature")
+              .eq("user_id", cw.id).eq("source", subscriptionId);
+            cFeatures = (ents ?? []).map((e: { feature: string }) => e.feature);
+          }
+          const cTenure = tenureLabel(sub.created ?? null);
+          const lapseStr = lapseSec ? new Date(lapseSec * 1000).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : null;
+          if (scheduled) {
+            await alertFounder(
+              `Cancellation scheduled: ${cw?.full_name ?? cw?.email ?? customerId}${cPlan ? ` — ${cPlan}` : ""}${cTenure ? `, ${cTenure} in` : ""}${lapseStr ? `, lapses ${lapseStr}` : ""}`,
+              [
+                `Set to cancel${lapseStr ? ` on <strong>${lapseStr}</strong>` : " at period end"} — access continues until then. This is the save window.`,
+                ...churnDossierLines({
+                  name: cw?.full_name ?? null, email: cw?.email ?? null, userId: cw?.id ?? null,
+                  plan: cPlan, features: cFeatures, subCreatedSec: sub.created ?? null,
+                }),
+                feedback ? `Stripe exit feedback: <strong>${escapeHtml(String(feedback))}</strong>${comment ? ` — "${escapeHtml(String(comment))}"` : ""}` : "No exit feedback captured.",
+              ],
+            );
+          } else {
+            await alertFounder(
+              `Cancellation removed: ${cw?.full_name ?? cw?.email ?? customerId}${cPlan ? ` — ${cPlan}` : ""}`,
+              [
+                `They un-scheduled their cancellation — a confirmed save. Subscription continues as normal.`,
+                ...churnDossierLines({
+                  name: cw?.full_name ?? null, email: cw?.email ?? null, userId: cw?.id ?? null,
+                  plan: cPlan, features: cFeatures, subCreatedSec: sub.created ?? null,
+                }),
+              ],
+            );
+          }
+
+          // Customer confirmation (transactional; logged for timeline/opens).
+          if (cw?.email) {
+            const mail = scheduled
+              ? buildCancelScheduledEmail({ fullName: cw.full_name ?? null, plan: cPlan, lapseSec })
+              : buildCancelUnscheduledEmail({ fullName: cw.full_name ?? null });
+            const msgId = await sendViaResend(cw.email, mail.subject, mail.html);
+            await logEmailSend(supa, cw.id, scheduled ? "cancel_scheduled_ack" : "cancel_unscheduled_ack", mail.subject, msgId);
+          }
+        }
+
         // Handle plan changes (upgrade/downgrade)
         if (status === "active") {
           const { plan, features } = await getSubscriptionEntitlements(subscriptionId);
@@ -552,6 +622,15 @@ serve(async (req) => {
                   }),
                 ],
               );
+
+              // Customer come-back note — same email the auto-cancel path
+              // sends. This branch only fires if revenue-recovery ever
+              // regresses to parking subs at unpaid instead of canceling.
+              if (who?.email) {
+                const mail = buildGoodbyeEmail({ fullName: who.full_name ?? null, plan, involuntary: true });
+                const msgId = await sendViaResend(who.email, mail.subject, mail.html);
+                await logEmailSend(supa, who.id, "goodbye_involuntary", mail.subject, msgId);
+              }
             }
           }
         }
@@ -584,24 +663,47 @@ serve(async (req) => {
 
         }
 
-        // Ledger: the churn record (previously this death went unrecorded).
+        // The fork that decides everything downstream: WHY did this sub end?
+        // 'payment_failed' / 'payment_disputed' = INVOLUNTARY (dunning
+        // exhausted → the revenue-recovery setting auto-canceled). Everything
+        // else ('cancellation_requested', missing) = voluntary. With auto-
+        // cancel on, involuntary churn now arrives HERE (not via the 'unpaid'
+        // status), so the ledger keeps involuntary distinct via payment_churn.
+        const cancelReason = sub.cancellation_details?.reason ?? null;
+        const involuntary = cancelReason === "payment_failed" || cancelReason === "payment_disputed";
+
         const tenureDays = sub.created ? Math.round((Date.now() / 1000 - sub.created) / 86400) : null;
         const plan = sub.metadata?.plan ?? sub.items?.data?.[0]?.price?.metadata?.plan ?? null;
         const who = profiles?.[0] ?? { id: null, email: null, full_name: null };
-        await recordBillingEvent(supa, {
-          user_id: who.id, email: who.email,
-          stripe_customer_id: customerId, stripe_subscription_id: subscriptionId,
-          event_type: "canceled", plan,
-          currency: sub.currency ?? null,
-          amount_cents: sub.items?.data?.[0]?.price?.unit_amount ?? null,
-          tenure_days: tenureDays,
-          details: { cancellation_reason: sub.cancellation_details?.reason ?? null, feedback: sub.cancellation_details?.feedback ?? null },
-        });
+
+        // Dedupe involuntary churn (a sub that went unpaid first already has a
+        // payment_churn row from the updated handler).
+        let alreadyChurned = false;
+        if (involuntary) {
+          const { data: priorChurn } = await supa
+            .from("billing_events").select("id")
+            .eq("stripe_subscription_id", subscriptionId)
+            .eq("event_type", "payment_churn").limit(1);
+          alreadyChurned = (priorChurn?.length ?? 0) > 0;
+        }
+        if (!alreadyChurned) {
+          await recordBillingEvent(supa, {
+            user_id: who.id, email: who.email,
+            stripe_customer_id: customerId, stripe_subscription_id: subscriptionId,
+            event_type: involuntary ? "payment_churn" : "canceled", plan,
+            currency: sub.currency ?? null,
+            amount_cents: sub.items?.data?.[0]?.price?.unit_amount ?? null,
+            tenure_days: tenureDays,
+            details: { cancellation_reason: cancelReason, feedback: sub.cancellation_details?.feedback ?? null },
+          });
+        }
         const tenure = tenureLabel(sub.created ?? null);
         await alertFounder(
-          `Cancellation: ${who.full_name ?? who.email ?? customerId} (${plan ?? "unknown plan"}${tenure ? `, ${tenure}` : ""})`,
+          `${involuntary ? "Involuntary churn (card failed)" : "Cancellation"}: ${who.full_name ?? who.email ?? customerId} (${plan ?? "unknown plan"}${tenure ? `, ${tenure}` : ""})`,
           [
-            `Canceled <strong>${escapeHtml(plan ?? "unknown plan")}</strong>.`,
+            involuntary
+              ? `Dunning exhausted — the subscription auto-canceled after all retries failed. Access revoked; they've been emailed the come-back note.`
+              : `Canceled <strong>${escapeHtml(plan ?? "unknown plan")}</strong> as scheduled.`,
             ...churnDossierLines({
               name: who.full_name ?? null,
               email: who.email ?? null,
@@ -613,6 +715,15 @@ serve(async (req) => {
             sub.cancellation_details?.feedback ? `Stripe exit feedback: ${escapeHtml(String(sub.cancellation_details.feedback))}` : "No exit feedback captured.",
           ],
         );
+
+        // Customer goodbye — voluntary gets the graceful close, involuntary
+        // gets the automated come-back-anytime card note. Logged for timeline
+        // visibility and open tracking.
+        if (who.email) {
+          const mail = buildGoodbyeEmail({ fullName: who.full_name ?? null, plan, involuntary });
+          const msgId = await sendViaResend(who.email, mail.subject, mail.html);
+          await logEmailSend(supa, who.id, involuntary ? "goodbye_involuntary" : "goodbye_voluntary", mail.subject, msgId);
+        }
         break;
       }
 
