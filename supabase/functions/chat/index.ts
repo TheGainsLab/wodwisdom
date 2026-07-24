@@ -177,6 +177,13 @@ async function buildEngineCoachingContext(
   // pacing from the raw baseline (July '26: coach said 21-22 cal/min against
   // an on-screen target of 18 because it only had the baseline to work from).
   targetPace: number | null,
+  // The athlete's engine_current_day pointer. The scoped day is merely the
+  // page the athlete has OPEN — browsing other days is a normal feature
+  // (July '26: an athlete correctly on Day 3 viewed Day 4, and the coach —
+  // knowing only the viewed day — told him "the app has you on Day 4" and
+  // invented history to back it up). When these differ, the coach must say
+  // viewing vs. on, never assert the viewed day as the athlete's position.
+  athleteCurrentDay: number | null,
 ): Promise<string> {
   // Mapping row for the requested day
   const { data: mapping } = await supa
@@ -278,7 +285,16 @@ async function buildEngineCoachingContext(
   const parts: string[] = ["\n\nENGINE PROGRAM CONTEXT:"];
   parts.push(`Program: ${programInfo?.name ?? "Year of the Engine"}`);
   parts.push(`Total: ${programInfo?.total_days ?? 720} days across ${programInfo?.total_months ?? 36} months`);
-  parts.push(`Position: Day ${engineProgramDay} (Month ${mapping.month}, Week ${mapping.week_number ?? "?"})`);
+  parts.push(`Scoped day: Day ${engineProgramDay} (Month ${mapping.month}, Week ${mapping.week_number ?? "?"}) — the training-day page this conversation is attached to.`);
+  if (athleteCurrentDay != null && athleteCurrentDay !== engineProgramDay) {
+    parts.push(
+      `ATHLETE'S ACTUAL POSITION: Day ${athleteCurrentDay} — NOT this page. The athlete is browsing a day ${athleteCurrentDay > engineProgramDay ? "behind" : "ahead of"} where they are in the program (a normal app feature). ` +
+        `If day position comes up, state plainly: they are ON Day ${athleteCurrentDay} and currently VIEWING Day ${engineProgramDay}. ` +
+        `NEVER assert this viewed day as the athlete's position, and never invent an explanation for the difference.`,
+    );
+  } else if (athleteCurrentDay != null) {
+    parts.push(`This is the athlete's current day (their program position and this page agree).`);
+  }
 
   parts.push("\nTODAY'S SESSION:");
   if (dayTypeRow?.name) parts.push(`Day type: ${dayTypeRow.name}`);
@@ -614,7 +630,15 @@ Deno.serve(async (req) => {
     // Target-aware key: the answer for a pacing chip embeds the computed
     // target, so a changed target (new baseline / rolling adjustment) must
     // miss the old cache row and regenerate rather than serve a stale number.
-    const chipKey = (engineCoachingMode && (history?.length ?? 0) <= 1)
+    // Browsing guard: chip answers now embed viewed-vs-current day framing,
+    // so an answer generated while BROWSING another day ("you're viewing Day 4,
+    // you're on Day 3") must never be cached — it would be served stale once
+    // the athlete actually reaches that day. Skip the cache (read AND write)
+    // whenever the scoped day isn't the athlete's current day.
+    const engineAthleteCurrentDay = (athleteProfile?.engine_current_day as number | null) ?? null;
+    const isBrowsingOtherDay =
+      engineCoachingMode && engineAthleteCurrentDay != null && engineAthleteCurrentDay !== engine_program_day;
+    const chipKey = (engineCoachingMode && !isBrowsingOtherDay && (history?.length ?? 0) <= 1)
       ? (ENGINE_CHIP_KEYS[(question || "").trim().toLowerCase()] ?? null)
       : null;
     const cacheKey = chipKey
@@ -713,6 +737,8 @@ Deno.serve(async (req) => {
     let workoutContext = "";
     let contextType: string | null = null;
     let contextId: string | null = null;
+    // context_id is a uuid — Engine day numbers go in context_day instead.
+    let contextDay: number | null = null;
     if (workout_id) {
       const { data: workout } = await supa
         .from("program_workouts")
@@ -744,6 +770,10 @@ Deno.serve(async (req) => {
     // engine context unless they ask from the review page.
     let engineContext = "";
     if (engineCoachingMode && athleteProfile?.engine_program_version) {
+      // Persist the scoping (even if the dossier build fails below) so
+      // day-scoped conversations are auditable in chat_messages.
+      contextType = "engine_day";
+      contextDay = engine_program_day;
       try {
         engineContext = await buildEngineCoachingContext(
           supa,
@@ -753,6 +783,7 @@ Deno.serve(async (req) => {
           typeof engine_modality === "string" ? engine_modality : null,
           typeof engine_units === "string" ? engine_units : null,
           engineTargetPace,
+          engineAthleteCurrentDay,
         );
       } catch (err) {
         console.error("[chat] Engine coaching context failed:", err);
@@ -1130,6 +1161,7 @@ Deno.serve(async (req) => {
               output_tokens: outputTokens,
               context_type: contextType,
               context_id: contextId,
+              context_day: contextDay,
             })
             .select("id")
             .single();
