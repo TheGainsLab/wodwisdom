@@ -185,14 +185,21 @@ async function buildEngineCoachingContext(
   // viewing vs. on, never assert the viewed day as the athlete's position.
   athleteCurrentDay: number | null,
 ): Promise<string> {
-  // Mapping row for the requested day
+  // Mapping row for the requested day. engineProgramDay is a CATALOG day
+  // number — it comes from the frontend route param, the same space sessions
+  // and engine_current_day use. Look up by engine_workout_day_number: catalog
+  // and sequence numbers diverge for every program except plain main_5day
+  // (the July '26 Dylan investigation — a sequence lookup here described a
+  // different workout than the athlete's screen showed).
   const { data: mapping } = await supa
     .from("engine_program_mapping")
-    .select("engine_workout_day_number, month, week_number")
+    .select("engine_workout_day_number, program_sequence_order, month, week_number")
     .eq("engine_program_id", programVersion)
-    .eq("program_sequence_order", engineProgramDay)
+    .eq("engine_workout_day_number", engineProgramDay)
     .maybeSingle();
   if (!mapping) return "";
+  // Athlete-facing day label = sequence position (what the UI shows).
+  const scopedSeq = mapping.program_sequence_order ?? engineProgramDay;
 
   // Fetch catalog workout, program metadata, recent sessions, upcoming
   // mapping rows, and time trial baselines in parallel.
@@ -202,6 +209,7 @@ async function buildEngineCoachingContext(
     { data: recentSessions },
     { data: upcomingMappings },
     { data: timeTrials },
+    { data: currentDayRow },
   ] = await Promise.all([
     // The 720-day catalog is program_type='main_5day' (every variant maps into it —
     // same filter the client uses). Without it, AI-sequencer rows (program_type
@@ -230,7 +238,7 @@ async function buildEngineCoachingContext(
       .from("engine_program_mapping")
       .select("program_sequence_order, engine_workout_day_number, month")
       .eq("engine_program_id", programVersion)
-      .gt("program_sequence_order", engineProgramDay)
+      .gt("program_sequence_order", scopedSeq)
       .order("program_sequence_order", { ascending: true })
       .limit(3),
     supa
@@ -238,6 +246,16 @@ async function buildEngineCoachingContext(
       .select("modality, total_output, calculated_rpm, units, date")
       .eq("user_id", userId)
       .eq("is_current", true),
+    // Sequence label for the athlete's current-day pointer (viewed-vs-current
+    // messaging must speak in athlete-facing day numbers).
+    athleteCurrentDay != null && athleteCurrentDay !== engineProgramDay
+      ? supa
+          .from("engine_program_mapping")
+          .select("program_sequence_order")
+          .eq("engine_program_id", programVersion)
+          .eq("engine_workout_day_number", athleteCurrentDay)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   if (!workout) return "";
@@ -285,11 +303,17 @@ async function buildEngineCoachingContext(
   const parts: string[] = ["\n\nENGINE PROGRAM CONTEXT:"];
   parts.push(`Program: ${programInfo?.name ?? "Year of the Engine"}`);
   parts.push(`Total: ${programInfo?.total_days ?? 720} days across ${programInfo?.total_months ?? 36} months`);
-  parts.push(`Scoped day: Day ${engineProgramDay} (Month ${mapping.month}, Week ${mapping.week_number ?? "?"}) — the training-day page this conversation is attached to.`);
+  parts.push(`Scoped day: Day ${scopedSeq} (Month ${mapping.month}, Week ${mapping.week_number ?? "?"}) — the training-day page this conversation is attached to.`);
   if (athleteCurrentDay != null && athleteCurrentDay !== engineProgramDay) {
+    // All labels in athlete-facing sequence numbers. Direction only when the
+    // pointer's sequence resolved (catalog magnitude ≠ program order for
+    // varied programs, so never infer direction from catalog numbers).
+    const currentSeq = currentDayRow?.program_sequence_order ?? null;
+    const direction = currentSeq != null ? (currentSeq > scopedSeq ? " behind" : " ahead of") : "";
+    const currentLabel = currentSeq ?? athleteCurrentDay;
     parts.push(
-      `ATHLETE'S ACTUAL POSITION: Day ${athleteCurrentDay} — NOT this page. The athlete is browsing a day ${athleteCurrentDay > engineProgramDay ? "behind" : "ahead of"} where they are in the program (a normal app feature). ` +
-        `If day position comes up, state plainly: they are ON Day ${athleteCurrentDay} and currently VIEWING Day ${engineProgramDay}. ` +
+      `ATHLETE'S ACTUAL POSITION: Day ${currentLabel} — NOT this page. The athlete is browsing a day${direction} where they are in the program (a normal app feature). ` +
+        `If day position comes up, state plainly: they are ON Day ${currentLabel} and currently VIEWING Day ${scopedSeq}. ` +
         `NEVER assert this viewed day as the athlete's position, and never invent an explanation for the difference.`,
     );
   } else if (athleteCurrentDay != null) {
@@ -402,12 +426,16 @@ async function buildEngineAthleteCard(
   currentDay: number | null,
 ): Promise<string> {
   const [{ data: mapping }, { data: timeTrials }, { data: pref }, { data: recentModalities }] = await Promise.all([
+    // engine_current_day is a CATALOG day number (the space sessions and the
+    // route params use) — look it up by engine_workout_day_number, never by
+    // program_sequence_order (they diverge for every program except plain
+    // main_5day; the July '26 Dylan investigation).
     currentDay
       ? supa
           .from("engine_program_mapping")
-          .select("engine_workout_day_number, month, week_number")
+          .select("engine_workout_day_number, program_sequence_order, month, week_number")
           .eq("engine_program_id", programVersion)
-          .eq("program_sequence_order", currentDay)
+          .eq("engine_workout_day_number", currentDay)
           .maybeSingle()
       : Promise.resolve({ data: null }),
     supa
@@ -453,8 +481,11 @@ async function buildEngineAthleteCard(
 
   const parts: string[] = ["\n\nENGINE ATHLETE CONTEXT (Year of the Engine subscriber):"];
   if (currentDay) {
+    // Athlete-facing label is the sequence number; the catalog number is
+    // internal plumbing the athlete never sees.
+    const positionLabel = mapping?.program_sequence_order ?? currentDay;
     parts.push(
-      `Position: next session is Day ${currentDay}${mapping ? ` (Month ${mapping.month}, Week ${mapping.week_number ?? "?"})` : ""}${nextDayType ? ` — ${nextDayType}` : ""}.`,
+      `Position: next session is Day ${positionLabel}${mapping ? ` (Month ${mapping.month}, Week ${mapping.week_number ?? "?"})` : ""}${nextDayType ? ` — ${nextDayType}` : ""}.`,
     );
   }
   // Equipment: usage distribution when they train on several machines, a

@@ -12,6 +12,7 @@ import {
   saveTimeTrial,
   updatePerformanceMetrics,
   advanceCurrentDay,
+  resolveNextProgramDay,
   loadUserProgress,
   getWorkoutSessionByDay,
   getSessionsByDayType,
@@ -752,7 +753,12 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
       // Advance day if this is the current day
       if (dayNumber >= currentDay) {
-        await advanceCurrentDay(dayNumber + 1).catch(() => {});
+        // Next day = the next MAPPING row, not catalog+1: catalog numbers skip
+        // and reorder for every program except plain main_5day, and +1 strands
+        // the pointer on days outside the athlete's program.
+        await resolveNextProgramDay(programVersion, dayNumber)
+          .then((next) => advanceCurrentDay(next))
+          .catch(() => {});
       }
 
       setStage('complete');
