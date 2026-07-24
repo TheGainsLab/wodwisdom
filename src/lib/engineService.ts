@@ -310,6 +310,12 @@ export async function getProgramMapping(
  * A completed day that isn't in the mapping (corrupted pointer, off-program
  * page) resumes at the first mapping day with a larger catalog number —
  * best-effort, never throws. Null completed day → the program's first day.
+ *
+ * KNOWN LIMITATION: vo2max/hyrox programs repeat catalog days (benchmark
+ * retests — up to 7 occurrences of one day). A catalog day alone can't say
+ * WHICH occurrence was just completed; this advances from the EARLIEST one.
+ * Correct until an athlete reaches a repeat's later occurrences; the real
+ * fix is sequence-based position identity (planned refactor).
  */
 export function nextDayInMapping(
   mapping: Array<{ engine_workout_day_number: number }>,

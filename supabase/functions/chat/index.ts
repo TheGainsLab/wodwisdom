@@ -191,12 +191,22 @@ async function buildEngineCoachingContext(
   // and sequence numbers diverge for every program except plain main_5day
   // (the July '26 Dylan investigation — a sequence lookup here described a
   // different workout than the athlete's screen showed).
-  const { data: mapping } = await supa
+  //
+  // REPEAT-SAFE: vo2max/hyrox programs schedule the same catalog day at
+  // several sequence positions (benchmark retests — one vo2max day appears
+  // 7×), so this lookup can match multiple rows and must NOT use
+  // maybeSingle() (multi-row → error → silently empty dossier). Earliest
+  // occurrence wins; the workout content is identical across occurrences,
+  // only the month/week label can be off for later retests. Real fix =
+  // sequence-based position identity (planned refactor).
+  const { data: mappingRows } = await supa
     .from("engine_program_mapping")
     .select("engine_workout_day_number, program_sequence_order, month, week_number")
     .eq("engine_program_id", programVersion)
     .eq("engine_workout_day_number", engineProgramDay)
-    .maybeSingle();
+    .order("program_sequence_order", { ascending: true })
+    .limit(1);
+  const mapping = mappingRows?.[0] ?? null;
   if (!mapping) return "";
   // Athlete-facing day label = sequence position (what the UI shows).
   const scopedSeq = mapping.program_sequence_order ?? engineProgramDay;
@@ -247,14 +257,17 @@ async function buildEngineCoachingContext(
       .eq("user_id", userId)
       .eq("is_current", true),
     // Sequence label for the athlete's current-day pointer (viewed-vs-current
-    // messaging must speak in athlete-facing day numbers).
+    // messaging must speak in athlete-facing day numbers). Repeat-safe:
+    // earliest occurrence (see the mapping lookup above).
     athleteCurrentDay != null && athleteCurrentDay !== engineProgramDay
       ? supa
           .from("engine_program_mapping")
           .select("program_sequence_order")
           .eq("engine_program_id", programVersion)
           .eq("engine_workout_day_number", athleteCurrentDay)
-          .maybeSingle()
+          .order("program_sequence_order", { ascending: true })
+          .limit(1)
+          .then((r) => ({ data: r.data?.[0] ?? null }))
       : Promise.resolve({ data: null }),
   ]);
 
@@ -429,14 +442,18 @@ async function buildEngineAthleteCard(
     // engine_current_day is a CATALOG day number (the space sessions and the
     // route params use) — look it up by engine_workout_day_number, never by
     // program_sequence_order (they diverge for every program except plain
-    // main_5day; the July '26 Dylan investigation).
+    // main_5day; the July '26 Dylan investigation). Repeat-safe: vo2max/hyrox
+    // repeat catalog days, so take the earliest occurrence instead of
+    // maybeSingle (multi-row → error → card loses position).
     currentDay
       ? supa
           .from("engine_program_mapping")
           .select("engine_workout_day_number, program_sequence_order, month, week_number")
           .eq("engine_program_id", programVersion)
           .eq("engine_workout_day_number", currentDay)
-          .maybeSingle()
+          .order("program_sequence_order", { ascending: true })
+          .limit(1)
+          .then((r) => ({ data: r.data?.[0] ?? null }))
       : Promise.resolve({ data: null }),
     supa
       .from("engine_time_trials")
