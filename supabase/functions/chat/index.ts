@@ -177,15 +177,29 @@ async function buildEngineCoachingContext(
   // pacing from the raw baseline (July '26: coach said 21-22 cal/min against
   // an on-screen target of 18 because it only had the baseline to work from).
   targetPace: number | null,
+  // The athlete's engine_current_day pointer. The scoped day is merely the
+  // page the athlete has OPEN — browsing other days is a normal feature
+  // (July '26: an athlete correctly on Day 3 viewed Day 4, and the coach —
+  // knowing only the viewed day — told him "the app has you on Day 4" and
+  // invented history to back it up). When these differ, the coach must say
+  // viewing vs. on, never assert the viewed day as the athlete's position.
+  athleteCurrentDay: number | null,
 ): Promise<string> {
-  // Mapping row for the requested day
+  // Mapping row for the requested day. engineProgramDay is a CATALOG day
+  // number — it comes from the frontend route param, the same space sessions
+  // and engine_current_day use. Look up by engine_workout_day_number: catalog
+  // and sequence numbers diverge for every program except plain main_5day
+  // (the July '26 Dylan investigation — a sequence lookup here described a
+  // different workout than the athlete's screen showed).
   const { data: mapping } = await supa
     .from("engine_program_mapping")
-    .select("engine_workout_day_number, month, week_number")
+    .select("engine_workout_day_number, program_sequence_order, month, week_number")
     .eq("engine_program_id", programVersion)
-    .eq("program_sequence_order", engineProgramDay)
+    .eq("engine_workout_day_number", engineProgramDay)
     .maybeSingle();
   if (!mapping) return "";
+  // Athlete-facing day label = sequence position (what the UI shows).
+  const scopedSeq = mapping.program_sequence_order ?? engineProgramDay;
 
   // Fetch catalog workout, program metadata, recent sessions, upcoming
   // mapping rows, and time trial baselines in parallel.
@@ -195,6 +209,7 @@ async function buildEngineCoachingContext(
     { data: recentSessions },
     { data: upcomingMappings },
     { data: timeTrials },
+    { data: currentDayRow },
   ] = await Promise.all([
     // The 720-day catalog is program_type='main_5day' (every variant maps into it —
     // same filter the client uses). Without it, AI-sequencer rows (program_type
@@ -223,7 +238,7 @@ async function buildEngineCoachingContext(
       .from("engine_program_mapping")
       .select("program_sequence_order, engine_workout_day_number, month")
       .eq("engine_program_id", programVersion)
-      .gt("program_sequence_order", engineProgramDay)
+      .gt("program_sequence_order", scopedSeq)
       .order("program_sequence_order", { ascending: true })
       .limit(3),
     supa
@@ -231,6 +246,16 @@ async function buildEngineCoachingContext(
       .select("modality, total_output, calculated_rpm, units, date")
       .eq("user_id", userId)
       .eq("is_current", true),
+    // Sequence label for the athlete's current-day pointer (viewed-vs-current
+    // messaging must speak in athlete-facing day numbers).
+    athleteCurrentDay != null && athleteCurrentDay !== engineProgramDay
+      ? supa
+          .from("engine_program_mapping")
+          .select("program_sequence_order")
+          .eq("engine_program_id", programVersion)
+          .eq("engine_workout_day_number", athleteCurrentDay)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   if (!workout) return "";
@@ -278,7 +303,22 @@ async function buildEngineCoachingContext(
   const parts: string[] = ["\n\nENGINE PROGRAM CONTEXT:"];
   parts.push(`Program: ${programInfo?.name ?? "Year of the Engine"}`);
   parts.push(`Total: ${programInfo?.total_days ?? 720} days across ${programInfo?.total_months ?? 36} months`);
-  parts.push(`Position: Day ${engineProgramDay} (Month ${mapping.month}, Week ${mapping.week_number ?? "?"})`);
+  parts.push(`Scoped day: Day ${scopedSeq} (Month ${mapping.month}, Week ${mapping.week_number ?? "?"}) — the training-day page this conversation is attached to.`);
+  if (athleteCurrentDay != null && athleteCurrentDay !== engineProgramDay) {
+    // All labels in athlete-facing sequence numbers. Direction only when the
+    // pointer's sequence resolved (catalog magnitude ≠ program order for
+    // varied programs, so never infer direction from catalog numbers).
+    const currentSeq = currentDayRow?.program_sequence_order ?? null;
+    const direction = currentSeq != null ? (currentSeq > scopedSeq ? " behind" : " ahead of") : "";
+    const currentLabel = currentSeq ?? athleteCurrentDay;
+    parts.push(
+      `ATHLETE'S ACTUAL POSITION: Day ${currentLabel} — NOT this page. The athlete is browsing a day${direction} where they are in the program (a normal app feature). ` +
+        `If day position comes up, state plainly: they are ON Day ${currentLabel} and currently VIEWING Day ${scopedSeq}. ` +
+        `NEVER assert this viewed day as the athlete's position, and never invent an explanation for the difference.`,
+    );
+  } else if (athleteCurrentDay != null) {
+    parts.push(`This is the athlete's current day (their program position and this page agree).`);
+  }
 
   parts.push("\nTODAY'S SESSION:");
   if (dayTypeRow?.name) parts.push(`Day type: ${dayTypeRow.name}`);
@@ -357,6 +397,138 @@ async function buildEngineCoachingContext(
     console.error("[chat] buildConditioningState failed:", err);
   }
 
+  return parts.join("\n");
+}
+
+/**
+ * Compact USER-LEVEL Engine card for non-day-scoped chat (general chat and
+ * the workout-scoped day coach).
+ *
+ * July '26 context audit: when day scoping shipped, the per-user Engine
+ * injection was removed entirely — but 43% of chat questions are Engine
+ * questions and most arrive through the general tab, so Engine athletes were
+ * getting "incomplete" answers: the model saw raw session lines in the
+ * 14-day history with none of the interpretive layer (position, baselines,
+ * rolling ratios, conditioning state) the day-scoped dossier carries.
+ *
+ * This card restores the user-level half of that dossier. Day-specific
+ * pieces (today's session structure, the computed target pace) deliberately
+ * stay on the training-day page, where they mean something — the card's
+ * closing instruction tells the model to route "exact today numbers" there.
+ *
+ * Non-Engine users: the caller's gate means this never runs for them —
+ * their prompts are byte-for-byte unchanged.
+ */
+async function buildEngineAthleteCard(
+  supa: SupabaseClient,
+  userId: string,
+  programVersion: string,
+  currentDay: number | null,
+): Promise<string> {
+  const [{ data: mapping }, { data: timeTrials }, { data: pref }, { data: recentModalities }] = await Promise.all([
+    // engine_current_day is a CATALOG day number (the space sessions and the
+    // route params use) — look it up by engine_workout_day_number, never by
+    // program_sequence_order (they diverge for every program except plain
+    // main_5day; the July '26 Dylan investigation).
+    currentDay
+      ? supa
+          .from("engine_program_mapping")
+          .select("engine_workout_day_number, program_sequence_order, month, week_number")
+          .eq("engine_program_id", programVersion)
+          .eq("engine_workout_day_number", currentDay)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supa
+      .from("engine_time_trials")
+      .select("modality, total_output, calculated_rpm, units, date")
+      .eq("user_id", userId)
+      .eq("is_current", true),
+    supa
+      .from("engine_user_modality_preferences")
+      .select("primary_unit, secondary_unit")
+      .eq("user_id", userId)
+      .eq("modality", "last_selected")
+      .maybeSingle(),
+    // Machine distribution for multi-machine athletes (last ~90 days of
+    // completed sessions; counted in code — PostgREST has no GROUP BY).
+    supa
+      .from("engine_workout_sessions")
+      .select("modality")
+      .eq("user_id", userId)
+      .eq("completed", true)
+      .gte("created_at", new Date(Date.now() - 90 * 864e5).toISOString())
+      .limit(200),
+  ]);
+
+  // Day type of the next session, when resolvable from the catalog.
+  let nextDayType = "";
+  if (mapping) {
+    const { data: w } = await supa
+      .from("engine_workouts")
+      .select("day_type")
+      .eq("program_type", "main_5day")
+      .eq("day_number", mapping.engine_workout_day_number)
+      .maybeSingle();
+    if (w?.day_type) {
+      const { data: dt } = await supa
+        .from("engine_day_types")
+        .select("name")
+        .eq("id", w.day_type)
+        .maybeSingle();
+      nextDayType = dt?.name ?? (w.day_type as string).replace(/_/g, " ");
+    }
+  }
+
+  const parts: string[] = ["\n\nENGINE ATHLETE CONTEXT (Year of the Engine subscriber):"];
+  if (currentDay) {
+    // Athlete-facing label is the sequence number; the catalog number is
+    // internal plumbing the athlete never sees.
+    const positionLabel = mapping?.program_sequence_order ?? currentDay;
+    parts.push(
+      `Position: next session is Day ${positionLabel}${mapping ? ` (Month ${mapping.month}, Week ${mapping.week_number ?? "?"})` : ""}${nextDayType ? ` — ${nextDayType}` : ""}.`,
+    );
+  }
+  // Equipment: usage distribution when they train on several machines, a
+  // single anchor when they don't. Either way, a named machine in the
+  // question always wins.
+  const modalityCounts = new Map<string, number>();
+  for (const s of recentModalities ?? []) {
+    if (s.modality) modalityCounts.set(s.modality, (modalityCounts.get(s.modality) ?? 0) + 1);
+  }
+  const usualModality = pref?.secondary_unit ? String(pref.secondary_unit).replace(/_/g, " ") : null;
+  if (modalityCounts.size > 1) {
+    const dist = [...modalityCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([m, n]) => `${m.replace(/_/g, " ")} (${n} session${n === 1 ? "" : "s"})`)
+      .join(", ");
+    parts.push(
+      `Equipment (last 90 days): ${dist}.${usualModality ? ` Most recent selection: ${usualModality}.` : ""} ` +
+        `For equipment-specific answers, use the machine the athlete names; if they don't name one, prefer the most recent selection and say which machine you're assuming.`,
+    );
+  } else if (usualModality) {
+    parts.push(
+      `Usual equipment: ${usualModality}${pref?.primary_unit ? ` (measured in ${pref.primary_unit})` : ""}. Anchor equipment-specific answers to THIS machine unless the athlete names a different one.`,
+    );
+  }
+  if (timeTrials && timeTrials.length > 0) {
+    parts.push("Current time-trial baselines:");
+    for (const tt of timeTrials) {
+      const bits: string[] = [(tt.modality as string).replace(/_/g, " ")];
+      if (tt.total_output != null) bits.push(`${tt.total_output} ${tt.units ?? ""}`.trim());
+      if (tt.calculated_rpm != null) bits.push(`rpm ${Number(tt.calculated_rpm).toFixed(2)}`);
+      if (tt.date) bits.push(`(set ${tt.date})`);
+      parts.push(`- ${bits.join(" — ")}`);
+    }
+  }
+  try {
+    const conditioning = await buildConditioningState(supa, userId);
+    if (conditioning) parts.push(conditioning);
+  } catch (err) {
+    console.error("[chat] buildConditioningState (athlete card) failed:", err);
+  }
+  parts.push(
+    "Use this to ground Engine questions — trends, readiness, baselines, summaries and insights on recent sessions. Exact pacing targets for a specific training day are computed on that day's screen; for \"what's my target today\" questions, give your best read from the baselines and trends, and point the athlete to the training day page for the precise number.",
+  );
   return parts.join("\n");
 }
 
@@ -489,7 +661,15 @@ Deno.serve(async (req) => {
     // Target-aware key: the answer for a pacing chip embeds the computed
     // target, so a changed target (new baseline / rolling adjustment) must
     // miss the old cache row and regenerate rather than serve a stale number.
-    const chipKey = (engineCoachingMode && (history?.length ?? 0) <= 1)
+    // Browsing guard: chip answers now embed viewed-vs-current day framing,
+    // so an answer generated while BROWSING another day ("you're viewing Day 4,
+    // you're on Day 3") must never be cached — it would be served stale once
+    // the athlete actually reaches that day. Skip the cache (read AND write)
+    // whenever the scoped day isn't the athlete's current day.
+    const engineAthleteCurrentDay = (athleteProfile?.engine_current_day as number | null) ?? null;
+    const isBrowsingOtherDay =
+      engineCoachingMode && engineAthleteCurrentDay != null && engineAthleteCurrentDay !== engine_program_day;
+    const chipKey = (engineCoachingMode && !isBrowsingOtherDay && (history?.length ?? 0) <= 1)
       ? (ENGINE_CHIP_KEYS[(question || "").trim().toLowerCase()] ?? null)
       : null;
     const cacheKey = chipKey
@@ -588,6 +768,8 @@ Deno.serve(async (req) => {
     let workoutContext = "";
     let contextType: string | null = null;
     let contextId: string | null = null;
+    // context_id is a uuid — Engine day numbers go in context_day instead.
+    let contextDay: number | null = null;
     if (workout_id) {
       const { data: workout } = await supa
         .from("program_workouts")
@@ -619,6 +801,10 @@ Deno.serve(async (req) => {
     // engine context unless they ask from the review page.
     let engineContext = "";
     if (engineCoachingMode && athleteProfile?.engine_program_version) {
+      // Persist the scoping (even if the dossier build fails below) so
+      // day-scoped conversations are auditable in chat_messages.
+      contextType = "engine_day";
+      contextDay = engine_program_day;
       try {
         engineContext = await buildEngineCoachingContext(
           supa,
@@ -628,6 +814,7 @@ Deno.serve(async (req) => {
           typeof engine_modality === "string" ? engine_modality : null,
           typeof engine_units === "string" ? engine_units : null,
           engineTargetPace,
+          engineAthleteCurrentDay,
         );
       } catch (err) {
         console.error("[chat] Engine coaching context failed:", err);
@@ -709,7 +896,8 @@ Deno.serve(async (req) => {
               '1. "type" — one of:\n' +
               '   - "methodology": explains a concept, principle, or mechanism. Personal data does not change the answer. Examples: "what\'s Zone 2", "explain carbohydrate metabolism", "why do we do Fran", "explain a devour day".\n' +
               '   - "personal_programming": asks for guidance specific to themselves — their lifts, their programming, a workout for them, pacing for their session. Examples: "what should I squat tomorrow", "give me a workout", "how should I pace this 5k", "rate my workout yesterday".\n' +
-              '   - "meta": about the AI itself, the app, product capabilities, or small talk. Examples: "who are you", "what can you do", "can you build programs", "hey", "where is my history".\n\n' +
+              '   - "meta": SOLELY about the AI itself, the app, product capabilities, or small talk — with no personal-training content at all. Examples: "who are you", "what can you do", "can you build programs", "hey", "where is my history page".\n' +
+              '     NOT meta — first-person training questions that mention the product: "can you build ME a program" (they want it done → personal_programming), "how has MY training been" → personal_programming, "what does my history show" → personal_programming.\n\n' +
               '2. "search_query" — a clean standalone search query string for the topical RAG lookup. For "meta" questions, output null. For others: topical keywords and phrases, no conversational filler. Fold in relevant topical context from recent conversation. Strip irrelevant specifics (exact numbers, names, dates) unless they are the topic itself. Preserve proper nouns that ARE the topic (day type names like "devour", program names like "Year of the Engine", named benchmarks).\n\n' +
               "TIEBREAKER for ambiguous questions: personal_programming > methodology > meta.\n\n" +
               "OUTPUT: ONLY valid JSON, one object, no prose, no code fences. Examples:\n" +
@@ -753,7 +941,19 @@ Deno.serve(async (req) => {
     // tier included. Fetched in parallel below (zero added latency); skipped for
     // meta questions where it's noise.
     const competitorId = (athleteProfile?.competition_athlete_id as string | null) ?? null;
-    const [embData, recentTraining, programContext, competitionBundle] = await Promise.all([
+    // Engine athlete card: user-level Engine context (position, baselines,
+    // conditioning state) for Engine-tier athletes in every NON-day-scoped
+    // mode — INCLUDING meta-routed questions: the router misclassifies some
+    // first-person questions as meta, and the card (cheap parallel indexed
+    // lookups) is what keeps those answers grounded. Day-scoped requests get
+    // the full dossier instead; non-Engine users never build it (prompt
+    // unchanged). The expensive meta skips (embedding, RAG, competition
+    // fetch) stay — those are latency, not grounding.
+    const shouldBuildEngineCard =
+      !engineCoachingMode &&
+      (userTier === "engine" || userTier === "all_access") &&
+      !!athleteProfile?.engine_program_version;
+    const [embData, recentTraining, programContext, competitionBundle, engineAthleteCard] = await Promise.all([
       isMeta
         ? Promise.resolve(null)
         : fetchWithTimeout("https://api.openai.com/v1/embeddings", {
@@ -775,6 +975,17 @@ Deno.serve(async (req) => {
             return null;
           })
         : Promise.resolve(null),
+      shouldBuildEngineCard
+        ? buildEngineAthleteCard(
+            supa,
+            user.id,
+            athleteProfile.engine_program_version,
+            (athleteProfile?.engine_current_day as number | null) ?? null,
+          ).catch((e) => {
+            console.error("[chat] engine athlete card failed:", e);
+            return "";
+          })
+        : Promise.resolve(""),
     ]);
     const queryEmb = embData?.data?.[0]?.embedding;
     const competitionContext = competitionBundle ? buildCompetitionContext(competitionBundle) : "";
@@ -871,15 +1082,16 @@ Deno.serve(async (req) => {
             ? "\n\nUSER TIER: AI Programming subscriber. Ground answers in their current program structure and training. They already have AI Nutrition bundled.\nProducts available to mention (only per the guidance-moment rules): Year of the Engine, All Access."
             : "\n\nUSER TIER: All Access subscriber. The user has everything — Engine, AI Programming, AI Nutrition, AI Coach.\nProducts available to mention: NONE. Mention no products under any circumstances."
           ) +
-          // Athlete profile — injected for everything except pure meta
-          // questions, where the profile is noise. Scoped requests
-          // (workout_id / engine_program_day) always get profile.
-          (questionType === "meta" && !workoutContext && !engineCoachingMode
-            ? ""
-            : buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units, athleteProfile?.gender)
-          ) +
-          // Engine program context (if applicable)
+          // Athlete profile — ALWAYS injected, meta included. It's ~200
+          // tokens of insurance: when the router misroutes a real personal
+          // question as meta, the answer still knows who the athlete is.
+          // True meta questions just ignore it.
+          buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units, athleteProfile?.gender) +
+          // Engine program context — the full day-scoped dossier when the
+          // request scopes to a day, else the user-level athlete card for
+          // Engine-tier users (exactly one of these is ever non-empty).
           engineContext +
+          engineAthleteCard +
           // AI Program context (if applicable)
           aiProgramContext +
           // Linked competition history (Tier 4) — grounds performance/competition answers
@@ -980,6 +1192,7 @@ Deno.serve(async (req) => {
               output_tokens: outputTokens,
               context_type: contextType,
               context_id: contextId,
+              context_day: contextDay,
             })
             .select("id")
             .single();

@@ -12,6 +12,7 @@ import {
   saveTimeTrial,
   updatePerformanceMetrics,
   advanceCurrentDay,
+  resolveNextProgramDay,
   loadUserProgress,
   getWorkoutSessionByDay,
   getSessionsByDayType,
@@ -395,6 +396,10 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   // Athlete-facing day number (1,2,3… in program order). Resolved from the
   // mapping; dayNumber (the route param) stays the catalog identity.
   const [displayDay, setDisplayDay] = useState<number | null>(null);
+  // Athlete-facing number for the CURRENT-day pointer, for the viewing-ahead
+  // banner (null until the mapping resolves, so the banner never flashes on
+  // stale state).
+  const [currentDisplayDay, setCurrentDisplayDay] = useState<number | null>(null);
   // Month fence: this day's month (from the program mapping — it owns month
   // truth, not day/20) vs the user's paid entitlement. The route param is an
   // open entry point, so the fence must live here, not just on the dashboard.
@@ -447,6 +452,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         const mapRow = mapping.find((m) => m.engine_workout_day_number === dayNumber);
         setDisplayDay(mapRow?.program_sequence_order ?? dayNumber);
         setDayMonth(mapRow?.month ?? null);
+        const ptr = progress?.engine_current_day ?? 1;
+        const ptrRow = mapping.find((m) => m.engine_workout_day_number === ptr);
+        setCurrentDisplayDay(ptrRow?.program_sequence_order ?? ptr);
 
         // Load workout history for this day type
         if (wk?.day_type) {
@@ -745,7 +753,12 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
       // Advance day if this is the current day
       if (dayNumber >= currentDay) {
-        await advanceCurrentDay(dayNumber + 1).catch(() => {});
+        // Next day = the next MAPPING row, not catalog+1: catalog numbers skip
+        // and reorder for every program except plain main_5day, and +1 strands
+        // the pointer on days outside the athlete's program.
+        await resolveNextProgramDay(programVersion, dayNumber)
+          .then((next) => advanceCurrentDay(next))
+          .catch(() => {});
       }
 
       setStage('complete');
@@ -1815,6 +1828,41 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
             </span>
           )}
         </header>
+
+        {/* Viewing-ahead/behind banner: browsing other days is allowed, but an
+            unlabeled non-current day reads as "the app lost track of me" (an
+            athlete correctly on Day 3 opened Day 4, concluded the app was
+            broken, and the day-scoped coach made it worse). */}
+        {hasAccess && !monthLocked && displayDay != null && currentDisplayDay != null && dayNumber !== currentDay && (
+          <div
+            style={{
+              margin: '10px 16px 0',
+              padding: '10px 14px',
+              background: 'rgba(250,204,21,.08)',
+              border: '1px solid rgba(250,204,21,.35)',
+              borderRadius: 8,
+              fontSize: 13,
+              lineHeight: 1.5,
+              color: 'var(--text)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span style={{ flex: 1, minWidth: 200 }}>
+              You're viewing <strong>Day {displayDay}</strong> — your current day is{' '}
+              <strong>Day {currentDisplayDay}</strong>.
+            </span>
+            <button
+              className="engine-btn engine-btn-secondary engine-btn-sm"
+              style={{ fontSize: 13 }}
+              onClick={() => navigate(`/engine/training/${currentDay}`)}
+            >
+              Go to Day {currentDisplayDay}
+            </button>
+          </div>
+        )}
 
         {!hasAccess && stage !== 'loading' && <EnginePaywall hasFeature={hasFeature} />}
         {hasAccess && monthLocked && (
