@@ -50,7 +50,10 @@ function CoachChat({ engineProgramDay, autoQuestion, modality, units, targetPace
         body: JSON.stringify({
           question,
           history: [...messages, userMsg].slice(-10),
-          engine_program_day: engineProgramDay,
+          // Sequence identity: the scoped position. (engine_program_day is
+          // the legacy field name pre-refactor bundles used for catalog days;
+          // this bundle sends only the sequence.)
+          engine_sequence_position: engineProgramDay,
           engine_modality: modality,
           engine_units: units,
           // The app-computed target the athlete sees on screen — the coach

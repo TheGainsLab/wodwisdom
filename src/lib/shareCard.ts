@@ -146,7 +146,7 @@ export function buildEngineShareCardData(
 
   return {
     kind: 'engine',
-    dayNumber: session.program_day_number,
+    dayNumber: session.sequence_position ?? session.program_day_number,
     dayTypeLabel: dtl,
     modalityLabel: engineModalityLabel(session.modality),
     workValue: session.total_output != null ? session.total_output.toLocaleString() : '—',

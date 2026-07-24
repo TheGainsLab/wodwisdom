@@ -12,7 +12,7 @@ import {
   saveTimeTrial,
   updatePerformanceMetrics,
   advanceCurrentDay,
-  resolveNextProgramDay,
+  loadDayOverride,
   loadUserProgress,
   getWorkoutSessionByDay,
   getSessionsByDayType,
@@ -374,6 +374,9 @@ function totalSegmentDuration(segs: Segment[]): number {
 // ── Component ────────────────────────────────────────────────────────
 
 export default function EngineTrainingDayPage({ session }: { session: Session }) {
+  // SEQUENCE IDENTITY: the route param is the PROGRAM SEQUENCE position
+  // (1..N — the day number the athlete sees). The catalog day behind it is
+  // resolved from the mapping and used only to load workout content.
   const { dayNumber: dayParam } = useParams<{ dayNumber: string }>();
   const dayNumber = parseInt(dayParam ?? '1', 10);
   const navigate = useNavigate();
@@ -393,13 +396,11 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const [breakdownExpanded, setBreakdownExpanded] = useState(false);
   const [currentDay, setCurrentDay] = useState(1);
   const [programVersion, setProgramVersion] = useState('main_5day');
-  // Athlete-facing day number (1,2,3… in program order). Resolved from the
-  // mapping; dayNumber (the route param) stays the catalog identity.
-  const [displayDay, setDisplayDay] = useState<number | null>(null);
-  // Athlete-facing number for the CURRENT-day pointer, for the viewing-ahead
-  // banner (null until the mapping resolves, so the banner never flashes on
-  // stale state).
-  const [currentDisplayDay, setCurrentDisplayDay] = useState<number | null>(null);
+  // Catalog day behind this position (content reference; null until the
+  // mapping resolves).
+  const [catalogDay, setCatalogDay] = useState<number | null>(null);
+  // Program length in positions, for clamping advancement.
+  const [programLength, setProgramLength] = useState<number | null>(null);
   // Month fence: this day's month (from the program mapping — it owns month
   // truth, not day/20) vs the user's paid entitlement. The route param is an
   // open entry point, so the fence must live here, not just on the dashboard.
@@ -435,26 +436,30 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   useEffect(() => {
     (async () => {
       try {
-        const [wk, progress, prevSession] = await Promise.all([
-          loadWorkoutForDay(dayNumber),
+        // Sequence identity: dayNumber is the sequence position. Resolve the
+        // program + mapping first, then load content by the catalog day the
+        // mapping assigns to this position (AI override, keyed by position,
+        // wins over catalog content).
+        const [progress, prevSession] = await Promise.all([
           loadUserProgress(),
           getWorkoutSessionByDay(dayNumber),
         ]);
-        setWorkout(wk);
         setCurrentDay(progress?.engine_current_day ?? 1);
         setMonthsUnlocked(progress?.engine_months_unlocked ?? 1);
         const version = progress?.engine_program_version ?? 'main_5day';
         setProgramVersion(version);
         setPreviousSession(!!prevSession);
 
-        // Resolve the athlete-facing day number + month for this catalog day.
         const mapping = await getProgramMapping(version);
-        const mapRow = mapping.find((m) => m.engine_workout_day_number === dayNumber);
-        setDisplayDay(mapRow?.program_sequence_order ?? dayNumber);
+        const mapRow = mapping.find((m) => m.program_sequence_order === dayNumber);
+        const catDay = mapRow?.engine_workout_day_number ?? null;
+        setCatalogDay(catDay);
         setDayMonth(mapRow?.month ?? null);
-        const ptr = progress?.engine_current_day ?? 1;
-        const ptrRow = mapping.find((m) => m.engine_workout_day_number === ptr);
-        setCurrentDisplayDay(ptrRow?.program_sequence_order ?? ptr);
+        setProgramLength(mapping.length > 0 ? mapping.length : null);
+
+        const override = await loadDayOverride(dayNumber).catch(() => null);
+        const wk = override ?? (catDay != null ? await loadWorkoutForDay(catDay) : null);
+        setWorkout(wk ? { ...wk, sequence_position: dayNumber } : null);
 
         // Load workout history for this day type
         if (wk?.day_type) {
@@ -465,7 +470,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
         // Load preceding Rocket Races A data for Rocket Races B days
         if (wk?.day_type === 'rocket_races_b') {
-          const result = await findPrecedingRocketRacesA(dayNumber, progress?.engine_program_version ?? 'main_5day').catch(() => { setLoadError('Failed to load Rocket Races data'); return null; });
+          const result = await findPrecedingRocketRacesA(dayNumber, version).catch(() => { setLoadError('Failed to load Rocket Races data'); return null; });
           if (result) {
             setRocketADay(result.partADay);
             setRocketASession(result.session);
@@ -704,11 +709,14 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
       const totalRestSeconds = restSegs.reduce((sum, s) => sum + s.duration, 0);
       const avgWorkRestRatio = totalRestSeconds > 0 ? totalWorkSeconds / totalRestSeconds : null;
 
-      // Save session
+      // Save session. Sequence identity: sequence_position is THE position
+      // trained; program_day/program_day_number keep the catalog content
+      // reference (historical continuity + phase/analytics reads).
       const saved = await saveWorkoutSession({
         date: localDateString(),
-        program_day: dayNumber,
-        program_day_number: dayNumber,
+        program_day: catalogDay ?? dayNumber,
+        program_day_number: catalogDay ?? dayNumber,
+        sequence_position: dayNumber,
         day_type: workout.day_type,
         modality,
         units: selectedUnit,
@@ -751,14 +759,11 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         await updatePerformanceMetrics(workout.day_type, modality, perfRatio, rpm).catch(() => {});
       }
 
-      // Advance day if this is the current day
+      // Advance the pointer if the athlete trained at or past it. Sequence
+      // identity: advancement is position + 1, clamped to the program length.
       if (dayNumber >= currentDay) {
-        // Next day = the next MAPPING row, not catalog+1: catalog numbers skip
-        // and reorder for every program except plain main_5day, and +1 strands
-        // the pointer on days outside the athlete's program.
-        await resolveNextProgramDay(programVersion, dayNumber)
-          .then((next) => advanceCurrentDay(next))
-          .catch(() => {});
+        const next = programLength != null ? Math.min(dayNumber + 1, programLength) : dayNumber + 1;
+        await advanceCurrentDay(next).catch(() => {});
       }
 
       setStage('complete');
@@ -1731,7 +1736,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
               {isTimeTrial ? 'Baseline Saved' : 'Workout Complete'}
             </h2>
             <p className="engine-subheader">
-              Day {displayDay ?? dayNumber} — {(workout?.day_type ?? '').replace(/_/g, ' ')}
+              Day {dayNumber} — {(workout?.day_type ?? '').replace(/_/g, ' ')}
             </p>
 
             {/* Summary stats */}
@@ -1821,7 +1826,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           <button className="menu-btn" onClick={() => setNavOpen(true)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <h1>Day {displayDay ?? dayNumber}</h1>
+          <h1>Day {dayNumber}</h1>
           {workout && (
             <span className={'engine-badge ' + dayTypeBadge(workout.day_type)}>
               {workout.day_type.replace(/_/g, ' ')}
@@ -1833,7 +1838,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
             unlabeled non-current day reads as "the app lost track of me" (an
             athlete correctly on Day 3 opened Day 4, concluded the app was
             broken, and the day-scoped coach made it worse). */}
-        {hasAccess && !monthLocked && displayDay != null && currentDisplayDay != null && dayNumber !== currentDay && (
+        {hasAccess && !monthLocked && dayMonth != null && dayNumber !== currentDay && (
           <div
             style={{
               margin: '10px 16px 0',
@@ -1851,15 +1856,15 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
             }}
           >
             <span style={{ flex: 1, minWidth: 200 }}>
-              You're viewing <strong>Day {displayDay}</strong> — your current day is{' '}
-              <strong>Day {currentDisplayDay}</strong>.
+              You're viewing <strong>Day {dayNumber}</strong> — your current day is{' '}
+              <strong>Day {currentDay}</strong>.
             </span>
             <button
               className="engine-btn engine-btn-secondary engine-btn-sm"
               style={{ fontSize: 13 }}
               onClick={() => navigate(`/engine/training/${currentDay}`)}
             >
-              Go to Day {currentDisplayDay}
+              Go to Day {currentDay}
             </button>
           </div>
         )}
@@ -1873,7 +1878,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
               </div>
               <div className="engine-empty-title">Month {dayMonth} is locked</div>
               <div className="engine-empty-desc">
-                Day {displayDay ?? dayNumber} is part of Month {dayMonth}. You have {monthsUnlocked}{' '}
+                Day {dayNumber} is part of Month {dayMonth}. You have {monthsUnlocked}{' '}
                 {monthsUnlocked === 1 ? 'month' : 'months'} unlocked — the next month unlocks with your next
                 monthly payment.
               </div>
@@ -1887,7 +1892,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           <div className="engine-page">
             <div className="engine-empty">
               <div className="engine-empty-title">Workout not found</div>
-              <div className="engine-empty-desc">Day {displayDay ?? dayNumber} doesn't exist in this program.</div>
+              <div className="engine-empty-desc">Day {dayNumber} doesn't exist in this program.</div>
               <button className="engine-btn engine-btn-secondary" onClick={() => navigate('/engine')}>
                 <ChevronLeft size={16} /> Dashboard
               </button>

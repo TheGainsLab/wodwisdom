@@ -7,7 +7,7 @@ import Nav from '../components/Nav';
 import MetconsTab from '../components/MetconsTab';
 import WorkoutCalendar from '../components/WorkoutCalendar';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { loadUserProgress, getWorkoutsForProgram } from '../lib/engineService';
+import { loadUserProgress, getWorkoutsForProgram, getProgramMapping } from '../lib/engineService';
 import { scheduleProgramDay, scheduleEngineDay, unschedule } from '../lib/trainingSchedule';
 import { localDateString } from '../lib/localDate';
 
@@ -36,6 +36,8 @@ interface EngineSession {
   id: string;
   date: string;
   program_day_number: number | null;
+  // Sequence-identity: the program position trained (routes address positions).
+  sequence_position: number | null;
   day_type: string | null;
   modality: string | null;
   units: string | null;
@@ -55,6 +57,9 @@ interface EngineSchedEntry {
   engine_workout_id: string;
   day_type: string | null;
   day_number: number | null;
+  // Sequence position of this catalog day in the user's CURRENT program
+  // (earliest occurrence); null when the day isn't in their program.
+  sequence_position: number | null;
 }
 
 // PostgREST to-one embed for training_schedule → engine_workouts.
@@ -637,12 +642,32 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       })
       .filter((r): r is ScheduledEntry => r !== null);
     setScheduled(schedRows);
+    // Sequence-identity: routes address program positions, so resolve each
+    // scheduled catalog day to its (earliest) position in the user's current
+    // program. Days outside the program get no position (no Open link).
+    let seqByCatalog = new Map<number, number>();
+    try {
+      const progress = await loadUserProgress();
+      if (progress?.engine_program_version) {
+        const mapping = await getProgramMapping(progress.engine_program_version);
+        for (const m of mapping) {
+          if (!seqByCatalog.has(m.engine_workout_day_number)) {
+            seqByCatalog.set(m.engine_workout_day_number, m.program_sequence_order);
+          }
+        }
+      }
+    } catch {
+      seqByCatalog = new Map();
+    }
     const engSchedRows: EngineSchedEntry[] = ((engSched as unknown as EngineSchedJoinRow[]) || []).map((s) => ({
       id: s.id,
       scheduled_date: s.scheduled_date,
       engine_workout_id: s.engine_workout_id,
       day_type: s.engine_workouts?.day_type ?? null,
       day_number: s.engine_workouts?.day_number ?? null,
+      sequence_position: s.engine_workouts?.day_number != null
+        ? (seqByCatalog.get(s.engine_workouts.day_number) ?? null)
+        : null,
     }));
     setEngineScheduled(engSchedRows);
     return { schedRows, engSchedRows };
@@ -815,7 +840,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       // Completed Engine sessions → completed days on the same calendar.
       const { data: engRows } = await supabase
         .from('engine_workout_sessions')
-        .select('id, date, program_day_number, day_type, modality, units, actual_pace, total_output, performance_ratio, average_heart_rate, peak_heart_rate, perceived_exertion')
+        .select('id, date, program_day_number, sequence_position, day_type, modality, units, actual_pace, total_output, performance_ratio, average_heart_rate, peak_heart_rate, perceived_exertion')
         .eq('user_id', session.user.id)
         .eq('completed', true)
         .order('date', { ascending: false })
@@ -1556,11 +1581,11 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                       <div key={s.id} className="wc-day-scheduled">
                         <div className="wc-day-scheduled-label">
                           <Calendar size={13} />
-                          Scheduled · Engine · {formatEngineDayType(s.day_type)}{s.day_number != null ? ` Day ${s.day_number}` : ''}
+                          Scheduled · Engine · {formatEngineDayType(s.day_type)}{s.sequence_position != null ? ` Day ${s.sequence_position}` : ''}
                         </div>
                         <div style={{ display: 'flex', gap: 6 }}>
-                          {s.day_number != null && (
-                            <button type="button" className="wc-day-scheduled-open" onClick={() => navigate(`/engine/training/${s.day_number}`)}>Open</button>
+                          {s.sequence_position != null && (
+                            <button type="button" className="wc-day-scheduled-open" onClick={() => navigate(`/engine/training/${s.sequence_position}`)}>Open</button>
                           )}
                           <button type="button" className="wc-day-scheduled-open" onClick={() => handleUnschedule(s.id)} aria-label="Remove from calendar"><X size={13} /></button>
                         </div>
@@ -1609,12 +1634,12 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                           ) : (
                             <div className="wc-day-detail-text">Completed — no metrics recorded.</div>
                           )}
-                          {e.program_day_number != null && (
+                          {e.sequence_position != null && (
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                               <button
                                 type="button"
                                 className="wc-day-scheduled-open"
-                                onClick={() => navigate(`/engine/training/${e.program_day_number}`)}
+                                onClick={() => navigate(`/engine/training/${e.sequence_position}`)}
                               >
                                 Open
                               </button>

@@ -127,7 +127,7 @@ export async function runResequence(
   //     walked in program_sequence_order, never by catalog day number.
   const { data: doneRows } = await supa
     .from("engine_workout_sessions")
-    .select("program_day_number")
+    .select("program_day_number, sequence_position")
     .eq("user_id", userId).eq("completed", true).eq("program_version", version)
     .not("program_day_number", "is", null);
   const completedDays = new Set<number>((doneRows ?? []).map((r) => r.program_day_number as number));
@@ -145,22 +145,36 @@ export async function runResequence(
     seq: m.program_sequence_order as number,
   }));
 
-  // Furthest sequence position the athlete has completed (sequential-completion model).
+  // Furthest SEQUENCE position completed. sessions.sequence_position is the
+  // exact record (sequence-identity migration); the catalog-day scan is the
+  // fallback for rows written before it — earliest occurrence, which for
+  // repeat programs (vo2max/hyrox schedule one catalog day at several
+  // positions) deliberately under-credits rather than over-credits.
   let maxCompletedSeq = 0;
-  for (const m of mapping) {
-    if (completedDays.has(m.day) && m.seq > maxCompletedSeq) maxCompletedSeq = m.seq;
+  for (const r of doneRows ?? []) {
+    const seq = r.sequence_position as number | null;
+    if (seq != null && seq > maxCompletedSeq) maxCompletedSeq = seq;
+  }
+  const seqRecorded = (doneRows ?? []).some((r) => r.sequence_position != null);
+  if (!seqRecorded) {
+    const credited = new Set<number>();
+    for (const m of mapping) {
+      if (completedDays.has(m.day) && !credited.has(m.day)) {
+        credited.add(m.day);
+        if (m.seq > maxCompletedSeq) maxCompletedSeq = m.seq;
+      }
+    }
   }
 
-  // 3c) The next maxDays positions = the program's mapped days AFTER that sequence
-  // position, in sequence order. Correct for monotonic (main_5day identity) AND
-  // curated non-monotonic (hyrox/vo2) programs alike.
-  let blockPositions = mapping
-    .filter((m) => m.seq > maxCompletedSeq)
-    .slice(0, maxDays)
-    .map((m) => m.day);
-  // Fallback for a program with no mapping rows: consecutive catalog days.
-  if (blockPositions.length === 0) {
-    blockPositions = Array.from({ length: maxDays }, (_, i) => currentDay + i);
+  // 3c) The next maxDays positions = the mapping rows AFTER that sequence
+  // position, in sequence order — kept as {seq, day} pairs: seq is the
+  // position identity (what overrides key on), day is the catalog content
+  // reference (what TT pinning and phase read).
+  let blockPairs = mapping.filter((m) => m.seq > maxCompletedSeq).slice(0, maxDays);
+  // Fallback for a program with no mapping rows: consecutive positions
+  // (identity assumption — only plain-catalog setups reach this).
+  if (blockPairs.length === 0) {
+    blockPairs = Array.from({ length: maxDays }, (_, i) => ({ seq: currentDay + i, day: currentDay + i }));
   }
 
   // 3d) Phase at the current position (read from the curated catalog day).
@@ -174,16 +188,20 @@ export async function runResequence(
     currentPhase = (w?.phase as number) ?? 1;
   }
 
-  // 4) Pin month-boundary time trials (left as the catalog TT; AI fills the rest).
+  // 4) Pin month-boundary time trials (left as the catalog TT; AI fills the
+  // rest). Day-typing is per catalog day; pinning is per POSITION, so a
+  // repeated TT catalog day pins every position it occupies in the window.
   const { data: catalogBlock } = await supa
     .from("engine_workouts")
     .select("day_number, day_type")
     .eq("program_type", "main_5day")
-    .in("day_number", blockPositions);
-  const ttPositions = (catalogBlock ?? [])
-    .filter((d) => d.day_type === "time_trial")
-    .map((d) => d.day_number as number);
-  const aiPositions = blockPositions.filter((p) => !ttPositions.includes(p));
+    .in("day_number", blockPairs.map((p) => p.day));
+  const ttDays = new Set(
+    (catalogBlock ?? []).filter((d) => d.day_type === "time_trial").map((d) => d.day_number as number),
+  );
+  const ttPositions = blockPairs.filter((p) => ttDays.has(p.day)).map((p) => p.seq);
+  const aiPairs = blockPairs.filter((p) => !ttDays.has(p.day));
+  const aiPositions = aiPairs.map((p) => p.seq);
   const daysToGenerate = aiPositions.length;
   if (daysToGenerate === 0) {
     return { status: "skipped", reason: "block is entirely pinned time trials", currentDay, pinned_time_trials: ttPositions };
@@ -210,8 +228,9 @@ export async function runResequence(
   const curatedByDay = new Map<number, string>(
     (catalogBlock ?? []).map((d) => [d.day_number as number, d.day_type as string]),
   );
-  const prescribedSlots = aiPositions
-    .map((p, i) => `  day ${i + 1}: program prescribes "${curatedByDay.get(p) ?? "unspecified"}"`)
+  // Day-types are keyed by CATALOG day; walk the {seq, day} pairs.
+  const prescribedSlots = aiPairs
+    .map((p, i) => `  day ${i + 1}: program prescribes "${curatedByDay.get(p.day) ?? "unspecified"}"`)
     .join("\n");
   const prescribedNote = prescribedSlots
     ? `PROGRAM-PRESCRIBED DAY-TYPES FOR THESE SLOTS (your baseline — keep each unless the ` +

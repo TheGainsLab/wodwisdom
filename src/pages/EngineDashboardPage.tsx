@@ -90,10 +90,19 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
           loadCompletedSessions(p.engine_program_version),
         ]);
         setWorkouts(wk);
+        // Sequence identity: completion is tracked by SEQUENCE position.
+        // Fallback for sessions without one (written by pre-refactor bundles
+        // in the deploy window): earliest position matching their catalog day.
+        const seqByCatalog = new Map<number, number>();
+        for (const w of wk) {
+          if (w.sequence_position != null && !seqByCatalog.has(w.day_number)) {
+            seqByCatalog.set(w.day_number, w.sequence_position);
+          }
+        }
         setCompletedDays(
           new Set(
             sessions
-              .map((s) => s.program_day_number)
+              .map((s) => s.sequence_position ?? (s.program_day_number != null ? seqByCatalog.get(s.program_day_number) : null))
               .filter((n): n is number => n != null),
           ),
         );
@@ -183,10 +192,9 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
 
   // ── Derived data ──
 
+  // Sequence identity: the pointer IS the athlete-facing sequence position.
   const currentDay = progress?.engine_current_day ?? 1;
-  // Athlete-facing day number for the current day (1,2,3… in program order).
-  // currentDay stays the catalog identity used for routing/completion.
-  const currentSeq = workouts.find((w) => w.day_number === currentDay)?.sequence_position ?? currentDay;
+  const currentSeq = currentDay;
   const totalDays = workouts.length;
 
   // Use engine_months_unlocked from the database — incremented by payment webhooks
@@ -198,14 +206,14 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
 
   // Month of the current day (mapping month, not day/20). When the pointer sits
   // in a month beyond the user's entitlement, the start button becomes a lock.
-  const currentDayMonth = workouts.find((w) => w.day_number === currentDay)?.month ?? 1;
+  const currentDayMonth = workouts.find((w) => w.sequence_position === currentDay)?.month ?? 1;
   const currentDayLocked = currentDayMonth > monthsUnlocked;
 
   // Month-level data (when drilled in)
   const monthDays = selectedMonth != null ? (monthMap.get(selectedMonth) ?? []) : [];
   const monthCompletedCount =
     selectedMonth != null
-      ? monthDays.filter((d) => completedDays.has(d.day_number)).length
+      ? monthDays.filter((d) => d.sequence_position != null && completedDays.has(d.sequence_position)).length
       : 0;
 
   // ── Render ──
@@ -261,14 +269,14 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
               {/* Day list */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {monthDays.map((day) => {
-                  const status = getDayStatus(day.day_number, currentDay, completedDays, selectedMonth, monthsUnlocked);
+                  const status = getDayStatus(day.sequence_position ?? day.day_number, currentDay, completedDays, selectedMonth, monthsUnlocked);
                   const isLocked = status === 'locked';
 
                   return (
                     <button
                       key={day.day_number}
                       className="engine-exercise"
-                      onClick={() => !isLocked && navigate(`/engine/training/${day.day_number}`)}
+                      onClick={() => !isLocked && navigate(`/engine/training/${day.sequence_position ?? day.day_number}`)}
                       disabled={isLocked}
                       style={{
                         opacity: isLocked ? 0.4 : 1,
@@ -399,9 +407,9 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
                 {months.map((m) => {
                   const days = monthMap.get(m) ?? [];
-                  const done = days.filter((d) => completedDays.has(d.day_number)).length;
+                  const done = days.filter((d) => d.sequence_position != null && completedDays.has(d.sequence_position)).length;
                   const isLocked = m > monthsUnlocked;
-                  const isCurrent = days.some((d) => d.day_number === currentDay);
+                  const isCurrent = days.some((d) => d.sequence_position === currentDay);
                   const isComplete = done === days.length && days.length > 0;
 
                   return (
