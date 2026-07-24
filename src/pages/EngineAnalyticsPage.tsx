@@ -763,7 +763,7 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
                 <div key={s.id ?? i} className="engine-card" style={{ padding: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
                     <span style={{ fontSize: 13, fontWeight: 600 }}>{formatDate(s.date)}</span>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Day {s.program_day_number}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Day {s.sequence_position ?? s.program_day_number}</span>
                   </div>
                   <div className="ea-dual-bar">
                     <div className="ea-dual-row">

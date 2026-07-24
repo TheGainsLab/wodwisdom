@@ -57,7 +57,7 @@ export function eventTitle(ev: TimelineEvent): string {
     case 'evaluation_nutrition': return 'Nutrition evaluation generated';
     case 'chat_question': return 'Asked the AI Coach';
     case 'chat_rating': return d.rating === 1 ? 'Rated an answer 👍' : 'Rated an answer 👎';
-    case 'engine_session': return `Engine session${d.program_day_number != null ? ` — day ${d.program_day_number}` : ''}`;
+    case 'engine_session': return `Engine session${(d.sequence_position ?? d.program_day_number) != null ? ` — day ${d.sequence_position ?? d.program_day_number}` : ''}`;
     case 'time_trial': return `Time trial — ${d.modality ?? '?'}`;
     case 'workout_log': return 'Logged a workout';
     case 'nutrition_day': return 'Logged nutrition';

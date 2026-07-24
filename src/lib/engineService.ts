@@ -23,9 +23,11 @@ export interface EngineWorkout {
   base_intensity_percent: number | null;
   month: number | null;
   avg_work_rest_ratio: number | null;
-  // Athlete-facing day number (1,2,3… in program order). Display only — set by
-  // getWorkoutsForProgram from engine_program_mapping.program_sequence_order.
-  // day_number stays the catalog identity used for routing/overrides/completion.
+  // SEQUENCE IDENTITY: the athlete-facing day number (1,2,3… in program
+  // order) and the position identity used for routing, overrides, the
+  // pointer, and completion. Set by getWorkoutsForProgram from
+  // engine_program_mapping.program_sequence_order. day_number is the CATALOG
+  // content reference only.
   sequence_position?: number;
 }
 
@@ -72,6 +74,9 @@ export interface EngineWorkoutSession {
   workout_data: Record<string, unknown> | null;
   completed: boolean;
   program_version: string;
+  // Program-sequence position this session was trained at (sequence-identity
+  // migration; backfilled for history, NULL for out-of-program sessions).
+  sequence_position?: number | null;
   created_at: string;
 }
 
@@ -196,12 +201,9 @@ export async function loadWorkoutForDay(
   dayNumber: number,
   programType = 'main_5day'
 ): Promise<EngineWorkout | null> {
-  // AI self-sequencer override: if this user has a generated workout at this
-  // position, serve it instead of the catalog day. Pure content swap — the
-  // position (dayNumber) is preserved so progression/logging are unchanged.
-  const override = await loadDayOverride(dayNumber);
-  if (override) return { ...override, day_number: dayNumber };
-
+  // Pure CATALOG content lookup (dayNumber = catalog day). Position-aware
+  // callers (day page / review page) check loadDayOverride(seq) first —
+  // sequence-identity: overrides key on positions, content on catalog days.
   const { data, error } = await supabase
     .from('engine_workouts')
     .select('*')
@@ -213,8 +215,8 @@ export async function loadWorkoutForDay(
   return data;
 }
 
-/** Load the current user's generated workout at a sequence position, if any. */
-async function loadDayOverride(position: number): Promise<EngineWorkout | null> {
+/** Load the current user's generated workout at a SEQUENCE position, if any. */
+export async function loadDayOverride(position: number): Promise<EngineWorkout | null> {
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth?.user?.id;
   if (!uid) return null;
@@ -296,46 +298,27 @@ export async function getProgramMapping(
 }
 
 /**
- * THE program-day advancement rule. engine_current_day, sessions'
- * program_day_number, and the /engine/training/:day route all store CATALOG
- * day numbers — but a program's day order is its mapping's sequence order,
- * and catalog+1 is NOT "the next day" for any program except plain main_5day
- * (main_3day's 3rd day is catalog 4; varied programs reorder the catalog
- * entirely). Advancing with +1 corrupted pointers for every non-identity
- * program (July '26). All pointer writes must go through these helpers.
+ * SEQUENCE IDENTITY: engine_current_day, sessions' sequence_position, the
+ * /engine/training/:day route, and override positions are all PROGRAM
+ * SEQUENCE positions (1..N in program order — the number the athlete sees).
+ * In this space advancement is simply +1 (clamped to the program's length);
+ * the catalog day number is a content reference resolved through the mapping
+ * at render time, never a position.
  *
- * Pure core, exported for tests: given the mapping (sequence-ordered) and
- * the catalog day just completed, return the catalog day of the NEXT
- * sequence position. Clamps to the last day when the program is finished.
- * A completed day that isn't in the mapping (corrupted pointer, off-program
- * page) resumes at the first mapping day with a larger catalog number —
- * best-effort, never throws. Null completed day → the program's first day.
+ * History: positions used to be catalog day numbers, which coincide with
+ * sequence only for plain main_5day. Every other program broke — stranded
+ * pointers, un-varied varied programs, and irreducible ambiguity on
+ * vo2max/hyrox programs that schedule one catalog day at up to 7 positions.
  */
-export function nextDayInMapping(
-  mapping: Array<{ engine_workout_day_number: number }>,
-  completedCatalogDay: number | null,
-): number | null {
-  if (mapping.length === 0) return null;
-  if (completedCatalogDay == null) return mapping[0].engine_workout_day_number;
-  const idx = mapping.findIndex((m) => m.engine_workout_day_number === completedCatalogDay);
-  if (idx >= 0) {
-    return idx + 1 < mapping.length
-      ? mapping[idx + 1].engine_workout_day_number
-      : mapping[idx].engine_workout_day_number;
-  }
-  const after = mapping.find((m) => m.engine_workout_day_number > completedCatalogDay);
-  return after ? after.engine_workout_day_number : mapping[0].engine_workout_day_number;
-}
 
-/** Fetching wrapper: next catalog day after completing `completedCatalogDay`. */
-export async function resolveNextProgramDay(
-  programId: string,
-  completedCatalogDay: number | null,
-): Promise<number> {
-  const mapping = await getProgramMapping(programId);
-  const next = nextDayInMapping(mapping, completedCatalogDay);
-  // Empty mapping (misconfigured program): legacy +1 keeps the app moving.
-  return next ?? (completedCatalogDay ?? 0) + 1;
+/** Number of sequence positions in a program (its length in days). */
+export async function getProgramLength(programId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('engine_program_mapping')
+    .select('id', { count: 'exact', head: true })
+    .eq('engine_program_id', programId);
+  if (error) throw error;
+  return count ?? 0;
 }
 
 // Legacy version strings → current program IDs
@@ -410,11 +393,17 @@ async function applyDayOverrides(result: EngineWorkout[], version: string): Prom
   const { data: gen } = await supabase.from('engine_workouts').select('*').in('id', ids);
   for (const w of gen ?? []) genById.set(w.id, w as EngineWorkout);
 
+  // Sequence-identity: overrides key on true sequence positions; match the
+  // workout rows by their sequence_position, not the catalog day_number
+  // (which repeats across positions in vo2max/hyrox programs).
   const ovByPos = new Map(overrides.map((o) => [o.sequence_position, o.engine_workout_id]));
   for (let i = 0; i < result.length; i++) {
-    const gid = ovByPos.get(result[i].day_number);
+    const pos = result[i].sequence_position;
+    const gid = pos != null ? ovByPos.get(pos) : undefined;
     const g = gid ? genById.get(gid) : undefined;
-    if (g) result[i] = { ...g, day_number: result[i].day_number, month: result[i].month };
+    if (g) {
+      result[i] = { ...g, day_number: result[i].day_number, month: result[i].month, sequence_position: pos };
+    }
   }
 }
 
@@ -541,9 +530,9 @@ export async function isPersonalBestSession(session: EngineWorkoutSession): Prom
   return best == null || session.calculated_rpm > best;
 }
 
-/** Get a specific session by program day number. */
+/** Get a specific session by SEQUENCE position (sequence-identity). */
 export async function getWorkoutSessionByDay(
-  programDayNumber: number
+  sequencePosition: number
 ): Promise<EngineWorkoutSession | null> {
   // Respect a program restart: pre-restart sessions are archived and must not
   // count as "already done this day" (or feed Rocket Races pairing).
@@ -557,9 +546,10 @@ export async function getWorkoutSessionByDay(
   let query = supabase
     .from('engine_workout_sessions')
     .select('*')
-    .eq('program_day_number', programDayNumber)
+    .eq('sequence_position', sequencePosition)
     .order('created_at', { ascending: false })
     .limit(1);
+  if (prof?.engine_program_version) query = query.eq('program_version', prof.engine_program_version);
   if (restartAt) query = query.gt('created_at', restartAt);
 
   const { data, error } = await query.maybeSingle();
@@ -568,24 +558,37 @@ export async function getWorkoutSessionByDay(
   return data;
 }
 
-/** Find the nearest preceding Rocket Races A day and its completed session (if any). */
+/**
+ * Find the nearest preceding Rocket Races A day (by PROGRAM SEQUENCE) and its
+ * completed session. Sequence-identity: precedence means "earlier in this
+ * athlete's program", walked through the mapping — the old catalog-day scan
+ * also silently matched nothing for non-5day program ids (engine_workouts only
+ * has program_type 'main_5day').
+ */
 export async function findPrecedingRocketRacesA(
-  dayNumber: number,
-  programType = 'main_5day'
+  sequencePosition: number,
+  programId = 'main_5day'
 ): Promise<{ partADay: number; session: EngineWorkoutSession | null } | null> {
-  const { data: workoutData, error: wErr } = await supabase
+  const mapping = await getProgramMapping(programId).catch(() => []);
+  const preceding = mapping
+    .filter((m) => m.program_sequence_order < sequencePosition)
+    .sort((a, b) => b.program_sequence_order - a.program_sequence_order);
+  if (preceding.length === 0) return null;
+
+  // Day-type lives on the catalog rows; fetch types for the preceding days
+  // (bounded window — Rocket Races pairs sit within a couple of weeks).
+  const window = preceding.slice(0, 30);
+  const { data: workouts } = await supabase
     .from('engine_workouts')
-    .select('day_number')
-    .eq('program_type', programType)
-    .eq('day_type', 'rocket_races_a')
-    .lt('day_number', dayNumber)
-    .order('day_number', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .select('day_number, day_type')
+    .eq('program_type', 'main_5day')
+    .in('day_number', window.map((m) => m.engine_workout_day_number));
+  const typeByDay = new Map((workouts ?? []).map((w) => [w.day_number, w.day_type]));
 
-  if (wErr || !workoutData) return null;
+  const partA = window.find((m) => typeByDay.get(m.engine_workout_day_number) === 'rocket_races_a');
+  if (!partA) return null;
 
-  const partADay = workoutData.day_number;
+  const partADay = partA.program_sequence_order;
   const session = await getWorkoutSessionByDay(partADay);
   return { partADay, session };
 }
@@ -780,15 +783,12 @@ export async function saveProgramVersion(version: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  // Pointer starts at the program's FIRST mapping day — not 1. Some programs
-  // don't begin at catalog day 1 (vo2max_4day starts at catalog 4), so a
-  // default-1 pointer is invalid from the first second.
-  const firstDay = await resolveNextProgramDay(version, null);
-
+  // Sequence identity: every program starts at position 1 (the catalog day
+  // behind position 1 is resolved through the mapping at render time).
   const { error } = await supabase
     .from('athlete_profiles')
     .upsert(
-      { user_id: user.id, engine_program_version: version, engine_current_day: firstDay },
+      { user_id: user.id, engine_program_version: version, engine_current_day: 1 },
       { onConflict: 'user_id' }
     );
 
@@ -805,7 +805,7 @@ export async function loadProgramVersion(): Promise<string> {
  * Switch the user to a different program variant.
  *
  * engine_current_day is set to 1 + the user's highest completed
- * program_day_number within the new program, defaulting to 1 if they
+ * sequence_position within the new program, defaulting to 1 if they
  * have no completions in that program yet. This mirrors how current_day
  * advances during normal training (via advanceCurrentDay at workout
  * completion) and gives sensible behavior in three cases:
@@ -830,28 +830,22 @@ export async function switchProgram(newProgramId: string): Promise<void> {
   // ignoring sessions archived by a restart of that program, so switching
   // away and back doesn't resurrect the pre-restart position.
   const restartAt = await getProgramRestartAt(newProgramId);
-  // Furthest completed day BY PROGRAM SEQUENCE (catalog magnitude is not
-  // program order — varied programs reorder the catalog), then the mapping
-  // row after it. No completions → the program's first mapping day. The
-  // resolver clamps to the last day for a fully-completed program.
+  // Sequence identity: pick up right after the furthest sequence position
+  // completed in the new program (restart-aware); position 1 with no
+  // completions; clamped to the program's length when fully completed.
   let doneQuery = supabase
     .from('engine_workout_sessions')
-    .select('program_day_number')
+    .select('sequence_position')
     .eq('user_id', user.id)
     .eq('program_version', newProgramId)
     .eq('completed', true)
-    .not('program_day_number', 'is', null);
+    .not('sequence_position', 'is', null);
   if (restartAt) doneQuery = doneQuery.gt('created_at', restartAt);
   const { data: doneRows } = await doneQuery;
-  const done = new Set((doneRows ?? []).map((r) => r.program_day_number as number));
-  const mapping = await getProgramMapping(newProgramId);
-  let lastIdx = -1;
-  mapping.forEach((m, i) => {
-    if (done.has(m.engine_workout_day_number)) lastIdx = i;
-  });
-  const newCurrentDay =
-    nextDayInMapping(mapping, lastIdx >= 0 ? mapping[lastIdx].engine_workout_day_number : null) ??
-    (done.size > 0 ? Math.max(...done) + 1 : 1);
+  const maxSeq = (doneRows ?? []).reduce(
+    (mx, r) => Math.max(mx, (r.sequence_position as number) ?? 0), 0);
+  const programLength = await getProgramLength(newProgramId).catch(() => 0);
+  const newCurrentDay = programLength > 0 ? Math.min(maxSeq + 1, programLength) : maxSeq + 1;
 
   const { error } = await supabase
     .from('athlete_profiles')
@@ -916,12 +910,10 @@ export async function restartProgram(programId: string): Promise<void> {
   const restarts = { ...((prof?.engine_restarts ?? {}) as Record<string, string>) };
   restarts[programId] = new Date().toISOString();
 
-  // "Day 1" = the program's first MAPPING day (not catalog 1 — some programs
-  // don't start there).
-  const firstDay = await resolveNextProgramDay(programId, null);
+  // Sequence identity: Day 1 = position 1, for every program.
   const { error } = await supabase
     .from('athlete_profiles')
-    .update({ engine_restarts: restarts, engine_current_day: firstDay })
+    .update({ engine_restarts: restarts, engine_current_day: 1 })
     .eq('user_id', user.id);
   if (error) throw error;
 

@@ -48,25 +48,52 @@ Deno.serve(async (_req) => {
         // non-monotonic programs (hyrox/vo2) too — no catalog-day comparison. New
         // overrides written at the next block's positions are not yet completed, so
         // the cron won't regenerate until the athlete works through them.
+        // Completed SEQUENCE positions (sequence-identity: sessions record
+        // sequence_position; overrides key on true sequence positions).
         const { data: doneRows } = await supa
           .from("engine_workout_sessions")
-          .select("program_day_number")
+          .select("sequence_position")
           .eq("user_id", uid).eq("completed", true).eq("program_version", version)
-          .not("program_day_number", "is", null);
-        const completed = new Set<number>((doneRows ?? []).map((r) => r.program_day_number as number));
+          .not("sequence_position", "is", null);
+        const completedSeqs = new Set<number>((doneRows ?? []).map((r) => r.sequence_position as number));
+        const maxCompletedSeq = completedSeqs.size ? Math.max(...completedSeqs) : 0;
 
         const { data: ovs } = await supa
           .from("engine_user_day_overrides")
           .select("sequence_position")
           .eq("user_id", uid).eq("program_version", version);
         const overridePositions = (ovs ?? []).map((o) => o.sequence_position as number);
-        const blockConsumed = overridePositions.length === 0 ||
-          overridePositions.every((p) => completed.has(p));
+        const maxOverrideSeq = overridePositions.length ? Math.max(...overridePositions) : 0;
 
-        if (!blockConsumed) {
-          const remaining = overridePositions.filter((p) => !completed.has(p));
+        // "Consumed" two ways:
+        //  - worked through: every overridden position completed; or
+        //  - skipped through: the athlete's frontier has moved PAST the
+        //    block's end. Athletes skip days (a normal behavior); treating
+        //    skip as "still working through it" stalled the loop forever —
+        //    the athlete silently fell out of AI sequencing.
+        const workedThrough = overridePositions.length === 0 ||
+          overridePositions.every((p) => completedSeqs.has(p));
+        const skippedThrough = overridePositions.length > 0 && maxCompletedSeq > maxOverrideSeq;
+
+        if (!workedThrough && !skippedThrough) {
+          const remaining = overridePositions.filter((p) => !completedSeqs.has(p));
           results.push({ user: uid, action: "skip", reason: "block not consumed", remaining });
           continue;
+        }
+
+        // Skip-through: the uncompleted overrides are behind the athlete's
+        // frontier — stale content written for an athlete-state that no longer
+        // exists. Delete them (their pages revert to curated content);
+        // completed-position overrides stay as the record of what was trained.
+        if (skippedThrough && !workedThrough) {
+          const stale = overridePositions.filter((p) => !completedSeqs.has(p));
+          if (stale.length > 0) {
+            await supa
+              .from("engine_user_day_overrides")
+              .delete()
+              .eq("user_id", uid).eq("program_version", version)
+              .in("sequence_position", stale);
+          }
         }
 
         const result = await runResequence(supa, uid, { dryRun: false });

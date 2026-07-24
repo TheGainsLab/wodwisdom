@@ -169,7 +169,12 @@ async function buildEngineCoachingContext(
   supa: SupabaseClient,
   userId: string,
   programVersion: string,
-  engineProgramDay: number,
+  // The scoped SEQUENCE position (1..N in program order) — the athlete-facing
+  // day number, unique per program by construction. Repeat programs
+  // (vo2max/hyrox schedule the same catalog day at up to 7 positions) are
+  // unambiguous in this space; the catalog day is resolved from the mapping
+  // row purely as a content reference.
+  scopedSeq: number,
   selectedModality: string | null,
   selectedUnits: string | null,
   // The app's computed target pace for today (client passes what it displays).
@@ -177,29 +182,22 @@ async function buildEngineCoachingContext(
   // pacing from the raw baseline (July '26: coach said 21-22 cal/min against
   // an on-screen target of 18 because it only had the baseline to work from).
   targetPace: number | null,
-  // The athlete's engine_current_day pointer. The scoped day is merely the
-  // page the athlete has OPEN — browsing other days is a normal feature
-  // (July '26: an athlete correctly on Day 3 viewed Day 4, and the coach —
-  // knowing only the viewed day — told him "the app has you on Day 4" and
-  // invented history to back it up). When these differ, the coach must say
-  // viewing vs. on, never assert the viewed day as the athlete's position.
+  // The athlete's engine_current_day pointer — ALSO a sequence position. The
+  // scoped day is merely the page the athlete has OPEN — browsing other days
+  // is a normal feature (July '26: an athlete correctly on Day 3 viewed Day 4,
+  // and the coach — knowing only the viewed day — told him "the app has you on
+  // Day 4" and invented history to back it up). When these differ, the coach
+  // must say viewing vs. on, never assert the viewed day as their position.
   athleteCurrentDay: number | null,
 ): Promise<string> {
-  // Mapping row for the requested day. engineProgramDay is a CATALOG day
-  // number — it comes from the frontend route param, the same space sessions
-  // and engine_current_day use. Look up by engine_workout_day_number: catalog
-  // and sequence numbers diverge for every program except plain main_5day
-  // (the July '26 Dylan investigation — a sequence lookup here described a
-  // different workout than the athlete's screen showed).
+  // Mapping row for the scoped sequence position (unique per program).
   const { data: mapping } = await supa
     .from("engine_program_mapping")
     .select("engine_workout_day_number, program_sequence_order, month, week_number")
     .eq("engine_program_id", programVersion)
-    .eq("engine_workout_day_number", engineProgramDay)
+    .eq("program_sequence_order", scopedSeq)
     .maybeSingle();
   if (!mapping) return "";
-  // Athlete-facing day label = sequence position (what the UI shows).
-  const scopedSeq = mapping.program_sequence_order ?? engineProgramDay;
 
   // Fetch catalog workout, program metadata, recent sessions, upcoming
   // mapping rows, and time trial baselines in parallel.
@@ -209,7 +207,6 @@ async function buildEngineCoachingContext(
     { data: recentSessions },
     { data: upcomingMappings },
     { data: timeTrials },
-    { data: currentDayRow },
   ] = await Promise.all([
     // The 720-day catalog is program_type='main_5day' (every variant maps into it —
     // same filter the client uses). Without it, AI-sequencer rows (program_type
@@ -246,16 +243,6 @@ async function buildEngineCoachingContext(
       .select("modality, total_output, calculated_rpm, units, date")
       .eq("user_id", userId)
       .eq("is_current", true),
-    // Sequence label for the athlete's current-day pointer (viewed-vs-current
-    // messaging must speak in athlete-facing day numbers).
-    athleteCurrentDay != null && athleteCurrentDay !== engineProgramDay
-      ? supa
-          .from("engine_program_mapping")
-          .select("program_sequence_order")
-          .eq("engine_program_id", programVersion)
-          .eq("engine_workout_day_number", athleteCurrentDay)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
   ]);
 
   if (!workout) return "";
@@ -304,16 +291,13 @@ async function buildEngineCoachingContext(
   parts.push(`Program: ${programInfo?.name ?? "Year of the Engine"}`);
   parts.push(`Total: ${programInfo?.total_days ?? 720} days across ${programInfo?.total_months ?? 36} months`);
   parts.push(`Scoped day: Day ${scopedSeq} (Month ${mapping.month}, Week ${mapping.week_number ?? "?"}) — the training-day page this conversation is attached to.`);
-  if (athleteCurrentDay != null && athleteCurrentDay !== engineProgramDay) {
-    // All labels in athlete-facing sequence numbers. Direction only when the
-    // pointer's sequence resolved (catalog magnitude ≠ program order for
-    // varied programs, so never infer direction from catalog numbers).
-    const currentSeq = currentDayRow?.program_sequence_order ?? null;
-    const direction = currentSeq != null ? (currentSeq > scopedSeq ? " behind" : " ahead of") : "";
-    const currentLabel = currentSeq ?? athleteCurrentDay;
+  if (athleteCurrentDay != null && athleteCurrentDay !== scopedSeq) {
+    // Pointer and scope are both sequence positions — compare and label
+    // directly in the athlete-facing space.
+    const direction = athleteCurrentDay > scopedSeq ? " behind" : " ahead of";
     parts.push(
-      `ATHLETE'S ACTUAL POSITION: Day ${currentLabel} — NOT this page. The athlete is browsing a day${direction} where they are in the program (a normal app feature). ` +
-        `If day position comes up, state plainly: they are ON Day ${currentLabel} and currently VIEWING Day ${scopedSeq}. ` +
+      `ATHLETE'S ACTUAL POSITION: Day ${athleteCurrentDay} — NOT this page. The athlete is browsing a day${direction} where they are in the program (a normal app feature). ` +
+        `If day position comes up, state plainly: they are ON Day ${athleteCurrentDay} and currently VIEWING Day ${scopedSeq}. ` +
         `NEVER assert this viewed day as the athlete's position, and never invent an explanation for the difference.`,
     );
   } else if (athleteCurrentDay != null) {
@@ -426,16 +410,15 @@ async function buildEngineAthleteCard(
   currentDay: number | null,
 ): Promise<string> {
   const [{ data: mapping }, { data: timeTrials }, { data: pref }, { data: recentModalities }] = await Promise.all([
-    // engine_current_day is a CATALOG day number (the space sessions and the
-    // route params use) — look it up by engine_workout_day_number, never by
-    // program_sequence_order (they diverge for every program except plain
-    // main_5day; the July '26 Dylan investigation).
+    // engine_current_day is a SEQUENCE position (post sequence-identity) —
+    // unique per program, so a plain maybeSingle lookup is exact even for
+    // repeat programs (vo2max/hyrox).
     currentDay
       ? supa
           .from("engine_program_mapping")
           .select("engine_workout_day_number, program_sequence_order, month, week_number")
           .eq("engine_program_id", programVersion)
-          .eq("engine_workout_day_number", currentDay)
+          .eq("program_sequence_order", currentDay)
           .maybeSingle()
       : Promise.resolve({ data: null }),
     supa
@@ -573,8 +556,21 @@ Deno.serve(async (req) => {
     // (Decision 10(b)), so its tier follows Engine access — not `ai_chat`. This applies
     // ONLY to day-scoped requests; a request without engine_program_day (the standalone
     // coach) is tiered exactly as before.
-    const { question, history = [], source_filter, workout_id, engine_program_day, engine_modality, engine_units, engine_target_pace } = await req.json();
-    const isEngineDayRequest = typeof engine_program_day === "number" && engine_program_day > 0;
+    const { question, history = [], source_filter, workout_id, engine_program_day, engine_sequence_position, engine_modality, engine_units, engine_target_pace } = await req.json();
+    // SEQUENCE IDENTITY: the day scope is a program-sequence position.
+    // engine_sequence_position is the current contract; engine_program_day is
+    // the legacy field from pre-refactor cached bundles, which sent CATALOG
+    // day numbers — translated to a sequence below (after auth) so stale
+    // clients keep working through the transition window.
+    const engineSeqParam =
+      typeof engine_sequence_position === "number" && engine_sequence_position > 0
+        ? engine_sequence_position
+        : null;
+    const engineLegacyCatalogDay =
+      engineSeqParam == null && typeof engine_program_day === "number" && engine_program_day > 0
+        ? engine_program_day
+        : null;
+    const isEngineDayRequest = engineSeqParam != null || engineLegacyCatalogDay != null;
     // The app-computed target pace for the scoped engine day (what the athlete
     // sees on screen). Client-supplied; bounds-checked and only ever used as
     // coaching context text. See buildEngineCoachingContext.
@@ -639,19 +635,33 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[chat] tier: ${userTier}, hasProfile: ${!!athleteProfile}, engineDay: ${athleteProfile?.engine_current_day || "n/a"}, engineProgramDay: ${engine_program_day ?? "n/a"}`);
+    console.log(`[chat] tier: ${userTier}, hasProfile: ${!!athleteProfile}, pointerSeq: ${athleteProfile?.engine_current_day || "n/a"}, scopedSeq: ${engineSeqParam ?? "n/a"}, legacyCatalog: ${engineLegacyCatalogDay ?? "n/a"}`);
 
     // Engine coaching mode: the Engine review page scopes the coach to a
-    // specific day by passing engine_program_day. When present and the user
-    // is an Engine subscriber, we build a rich Engine context block, lock
-    // retrieval to the engine + journal categories, and use the workout
-    // coaching prompt. Otherwise this is a normal chat call and nothing
-    // about the request changes.
+    // specific SEQUENCE position via engine_sequence_position. When present
+    // and the user is an Engine subscriber, we build a rich Engine context
+    // block, lock retrieval to the engine + journal categories, and use the
+    // workout coaching prompt. Otherwise this is a normal chat call and
+    // nothing about the request changes.
     const engineCoachingMode =
-      typeof engine_program_day === "number" &&
-      engine_program_day > 0 &&
+      isEngineDayRequest &&
       (userTier === "engine" || userTier === "all_access") &&
       !!athleteProfile?.engine_program_version;
+
+    // Resolve the scoped sequence. Legacy cached bundles sent CATALOG day
+    // numbers — translate through the mapping (earliest occurrence, matching
+    // the migration's backfill) so stale clients degrade gracefully.
+    let engineSeq: number | null = engineSeqParam;
+    if (engineCoachingMode && engineSeq == null && engineLegacyCatalogDay != null) {
+      const { data: legacyRows } = await supa
+        .from("engine_program_mapping")
+        .select("program_sequence_order")
+        .eq("engine_program_id", athleteProfile.engine_program_version)
+        .eq("engine_workout_day_number", engineLegacyCatalogDay)
+        .order("program_sequence_order", { ascending: true })
+        .limit(1);
+      engineSeq = (legacyRows?.[0]?.program_sequence_order as number | undefined) ?? null;
+    }
 
     // Quick-action chip caching: a canned chip question sent with empty history
     // is a pure function of (user, day, equipment, question). Serve a cache hit
@@ -666,10 +676,13 @@ Deno.serve(async (req) => {
     // you're on Day 3") must never be cached — it would be served stale once
     // the athlete actually reaches that day. Skip the cache (read AND write)
     // whenever the scoped day isn't the athlete's current day.
+    // engine_current_day is a SEQUENCE position (post sequence-identity
+    // migration), so pointer and scope compare directly.
     const engineAthleteCurrentDay = (athleteProfile?.engine_current_day as number | null) ?? null;
     const isBrowsingOtherDay =
-      engineCoachingMode && engineAthleteCurrentDay != null && engineAthleteCurrentDay !== engine_program_day;
-    const chipKey = (engineCoachingMode && !isBrowsingOtherDay && (history?.length ?? 0) <= 1)
+      engineCoachingMode && engineAthleteCurrentDay != null && engineSeq != null &&
+      engineAthleteCurrentDay !== engineSeq;
+    const chipKey = (engineCoachingMode && engineSeq != null && !isBrowsingOtherDay && (history?.length ?? 0) <= 1)
       ? (ENGINE_CHIP_KEYS[(question || "").trim().toLowerCase()] ?? null)
       : null;
     const cacheKey = chipKey
@@ -682,7 +695,9 @@ Deno.serve(async (req) => {
         .from("engine_coach_cache")
         .select("answer")
         .eq("user_id", user.id)
-        .eq("engine_program_day", engine_program_day)
+        // Column keeps its historical name; values are sequence positions
+        // post-migration (old catalog-keyed rows were truncated with it).
+        .eq("engine_program_day", engineSeq)
         .eq("modality", cacheModality)
         .eq("units", cacheUnits)
         .eq("question_key", cacheKey)
@@ -800,17 +815,18 @@ Deno.serve(async (req) => {
     // page). General /chat questions from Engine users no longer carry
     // engine context unless they ask from the review page.
     let engineContext = "";
-    if (engineCoachingMode && athleteProfile?.engine_program_version) {
+    if (engineCoachingMode && engineSeq != null && athleteProfile?.engine_program_version) {
       // Persist the scoping (even if the dossier build fails below) so
       // day-scoped conversations are auditable in chat_messages.
+      // context_day records the SEQUENCE position post sequence-identity.
       contextType = "engine_day";
-      contextDay = engine_program_day;
+      contextDay = engineSeq;
       try {
         engineContext = await buildEngineCoachingContext(
           supa,
           user.id,
           athleteProfile.engine_program_version,
-          engine_program_day,
+          engineSeq,
           typeof engine_modality === "string" ? engine_modality : null,
           typeof engine_units === "string" ? engine_units : null,
           engineTargetPace,
@@ -1204,10 +1220,11 @@ Deno.serve(async (req) => {
           });
 
           // Store the quick-action chip answer so re-taps serve instantly/free.
+          // engine_program_day column holds SEQUENCE positions post-migration.
           if (cacheKey && fullAnswer) {
             await supa.from("engine_coach_cache").upsert({
               user_id: userId,
-              engine_program_day,
+              engine_program_day: engineSeq,
               modality: cacheModality,
               units: cacheUnits,
               question_key: cacheKey,
