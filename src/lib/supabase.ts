@@ -18,6 +18,7 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
   return { Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' };
 }
 export const CHAT_ENDPOINT = SUPABASE_URL + '/functions/v1/chat';
+export const PARSE_ACTIVITY_ENDPOINT = SUPABASE_URL + '/functions/v1/parse-activity';
 export const SUMMARIZE_ENDPOINT = SUPABASE_URL + '/functions/v1/summarize';
 export const WORKOUT_REVIEW_ENDPOINT = SUPABASE_URL + '/functions/v1/workout-review';
 export const LOG_WORKOUT_ENDPOINT = SUPABASE_URL + '/functions/v1/log-workout';

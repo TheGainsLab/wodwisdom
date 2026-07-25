@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-
 import { MODELS } from "../_shared/model-profiles.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { buildConditioningState } from "../_shared/conditioning-state.ts";
+import { buildActivityChatContext, fetchOutsideTraining } from "../_shared/athlete-activities.ts";
 import { fetchAndFormatProgramContext } from "../_shared/training-program.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
@@ -100,6 +101,34 @@ function buildAthleteContext(
 
   return parts.join("\n");
 }
+
+/**
+ * PRODUCT KNOWLEDGE — verified facts about The Gains Lab, injected into every
+ * chat mode so product/app questions get true answers instead of improvised
+ * ones. Built July '26 from an audit of every product-classified question:
+ * the coach had recommended a competitor's app by name, sent angry users to
+ * ANOTHER COMPANY's support address, and invented UI (device pairing flows,
+ * settings screens, logging paths) that doesn't exist. Every line below is
+ * verified against the codebase or founder-confirmed. When editing: never add
+ * a claim you haven't verified — this block exists to STOP fabrication.
+ */
+const PRODUCT_KNOWLEDGE =
+  "\n\nPRODUCT KNOWLEDGE (about the app/product — answer ONLY from these facts; NEVER invent navigation paths, features, integrations, or company details not listed here):\n" +
+  "- We are The Gains Lab — a web app at thegainslab.com (works great in any phone browser). Products: Year of the Engine (conditioning), AI Programming (personalized monthly programs), AI Coach (this chat), AI Nutrition; All Access bundles everything. We are NOT affiliated with CrossFit Inc — never direct anyone to crossfit.com — and NEVER name any other company's app as ours or recommend competitor apps.\n" +
+  "- Mobile app: long-term plans, no timeline. Don't promise dates.\n" +
+  "- Pricing: don't quote numbers — plans and pricing live on the website.\n" +
+  "- Support: for anything that needs a human (bad/duplicate logged data, billing, bugs), email coach@thegainslab.com — a real person reads every message. Answer what you can yourself FIRST; deflect to support only when the fix genuinely needs us.\n" +
+  "- YOUR abilities: you can see the athlete context provided to you and coach. You CANNOT edit programs, logs, settings, or accounts — never claim you made a change or promise to make one.\n" +
+  "- Engine navigation: the Engine dashboard shows each month as a grid of days; 'Start' opens the athlete's current day; any unlocked day is tappable, past or future (browsing ahead is fine — a banner shows when viewing a non-current day). A training day: pick equipment, run the guided timer, log the result. Day numbers are program positions (Day 1..N).\n" +
+  "- Engine pacing: target = time-trial baseline × the day's intended intensity × a rolling recent-performance multiplier. Scheduled monthly time trials recalibrate. To RE-DO a time trial anytime: open any completed time-trial day from the dashboard and train it again — the new result automatically becomes the current baseline.\n" +
+  "- Engine start-over: on the program screen (Switch Program), 'Restart current program from Day 1' archives program progress and pacing calibration for a true fresh start; training history and PRs are kept; unlocked months are unaffected. Switching program variants keeps per-program progress — switch back anytime. Months unlock one at a time with each monthly payment.\n" +
+  "- AI Programming: the next month generates automatically when the current one completes (an automatic daily check heals any missed generation — if a month seems stuck more than a day, email us). Profile changes (goals, session length, equipment, injuries) apply to the NEXT generation, not retroactively. Session length = target minutes per session, one number. Each workout block has a one-shot 'AI Edit' that can revise that block on request.\n" +
+  "- Injuries vs preferences: injuries/limitations go in the profile's injuries field — generation and AI Edit avoid those movements. Choice-based preferences (movements to avoid or emphasize, goals) go in the profile's goals — reflected at next generation.\n" +
+  "- Logging: program and Engine days are logged from their own day pages on completion. Q = movement-quality self-rating; fault checkboxes are marked only when the fault actually happened; RPE = effort. Program/Engine session records can NOT be edited or deleted in the app (they drive progression and are permanent) — for bad or duplicate data, email coach@thegainslab.com and we'll correct it.\n" +
+  "- Outside activities (AI Programming subscribers): 'Log Activity' — in the sidebar and on any Training Log calendar day — records training done outside the program (a ride, a run, a test). Type what you did in plain words, confirm the parsed card, done. These appear on the Training Log calendar, can be edited or deleted there (they're context, not program records), inform your coach immediately and your NEXT month's program at generation — they never change Engine pace targets. Benchmark tests (FTP, PRs) are tracked with retest history; they never change profile 1RMs — the athlete updates those in the profile deliberately. Engine-only subscribers: outside-activity logging is part of AI Programming.\n" +
+  "- Heart rate & wearables: manual entry only (average/peak HR fields when logging). No device, Bluetooth, or health-platform integrations.\n" +
+  "- Training Log calendar: shows completed work across products and lets athletes schedule upcoming program/Engine days onto dates.\n" +
+  "- Anything product-related not covered above: say you don't have that detail rather than guessing, and point to coach@thegainslab.com.";
 
 // Shared spine for all coaching personas. Mode-specific addenda are appended below.
 const COACH_SPINE =
@@ -969,7 +998,10 @@ Deno.serve(async (req) => {
       !engineCoachingMode &&
       (userTier === "engine" || userTier === "all_access") &&
       !!athleteProfile?.engine_program_version;
-    const [embData, recentTraining, programContext, competitionBundle, engineAthleteCard] = await Promise.all([
+    // Logged outside activities: Programming-tier feature (schema is
+    // product-agnostic for the future AI Logger; the gate is UI/tier only).
+    const shouldFetchActivities = userTier === "ai_programming" || userTier === "all_access";
+    const [embData, recentTraining, programContext, competitionBundle, engineAthleteCard, activityContext] = await Promise.all([
       isMeta
         ? Promise.resolve(null)
         : fetchWithTimeout("https://api.openai.com/v1/embeddings", {
@@ -1001,6 +1033,14 @@ Deno.serve(async (req) => {
             console.error("[chat] engine athlete card failed:", e);
             return "";
           })
+        : Promise.resolve(""),
+      shouldFetchActivities
+        ? fetchOutsideTraining(supa, user.id)
+            .then(buildActivityChatContext)
+            .catch((e) => {
+              console.error("[chat] activity context failed:", e);
+              return "";
+            })
         : Promise.resolve(""),
     ]);
     const queryEmb = embData?.data?.[0]?.embedding;
@@ -1098,6 +1138,9 @@ Deno.serve(async (req) => {
             ? "\n\nUSER TIER: AI Programming subscriber. Ground answers in their current program structure and training. They already have AI Nutrition bundled.\nProducts available to mention (only per the guidance-moment rules): Year of the Engine, All Access."
             : "\n\nUSER TIER: All Access subscriber. The user has everything — Engine, AI Programming, AI Nutrition, AI Coach.\nProducts available to mention: NONE. Mention no products under any circumstances."
           ) +
+          // Verified product facts — every mode, meta included (product
+          // questions overwhelmingly route meta). See the const's doc.
+          PRODUCT_KNOWLEDGE +
           // Athlete profile — ALWAYS injected, meta included. It's ~200
           // tokens of insurance: when the router misroutes a real personal
           // question as meta, the answer still knows who the athlete is.
@@ -1110,6 +1153,9 @@ Deno.serve(async (req) => {
           engineAthleteCard +
           // AI Program context (if applicable)
           aiProgramContext +
+          // Logged outside activities (Programming tiers): exact aggregates +
+          // recent detail + benchmark trends.
+          activityContext +
           // Linked competition history (Tier 4) — grounds performance/competition answers
           competitionContext +
           // Recent training history

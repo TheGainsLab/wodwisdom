@@ -23,6 +23,7 @@ import {
   type AvoidanceConfirmed,
   type InjuryConstraints,
 } from "../_shared/build-writer-payload.ts";
+import { buildRecentLoadLine, fetchOutsideTraining } from "../_shared/athlete-activities.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -319,9 +320,12 @@ async function handleBlockPropose(
     .neq("id", block_id)
     .order("sort_order");
 
-  const [{ data: profile }, vocabulary] = await Promise.all([
+  const [{ data: profile }, vocabulary, recentLoad] = await Promise.all([
     supa.from("athlete_profiles").select(`lifts, skills, conditioning, equipment, bodyweight, units, ${AVOIDANCE_COLS}`).eq("user_id", user.id).single(),
     fetchVocabulary(supa),
+    // Outside training last 7 days — grounds "make this easier, I rode hard
+    // yesterday" edits in the athlete's actual logged load. Best-effort.
+    fetchOutsideTraining(supa, user.id).then(buildRecentLoadLine).catch(() => null),
   ]);
   const prof = (profile ?? {}) as ProfileData;
   const units = (prof.units === "kg" ? "kg" : "lbs") as "lbs" | "kg";
@@ -341,6 +345,7 @@ async function handleBlockPropose(
       ? { do_not_program: avoidance.injuries_structured.do_not_program }
       : {}),
     ...(injuryNotes ? { injury_notes: injuryNotes } : {}),
+    ...(recentLoad ? { recent_outside_training: recentLoad } : {}),
     vocabulary,
   };
 

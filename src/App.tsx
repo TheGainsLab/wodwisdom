@@ -42,6 +42,7 @@ const WorkoutReviewPage = lazy(() => import('./pages/WorkoutReviewPage'));
 const StartWorkoutPage = lazy(() => import('./pages/StartWorkoutPage'));
 const DayPage = lazy(() => import('./pages/DayPage'));
 const TrainingLogPage = lazy(() => import('./pages/TrainingLogPage'));
+const LogActivityPage = lazy(() => import('./pages/LogActivityPage'));
 const WorkoutAnalysisPage = lazy(() => import('./pages/WorkoutAnalysisPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const CheckoutCompletePage = lazy(() => import('./pages/CheckoutCompletePage'));
@@ -208,6 +209,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/day/:workoutId" element={<DayPage session={session} />} />
             <Route path="/workout-analysis" element={<WorkoutAnalysisPage session={session} />} />
             <Route path="/training-log" element={<TrainingLogPage session={session} />} />
+            <Route path="/log-activity" element={<LogActivityPage session={session} />} />
             <Route path="/programs" element={<ProgramsListPage session={session} />} />
             <Route path="/programs/new" element={<AddProgramPage session={session} />} />
             <Route path="/programs/:id/analyze" element={<ProgramAnalysisPage session={session} />} />

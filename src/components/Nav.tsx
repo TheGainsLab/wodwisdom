@@ -127,6 +127,11 @@ export default function Nav({ isOpen, onClose }: NavProps) {
                     <button className={"nav-link sub " + (location.pathname === "/training-log" ? "active" : "")} onClick={() => goTo("/training-log")}>
                       <span className="nav-sub-dot" />My Calendar
                     </button>
+                    {(hasProgramming || isAdmin) && (
+                      <button className={"nav-link sub " + (location.pathname === "/log-activity" ? "active" : "")} onClick={() => goTo("/log-activity")}>
+                        <span className="nav-sub-dot" />Log Activity
+                      </button>
+                    )}
                   </div>
                 )}
               </>

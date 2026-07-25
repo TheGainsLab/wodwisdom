@@ -8,6 +8,7 @@ import MetconsTab from '../components/MetconsTab';
 import WorkoutCalendar from '../components/WorkoutCalendar';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { loadUserProgress, getWorkoutsForProgram, getProgramMapping } from '../lib/engineService';
+import { listActivities, deleteActivity, type AthleteActivity } from '../lib/activitiesService';
 import { scheduleProgramDay, scheduleEngineDay, unschedule } from '../lib/trainingSchedule';
 import { localDateString } from '../lib/localDate';
 
@@ -473,6 +474,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [scheduled, setScheduled] = useState<ScheduledEntry[]>([]);
   const [engineSessions, setEngineSessions] = useState<EngineSession[]>([]);
+  const [activities, setActivities] = useState<AthleteActivity[]>([]);
   const [engineScheduled, setEngineScheduled] = useState<EngineSchedEntry[]>([]);
   const [engineTimeTrials, setEngineTimeTrials] = useState<EngineTimeTrial[]>([]);
   // ── Calendar-first add (tap a today-forward date → schedule a day) ──
@@ -847,6 +849,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         .limit(400);
       setEngineSessions((engRows as EngineSession[]) || []);
 
+      // Athlete-logged outside activities (advisory context) on the same calendar.
+      listActivities(400).then(setActivities).catch(() => {});
+
       // Time-trial results live in their own table; merged onto the matching
       // (date, modality) session card since time-trial sessions store no
       // top-level metrics.
@@ -1050,11 +1055,21 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     for (const e of engineSessions) map[e.date] = (map[e.date] || 0) + 1;
     return map;
   }, [logs, engineSessions]);
+  // Outside activities per date.
+  const activitiesByDate = useMemo(() => {
+    const map: Record<string, AthleteActivity[]> = {};
+    for (const a of activities) {
+      if (!map[a.date]) map[a.date] = [];
+      map[a.date].push(a);
+    }
+    return map;
+  }, [activities]);
   // Completed wins over partial wins over scheduled; scheduled+completed = both.
   const dayStatus = useMemo(() => {
     const map: Record<string, 'scheduled' | 'partial' | 'completed' | 'both'> = {};
     for (const d of completedDates) map[d] = 'completed';
     for (const d of Object.keys(engineByDate)) map[d] = 'completed';
+    for (const d of Object.keys(activitiesByDate)) if (!map[d]) map[d] = 'completed';
     for (const d of partialDates) if (map[d] !== 'completed') map[d] = 'partial';
     for (const d of Object.keys(scheduledByDate)) {
       map[d] = map[d] === 'completed' ? 'both' : map[d] === 'partial' ? 'partial' : 'scheduled';
@@ -1063,7 +1078,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       map[d] = (map[d] === 'completed' || map[d] === 'both') ? 'both' : map[d] === 'partial' ? 'partial' : 'scheduled';
     }
     return map;
-  }, [completedDates, partialDates, engineByDate, scheduledByDate, engineScheduledByDate]);
+  }, [completedDates, partialDates, engineByDate, activitiesByDate, scheduledByDate, engineScheduledByDate]);
 
   // Today (local) — calendar-first add is offered for today-forward dates only.
   const todayStr = localDateString();
@@ -1546,7 +1561,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                 {/* Day sheet — slides up over the calendar for any populated
                     date, plus today-forward empty dates so they can be scheduled.
                     Backdrop tap / Escape / ✕ dismiss it; clicks inside don't. */}
-                {selectedDate && (logBlocksByDate.has(selectedDate) || scheduledByDate[selectedDate] || engineByDate[selectedDate] || engineScheduledByDate[selectedDate] || selectedDate >= todayStr) && (
+                {selectedDate && (logBlocksByDate.has(selectedDate) || scheduledByDate[selectedDate] || engineByDate[selectedDate] || engineScheduledByDate[selectedDate] || activitiesByDate[selectedDate] || selectedDate >= todayStr) && (
                   <div className="day-sheet-backdrop" onClick={() => setSelectedDate(null)}>
                   <div className="day-sheet" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
                     <div className="day-sheet-handle" />
@@ -1648,6 +1663,23 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         </div>
                       );
                     })}
+                    {(activitiesByDate[selectedDate] || []).map(a => (
+                      <div key={a.id} className="wc-day-scheduled" style={{ borderLeft: '3px solid #a78bfa' }}>
+                        <div className="wc-day-scheduled-label">
+                          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#a78bfa' }}>Outside</span>
+                          {(a.parsed?.summary as string | undefined) ?? `${(a.activity_type ?? 'activity').replace(/_/g, ' ')}${a.duration_minutes ? ` · ${a.duration_minutes} min` : ''}`}
+                          {a.rpe != null && <span style={{ color: 'var(--text-muted)' }}> · RPE {a.rpe}</span>}
+                        </div>
+                        <button
+                          type="button"
+                          className="wc-day-scheduled-open"
+                          onClick={() => { if (confirm('Remove this activity?')) deleteActivity(a.id).then(() => listActivities(400).then(setActivities)).catch(() => {}); }}
+                          aria-label="Remove activity"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
                     {[...(logBlocksByDate.get(selectedDate)?.entries() ?? [])].map(([logId, dateBlocks]) => {
                       const log = logById.get(logId);
                       if (!log) return null;
@@ -1765,6 +1797,20 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                       );
                     })}
 
+                    {/* Past dates: outside-activity logging only (training
+                        can't be scheduled backward, but it can be recorded). */}
+                    {hasProgramming && selectedDate < todayStr && (
+                      <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                        <button
+                          type="button"
+                          className="wc-day-scheduled-open"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                          onClick={() => navigate(`/log-activity?date=${selectedDate}`)}
+                        >
+                          <Plus size={14} /> Log activity
+                        </button>
+                      </div>
+                    )}
                     {/* Calendar-first add — today-forward only. Program days
                         are once-and-done; Engine days are a repeatable pool. */}
                     {selectedDate >= todayStr && (() => {
@@ -1776,14 +1822,26 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                       return (
                         <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                           {!addOpen ? (
-                            <button
-                              type="button"
-                              className="wc-day-scheduled-open"
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                              onClick={openAddPanel}
-                            >
-                              <Plus size={14} /> Add training
-                            </button>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                className="wc-day-scheduled-open"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                                onClick={openAddPanel}
+                              >
+                                <Plus size={14} /> Add training
+                              </button>
+                              {hasProgramming && selectedDate <= todayStr && (
+                                <button
+                                  type="button"
+                                  className="wc-day-scheduled-open"
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                                  onClick={() => navigate(`/log-activity?date=${selectedDate}`)}
+                                >
+                                  <Plus size={14} /> Log activity
+                                </button>
+                              )}
+                            </div>
                           ) : (
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>

@@ -49,6 +49,7 @@ import {
   profileStaticFromRow,
 } from "./athlete-model.ts";
 import { buildTrainingSummary } from "./training-summary.ts";
+import { buildOutsideTrainingFacts, fetchOutsideTraining } from "./athlete-activities.ts";
 import type { CoachingIntake } from "./coaching-intake.ts";
 import { persistAthleteModel } from "./persist-athlete-model.ts";
 import { persistTrainingSummary } from "./persist-training-summary.ts";
@@ -671,6 +672,15 @@ export async function buildWriterPayload(
   // to NOW (current training picture).
   const todayISO = new Date().toISOString().slice(0, 10);
   const trainingSummary = await buildTrainingSummary(supa, userId, todayISO);
+  // Athlete-logged outside training (best-effort; null when none) — becomes
+  // the Model's outside_training facts section for CoachState's load/recovery
+  // judgment. Never a capability source.
+  const outsideTraining = await fetchOutsideTraining(supa, userId)
+    .then(buildOutsideTrainingFacts)
+    .catch((err) => {
+      console.warn(`[build-writer-payload] outside training fetch failed for ${userId}:`, err);
+      return null;
+    });
   // Persist a versioned snapshot (best-effort) — powers the "what changed in
   // training" diff. Skip empty summaries (no logs) so non-loggers don't get rows.
   if (trainingSummary.sessions_logged > 0) {
@@ -685,6 +695,7 @@ export async function buildWriterPayload(
     trainingSummary,
     loggedCompetitionResults: loggedResults,
     coachingIntake: profile.coaching_intake ?? null,
+    outsideTraining,
   });
   let athlete_model: AthleteModel = {
     ...modelContent,
