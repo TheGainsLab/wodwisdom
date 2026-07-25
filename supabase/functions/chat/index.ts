@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-
 import { MODELS } from "../_shared/model-profiles.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { buildConditioningState } from "../_shared/conditioning-state.ts";
+import { buildActivityChatContext, fetchOutsideTraining } from "../_shared/athlete-activities.ts";
 import { fetchAndFormatProgramContext } from "../_shared/training-program.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
@@ -123,7 +124,8 @@ const PRODUCT_KNOWLEDGE =
   "- Engine start-over: on the program screen (Switch Program), 'Restart current program from Day 1' archives program progress and pacing calibration for a true fresh start; training history and PRs are kept; unlocked months are unaffected. Switching program variants keeps per-program progress — switch back anytime. Months unlock one at a time with each monthly payment.\n" +
   "- AI Programming: the next month generates automatically when the current one completes (an automatic daily check heals any missed generation — if a month seems stuck more than a day, email us). Profile changes (goals, session length, equipment, injuries) apply to the NEXT generation, not retroactively. Session length = target minutes per session, one number. Each workout block has a one-shot 'AI Edit' that can revise that block on request.\n" +
   "- Injuries vs preferences: injuries/limitations go in the profile's injuries field — generation and AI Edit avoid those movements. Choice-based preferences (movements to avoid or emphasize, goals) go in the profile's goals — reflected at next generation.\n" +
-  "- Logging: program and Engine days are logged from their own day pages on completion. Q = movement-quality self-rating; fault checkboxes are marked only when the fault actually happened; RPE = effort. Logged entries can NOT be edited or deleted in the app (records are permanent) — for bad or duplicate data, email coach@thegainslab.com and we'll correct it. Logging general outside activities (an extra run or ride) isn't supported yet — it's a known request; you may note such work in conversation and coach around it.\n" +
+  "- Logging: program and Engine days are logged from their own day pages on completion. Q = movement-quality self-rating; fault checkboxes are marked only when the fault actually happened; RPE = effort. Program/Engine session records can NOT be edited or deleted in the app (they drive progression and are permanent) — for bad or duplicate data, email coach@thegainslab.com and we'll correct it.\n" +
+  "- Outside activities (AI Programming subscribers): 'Log Activity' — in the sidebar and on any Training Log calendar day — records training done outside the program (a ride, a run, a test). Type what you did in plain words, confirm the parsed card, done. These appear on the Training Log calendar, can be edited or deleted there (they're context, not program records), inform your coach immediately and your NEXT month's program at generation — they never change Engine pace targets. Benchmark tests (FTP, PRs) are tracked with retest history; they never change profile 1RMs — the athlete updates those in the profile deliberately. Engine-only subscribers: outside-activity logging is part of AI Programming.\n" +
   "- Heart rate & wearables: manual entry only (average/peak HR fields when logging). No device, Bluetooth, or health-platform integrations.\n" +
   "- Training Log calendar: shows completed work across products and lets athletes schedule upcoming program/Engine days onto dates.\n" +
   "- Anything product-related not covered above: say you don't have that detail rather than guessing, and point to coach@thegainslab.com.";
@@ -996,7 +998,10 @@ Deno.serve(async (req) => {
       !engineCoachingMode &&
       (userTier === "engine" || userTier === "all_access") &&
       !!athleteProfile?.engine_program_version;
-    const [embData, recentTraining, programContext, competitionBundle, engineAthleteCard] = await Promise.all([
+    // Logged outside activities: Programming-tier feature (schema is
+    // product-agnostic for the future AI Logger; the gate is UI/tier only).
+    const shouldFetchActivities = userTier === "ai_programming" || userTier === "all_access";
+    const [embData, recentTraining, programContext, competitionBundle, engineAthleteCard, activityContext] = await Promise.all([
       isMeta
         ? Promise.resolve(null)
         : fetchWithTimeout("https://api.openai.com/v1/embeddings", {
@@ -1028,6 +1033,14 @@ Deno.serve(async (req) => {
             console.error("[chat] engine athlete card failed:", e);
             return "";
           })
+        : Promise.resolve(""),
+      shouldFetchActivities
+        ? fetchOutsideTraining(supa, user.id)
+            .then(buildActivityChatContext)
+            .catch((e) => {
+              console.error("[chat] activity context failed:", e);
+              return "";
+            })
         : Promise.resolve(""),
     ]);
     const queryEmb = embData?.data?.[0]?.embedding;
@@ -1140,6 +1153,9 @@ Deno.serve(async (req) => {
           engineAthleteCard +
           // AI Program context (if applicable)
           aiProgramContext +
+          // Logged outside activities (Programming tiers): exact aggregates +
+          // recent detail + benchmark trends.
+          activityContext +
           // Linked competition history (Tier 4) — grounds performance/competition answers
           competitionContext +
           // Recent training history

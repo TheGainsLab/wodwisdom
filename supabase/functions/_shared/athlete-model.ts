@@ -43,6 +43,7 @@ import {
 } from "./athlete-inference-engine.ts";
 import type { TrainingSummary } from "./training-summary.ts";
 import type { CoachingIntake } from "./coaching-intake.ts";
+import type { OutsideTrainingFacts } from "./athlete-activities.ts";
 
 // ============================================================
 // Versions — bump MODEL_BUILDER_VERSION on any logic change, and
@@ -59,7 +60,7 @@ import type { CoachingIntake } from "./coaching-intake.ts";
 // CoachState/eval read them like imported competition history.
 // v1.4: carries self_report (the Tier-3 qualitative intake — preferences,
 // self-assessment, history, constraints) so CoachState can weigh it.
-export const MODEL_BUILDER_VERSION = "v1.4";
+export const MODEL_BUILDER_VERSION = "v1.5";
 export const THRESHOLDS_VERSION = "v1";
 
 // ============================================================
@@ -281,6 +282,13 @@ export interface AthleteModelContent {
    *  as a hypothesis vs the data, uses training age for the capacity estimate,
    *  and treats injuries as hard avoidance. null when the athlete hasn't filled it. */
   self_report: CoachingIntake | null;
+
+  /** Athlete-logged OUTSIDE training (v1.5) — facts only (counts, 30-day
+   *  load, recent items, observed benchmarks). CoachState weighs it for
+   *  recovery/volume posture; it never changes capabilities (declared lifts
+   *  live in the profile) and never touches Engine calibration. null when
+   *  nothing is logged. */
+  outside_training: OutsideTrainingFacts | null;
 
   /** Ratios + relative-strength + competition percentiles vs thresholds.
    *  NO priority labels (fact/judgment seam). Only keys with a computable
@@ -550,6 +558,11 @@ export interface BuildAthleteModelOptions {
   loggedCompetitionResults?: LoggedCompetitionResult[] | null;
   /** Tier-3 qualitative intake (self-reported preferences/history/constraints). */
   coachingIntake?: CoachingIntake | null;
+  /** Athlete-logged training done OUTSIDE their programs (athlete_activities,
+   *  v1.5) — facts only: counts, 30-day load, recent items, observed
+   *  benchmarks. Load/recovery context for CoachState; NEVER a capability
+   *  source (benchmarks never overwrite declared lifts — profile owns those). */
+  outsideTraining?: OutsideTrainingFacts | null;
   // assessments: accepted by the LOCKED signature but UNUSED (future evidence
   // source — plugs into the same synthesizer seam).
   assessments?: unknown;
@@ -703,6 +716,7 @@ export function buildAthleteModel(
     competition_movements,
     logged_competition_results: options.loggedCompetitionResults ?? [],
     self_report: options.coachingIntake ?? null,
+    outside_training: options.outsideTraining ?? null,
     normative,
     ranked_by_position,
   };
