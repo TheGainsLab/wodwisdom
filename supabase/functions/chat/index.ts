@@ -125,7 +125,7 @@ const PRODUCT_KNOWLEDGE =
   "- AI Programming: the next month generates automatically when the current one completes (an automatic daily check heals any missed generation — if a month seems stuck more than a day, email us). Profile changes (goals, session length, equipment, injuries) apply to the NEXT generation, not retroactively. Session length = target minutes per session, one number. Each workout block has a one-shot 'AI Edit' that can revise that block on request.\n" +
   "- Injuries vs preferences: injuries/limitations go in the profile's injuries field — generation and AI Edit avoid those movements. Choice-based preferences (movements to avoid or emphasize, goals) go in the profile's goals — reflected at next generation.\n" +
   "- Logging: program and Engine days are logged from their own day pages on completion. Q = movement-quality self-rating; fault checkboxes are marked only when the fault actually happened; RPE = effort. Program/Engine session records can NOT be edited or deleted in the app (they drive progression and are permanent) — for bad or duplicate data, email coach@thegainslab.com and we'll correct it.\n" +
-  "- Outside activities (AI Programming subscribers): 'Log Activity' — in the sidebar and on any Training Log calendar day — records training done outside the program (a ride, a run, a test). Type what you did in plain words, confirm the parsed card, done. These appear on the Training Log calendar, can be edited or deleted there (they're context, not program records), inform your coach immediately and your NEXT month's program at generation — they never change Engine pace targets. Benchmark tests (FTP, PRs) are tracked with retest history; they never change profile 1RMs — the athlete updates those in the profile deliberately. Engine-only subscribers: outside-activity logging is part of AI Programming.\n" +
+  "- Outside activities (AI Programming AND Year of the Engine subscribers): 'Log Activity' — in the sidebar and on any Training Log calendar day — records training done outside your programs (a ride, a run, an improvised strength day, a test). Type what you did in plain words, confirm the parsed card, done. These appear on the Training Log calendar, can be edited or deleted there (they're context, not program records), and inform your coach immediately. For AI Programming, they're considered when the NEXT month generates; for Engine, the weekly AI adaptation (once active for the athlete) considers them when sequencing upcoming days. They never change Engine pace targets. Benchmark tests (FTP, PRs) are tracked with retest history; they never change profile 1RMs — the athlete updates those in the profile deliberately.\n" +
   "- Heart rate & wearables: manual entry only (average/peak HR fields when logging). No device, Bluetooth, or health-platform integrations.\n" +
   "- Training Log calendar: shows completed work across products and lets athletes schedule upcoming program/Engine days onto dates.\n" +
   "- Anything product-related not covered above: say you don't have that detail rather than guessing, and point to coach@thegainslab.com.";
@@ -998,9 +998,12 @@ Deno.serve(async (req) => {
       !engineCoachingMode &&
       (userTier === "engine" || userTier === "all_access") &&
       !!athleteProfile?.engine_program_version;
-    // Logged outside activities: Programming-tier feature (schema is
-    // product-agnostic for the future AI Logger; the gate is UI/tier only).
-    const shouldFetchActivities = userTier === "ai_programming" || userTier === "all_access";
+    // Logged outside activities: a coach capability for Programming AND
+    // Engine tiers (gap #5 v1 — Engine roll-your-own athletes log the
+    // strength work the coach helps them improvise). Schema stays
+    // product-agnostic for the future AI Logger; the gate is UI/tier only.
+    const shouldFetchActivities =
+      userTier === "ai_programming" || userTier === "all_access" || userTier === "engine";
     const [embData, recentTraining, programContext, competitionBundle, engineAthleteCard, activityContext] = await Promise.all([
       isMeta
         ? Promise.resolve(null)
@@ -1133,7 +1136,7 @@ Deno.serve(async (req) => {
             : userTier === "coach_standalone"
             ? "\n\nUSER TIER: AI Coach subscriber (no program, no nutrition tracking). Answer as a pure coach.\nProducts available to mention (only per the guidance-moment rules): Year of the Engine, AI Programming, AI Nutrition, All Access."
             : userTier === "engine"
-            ? "\n\nUSER TIER: Year of the Engine subscriber. Ground answers in their current framework and programming when relevant. They already have AI Nutrition bundled.\nProducts available to mention (only per the guidance-moment rules): AI Programming, All Access."
+            ? "\n\nUSER TIER: Year of the Engine subscriber. Ground answers in their current framework and programming when relevant. They already have AI Nutrition bundled.\nProducts available to mention (only per the guidance-moment rules): AI Programming, All Access.\nSupplementary work: when they ask for help with training beyond Engine (a strength day, accessories, a session for something specific), help them fully — and suggest logging it with Log Activity so their coach and their Engine program's weekly adaptation can account for it. If they ask for a complete multi-week program, help generously once, then note that AI Programming is the product built for exactly that — one mention, no pushing."
             : userTier === "ai_programming"
             ? "\n\nUSER TIER: AI Programming subscriber. Ground answers in their current program structure and training. They already have AI Nutrition bundled.\nProducts available to mention (only per the guidance-moment rules): Year of the Engine, All Access."
             : "\n\nUSER TIER: All Access subscriber. The user has everything — Engine, AI Programming, AI Nutrition, AI Coach.\nProducts available to mention: NONE. Mention no products under any circumstances."

@@ -101,6 +101,13 @@ export default function Nav({ isOpen, onClose }: NavProps) {
                     <button className={"nav-link sub " + (location.pathname === "/engine/analytics" ? "active" : "")} onClick={() => goTo("/engine/analytics")}>
                       <span className="nav-sub-dot" />Analytics
                     </button>
+                    {/* Coach capability (not an Engine feature) — but Engine-only
+                        athletes have no Training group, so it also surfaces here. */}
+                    {!hasProgramming && (
+                      <button className={"nav-link sub " + (location.pathname === "/log-activity" ? "active" : "")} onClick={() => goTo("/log-activity")}>
+                        <span className="nav-sub-dot" />Log Activity
+                      </button>
+                    )}
                   </div>
                 )}
               </>
@@ -127,7 +134,7 @@ export default function Nav({ isOpen, onClose }: NavProps) {
                     <button className={"nav-link sub " + (location.pathname === "/training-log" ? "active" : "")} onClick={() => goTo("/training-log")}>
                       <span className="nav-sub-dot" />My Calendar
                     </button>
-                    {(hasProgramming || isAdmin) && (
+                    {(hasProgramming || hasEngine || isAdmin) && (
                       <button className={"nav-link sub " + (location.pathname === "/log-activity" ? "active" : "")} onClick={() => goTo("/log-activity")}>
                         <span className="nav-sub-dot" />Log Activity
                       </button>
