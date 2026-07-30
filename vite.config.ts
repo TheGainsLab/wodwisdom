@@ -78,12 +78,19 @@ export default defineConfig({
             },
           },
           {
-            // Supabase REST API (data queries) - network first, fall back to cache
+            // Supabase REST API (data queries) - network first, fall back to cache.
+            // The cache is an offline fallback, not a speed-up: NetworkFirst only
+            // serves it when the network fails or times out. A 24h max age meant a
+            // brief connection drop could surface day-old training data as if it
+            // were current, so entries now expire after an hour — recent enough to
+            // be worth showing offline, stale enough that it can't masquerade.
+            // Cache name bumped to -v1 so existing 24h entries are abandoned rather
+            // than inherited on upgrade.
             urlPattern: /^https:\/\/hsiqzmbfulmfxbvbsdwz\.supabase\.co\/rest\/.*/i,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'supabase-api',
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
+              cacheName: 'supabase-api-v1',
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 },
               cacheableResponse: { statuses: [0, 200] },
               networkTimeoutSeconds: 10,
             },

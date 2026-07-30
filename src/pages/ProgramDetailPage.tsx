@@ -10,6 +10,7 @@ import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksD
 import { BlockCoachingBody, coachingForBlockType, formatReviewMarkdown, CHEVRON_DOWN, type ReviewBlock } from '../components/reviewCoaching';
 import { useWorkoutReview } from '../lib/useWorkoutReview';
 import BlockLog, { type DayLogController } from '../components/blockLog';
+import { formatMovementName } from '../lib/movementName';
 
 interface ProgramBlock {
   id: string;
@@ -888,7 +889,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                             const label = BLOCK_DISPLAY[b.block_type] ?? b.block_type.charAt(0).toUpperCase() + b.block_type.slice(1);
                                             // Lead with the movements (so athletes can see the weaknesses
                                             // being targeted), then the scheme. CSS ellipsis trims overflow.
-                                            const moves = b.movements.map((m) => m.movement).filter(Boolean).slice(0, 3).join(' · ');
+                                            const moves = b.movements.map((m) => formatMovementName(m.movement)).filter(Boolean).slice(0, 3).join(' · ');
                                             const scheme = (b.block_scheme && b.block_scheme.trim()) || (b.block_label && b.block_label.trim()) || '';
                                             const text =
                                               [moves, scheme].filter(Boolean).join(' — ') ||
@@ -1112,7 +1113,7 @@ function formatRepPrescription(m: ProgramMovementV2): string | null {
     return `${arr.length}×${arr[0]}`;
   }
   if (m.sets != null && m.reps != null) return `${m.sets}×${m.reps}`;
-  if (m.sets != null) return `${m.sets} sets`;
+  if (m.sets != null) return `${m.sets} ${m.sets === 1 ? 'set' : 'sets'}`;
   if (m.reps != null) return `${m.reps} reps`;
   return null;
 }
@@ -1699,7 +1700,7 @@ function V3MovementRow({ movement }: { movement: ProgramMovementV2 }) {
       borderBottom: '1px dashed var(--border)',
     }}>
       <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', flex: '0 0 auto' }}>
-        {movement.movement}
+        {formatMovementName(movement.movement)}
       </span>
       {prescription && (
         <span style={{

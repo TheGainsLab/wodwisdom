@@ -11,6 +11,7 @@ import { loadUserProgress, getWorkoutsForProgram, getProgramMapping } from '../l
 import { listActivities, deleteActivity, activityImageUrl, type AthleteActivity } from '../lib/activitiesService';
 import { scheduleProgramDay, scheduleEngineDay, unschedule } from '../lib/trainingSchedule';
 import { localDateString } from '../lib/localDate';
+import { formatMovementName } from '../lib/movementName';
 
 interface WorkoutLog {
   id: string;
@@ -234,10 +235,6 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
   'cool-down': 'Cool-down',
   accessory: 'Accessory',
 };
-
-function formatMovementName(canonical: string): string {
-  return canonical.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
 
 /** Strength lift groups for the cards-by-lift Strength tab.
  *  Order = display order. `profileKey` maps to `athlete_profiles.lifts` (null
