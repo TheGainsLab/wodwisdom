@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useEntitlements } from '../hooks/useEntitlements';
 import { getAcquisition } from '../lib/acquisition';
 import GainsLogo from '../components/GainsLogo';
 import TurnstileWidget, { TURNSTILE_ENABLED } from '../components/TurnstileWidget';
@@ -12,6 +13,7 @@ export default function CheckoutCompletePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session_id');
+  const { refresh } = useEntitlements();
 
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
@@ -35,6 +37,11 @@ export default function CheckoutCompletePage() {
       if (session) {
         setIsLoggedIn(true);
         setLoading(false);
+        // The entitlement this user just paid for was granted server-side after
+        // the provider's last read, so pull it before leaving. Awaited, not left
+        // to the background revalidation: this redirect would beat it, and the
+        // user would land on a locked app seconds after paying.
+        await refresh();
         // Logged-in user upgrading — redirect after a moment
         setTimeout(() => navigate('/', { replace: true }), 3000);
         return;
@@ -60,7 +67,7 @@ export default function CheckoutCompletePage() {
       }
       setLoading(false);
     })();
-  }, [sessionId, navigate]);
+  }, [sessionId, navigate, refresh]);
 
   const handleSignup = async () => {
     setSignupError('');

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import GainsLogo from './GainsLogo';
+import { useEntitlements } from '../hooks/useEntitlements';
 import { ATHLETEDATA_PUBLIC_TIER } from '../lib/featureFlags';
 
 interface NavProps { isOpen: boolean; onClose: () => void; }
@@ -10,11 +11,14 @@ export default function Nav({ isOpen, onClose }: NavProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const goTo = (path: string) => { navigate(path); onClose(); };
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [features, setFeatures] = useState<Set<string>>(new Set());
-  const hasEngine = features.has('engine');
-  const hasProgramming = features.has('programming');
-  const hasNutrition = features.has('nutrition');
+  // Each page mounts its own <Nav>, so this used to refetch role + entitlements
+  // on every route change. It now reads the session-wide provider instead.
+  // hasEntitlement, not hasFeature: nav visibility has never had an admin
+  // bypass, and adding one here would change what admins see.
+  const { isAdmin, hasEntitlement } = useEntitlements();
+  const hasEngine = hasEntitlement('engine');
+  const hasProgramming = hasEntitlement('programming');
+  const hasNutrition = hasEntitlement('nutrition');
 
   const isChatActive = location.pathname === '/chat' || location.pathname === '/history' || location.pathname === '/bookmarks';
   const isEngineActive = location.pathname.startsWith('/engine');
@@ -31,27 +35,6 @@ export default function Nav({ isOpen, onClose }: NavProps) {
     if (isTrainingActive) setTrainingExpanded(true);
     if (isNutritionActive) setNutritionExpanded(true);
   }, [isChatActive, isEngineActive, isTrainingActive, isNutritionActive]);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        // Check admin role
-        supabase.from('profiles').select('role').eq('id', user.id).single()
-          .then(({ data }) => {
-            if (data?.role === 'admin') setIsAdmin(true);
-          });
-        // Check if user has any entitlements (i.e. is a subscriber)
-        supabase.from('user_entitlements').select('id, feature')
-          .eq('user_id', user.id)
-          .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
-          .then(({ data }) => {
-            if (!data) return;
-            setFeatures(new Set(data.map(e => e.feature)));
-          });
-      }
-    });
-  }, []);
-
 
   return (
     <>
