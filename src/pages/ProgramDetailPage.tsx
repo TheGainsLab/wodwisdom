@@ -153,6 +153,25 @@ function workoutSummaryLines(text: string): SummaryLine[] {
   return lines;
 }
 
+/**
+ * Run an `.in(...)` query across id batches concurrently and flatten the rows.
+ *
+ * Batches of 100 keep the PostgREST query string under URL length limits. They
+ * used to be awaited one at a time, which serialized each stage of the program
+ * load internally, on top of the stages already being serialized against each
+ * other. Batching is a transport constraint, not an ordering requirement.
+ */
+async function fetchInBatches<T>(
+  ids: string[],
+  run: (batch: string[]) => PromiseLike<{ data: T[] | null }>,
+): Promise<T[]> {
+  if (!ids.length) return [];
+  const batches: string[][] = [];
+  for (let i = 0; i < ids.length; i += 100) batches.push(ids.slice(i, i + 100));
+  const results = await Promise.all(batches.map(run));
+  return results.flatMap(r => r.data ?? []);
+}
+
 export default function ProgramDetailPage({ session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -472,82 +491,127 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       .order('sort_order');
     setAllWorkouts(wk || []);
 
-    // Calendar overlay: which of this program's days the user has scheduled.
-    if (wk?.length) {
-      const wkIds = wk.map((w) => w.id);
-      const schedMap = new Map<string, { id: string; scheduled_date: string }>();
-      for (let i = 0; i < wkIds.length; i += 100) {
-        const batch = wkIds.slice(i, i + 100);
-        const { data: sched } = await supabase
-          .from('training_schedule')
-          .select('id, program_workout_id, scheduled_date')
-          .in('program_workout_id', batch);
-        for (const s of sched || []) {
-          const row = s as { id: string; program_workout_id: string; scheduled_date: string };
-          schedMap.set(row.program_workout_id, { id: row.id, scheduled_date: row.scheduled_date });
-        }
-      }
-      setScheduleByWorkout(schedMap);
+    if (!wk?.length) {
+      setCompletedWorkoutIds(new Set());
+      setInProgressWorkouts(new Map());
+      setLoading(false);
+      return;
     }
 
     const isV3 = prog.program_version === 'v3';
+    const workoutIds = wk.map((w) => w.id);
+    const SKIP_BLOCK_TYPES = '("warm-up","mobility","cool-down")';
 
-    // v1 path: fetch prose blocks from program_workout_blocks.
-    // v3 path: fetch structured blocks + movements from program_blocks_v2 + program_movements_v2.
-    if (wk?.length && !isV3) {
-      const ids = wk.map((w) => w.id);
-      const blockMap = new Map<string, ProgramBlock[]>();
-      for (let i = 0; i < ids.length; i += 100) {
-        const batch = ids.slice(i, i + 100);
-        const { data: blocks } = await supabase
+    // ── Wave A: everything keyed only by workout id. ───────────────────
+    // These three have no dependency on one another and were previously
+    // awaited in sequence, so each paid the full round-trip of the last.
+    const [sched, v1Blocks, v3Blocks, logs] = await Promise.all([
+      // Calendar overlay: which of this program's days the user has scheduled.
+      fetchInBatches<{ id: string; program_workout_id: string; scheduled_date: string }>(
+        workoutIds,
+        (batch) => supabase
+          .from('training_schedule')
+          .select('id, program_workout_id, scheduled_date')
+          .in('program_workout_id', batch),
+      ),
+      // v1 path: prose blocks from program_workout_blocks.
+      isV3 ? Promise.resolve([]) : fetchInBatches<ProgramBlock>(
+        workoutIds,
+        (batch) => supabase
           .from('program_workout_blocks')
           .select('id, program_workout_id, block_type, block_order, block_text')
           .in('program_workout_id', batch)
-          .order('block_order');
-        for (const b of blocks || []) {
-          const existing = blockMap.get(b.program_workout_id) || [];
-          existing.push(b as ProgramBlock);
-          blockMap.set(b.program_workout_id, existing);
-        }
+          .order('block_order'),
+      ),
+      // v3 path: structured blocks from program_blocks_v2.
+      isV3 ? fetchInBatches<Omit<ProgramBlockV2, 'movements'> & { program_workout_id: string }>(
+        workoutIds,
+        (batch) => supabase
+          .from('program_blocks_v2')
+          .select('id, program_workout_id, block_type, block_label, block_scheme, time_cap_seconds, block_notes, sort_order, expected_benchmark')
+          .in('program_workout_id', batch)
+          .order('sort_order'),
+      ) : Promise.resolve([]),
+      fetchInBatches<{ id: string; source_id: string | null; status: string }>(
+        workoutIds,
+        (batch) => supabase
+          .from('workout_logs')
+          .select('id, source_id, status')
+          .eq('user_id', session.user.id)
+          .in('source_id', batch),
+      ),
+    ]);
+
+    const schedMap = new Map<string, { id: string; scheduled_date: string }>();
+    for (const s of sched) schedMap.set(s.program_workout_id, { id: s.id, scheduled_date: s.scheduled_date });
+    setScheduleByWorkout(schedMap);
+
+    if (!isV3) {
+      const blockMap = new Map<string, ProgramBlock[]>();
+      for (const b of v1Blocks) {
+        const existing = blockMap.get(b.program_workout_id) || [];
+        existing.push(b);
+        blockMap.set(b.program_workout_id, existing);
       }
       setWorkoutBlocks(blockMap);
     }
 
-    if (wk?.length && isV3) {
-      const workoutIds = wk.map((w) => w.id);
-      const blocksByWorkout = new Map<string, ProgramBlockV2[]>();
-      // 1. Fetch all blocks for these workouts (batched).
-      const allBlocks: Array<ProgramBlockV2 & { program_workout_id: string }> = [];
-      for (let i = 0; i < workoutIds.length; i += 100) {
-        const batch = workoutIds.slice(i, i + 100);
-        const { data: blocks } = await supabase
-          .from('program_blocks_v2')
-          .select('id, program_workout_id, block_type, block_label, block_scheme, time_cap_seconds, block_notes, sort_order, expected_benchmark')
+    const allBlocks = v3Blocks.map((b) => ({ ...b, movements: [] as ProgramMovementV2[] }));
+    const blockIds = allBlocks.map((b) => b.id);
+    // Only in-progress logs need block tallies; completed ones just need the id.
+    const inProgress = logs.filter((l) => l.status === 'in_progress' && l.source_id);
+
+    // ── Wave B/C: everything keyed by block id (from A) or by log id ───
+    // (from A). B and C depend on A but not on each other, so they overlap.
+    const [movements, editLocks, savedRows, totalRows] = await Promise.all([
+      fetchInBatches<ProgramMovementV2>(
+        blockIds,
+        (batch) => supabase
+          .from('program_movements_v2')
+          .select('id, block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order')
+          .in('block_id', batch)
+          .order('sort_order'),
+      ),
+      // Which blocks have already used their one AI Edit (lock).
+      fetchInBatches<{ block_id: string }>(
+        blockIds,
+        (batch) => supabase.from('ai_edit_log').select('block_id').in('block_id', batch),
+      ),
+      // Saved-block and total-block tallies for the in-progress badges. These
+      // were two `count` queries per in-progress workout, awaited inside the
+      // loop — 2N sequential round-trips. Fetching the id columns for every
+      // in-progress log at once and counting client-side makes it 2, flat.
+      // Row volume is bounded by (in-progress days x blocks per day), which is
+      // small enough that returning rows beats N round-trips comfortably.
+      fetchInBatches<{ log_id: string }>(
+        inProgress.map((l) => l.id),
+        (batch) => supabase
+          .from('workout_log_blocks')
+          .select('log_id')
+          .in('log_id', batch)
+          .not('block_type', 'in', SKIP_BLOCK_TYPES),
+      ),
+      fetchInBatches<{ program_workout_id: string }>(
+        inProgress.map((l) => l.source_id as string),
+        (batch) => supabase
+          .from(isV3 ? 'program_blocks_v2' : 'program_workout_blocks')
+          .select('program_workout_id')
           .in('program_workout_id', batch)
-          .order('sort_order');
-        for (const b of blocks || []) {
-          allBlocks.push({ ...(b as ProgramBlockV2), movements: [] });
-        }
-      }
-      // 2. Fetch all movements for those blocks (batched).
+          .not('block_type', 'in', SKIP_BLOCK_TYPES),
+      ),
+    ]);
+
+    if (isV3) {
       const movementsByBlock = new Map<string, ProgramMovementV2[]>();
-      if (allBlocks.length) {
-        const blockIds = allBlocks.map((b) => b.id);
-        for (let i = 0; i < blockIds.length; i += 100) {
-          const batch = blockIds.slice(i, i + 100);
-          const { data: movements } = await supabase
-            .from('program_movements_v2')
-            .select('id, block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order')
-            .in('block_id', batch)
-            .order('sort_order');
-          for (const m of movements || []) {
-            const arr = movementsByBlock.get((m as ProgramMovementV2).block_id) ?? [];
-            arr.push(m as ProgramMovementV2);
-            movementsByBlock.set((m as ProgramMovementV2).block_id, arr);
-          }
-        }
+      for (const m of movements) {
+        const arr = movementsByBlock.get(m.block_id) ?? [];
+        arr.push(m);
+        movementsByBlock.set(m.block_id, arr);
       }
-      // 3. Group blocks-with-movements by program_workout_id.
+      // Group blocks-with-movements by program_workout_id. Batches partition by
+      // workout id, so every block of a given workout comes back in one batch
+      // and its sort_order ordering survives the concurrent fetch.
+      const blocksByWorkout = new Map<string, ProgramBlockV2[]>();
       for (const b of allBlocks) {
         b.movements = movementsByBlock.get(b.id) ?? [];
         const arr = blocksByWorkout.get(b.program_workout_id) ?? [];
@@ -555,66 +619,29 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
         blocksByWorkout.set(b.program_workout_id, arr);
       }
       setV3BlocksByWorkout(blocksByWorkout);
-
-      // 4. Which blocks have already used their one AI Edit (lock).
-      if (allBlocks.length) {
-        const locked = new Set<string>();
-        const blockIds = allBlocks.map((b) => b.id);
-        for (let i = 0; i < blockIds.length; i += 100) {
-          const batch = blockIds.slice(i, i + 100);
-          const { data: logs } = await supabase
-            .from('ai_edit_log')
-            .select('block_id')
-            .in('block_id', batch);
-          for (const l of logs || []) locked.add((l as { block_id: string }).block_id);
-        }
-        setAiEditedBlockIds(locked);
-      }
+      setAiEditedBlockIds(new Set(editLocks.map((l) => l.block_id)));
     }
 
-    if (wk?.length) {
-      const ids = wk.map((w) => w.id);
-      // Query in batches of 100 to avoid URL length limits
-      const allCompleted = new Set<string>();
-      const ipMap = new Map<string, { logId: string; savedCount: number; totalBlocks: number }>();
-      for (let i = 0; i < ids.length; i += 100) {
-        const batch = ids.slice(i, i + 100);
-        const { data: logs } = await supabase
-          .from('workout_logs')
-          .select('id, source_id, status')
-          .eq('user_id', session.user.id)
-          .in('source_id', batch);
-        for (const l of logs || []) {
-          if (!l.source_id) continue;
-          if (l.status === 'completed') {
-            allCompleted.add(l.source_id);
-          } else if (l.status === 'in_progress') {
-            // Count saved blocks for this in-progress log (exclude warm-up/cool-down)
-            const { count } = await supabase
-              .from('workout_log_blocks')
-              .select('id', { count: 'exact', head: true })
-              .eq('log_id', l.id)
-              .not('block_type', 'in', '("warm-up","mobility","cool-down")');
-            // Count total blocks for this workout (exclude warm-up/cool-down)
-            const { count: totalCount } = await supabase
-              .from(isV3 ? 'program_blocks_v2' : 'program_workout_blocks')
-              .select('id', { count: 'exact', head: true })
-              .eq('program_workout_id', l.source_id)
-              .not('block_type', 'in', '("warm-up","mobility","cool-down")');
-            ipMap.set(l.source_id, {
-              logId: l.id,
-              savedCount: count ?? 0,
-              totalBlocks: totalCount ?? 0,
-            });
-          }
-        }
-      }
-      setCompletedWorkoutIds(allCompleted);
-      setInProgressWorkouts(ipMap);
-    } else {
-      setCompletedWorkoutIds(new Set());
-      setInProgressWorkouts(new Map());
+    const savedByLog = new Map<string, number>();
+    for (const r of savedRows) savedByLog.set(r.log_id, (savedByLog.get(r.log_id) ?? 0) + 1);
+    const totalBySource = new Map<string, number>();
+    for (const r of totalRows) totalBySource.set(r.program_workout_id, (totalBySource.get(r.program_workout_id) ?? 0) + 1);
+
+    const allCompleted = new Set<string>();
+    for (const l of logs) {
+      if (l.source_id && l.status === 'completed') allCompleted.add(l.source_id);
     }
+    const ipMap = new Map<string, { logId: string; savedCount: number; totalBlocks: number }>();
+    for (const l of inProgress) {
+      const sourceId = l.source_id as string;
+      ipMap.set(sourceId, {
+        logId: l.id,
+        savedCount: savedByLog.get(l.id) ?? 0,
+        totalBlocks: totalBySource.get(sourceId) ?? 0,
+      });
+    }
+    setCompletedWorkoutIds(allCompleted);
+    setInProgressWorkouts(ipMap);
 
     setLoading(false);
   };
