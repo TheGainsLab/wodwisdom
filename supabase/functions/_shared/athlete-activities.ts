@@ -179,6 +179,91 @@ export interface OutsideTrainingFacts {
   benchmarks: Array<{ name: string; value: number; unit: string; date: string }>;
 }
 
+/**
+ * Sequencer context (gap #5 v1): everything the athlete trained in the last
+ * 14 days that Engine did NOT prescribe — program strength sessions
+ * (workout_log_entries, dual-product users) + logged activities
+ * (roll-your-own athletes). Injected into the resequence prompt so weekly
+ * day-type/intensity choices respect the athlete's whole recovery budget.
+ * ADVISORY ONLY — the sequencer still cannot change program length, day
+ * count, or pinned time trials. Returns "" when there's nothing to report
+ * (single-product, nothing logged → prompt unchanged).
+ */
+export async function buildOtherTrainingLoadBlock(
+  supa: SupabaseClient,
+  userId: string,
+): Promise<string> {
+  const cutoff = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10);
+
+  const [{ data: entries }, { data: acts }] = await Promise.all([
+    supa
+      .from("workout_log_entries")
+      .select("movement, weight, weight_unit, rpe, sets, reps, workout_logs!inner(user_id, workout_date)")
+      .eq("workout_logs.user_id", userId)
+      .gte("workout_logs.workout_date", cutoff),
+    supa
+      .from("athlete_activities")
+      .select("date, activity_type, duration_minutes, rpe, parsed")
+      .eq("user_id", userId)
+      .gte("date", cutoff)
+      .order("date", { ascending: false })
+      .limit(30),
+  ]);
+
+  // Program strength: group by date; surface the heaviest movements per day.
+  const byDate = new Map<string, Array<{ movement: string; weight: number | null; rpe: number | null }>>();
+  for (const raw of entries ?? []) {
+    const r = raw as Record<string, unknown>;
+    const wl = r.workout_logs as { workout_date?: string } | Array<{ workout_date?: string }> | null;
+    const date = Array.isArray(wl) ? (wl[0]?.workout_date ?? "") : (wl?.workout_date ?? "");
+    if (!date) continue;
+    if (!byDate.has(date)) byDate.set(date, []);
+    byDate.get(date)!.push({
+      movement: String(r.movement ?? ""),
+      weight: (r.weight as number | null) ?? null,
+      rpe: (r.rpe as number | null) ?? null,
+    });
+  }
+  const programLines = [...byDate.entries()]
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .slice(0, 14)
+    .map(([date, movs]) => {
+      const top = movs
+        .filter((m) => m.weight != null)
+        .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))
+        .slice(0, 3)
+        .map((m) => m.movement);
+      const maxRpe = movs.reduce((mx, m) => Math.max(mx, m.rpe ?? 0), 0);
+      return `- ${date}: program session${top.length ? ` — ${top.join(", ")}` : ""}${maxRpe > 0 ? ` (top RPE ${maxRpe})` : ""}`;
+    });
+
+  const activityLines = ((acts ?? []) as Array<{ date: string; activity_type: string | null; duration_minutes: number | null; rpe: number | null; parsed: Record<string, unknown> | null }>)
+    .map((a) => {
+      const summary = (a.parsed?.summary as string | undefined) ?? null;
+      return `- ${a.date}: ${summary ?? `${(a.activity_type ?? "activity").replace(/_/g, " ")}${a.duration_minutes != null ? `, ${a.duration_minutes} min` : ""}`}${a.rpe != null ? ` (RPE ${a.rpe})` : ""}`;
+    });
+
+  if (programLines.length === 0 && activityLines.length === 0) return "";
+
+  const parts: string[] = ["OTHER TRAINING LOAD (last 14 days — real training Engine did NOT prescribe):"];
+  if (programLines.length > 0) {
+    parts.push("Program strength/conditioning sessions:");
+    parts.push(...programLines);
+  }
+  if (activityLines.length > 0) {
+    parts.push("Athlete-logged activities:");
+    parts.push(...activityLines);
+  }
+  parts.push(
+    "This work competes for the same recovery budget as the conditioning you are sequencing. " +
+      "Weigh it in your intensity and day-type choices — e.g. avoid stacking maximal lower-body " +
+      "anaerobic work right after heavy squat/deadlift days, and be conservative when the recent " +
+      "combined load is high. Do NOT reduce the number of days or insert rest days — day count is fixed; " +
+      "you express judgment through day-type selection and intensity within the envelopes.",
+  );
+  return parts.join("\n");
+}
+
 export function buildOutsideTrainingFacts(ot: OutsideTraining | null): OutsideTrainingFacts | null {
   if (!ot || (ot.total_count === 0 && ot.benchmarks.length === 0)) return null;
   return {

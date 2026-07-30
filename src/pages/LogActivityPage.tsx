@@ -6,7 +6,8 @@
  * Training Log calendar, inform the AI Coach immediately, and are considered
  * when the next month's program generates. They never change Engine pacing.
  *
- * AI Programming tier (and admins). The entry primitive of the long-term
+ * AI Programming + Year of the Engine tiers (and admins) — a coach
+ * capability, not a program feature. The entry primitive of the long-term
  * AI Logger platform — keep it self-contained.
  */
 import { useEffect, useState } from 'react';
@@ -44,7 +45,8 @@ export default function LogActivityPage({ session }: { session: Session }) {
   const [recent, setRecent] = useState<AthleteActivity[]>([]);
   const [savedFlash, setSavedFlash] = useState(false);
 
-  const allowed = isAdmin || hasFeature('programming');
+  // Coach capability, not a program feature: Programming AND Engine tiers.
+  const allowed = isAdmin || hasFeature('programming') || hasFeature('engine');
 
   const loadRecent = () => {
     listActivities(15).then(setRecent).catch(() => {});
@@ -105,10 +107,10 @@ export default function LogActivityPage({ session }: { session: Session }) {
         {!allowed ? (
           <div className="engine-page">
             <div className="engine-empty">
-              <div className="engine-empty-title">Part of AI Programming</div>
+              <div className="engine-empty-title">Part of our training subscriptions</div>
               <div className="engine-empty-desc">
-                Logging training done outside your program — and having your monthly
-                programming account for it — is an AI Programming feature.
+                Logging training done outside your program — and having your coach and
+                programming account for it — comes with AI Programming and Year of the Engine.
               </div>
               <button className="engine-btn engine-btn-secondary" onClick={() => navigate(-1)}>
                 <ChevronLeft size={16} /> Back
@@ -121,9 +123,9 @@ export default function LogActivityPage({ session }: { session: Session }) {
               <div className="engine-card">
                 <div className="engine-section">
                   <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 12 }}>
-                    Did something outside your program — a ride, a run, a test? Describe it
-                    in plain words. It'll show on your calendar, your coach sees it right
-                    away, and your next month's program takes it into account.
+                    Did something outside your program — a ride, a run, an extra strength
+                    day, a test? Describe it in plain words. It'll show on your calendar,
+                    your coach sees it right away, and your programming accounts for it.
                   </p>
                   <span className="engine-label">Date</span>
                   <input

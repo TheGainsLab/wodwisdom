@@ -17,6 +17,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callClaude } from "./call-claude.ts";
 import { buildConditioningState } from "./conditioning-state.ts";
+import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
 import { buildDayTypeCatalogue, loadDayTypeCatalogue } from "./engine-catalogue.ts";
 import { parseProposal, type ProposedDay, validateProposal } from "./engine-sequence.ts";
 
@@ -28,8 +29,11 @@ const SYSTEM_PROMPT =
   `their authored envelopes.\n\n` +
   `You are given: (1) the athlete's RAW conditioning signals (per-competency rolling ratios + recent ` +
   `trend, time-trial/calibration age, days since last session — no labels; you interpret them), ` +
-  `(2) the day-type catalogue with each type's parameter envelope, and (3) the athlete's ` +
-  `current phase and how many days to generate.\n\n` +
+  `(2) the day-type catalogue with each type's parameter envelope, (3) the athlete's ` +
+  `current phase and how many days to generate, and (4) when present, their OTHER TRAINING LOAD — ` +
+  `real recent training Engine did not prescribe (program strength days, self-logged activities). ` +
+  `That load draws on the same recovery budget: factor it into intensity and day-type placement, ` +
+  `but never into day count — the program's length and cadence are fixed.\n\n` +
   `Read the signals and form your own judgment: which energy systems are behind, what's trending down, ` +
   `whether a layoff warrants re-baselining, which prerequisites are met. Then choose day-types that ` +
   `serve that judgment. For each chosen day, GENERATE concrete block ` +
@@ -238,8 +242,18 @@ export async function runResequence(
       `${prescribedSlots}\n`
     : "";
 
+  // Gap #5 v1: the athlete's NON-Engine training load (program strength for
+  // dual-product users, logged activities for roll-your-own athletes) —
+  // advisory context for intensity/day-type judgment. Best-effort; "" when
+  // there is nothing to report, leaving the prompt unchanged.
+  const otherLoad = await buildOtherTrainingLoadBlock(supa, userId).catch((err) => {
+    console.warn(`[run-resequence] other-load fetch failed for ${userId}:`, err);
+    return "";
+  });
+
   const userContent =
     `${diagnosis}\n\n` +
+    (otherLoad ? `${otherLoad}\n\n` : "") +
     programGoal +
     `ATHLETE CURRENT PHASE: ${currentPhase} (only day_types with phase_requirement <= ${currentPhase} are legal)\n` +
     `GENERATE THE NEXT ${daysToGenerate} ENGINE DAYS.\n` +

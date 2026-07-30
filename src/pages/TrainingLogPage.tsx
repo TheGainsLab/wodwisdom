@@ -1799,7 +1799,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
                     {/* Past dates: outside-activity logging only (training
                         can't be scheduled backward, but it can be recorded). */}
-                    {hasProgramming && selectedDate < todayStr && (
+                    {hasAccess && selectedDate < todayStr && (
                       <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                         <button
                           type="button"
@@ -1831,7 +1831,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                               >
                                 <Plus size={14} /> Add training
                               </button>
-                              {hasProgramming && selectedDate <= todayStr && (
+                              {hasAccess && selectedDate <= todayStr && (
                                 <button
                                   type="button"
                                   className="wc-day-scheduled-open"

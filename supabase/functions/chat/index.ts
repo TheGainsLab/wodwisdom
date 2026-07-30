@@ -125,7 +125,7 @@ const PRODUCT_KNOWLEDGE =
   "- AI Programming: the next month generates automatically when the current one completes (an automatic daily check heals any missed generation — if a month seems stuck more than a day, email us). Profile changes (goals, session length, equipment, injuries) apply to the NEXT generation, not retroactively. Session length = target minutes per session, one number. Each workout block has a one-shot 'AI Edit' that can revise that block on request.\n" +
   "- Injuries vs preferences: injuries/limitations go in the profile's injuries field — generation and AI Edit avoid those movements. Choice-based preferences (movements to avoid or emphasize, goals) go in the profile's goals — reflected at next generation.\n" +
   "- Logging: program and Engine days are logged from their own day pages on completion. Q = movement-quality self-rating; fault checkboxes are marked only when the fault actually happened; RPE = effort. Program/Engine session records can NOT be edited or deleted in the app (they drive progression and are permanent) — for bad or duplicate data, email coach@thegainslab.com and we'll correct it.\n" +
-  "- Outside activities (AI Programming subscribers): 'Log Activity' — in the sidebar and on any Training Log calendar day — records training done outside the program (a ride, a run, a test). Type what you did in plain words, confirm the parsed card, done. These appear on the Training Log calendar, can be edited or deleted there (they're context, not program records), inform your coach immediately and your NEXT month's program at generation — they never change Engine pace targets. Benchmark tests (FTP, PRs) are tracked with retest history; they never change profile 1RMs — the athlete updates those in the profile deliberately. Engine-only subscribers: outside-activity logging is part of AI Programming.\n" +
+  "- Outside activities (AI Programming AND Year of the Engine subscribers): 'Log Activity' — in the sidebar and on any Training Log calendar day — records training done outside your programs (a ride, a run, an improvised strength day, a test). Type what you did in plain words, confirm the parsed card, done. These appear on the Training Log calendar, can be edited or deleted there (they're context, not program records), and inform your coach immediately. For AI Programming, they're considered when the NEXT month generates; for Engine, the weekly AI adaptation (once active for the athlete) considers them when sequencing upcoming days. They never change Engine pace targets. Benchmark tests (FTP, PRs) are tracked with retest history; they never change profile 1RMs — the athlete updates those in the profile deliberately.\n" +
   "- Heart rate & wearables: manual entry only (average/peak HR fields when logging). No device, Bluetooth, or health-platform integrations.\n" +
   "- Training Log calendar: shows completed work across products and lets athletes schedule upcoming program/Engine days onto dates.\n" +
   "- Anything product-related not covered above: say you don't have that detail rather than guessing, and point to coach@thegainslab.com.";
@@ -175,7 +175,8 @@ const ALL_SYSTEM_PROMPT =
 
 const WORKOUT_COACHING_PROMPT =
   COACH_SPINE +
-  "\n\nFOCUS: You are coaching an athlete through a specific training session described below. Be specific to the movements, loads, and time domains in the session. Answer questions about today's workout using the context provided.";
+  "\n\nFOCUS: You are coaching an athlete through a specific training session described below. Be specific to the movements, loads, and time domains in the session. Answer questions about today's workout using the context provided." +
+  "\n\nPACING ARITHMETIC: whenever you give a pace or rate, ALWAYS show the per-piece arithmetic in the athlete's units alongside it — e.g. \"10.8 cal/min ≈ 81 cal over a 7:30 piece\" or \"9 cal/min ≈ 3 cal per 20-second interval\" — and convert between rate forms (cal/min, cal/hr, min/1000m, /500m splits) on request, showing the conversion. Athletes execute against per-piece numbers, not rates; a rate alone forces them to do the math mid-workout.";
 
 /**
  * Build a rich Engine-coaching context block: today's day type + coaching
@@ -361,6 +362,7 @@ async function buildEngineCoachingContext(
         `${Number(targetPace.toFixed(2))}${selectedUnits ? ` ${selectedUnits}/min` : " per minute"} for the work intervals. ` +
         `This is the number on the athlete's screen. Coach TO this target — never derive a different pacing number from the raw time-trial baseline. ` +
         `Use the baseline only for color (e.g. what fraction of their max this represents). ` +
+        `ALWAYS express the target as per-piece arithmetic too — rate × interval length = the number to hit per interval (e.g. 9 cal/min over a 4:00 interval ≈ 36 cal per interval) — never leave the athlete to convert mid-workout, and never equate a per-minute rate with a per-interval count. ` +
         `If the athlete questions the target, explain how it is derived (baseline scaled to today's intended intensity, adjusted by recent performance) rather than proposing a different number.`,
     );
   } else if (selectedModality) {
@@ -440,15 +442,18 @@ async function buildEngineAthleteCard(
 ): Promise<string> {
   const [{ data: mapping }, { data: timeTrials }, { data: pref }, { data: recentModalities }] = await Promise.all([
     // engine_current_day is a SEQUENCE position (post sequence-identity) —
-    // unique per program, so a plain maybeSingle lookup is exact even for
-    // repeat programs (vo2max/hyrox).
+    // unique per program. Fetch the current row PLUS the upcoming window so
+    // the card can also answer "when is my next time trial?" (a repeatedly
+    // asked question) without another query.
     currentDay
       ? supa
           .from("engine_program_mapping")
           .select("engine_workout_day_number, program_sequence_order, month, week_number")
           .eq("engine_program_id", programVersion)
-          .eq("program_sequence_order", currentDay)
-          .maybeSingle()
+          .gte("program_sequence_order", currentDay)
+          .order("program_sequence_order", { ascending: true })
+          .limit(45)
+          .then((r) => ({ data: r.data ?? null }))
       : Promise.resolve({ data: null }),
     supa
       .from("engine_time_trials")
@@ -472,33 +477,48 @@ async function buildEngineAthleteCard(
       .limit(200),
   ]);
 
-  // Day type of the next session, when resolvable from the catalog.
+  // Resolve day types for the upcoming window in one query: the current
+  // day's type for the Position line, and the first upcoming time_trial for
+  // the "next test" line athletes keep asking about.
+  const upcoming = (mapping ?? []) as Array<{ engine_workout_day_number: number; program_sequence_order: number; month: number; week_number: number | null }>;
+  const currentRow = upcoming.find((m) => m.program_sequence_order === currentDay) ?? null;
   let nextDayType = "";
-  if (mapping) {
-    const { data: w } = await supa
+  let nextTTSeq: number | null = null;
+  if (upcoming.length > 0) {
+    const catalogDays = [...new Set(upcoming.map((m) => m.engine_workout_day_number))];
+    const { data: ws } = await supa
       .from("engine_workouts")
-      .select("day_type")
+      .select("day_number, day_type")
       .eq("program_type", "main_5day")
-      .eq("day_number", mapping.engine_workout_day_number)
-      .maybeSingle();
-    if (w?.day_type) {
+      .in("day_number", catalogDays);
+    const typeByDay = new Map((ws ?? []).map((w) => [w.day_number as number, w.day_type as string]));
+    const currentType = currentRow ? typeByDay.get(currentRow.engine_workout_day_number) : null;
+    if (currentType) {
       const { data: dt } = await supa
         .from("engine_day_types")
         .select("name")
-        .eq("id", w.day_type)
+        .eq("id", currentType)
         .maybeSingle();
-      nextDayType = dt?.name ?? (w.day_type as string).replace(/_/g, " ");
+      nextDayType = dt?.name ?? currentType.replace(/_/g, " ");
     }
+    const tt = upcoming.find((m) => typeByDay.get(m.engine_workout_day_number) === "time_trial");
+    if (tt) nextTTSeq = tt.program_sequence_order;
   }
 
   const parts: string[] = ["\n\nENGINE ATHLETE CONTEXT (Year of the Engine subscriber):"];
   if (currentDay) {
     // Athlete-facing label is the sequence number; the catalog number is
     // internal plumbing the athlete never sees.
-    const positionLabel = mapping?.program_sequence_order ?? currentDay;
     parts.push(
-      `Position: next session is Day ${positionLabel}${mapping ? ` (Month ${mapping.month}, Week ${mapping.week_number ?? "?"})` : ""}${nextDayType ? ` — ${nextDayType}` : ""}.`,
+      `Position: next session is Day ${currentDay}${currentRow ? ` (Month ${currentRow.month}, Week ${currentRow.week_number ?? "?"})` : ""}${nextDayType ? ` — ${nextDayType}` : ""}.`,
     );
+    if (nextTTSeq != null) {
+      const away = nextTTSeq - currentDay;
+      parts.push(
+        `Next scheduled time trial: Day ${nextTTSeq}${away > 0 ? ` (${away} training day${away === 1 ? "" : "s"} from their current day)` : " (their current day)"}. ` +
+          `They can also re-do a past time trial anytime from the dashboard to re-baseline sooner.`,
+      );
+    }
   }
   // Equipment: usage distribution when they train on several machines, a
   // single anchor when they don't. Either way, a named machine in the
@@ -998,10 +1018,13 @@ Deno.serve(async (req) => {
       !engineCoachingMode &&
       (userTier === "engine" || userTier === "all_access") &&
       !!athleteProfile?.engine_program_version;
-    // Logged outside activities: Programming-tier feature (schema is
-    // product-agnostic for the future AI Logger; the gate is UI/tier only).
-    const shouldFetchActivities = userTier === "ai_programming" || userTier === "all_access";
-    const [embData, recentTraining, programContext, competitionBundle, engineAthleteCard, activityContext] = await Promise.all([
+    // Logged outside activities: a coach capability for Programming AND
+    // Engine tiers (gap #5 v1 — Engine roll-your-own athletes log the
+    // strength work the coach helps them improvise). Schema stays
+    // product-agnostic for the future AI Logger; the gate is UI/tier only.
+    const shouldFetchActivities =
+      userTier === "ai_programming" || userTier === "all_access" || userTier === "engine";
+    const [embData, recentTraining, programContext, competitionBundle, engineAthleteCard, activityContext, engineProgramCatalog] = await Promise.all([
       isMeta
         ? Promise.resolve(null)
         : fetchWithTimeout("https://api.openai.com/v1/embeddings", {
@@ -1042,6 +1065,26 @@ Deno.serve(async (req) => {
               return "";
             })
         : Promise.resolve(""),
+      // Engine program catalog — live from engine_programs so program-selection
+      // consults (a recurring, high-intent question pattern) are answered from
+      // real facts and can never drift as programs change. All tiers: prospects
+      // ask these questions most.
+      supa
+        .from("engine_programs")
+        .select("name, days_per_week, total_days, description")
+        .order("sort_order")
+        .then(({ data }) => {
+          const rows = (data ?? []) as Array<{ name: string; days_per_week: number; total_days: number; description: string | null }>;
+          if (rows.length === 0) return "";
+          const lines = rows.map((p) =>
+            `- ${p.name}: ${p.days_per_week}x/week, ${p.total_days} training days.${p.description ? ` ${p.description}` : ""}`,
+          );
+          return (
+            "\n\nENGINE PROGRAM CATALOG (every conditioning program athletes can choose — for program-selection and comparison questions, answer from THESE facts; a program not listed here does not exist, say so rather than guessing):\n" +
+            lines.join("\n") +
+            "\nSwitching program variants is free and keeps per-program progress (athletes pick or switch on the Engine program screen); all variants share the same adaptive pacing system."
+          );
+        }, () => ""),
     ]);
     const queryEmb = embData?.data?.[0]?.embedding;
     const competitionContext = competitionBundle ? buildCompetitionContext(competitionBundle) : "";
@@ -1133,7 +1176,7 @@ Deno.serve(async (req) => {
             : userTier === "coach_standalone"
             ? "\n\nUSER TIER: AI Coach subscriber (no program, no nutrition tracking). Answer as a pure coach.\nProducts available to mention (only per the guidance-moment rules): Year of the Engine, AI Programming, AI Nutrition, All Access."
             : userTier === "engine"
-            ? "\n\nUSER TIER: Year of the Engine subscriber. Ground answers in their current framework and programming when relevant. They already have AI Nutrition bundled.\nProducts available to mention (only per the guidance-moment rules): AI Programming, All Access."
+            ? "\n\nUSER TIER: Year of the Engine subscriber. Ground answers in their current framework and programming when relevant. They already have AI Nutrition bundled.\nProducts available to mention (only per the guidance-moment rules): AI Programming, All Access.\nSupplementary work: when they ask for help with training beyond Engine (a strength day, accessories, a session for something specific), help them fully — and suggest logging it with Log Activity so their coach and their Engine program's weekly adaptation can account for it. If they ask for a complete multi-week program, help generously once, then note that AI Programming is the product built for exactly that — one mention, no pushing."
             : userTier === "ai_programming"
             ? "\n\nUSER TIER: AI Programming subscriber. Ground answers in their current program structure and training. They already have AI Nutrition bundled.\nProducts available to mention (only per the guidance-moment rules): Year of the Engine, All Access."
             : "\n\nUSER TIER: All Access subscriber. The user has everything — Engine, AI Programming, AI Nutrition, AI Coach.\nProducts available to mention: NONE. Mention no products under any circumstances."
@@ -1141,6 +1184,7 @@ Deno.serve(async (req) => {
           // Verified product facts — every mode, meta included (product
           // questions overwhelmingly route meta). See the const's doc.
           PRODUCT_KNOWLEDGE +
+          engineProgramCatalog +
           // Athlete profile — ALWAYS injected, meta included. It's ~200
           // tokens of insurance: when the router misroutes a real personal
           // question as meta, the answer still knows who the athlete is.
