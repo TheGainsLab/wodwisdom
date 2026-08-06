@@ -385,6 +385,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   // ── Core state ──
   const [stage, setStage] = useState<Stage>('loading');
   const [workout, setWorkout] = useState<EngineWorkout | null>(null);
+  // True only after the load CONFIRMED the day has no content — never while
+  // the fetch is in flight, so the not-found card can't flash during loading.
+  const [dayNotFound, setDayNotFound] = useState(false);
   const [modality, setModality] = useState('');
   const [expandedCategory, setExpandedCategory] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('');
@@ -434,6 +437,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
   // ── Load data ──
   useEffect(() => {
+    setDayNotFound(false);
     (async () => {
       try {
         // Sequence identity: dayNumber is the sequence position. Resolve the
@@ -489,10 +493,12 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           setStage('equipment');
           track('workout_viewed', { kind: 'engine' });
         } else {
-          setStage('loading'); // will show not-found
+          setStage('loading');
+          setDayNotFound(true);
         }
       } catch {
         setStage('loading');
+        setDayNotFound(true);
       }
     })();
   }, [dayNumber]);
@@ -1888,7 +1894,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
             </div>
           </div>
         )}
-        {hasAccess && !monthLocked && stage === 'loading' && !workout && (
+        {hasAccess && !monthLocked && stage === 'loading' && dayNotFound && (
           <div className="engine-page">
             <div className="engine-empty">
               <div className="engine-empty-title">Workout not found</div>
@@ -1899,7 +1905,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
             </div>
           </div>
         )}
-        {hasAccess && !monthLocked && stage === 'loading' && workout === null && !dayParam && (
+        {hasAccess && !monthLocked && stage === 'loading' && !dayNotFound && (
           <div className="page-loading"><div className="loading-pulse" /></div>
         )}
         {hasAccess && !monthLocked && stage === 'equipment' && renderEquipment()}
