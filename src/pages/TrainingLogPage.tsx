@@ -1527,6 +1527,19 @@ export default function TrainingLogPage({ session }: { session: Session }) {
             ) : view === 'calendar' ? (
               /* ── Calendar section ── */
               <div>
+                {/* Page-level action: the calendar is the logging home, so the
+                    capability is visible without opening a day sheet first.
+                    Date defaults to today and stays editable on the page. */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                  <button
+                    type="button"
+                    className="wc-day-scheduled-open"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    onClick={() => navigate(`/log-activity?date=${todayStr}`)}
+                  >
+                    <Plus size={14} /> Log activity
+                  </button>
+                </div>
                 <WorkoutCalendar
                   workoutCounts={workoutCounts}
                   dayStatus={dayStatus}
