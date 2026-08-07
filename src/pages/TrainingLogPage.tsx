@@ -8,7 +8,7 @@ import MetconsTab from '../components/MetconsTab';
 import WorkoutCalendar from '../components/WorkoutCalendar';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { loadUserProgress, getWorkoutsForProgram, getProgramMapping } from '../lib/engineService';
-import { listActivities, deleteActivity, type AthleteActivity } from '../lib/activitiesService';
+import { listActivities, deleteActivity, activityImageUrl, type AthleteActivity } from '../lib/activitiesService';
 import { scheduleProgramDay, scheduleEngineDay, unschedule } from '../lib/trainingSchedule';
 import { localDateString } from '../lib/localDate';
 
@@ -210,6 +210,19 @@ const TYPE_LABELS: Record<string, string> = {
   strength: 'Strength',
   other: 'Other',
 };
+
+/** Thumbnail for a screenshot-born activity — signed URL (private bucket),
+ *  opens full size in a new tab. Renders nothing until the URL resolves. */
+function ActivityThumb({ path }: { path: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => { activityImageUrl(path).then(setUrl).catch(() => {}); }, [path]);
+  if (!url) return null;
+  return (
+    <a href={url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginLeft: 8, verticalAlign: 'middle' }}>
+      <img src={url} alt="Workout screenshot" style={{ height: 28, borderRadius: 4, border: '1px solid var(--border)', display: 'block' }} />
+    </a>
+  );
+}
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   'warm-up': 'Warm-up & Mobility',
@@ -1679,9 +1692,13 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                     {(activitiesByDate[selectedDate] || []).map(a => (
                       <div key={a.id} className="wc-day-scheduled" style={{ borderLeft: '3px solid #a78bfa' }}>
                         <div className="wc-day-scheduled-label">
-                          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#a78bfa' }}>Outside</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#a78bfa' }}>
+                            {a.workout_type && a.workout_type !== 'other' ? `Outside · ${a.workout_type}` : 'Outside'}
+                          </span>
                           {(a.parsed?.summary as string | undefined) ?? `${(a.activity_type ?? 'activity').replace(/_/g, ' ')}${a.duration_minutes ? ` · ${a.duration_minutes} min` : ''}`}
+                          {a.score && <span style={{ color: 'var(--text-muted)' }}> · {a.score}</span>}
                           {a.rpe != null && <span style={{ color: 'var(--text-muted)' }}> · RPE {a.rpe}</span>}
+                          {a.image_path && <ActivityThumb path={a.image_path} />}
                         </div>
                         <button
                           type="button"
