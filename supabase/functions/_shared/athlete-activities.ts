@@ -21,10 +21,15 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 export interface ActivityRow {
   date: string;
   raw_text: string;
+  // v2 block-aligned category (conditioning|metcon|strength|skills|other);
+  // null on pre-v2 rows.
+  workout_type: string | null;
   activity_type: string | null;
   duration_minutes: number | null;
   distance: number | null;
   distance_unit: string | null;
+  calories: number | null;
+  score: string | null;
   rpe: number | null;
   avg_hr: number | null;
   peak_hr: number | null;
@@ -60,7 +65,7 @@ export async function fetchOutsideTraining(
   const [{ data: acts }, { data: bms }] = await Promise.all([
     supa
       .from("athlete_activities")
-      .select("date, raw_text, activity_type, duration_minutes, distance, distance_unit, rpe, avg_hr, peak_hr, parsed, is_benchmark")
+      .select("date, raw_text, workout_type, activity_type, duration_minutes, distance, distance_unit, calories, score, rpe, avg_hr, peak_hr, parsed, is_benchmark")
       .eq("user_id", userId)
       .order("date", { ascending: false })
       .limit(1000),
@@ -101,8 +106,13 @@ export async function fetchOutsideTraining(
 
 function fmtActivity(r: ActivityRow): string {
   const bits: string[] = [r.date];
-  bits.push(r.activity_type ? r.activity_type.replace(/_/g, " ") : "activity");
+  const label = r.workout_type && r.workout_type !== "other"
+    ? r.workout_type
+    : (r.activity_type ? r.activity_type.replace(/_/g, " ") : "activity");
+  bits.push(label);
+  if (r.score) bits.push(`score ${r.score}`);
   if (r.duration_minutes != null) bits.push(`${r.duration_minutes} min`);
+  if (r.calories != null) bits.push(`${r.calories} cal`);
   if (r.distance != null) bits.push(`${r.distance}${r.distance_unit ? ` ${r.distance_unit}` : ""}`);
   if (r.rpe != null) bits.push(`RPE ${r.rpe}`);
   if (r.avg_hr != null) bits.push(`HR ${r.avg_hr}`);
@@ -165,7 +175,7 @@ export function buildRecentLoadLine(ot: OutsideTraining | null): string | null {
   const week = ot.recent.filter((r) => r.date >= cutoff);
   if (week.length === 0) return null;
   const items = week.map((r) =>
-    `${r.date}: ${r.activity_type ?? "activity"}${r.duration_minutes != null ? ` ${r.duration_minutes}min` : ""}${r.rpe != null ? ` RPE${r.rpe}` : ""}`,
+    `${r.date}: ${r.workout_type && r.workout_type !== "other" ? r.workout_type : (r.activity_type ?? "activity")}${r.duration_minutes != null ? ` ${r.duration_minutes}min` : ""}${r.score ? ` ${r.score}` : ""}${r.rpe != null ? ` RPE${r.rpe}` : ""}`,
   );
   return `Outside training last 7 days (account for this load): ${items.join("; ")}`;
 }
@@ -203,7 +213,7 @@ export async function buildOtherTrainingLoadBlock(
       .gte("workout_logs.workout_date", cutoff),
     supa
       .from("athlete_activities")
-      .select("date, activity_type, duration_minutes, rpe, parsed")
+      .select("date, workout_type, activity_type, duration_minutes, calories, score, rpe, parsed")
       .eq("user_id", userId)
       .gte("date", cutoff)
       .order("date", { ascending: false })
@@ -237,10 +247,14 @@ export async function buildOtherTrainingLoadBlock(
       return `- ${date}: program session${top.length ? ` — ${top.join(", ")}` : ""}${maxRpe > 0 ? ` (top RPE ${maxRpe})` : ""}`;
     });
 
-  const activityLines = ((acts ?? []) as Array<{ date: string; activity_type: string | null; duration_minutes: number | null; rpe: number | null; parsed: Record<string, unknown> | null }>)
+  const activityLines = ((acts ?? []) as Array<{ date: string; workout_type: string | null; activity_type: string | null; duration_minutes: number | null; calories: number | null; score: string | null; rpe: number | null; parsed: Record<string, unknown> | null }>)
     .map((a) => {
       const summary = (a.parsed?.summary as string | undefined) ?? null;
-      return `- ${a.date}: ${summary ?? `${(a.activity_type ?? "activity").replace(/_/g, " ")}${a.duration_minutes != null ? `, ${a.duration_minutes} min` : ""}`}${a.rpe != null ? ` (RPE ${a.rpe})` : ""}`;
+      const label = a.workout_type && a.workout_type !== "other"
+        ? a.workout_type
+        : (a.activity_type ?? "activity").replace(/_/g, " ");
+      const base = summary ?? `${label}${a.duration_minutes != null ? `, ${a.duration_minutes} min` : ""}${a.calories != null ? `, ${a.calories} cal` : ""}${a.score ? `, ${a.score}` : ""}`;
+      return `- ${a.date}: ${base}${a.rpe != null ? ` (RPE ${a.rpe})` : ""}`;
     });
 
   if (programLines.length === 0 && activityLines.length === 0) return "";
