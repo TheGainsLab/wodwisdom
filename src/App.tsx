@@ -1,7 +1,8 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
+import { EntitlementsProvider } from './hooks/useEntitlements';
 import { captureAcquisition } from './lib/acquisition';
 import { track, routePattern } from './lib/appEvents';
 import BottomTabBar from './components/BottomTabBar';
@@ -106,6 +107,13 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Which user we've already run the once-per-session bootstrap for. A normal
+  // load resolves getSession() AND fires onAuthStateChange('SIGNED_IN'), so
+  // without this every load fired the claim RPC and the timezone PATCH twice,
+  // concurrently. A ref (not a local) so React's dev-mode double-invoke of this
+  // effect doesn't reintroduce the duplicate.
+  const bootstrappedFor = useRef<string | null>(null);
+
   useEffect(() => {
     // First-touch acquisition capture (UTM/referrer → localStorage → signup
     // metadata). Runs every load; first touch wins inside.
@@ -119,22 +127,28 @@ export default function App() {
         .then(() => {}, () => {});
     };
 
+    // Once-per-session side effects for a logged-in user. Safe to call from
+    // both auth paths; only the first call for a given user does anything.
+    const bootstrapSession = (session: Session) => {
+      if (bootstrappedFor.current === session.user.id) return;
+      bootstrappedFor.current = session.user.id;
+      // Safety net: claim any pending subscription that matches this user's
+      // email. No-op if nothing to claim. Backs up the
+      // claim_pending_subscription trigger.
+      supabase.rpc('claim_my_pending_subscription').then(() => {}, () => {});
+      syncTimezone(session.user.id);
+      // PWA install stamp: standalone display-mode means the app is
+      // running from the home screen (covers iOS manual installs, where
+      // no appinstalled event exists). Idempotent — first install wins.
+      if (window.matchMedia('(display-mode: standalone)').matches) {
+        supabase.rpc('mark_pwa_installed').then(() => {}, () => {});
+      }
+    };
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
-      // Safety net: claim any pending subscription that matches this user's
-      // email. Runs on every app load for logged-in users; no-op if nothing
-      // to claim. Backs up the claim_pending_subscription trigger.
-      if (session) {
-        supabase.rpc('claim_my_pending_subscription').then(() => {}, () => {});
-        syncTimezone(session.user.id);
-        // PWA install stamp: standalone display-mode means the app is
-        // running from the home screen (covers iOS manual installs, where
-        // no appinstalled event exists). Idempotent — first install wins.
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-          supabase.rpc('mark_pwa_installed').then(() => {}, () => {});
-        }
-      }
+      if (session) bootstrapSession(session);
     }).catch(() => {
       setLoading(false);
     });
@@ -143,43 +157,48 @@ export default function App() {
       if (event === 'PASSWORD_RECOVERY') {
         window.location.href = '/settings';
       }
-      // Safety net: try to claim any pending subscription on sign-in.
-      if (event === 'SIGNED_IN' && session) {
-        supabase.rpc('claim_my_pending_subscription').then(() => {}, () => {});
-        syncTimezone(session.user.id);
-      }
+      if (event === 'SIGNED_IN' && session) bootstrapSession(session);
+      // A different user signing in must be able to bootstrap again.
+      if (event === 'SIGNED_OUT') bootstrappedFor.current = null;
     });
     return () => subscription.unsubscribe();
   }, []);
 
   if (loading) return <PageLoader />;
+  // Both trees get the provider: /checkout/complete renders signed-out as well
+  // as signed-in, and it needs refresh() in the signed-in case. With no user the
+  // provider holds an empty set and refresh() is a no-op.
   if (!session) return (
-    <ErrorBoundary>
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
-          <Route path="/auth" element={<AuthPage />} />
-          <Route path="/features" element={<FeaturesHubPage />} />
-          <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
-          <Route path="/features/programs" element={<ProgramsFeaturePage />} />
-          <Route path="/features/engine" element={<EngineFeaturePage />} />
-          <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
-          <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
-          {/* Signed-out /checkout (email links, bookmarks): the plans page
-              needs a session, so land on the features hub — its checkout
-              works anonymously — instead of silently falling to the landing
-              page (the July '26 recovery-email leak). */}
-          <Route path="/checkout" element={<Navigate to="/features" replace />} />
-          {/* Dead-link stubs for the retired gym flows (Decisions 11 / 12a). */}
-          <Route path="/join/engine/:token" element={<RetiredInviteNotice />} />
-          <Route path="/claim/:token" element={<RetiredInviteNotice />} />
-          <Route path="*" element={<LandingPage />} />
-        </Routes>
-      </Suspense>
-    </ErrorBoundary>
+    <EntitlementsProvider userId={undefined}>
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/features" element={<FeaturesHubPage />} />
+            <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
+            <Route path="/features/programs" element={<ProgramsFeaturePage />} />
+            <Route path="/features/engine" element={<EngineFeaturePage />} />
+            <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
+            <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
+            {/* Signed-out /checkout (email links, bookmarks): the plans page
+                needs a session, so land on the features hub — its checkout
+                works anonymously — instead of silently falling to the landing
+                page (the July '26 recovery-email leak). */}
+            <Route path="/checkout" element={<Navigate to="/features" replace />} />
+            {/* Dead-link stubs for the retired gym flows (Decisions 11 / 12a). */}
+            <Route path="/join/engine/:token" element={<RetiredInviteNotice />} />
+            <Route path="/claim/:token" element={<RetiredInviteNotice />} />
+            <Route path="*" element={<LandingPage />} />
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
+    </EntitlementsProvider>
   );
 
   return (
-    <AuthenticatedApp session={session} />
+    <EntitlementsProvider userId={session.user.id}>
+      <AuthenticatedApp session={session} />
+    </EntitlementsProvider>
   );
 }
 

@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import type { ProgramBlockV2, ProgramMovementV2 } from '../pages/ProgramDetailPage';
 import type { ReviewBlock } from '../components/reviewCoaching';
 import { scoreMetcon, deriveTimeDomain, type BenchmarkResult } from '../lib/metconScoring';
+import { formatMovementName } from '../lib/movementName';
 
 // ── Save payload (the `block` body of save-workout-block) ──
 export interface LogEntry {
@@ -180,11 +181,32 @@ function SavedBadge({ onEdit }: { onEdit: () => void }) {
     </div>
   );
 }
+/**
+ * What the two unlabelled columns mean. The reps input labels itself via its
+ * placeholder and RPE is at least an abbreviation people meet elsewhere, but
+ * the quality select renders as a bare "Q" with A–D options and its only
+ * explanation was a `title` tooltip — which does not exist on touch, i.e. the
+ * way this form is actually used. Rendered as a line rather than a column
+ * header so it costs no horizontal width in the grid.
+ */
+function FieldLegend() {
+  return (
+    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
+      RPE = perceived exertion (1–10) · Q = movement quality (A–D)
+    </div>
+  );
+}
+
+// Legend lives here because SaveButton is the one component every block-type
+// form renders, so it appears exactly once per log panel.
 function SaveButton({ saving, onSave }: { saving: boolean; onSave: () => void }) {
   return (
-    <button type="button" className="auth-btn" style={{ width: '100%', marginTop: 8 }} onClick={onSave} disabled={saving}>
-      {saving ? 'Saving…' : 'Save block'}
-    </button>
+    <>
+      <FieldLegend />
+      <button type="button" className="auth-btn" style={{ width: '100%', marginTop: 8 }} onClick={onSave} disabled={saving}>
+        {saving ? 'Saving…' : 'Save block'}
+      </button>
+    </>
   );
 }
 const useChecked = () => {
@@ -229,7 +251,7 @@ function StrengthLog({ block, controller, coaching }: { block: ProgramBlockV2; c
         const { count } = plannedSets(m);
         return (
           <div key={m.id} style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{m.movement}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{formatMovementName(m.movement)}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 1fr 1fr 44px', gap: 6, alignItems: 'center' }}>
               <span /><span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>{controller.userUnits}</span><span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>reps</span><span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>RPE</span><span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>Q</span>
               {Array.from({ length: count }, (_, i) => {
@@ -311,7 +333,7 @@ function MetconLog({ block, controller, coaching }: { block: ProgramBlockV2; con
         if (!mFaults.length) return null;
         return (
           <div key={m.id} style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{m.movement}</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>{formatMovementName(m.movement)}</div>
             <FaultChecklist faults={mFaults} checked={checked[m.id] ?? []} onToggle={(f) => toggle(m.id, f)} />
           </div>
         );
@@ -343,7 +365,7 @@ function SkillsLog({ block, controller, coaching }: { block: ProgramBlockV2; con
         return (
           <div key={m.id} style={{ marginBottom: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 44px', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>{m.movement}</span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{formatMovementName(m.movement)}</span>
               <input style={inputStyle} inputMode="numeric" placeholder="reps" value={r.reps} onChange={e => set(m.id, 'reps', e.target.value)} />
               <RpeSelect value={r.rpe} onChange={v => set(m.id, 'rpe', v)} />
               <QualitySelect value={r.quality} onChange={v => set(m.id, 'quality', v)} />
@@ -384,7 +406,7 @@ function AccessoryLog({ block, controller, coaching }: { block: ProgramBlockV2; 
         return (
           <div key={m.id} style={{ marginBottom: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>{m.movement}</span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{formatMovementName(m.movement)}</span>
               <input style={inputStyle} inputMode="decimal" value={r.weight} onChange={e => set(m.id, 'weight', e.target.value)} />
               <input style={inputStyle} inputMode="numeric" value={r.reps} onChange={e => set(m.id, 'reps', e.target.value)} />
               <RpeSelect value={r.rpe} onChange={v => set(m.id, 'rpe', v)} />
