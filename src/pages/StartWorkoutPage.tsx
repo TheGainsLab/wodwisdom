@@ -825,7 +825,9 @@ export default function StartWorkoutPage({ session, sourceStateProp, onExit, onD
               // Restore score/rx/capped for metcon blocks
               if (sb.block_type === 'metcon') {
                 if (sb.score) setBlockScores(prev => ({ ...prev, [sb.sort_order]: sb.score }));
-                setBlockRx(prev => ({ ...prev, [sb.sort_order]: sb.rx ?? true }));
+                // Rx is retired for personal programs (editing the prescription
+                // IS scaling) — never default it on.
+                setBlockRx(prev => ({ ...prev, [sb.sort_order]: sb.rx ?? false }));
                 if (sb.capped) {
                   setBlockCapped(prev => ({ ...prev, [sb.sort_order]: true }));
                   if (sb.capped_reps != null) {
@@ -1359,7 +1361,7 @@ export default function StartWorkoutPage({ session, sourceStateProp, onExit, onD
           };
         });
       score = blockScores[bi]?.trim() || null;
-      rx = blockRx[bi] ?? true;
+      rx = blockRx[bi] ?? false;
     } else if (b.type === 'skills') {
       const skKeys = Object.keys(skillsEntries)
         .filter(k => k.startsWith(`${bi}-sk`))
@@ -1839,11 +1841,9 @@ export default function StartWorkoutPage({ session, sourceStateProp, onExit, onD
 
                       return (
                         <>
+                          {/* Rx checkbox retired: personal programs — editing the
+                              prescription IS scaling. Column kept in schema. */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <input type="checkbox" id={`rx-${bi}`} checked={blockRx[bi] ?? true} onChange={e => setBlockRx(prev => ({ ...prev, [bi]: e.target.checked }))} />
-                              <label htmlFor={`rx-${bi}`} style={{ fontSize: 14, color: 'var(--text-dim)' }}>Rx</label>
-                            </div>
                             {isForTime && (
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <input

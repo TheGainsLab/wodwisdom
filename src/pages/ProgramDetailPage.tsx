@@ -1410,7 +1410,11 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
   };
 
   const [editing, setEditing] = useState(false);
-  const canEdit = !!onUpdateMovement;
+  // Warm-up / cool-down / mobility / active-recovery are instructions, not
+  // logged work — nobody edits them, so no action row at all (AI Edit and
+  // Coach already exclude them below).
+  const NON_EDITABLE_TYPES = ['warm-up', 'cool-down', 'mobility', 'active-recovery'];
+  const canEdit = !!onUpdateMovement && !NON_EDITABLE_TYPES.includes(block.block_type);
 
   // Block-level scheme ("Every 90s for 12 min (8 sets)"), editable in edit mode.
   const [scheme, setScheme] = useState(block.block_scheme ?? '');
@@ -1422,8 +1426,7 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
     try { await onUpdateBlock(block.id, { block_scheme: next }); }
     catch { setScheme(block.block_scheme ?? ''); }
   };
-  // AI Edit is overkill for warm-up / cool-down — manual edit covers those.
-  const aiEditAllowedType = block.block_type !== 'warm-up' && block.block_type !== 'cool-down';
+  const aiEditAllowedType = !NON_EDITABLE_TYPES.includes(block.block_type);
   const canAiEdit = !!onProposeAiEdit && !!onApplyAiProposal && !!onRefuseAiProposal && aiEditAllowedType;
   const locked = aiEditedBlockIds?.has(block.id) ?? false;
   // Inline coaching disclosure (skills/strength/metcon). Collapsed by default;

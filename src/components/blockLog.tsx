@@ -2,6 +2,20 @@
 // its own little world; BlockLog dispatches to the right one. The day page owns a
 // DayLogController (in-progress log id, saved-state, save via save-workout-block);
 // each world reads the prescription off the block and collects actuals.
+//
+// Logging-fidelity redesign:
+//  - Strength / skills / accessory all log PER SET on the same prefilled grid
+//    (a row is a set; prefill = the prescription, so "did it as written" is
+//    just Save). Rows are shape-aware: rep-counted work gets a reps column,
+//    holds get seconds (hold_seconds), distance work gets distance.
+//  - Effort is ONE question per block ("how hard was this block?"), saved on
+//    workout_log_blocks.rpe. Per-set RPE is gone — it was prefilled from the
+//    prescription, so the stored values were the question echoed back.
+//  - The Q (A-D quality) column is gone — never interpretable on touch, never
+//    consumed. The fault checkboxes are the quality signal.
+//  - Metcon: no Rx checkbox (personal programs — editing the prescription IS
+//    scaling); capped saves the cap time as the score plus a rounds+reps
+//    "how far did you get"; calorie movements save to the calories column.
 import { useMemo, useState } from 'react';
 import type { ProgramBlockV2, ProgramMovementV2 } from '../pages/ProgramDetailPage';
 import type { ReviewBlock } from '../components/reviewCoaching';
@@ -21,6 +35,7 @@ export interface LogEntry {
   hold_seconds: number | null;
   distance: number | null;
   distance_unit: string | null;
+  calories: number | null;
   quality: string | null;
   variation: string | null;
   faults_observed: string[] | null;
@@ -40,6 +55,8 @@ export interface SaveBlockPayload {
   entries: LogEntry[];
   capped: boolean;
   capped_reps: number | null;
+  /** Block-level effort (1-10) — the one RPE signal per block. */
+  rpe?: number | null;
   cardio_avg_watts?: number | null;
   cardio_work_seconds?: number | null;
   cardio_modality?: string | null;
@@ -70,16 +87,42 @@ const parseClock = (s: string): number | null => {
   if (t.includes(':')) { const [m, sec] = t.split(':'); const mm = parseInt(m, 10), ss = parseInt(sec, 10); if (!Number.isFinite(mm) || !Number.isFinite(ss)) return null; return mm * 60 + ss; }
   const n = parseInt(t, 10); return Number.isFinite(n) ? n : null;
 };
-function plannedSets(m: ProgramMovementV2): { count: number; reps: (number | null)[] } {
+export const formatClock = (seconds: number): string =>
+  `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+
+/**
+ * Shape-aware per-set plan for one movement. A row is a set; the value column
+ * depends on how the work is prescribed:
+ *   - rep-counted (rep_scheme / reps)      → reps, prefilled per set
+ *   - time-based (time_seconds, no reps)   → seconds (saved as hold_seconds)
+ *   - distance-based                       → distance (saved with its unit)
+ *   - sets only ("3 sets max pull-ups")    → reps, EMPTY prefill (the blank
+ *     is the feature: the athlete fills their actual max)
+ * Same precedence the day card's display uses, so the log form can never
+ * disagree with the prescription the athlete is looking at.
+ */
+type SetKind = 'reps' | 'seconds' | 'distance';
+export function plannedSets(m: ProgramMovementV2): { kind: SetKind; count: number; prefill: (number | null)[]; unitLabel: string } {
   const scheme = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
-  if (scheme && scheme.length > 0) return { count: scheme.length, reps: scheme };
+  if (scheme && scheme.length > 0) {
+    return { kind: 'reps', count: scheme.length, prefill: scheme, unitLabel: 'reps' };
+  }
   const count = m.sets ?? 1;
-  return { count, reps: Array.from({ length: count }, () => m.reps ?? null) };
+  if (m.reps != null) {
+    return { kind: 'reps', count, prefill: Array.from({ length: count }, () => m.reps), unitLabel: 'reps' };
+  }
+  if (m.time_seconds != null) {
+    return { kind: 'seconds', count, prefill: Array.from({ length: count }, () => m.time_seconds), unitLabel: 'sec' };
+  }
+  if (m.distance != null) {
+    return { kind: 'distance', count, prefill: Array.from({ length: count }, () => m.distance), unitLabel: m.distance_unit || 'dist' };
+  }
+  return { kind: 'reps', count, prefill: Array.from({ length: count }, () => null), unitLabel: 'reps' };
 }
 const blockText = (b: ProgramBlockV2) => b.block_scheme || b.block_label || '';
 const emptyEntry = (movement: string, extra: Partial<LogEntry>): LogEntry => ({
   movement, sets: null, reps: null, weight: null, weight_unit: 'lbs', rpe: null, set_number: null,
-  reps_completed: null, hold_seconds: null, distance: null, distance_unit: null, quality: null,
+  reps_completed: null, hold_seconds: null, distance: null, distance_unit: null, calories: null, quality: null,
   variation: null, faults_observed: null, completed: true, skip_reason: null,
   prescribed_weight: null, prescribed_reps: null, ...extra,
 });
@@ -94,6 +137,37 @@ function inferMetconType(block: ProgramBlockV2): string {
   if (/EMOM|E\d+MOM/.test(combined)) return 'emom';
   return 'for_time';
 }
+
+/**
+ * Reps in one round of this metcon, when the shape supports rounds (every
+ * movement carries a uniform rep_scheme). Used to convert a capped athlete's
+ * "4+7" into total reps. Null when rounds aren't well-defined (chippers,
+ * mixed schemes) — those athletes enter a plain total instead.
+ */
+export function metconRoundSize(block: ProgramBlockV2): number | null {
+  let size = 0;
+  for (const m of block.movements) {
+    const scheme = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
+    if (!scheme || scheme.length === 0) continue; // cal/distance movements don't count reps
+    if (!scheme.every((n) => n === scheme[0])) return null; // non-uniform → no round size
+    size += scheme[0];
+  }
+  return size > 0 ? size : null;
+}
+
+/** Parse capped progress: "4+7" (rounds+reps, needs round size) or a plain
+ *  total. Returns total reps completed, or null when unparseable. */
+export function parseCapProgress(input: string, roundSize: number | null): number | null {
+  const t = input.trim();
+  if (!t) return null;
+  const plus = t.match(/^(\d+)\s*\+\s*(\d+)$/);
+  if (plus) {
+    if (roundSize == null) return null;
+    return parseInt(plus[1], 10) * roundSize + parseInt(plus[2], 10);
+  }
+  return intOrNull(t);
+}
+
 // Match the coach review's common_faults to a movement by fuzzy name (same as
 // the old logger). Coaching is lazy — empty until the review loads.
 const normalizeName = (name: string): string => name.toLowerCase().replace(/[-\s'']/g, '').replace(/[^a-z0-9]/g, '');
@@ -118,38 +192,6 @@ const inputStyle: React.CSSProperties = {
   color: 'var(--text)', fontFamily: "'Outfit', sans-serif",
 };
 const wrapStyle: React.CSSProperties = { marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)' };
-
-// A/B/C/D self-rated movement quality. Red border until set (a "rate me" nudge).
-function QualitySelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      title="Movement quality A–D"
-      style={{ ...inputStyle, padding: '8px 2px', border: value ? '1px solid var(--border)' : '1px solid var(--accent)' }}
-    >
-      <option value="">Q</option>
-      <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>
-    </select>
-  );
-}
-
-// RPE 1–10 dropdown (perceived exertion). Blank until set.
-function RpeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      title="RPE 1–10"
-      style={{ ...inputStyle, padding: '8px 2px' }}
-    >
-      <option value="">RPE</option>
-      {Array.from({ length: 10 }, (_, i) => String(i + 1)).map(n => (
-        <option key={n} value={n}>{n}</option>
-      ))}
-    </select>
-  );
-}
 
 // Common-fault checkboxes (from the coach review). Checked → faults_observed.
 function FaultChecklist({ faults, checked, onToggle }: { faults: string[]; checked: string[]; onToggle: (f: string) => void }) {
@@ -181,28 +223,29 @@ function SavedBadge({ onEdit }: { onEdit: () => void }) {
     </div>
   );
 }
-/**
- * What the two unlabelled columns mean. The reps input labels itself via its
- * placeholder and RPE is at least an abbreviation people meet elsewhere, but
- * the quality select renders as a bare "Q" with A–D options and its only
- * explanation was a `title` tooltip — which does not exist on touch, i.e. the
- * way this form is actually used. Rendered as a line rather than a column
- * header so it costs no horizontal width in the grid.
- */
-function FieldLegend() {
-  return (
-    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
-      RPE = perceived exertion (1–10) · Q = movement quality (A–D)
-    </div>
-  );
-}
 
-// Legend lives here because SaveButton is the one component every block-type
-// form renders, so it appears exactly once per log panel.
-function SaveButton({ saving, onSave }: { saving: boolean; onSave: () => void }) {
+/**
+ * The one effort question per block. Lives inside SaveButton so it appears
+ * exactly once per log panel, directly above Save — the natural "how did
+ * that go?" moment. Unprefilled on purpose: this is the first real effort
+ * signal the system collects (per-set RPE was prescription-prefilled noise).
+ */
+function SaveButton({ saving, onSave, rpe, onRpe }: { saving: boolean; onSave: () => void; rpe: string; onRpe: (v: string) => void }) {
   return (
     <>
-      <FieldLegend />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-dim)', flex: 1 }}>How hard was this block? (RPE 1–10)</span>
+        <select
+          value={rpe}
+          onChange={e => onRpe(e.target.value)}
+          style={{ ...inputStyle, width: 72, padding: '8px 4px' }}
+        >
+          <option value="">—</option>
+          {Array.from({ length: 10 }, (_, i) => String(i + 1)).map(n => (
+            <option key={n} value={n}>{n}</option>
+          ))}
+        </select>
+      </div>
       <button type="button" className="auth-btn" style={{ width: '100%', marginTop: 8 }} onClick={onSave} disabled={saving}>
         {saving ? 'Saving…' : 'Save block'}
       </button>
@@ -218,95 +261,147 @@ const useChecked = () => {
   return { checked, toggle };
 };
 
-// ── Strength: per-set weight / reps / RPE / quality + block faults ──
-function StrengthLog({ block, controller, coaching }: { block: ProgramBlockV2; controller: DayLogController; coaching: ReviewBlock | null }) {
+// ── Shared per-set grid: strength / skills / accessory ──
+// A row is a set, prefilled from the prescription. showWeight adds the load
+// column (strength + accessory); skills is bodyweight/technique work.
+function PerSetLog({ block, controller, coaching, label, type, showWeight, faultsPerMovement }: {
+  block: ProgramBlockV2;
+  controller: DayLogController;
+  coaching: ReviewBlock | null;
+  label: string;
+  type: string;
+  showWeight: boolean;
+  faultsPerMovement: boolean;
+}) {
   const saving = controller.saving === block.sort_order;
   const initial = useMemo(() => {
-    const rows: Record<string, { weight: string; reps: string; rpe: string; quality: string }> = {};
+    const rows: Record<string, { weight: string; value: string }> = {};
     for (const m of block.movements) {
-      const { count, reps } = plannedSets(m);
-      for (let i = 0; i < count; i++) rows[`${m.id}-${i}`] = { weight: m.weight != null ? String(m.weight) : '', reps: reps[i] != null ? String(reps[i]) : '', rpe: m.rpe != null ? String(m.rpe) : '', quality: '' };
+      const { count, prefill } = plannedSets(m);
+      for (let i = 0; i < count; i++) {
+        rows[`${m.id}-${i}`] = {
+          weight: m.weight != null ? String(m.weight) : '',
+          value: prefill[i] != null ? String(prefill[i]) : '',
+        };
+      }
     }
     return rows;
   }, [block]);
   const [vals, setVals] = useState(initial);
-  const set = (k: string, f: 'weight' | 'reps' | 'rpe' | 'quality', v: string) => setVals(p => ({ ...p, [k]: { ...p[k], [f]: v } }));
+  const [blockRpe, setBlockRpe] = useState('');
+  const set = (k: string, f: 'weight' | 'value', v: string) => setVals(p => ({ ...p, [k]: { ...p[k], [f]: v } }));
   const { checked, toggle } = useChecked();
-  const faults = blockFaults(coaching, block.movements);
+  const sharedFaults = faultsPerMovement ? [] : blockFaults(coaching, block.movements);
+
   const save = () => {
     const blockFaultsChecked = checked['block'] ?? [];
     const entries: LogEntry[] = [];
     for (const m of block.movements) {
-      const { count } = plannedSets(m);
+      const { kind, count, prefill } = plannedSets(m);
+      const movementFaults = faultsPerMovement ? (checked[m.id] ?? []) : blockFaultsChecked;
       for (let i = 0; i < count; i++) {
-        const r = vals[`${m.id}-${i}`] ?? { weight: '', reps: '', rpe: '', quality: '' };
-        entries.push(emptyEntry(m.movement, { sets: 1, reps: intOrNull(r.reps), weight: numOrNull(r.weight), weight_unit: m.weight_unit || controller.userUnits, rpe: numOrNull(r.rpe), set_number: i + 1, quality: r.quality || null, faults_observed: blockFaultsChecked.length ? blockFaultsChecked : null, prescribed_weight: m.weight ?? null, prescribed_reps: m.reps ?? null }));
+        const r = vals[`${m.id}-${i}`] ?? { weight: '', value: '' };
+        const v = kind === 'distance' ? numOrNull(r.value) : intOrNull(r.value);
+        entries.push(emptyEntry(m.movement, {
+          sets: 1,
+          set_number: i + 1,
+          reps: kind === 'reps' ? v : null,
+          hold_seconds: kind === 'seconds' ? v : null,
+          distance: kind === 'distance' ? v : null,
+          distance_unit: kind === 'distance' ? (m.distance_unit ?? null) : null,
+          weight: showWeight ? numOrNull(r.weight) : null,
+          weight_unit: m.weight_unit || controller.userUnits,
+          faults_observed: movementFaults.length ? movementFaults : null,
+          prescribed_weight: m.weight ?? null,
+          // Per-set prescription (was the movement's TOTAL pre-redesign, which
+          // made every logged set read as an 80% miss to any comparer).
+          prescribed_reps: kind === 'reps' ? (prefill[i] ?? null) : null,
+        }));
       }
     }
-    controller.saveBlock({ label: block.block_label || 'Strength', type: 'strength', text: blockText(block), score: null, rx: false, notes: null, sort_order: block.sort_order, entries, capped: false, capped_reps: null });
+    controller.saveBlock({
+      label: block.block_label || label, type, text: blockText(block), score: null, rx: false, notes: null,
+      sort_order: block.sort_order, entries, capped: false, capped_reps: null, rpe: numOrNull(blockRpe),
+    });
   };
+
+  const cols = showWeight ? '28px 1fr 1fr' : '28px 1fr';
   return (
     <div className="block-log" style={wrapStyle}>
       {block.movements.map((m) => {
-        const { count } = plannedSets(m);
+        const { count, unitLabel } = plannedSets(m);
+        const faults = faultsPerMovement ? faultsForMovement(coaching, m.movement) : [];
         return (
           <div key={m.id} style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{formatMovementName(m.movement)}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 1fr 1fr 44px', gap: 6, alignItems: 'center' }}>
-              <span /><span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>{controller.userUnits}</span><span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>reps</span><span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>RPE</span><span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>Q</span>
+            <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 6, alignItems: 'center' }}>
+              <span />
+              {showWeight && <span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>{controller.userUnits}</span>}
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>{unitLabel}</span>
               {Array.from({ length: count }, (_, i) => {
-                const k = `${m.id}-${i}`; const r = vals[k] ?? { weight: '', reps: '', rpe: '', quality: '' };
+                const k = `${m.id}-${i}`; const r = vals[k] ?? { weight: '', value: '' };
                 return (
                   <>
                     <span key={`${k}-l`} style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 600 }}>S{i + 1}</span>
-                    <input key={`${k}-w`} style={inputStyle} inputMode="decimal" value={r.weight} onChange={e => set(k, 'weight', e.target.value)} />
-                    <input key={`${k}-r`} style={inputStyle} inputMode="numeric" value={r.reps} onChange={e => set(k, 'reps', e.target.value)} />
-                    <RpeSelect key={`${k}-p`} value={r.rpe} onChange={v => set(k, 'rpe', v)} />
-                    <QualitySelect key={`${k}-q`} value={r.quality} onChange={v => set(k, 'quality', v)} />
+                    {showWeight && <input key={`${k}-w`} style={inputStyle} inputMode="decimal" value={r.weight} onChange={e => set(k, 'weight', e.target.value)} />}
+                    <input key={`${k}-v`} style={inputStyle} inputMode="decimal" value={r.value} onChange={e => set(k, 'value', e.target.value)} />
                   </>
                 );
               })}
             </div>
+            {faultsPerMovement && <FaultChecklist faults={faults} checked={checked[m.id] ?? []} onToggle={(f) => toggle(m.id, f)} />}
           </div>
         );
       })}
-      <FaultChecklist faults={faults} checked={checked['block'] ?? []} onToggle={(f) => toggle('block', f)} />
-      <SaveButton saving={saving} onSave={save} />
+      {!faultsPerMovement && <FaultChecklist faults={sharedFaults} checked={checked['block'] ?? []} onToggle={(f) => toggle('block', f)} />}
+      <SaveButton saving={saving} onSave={save} rpe={blockRpe} onRpe={setBlockRpe} />
     </div>
   );
 }
 
-// ── Metcon: one result (time or rounds+reps), Rx/scaled, capped + block faults ──
+// ── Metcon: one result (time or rounds+reps), capped + block faults ──
+// No Rx checkbox: these are personal programs — editing the prescription IS
+// the scaling mechanism, so "as prescribed" is a tautology. The rx column
+// stays in the schema (always false) for a future group-program world.
 function MetconLog({ block, controller, coaching }: { block: ProgramBlockV2; controller: DayLogController; coaching: ReviewBlock | null }) {
   const saving = controller.saving === block.sort_order;
   const [score, setScore] = useState('');
-  const [rx, setRx] = useState(true);
   const [capped, setCapped] = useState(false);
   const [cappedReps, setCappedReps] = useState('');
   const [notes, setNotes] = useState('');
+  const [blockRpe, setBlockRpe] = useState('');
   const { checked, toggle } = useChecked();
   // "Hit the cap" only applies to for-time work; AMRAP/EMOM score IS rounds+reps.
   const isForTime = inferMetconType(block) === 'for_time';
+  const roundSize = metconRoundSize(block);
+  const capTotal = capped ? parseCapProgress(cappedReps, roundSize) : null;
   const save = () => {
     const entries: LogEntry[] = block.movements.map((m) => {
       const isCal = m.calories != null && m.calories > 0;
       const f = checked[m.id] ?? [];
       return emptyEntry(m.movement, {
-        reps: isCal ? (m.calories ?? null) : (m.reps ?? null),
+        // Calories are calories — never reps with a phantom unit. (The old
+        // smuggled encoding is backfilled by the logging-fidelity migration.)
+        reps: isCal ? null : (m.reps ?? null),
+        calories: isCal ? (m.calories ?? null) : null,
         weight: m.weight ?? null, weight_unit: m.weight_unit || controller.userUnits,
-        distance: isCal ? null : (m.distance ?? null), distance_unit: isCal ? 'cal' : (m.distance_unit ?? null),
+        distance: isCal ? null : (m.distance ?? null), distance_unit: isCal ? null : (m.distance_unit ?? null),
         faults_observed: f.length ? f : null,
-        prescribed_weight: m.weight ?? null, prescribed_reps: m.reps ?? null,
+        prescribed_weight: m.weight ?? null, prescribed_reps: isCal ? null : (m.reps ?? null),
       });
     });
     const benchmark = reshapeBenchmark(block.expected_benchmark);
     const wType = inferMetconType(block);
     const text = [block.block_scheme, block.block_label].filter(Boolean).join('\n');
     const scoring = !capped && score.trim() && benchmark ? scoreMetcon(score.trim(), wType, benchmark) : null;
+    // Capped: the athlete's time IS the cap — save it as the score so a capped
+    // workout is distinguishable from an unlogged one. capped:true marks it.
+    const cappedScore = block.time_cap_seconds != null ? formatClock(block.time_cap_seconds) : null;
     controller.saveBlock({
       label: block.block_label || 'Metcon', type: 'metcon', text: blockText(block),
-      score: capped ? null : (score.trim() || null), rx, notes: notes.trim() || null,
-      sort_order: block.sort_order, entries, capped, capped_reps: capped ? intOrNull(cappedReps) : null,
+      score: capped ? cappedScore : (score.trim() || null), rx: false, notes: notes.trim() || null,
+      sort_order: block.sort_order, entries, capped, capped_reps: capped ? capTotal : null,
+      rpe: numOrNull(blockRpe),
       block_scheme: block.block_scheme, time_cap_seconds: block.time_cap_seconds,
       percentile: scoring?.percentile ?? null, performance_tier: scoring?.performanceTier ?? null,
       median_benchmark: benchmark && benchmark.medianScore !== '--' ? benchmark.medianScore : null,
@@ -322,11 +417,24 @@ function MetconLog({ block, controller, coaching }: { block: ProgramBlockV2; con
           <input style={{ ...inputStyle, textAlign: 'left' }} placeholder={isForTime ? 'e.g. 12:34' : 'e.g. 5+18'} value={score} onChange={e => setScore(e.target.value)} />
         </div>
       )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', marginBottom: 8 }}>
-        <label style={{ fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={rx} onChange={e => setRx(e.target.checked)} /> Rx</label>
-        {isForTime && <label style={{ fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={capped} onChange={e => setCapped(e.target.checked)} /> Hit the cap</label>}
-        {isForTime && capped && <input style={{ ...inputStyle, width: 120 }} inputMode="numeric" placeholder="reps at cap" value={cappedReps} onChange={e => setCappedReps(e.target.value)} />}
-      </div>
+      {isForTime && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', marginBottom: 8 }}>
+          <label style={{ fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={capped} onChange={e => setCapped(e.target.checked)} /> Hit the cap</label>
+          {capped && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <input
+                style={{ ...inputStyle, width: 140 }}
+                placeholder={roundSize != null ? 'e.g. 4+7 or total reps' : 'total reps done'}
+                value={cappedReps}
+                onChange={e => setCappedReps(e.target.value)}
+              />
+              {capTotal != null && cappedReps.includes('+') && (
+                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>= {capTotal} reps</span>
+              )}
+            </span>
+          )}
+        </div>
+      )}
       <input style={{ ...inputStyle, textAlign: 'left' }} placeholder="Notes (optional)" value={notes} onChange={e => setNotes(e.target.value)} />
       {block.movements.map((m) => {
         const mFaults = faultsForMovement(coaching, m.movement);
@@ -338,84 +446,7 @@ function MetconLog({ block, controller, coaching }: { block: ProgramBlockV2; con
           </div>
         );
       })}
-      <SaveButton saving={saving} onSave={save} />
-    </div>
-  );
-}
-
-// ── Skills: reps completed + RPE + quality + per-movement faults ──
-function SkillsLog({ block, controller, coaching }: { block: ProgramBlockV2; controller: DayLogController; coaching: ReviewBlock | null }) {
-  const saving = controller.saving === block.sort_order;
-  const [vals, setVals] = useState<Record<string, { reps: string; rpe: string; quality: string }>>(() => Object.fromEntries(block.movements.map(m => [m.id, { reps: '', rpe: '', quality: '' }])));
-  const set = (id: string, f: 'reps' | 'rpe' | 'quality', v: string) => setVals(p => ({ ...p, [id]: { ...p[id], [f]: v } }));
-  const { checked, toggle } = useChecked();
-  const save = () => {
-    const entries: LogEntry[] = block.movements.map((m) => {
-      const r = vals[m.id] ?? { reps: '', rpe: '', quality: '' };
-      const f = checked[m.id] ?? [];
-      return emptyEntry(m.movement, { sets: m.sets ?? null, reps_completed: intOrNull(r.reps), rpe: numOrNull(r.rpe), quality: r.quality || null, faults_observed: f.length ? f : null, prescribed_reps: m.reps ?? null });
-    });
-    controller.saveBlock({ label: block.block_label || 'Skills', type: 'skills', text: blockText(block), score: null, rx: false, notes: null, sort_order: block.sort_order, entries, capped: false, capped_reps: null });
-  };
-  return (
-    <div className="block-log" style={wrapStyle}>
-      {block.movements.map((m) => {
-        const r = vals[m.id] ?? { reps: '', rpe: '', quality: '' };
-        const faults = faultsForMovement(coaching, m.movement);
-        return (
-          <div key={m.id} style={{ marginBottom: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 44px', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>{formatMovementName(m.movement)}</span>
-              <input style={inputStyle} inputMode="numeric" placeholder="reps" value={r.reps} onChange={e => set(m.id, 'reps', e.target.value)} />
-              <RpeSelect value={r.rpe} onChange={v => set(m.id, 'rpe', v)} />
-              <QualitySelect value={r.quality} onChange={v => set(m.id, 'quality', v)} />
-            </div>
-            <FaultChecklist faults={faults} checked={checked[m.id] ?? []} onToggle={(f) => toggle(m.id, f)} />
-          </div>
-        );
-      })}
-      <SaveButton saving={saving} onSave={save} />
-    </div>
-  );
-}
-
-// ── Accessory: weight / reps / RPE per movement + block faults ──
-function AccessoryLog({ block, controller, coaching }: { block: ProgramBlockV2; controller: DayLogController; coaching: ReviewBlock | null }) {
-  const saving = controller.saving === block.sort_order;
-  const [vals, setVals] = useState<Record<string, { weight: string; reps: string; rpe: string }>>(
-    () => Object.fromEntries(block.movements.map(m => [m.id, { weight: m.weight != null ? String(m.weight) : '', reps: m.reps != null ? String(m.reps) : '', rpe: m.rpe != null ? String(m.rpe) : '' }]))
-  );
-  const set = (id: string, f: 'weight' | 'reps' | 'rpe', v: string) => setVals(p => ({ ...p, [id]: { ...p[id], [f]: v } }));
-  const { checked, toggle } = useChecked();
-  const save = () => {
-    const entries: LogEntry[] = block.movements.map((m) => {
-      const r = vals[m.id] ?? { weight: '', reps: '', rpe: '' };
-      const f = checked[m.id] ?? [];
-      return emptyEntry(m.movement, { sets: m.sets ?? null, weight: numOrNull(r.weight), weight_unit: m.weight_unit || controller.userUnits, reps_completed: intOrNull(r.reps), rpe: numOrNull(r.rpe), faults_observed: f.length ? f : null, prescribed_weight: m.weight ?? null, prescribed_reps: m.reps ?? null });
-    });
-    controller.saveBlock({ label: block.block_label || 'Accessory', type: 'accessory', text: blockText(block), score: null, rx: false, notes: null, sort_order: block.sort_order, entries, capped: false, capped_reps: null });
-  };
-  return (
-    <div className="block-log" style={wrapStyle}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 6, alignItems: 'center', marginBottom: 4 }}>
-        <span /><span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>{controller.userUnits}</span><span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>reps</span><span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>RPE</span>
-      </div>
-      {block.movements.map((m) => {
-        const r = vals[m.id] ?? { weight: '', reps: '', rpe: '' };
-        const faults = faultsForMovement(coaching, m.movement);
-        return (
-          <div key={m.id} style={{ marginBottom: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>{formatMovementName(m.movement)}</span>
-              <input style={inputStyle} inputMode="decimal" value={r.weight} onChange={e => set(m.id, 'weight', e.target.value)} />
-              <input style={inputStyle} inputMode="numeric" value={r.reps} onChange={e => set(m.id, 'reps', e.target.value)} />
-              <RpeSelect value={r.rpe} onChange={v => set(m.id, 'rpe', v)} />
-            </div>
-            <FaultChecklist faults={faults} checked={checked[m.id] ?? []} onToggle={(f) => toggle(m.id, f)} />
-          </div>
-        );
-      })}
-      <SaveButton saving={saving} onSave={save} />
+      <SaveButton saving={saving} onSave={save} rpe={blockRpe} onRpe={setBlockRpe} />
     </div>
   );
 }
@@ -425,11 +456,12 @@ function CardioLog({ block, controller }: { block: ProgramBlockV2; controller: D
   const saving = controller.saving === block.sort_order;
   const [watts, setWatts] = useState('');
   const [time, setTime] = useState('');
+  const [blockRpe, setBlockRpe] = useState('');
   const save = () => {
     const entries: LogEntry[] = block.movements.map((m) => emptyEntry(m.movement, { distance: m.distance ?? null, distance_unit: m.distance_unit ?? null }));
     controller.saveBlock({
       label: block.block_label || 'Cardio', type: 'cardio', text: blockText(block), score: null, rx: false, notes: null,
-      sort_order: block.sort_order, entries, capped: false, capped_reps: null,
+      sort_order: block.sort_order, entries, capped: false, capped_reps: null, rpe: numOrNull(blockRpe),
       cardio_avg_watts: numOrNull(watts), cardio_work_seconds: parseClock(time), cardio_modality: null,
     });
   };
@@ -439,7 +471,7 @@ function CardioLog({ block, controller }: { block: ProgramBlockV2; controller: D
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Avg watts</div><input style={inputStyle} inputMode="decimal" placeholder="watts" value={watts} onChange={e => setWatts(e.target.value)} /></div>
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Work time</div><input style={inputStyle} placeholder="mm:ss" value={time} onChange={e => setTime(e.target.value)} /></div>
       </div>
-      <SaveButton saving={saving} onSave={save} />
+      <SaveButton saving={saving} onSave={save} rpe={blockRpe} onRpe={setBlockRpe} />
     </div>
   );
 }
@@ -447,11 +479,16 @@ function CardioLog({ block, controller }: { block: ProgramBlockV2; controller: D
 // ── Dispatcher ──
 function renderWorld(block: ProgramBlockV2, controller: DayLogController, coaching: ReviewBlock | null) {
   switch (block.block_type) {
-    case 'strength': return <StrengthLog block={block} controller={controller} coaching={coaching} />;
-    case 'metcon': return <MetconLog block={block} controller={controller} coaching={coaching} />;
-    case 'skills': return <SkillsLog block={block} controller={controller} coaching={coaching} />;
-    case 'accessory': return <AccessoryLog block={block} controller={controller} coaching={coaching} />;
-    case 'cardio': return <CardioLog block={block} controller={controller} />;
+    case 'strength':
+      return <PerSetLog block={block} controller={controller} coaching={coaching} label="Strength" type="strength" showWeight faultsPerMovement={false} />;
+    case 'metcon':
+      return <MetconLog block={block} controller={controller} coaching={coaching} />;
+    case 'skills':
+      return <PerSetLog block={block} controller={controller} coaching={coaching} label="Skills" type="skills" showWeight={false} faultsPerMovement />;
+    case 'accessory':
+      return <PerSetLog block={block} controller={controller} coaching={coaching} label="Accessory" type="accessory" showWeight faultsPerMovement />;
+    case 'cardio':
+      return <CardioLog block={block} controller={controller} />;
     default: return null;
   }
 }
