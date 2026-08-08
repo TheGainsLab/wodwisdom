@@ -25,6 +25,11 @@ export interface WorkoutLogBlockRow {
   block_text: string;
   score: string | null;
   rx: boolean;
+  /** Block-level athlete-reported effort (1-10). */
+  rpe: number | null;
+  /** For-time metcon that hit the cap — score holds the cap time. */
+  capped: boolean | null;
+  capped_reps: number | null;
   sort_order: number;
 }
 
@@ -46,6 +51,7 @@ export interface WorkoutLogEntryRow {
   hold_seconds: number | null;
   distance: number | null;
   distance_unit: string | null;
+  calories: number | null;
   quality: string | null;
   variation: string | null;
   faults_observed: string[] | null;
@@ -133,7 +139,7 @@ function formatBlock(
   if (block.block_type === "metcon") {
     const typeLabel = getMetconTypeLabel(block.block_text);
     const parts: string[] = [];
-    if (block.score) parts.push(block.score);
+    if (block.score) parts.push(block.capped ? `capped at ${block.score}${block.capped_reps != null ? ` (${block.capped_reps} reps in)` : ""}` : block.score);
     if (block.rx) parts.push("Rx");
     if (sorted.length > 0) {
       parts.push(
@@ -142,6 +148,7 @@ function formatBlock(
             .slice(0, 3)
             .map((e) => {
               let s = formatMovementName(e.movement);
+              if (e.calories != null) s += ` ${e.calories} cal`;
               if (e.scaling_note) s += ` ${e.scaling_note}`;
               if (e.faults_observed && e.faults_observed.length > 0) s += ` faults: ${e.faults_observed.join(", ")}`;
               return s;
@@ -193,6 +200,7 @@ function formatBlock(
         }
         if (e.hold_seconds != null) p += ` ${e.hold_seconds}s hold`;
         if (e.distance != null) p += ` ${e.distance}${e.distance_unit || "ft"}`;
+        if (e.calories != null) p += ` ${e.calories} cal`;
         if (e.weight != null) p += ` @${e.weight}${e.weight_unit === "kg" ? "kg" : "lbs"}`;
         if (e.rpe != null) p += ` RPE ${e.rpe}`;
         if (e.quality) p += ` Q:${e.quality}`;
@@ -279,7 +287,9 @@ export function formatRecentHistory(
       const byLabel = entriesByBlock.get(`${log.id}::${block.block_label ?? ""}`) || [];
       const blockEntries = byId.length > 0 ? byId : byLabel;
       const summary = formatBlock(block, blockEntries);
-      lines.push(`${dateLabel} — ${summary}`);
+      // Block-level effort — the one RPE signal per block post-redesign.
+      const rpeSuffix = block.rpe != null ? ` — block RPE ${block.rpe}` : "";
+      lines.push(`${dateLabel} — ${summary}${rpeSuffix}`);
     }
   }
 
@@ -443,11 +453,11 @@ export async function fetchAndFormatRecentHistory(
     const [{ data: blocks }, { data: entries }] = await Promise.all([
       supa
         .from("workout_log_blocks")
-        .select("id, log_id, block_type, block_label, block_text, score, rx, sort_order")
+        .select("id, log_id, block_type, block_label, block_text, score, rx, rpe, capped, capped_reps, sort_order")
         .in("log_id", logIds),
       supa
         .from("workout_log_entries")
-        .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, quality, variation, faults_observed")
+        .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, calories, quality, variation, faults_observed")
         .in("log_id", logIds),
     ]);
 

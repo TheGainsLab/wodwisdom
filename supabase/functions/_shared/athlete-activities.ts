@@ -205,12 +205,21 @@ export async function buildOtherTrainingLoadBlock(
 ): Promise<string> {
   const cutoff = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10);
 
-  const [{ data: entries }, { data: acts }] = await Promise.all([
+  const [{ data: entries }, { data: blocks }, { data: acts }] = await Promise.all([
     supa
       .from("workout_log_entries")
       .select("movement, weight, weight_unit, rpe, sets, reps, workout_logs!inner(user_id, workout_date)")
       .eq("workout_logs.user_id", userId)
       .gte("workout_logs.workout_date", cutoff),
+    // Block-level effort — the one RPE signal per block post logging-fidelity
+    // (per-set entry rpe is null on new logs; old logs still carry it, so
+    // both sources feed the per-day max below).
+    supa
+      .from("workout_log_blocks")
+      .select("rpe, workout_logs!inner(user_id, workout_date)")
+      .eq("workout_logs.user_id", userId)
+      .gte("workout_logs.workout_date", cutoff)
+      .not("rpe", "is", null),
     supa
       .from("athlete_activities")
       .select("date, workout_type, activity_type, duration_minutes, calories, score, rpe, parsed")
@@ -234,6 +243,18 @@ export async function buildOtherTrainingLoadBlock(
       rpe: (r.rpe as number | null) ?? null,
     });
   }
+  // Per-day max of block-level RPE (merged with legacy per-set values below).
+  const blockRpeByDate = new Map<string, number>();
+  for (const raw of blocks ?? []) {
+    const r = raw as Record<string, unknown>;
+    const wl = r.workout_logs as { workout_date?: string } | Array<{ workout_date?: string }> | null;
+    const date = Array.isArray(wl) ? (wl[0]?.workout_date ?? "") : (wl?.workout_date ?? "");
+    const rpe = (r.rpe as number | null) ?? null;
+    if (!date || rpe == null) continue;
+    blockRpeByDate.set(date, Math.max(blockRpeByDate.get(date) ?? 0, rpe));
+    if (!byDate.has(date)) byDate.set(date, []);
+  }
+
   const programLines = [...byDate.entries()]
     .sort((a, b) => (a[0] < b[0] ? 1 : -1))
     .slice(0, 14)
@@ -243,7 +264,10 @@ export async function buildOtherTrainingLoadBlock(
         .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))
         .slice(0, 3)
         .map((m) => m.movement);
-      const maxRpe = movs.reduce((mx, m) => Math.max(mx, m.rpe ?? 0), 0);
+      const maxRpe = Math.max(
+        movs.reduce((mx, m) => Math.max(mx, m.rpe ?? 0), 0),
+        blockRpeByDate.get(date) ?? 0,
+      );
       return `- ${date}: program session${top.length ? ` — ${top.join(", ")}` : ""}${maxRpe > 0 ? ` (top RPE ${maxRpe})` : ""}`;
     });
 

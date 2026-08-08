@@ -51,6 +51,8 @@ interface Entry {
   hold_seconds?: number | null;
   distance?: number | null;
   distance_unit?: "ft" | "m";
+  /** Calorie-counted work (cal row/bike/ski) — its own field, never reps. */
+  calories?: number | null;
   quality?: "A" | "B" | "C" | "D" | null;
   variation?: string | null;
   faults_observed?: string[] | null;
@@ -83,6 +85,8 @@ interface SaveBlockBody {
     entries?: Entry[];
     capped?: boolean | null;
     capped_reps?: number | null;
+    /** Block-level effort (1-10) — the one RPE signal per block. */
+    rpe?: number | null;
     percentile?: number | null;
     performance_tier?: string | null;
     median_benchmark?: string | null;
@@ -250,8 +254,11 @@ Deno.serve(async (req) => {
         block_type: blockType,
         block_label: block.label?.trim() || null,
         block_text: blockText,
-        score: isCapped ? null : block.score?.trim() || null,
+        // A capped for-time score is the cap itself — the client sends it so a
+        // capped workout is distinguishable from an unlogged one.
+        score: block.score?.trim() || null,
         rx: block.rx ?? false,
+        rpe: block.rpe != null && block.rpe >= 1 && block.rpe <= 10 ? block.rpe : null,
         notes: block.notes?.trim() || null,
         sort_order: block.sort_order,
         // Preserve a re-saved block's original date; omit for new blocks so the
@@ -344,6 +351,10 @@ Deno.serve(async (req) => {
         hold_seconds:
           entry.hold_seconds != null && entry.hold_seconds > 0
             ? entry.hold_seconds
+            : null,
+        calories:
+          entry.calories != null && entry.calories > 0 && entry.calories < 100000
+            ? entry.calories
             : null,
         distance:
           entry.distance != null && entry.distance > 0 ? entry.distance : null,
