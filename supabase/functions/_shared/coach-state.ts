@@ -51,7 +51,12 @@ export type EvidenceKey = AthleteModelKey | (string & {});
 // from that evidence.
 // v1.5 (intake): reads athlete_model.self_report (Tier-3 qualitative intake) —
 // honors preferences, weighs self-assessment vs data, uses training age.
-export const COACH_STATE_BUILDER_VERSION = "v1.5";
+// v1.6 (eval hardening): target estimates cited from the model; confidence
+// calibrated to data provenance; summary as connective tissue; second-person
+// headline; taxonomy definitions; no mixed-modal claims without data. Reason
+// codes are now shaped per-athlete (unsupportable codes stripped from the tool
+// enum) and outputs run through coach-state-audits with one retry.
+export const COACH_STATE_BUILDER_VERSION = "v1.6";
 
 // ============================================================
 // Controlled vocabularies — LOCKED v1 (DATA, versioned with the schema;
@@ -215,6 +220,45 @@ export interface CoachState extends CoachStateContent {
 // focus / reason / evidence values (no invented variants).
 // ============================================================
 
+/** The minimal payload shape reason-code shaping reads. Structurally satisfied
+ *  by WriterPayload — kept narrow so the harness can pass a stub. */
+export interface ReasonShapingInputs {
+  training_context?: { goal_text?: string | null } | null;
+  previous_cycle?: unknown | null;
+  competition?: unknown | null;
+  athlete_model: {
+    capability_revisions?: unknown[];
+    logged_competition_results?: unknown[];
+    outside_training?: unknown | null;
+  };
+}
+
+/**
+ * Per-athlete reason enum: the full controlled set MINUS codes this athlete's
+ * data cannot support. Unsupported codes become UNEMITTABLE (schema-rejected),
+ * not caught after the fact — same philosophy as the per-athlete evidence enum.
+ */
+export function allowedReasonCodes(payload: ReasonShapingInputs): ReasonCode[] {
+  const goal = payload.training_context?.goal_text;
+  const hasGoal = typeof goal === "string" && goal.trim() !== "";
+  const revisions = payload.athlete_model.capability_revisions ?? [];
+  const loggedComp = payload.athlete_model.logged_competition_results ?? [];
+  const hasLoadHistory = payload.previous_cycle != null ||
+    payload.athlete_model.outside_training != null || revisions.length > 0;
+  const hasCompetition = payload.competition != null || loggedComp.length > 0;
+  const hasObserved = revisions.length > 0;
+
+  return REASON_CODES.filter((code) => {
+    if (code === "supports_stated_goal") return hasGoal;
+    if (code === "high_prior_load") return hasLoadHistory;
+    if (code === "recent_competition") return hasCompetition;
+    if (code === "observed_progress" || code === "observed_plateau" || code === "low_adherence") {
+      return hasObserved;
+    }
+    return true;
+  });
+}
+
 /**
  * Build the emit tool with a per-athlete evidence enum. evidenceEnum should be
  * athleteModelEvidenceKeys(model) = the static strength normative keys PLUS this
@@ -222,10 +266,26 @@ export interface CoachState extends CoachStateContent {
  * movement percentile as typed evidence, and the API rejects any key that
  * isn't actually in this athlete's model. This is the runtime guarantee behind
  * the (compile-time-widened) evidence type.
+ *
+ * reasonEnum (optional, from allowedReasonCodes(payload)) narrows every
+ * reasons enum in the schema the same way — codes the athlete's data cannot
+ * support are schema-rejected rather than validated after the fact.
  */
-export function buildEmitCoachStateTool(evidenceEnum: readonly string[]) {
+export function buildEmitCoachStateTool(
+  evidenceEnum: readonly string[],
+  reasonEnum?: readonly string[],
+) {
   const tool = structuredClone(EMIT_COACH_STATE_TOOL);
-  tool.input_schema.properties.priorities.items.properties.evidence.items.enum = [...evidenceEnum];
+  const props = tool.input_schema.properties;
+  props.priorities.items.properties.evidence.items.enum = [...evidenceEnum];
+  if (reasonEnum) {
+    const reasons = [...reasonEnum];
+    props.priorities.items.properties.reasons.items.enum = reasons;
+    props.maintain.items.properties.reasons.items.enum = reasons;
+    props.deprioritize.items.properties.reasons.items.enum = reasons;
+    props.recovery_posture.properties.reasons.items.enum = reasons;
+    props.strength_emphasis.properties.reasons.items.enum = reasons;
+  }
   return tool;
 }
 

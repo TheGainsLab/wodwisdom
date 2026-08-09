@@ -58,7 +58,7 @@ const EVAL_SECTION_LABEL: React.CSSProperties = {
 /** Shared structured-evaluation renderer (admin v2 panel + user eval history):
  *  green strengths (bulleted), red weaknesses (numbered), synthesizing prose,
  *  numbered recommendations. */
-function StructuredEvalView({ e }: { e: SafeEvaluation }) {
+function StructuredEvalView({ e, onUpgrade }: { e: SafeEvaluation; onUpgrade?: () => void }) {
   // Stage D: does the eval have a shelf life (re-reads)?
   useEffect(() => { track('eval_viewed'); }, []);
   return (
@@ -91,6 +91,25 @@ function StructuredEvalView({ e }: { e: SafeEvaluation }) {
           <ol style={{ margin: 0, paddingLeft: 18 }}>
             {e.recommendations.map((r, i) => <li key={i} style={{ marginBottom: 4 }}>{r}</li>)}
           </ol>
+        </div>
+      )}
+      {/* Soft CTA — the app talking, not the coach: visually distinct from the
+          eval body, rendered only for users without AI Programming. */}
+      {onUpgrade && (
+        <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+            This evaluation is built from your numbers. AI Programming takes it the rest of the way —
+            your priorities, your schedule, your equipment, turned into a personalized training cycle
+            that updates as you log.
+          </div>
+          <button
+            type="button"
+            className="auth-btn"
+            style={{ padding: '8px 16px', fontSize: 13, width: 'auto' }}
+            onClick={onUpgrade}
+          >
+            Get AI Programming →
+          </button>
         </div>
       )}
     </div>
@@ -1886,7 +1905,10 @@ export default function AthletePage({ session }: { session: Session }) {
                                       {isExpanded && (structured || ev.analysis) && (
                                         <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
                                           {structured ? (
-                                            <StructuredEvalView e={normalizeEvaluation(structured)} />
+                                            <StructuredEvalView
+                                              e={normalizeEvaluation(structured)}
+                                              onUpgrade={!isAdmin && !hasFeature('programming') ? () => navigate('/checkout') : undefined}
+                                            />
                                           ) : (
                                             <div className="workout-review-section" style={{ marginTop: 0 }}>
                                               <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.analysis!) }} />

@@ -25,11 +25,16 @@ import {
   athleteModelEvidenceKeys,
 } from "./athlete-model.ts";
 import {
+  allowedReasonCodes,
   buildEmitCoachStateTool,
   COACH_STATE_BUILDER_VERSION,
   type CoachState,
   type CoachStateContent,
 } from "./coach-state.ts";
+import {
+  auditCoachState,
+  formatCoachStateViolationsForRetry,
+} from "./coach-state-audits.ts";
 import { persistCoachState } from "./persist-coach-state.ts";
 import { MODELS } from "./model-profiles.ts";
 
@@ -43,12 +48,23 @@ interface ClaudeResponse {
 }
 
 /** One CoachState LLM call. Consumes payload.athlete_model (Step-1 facts) +
- *  a per-athlete evidence enum (Step 1.5). Returns validated content stamped
- *  with the builder version. */
-async function callCoachState(payload: WriterPayload): Promise<CoachStateContent> {
+ *  a per-athlete evidence enum (Step 1.5) + a per-athlete reason enum (v1.6 —
+ *  unsupportable codes are schema-rejected). Returns content stamped with the
+ *  builder version. retryViolations, when present, is prepended so the model
+ *  fixes a failed audit rather than starting fresh. */
+async function callCoachState(
+  payload: WriterPayload,
+  retryViolations = "",
+): Promise<CoachStateContent> {
   if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
-  const tool = buildEmitCoachStateTool(athleteModelEvidenceKeys(payload.athlete_model));
-  const userMessage = `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(payload, null, 2)}`;
+  const tool = buildEmitCoachStateTool(
+    athleteModelEvidenceKeys(payload.athlete_model),
+    allowedReasonCodes(payload),
+  );
+  const payloadBlock = `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(payload, null, 2)}`;
+  const userMessage = retryViolations
+    ? `${retryViolations}\n\n---\n\n${payloadBlock}`
+    : payloadBlock;
 
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -130,7 +146,23 @@ export async function generateAndPersistCoachState(
     }
   }
 
-  const content = await callCoachState(payload);
+  // Generate + audit, one retry on violations. Violations are quality defects,
+  // not fatal: a second-attempt failure is logged and accepted (evals must
+  // ship; the audit trail is the fix signal).
+  let content = await callCoachState(payload);
+  const audit = auditCoachState(content, payload);
+  if (!audit.passed) {
+    console.warn(
+      `[generate-coach-state] audit violations (retrying once): ${audit.violations.join(" | ")}`,
+    );
+    content = await callCoachState(payload, formatCoachStateViolationsForRetry(audit.violations));
+    const retryAudit = auditCoachState(content, payload);
+    if (!retryAudit.passed) {
+      console.warn(
+        `[generate-coach-state] audit violations persist after retry (accepting): ${retryAudit.violations.join(" | ")}`,
+      );
+    }
+  }
   const persisted = await persistCoachState(supa, userId, content, athleteModelVersion);
   console.log(
     `[generate-coach-state] generated coach_state v${persisted.version} (AM v${athleteModelVersion}, builder ${COACH_STATE_BUILDER_VERSION}, force=${!!opts.force})`,
