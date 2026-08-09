@@ -180,12 +180,19 @@ const supa = createClient(SUPABASE_URL, SERVICE_ROLE_KEY) as any;
 
 console.log(`Building payload for ${USER_ID}…`);
 const payload = await buildWriterPayload(supa, USER_ID);
-console.log(
-  `Payload ready (athlete_model v${payload.athlete_model.version}). Running ${MODEL_LIST.length} models…`,
-);
 
 const outDir = `${OUT_ROOT}/${USER_ID.slice(0, 8)}`;
 await Deno.mkdir(outDir, { recursive: true });
+
+// The EXACT JSON the models receive (the user message wraps this verbatim).
+await Deno.writeTextFile(`${outDir}/payload.json`, JSON.stringify(payload, null, 2));
+console.log(`Payload ready (athlete_model v${payload.athlete_model.version}) → ${outDir}/payload.json`);
+
+if (Deno.args.includes("--payload-only")) {
+  console.log("--payload-only: skipping model calls.");
+  Deno.exit(0);
+}
+console.log(`Running ${MODEL_LIST.length} models…`);
 
 const results: Array<{ model: string; cs: CoachStateContent }> = [];
 for (const model of MODEL_LIST) {
