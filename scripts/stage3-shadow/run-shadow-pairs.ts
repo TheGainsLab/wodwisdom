@@ -30,6 +30,7 @@ import {
   type TrainingDesignInput,
 } from "../../supabase/functions/_shared/training-design-input.ts";
 import {
+  allowedReasonCodes,
   buildEmitCoachStateTool,
   COACH_STATE_BUILDER_VERSION,
   type CoachState,
@@ -106,9 +107,13 @@ async function loadCoachStateReadOnly(userId: string, payload: WriterPayload): P
   if (cached) return { coachState: cached.coach_state as CoachState, source: `cache v${cached.version}` };
 
   // Miss (e.g. intake-only new athlete): generate in memory, do NOT persist.
-  const tool = buildEmitCoachStateTool(athleteModelEvidenceKeys(payload.athlete_model));
+  // Fable + reason shaping — matches the production judgment seat post-#649.
+  const tool = buildEmitCoachStateTool(
+    athleteModelEvidenceKeys(payload.athlete_model),
+    allowedReasonCodes(payload),
+  );
   const data = await callClaude({
-    model: MODELS.sonnet,
+    model: MODELS.fable,
     system: COACH_STATE_SYSTEM_PROMPT,
     tools: [tool],
     tool_choice: { type: "tool", name: "emit_coach_state" },
