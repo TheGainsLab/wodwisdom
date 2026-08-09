@@ -1,3 +1,23 @@
+# Shadow-Test Runners (Stage 1 + Stage 3)
+
+## Stage 1 — free-eval model comparison (`run-eval-comparison.ts`)
+
+Runs ONE athlete's real payload through the identical CoachState prompt on
+several models (default Sonnet / Opus / Fable) and writes, per model, the
+evaluation exactly as the athlete would read it, plus a cross-model table of
+the internal decisions. Read-only; nothing persisted. Needs only Tiers 1–2
+completed.
+
+```
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... ANTHROPIC_API_KEY=... \
+deno run --allow-net --allow-env --allow-read --allow-write \
+  scripts/stage3-shadow/run-eval-comparison.ts --user=<uuid>
+```
+
+Output in `eval-compare/<user-prefix>/`: `eval-<model>.md` (athlete-facing
+read), `decisions.md` (do the models judge differently or just write
+differently?), `raw-<model>.json`.
+
 # Stage 3 Shadow Test — Runner
 
 Generates the ten pre-registered A/B skeleton pairs for the Stage 3 rubric
