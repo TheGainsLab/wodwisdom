@@ -39,7 +39,10 @@ import { persistCoachState } from "./persist-coach-state.ts";
 import { MODELS } from "./model-profiles.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-const MODEL = MODELS.sonnet;
+// Frontier eval (2026-08 side-by-side: Fable > Opus > Sonnet on fidelity,
+// calibration, and causal reasoning; ~25¢/eval). The free eval is the
+// conversion artifact — pay for judgment here. Skeleton/week-fill unaffected.
+const MODEL = MODELS.fable;
 
 interface ClaudeResponse {
   content?: Array<{ type?: string; name?: string; input?: unknown }>;
