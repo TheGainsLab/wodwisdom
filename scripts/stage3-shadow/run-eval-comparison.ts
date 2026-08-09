@@ -29,10 +29,15 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildWriterPayload } from "../../supabase/functions/_shared/build-writer-payload.ts";
 import type { WriterPayload } from "../../supabase/functions/_shared/build-writer-payload.ts";
 import {
+  allowedReasonCodes,
   buildEmitCoachStateTool,
   evaluationFromCoachState,
   type CoachStateContent,
 } from "../../supabase/functions/_shared/coach-state.ts";
+import {
+  auditCoachState,
+  formatCoachStateViolationsForRetry,
+} from "../../supabase/functions/_shared/coach-state-audits.ts";
 import { COACH_STATE_SYSTEM_PROMPT } from "../../supabase/functions/_shared/coach-state-prompt.ts";
 import { athleteModelEvidenceKeys } from "../../supabase/functions/_shared/athlete-model.ts";
 
@@ -70,9 +75,17 @@ if (!ANTHROPIC_API_KEY || !SUPABASE_URL || !SERVICE_ROLE_KEY) {
 async function callCoachStateWithModel(
   payload: WriterPayload,
   model: string,
+  retryViolations = "",
 ): Promise<{ content: CoachStateContent; usage: { input?: number; output?: number } }> {
-  const tool = buildEmitCoachStateTool(athleteModelEvidenceKeys(payload.athlete_model));
-  const userMessage = `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(payload, null, 2)}`;
+  // Mirror production exactly: per-athlete evidence enum AND reason shaping.
+  const tool = buildEmitCoachStateTool(
+    athleteModelEvidenceKeys(payload.athlete_model),
+    allowedReasonCodes(payload),
+  );
+  const payloadBlock = `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(payload, null, 2)}`;
+  const userMessage = retryViolations
+    ? `${retryViolations}\n\n---\n\n${payloadBlock}`
+    : payloadBlock;
 
   for (let attempt = 1; ; attempt++) {
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -197,8 +210,22 @@ console.log(`Running ${MODEL_LIST.length} models…`);
 const results: Array<{ model: string; cs: CoachStateContent }> = [];
 for (const model of MODEL_LIST) {
   console.log(`  ${model}…`);
-  const { content, usage } = await callCoachStateWithModel(payload, model);
+  let { content, usage } = await callCoachStateWithModel(payload, model);
   console.log(`    input=${usage.input} output=${usage.output}`);
+
+  // Mirror production's audit + one-retry loop, and surface the results.
+  let audit = auditCoachState(content, payload);
+  if (!audit.passed) {
+    console.warn(`    audit violations (retrying once):\n      - ${audit.violations.join("\n      - ")}`);
+    ({ content, usage } = await callCoachStateWithModel(
+      payload,
+      model,
+      formatCoachStateViolationsForRetry(audit.violations),
+    ));
+    console.log(`    retry: input=${usage.input} output=${usage.output}`);
+    audit = auditCoachState(content, payload);
+  }
+  console.log(`    audit: ${audit.passed ? "clean" : `STILL FAILING — ${audit.violations.join(" | ")}`}`);
   results.push({ model, cs: content });
   const slug = model.replace(/[^a-z0-9.-]+/gi, "-");
   await Deno.writeTextFile(`${outDir}/eval-${slug}.md`, renderAthleteEval(model, content) + "\n");
