@@ -1518,7 +1518,6 @@ export default function AthletePage({ session }: { session: Session }) {
                             <input
                               className="lift-input"
                               type={bm.isTime ? 'text' : 'number'}
-                              inputMode={bm.isTime ? 'numeric' : undefined}
                               min={bm.isTime ? undefined : 0}
                               title={timeInvalid ? 'Use mm:ss (e.g. 6:45)' : undefined}
                               placeholder={bm.placeholder}

@@ -1963,7 +1963,6 @@ function V3MovementEditRow({ movement, onUpdate, onRemove }: {
       ) : (
         <input
           type="text"
-          inputMode="numeric"
           className="movement-edit-input movement-edit-input--reps"
           value={reps}
           onChange={e => setReps(e.target.value)}

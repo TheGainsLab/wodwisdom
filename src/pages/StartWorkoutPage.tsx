@@ -2267,7 +2267,6 @@ export default function StartWorkoutPage({ session, sourceStateProp, onExit, onD
                               <label>Time (min:sec)</label>
                               <input
                                 type="text"
-                                inputMode="numeric"
                                 placeholder="e.g. 20:00"
                                 value={blockCardioTime[bi] ?? ''}
                                 onChange={e => setBlockCardioTime(prev => ({ ...prev, [bi]: e.target.value }))}
