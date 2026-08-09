@@ -1,0 +1,12 @@
+[
+  { "user_id": "REPLACE-UUID", "category": "intake-only new athlete #1" },
+  { "user_id": "REPLACE-UUID", "category": "intake-only new athlete #2" },
+  { "user_id": "REPLACE-UUID", "category": "competition-linked veteran" },
+  { "user_id": "REPLACE-UUID", "category": "masters athlete" },
+  { "user_id": "REPLACE-UUID", "category": "injury-constrained (do_not_program populated)" },
+  { "user_id": "REPLACE-UUID", "category": "self-report contradicts numbers" },
+  { "user_id": "REPLACE-UUID", "category": "past_failed: high volume" },
+  { "user_id": "REPLACE-UUID", "category": "typical intermediate #1" },
+  { "user_id": "REPLACE-UUID", "category": "typical intermediate #2" },
+  { "user_id": "REPLACE-UUID", "category": "typical intermediate #3" }
+]
