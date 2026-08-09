@@ -60,7 +60,10 @@ import type { OutsideTrainingFacts } from "./athlete-activities.ts";
 // CoachState/eval read them like imported competition history.
 // v1.4: carries self_report (the Tier-3 qualitative intake — preferences,
 // self-assessment, history, constraints) so CoachState can weigh it.
-export const MODEL_BUILDER_VERSION = "v1.5";
+// v1.6: strength-ratio normatives carry target_estimate — the precomputed lift
+// value that would bring the ratio to its bar (threshold × denominator). Facts
+// stay code-computed; the eval cites the estimate instead of deriving math.
+export const MODEL_BUILDER_VERSION = "v1.6";
 export const THRESHOLDS_VERSION = "v1";
 
 // ============================================================
@@ -100,6 +103,11 @@ export interface Normative {
   /** value − threshold. */
   gap: number;
   position: Position;
+  /** Strength ratios only: the numerator lift value (athlete's units, rounded
+   *  to 5) that would bring this ratio to its bar. An ESTIMATE for prose
+   *  ("roughly 220"), never a promise. Absent on percentile normatives and on
+   *  models built before v1.6. */
+  target_estimate?: number;
 }
 
 /**
@@ -657,6 +665,29 @@ export function buildAthleteModel(
     for (const [ratioKey, barKey] of Object.entries(relMap)) {
       const n = makeNormative(strength_ratios[ratioKey], bars[barKey] ?? null);
       if (n) normative[ratioKey] = n;
+    }
+  }
+
+  // Target estimates (v1.6): for each strength-ratio normative, the numerator
+  // value that would put the ratio at its bar — threshold × denominator,
+  // rounded to 5. Precomputed here so the eval CITES a number instead of doing
+  // arithmetic (the no-recompute principle applies to targets too).
+  const targetDenominators: Record<string, number | null> = {
+    snatch_to_back_squat: L("back_squat"),
+    clean_jerk_to_back_squat: L("back_squat"),
+    snatch_to_clean_jerk: L("clean_and_jerk"),
+    front_squat_to_back_squat: L("back_squat"),
+    overhead_squat_to_snatch: L("snatch"),
+    deadlift_to_back_squat: L("back_squat"),
+    back_squat_to_bodyweight: bw,
+    deadlift_to_bodyweight: bw,
+    press_to_bodyweight: bw,
+    bench_to_bodyweight: bw,
+  };
+  for (const [key, den] of Object.entries(targetDenominators)) {
+    const n = normative[key];
+    if (n && den != null && den > 0) {
+      n.target_estimate = Math.round((n.threshold * den) / 5) * 5;
     }
   }
 

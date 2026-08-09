@@ -30,6 +30,9 @@ export const MODELS = {
   sonnet: Deno.env.get("MODEL_SONNET") ?? "claude-sonnet-4-6",
   haiku: Deno.env.get("MODEL_HAIKU") ?? "claude-haiku-4-5-20251001",
   opus: Deno.env.get("MODEL_OPUS") ?? "claude-opus-4-8",
+  // Frontier tier — adopted for the free eval (CoachState) after the 2026-08
+  // side-by-side; call sites opt in explicitly, nothing reads this by default.
+  fable: Deno.env.get("MODEL_FABLE") ?? "claude-fable-5",
 } as const;
 
 export type ModelProfile = "default" | "fast" | "quality";
