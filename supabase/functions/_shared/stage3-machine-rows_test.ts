@@ -18,6 +18,7 @@ import {
   machineRowM5,
   machineRowM6,
   machineRowM7,
+  machineRowM8,
   runMachineRows,
   summarizeMachineRows,
 } from "./stage3-machine-rows.ts";
@@ -255,6 +256,27 @@ Deno.test("M7 passes when metcons fit, when duration is unstated, and when sessi
 });
 
 // ============================================================
+// M8 — block/intent reconciliation
+// ============================================================
+
+Deno.test("M8 fails on a phantom block: declared in block_types with no matching intent", () => {
+  const s = baseSkeleton(CONFORMING_INTENTS);
+  // Remove day 1 week 1's metcon intent while the block_type stays declared.
+  s.weeks[0].days[0].block_intents = s.weeks[0].days[0].block_intents.filter(
+    (bi) => bi.block_type !== "metcon",
+  );
+  const r = machineRowM8(s);
+  assertEquals(r.passed, false);
+  assertEquals(r.violations.length, 1);
+  assertEquals(r.violations[0].includes('"metcon"'), true);
+});
+
+Deno.test("M8 passes when every focus-bearing block has an intent (structural blocks exempt)", () => {
+  // baseSkeleton days declare warm-up + cool-down with no intents — exempt.
+  assertEquals(machineRowM8(baseSkeleton(CONFORMING_INTENTS)).passed, true);
+});
+
+// ============================================================
 // M6 — progression truthfulness
 // ============================================================
 
@@ -319,14 +341,14 @@ Deno.test("runMachineRows passes a fully conforming pair and summarizes", () => 
   const result = runMachineRows(baseSkeleton(CONFORMING_INTENTS), tdi());
   assertEquals(result.passed, true);
   assertEquals(result.structural_failure, false);
-  assertEquals(summarizeMachineRows(result), "M1=ok M2=ok M3=ok M4=ok M5=ok M6=ok M7=ok");
+  assertEquals(summarizeMachineRows(result), "M1=ok M2=ok M3=ok M4=ok M5=ok M6=ok M7=ok M8=ok");
 });
 
 Deno.test("runMachineRows fails all rows on a structurally broken skeleton", () => {
   const result = runMachineRows({} as SkeletonOutput, tdi());
   assertEquals(result.passed, false);
   assertEquals(result.structural_failure, true);
-  assertEquals(result.rows.length, 7);
+  assertEquals(result.rows.length, 8);
   assertEquals(result.rows.every((r) => !r.passed), true);
 });
 

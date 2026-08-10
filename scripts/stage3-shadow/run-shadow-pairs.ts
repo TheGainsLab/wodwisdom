@@ -203,11 +203,13 @@ async function callFullDocSkeleton(
   tdi: TrainingDesignInput,
   coachState: CoachState,
   model: string,
+  retryNote = "",
 ): Promise<SkeletonOutput> {
   const daysPerWeek = tdi.days_per_week;
   const inputBlock = `TRAINING DESIGN INPUT (JSON — the FIXED plan to allocate):\n${JSON.stringify(tdi, null, 2)}`;
   const docBlock = buildCoachStateDocumentBlock(coachState);
   const ruleRecap = CROSSFIT_PACK.writer.skeletonRuleRecap(daysPerWeek, tdi);
+  const body = `${inputBlock}\n\n${docBlock}\n\n${ruleRecap}`;
   const data = await callClaude({
     model,
     // Fable emits noticeably longer skeletons than Sonnet — pair-02 hit the
@@ -217,9 +219,50 @@ async function callFullDocSkeleton(
     system: buildFrontierSkeletonSystemPrompt(),
     tools: [buildEmitSkeletonTool(daysPerWeek)],
     tool_choice: { type: "tool", name: "emit_skeleton" },
-    userMessage: `${inputBlock}\n\n${docBlock}\n\n${ruleRecap}`,
+    userMessage: retryNote ? `${retryNote}\n\n---\n\n${body}` : body,
   });
-  return extractToolInput(data, "emit_skeleton") as SkeletonOutput;
+  const skeleton = extractToolInput(data, "emit_skeleton") as SkeletonOutput;
+  return repairSkeleton(skeleton, model);
+}
+
+/** Anthropic tool-schema enforcement is imperfect even under forced tool-use:
+ *  Fable has emitted month_plan as a JSON-STRINGIFIED object (schema-illegal —
+ *  the node is strictly object-typed). Un-stringify when the content parses;
+ *  the retry loop handles the unparseable (truncated) variant. */
+function repairSkeleton(skeleton: SkeletonOutput, model: string): SkeletonOutput {
+  // deno-lint-ignore no-explicit-any
+  const s = skeleton as any;
+  if (typeof s?.month_plan === "string") {
+    try {
+      const parsed = JSON.parse(s.month_plan);
+      if (parsed && typeof parsed === "object") {
+        console.warn(`    [${model}] repaired double-encoded month_plan (string → object)`);
+        s.month_plan = parsed;
+      }
+    } catch {
+      console.warn(`    [${model}] month_plan is a string of unparseable JSON — retry loop will handle`);
+    }
+  }
+  return s as SkeletonOutput;
+}
+
+/** Failure-specific retry note derived from the evidence — "you stringified an
+ *  object" and "you ran out of room" are different mistakes and the model
+ *  should be told which one it made. */
+function structuralRetryNote(skeleton: SkeletonOutput, violations: string[]): string {
+  // deno-lint-ignore no-explicit-any
+  const s = skeleton as any;
+  const lines = [
+    "Your previous emit_skeleton output was STRUCTURALLY INVALID and has been discarded. Emit the full skeleton again, correctly. Specific problems:",
+  ];
+  if (typeof s?.month_plan === "string") {
+    lines.push(
+      "- You emitted month_plan as a STRING containing JSON text. month_plan must be a JSON OBJECT with weekly_intent (array), strength_progression, deload_placement — never a quoted/escaped string.",
+    );
+  }
+  for (const v of violations) lines.push(`- ${v}`);
+  lines.push("Keep the coaching content of your plan; fix ONLY the structure.");
+  return lines.join("\n");
 }
 
 // ============================================================
@@ -301,6 +344,8 @@ interface KeyEntry {
 
 await Deno.mkdir(OUT_DIR, { recursive: true });
 const key: KeyEntry[] = [];
+/** Pre-retry structural-failure count per model — the serialization-tax metric. */
+const structuralFlakes: Record<string, number> = {};
 const summaryLines: string[] = [
   `# Skeleton-model shadow run — machine-row summary`,
   ``,
@@ -332,11 +377,35 @@ for (let i = 0; i < athletes.length; i++) {
   });
 
   // One full-document skeleton per arm model — SAME CoachState roll for all.
-  const arms: Array<{ model: string; skeleton: SkeletonOutput; rows: ReturnType<typeof runMachineRows> }> = [];
+  // Structural failures get ONE failure-specific retry (mirrors production's
+  // audit-retry machinery); the pre-retry flake is counted per model.
+  const arms: Array<{
+    model: string;
+    skeleton: SkeletonOutput;
+    rows: ReturnType<typeof runMachineRows>;
+    structural_retry: boolean;
+  }> = [];
   for (const model of ARM_MODELS) {
     console.log(`  arm ${model}…`);
-    const skeleton = await callFullDocSkeleton(tdi, coachState, model);
-    arms.push({ model, skeleton, rows: runMachineRows(skeleton, tdi) });
+    let skeleton = await callFullDocSkeleton(tdi, coachState, model);
+    let rows = runMachineRows(skeleton, tdi);
+    let structuralRetry = false;
+    if (rows.structural_failure) {
+      structuralFlakes[model] = (structuralFlakes[model] ?? 0) + 1;
+      structuralRetry = true;
+      console.warn(`    [${model}] STRUCTURAL FAILURE — retrying once with failure detail`);
+      skeleton = await callFullDocSkeleton(
+        tdi,
+        coachState,
+        model,
+        structuralRetryNote(skeleton, rows.rows[0]?.violations ?? []),
+      );
+      rows = runMachineRows(skeleton, tdi);
+      if (rows.structural_failure) {
+        console.warn(`    [${model}] STILL structurally invalid after retry — scoring as-is`);
+      }
+    }
+    arms.push({ model, skeleton, rows, structural_retry: structuralRetry });
   }
   const crossNotes = arms.flatMap((a) => crossCheckWithLiveInvariants(a.skeleton, tdi));
 
@@ -361,7 +430,9 @@ for (let i = 0; i < athletes.length; i++) {
         pair: pairNum,
         user_id: spec.user_id,
         category: spec.category,
-        arms: Object.fromEntries(arms.map((a) => [a.model, { rows: a.rows, skeleton: a.skeleton }])),
+        arms: Object.fromEntries(
+          arms.map((a) => [a.model, { rows: a.rows, structural_retry: a.structural_retry, skeleton: a.skeleton }]),
+        ),
         cross_check_notes: crossNotes,
         tdi,
       },
@@ -380,6 +451,13 @@ for (let i = 0; i < athletes.length; i++) {
   console.log(`  machine: ${arms.map((a) => `${a.model}[${summarizeMachineRows(a.rows)}]`).join(" ")}`);
 }
 
+summaryLines.push(
+  ``,
+  `Structural failures before retry (serialization-tax metric): ` +
+    (Object.keys(structuralFlakes).length === 0
+      ? "none"
+      : Object.entries(structuralFlakes).map(([m, n]) => `${m}=${n}`).join(", ")),
+);
 await Deno.writeTextFile(`${OUT_DIR}/assignment-key.json`, JSON.stringify(key, null, 2));
 await Deno.writeTextFile(`${OUT_DIR}/summary.md`, summaryLines.join("\n") + "\n");
 console.log(`\nDone. Scorer packets in ${OUT_DIR}/pair-*/ — hand assignment-key.json to the non-scorer NOW (see README.md).`);
