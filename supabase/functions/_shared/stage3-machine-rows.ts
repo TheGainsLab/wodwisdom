@@ -34,12 +34,14 @@ import { normalizeMovementKey } from "./athlete-model.ts";
 import { auditSkeletonDayCount, auditSkeletonStructural } from "./v3-skeleton-audits.ts";
 import { checkAllocationInvariants } from "./training-design-invariants.ts";
 
-export type MachineRowId = "M1" | "M2" | "M3" | "M4" | "M5";
+export type MachineRowId = "M1" | "M2" | "M3" | "M4" | "M5" | "M6";
 
 export interface MachineRowResult {
   id: MachineRowId;
   passed: boolean;
   violations: string[];
+  /** Non-failing observations (e.g. M4 cross-block-type dose inversions). */
+  warnings?: string[];
 }
 
 export interface MachineRowsRunResult {
@@ -205,28 +207,66 @@ export function machineRowM3(
   return { id: "M3", passed: violations.length === 0, violations };
 }
 
-/** M4 — dose monotone non-increasing with rank (rank-1 ≥ rank-2 ≥ …).
- *  Confidence modulation is within-rank per the skeleton prompt, so strict
- *  cross-rank monotonicity stands. */
+/** Develop-dose per (block_type → focus). */
+function doseByBlockTypeAndFocus(skeleton: SkeletonOutput): Map<string, Map<FocusArea, number>> {
+  const out = new Map<string, Map<FocusArea, number>>();
+  for (const i of flattenIntents(skeleton)) {
+    if (i.purpose !== "develop") continue;
+    let m = out.get(i.block_type);
+    if (!m) out.set(i.block_type, (m = new Map()));
+    m.set(i.focus, (m.get(i.focus) ?? 0) + 1);
+  }
+  return out;
+}
+
+/** M4 (amended 2026-08-10) — dose ordering enforced WITHIN each block type:
+ *  when two priorities both develop in the same block type, the higher rank
+ *  must get at least as many blocks there. Cross-type total inversions are
+ *  WARNINGS only — a strength day is inherently a bigger chunk than a skill
+ *  touch, and the eval may legitimately prescribe e.g. pressing-biased
+ *  strength alongside twice-weekly skill work. */
 export function machineRowM4(
   skeleton: SkeletonOutput,
   tdi: TrainingDesignInput,
 ): MachineRowResult {
   const violations: string[] = [];
-  const dose = doseByFocus(skeleton);
+  const warnings: string[] = [];
   const ranked = [...tdi.priorities].sort((a, b) => a.rank - b.rank);
+
+  const byType = doseByBlockTypeAndFocus(skeleton);
+  for (const [blockType, doses] of byType) {
+    for (let i = 1; i < ranked.length; i++) {
+      for (let j = 0; j < i; j++) {
+        const hi = ranked[j];
+        const lo = ranked[i];
+        const hiDose = doses.get(hi.focus);
+        const loDose = doses.get(lo.focus);
+        // Only meaningful when BOTH foci develop in this block type — a focus
+        // that never uses this block type isn't being out-dosed there.
+        if (hiDose != null && loDose != null && loDose > hiDose) {
+          violations.push(
+            `${blockType}: rank ${lo.rank} (${lo.focus}) dose ${loDose} exceeds rank ${hi.rank} (${hi.focus}) dose ${hiDose}.`,
+          );
+        }
+      }
+    }
+  }
+
+  // Cross-type totals — observational only.
+  const total = doseByFocus(skeleton);
   for (let i = 1; i < ranked.length; i++) {
     const hi = ranked[i - 1];
     const lo = ranked[i];
-    const hiDose = dose.get(hi.focus) ?? 0;
-    const loDose = dose.get(lo.focus) ?? 0;
+    const hiDose = total.get(hi.focus) ?? 0;
+    const loDose = total.get(lo.focus) ?? 0;
     if (loDose > hiDose) {
-      violations.push(
-        `Rank ${lo.rank} (${lo.focus}) dose ${loDose} exceeds rank ${hi.rank} (${hi.focus}) dose ${hiDose}.`,
+      warnings.push(
+        `total: rank ${lo.rank} (${lo.focus}) dose ${loDose} exceeds rank ${hi.rank} (${hi.focus}) dose ${hiDose} across block types.`,
       );
     }
   }
-  return { id: "M4", passed: violations.length === 0, violations };
+
+  return { id: "M4", passed: violations.length === 0, violations, warnings };
 }
 
 /** M5 — maintain foci appear as purpose="maintain" with dose 0; deprioritized
@@ -259,6 +299,68 @@ export function machineRowM5(
   return { id: "M5", passed: violations.length === 0, violations };
 }
 
+/** Canonical lift names M6 recognizes as progression labels. Longest names
+ *  first so "Clean and Jerk" matches before "Clean". */
+const M6_KNOWN_LIFTS = [
+  "Clean and Jerk",
+  "Overhead Squat",
+  "Front Squat",
+  "Back Squat",
+  "Bench Press",
+  "Strict Press",
+  "Push Press",
+  "Power Snatch",
+  "Power Clean",
+  "Push Jerk",
+  "Split Jerk",
+  "Deadlift",
+  "Snatch",
+  "Clean",
+  "Jerk",
+  "Press",
+  "Thruster",
+];
+
+/** M6 — progression truthfulness: every lift the month plan PROMISES a
+ *  progression for (a "<Lift>: ..." labeled segment in strength_progression)
+ *  must appear as a primary_lift on some day. The plan text may not contradict
+ *  the days. Incidental lift mentions inside prose (e.g. "EMOM tech work
+ *  (Hang Power Clean variants)") are not promises and are not enforced. */
+export function machineRowM6(skeleton: SkeletonOutput): MachineRowResult {
+  const violations: string[] = [];
+  const progression = skeleton.month_plan?.strength_progression ?? "";
+
+  // Promised lifts = segment labels of the form "<Lift>:" at the start of the
+  // text or immediately after sentence/segment punctuation.
+  const promised = new Set<string>();
+  const labelRe = /(?:^|[.;\n]\s*)([A-Za-z][A-Za-z &+/-]{2,40}?):/g;
+  for (const m of progression.matchAll(labelRe)) {
+    const label = m[1].trim().toLowerCase();
+    for (const lift of M6_KNOWN_LIFTS) {
+      if (label === lift.toLowerCase()) {
+        promised.add(lift);
+        break;
+      }
+    }
+  }
+
+  const primaryLifts = [];
+  for (const wk of skeleton.weeks ?? []) {
+    for (const day of wk.days ?? []) {
+      if (day.primary_lift) primaryLifts.push(day.primary_lift.toLowerCase());
+    }
+  }
+  for (const lift of promised) {
+    const needle = lift.toLowerCase();
+    if (!primaryLifts.some((p) => p.includes(needle))) {
+      violations.push(
+        `strength_progression promises a "${lift}" progression but no day programs it as a primary_lift.`,
+      );
+    }
+  }
+  return { id: "M6", passed: violations.length === 0, violations };
+}
+
 // ============================================================
 // Runner
 // ============================================================
@@ -270,7 +372,7 @@ export function runMachineRows(
   // A skeleton too malformed to iterate fails every row rather than crashing.
   const structural = auditSkeletonStructural(skeleton);
   if (!structural.passed) {
-    const rows: MachineRowResult[] = (["M1", "M2", "M3", "M4", "M5"] as MachineRowId[]).map(
+    const rows: MachineRowResult[] = (["M1", "M2", "M3", "M4", "M5", "M6"] as MachineRowId[]).map(
       (id) => ({ id, passed: false, violations: structural.violations }),
     );
     return { passed: false, rows, structural_failure: true };
@@ -282,14 +384,18 @@ export function runMachineRows(
     machineRowM3(skeleton, tdi),
     machineRowM4(skeleton, tdi),
     machineRowM5(skeleton, tdi),
+    machineRowM6(skeleton),
   ];
   return { passed: rows.every((r) => r.passed), rows, structural_failure: false };
 }
 
-/** One-line summary for the shadow-run log, e.g. "M1=ok M2=FAIL(2) …". */
+/** One-line summary for the shadow-run log, e.g. "M1=ok M4=ok(2 warn) M6=FAIL(1)". */
 export function summarizeMachineRows(result: MachineRowsRunResult): string {
   return result.rows
-    .map((r) => `${r.id}=${r.passed ? "ok" : `FAIL(${r.violations.length})`}`)
+    .map((r) => {
+      const warn = r.warnings?.length ? `(${r.warnings.length} warn)` : "";
+      return `${r.id}=${r.passed ? `ok${warn}` : `FAIL(${r.violations.length})`}`;
+    })
     .join(" ");
 }
 
