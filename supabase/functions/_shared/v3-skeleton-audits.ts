@@ -25,6 +25,13 @@ import type {
 } from "./v3-output-schema.ts";
 import type { TrainingDesignInput } from "./training-design-input.ts";
 import { checkAllocationInvariants } from "./training-design-invariants.ts";
+import {
+  machineRowM4,
+  machineRowM6,
+  machineRowM7,
+  machineRowM8,
+  type MachineRowResult,
+} from "./stage3-machine-rows.ts";
 
 export interface SkeletonAuditResult {
   rule: string;
@@ -149,6 +156,17 @@ export function auditSkeletonCoverage(skeleton: SkeletonOutput): SkeletonAuditRe
   for (const week of safeWeeks(skeleton)) {
     for (const day of safeDays(week)) {
       const types = new Set(safeBlockTypes(day));
+      // Active-recovery exception (2026-08-10): the prompt explicitly permits
+      // dedicated recovery days "replacing strength + metcon" — the audit must
+      // not contradict it. Accessory is still required (light touches remain).
+      if (types.has("active-recovery")) {
+        if (!types.has("accessory")) {
+          violations.push(
+            `Week ${week.week_num} Day ${day.day_num}: active-recovery day still requires an accessory block for light touches.`,
+          );
+        }
+        continue;
+      }
       if (!types.has("strength")) {
         violations.push(
           `Week ${week.week_num} Day ${day.day_num}: missing required strength block.`,
@@ -239,6 +257,24 @@ export function runSkeletonAudits(ctx: SkeletonAuditContext): SkeletonAuditRunRe
   // Allocation invariants — only when the plan is available to check against.
   if (ctx.trainingDesignInput) {
     all.push(auditSkeletonAllocation(ctx.skeleton, ctx.trainingDesignInput));
+    // Machine rows graduated from the 2026-08 shadow-test series — each earned
+    // by a real failure (M4: dose re-weighting; M6: plan text promising lifts
+    // the days never program; M7: metcons that can't fit the session; M8:
+    // phantom blocks invisible to allocation accounting). M4 warnings are
+    // logged, never fail — placement across block types is coaching freedom.
+    const tdi = ctx.trainingDesignInput;
+    const rows: MachineRowResult[] = [
+      machineRowM4(ctx.skeleton, tdi),
+      machineRowM6(ctx.skeleton),
+      machineRowM7(ctx.skeleton, tdi.session_length_minutes),
+      machineRowM8(ctx.skeleton),
+    ];
+    for (const row of rows) {
+      if (row.warnings?.length) {
+        console.log(`[skeleton audit ${row.id}] warnings: ${row.warnings.join(" | ")}`);
+      }
+      all.push({ rule: `machine_row_${row.id.toLowerCase()}`, passed: row.passed, violations: row.violations });
+    }
   }
   const failures = all.filter((r) => !r.passed);
   return { passed: failures.length === 0, failures, all };

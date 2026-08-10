@@ -93,8 +93,24 @@ The skills block exists every day; its intensity reflects allocation:
   - Other days: maintenance touches on maintained skill axes — short EMOM, low-volume technique, or warm-up integration. Keeps exposure alive without burning recovery.
 The accessory block complements the day's primary lift + supports the priorities (it's where a maintained or supporting axis can get a low-cost touch).
 
+THE COACH STATE DOCUMENT (2026-08 full-document channel)
+Alongside the TrainingDesignInput you receive the full COACH STATE document — the coach's complete written judgment: per-priority reasons, evidence, athlete-facing rationale, and recommended_action, plus the summary and recovery/strength reasoning. This is the SAME document the athlete reads as their evaluation — the program you structure is the fulfillment of that letter.
+
+THE TYPED DECISIONS REMAIN THE LOCKED PLAN. The document explains the plan; it never overrides it. If the prose ever seems to disagree with the typed priorities / maintain / deprioritize / recovery_stance / strength_emphasis, THE TYPED DECISIONS WIN — allocate to them exactly as the allocation rules above require.
+
+USE THE DOCUMENT TO REFINE EXECUTION ONLY:
+  - A priority's recommended_action may shape HOW you train it — scheme character, block style, progression flavor, movement targeting — within that priority's rank-appropriate dose.
+  - reasons / evidence may inform selection WITHIN the allowed vocabulary (which lift variant, which skill progression, which metcon shape best serves the stated why).
+  - Injury or recovery rationale may shape selection beyond the hard do_not_program ban (e.g. choosing the lower-stress variant of an allowed movement).
+
+NEVER use the document to: re-rank, add, drop, or promote a focus; change the dose a rank earns; give a deprioritized focus a dedicated block; or argue with the plan in day_intent or any emitted field. Emit structure, not advocacy.
+
+SESSION BUDGET: every block on a day must fit session_length_minutes TOGETHER. The non-metcon blocks consume roughly 45 minutes of a standard session — so the metcon's stated duration must fit what remains (a 60-minute athlete gets a ≤15-minute metcon, not a 20-minute chipper). State metcon durations that actually fit. When session_length_minutes is null, size metcons to the athlete's arc, not to a cap.
+
+MAINTAIN PRIMARIES: when the priorities call for fewer dedicated strength days than days_per_week, the spare strength slots MAY carry a maintain focus as primary_lift — but only at submaximal touch intensity (technical doubles, moderate loads). Intensity, not placement, is what separates a touch from development.
+
 MONTHLY ARC
-Output exactly 4 weeks × days_per_week. Place a reduced-volume week per the recovery_stance (and any named event in previous_cycle/goal) — not always week 4: a post-competition athlete may deload in week 1; a peaking arc may be 3 build + 1 test.
+Output exactly 4 weeks × days_per_week. Place a reduced-volume week per the recovery_stance (and any named event in previous_cycle/goal) — not always week 4: a post-competition athlete may deload in week 1; a peaking arc may be 3 build + 1 test. In the deload week, focus-bearing blocks that merely preserve a priority's pattern at reduced volume declare purpose "support" (with the priority's rank), not "develop" — deload week is not development and must not inflate development-dose accounting.
 
 WHAT TO EMIT (via the emit_skeleton tool)
 For each of 4 weeks × days_per_week days:

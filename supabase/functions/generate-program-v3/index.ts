@@ -27,6 +27,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { buildWriterPayload, type WriterPayload } from "../_shared/build-writer-payload.ts";
 import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts";
+import { buildCoachStateDocumentBlock } from "../_shared/coach-state.ts";
 import { buildTrainingDesignInput } from "../_shared/training-design-input.ts";
 import { type SkeletonOutput } from "../_shared/v3-output-schema.ts";
 import {
@@ -267,10 +268,13 @@ async function stageSkeleton(
   _job: ProgramJobRow,
   rs: ResumeState,
 ): Promise<StageOutcome> {
-  // The skeleton consumes the TrainingDesignInput CONTRACT — the FIXED plan,
-  // with decision-data stripped — never the raw payload. Allocate, don't reinterpret.
+  // The skeleton consumes the TrainingDesignInput CONTRACT (the locked plan)
+  // PLUS the full CoachState document (2026-08 full-document channel) — the
+  // letter the athlete reads. The typed decisions bind; the document refines
+  // execution; the audit loop enforces the boundary.
   const tdi = rs.trainingDesignInput!;
-  const skeleton = await generateSkeletonWithAudits(tdi, PACK);
+  const intentDocument = rs.coachState ? buildCoachStateDocumentBlock(rs.coachState) : "";
+  const skeleton = await generateSkeletonWithAudits(tdi, PACK, undefined, intentDocument);
   console.log("[generate-program-v3] skeleton passed audits");
   return {
     next: "fill_week_1",

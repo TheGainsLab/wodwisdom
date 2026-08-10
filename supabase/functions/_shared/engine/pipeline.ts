@@ -31,11 +31,17 @@ type AuditFailures = ReturnType<typeof runAudits>["failures"];
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = MODELS.sonnet;
+// 2026-08 adoption: the skeleton is the judgment-translation layer — it reads
+// the full CoachState document and structures the cycle. Frontier model per the
+// shadow-test series (clean sweeps on rules + letter fidelity); the week-fill
+// stays on Sonnet (pure execution). Fable emits longer skeletons (~7-9K tokens)
+// less reliably — hence the 16K budget and the structural repair below.
+const SKELETON_MODEL = MODELS.fable;
 export const MAX_SKELETON_ATTEMPTS = 3;
-// The skeleton emits up to 8k tokens of Sonnet output; the LLM call sits inside the
-// MAX_SKELETON_ATTEMPTS audit-retry loop (the ONLY multiplier) — keep ATTEMPTS ×
-// this timeout under the ~400s edge wall-clock (3 × 120s = 360s).
-const SKELETON_TIMEOUT_MS = 120_000;
+// The skeleton emits up to ~9k tokens of Fable output; the LLM call sits inside
+// the MAX_SKELETON_ATTEMPTS audit-retry loop (the ONLY multiplier) — keep
+// ATTEMPTS × this timeout under the ~400s edge wall-clock (3 × 130s = 390s).
+const SKELETON_TIMEOUT_MS = 130_000;
 
 interface ClaudeContentBlock {
   type?: string;
@@ -82,11 +88,15 @@ export class SkeletonLoopExhausted extends Error {
 // Writer calls
 // ============================================================
 
-/** Call the skeleton writer for the given pack. Returns parsed SkeletonOutput. */
+/** Call the skeleton writer for the given pack. Returns parsed SkeletonOutput.
+ *  intentDocument (optional) is the judgment layer's full written document
+ *  (e.g. the CoachState document block) — pack-agnostic string, appended after
+ *  the TDI so the writer reads the letter it is structurally executing. */
 export async function callSkeletonWriter(
   tdi: TrainingDesignInput,
   retryViolations: string,
   pack: DomainPack,
+  intentDocument = "",
 ): Promise<SkeletonOutput> {
   if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
@@ -97,9 +107,10 @@ export async function callSkeletonWriter(
   const ruleRecap = pack.writer.skeletonRuleRecap(daysPerWeek, tdi);
 
   const inputBlock = `TRAINING DESIGN INPUT (JSON — the FIXED plan to allocate):\n${JSON.stringify(tdi, null, 2)}`;
-  const userMessage = retryViolations
-    ? `${retryViolations}\n\n---\n\n${inputBlock}\n\n${ruleRecap}`
+  const body = intentDocument
+    ? `${inputBlock}\n\n${intentDocument}\n\n${ruleRecap}`
     : `${inputBlock}\n\n${ruleRecap}`;
+  const userMessage = retryViolations ? `${retryViolations}\n\n---\n\n${body}` : body;
 
   const t0 = Date.now();
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -110,8 +121,8 @@ export async function callSkeletonWriter(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 8000,
+      model: SKELETON_MODEL,
+      max_tokens: 16000,
       stream: false,
       system: pack.writer.skeletonSystemPrompt,
       tools: [pack.writer.buildSkeletonTool(daysPerWeek)],
@@ -138,7 +149,29 @@ export async function callSkeletonWriter(
   console.log(
     `[engine skeleton] Claude usage: input=${data.usage?.input_tokens} output=${data.usage?.output_tokens} stop_reason=${data.stop_reason} fetch_ms=${Date.now() - t0}`,
   );
-  return toolUse.input as SkeletonOutput;
+  return repairSkeletonEmission(toolUse.input as SkeletonOutput);
+}
+
+/** Anthropic tool-schema enforcement is imperfect even under forced tool-use:
+ *  Fable has emitted month_plan as a JSON-STRINGIFIED object (schema-illegal —
+ *  the node is strictly object-typed; observed 2026-08-10). Un-stringify when
+ *  the content parses; the unparseable variant fails the structural audit and
+ *  rides the existing retry loop. */
+function repairSkeletonEmission(skeleton: SkeletonOutput): SkeletonOutput {
+  // deno-lint-ignore no-explicit-any
+  const s = skeleton as any;
+  if (typeof s?.month_plan === "string") {
+    try {
+      const parsed = JSON.parse(s.month_plan);
+      if (parsed && typeof parsed === "object") {
+        console.warn(`[engine skeleton] repaired double-encoded month_plan (string → object)`);
+        s.month_plan = parsed;
+      }
+    } catch {
+      console.warn(`[engine skeleton] month_plan is a string of unparseable JSON — structural audit will retry`);
+    }
+  }
+  return s as SkeletonOutput;
 }
 
 // EVAL STOPGAP: a verbose week fill can need >150s of Sonnet output; no fixed
@@ -174,6 +207,7 @@ export async function callWeekFill(
     "- At most one metcon block per day. Every metcon block must declare a block_scheme.",
     "- Every movement in strength / accessory / metcon / skills blocks must populate at least one of {sets, reps, weight, time_seconds, distance} > 0.",
     "- Read injuries_constraints_text + injuries_structured.do_not_program. Substitute or scale any contraindicated movement.",
+    "- The metcon's EXPECTED completion time must land inside the skeleton's stated metcon_focus window; a time cap may sit above it as a ceiling, never below.",
     priorWeeks.length > 0
       ? `- PROGRESS from the prior weeks below per the month_plan's arc (add load/volume, advance schemes) — do NOT copy them verbatim.`
       : `- This is week 1 — set the cycle's opening baseline.`,
@@ -270,6 +304,7 @@ export async function generateSkeletonWithAudits(
   tdi: TrainingDesignInput,
   pack: DomainPack,
   setStage: SetStage = NO_STAGE,
+  intentDocument = "",
 ): Promise<SkeletonOutput> {
   let retryViolations = "";
   let lastSkeleton: SkeletonOutput | null = null;
@@ -280,7 +315,7 @@ export async function generateSkeletonWithAudits(
     await setStage(`skeleton_attempt_${attempt}`);
     let skeleton: SkeletonOutput;
     try {
-      skeleton = await callSkeletonWriter(tdi, retryViolations, pack);
+      skeleton = await callSkeletonWriter(tdi, retryViolations, pack, intentDocument);
     } catch (err) {
       const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
       const isTransient = err instanceof Error &&
