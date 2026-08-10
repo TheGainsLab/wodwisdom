@@ -27,14 +27,14 @@
  *       every deprioritized focus has dose = 0.
  */
 
-import type { SkeletonOutput } from "./v3-output-schema.ts";
+import { FOCUS_BEARING_BLOCK_TYPES, type SkeletonOutput } from "./v3-output-schema.ts";
 import type { TrainingDesignInput } from "./training-design-input.ts";
 import type { FocusArea, RecoveryStance } from "./coach-state.ts";
 import { normalizeMovementKey } from "./athlete-model.ts";
 import { auditSkeletonDayCount, auditSkeletonStructural } from "./v3-skeleton-audits.ts";
 import { checkAllocationInvariants } from "./training-design-invariants.ts";
 
-export type MachineRowId = "M1" | "M2" | "M3" | "M4" | "M5" | "M6" | "M7";
+export type MachineRowId = "M1" | "M2" | "M3" | "M4" | "M5" | "M6" | "M7" | "M8";
 
 export interface MachineRowResult {
   id: MachineRowId;
@@ -400,6 +400,29 @@ export function machineRowM7(
   return { id: "M7", passed: violations.length === 0, violations };
 }
 
+/** M8 — block/intent reconciliation: every focus-bearing block_type a day
+ *  declares must have a matching block_intents entry. Catches "phantom
+ *  blocks" — a skills block declared with a written skill_focus but no
+ *  intent (Fable's lower-body days, 2026-08-10 run) — whose work is
+ *  invisible to allocation accounting. */
+export function machineRowM8(skeleton: SkeletonOutput): MachineRowResult {
+  const violations: string[] = [];
+  const focusBearing = new Set<string>(FOCUS_BEARING_BLOCK_TYPES);
+  for (const wk of skeleton.weeks ?? []) {
+    for (const day of wk.days ?? []) {
+      const intentTypes = new Set((day.block_intents ?? []).map((bi) => bi.block_type));
+      for (const bt of day.block_types ?? []) {
+        if (focusBearing.has(bt) && !intentTypes.has(bt)) {
+          violations.push(
+            `Week ${wk.week_num} Day ${day.day_num}: block_types declares "${bt}" but block_intents has no entry for it.`,
+          );
+        }
+      }
+    }
+  }
+  return { id: "M8", passed: violations.length === 0, violations };
+}
+
 // ============================================================
 // Runner
 // ============================================================
@@ -411,7 +434,7 @@ export function runMachineRows(
   // A skeleton too malformed to iterate fails every row rather than crashing.
   const structural = auditSkeletonStructural(skeleton);
   if (!structural.passed) {
-    const rows: MachineRowResult[] = (["M1", "M2", "M3", "M4", "M5", "M6", "M7"] as MachineRowId[]).map(
+    const rows: MachineRowResult[] = (["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8"] as MachineRowId[]).map(
       (id) => ({ id, passed: false, violations: structural.violations }),
     );
     return { passed: false, rows, structural_failure: true };
@@ -425,6 +448,7 @@ export function runMachineRows(
     machineRowM5(skeleton, tdi),
     machineRowM6(skeleton),
     machineRowM7(skeleton, tdi.session_length_minutes),
+    machineRowM8(skeleton),
   ];
   return { passed: rows.every((r) => r.passed), rows, structural_failure: false };
 }
