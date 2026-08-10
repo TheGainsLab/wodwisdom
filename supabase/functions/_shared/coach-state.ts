@@ -442,6 +442,14 @@ export function coachStateDiff(
   return { priorities_added, priorities_removed, rank_changes, recovery_change, strength_emphasis_change };
 }
 
+/** The verbatim CoachState document block for the skeleton writer's user
+ *  message (2026-08 full-document channel). The typed decisions in the
+ *  TrainingDesignInput remain the locked plan; this is the letter that
+ *  explains it — the same content the athlete reads as their evaluation. */
+export function buildCoachStateDocumentBlock(coachState: CoachStateContent): string {
+  return `COACH STATE DOCUMENT (JSON — the coach's full written judgment; the TrainingDesignInput above remains the locked plan):\n${JSON.stringify(coachState, null, 2)}`;
+}
+
 export function evaluationFromCoachState(cs: CoachStateContent): EvaluationOutput {
   const ranked = [...cs.priorities].sort((a, b) => a.rank - b.rank);
   return {
