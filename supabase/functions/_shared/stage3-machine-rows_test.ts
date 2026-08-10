@@ -17,6 +17,7 @@ import {
   machineRowM4,
   machineRowM5,
   machineRowM6,
+  machineRowM7,
   runMachineRows,
   summarizeMachineRows,
 } from "./stage3-machine-rows.ts";
@@ -188,7 +189,7 @@ Deno.test("M4 passes when rank-1 out-doses rank-2, and on equal dose", () => {
   assertEquals(machineRowM4(baseSkeleton(equal), tdi()).passed, true);
 });
 
-Deno.test("M4 fails when rank-2 out-doses rank-1 WITHIN a block type", () => {
+Deno.test("M4 fails on unambiguous starvation: total AND shared-type both inverted", () => {
   const inverted: BlockIntent[] = [
     { block_type: "skills", focus: "gymnastics_pulling", purpose: "develop", source_priority_rank: 2 },
     { block_type: "skills", focus: "gymnastics_pulling", purpose: "develop", source_priority_rank: 2 },
@@ -197,6 +198,22 @@ Deno.test("M4 fails when rank-2 out-doses rank-1 WITHIN a block type", () => {
   const r = machineRowM4(baseSkeleton(inverted), tdi());
   assertEquals(r.passed, false);
   assertEquals(r.violations.length, 1);
+});
+
+Deno.test("M4 within-type-only inversion is a warning when totals honor rank (placement freedom)", () => {
+  // Rank-1 midline-style routing: 1 skills + 2 accessory (total 3); rank-2
+  // gets 2 skills (total 2). Skills block inverts 2>1, totals don't.
+  const placement: BlockIntent[] = [
+    { block_type: "skills", focus: "olympic_lifting", purpose: "develop", source_priority_rank: 1 },
+    { block_type: "accessory", focus: "olympic_lifting", purpose: "develop", source_priority_rank: 1 },
+    { block_type: "accessory", focus: "olympic_lifting", purpose: "develop", source_priority_rank: 1 },
+    { block_type: "skills", focus: "gymnastics_pulling", purpose: "develop", source_priority_rank: 2 },
+    { block_type: "skills", focus: "gymnastics_pulling", purpose: "develop", source_priority_rank: 2 },
+  ];
+  const r = machineRowM4(baseSkeleton(placement), tdi());
+  assertEquals(r.passed, true);
+  assertEquals(r.violations, []);
+  assertEquals((r.warnings ?? []).some((w) => w.includes("placement choice")), true);
 });
 
 Deno.test("M4 cross-type inversion is a warning, not a violation (letter-prescribed dose shapes)", () => {
@@ -211,6 +228,30 @@ Deno.test("M4 cross-type inversion is a warning, not a violation (letter-prescri
   assertEquals(r.passed, true);
   assertEquals(r.violations, []);
   assertEquals((r.warnings ?? []).length > 0, true);
+});
+
+// ============================================================
+// M7 — session budget
+// ============================================================
+
+Deno.test("M7 fails when the metcon's stated duration can't fit the session", () => {
+  const s = baseSkeleton(CONFORMING_INTENTS);
+  s.weeks[2].days[1].metcon_focus = "long mixed-modal chipper (18–22 min)";
+  const r = machineRowM7(s, 60); // 22 + 45 > 60
+  assertEquals(r.passed, false);
+  assertEquals(r.violations.length, 1);
+  assertEquals(r.violations[0].includes("Week 3 Day 2"), true);
+});
+
+Deno.test("M7 passes when metcons fit, when duration is unstated, and when session length is unknown", () => {
+  // baseSkeleton metcons are "(6-8 min)" — fit a 60-min session.
+  assertEquals(machineRowM7(baseSkeleton(CONFORMING_INTENTS), 60).passed, true);
+  const s = baseSkeleton(CONFORMING_INTENTS);
+  s.weeks[0].days[0].metcon_focus = "coach's choice conditioning";
+  assertEquals(machineRowM7(s, 60).passed, true);
+  const long = baseSkeleton(CONFORMING_INTENTS);
+  long.weeks[0].days[0].metcon_focus = "long chipper (25 min)";
+  assertEquals(machineRowM7(long, null).passed, true);
 });
 
 // ============================================================
@@ -278,14 +319,14 @@ Deno.test("runMachineRows passes a fully conforming pair and summarizes", () => 
   const result = runMachineRows(baseSkeleton(CONFORMING_INTENTS), tdi());
   assertEquals(result.passed, true);
   assertEquals(result.structural_failure, false);
-  assertEquals(summarizeMachineRows(result), "M1=ok M2=ok M3=ok M4=ok M5=ok M6=ok");
+  assertEquals(summarizeMachineRows(result), "M1=ok M2=ok M3=ok M4=ok M5=ok M6=ok M7=ok");
 });
 
 Deno.test("runMachineRows fails all rows on a structurally broken skeleton", () => {
   const result = runMachineRows({} as SkeletonOutput, tdi());
   assertEquals(result.passed, false);
   assertEquals(result.structural_failure, true);
-  assertEquals(result.rows.length, 6);
+  assertEquals(result.rows.length, 7);
   assertEquals(result.rows.every((r) => !r.passed), true);
 });
 

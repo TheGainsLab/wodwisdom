@@ -34,7 +34,7 @@ import { normalizeMovementKey } from "./athlete-model.ts";
 import { auditSkeletonDayCount, auditSkeletonStructural } from "./v3-skeleton-audits.ts";
 import { checkAllocationInvariants } from "./training-design-invariants.ts";
 
-export type MachineRowId = "M1" | "M2" | "M3" | "M4" | "M5" | "M6";
+export type MachineRowId = "M1" | "M2" | "M3" | "M4" | "M5" | "M6" | "M7";
 
 export interface MachineRowResult {
   id: MachineRowId;
@@ -219,12 +219,15 @@ function doseByBlockTypeAndFocus(skeleton: SkeletonOutput): Map<string, Map<Focu
   return out;
 }
 
-/** M4 (amended 2026-08-10) — dose ordering enforced WITHIN each block type:
- *  when two priorities both develop in the same block type, the higher rank
- *  must get at least as many blocks there. Cross-type total inversions are
- *  WARNINGS only — a strength day is inherently a bigger chunk than a skill
- *  touch, and the eval may legitimately prescribe e.g. pressing-biased
- *  strength alongside twice-weekly skill work. */
+/** M4 (composite, 2026-08-10) — a lower rank hard-fails ONLY when it out-doses
+ *  a higher rank BOTH in total across block types AND within a shared block
+ *  type. Either signal alone is a WARNING:
+ *    - total-only inversion may be letter-prescribed dose shape (a strength
+ *      day is a bigger chunk than a skill touch — run 1's false positive);
+ *    - within-type-only inversion may be legitimate placement (midline's
+ *      canonical home is the accessory block — run 2's false positive).
+ *  Placement across block types is coaching vocabulary, not drift; only
+ *  unambiguous starvation of a higher rank fails. */
 export function machineRowM4(
   skeleton: SkeletonOutput,
   tdi: TrainingDesignInput,
@@ -232,37 +235,36 @@ export function machineRowM4(
   const violations: string[] = [];
   const warnings: string[] = [];
   const ranked = [...tdi.priorities].sort((a, b) => a.rank - b.rank);
-
+  const total = doseByFocus(skeleton);
   const byType = doseByBlockTypeAndFocus(skeleton);
-  for (const [blockType, doses] of byType) {
-    for (let i = 1; i < ranked.length; i++) {
-      for (let j = 0; j < i; j++) {
-        const hi = ranked[j];
-        const lo = ranked[i];
+
+  for (let i = 1; i < ranked.length; i++) {
+    for (let j = 0; j < i; j++) {
+      const hi = ranked[j];
+      const lo = ranked[i];
+      const totalInverted = (total.get(lo.focus) ?? 0) > (total.get(hi.focus) ?? 0);
+      const sharedTypeInversions: string[] = [];
+      for (const [blockType, doses] of byType) {
         const hiDose = doses.get(hi.focus);
         const loDose = doses.get(lo.focus);
-        // Only meaningful when BOTH foci develop in this block type — a focus
-        // that never uses this block type isn't being out-dosed there.
         if (hiDose != null && loDose != null && loDose > hiDose) {
-          violations.push(
-            `${blockType}: rank ${lo.rank} (${lo.focus}) dose ${loDose} exceeds rank ${hi.rank} (${hi.focus}) dose ${hiDose}.`,
-          );
+          sharedTypeInversions.push(`${blockType} ${loDose}>${hiDose}`);
         }
       }
-    }
-  }
-
-  // Cross-type totals — observational only.
-  const total = doseByFocus(skeleton);
-  for (let i = 1; i < ranked.length; i++) {
-    const hi = ranked[i - 1];
-    const lo = ranked[i];
-    const hiDose = total.get(hi.focus) ?? 0;
-    const loDose = total.get(lo.focus) ?? 0;
-    if (loDose > hiDose) {
-      warnings.push(
-        `total: rank ${lo.rank} (${lo.focus}) dose ${loDose} exceeds rank ${hi.rank} (${hi.focus}) dose ${hiDose} across block types.`,
-      );
+      const pair = `rank ${lo.rank} (${lo.focus}) vs rank ${hi.rank} (${hi.focus})`;
+      if (totalInverted && sharedTypeInversions.length > 0) {
+        violations.push(
+          `${pair}: out-dosed in total (${total.get(lo.focus)}>${total.get(hi.focus)}) AND within shared block type(s) [${sharedTypeInversions.join(", ")}].`,
+        );
+      } else if (totalInverted) {
+        warnings.push(
+          `${pair}: total dose inverted (${total.get(lo.focus)}>${total.get(hi.focus)}) but no shared-block-type inversion — may be letter-prescribed dose shape.`,
+        );
+      } else if (sharedTypeInversions.length > 0) {
+        warnings.push(
+          `${pair}: within-type inversion [${sharedTypeInversions.join(", ")}] but totals honor rank — placement choice, not starvation.`,
+        );
+      }
     }
   }
 
@@ -361,6 +363,43 @@ export function machineRowM6(skeleton: SkeletonOutput): MachineRowResult {
   return { id: "M6", passed: violations.length === 0, violations };
 }
 
+/** Estimated minutes the five non-metcon blocks consume in a standard session
+ *  (warm-up ~8, skills ~10, strength ~15, accessory ~8, cool-down ~4). The
+ *  metcon must fit in what remains of session_length_minutes. Documented
+ *  assumption — revisit if block shapes change. */
+export const M7_OTHER_BLOCKS_BUDGET_MIN = 45;
+
+/** M7 — session budget: the metcon's own stated upper duration ("(15-18 min)")
+ *  plus the fixed budget for the other blocks must fit session_length_minutes.
+ *  Run 2's Fable arm programmed 18-22 min chippers into six-block 60-minute
+ *  days; Sonnet self-capped at ≤15 and fit. Skipped when the athlete has no
+ *  session length or a metcon states no duration. */
+export function machineRowM7(
+  skeleton: SkeletonOutput,
+  sessionLengthMinutes: number | null,
+): MachineRowResult {
+  const violations: string[] = [];
+  if (sessionLengthMinutes == null || sessionLengthMinutes <= 0) {
+    return { id: "M7", passed: true, violations };
+  }
+  const metconBudget = sessionLengthMinutes - M7_OTHER_BLOCKS_BUDGET_MIN;
+  for (const wk of skeleton.weeks ?? []) {
+    for (const day of wk.days ?? []) {
+      const focus = day.metcon_focus;
+      if (!focus) continue;
+      const m = focus.match(/\((\d+)(?:\s*[-–—]\s*(\d+))?\s*min/i);
+      if (!m) continue;
+      const upper = parseInt(m[2] ?? m[1], 10);
+      if (Number.isFinite(upper) && upper > metconBudget) {
+        violations.push(
+          `Week ${wk.week_num} Day ${day.day_num}: metcon "${focus}" (up to ${upper} min) + ~${M7_OTHER_BLOCKS_BUDGET_MIN} min of other blocks exceeds the ${sessionLengthMinutes}-min session.`,
+        );
+      }
+    }
+  }
+  return { id: "M7", passed: violations.length === 0, violations };
+}
+
 // ============================================================
 // Runner
 // ============================================================
@@ -372,7 +411,7 @@ export function runMachineRows(
   // A skeleton too malformed to iterate fails every row rather than crashing.
   const structural = auditSkeletonStructural(skeleton);
   if (!structural.passed) {
-    const rows: MachineRowResult[] = (["M1", "M2", "M3", "M4", "M5", "M6"] as MachineRowId[]).map(
+    const rows: MachineRowResult[] = (["M1", "M2", "M3", "M4", "M5", "M6", "M7"] as MachineRowId[]).map(
       (id) => ({ id, passed: false, violations: structural.violations }),
     );
     return { passed: false, rows, structural_failure: true };
@@ -385,6 +424,7 @@ export function runMachineRows(
     machineRowM4(skeleton, tdi),
     machineRowM5(skeleton, tdi),
     machineRowM6(skeleton),
+    machineRowM7(skeleton, tdi.session_length_minutes),
   ];
   return { passed: rows.every((r) => r.passed), rows, structural_failure: false };
 }

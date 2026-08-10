@@ -31,7 +31,11 @@ USE THE DOCUMENT TO REFINE EXECUTION ONLY:
   - reasons / evidence may inform selection WITHIN the allowed vocabulary (which lift variant, which skill progression, which metcon shape best serves the stated why).
   - Injury or recovery rationale may shape selection beyond the hard do_not_program ban (e.g. choosing the lower-stress variant of an allowed movement).
 
-NEVER use the document to: re-rank, add, drop, or promote a focus; change the dose a rank earns; give a deprioritized focus a dedicated block; or argue with the plan in day_intent or any emitted field. Emit structure, not advocacy.`;
+NEVER use the document to: re-rank, add, drop, or promote a focus; change the dose a rank earns; give a deprioritized focus a dedicated block; or argue with the plan in day_intent or any emitted field. Emit structure, not advocacy.
+
+SESSION BUDGET: every block on a day must fit session_length_minutes TOGETHER. The non-metcon blocks consume roughly 45 minutes of a standard session — so the metcon's stated duration must fit what remains (a 60-minute athlete gets a ≤15-minute metcon, not a 20-minute chipper). State metcon durations that actually fit.
+
+MAINTAIN PRIMARIES: when the priorities call for fewer dedicated strength days than days_per_week, the spare strength slots MAY carry a maintain focus as primary_lift — but only at submaximal touch intensity (technical doubles, moderate loads). Intensity, not placement, is what separates a touch from development.`;
 
 /** Frontier-arm system prompt = live prompt + addendum, nothing else. */
 export function buildFrontierSkeletonSystemPrompt(): string {
