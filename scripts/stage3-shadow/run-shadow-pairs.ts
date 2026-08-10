@@ -141,6 +141,7 @@ async function loadCoachStateReadOnly(userId: string, payload: WriterPayload): P
 
 interface ClaudeCallOpts {
   model: string;
+  maxTokens?: number;
   system: string;
   // deno-lint-ignore no-explicit-any
   tools: any[];
@@ -161,7 +162,7 @@ async function callClaude(opts: ClaudeCallOpts): Promise<any> {
       },
       body: JSON.stringify({
         model: opts.model,
-        max_tokens: 8000,
+        max_tokens: opts.maxTokens ?? 8000,
         stream: false,
         system: opts.system,
         tools: opts.tools,
@@ -209,6 +210,10 @@ async function callFullDocSkeleton(
   const ruleRecap = CROSSFIT_PACK.writer.skeletonRuleRecap(daysPerWeek, tdi);
   const data = await callClaude({
     model,
+    // Fable emits noticeably longer skeletons than Sonnet — pair-02 hit the
+    // 8K cap mid-emission and failed structurally. Give skeleton calls
+    // headroom; a production adoption would need the same bump.
+    maxTokens: 16000,
     system: buildFrontierSkeletonSystemPrompt(),
     tools: [buildEmitSkeletonTool(daysPerWeek)],
     tool_choice: { type: "tool", name: "emit_skeleton" },
