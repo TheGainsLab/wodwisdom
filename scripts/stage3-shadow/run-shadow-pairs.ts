@@ -1,9 +1,11 @@
 /**
- * run-shadow-pairs.ts — Stage 3 shadow test pair generator.
+ * run-shadow-pairs.ts — skeleton-model comparison (full-document arms).
  *
- * Runs the ten pre-registered athletes through BOTH skeleton arms:
- *   enum arm     — the live skeleton writer, byte-identical call (Sonnet, TDI only)
- *   frontier arm — live prompt + frontier addendum, TDI + full CoachState document
+ * 2026-08-10 redesign: the enum arm is retired (channel question settled —
+ * the skeleton receives the full CoachState). What's compared now is the
+ * SKELETON WRITER MODEL: one CoachState roll per athlete (Fable, matching
+ * production), then one full-document skeleton per model in --arms — so any
+ * difference between outlines is the writer, never the letter.
  *
  * READ-ONLY against production: coach_states is read (cache hit expected); on a
  * miss the CoachState is generated IN MEMORY and never persisted. Nothing is
@@ -11,16 +13,17 @@
  *
  * Usage (Deno; needs `brew install deno` if absent):
  *   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... ANTHROPIC_API_KEY=... \
+ *   COMPETITION_SERVICE_BASE_URL=... COMPETITION_SERVICE_KEY=... \
  *   deno run --allow-net --allow-env --allow-read --allow-write \
  *     scripts/stage3-shadow/run-shadow-pairs.ts \
  *     --athletes=scripts/stage3-shadow/athletes.json \
- *     [--out=shadow-out] [--frontier-model=claude-opus-4-8]
+ *     [--out=shadow-out] [--arms=claude-sonnet-4-6,claude-fable-5]
  *
  * Output layout (see README.md for the blinding procedure):
- *   <out>/pair-NN/outline-A.md, outline-B.md, inputs.md   ← scorer packet
- *   <out>/pair-NN/machine.json                            ← arm-keyed, NOT for scorers
- *   <out>/assignment-key.json                             ← unblinding key, non-scorer holds it
- *   <out>/summary.md                                      ← machine-row roll-up
+ *   <out>/pair-NN/outline-A.md, outline-B.md[, -C…], inputs.md  ← scorer packet
+ *   <out>/pair-NN/machine.json                                  ← arm-keyed, NOT for scorers
+ *   <out>/assignment-key.json                                   ← unblinding key, non-scorer holds it
+ *   <out>/summary.md                                            ← machine-row roll-up
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -39,7 +42,6 @@ import {
 import { COACH_STATE_SYSTEM_PROMPT } from "../../supabase/functions/_shared/coach-state-prompt.ts";
 import { athleteModelEvidenceKeys } from "../../supabase/functions/_shared/athlete-model.ts";
 import { MODELS } from "../../supabase/functions/_shared/model-profiles.ts";
-import { callSkeletonWriter } from "../../supabase/functions/_shared/engine/pipeline.ts";
 import { CROSSFIT_PACK } from "../../supabase/functions/_shared/domain-packs/crossfit/index.ts";
 import { buildEmitSkeletonTool, type SkeletonOutput } from "../../supabase/functions/_shared/v3-output-schema.ts";
 import type { WriterPayload } from "../../supabase/functions/_shared/build-writer-payload.ts";
@@ -64,7 +66,11 @@ function arg(name: string, fallback?: string): string | undefined {
 
 const ATHLETES_PATH = arg("athletes");
 const OUT_DIR = arg("out", "shadow-out")!;
-const FRONTIER_MODEL = arg("frontier-model", "claude-opus-4-8")!;
+/** Skeleton-writer models — one full-document arm per entry, same CoachState. */
+const ARM_MODELS = (arg("arms", arg("frontier-model", "claude-sonnet-4-6,claude-fable-5"))!)
+  .split(",")
+  .map((m) => m.trim())
+  .filter(Boolean);
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -189,16 +195,20 @@ function extractToolInput(data: any, toolName: string): unknown {
   return toolUse.input;
 }
 
-/** Frontier arm: live prompt + addendum; TDI + full CoachState document. Same
- *  tool schema and rule recap as the live call — the deltas are the addendum,
- *  the document block, and the model. */
-async function callFrontierSkeleton(tdi: TrainingDesignInput, coachState: CoachState): Promise<SkeletonOutput> {
+/** Full-document skeleton call: live prompt + addendum; TDI + full CoachState
+ *  document. Same tool schema and rule recap as the live call — the deltas are
+ *  the addendum, the document block, and the model under test. */
+async function callFullDocSkeleton(
+  tdi: TrainingDesignInput,
+  coachState: CoachState,
+  model: string,
+): Promise<SkeletonOutput> {
   const daysPerWeek = tdi.days_per_week;
   const inputBlock = `TRAINING DESIGN INPUT (JSON — the FIXED plan to allocate):\n${JSON.stringify(tdi, null, 2)}`;
   const docBlock = buildCoachStateDocumentBlock(coachState);
   const ruleRecap = CROSSFIT_PACK.writer.skeletonRuleRecap(daysPerWeek, tdi);
   const data = await callClaude({
-    model: FRONTIER_MODEL,
+    model,
     system: buildFrontierSkeletonSystemPrompt(),
     tools: [buildEmitSkeletonTool(daysPerWeek)],
     tool_choice: { type: "tool", name: "emit_skeleton" },
@@ -240,10 +250,11 @@ function renderInputs(spec: AthleteSpec, tdi: TrainingDesignInput, coachState: C
   return [
     `# Pair inputs — ${spec.category}`,
     ``,
-    `Both outlines were generated from the same locked plan below. One arm ALSO`,
-    `received the full Coach State document. Score per the pre-registered rubric:`,
-    `H1 nuance utilization (per outline, 1–5), H2 soft drift (quote required),`,
-    `H3 coherence (per outline, 1–5).`,
+    `Every outline was generated from the SAME locked plan and the SAME full`,
+    `Coach State document below — only the skeleton-writer model differs.`,
+    `Build the answer key from the recommended_actions and maintain notes BEFORE`,
+    `opening any outline; score each arm per item: honored / partial / missed /`,
+    `contradicted, with a quote required for any re-arguing flag.`,
     ``,
     `## Typed decisions (both arms — THE LOCKED PLAN)`,
     "```json",
@@ -263,7 +274,7 @@ function renderInputs(spec: AthleteSpec, tdi: TrainingDesignInput, coachState: C
     ),
     "```",
     ``,
-    `## Full Coach State document (one arm only)`,
+    `## Full Coach State document (given to every arm)`,
     "```json",
     JSON.stringify(coachState, null, 2),
     "```",
@@ -278,20 +289,20 @@ interface KeyEntry {
   pair: number;
   user_id: string;
   category: string;
-  A: "enum" | "frontier";
-  B: "enum" | "frontier";
+  /** Blinded label → skeleton-writer model. */
+  labels: Record<string, string>;
   coach_state_source: string;
 }
 
 await Deno.mkdir(OUT_DIR, { recursive: true });
 const key: KeyEntry[] = [];
 const summaryLines: string[] = [
-  `# Stage 3 shadow run — machine-row summary`,
+  `# Skeleton-model shadow run — machine-row summary`,
   ``,
-  `Frontier model: ${FRONTIER_MODEL}`,
+  `Arms (blinded per pair): ${ARM_MODELS.join(" vs ")}`,
   ``,
-  `| pair | category | enum arm | frontier arm | cross-check |`,
-  `|---|---|---|---|---|`,
+  `| pair | category | ${ARM_MODELS.map((_, i) => `arm ${String.fromCharCode(65 + i)}`).join(" | ")} | cross-check |`,
+  `|---|---|${ARM_MODELS.map(() => "---").join("|")}|---|`,
 ];
 
 for (let i = 0; i < athletes.length; i++) {
@@ -315,35 +326,28 @@ for (let i = 0; i < athletes.length; i++) {
     previous_cycle: payload.previous_cycle,
   });
 
-  console.log(`  enum arm (live call)…`);
-  const enumSkeleton = await callSkeletonWriter(tdi, "", CROSSFIT_PACK);
-  console.log(`  frontier arm…`);
-  const frontierSkeleton = await callFrontierSkeleton(tdi, coachState);
+  // One full-document skeleton per arm model — SAME CoachState roll for all.
+  const arms: Array<{ model: string; skeleton: SkeletonOutput; rows: ReturnType<typeof runMachineRows> }> = [];
+  for (const model of ARM_MODELS) {
+    console.log(`  arm ${model}…`);
+    const skeleton = await callFullDocSkeleton(tdi, coachState, model);
+    arms.push({ model, skeleton, rows: runMachineRows(skeleton, tdi) });
+  }
+  const crossNotes = arms.flatMap((a) => crossCheckWithLiveInvariants(a.skeleton, tdi));
 
-  const enumRows = runMachineRows(enumSkeleton, tdi);
-  const frontierRows = runMachineRows(frontierSkeleton, tdi);
-  const crossNotes = [
-    ...crossCheckWithLiveInvariants(enumSkeleton, tdi),
-    ...crossCheckWithLiveInvariants(frontierSkeleton, tdi),
-  ];
+  // Blind assignment: shuffle arm order, then label A, B, C… in shuffled order.
+  const shuffled = [...arms].sort(() => Math.random() - 0.5);
+  const labels: Record<string, string> = {};
+  for (let j = 0; j < shuffled.length; j++) {
+    const label = String.fromCharCode(65 + j);
+    labels[label] = shuffled[j].model;
+    await Deno.writeTextFile(
+      `${pairDir}/outline-${label}.md`,
+      `# Pair ${pairNum} — Outline ${label}\n\n${renderOutline(shuffled[j].skeleton)}\n`,
+    );
+  }
+  key.push({ pair: pairNum, user_id: spec.user_id, category: spec.category, labels, coach_state_source: source });
 
-  // Blind assignment: coin flip which arm becomes label A.
-  const enumIsA = Math.random() < 0.5;
-  const outlines: Record<"A" | "B", SkeletonOutput> = {
-    A: enumIsA ? enumSkeleton : frontierSkeleton,
-    B: enumIsA ? frontierSkeleton : enumSkeleton,
-  };
-  key.push({
-    pair: pairNum,
-    user_id: spec.user_id,
-    category: spec.category,
-    A: enumIsA ? "enum" : "frontier",
-    B: enumIsA ? "frontier" : "enum",
-    coach_state_source: source,
-  });
-
-  await Deno.writeTextFile(`${pairDir}/outline-A.md`, `# Pair ${pairNum} — Outline A\n\n${renderOutline(outlines.A)}\n`);
-  await Deno.writeTextFile(`${pairDir}/outline-B.md`, `# Pair ${pairNum} — Outline B\n\n${renderOutline(outlines.B)}\n`);
   await Deno.writeTextFile(`${pairDir}/inputs.md`, renderInputs(spec, tdi, coachState) + "\n");
   await Deno.writeTextFile(
     `${pairDir}/machine.json`,
@@ -352,8 +356,7 @@ for (let i = 0; i < athletes.length; i++) {
         pair: pairNum,
         user_id: spec.user_id,
         category: spec.category,
-        enum: { rows: enumRows, skeleton: enumSkeleton },
-        frontier: { rows: frontierRows, skeleton: frontierSkeleton },
+        arms: Object.fromEntries(arms.map((a) => [a.model, { rows: a.rows, skeleton: a.skeleton }])),
         cross_check_notes: crossNotes,
         tdi,
       },
@@ -361,10 +364,15 @@ for (let i = 0; i < athletes.length; i++) {
       2,
     ),
   );
+  // Summary in BLINDED label order so it can sit with the scorer packet.
+  const labelSummaries = Object.keys(labels).sort().map((label) => {
+    const arm = arms.find((a) => a.model === labels[label])!;
+    return summarizeMachineRows(arm.rows);
+  });
   summaryLines.push(
-    `| ${pairNum} | ${spec.category} | ${summarizeMachineRows(enumRows)} | ${summarizeMachineRows(frontierRows)} | ${crossNotes.length === 0 ? "ok" : `${crossNotes.length} note(s)`} |`,
+    `| ${pairNum} | ${spec.category} | ${labelSummaries.join(" | ")} | ${crossNotes.length === 0 ? "ok" : `${crossNotes.length} note(s)`} |`,
   );
-  console.log(`  machine: enum[${summarizeMachineRows(enumRows)}] frontier[${summarizeMachineRows(frontierRows)}]`);
+  console.log(`  machine: ${arms.map((a) => `${a.model}[${summarizeMachineRows(a.rows)}]`).join(" ")}`);
 }
 
 await Deno.writeTextFile(`${OUT_DIR}/assignment-key.json`, JSON.stringify(key, null, 2));

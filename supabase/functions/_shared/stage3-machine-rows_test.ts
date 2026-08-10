@@ -16,6 +16,7 @@ import {
   machineRowM3,
   machineRowM4,
   machineRowM5,
+  machineRowM6,
   runMachineRows,
   summarizeMachineRows,
 } from "./stage3-machine-rows.ts";
@@ -187,14 +188,58 @@ Deno.test("M4 passes when rank-1 out-doses rank-2, and on equal dose", () => {
   assertEquals(machineRowM4(baseSkeleton(equal), tdi()).passed, true);
 });
 
-Deno.test("M4 fails when rank-2 out-doses rank-1", () => {
+Deno.test("M4 fails when rank-2 out-doses rank-1 WITHIN a block type", () => {
   const inverted: BlockIntent[] = [
-    { block_type: "strength", focus: "gymnastics_pulling", purpose: "develop", source_priority_rank: 2 },
     { block_type: "skills", focus: "gymnastics_pulling", purpose: "develop", source_priority_rank: 2 },
-    { block_type: "metcon", focus: "olympic_lifting", purpose: "develop", source_priority_rank: 1 },
+    { block_type: "skills", focus: "gymnastics_pulling", purpose: "develop", source_priority_rank: 2 },
+    { block_type: "skills", focus: "olympic_lifting", purpose: "develop", source_priority_rank: 1 },
   ];
   const r = machineRowM4(baseSkeleton(inverted), tdi());
   assertEquals(r.passed, false);
+  assertEquals(r.violations.length, 1);
+});
+
+Deno.test("M4 cross-type inversion is a warning, not a violation (letter-prescribed dose shapes)", () => {
+  // Rank-2 lives only in skills (2 blocks); rank-1 lives only in metcon (1
+  // block). No shared block type → no violation; total inversion → warning.
+  const crossType: BlockIntent[] = [
+    { block_type: "skills", focus: "gymnastics_pulling", purpose: "develop", source_priority_rank: 2 },
+    { block_type: "skills", focus: "gymnastics_pulling", purpose: "develop", source_priority_rank: 2 },
+    { block_type: "metcon", focus: "olympic_lifting", purpose: "develop", source_priority_rank: 1 },
+  ];
+  const r = machineRowM4(baseSkeleton(crossType), tdi());
+  assertEquals(r.passed, true);
+  assertEquals(r.violations, []);
+  assertEquals((r.warnings ?? []).length > 0, true);
+});
+
+// ============================================================
+// M6 — progression truthfulness
+// ============================================================
+
+Deno.test("M6 fails when the plan promises a lift no day programs", () => {
+  const s = baseSkeleton(CONFORMING_INTENTS);
+  s.month_plan.strength_progression =
+    "Back Squat: W1 5×5 @75% → W3 4×3 @82%. Deadlift: W1 4×4 @75% → W3 3×3 @85%.";
+  // baseSkeleton days all have primary_lift "Back Squat" — no deadlift day.
+  const r = machineRowM6(s);
+  assertEquals(r.passed, false);
+  assertEquals(r.violations.length, 1);
+  assertEquals(r.violations[0].includes("Deadlift"), true);
+});
+
+Deno.test("M6 passes when every promised lift is programmed", () => {
+  const s = baseSkeleton(CONFORMING_INTENTS);
+  s.month_plan.strength_progression = "Back Squat: W1 5×5 @75% → W3 4×3 @82%.";
+  assertEquals(machineRowM6(s).passed, true);
+});
+
+Deno.test("M6 ignores incidental lift mentions that aren't progression labels", () => {
+  const s = baseSkeleton(CONFORMING_INTENTS);
+  s.month_plan.strength_progression =
+    "Back Squat: W1 5×5 → W3 4×3. Olympic maintenance: EMOM tech work (Hang Power Clean / Power Snatch variants) at 60-70%, held flat.";
+  // Power Clean / Power Snatch appear only inside prose, not as "<Lift>:" labels.
+  assertEquals(machineRowM6(s).passed, true);
 });
 
 // ============================================================
@@ -233,14 +278,14 @@ Deno.test("runMachineRows passes a fully conforming pair and summarizes", () => 
   const result = runMachineRows(baseSkeleton(CONFORMING_INTENTS), tdi());
   assertEquals(result.passed, true);
   assertEquals(result.structural_failure, false);
-  assertEquals(summarizeMachineRows(result), "M1=ok M2=ok M3=ok M4=ok M5=ok");
+  assertEquals(summarizeMachineRows(result), "M1=ok M2=ok M3=ok M4=ok M5=ok M6=ok");
 });
 
 Deno.test("runMachineRows fails all rows on a structurally broken skeleton", () => {
   const result = runMachineRows({} as SkeletonOutput, tdi());
   assertEquals(result.passed, false);
   assertEquals(result.structural_failure, true);
-  assertEquals(result.rows.length, 5);
+  assertEquals(result.rows.length, 6);
   assertEquals(result.rows.every((r) => !r.passed), true);
 });
 

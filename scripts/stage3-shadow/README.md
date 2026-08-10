@@ -18,24 +18,23 @@ Output in `eval-compare/<user-prefix>/`: `eval-<model>.md` (athlete-facing
 read), `decisions.md` (do the models judge differently or just write
 differently?), `raw-<model>.json`.
 
-# Stage 3 Shadow Test — Runner
+# Skeleton-Model Shadow Test — Runner
 
-Generates the ten pre-registered A/B skeleton pairs for the Stage 3 rubric
-(frozen 2026-08). Read-only against production: `coach_states` is read; on a
+**2026-08-10 redesign:** the channel question is settled — every arm receives
+the **full CoachState document**. What's compared is the **skeleton-writer
+model**. Per athlete: ONE CoachState roll (Fable, matching production), then
+one full-document skeleton per model in `--arms`
+(default `claude-sonnet-4-6,claude-fable-5`), blinded A/B outlines, machine
+rows M1–M6 on each. Read-only against production: `coach_states` is read; on a
 cache miss the CoachState is generated in memory and **never persisted**.
-Nothing is written to any table — outputs land on local disk only.
 
-## Arms
+Protocol: build the answer key from the letter's `recommended_action`s and
+maintain notes in `inputs.md` BEFORE opening any outline; machine rows gate;
+score each arm per answer-key item (honored / partial / missed / contradicted,
+quote required for re-arguing flags); ties go to the cheaper model.
 
-- **enum** — the live skeleton writer, byte-identical call (`callSkeletonWriter`,
-  Sonnet, TrainingDesignInput only).
-- **frontier** — the live prompt **plus** the de-prescribing addendum
-  (`frontier-skeleton-prompt.ts`), receiving the TDI **plus** the full CoachState
-  document. Default model `claude-opus-4-8` (`--frontier-model=` to override).
-
-Both arms are single-shot (no audit-retry loop) so the pair compares the
-writers, not the recovery machinery. Machine rows M1–M5
-(`_shared/stage3-machine-rows.ts`) run on both outputs.
+All arms are single-shot (no audit-retry loop) so the comparison is between
+writers, not recovery machinery.
 
 ## Run
 
