@@ -105,7 +105,7 @@ USE THE DOCUMENT TO REFINE EXECUTION ONLY:
 
 NEVER use the document to: re-rank, add, drop, or promote a focus; change the dose a rank earns; give a deprioritized focus a dedicated block; or argue with the plan in day_intent or any emitted field. Emit structure, not advocacy.
 
-SESSION BUDGET: every block on a day must fit session_length_minutes TOGETHER. The non-metcon blocks consume roughly 45 minutes of a standard session — so the metcon's stated duration must fit what remains (a 60-minute athlete gets a ≤15-minute metcon, not a 20-minute chipper). State metcon durations that actually fit. When session_length_minutes is null, size metcons to the athlete's arc, not to a cap.
+SESSION BUDGET: session_length_minutes is advisory — it signals the athlete's typical session, so keep stated metcon durations in character with it (a 60-minute athlete doesn't need a 25-minute chipper). Exact fit is not required; the athlete adjusts day-of with in-app coaching. When session_length_minutes is null, size metcons to the athlete's arc, not to a cap.
 
 MAINTAIN PRIMARIES: when the priorities call for fewer dedicated strength days than days_per_week, the spare strength slots MAY carry a maintain focus as primary_lift — but only at submaximal touch intensity (technical doubles, moderate loads). Intensity, not placement, is what separates a touch from development.
 
