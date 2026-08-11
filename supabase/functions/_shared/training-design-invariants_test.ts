@@ -23,7 +23,6 @@ function tdi(): TrainingDesignInput {
     recovery_stance: "conservative",
     strength_emphasis: "absolute_strength",
     days_per_week: 4,
-    session_length_minutes: 60,
     equipment: {},
     do_not_program: [],
     vocabulary: [],

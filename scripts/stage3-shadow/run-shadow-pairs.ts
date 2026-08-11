@@ -318,7 +318,6 @@ function renderInputs(spec: AthleteSpec, tdi: TrainingDesignInput, coachState: C
         recovery_stance: tdi.recovery_stance,
         strength_emphasis: tdi.strength_emphasis,
         days_per_week: tdi.days_per_week,
-        session_length_minutes: tdi.session_length_minutes,
         do_not_program: tdi.do_not_program,
       },
       null,
@@ -376,7 +375,6 @@ for (let i = 0; i < athletes.length; i++) {
 
   const tdi = buildTrainingDesignInput(coachState, {
     days_per_week: payload.training_context.days_per_week,
-    session_length_minutes: payload.training_context.session_length_minutes,
     equipment: payload.equipment,
     do_not_program: payload.training_context.injuries_structured?.do_not_program ?? [],
     vocabulary: payload.vocabulary,

@@ -286,7 +286,6 @@ async function stageCoachState(
 
   const trainingDesignInput = buildTrainingDesignInput(coachState, {
     days_per_week: payload.training_context.days_per_week,
-    session_length_minutes: payload.training_context.session_length_minutes,
     equipment: payload.equipment,
     do_not_program: payload.training_context.injuries_structured?.do_not_program ?? [],
     vocabulary: payload.vocabulary,
@@ -355,7 +354,6 @@ async function stageMetcons(
     athlete_context: [
       payload.basics.age ? `age ${payload.basics.age}` : "",
       `${tdi.days_per_week} days/week`,
-      tdi.session_length_minutes ? `${tdi.session_length_minutes}-min sessions` : "",
       `recovery stance ${tdi.recovery_stance}`,
     ].filter(Boolean).join(", "),
     previous_cycle_metcons: [], // per-month metcon detail needs the scoped RPC (parked)

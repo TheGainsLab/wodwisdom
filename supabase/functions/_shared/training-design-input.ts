@@ -35,7 +35,10 @@ import type { PreviousCycleSummary } from "./build-writer-payload.ts";
  *  these are decision-data (no facts it could use to re-rank intent). */
 export interface TrainingDesignExecutionInputs {
   days_per_week: number;
-  session_length_minutes: number | null;
+  /** RETAIL NEVER SETS THIS (duration ruling 2026-08-11: session duration is
+   *  not a programming concept for individual athletes). Present only for the
+   *  gym/class product line, where a class IS a fixed time slot. */
+  session_length_minutes?: number | null;
   equipment: Record<string, boolean>;
   /** The HARD ban — injuries + equipment-blocked movements, merged. */
   do_not_program: string[];
@@ -59,7 +62,6 @@ export interface TrainingDesignInput {
 
   // ── Execution constraints ──
   days_per_week: number;
-  session_length_minutes: number | null;
   equipment: Record<string, boolean>;
   do_not_program: string[];
   vocabulary: string[];
@@ -94,7 +96,6 @@ export function buildTrainingDesignInput(
     strength_emphasis: coachState.strength_emphasis.value,
 
     days_per_week: exec.days_per_week,
-    session_length_minutes: exec.session_length_minutes,
     equipment: exec.equipment,
     do_not_program: exec.do_not_program,
     vocabulary: exec.vocabulary,

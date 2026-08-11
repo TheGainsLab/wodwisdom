@@ -29,7 +29,7 @@ WHAT YOU RECEIVE (TrainingDesignInput)
   - deprioritize: [focus] — give NO dedicated development budget this cycle (incidental exposure is fine; this is NOT a ban).
   - recovery_stance: aggressive | standard | conservative — caps total volume + shapes deload.
   - strength_emphasis: technical | balanced | absolute_strength — biases the strength block.
-  - days_per_week, session_length_minutes — the budget.
+  - days_per_week — the budget.
   - do_not_program: [movement] — ABSOLUTE exclusion (injuries + missing equipment). Never program these.
   - vocabulary, lifts, previous_cycle — execution inputs (movement names you may use; 1RMs; last cycle for progression).
 
@@ -42,7 +42,7 @@ Olympic lifts (snatch, clean & jerk, variants) are STRENGTH, never skills. Skill
 A metcon focus names the target ADAPTATION only — you do NOT design metcons (see THE METCON SLOT).
 
 ALLOCATION — TRANSLATE INTENT INTO DOSE (this is your core job)
-Distribute the weekly block slots across the priorities by RANK, within the days_per_week × session_length budget and the recovery_stance cap:
+Distribute the weekly block slots across the priorities by RANK, within the days_per_week budget and the recovery_stance cap:
   - DEVELOP (priorities): the #1 priority gets the most dedicated slots across the 4 weeks; taper down the ranks. A typical 4-day athlete supports ~2–3 dedicated strength emphases + ~2–3 dedicated skill emphases per week total, shared across the priorities — do not spread so thin that nothing adapts. confidence may modulate: a low-confidence priority earns a smaller, more exploratory dose than a high-confidence one of the same rank.
   - MAINTAIN: ~1 low-cost touch per week per maintained focus — fold it into the block that already exists (a light technical strength exposure, a short skill EMOM, conditioning that already touches it). No dedicated development volume.
   - DEPRIORITIZE: assign NO dedicated slots. It may still appear incidentally (e.g. a deprioritized energy system inside a mixed metcon) — that's fine — but never build a block around it.
@@ -77,9 +77,6 @@ NEVER name movements, machines, implements, formats, or workouts in metcon_focus
 METCON TIME-DOMAIN MIX (how to assign the buckets across slots)
 Baseline: a roughly balanced mix across the cycle (≈ one-third each), each week touching all three when days_per_week ≥ 3; don't stack 3+ of the same in a row. Then BIAS the mix toward the conditioning PRIORITIES: aerobic_capacity → more long; anaerobic_capacity → more short. Use previous_cycle.conditioning.time_domains to rebalance toward under-served buckets. A deprioritized energy system still appears incidentally but gets no dedicated bias.
 
-SESSION-LENGTH BUDGET
-Session length is advisory (see SESSION BUDGET below) — keep each metcon's stated duration in character with the athlete's typical session. Rough guides: 60-min session → metcon usually ≤ 15 min (short/medium primarily); longer sessions carry longer pieces. When in doubt, err shorter — a rushed metcon at the tail of an overstuffed session hurts more than a slightly-short one.
-
 PRIOR CYCLE CONTINUITY (when previous_cycle is non-null)
 previous_cycle is last cycle's prescription — PROGRESS from it, never penalize. The prescription is the backbone; logged actuals only let you push a lift faster or ease one back. Absence of logging is NEUTRAL: if logged_* / volume fields are null/low it may just mean the athlete didn't log — progress as normal; NEVER cut sessions, deload, trim volume, or regress on that basis.
   - strength[]: build strength_progression as a step UP from last cycle's top_pct_1rm / sessions for the lifts this cycle's priorities call for.
@@ -111,8 +108,6 @@ USE THE DOCUMENT TO REFINE EXECUTION ONLY:
   - Injury or recovery rationale may shape selection beyond the hard do_not_program ban (e.g. choosing the lower-stress variant of an allowed movement).
 
 NEVER use the document to: re-rank, add, drop, or promote a focus; change the dose a rank earns; give a deprioritized focus a dedicated block; or argue with the plan in day_intent or any emitted field. Emit structure, not advocacy.
-
-SESSION BUDGET: session_length_minutes is advisory — it signals the athlete's typical session, so keep stated metcon durations in character with it (a 60-minute athlete doesn't need a 25-minute chipper). Exact fit is not required; the athlete adjusts day-of with in-app coaching. When session_length_minutes is null, size metcons to the athlete's arc, not to a cap.
 
 MAINTAIN PRIMARIES: when the priorities call for fewer dedicated strength days than days_per_week, the spare strength slots MAY carry a maintain focus as primary_lift — but only at submaximal touch intensity (technical doubles, moderate loads). Intensity, not placement, is what separates a touch from development.
 

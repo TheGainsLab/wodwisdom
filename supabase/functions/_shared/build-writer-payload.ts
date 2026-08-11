@@ -96,7 +96,9 @@ export interface AvoidanceConfirmed {
 export interface TrainingContextPayload {
   /** User-specified or default 5; clamped to [3, 6]. */
   days_per_week: 3 | 4 | 5 | 6;
-  session_length_minutes: number | null;
+  /** Retail payloads no longer carry this (duration ruling 2026-08-11);
+   *  the gym cohort envelope still sets it for class-slot scheduling. */
+  session_length_minutes?: number | null;
   /** Raw user free-text — NOT parsed. */
   goal_text: string | null;
   /** Raw user free-text — NOT parsed. */
@@ -462,7 +464,6 @@ interface AthleteProfileRow {
   conditioning: Record<string, unknown> | null;
   equipment: Record<string, unknown> | null;
   days_per_week: number | null;
-  session_length_minutes: number | null;
   goal: string | null;
   injuries_constraints: string | null;
   injuries_structured: InjuryConstraints | null;
@@ -477,7 +478,7 @@ interface AthleteProfileRow {
 const PROFILE_COLS =
   "age, height, bodyweight, gender, units, " +
   "lifts, skills, conditioning, equipment, " +
-  "days_per_week, session_length_minutes, " +
+  "days_per_week, " +
   "goal, injuries_constraints, injuries_structured, " +
   "injuries_constraints_hash, injuries_avoidance_confirmed, self_perception_level, " +
   "competition_athlete_id, coaching_intake, updated_at";
@@ -729,7 +730,6 @@ export async function buildWriterPayload(
     equipment,
     training_context: {
       days_per_week: clampDaysPerWeek(profile.days_per_week),
-      session_length_minutes: asNumber(profile.session_length_minutes),
       goal_text: asString(profile.goal),
       injuries_constraints_text: asString(profile.injuries_constraints),
       injuries_structured: mergedInjuriesStructured,
