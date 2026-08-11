@@ -232,27 +232,38 @@ Deno.test("M4 cross-type inversion is a warning, not a violation (letter-prescri
 });
 
 // ============================================================
-// M7 — session budget
+// M7 — session budget (advisory: warnings only, never fails)
 // ============================================================
 
-Deno.test("M7 fails when the metcon's stated duration can't fit the session", () => {
+Deno.test("M7 warns (but passes) when the metcon's stated duration can't fit the session", () => {
   const s = baseSkeleton(CONFORMING_INTENTS);
   s.weeks[2].days[1].metcon_focus = "long mixed-modal chipper (18–22 min)";
   const r = machineRowM7(s, 60); // 22 + 45 > 60
-  assertEquals(r.passed, false);
-  assertEquals(r.violations.length, 1);
-  assertEquals(r.violations[0].includes("Week 3 Day 2"), true);
+  assertEquals(r.passed, true);
+  assertEquals(r.violations.length, 0);
+  assertEquals(r.warnings?.length, 1);
+  assertEquals(r.warnings![0].includes("Week 3 Day 2"), true);
 });
 
-Deno.test("M7 passes when metcons fit, when duration is unstated, and when session length is unknown", () => {
+Deno.test("M7 warns on every metcon day when the session is shorter than the block estimate", () => {
+  // 40-min athlete: 45-min flat estimate exceeds the session before any
+  // metcon — the month-4 run that demoted M7 to advisory. All stated-duration
+  // metcons warn; none fail.
+  const r = machineRowM7(baseSkeleton(CONFORMING_INTENTS), 40);
+  assertEquals(r.passed, true);
+  assertEquals(r.violations.length, 0);
+  assertEquals((r.warnings ?? []).length > 0, true);
+});
+
+Deno.test("M7 is silent when metcons fit, when duration is unstated, and when session length is unknown", () => {
   // baseSkeleton metcons are "(6-8 min)" — fit a 60-min session.
-  assertEquals(machineRowM7(baseSkeleton(CONFORMING_INTENTS), 60).passed, true);
+  assertEquals(machineRowM7(baseSkeleton(CONFORMING_INTENTS), 60).warnings, undefined);
   const s = baseSkeleton(CONFORMING_INTENTS);
   s.weeks[0].days[0].metcon_focus = "coach's choice conditioning";
-  assertEquals(machineRowM7(s, 60).passed, true);
+  assertEquals(machineRowM7(s, 60).warnings, undefined);
   const long = baseSkeleton(CONFORMING_INTENTS);
   long.weeks[0].days[0].metcon_focus = "long chipper (25 min)";
-  assertEquals(machineRowM7(long, null).passed, true);
+  assertEquals(machineRowM7(long, null).warnings, undefined);
 });
 
 // ============================================================

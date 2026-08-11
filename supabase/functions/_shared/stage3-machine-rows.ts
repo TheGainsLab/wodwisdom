@@ -327,7 +327,13 @@ const M6_KNOWN_LIFTS = [
  *  progression for (a "<Lift>: ..." labeled segment in strength_progression)
  *  must appear as a primary_lift on some day. The plan text may not contradict
  *  the days. Incidental lift mentions inside prose (e.g. "EMOM tech work
- *  (Hang Power Clean variants)") are not promises and are not enforced. */
+ *  (Hang Power Clean variants)") are not promises and are not enforced.
+ *
+ *  INTENDED exemption (confirmed 2026-08-11): the label must EXACT-match a
+ *  known lift, so qualified labels like "Back Squat (maintain touch):" or
+ *  "Back Squat maintain touch:" do not count as promises. A maintain touch
+ *  may legitimately live in an accessory block rather than as a primary_lift,
+ *  so only clean "<Lift>:" dedicated-progression labels are enforced. */
 export function machineRowM6(skeleton: SkeletonOutput): MachineRowResult {
   const violations: string[] = [];
   const progression = skeleton.month_plan?.strength_progression ?? "";
@@ -363,24 +369,30 @@ export function machineRowM6(skeleton: SkeletonOutput): MachineRowResult {
   return { id: "M6", passed: violations.length === 0, violations };
 }
 
-/** Estimated minutes the five non-metcon blocks consume in a standard session
- *  (warm-up ~8, skills ~10, strength ~15, accessory ~8, cool-down ~4). The
- *  metcon must fit in what remains of session_length_minutes. Documented
- *  assumption — revisit if block shapes change. */
+/** Estimated minutes the five non-metcon blocks consume in a STANDARD session
+ *  (warm-up ~8, skills ~10, strength ~15, accessory ~8, cool-down ~4). A flat
+ *  estimate — blocks compress at shorter sessions, so below ~53 min every
+ *  metcon overshoots it. Fine for an advisory warning heuristic; do not
+ *  reuse as a hard budget. */
 export const M7_OTHER_BLOCKS_BUDGET_MIN = 45;
 
-/** M7 — session budget: the metcon's own stated upper duration ("(15-18 min)")
- *  plus the fixed budget for the other blocks must fit session_length_minutes.
- *  Run 2's Fable arm programmed 18-22 min chippers into six-block 60-minute
- *  days; Sonnet self-capped at ≤15 and fit. Skipped when the athlete has no
- *  session length or a metcon states no duration. */
+/** M7 — session budget, ADVISORY (2026-08-11): session duration belongs to the
+ *  athlete — the AI Coach in the app is the adjustment lever, so an oversized
+ *  metcon is coaching material, not a defect. This row therefore always passes
+ *  and reports overshoots as warnings only (never fed back to the writer, never
+ *  blocking). Demoted from hard-fail after the month-4 run: the fixed 45-min
+ *  estimator made every metcon day auto-fail for a 40-minute athlete, and no
+ *  retry can fix a violation the day template guarantees. History: run 2's
+ *  Fable arm programmed 18-22 min chippers into six-block 60-minute days.
+ *  Skipped when the athlete has no session length or a metcon states no
+ *  duration. */
 export function machineRowM7(
   skeleton: SkeletonOutput,
   sessionLengthMinutes: number | null,
 ): MachineRowResult {
-  const violations: string[] = [];
+  const warnings: string[] = [];
   if (sessionLengthMinutes == null || sessionLengthMinutes <= 0) {
-    return { id: "M7", passed: true, violations };
+    return { id: "M7", passed: true, violations: [] };
   }
   const metconBudget = sessionLengthMinutes - M7_OTHER_BLOCKS_BUDGET_MIN;
   for (const wk of skeleton.weeks ?? []) {
@@ -391,13 +403,13 @@ export function machineRowM7(
       if (!m) continue;
       const upper = parseInt(m[2] ?? m[1], 10);
       if (Number.isFinite(upper) && upper > metconBudget) {
-        violations.push(
+        warnings.push(
           `Week ${wk.week_num} Day ${day.day_num}: metcon "${focus}" (up to ${upper} min) + ~${M7_OTHER_BLOCKS_BUDGET_MIN} min of other blocks exceeds the ${sessionLengthMinutes}-min session.`,
         );
       }
     }
   }
-  return { id: "M7", passed: violations.length === 0, violations };
+  return { id: "M7", passed: true, violations: [], warnings: warnings.length ? warnings : undefined };
 }
 
 /** M8 — block/intent reconciliation: every focus-bearing block_type a day
