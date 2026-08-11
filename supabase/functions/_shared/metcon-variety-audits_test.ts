@@ -85,16 +85,19 @@ Deno.test("fewer than 3 formats / one format over half are flagged", () => {
   assert(r.violations.some((v) => v.includes("exceed half")));
 });
 
-Deno.test("zero barbell for a capable athlete is flagged; incapable athletes exempt", () => {
+Deno.test("barbell floor is WARNING tier (letter may overrule it); incapable athletes exempt", () => {
+  // Demoted 2026-08-11: Nick's letter (no Olympic lifting, engine-first,
+  // loading de-emphasized) legitimately argued against the floor — the
+  // composer followed the coach and the old hard rule called it a defect.
   const m = goodMonth().map((p) => ({
     ...p,
     movements: p.movements.filter((mv) => !isBarbellMetconMovement(mv.movement)),
   })).filter((p) => p.movements.length > 0);
   const flagged = auditMetconVariety({ metcons: m }, { barbellCapable: true });
-  assertEquals(flagged.passed, false);
-  assert(flagged.violations.some((v) => v.includes("barbell")));
+  assertEquals(flagged.violations.filter((v) => v.includes("barbell")), []);
+  assert(flagged.warnings.some((w) => w.includes("barbell-capable")));
   const exempt = auditMetconVariety({ metcons: m }, { barbellCapable: false });
-  assertEquals(exempt.violations.filter((v) => v.includes("barbell")), []);
+  assertEquals(exempt.warnings.filter((w) => w.includes("barbell")), []);
 });
 
 Deno.test("three monostructural pieces exceed the budget of 2", () => {

@@ -214,13 +214,21 @@ export function auditMetconVariety(
     }
   }
 
-  // 5. Barbell floor — capable athletes see 2–3 barbell pieces.
+  // 5. Barbell floor — WARNING TIER (demoted 2026-08-11): a taste rule the
+  //    letter can legitimately overrule. Nick's case proved it: no Olympic
+  //    lifting, VO2 as the outcome, loading deliberately light — the composer
+  //    followed the coach and the old hard rule called that a defect. Standing
+  //    principle: audits enforce CONTRACTS (legality, slots, distinctness);
+  //    the letter owns TASTE — a taste rule demotes when a letter explicitly
+  //    argues for the pattern. Rules 3/4/6/7 stay violations: every one was
+  //    born from the attractor (wall-ball saturation, machine months), which
+  //    no letter has ever argued for.
   if (opts.barbellCapable) {
     const barbellPieces = pieces.filter((m) => m.movements.some((mv) => isBarbellMetconMovement(mv.movement)));
     const floor = n >= 12 ? 2 : 1;
     if (barbellPieces.length < floor) {
-      violations.push(
-        `${barbellPieces.length} barbell-bearing piece(s) in ${n} — a barbell-capable athlete's month needs at least ${floor} (zero barbell conditioning is a defect).`,
+      warnings.push(
+        `${barbellPieces.length} barbell-bearing piece(s) in ${n} for a barbell-capable athlete (typical floor ${floor}) — fine when the letter de-emphasizes loading; worth a look otherwise.`,
       );
     }
   }
@@ -304,8 +312,9 @@ export function auditMetconVariety(
 
 export function formatMetconVarietyViolationsForRetry(violations: string[]): string {
   return [
-    "Your previous month of metcons failed the set-level variety audit. Re-emit the FULL month via emit_metcon_month, fixing ONLY these violations — keep every piece not named below unchanged.",
-    "For each named piece, RECOMPOSE it: change its movements and/or format so the rule is satisfied. Re-labeling a piece, toggling its monostructural flag, or editing its stimulus_note does NOT fix a violation about its content.",
+    "Your previous month of metcons failed the variety audit. Re-emit the FULL month via emit_metcon_month, fixing these violations. Two kinds of violation, two obligations:",
+    "- PIECE violations (named by WxDx): recompose THAT piece — change its movements and/or format. Re-labeling it, toggling its monostructural flag, or editing its stimulus_note does NOT fix a content violation. Keep pieces not named by any violation unchanged.",
+    "- SET violations (a count across the month: the barbell floor, format spread, movement-frequency caps, mono budget): no piece is named — YOU choose which piece(s) to recompose, and you MUST change enough of them that the count is satisfied. Returning the month unchanged is a failure.",
     "",
     ...violations.map((v) => `  - ${v}`),
   ].join("\n");
