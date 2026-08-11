@@ -32,6 +32,8 @@ function arg(name: string, fallback?: string): string | undefined {
 
 const MACHINE_PATH = arg("machine");
 const ARM = arg("arm", "claude-fable-5")!;
+/** Match the month the skeleton was generated as (see run-shadow-pairs --month). */
+const MONTH = Math.max(1, parseInt(arg("month", "1")!, 10) || 1);
 
 if (!MACHINE_PATH) {
   console.error("Missing --machine=<path to a pair's machine.json>");
@@ -56,7 +58,7 @@ if (!skeleton) {
 const supa = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!) as any;
 
 console.log(`Filling ${ARM} skeleton for ${userId} (${machine.category ?? "?"})…`);
-const payload = await buildWriterPayload(supa, userId);
+const payload = await buildWriterPayload(supa, userId, { monthNumber: MONTH, includeEvaluations: true });
 
 const weeks: WeekPrescription[] = [];
 for (let w = 1; w <= 4; w++) {

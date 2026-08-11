@@ -66,6 +66,10 @@ function arg(name: string, fallback?: string): string | undefined {
 
 const ATHLETES_PATH = arg("athletes");
 const OUT_DIR = arg("out", "shadow-out")!;
+/** Generate AS this month: previous_cycle comes from month N-1's real data and
+ *  the athlete's past evaluations ride along — mirrors generate-program-v3's
+ *  rollover payload. Default 1 = new-athlete shape. */
+const MONTH = Math.max(1, parseInt(arg("month", "1")!, 10) || 1);
 /** Skeleton-writer models — one full-document arm per entry, same CoachState. */
 const ARM_MODELS = (arg("arms", arg("frontier-model", "claude-sonnet-4-6,claude-fable-5"))!)
   .split(",")
@@ -362,7 +366,11 @@ for (let i = 0; i < athletes.length; i++) {
   await Deno.mkdir(pairDir, { recursive: true });
   console.log(`\n[pair ${pairNum}/${athletes.length}] ${spec.category} (${spec.user_id})`);
 
-  const payload = await buildWriterPayload(supa, spec.user_id);
+  const payload = await buildWriterPayload(supa, spec.user_id, {
+    monthNumber: MONTH,
+    includeEvaluations: true,
+  });
+  if (MONTH > 1) console.log(`  month ${MONTH} payload (previous_cycle ${payload.previous_cycle ? "present" : "MISSING"})`);
   const { coachState, source } = await loadCoachStateReadOnly(spec.user_id, payload);
   console.log(`  coach_state: ${source}`);
 
