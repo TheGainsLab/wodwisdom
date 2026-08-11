@@ -192,9 +192,18 @@ const ROW_NON_MACHINE_KEYWORDS = [
   "pendlay row", "kroc row", "seal row", "t-bar", "tbar",
 ];
 
+// Run variants that aren't a running/treadmill modality — floor movements,
+// rep-counted like burpees. A shuttle run beside a bike is standard
+// programming; the machine-swap rationale doesn't apply (2026-08-11, found
+// when the fill paired 10 shuttle runs with a bike AMRAP and got flagged).
+const RUN_NON_MACHINE_KEYWORDS = [
+  "shuttle run", "shuttle-run",
+];
+
 function isMonostructural(movement: string): boolean {
   const n = movement.toLowerCase();
   if (n.includes("row") && ROW_NON_MACHINE_KEYWORDS.some((k) => n.includes(k))) return false;
+  if (RUN_NON_MACHINE_KEYWORDS.some((k) => n.includes(k))) return false;
   return MONOSTRUCTURAL_KEYWORDS.some((k) => n.includes(k));
 }
 

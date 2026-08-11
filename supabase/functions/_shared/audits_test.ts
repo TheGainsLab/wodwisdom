@@ -11,6 +11,7 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import {
   auditBlockTypeEnum,
   auditStrengthOneLift,
+  auditMetconMonostructural,
   auditMetconOnePiece,
   auditRequiredFields,
   auditDoNotProgram,
@@ -231,6 +232,46 @@ Deno.test("auditMetconOnePiece: two metcon blocks on one day → fails", () => {
   const result = auditMetconOnePiece(out);
   assert(!result.passed);
   assert(result.violations.some((v) => v.includes("2 metcon blocks")));
+});
+
+// ============================================================
+// Rule — one monostructural cardio modality per metcon
+// ============================================================
+
+Deno.test("auditMetconMonostructural: two machines in one metcon → fails", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks.push(
+    block("metcon", [
+      mv("Row", { distance: 400 }),
+      mv("Bike", { time_seconds: 120 }),
+    ], { block_scheme: "3 RFT" }),
+  );
+  const result = auditMetconMonostructural(out);
+  assert(!result.passed);
+  assert(result.violations.some((v) => v.includes("2 monostructural")));
+});
+
+Deno.test("auditMetconMonostructural: shuttle run beside a machine → passes (floor movement, not a Run modality)", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks.push(
+    block("metcon", [
+      mv("Kettlebell Swing", { reps: 12, weight: 53 }),
+      mv("Assault Bike", { reps: undefined, sets: undefined }),
+      mv("Shuttle Run", { reps: 10 }),
+    ], { block_scheme: "AMRAP 13" }),
+  );
+  assert(auditMetconMonostructural(out).passed);
+});
+
+Deno.test("auditMetconMonostructural: strength-row variants beside a machine → passes", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks.push(
+    block("metcon", [
+      mv("Dumbbell Row", { reps: 8, weight: 50 }),
+      mv("Run", { distance: 400 }),
+    ], { block_scheme: "4 RFT" }),
+  );
+  assert(auditMetconMonostructural(out).passed);
 });
 
 // ============================================================

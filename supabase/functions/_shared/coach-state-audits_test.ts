@@ -79,7 +79,9 @@ function content(overrides: Partial<CoachStateContent> = {}): CoachStateContent 
     deprioritize: [],
     recovery_posture: { stance: "conservative", confidence: "high", reasons: ["masters_age"] },
     strength_emphasis: { value: "technical", confidence: "medium", reasons: ["oly_imbalance"] },
-    coach_state_builder_version: "v1.6",
+    metcon_guidance:
+      "Conditioning this cycle builds a repeatable aerobic base: sustained, conversational-to-threshold efforts in the medium domain, with one short high-turnover touch weekly. Keep pressing volume inside conditioning modest while the strict work develops.",
+    coach_state_builder_version: "v1.7",
     ...overrides,
   } as CoachStateContent;
 }
@@ -192,4 +194,28 @@ Deno.test("evidence key missing from the athlete's model is flagged", () => {
   const r = auditCoachState(cs, freshPayload());
   assertEquals(r.passed, false);
   assert(r.violations.some((v) => v.includes("does not exist")));
+});
+
+// ============================================================
+// v1.7 — month_in_review presence mirrors previous_cycle
+// ============================================================
+
+Deno.test("missing month_in_review with a previous_cycle is flagged", () => {
+  const payload = freshPayload({ previous_cycle: { logged: true } });
+  const r = auditCoachState(content(), payload);
+  assertEquals(r.passed, false);
+  assert(r.violations.some((v) => v.includes("month_in_review is missing")));
+});
+
+Deno.test("month_in_review with a previous_cycle passes; fabricated review without history is flagged", () => {
+  const review = "Last cycle you pulled deadlifts to 270 at 87% across 19 sessions and held a perfect hit rate on Romanian deadlifts — the hinge base is doing its job, so this cycle steps the load. ".repeat(2);
+  const withHistory = auditCoachState(
+    content({ month_in_review: review }),
+    freshPayload({ previous_cycle: { logged: true } }),
+  );
+  assertEquals(withHistory.passed, true);
+
+  const fabricated = auditCoachState(content({ month_in_review: review }), freshPayload());
+  assertEquals(fabricated.passed, false);
+  assert(fabricated.violations.some((v) => v.includes("NO previous_cycle")));
 });

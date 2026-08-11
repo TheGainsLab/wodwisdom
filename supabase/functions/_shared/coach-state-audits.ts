@@ -147,6 +147,22 @@ export function auditCoachState(
     }
   }
 
+  // 7. month_in_review presence mirrors previous_cycle (v1.7): a review of a
+  //    cycle that never happened is fabrication; a missing review when real
+  //    history exists silently drops the training-evaluation render.
+  const hasPrevCycle = payload.previous_cycle != null;
+  const hasReview = typeof cs.month_in_review === "string" && cs.month_in_review.trim() !== "";
+  if (hasPrevCycle && !hasReview) {
+    violations.push(
+      "month_in_review is missing but the payload carries a previous_cycle — emit the athlete-facing review of the completed cycle, grounded in its logged numbers.",
+    );
+  }
+  if (!hasPrevCycle && hasReview) {
+    violations.push(
+      "month_in_review was emitted but this athlete has NO previous_cycle — omit the field entirely for a first cycle.",
+    );
+  }
+
   return { passed: violations.length === 0, violations };
 }
 

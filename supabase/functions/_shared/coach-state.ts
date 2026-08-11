@@ -56,7 +56,15 @@ export type EvidenceKey = AthleteModelKey | (string & {});
 // headline; taxonomy definitions; no mixed-modal claims without data. Reason
 // codes are now shaped per-athlete (unsupportable codes stripped from the tool
 // enum) and outputs run through coach-state-audits with one retry.
-export const COACH_STATE_BUILDER_VERSION = "v1.6";
+// v1.7 (metcon composer + month review): metcon_guidance — the coach's
+// conditioning intent for the cycle (character/pace/dose, never movement
+// lists), consumed by the metcon composer so the letter's conditioning
+// judgment survives without compressing through the skeleton. month_in_review —
+// athlete-facing narrative of the LAST cycle from real logged data, emitted
+// only when previous_cycle exists; persisted to training_evaluations by the
+// generation path (replaces the separate Sonnet training-analysis call:
+// one judgment, three renders).
+export const COACH_STATE_BUILDER_VERSION = "v1.7";
 
 // ============================================================
 // Controlled vocabularies — LOCKED v1 (DATA, versioned with the schema;
@@ -200,6 +208,19 @@ export interface CoachStateContent {
 
   recovery_posture: CoachStateRecoveryPosture;
   strength_emphasis: CoachStateStrengthEmphasis;
+
+  /** v1.7 — the coach's conditioning INTENT for the cycle: what the metcons
+   *  must accomplish, pace/duration/rest character per conditioning priority,
+   *  dose cautions (age, injury, recovery), preference notes. NEVER a movement
+   *  list or a workout — composition is the metcon composer's job downstream.
+   *  Terminates at the composer (not the skeleton). */
+  metcon_guidance: string;
+
+  /** v1.7 — athlete-facing review of the PREVIOUS cycle, grounded in real
+   *  logged numbers from payload.previous_cycle. Present ONLY when a previous
+   *  cycle exists (audited); the generation path persists it to
+   *  training_evaluations, replacing the separate training-analysis call. */
+  month_in_review?: string | null;
 }
 
 /** The persisted, versioned snapshot. References the Athlete Model version it
@@ -391,6 +412,20 @@ export const EMIT_COACH_STATE_TOOL = {
         required: ["value", "confidence", "reasons"],
         additionalProperties: false,
       },
+      metcon_guidance: {
+        type: "string",
+        minLength: 100,
+        maxLength: 1200,
+        description:
+          "The coach's conditioning INTENT for the cycle: what the metcons must accomplish, the pace/duration/rest character each conditioning priority calls for, dose cautions (age, injury, recovery budget), and preference notes worth honoring. NEVER name specific movements or write workouts — composition happens downstream.",
+      },
+      month_in_review: {
+        type: "string",
+        minLength: 200,
+        maxLength: 2500,
+        description:
+          "Athlete-facing review of the PREVIOUS training cycle — emit ONLY when the payload has a non-null previous_cycle. Second person, concrete: cite the real logged numbers (top lifts, hit rates, session counts, metcon coverage), name what moved and what held, connect it forward to this cycle's plan. Sparse logging is NEUTRAL — never scold or infer decline from absence. Omit this field entirely for a first cycle.",
+      },
     },
     required: [
       "headline",
@@ -400,6 +435,7 @@ export const EMIT_COACH_STATE_TOOL = {
       "deprioritize",
       "recovery_posture",
       "strength_emphasis",
+      "metcon_guidance",
     ],
     additionalProperties: false,
   },

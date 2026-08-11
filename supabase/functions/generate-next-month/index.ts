@@ -6,7 +6,8 @@
  * Flow:
  *   1. Look up the program and determine the next month number
  *   2. Run profile-analysis with month context (eval saved as invisible)
- *   3. Run training-analysis and nutrition-analysis in parallel (results appended to evaluation)
+ *   3. Run nutrition-analysis (training review now comes from the generation's
+ *      CoachState month_in_review — persisted by generate-program-v3)
  *   4. Trigger generate-program with month_number + program_id (appends workouts, makes eval visible)
  *   5. Return job_id for polling
  *
@@ -275,17 +276,14 @@ Deno.serve(async (req) => {
       console.log(`[generate-next-month] Profile evaluation complete`);
     }
 
-    // 4. Run training and nutrition analysis in parallel (best-effort).
-    //    Skipped on resume — the original attempt already wrote them; re-running
-    //    would duplicate this month's rows.
+    // 4. Run nutrition analysis (best-effort). Skipped on resume — the original
+    //    attempt already wrote it; re-running would duplicate this month's row.
+    //    The TRAINING evaluation is no longer a separate call (retired 2026-08):
+    //    generate-program-v3 persists the CoachState's month_in_review into
+    //    training_evaluations during generation — one judgment, both renders.
     if (!resumeEvalId) {
       const analysisBody = JSON.stringify({ month_number: targetMonth, program_id: appendToProgramId });
-      const [trainingResult, nutritionResult] = await Promise.allSettled([
-        fetch(`${SUPABASE_URL}/functions/v1/training-analysis`, {
-          method: "POST",
-          headers: subHeaders(),
-          body: analysisBody,
-        }).then(r => r.json()),
+      const [nutritionResult] = await Promise.allSettled([
         fetch(`${SUPABASE_URL}/functions/v1/nutrition-analysis`, {
           method: "POST",
           headers: subHeaders(),
@@ -293,9 +291,8 @@ Deno.serve(async (req) => {
         }).then(r => r.json()),
       ]);
 
-      const trainingOk = trainingResult.status === "fulfilled" && trainingResult.value?.analysis;
       const nutritionOk = nutritionResult.status === "fulfilled" && nutritionResult.value?.analysis;
-      console.log(`[generate-next-month] Training: ${trainingOk ? 'saved' : 'none'}, Nutrition: ${nutritionOk ? 'saved' : 'none'}`);
+      console.log(`[generate-next-month] Nutrition: ${nutritionOk ? 'saved' : 'none'} (training review rides the generation's coach state)`);
     }
 
     // 5. Trigger program generation (v3) with month context.

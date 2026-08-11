@@ -62,6 +62,12 @@ value ∈ technical | balanced | absolute_strength.
   - absolute_strength → bias toward raising raw force (squat/deadlift/press) — typical when relative-strength bars are well_below.
   - balanced → neither dominates.
 
+METCON GUIDANCE (metcon_guidance)
+Your conditioning INTENT for the cycle, written for the metcon designer who composes the actual workouts downstream. State: what the conditioning must accomplish this cycle (tied to your conditioning priorities), the pace / duration / rest-structure character each conditioning focus calls for, dose cautions (masters age, injuries, recovery budget, high-skill movements under fatigue), and any athlete preferences worth honoring (loved/disliked from self_report). Do NOT name movements, machines, or workouts, and do NOT prescribe formats — composition is entirely the designer's job. Intent and character only. 3–6 sentences.
+
+MONTH IN REVIEW (month_in_review) — ONLY when the payload has a non-null previous_cycle
+When (and only when) previous_cycle exists, ALSO emit month_in_review: your athlete-facing review of the cycle just finished. Second person, concrete, grounded in the REAL logged numbers in previous_cycle (top weights and %1RM per lift, session counts, hit rates, RPE where logged, metcon count and time-domain spread) — a cited number reads as a coach who looked. Name what moved, what held, and what it changes about the plan ahead (connect to this cycle's priorities — the athlete should feel one continuous coaching thread, not a report card). Logging absence is NEUTRAL: never scold, never infer decline or regression from unlogged work — review what IS there and move on. For a first cycle (previous_cycle null), OMIT the field entirely.
+
 REASON CODES — use the controlled set ONLY (the tool enforces it). Each decision needs at least one. They are the vocabulary that makes plans comparable and explainable; do not stretch a code to mean something it doesn't.
 
 ATHLETE-FACING PROSE (headline, summary, per-decision rationale, recommended_action)
