@@ -246,6 +246,32 @@ async function stageCoachState(
     `[generate-program-v3] coach_state v${result.version} (reused=${result.reused}, refs AM v${payload.athlete_model.version})`,
   );
 
+  // v1.7: the CoachState's month_in_review IS the training evaluation — one
+  // judgment, rendered for both audiences (replaces the separate Sonnet
+  // training-analysis call generate-next-month used to make). Written invisible;
+  // the completion stage's existing flip makes it visible with the rest of the
+  // month's evaluations. Delete-then-insert keeps retries idempotent. Best-effort:
+  // a failed insert must never fail generation.
+  const monthNumber = rs.continuation.monthNumber;
+  const review = typeof coachState.month_in_review === "string" ? coachState.month_in_review.trim() : "";
+  if (review) {
+    try {
+      await supa.from("training_evaluations").delete()
+        .eq("user_id", job.user_id).eq("month_number", monthNumber);
+      const { error: reviewErr } = await supa.from("training_evaluations").insert({
+        user_id: job.user_id,
+        analysis: review,
+        month_number: monthNumber,
+        visible: false,
+        ...(rs.continuation.programId ? { program_id: rs.continuation.programId } : {}),
+      });
+      if (reviewErr) console.error("[generate-program-v3] month_in_review save failed:", reviewErr);
+      else console.log(`[generate-program-v3] month_in_review saved as training evaluation (month ${monthNumber})`);
+    } catch (e) {
+      console.error("[generate-program-v3] month_in_review save failed:", e);
+    }
+  }
+
   const trainingDesignInput = buildTrainingDesignInput(coachState, {
     days_per_week: payload.training_context.days_per_week,
     session_length_minutes: payload.training_context.session_length_minutes,
