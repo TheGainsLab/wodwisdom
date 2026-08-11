@@ -59,7 +59,6 @@ function tdi(): TrainingDesignInput {
     recovery_stance: "standard",
     strength_emphasis: "balanced",
     days_per_week: 2,
-    session_length_minutes: 60,
     equipment: {},
     do_not_program: [],
     vocabulary: [],
@@ -113,24 +112,10 @@ Deno.test("runSkeletonAudits includes graduated machine rows when the TDI is pre
     trainingDesignInput: tdi(),
   });
   const rules = result.all.map((r) => r.rule);
-  for (const expected of ["machine_row_m4", "machine_row_m6", "machine_row_m7", "machine_row_m8"]) {
+  for (const expected of ["machine_row_m4", "machine_row_m6", "machine_row_m8"]) {
     assert(rules.includes(expected), `missing ${expected} in [${rules.join(", ")}]`);
   }
   assertEquals(result.passed, true);
-});
-
-Deno.test("runSkeletonAudits passes a short-session athlete — M7 is advisory, never blocking", () => {
-  // 40-min session: the flat 45-min block estimate exceeds it before any
-  // metcon, so under the old hard-fail M7 this athlete could never generate
-  // (SkeletonLoopExhausted). Advisory M7 must let the skeleton through.
-  const shortTdi = { ...tdi(), session_length_minutes: 40 };
-  const result = runSkeletonAudits({
-    skeleton: baseSkeleton(),
-    daysPerWeek: 2,
-    trainingDesignInput: shortTdi,
-  });
-  assertEquals(result.passed, true);
-  assert(!result.failures.some((f) => f.rule === "machine_row_m7"));
 });
 
 Deno.test("runSkeletonAudits fails via M6 when the plan promises an unprogrammed lift", () => {

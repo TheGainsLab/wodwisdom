@@ -259,7 +259,7 @@ export async function callWeekFill(
           max_tokens: 16000,
           stream: false,
           system: pack.writer.weekFillSystemPrompt,
-          tools: [pack.writer.buildWeekTool(daysPerWeek, units, payload.training_context.session_length_minutes)],
+          tools: [pack.writer.buildWeekTool(daysPerWeek, units, payload.training_context.session_length_minutes ?? null)],
           tool_choice: { type: "tool", name: "emit_week" },
           messages: [{ role: "user", content: userMessage }],
         }),

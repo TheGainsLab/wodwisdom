@@ -28,7 +28,6 @@ import { checkAllocationInvariants } from "./training-design-invariants.ts";
 import {
   machineRowM4,
   machineRowM6,
-  machineRowM7,
   machineRowM8,
   type MachineRowResult,
 } from "./stage3-machine-rows.ts";
@@ -262,14 +261,13 @@ export function runSkeletonAudits(ctx: SkeletonAuditContext): SkeletonAuditRunRe
     // the days never program; M7: metcons that can't fit the session; M8:
     // phantom blocks invisible to allocation accounting). M4 warnings are
     // logged, never fail — placement across block types is coaching freedom.
-    // M7 is warnings-only too (2026-08-11): session duration is advisory and
-    // the athlete's adjustment lever is the in-app AI Coach; its old hard-fail
-    // made short-session athletes (< ~53 min) unable to generate at all.
+    // M7 (session budget) was DELETED 2026-08-11: session duration is not a
+    // programming concept for individual athletes (the athlete owns their
+    // clock; the in-app AI Coach is the adjustment lever).
     const tdi = ctx.trainingDesignInput;
     const rows: MachineRowResult[] = [
       machineRowM4(ctx.skeleton, tdi),
       machineRowM6(ctx.skeleton),
-      machineRowM7(ctx.skeleton, tdi.session_length_minutes),
       machineRowM8(ctx.skeleton),
     ];
     for (const row of rows) {

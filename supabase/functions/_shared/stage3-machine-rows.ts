@@ -34,7 +34,7 @@ import { normalizeMovementKey } from "./athlete-model.ts";
 import { auditSkeletonDayCount, auditSkeletonStructural } from "./v3-skeleton-audits.ts";
 import { checkAllocationInvariants } from "./training-design-invariants.ts";
 
-export type MachineRowId = "M1" | "M2" | "M3" | "M4" | "M5" | "M6" | "M7" | "M8";
+export type MachineRowId = "M1" | "M2" | "M3" | "M4" | "M5" | "M6" | "M8";
 
 export interface MachineRowResult {
   id: MachineRowId;
@@ -369,49 +369,6 @@ export function machineRowM6(skeleton: SkeletonOutput): MachineRowResult {
   return { id: "M6", passed: violations.length === 0, violations };
 }
 
-/** Estimated minutes the five non-metcon blocks consume in a STANDARD session
- *  (warm-up ~8, skills ~10, strength ~15, accessory ~8, cool-down ~4). A flat
- *  estimate — blocks compress at shorter sessions, so below ~53 min every
- *  metcon overshoots it. Fine for an advisory warning heuristic; do not
- *  reuse as a hard budget. */
-export const M7_OTHER_BLOCKS_BUDGET_MIN = 45;
-
-/** M7 — session budget, ADVISORY (2026-08-11): session duration belongs to the
- *  athlete — the AI Coach in the app is the adjustment lever, so an oversized
- *  metcon is coaching material, not a defect. This row therefore always passes
- *  and reports overshoots as warnings only (never fed back to the writer, never
- *  blocking). Demoted from hard-fail after the month-4 run: the fixed 45-min
- *  estimator made every metcon day auto-fail for a 40-minute athlete, and no
- *  retry can fix a violation the day template guarantees. History: run 2's
- *  Fable arm programmed 18-22 min chippers into six-block 60-minute days.
- *  Skipped when the athlete has no session length or a metcon states no
- *  duration. */
-export function machineRowM7(
-  skeleton: SkeletonOutput,
-  sessionLengthMinutes: number | null,
-): MachineRowResult {
-  const warnings: string[] = [];
-  if (sessionLengthMinutes == null || sessionLengthMinutes <= 0) {
-    return { id: "M7", passed: true, violations: [] };
-  }
-  const metconBudget = sessionLengthMinutes - M7_OTHER_BLOCKS_BUDGET_MIN;
-  for (const wk of skeleton.weeks ?? []) {
-    for (const day of wk.days ?? []) {
-      const focus = day.metcon_focus;
-      if (!focus) continue;
-      const m = focus.match(/\((\d+)(?:\s*[-–—]\s*(\d+))?\s*min/i);
-      if (!m) continue;
-      const upper = parseInt(m[2] ?? m[1], 10);
-      if (Number.isFinite(upper) && upper > metconBudget) {
-        warnings.push(
-          `Week ${wk.week_num} Day ${day.day_num}: metcon "${focus}" (up to ${upper} min) + ~${M7_OTHER_BLOCKS_BUDGET_MIN} min of other blocks exceeds the ${sessionLengthMinutes}-min session.`,
-        );
-      }
-    }
-  }
-  return { id: "M7", passed: true, violations: [], warnings: warnings.length ? warnings : undefined };
-}
-
 /** M8 — block/intent reconciliation: every focus-bearing block_type a day
  *  declares must have a matching block_intents entry. Catches "phantom
  *  blocks" — a skills block declared with a written skill_focus but no
@@ -446,7 +403,7 @@ export function runMachineRows(
   // A skeleton too malformed to iterate fails every row rather than crashing.
   const structural = auditSkeletonStructural(skeleton);
   if (!structural.passed) {
-    const rows: MachineRowResult[] = (["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8"] as MachineRowId[]).map(
+    const rows: MachineRowResult[] = (["M1", "M2", "M3", "M4", "M5", "M6", "M8"] as MachineRowId[]).map(
       (id) => ({ id, passed: false, violations: structural.violations }),
     );
     return { passed: false, rows, structural_failure: true };
@@ -459,7 +416,6 @@ export function runMachineRows(
     machineRowM4(skeleton, tdi),
     machineRowM5(skeleton, tdi),
     machineRowM6(skeleton),
-    machineRowM7(skeleton, tdi.session_length_minutes),
     machineRowM8(skeleton),
   ];
   return { passed: rows.every((r) => r.passed), rows, structural_failure: false };

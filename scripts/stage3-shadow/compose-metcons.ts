@@ -91,7 +91,7 @@ const inputs: MetconComposerInputs = {
   skills: machine.skills ?? {},
   lifts: tdi.lifts ?? {},
   conditioning_benchmarks: machine.conditioning_benchmarks ?? {},
-  athlete_context: `${machine.category ?? ""}; session_length ${tdi.session_length_minutes ?? "?"} min; ${tdi.days_per_week} days/week`,
+  athlete_context: `${machine.category ?? ""}; ${tdi.days_per_week} days/week`,
   previous_cycle_metcons: [],
   examples,
 };
