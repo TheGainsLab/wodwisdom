@@ -36,11 +36,6 @@ import {
   ALL_LIFT_KEYS,
   ALL_SKILL_KEYS,
 } from "./tier-status.ts";
-import {
-  type CapabilityRevision,
-  INFERENCE_VERSION,
-  reviseCapabilities,
-} from "./athlete-inference-engine.ts";
 import type { TrainingSummary } from "./training-summary.ts";
 import type { CoachingIntake } from "./coaching-intake.ts";
 import type { OutsideTrainingFacts } from "./athlete-activities.ts";
@@ -63,7 +58,14 @@ import type { OutsideTrainingFacts } from "./athlete-activities.ts";
 // v1.6: strength-ratio normatives carry target_estimate — the precomputed lift
 // value that would bring the ratio to its bar (threshold × denominator). Facts
 // stay code-computed; the eval cites the estimate instead of deriving math.
-export const MODEL_BUILDER_VERSION = "v1.6";
+// v1.7 (declared-1RMs ruling, 2026-08-11): the Athlete Inference Engine is
+// REMOVED — strength numbers change when the athlete edits their profile and
+// absolutely never any other time. Capabilities are the declared values,
+// period; ratios/normatives/letters/loads all read the same number (one truth).
+// training_fingerprint (a compact digest of logged work) replaces capability
+// revision as the version-bump signal, so one saved log still triggers a
+// fresh judgment at the next evaluation/generation.
+export const MODEL_BUILDER_VERSION = "v1.7";
 export const THRESHOLDS_VERSION = "v1";
 
 // ============================================================
@@ -257,14 +259,17 @@ export interface DerivedMetrics {
 export interface AthleteModelContent {
   thresholds_version: string;
   model_builder_version: string;
-  /** Inference Engine version that revised capabilities from evidence (Step 4).
-   *  null when no training summary was supplied (pure intake model). */
-  inference_version: string | null;
-
   capabilities: Record<string, Capability>;
-  /** Per-lift belief revisions the Inference Engine applied (Step 4) — the
-   *  "what we learned" trace. Empty when intake-only. */
-  capability_revisions: CapabilityRevision[];
+  /** Digest of the athlete's logged training (v1.7). Carries NO strength
+   *  inference — it exists so logging changes the content hash and mints a new
+   *  model version (fresh judgment at next evaluation). One saved log day is
+   *  sufficient to change it. null = no training summary supplied. */
+  training_fingerprint: {
+    sessions_logged: number;
+    last_lift_date: string | null;
+    total_logged_reps: number;
+    movements_logged: number;
+  } | null;
   recovery_class: RecoveryClass;
 
   /** Pure lift relationships. null when an input 1RM is missing. */
@@ -602,14 +607,25 @@ export function buildAthleteModel(
     };
   }
   const trainingSummary = options.trainingSummary ?? null;
-  const { capabilities, revisions: capability_revisions } = reviseCapabilities(
-    selfReported,
-    trainingSummary,
-  );
-  const inference_version = trainingSummary ? INFERENCE_VERSION : null;
+  // v1.7: capabilities ARE the declared values — no inference, ever. The
+  // summary contributes only the version-bump fingerprint below.
+  const capabilities = selfReported;
+  const training_fingerprint = trainingSummary
+    ? {
+      sessions_logged: trainingSummary.sessions_logged,
+      last_lift_date: Object.values(trainingSummary.lifts ?? {})
+        .map((l) => l.last_performed)
+        .filter(Boolean)
+        .sort()
+        .at(-1) ?? null,
+      total_logged_reps: Object.values(trainingSummary.movement_volume ?? {})
+        .reduce((s, m) => s + (m.reps ?? 0), 0),
+      movements_logged: Object.keys(trainingSummary.movement_volume ?? {}).length,
+    }
+    : null;
 
-  // Ratios/normatives compute off the SYNTHESIZED capability values (the belief),
-  // not the raw intake — so an evidence-raised squat flows into every ratio.
+  // Ratios/normatives compute off the DECLARED capability values — the same
+  // numbers that prescribe loads (one truth, 2026-08-11 ruling).
   const L = (k: string): number | null => capabilities[k]?.value ?? null;
 
   // --- Strength ratios (pure lift relationships; null when input missing) ---
@@ -738,9 +754,8 @@ export function buildAthleteModel(
   return {
     thresholds_version: thresholds.version,
     model_builder_version: MODEL_BUILDER_VERSION,
-    inference_version,
     capabilities,
-    capability_revisions,
+    training_fingerprint,
     recovery_class,
     strength_ratios,
     derived_metrics,

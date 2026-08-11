@@ -312,3 +312,54 @@ Deno.test("asOf stamped on present capabilities only", () => {
   assertEquals(m.capabilities.back_squat.as_of, "2026-06-27T00:00:00Z");
   assertEquals(m.capabilities.front_squat.as_of, null);
 });
+
+// ============================================================
+// v1.7 — declared-1RMs ruling: no inference, fingerprint bumps versions
+// ============================================================
+
+Deno.test("v1.7: logged training NEVER changes capabilities — declared values pass through", () => {
+  const summary = {
+    training_summary_version: "v1",
+    window_days: 90,
+    as_of: "2026-08-11",
+    sessions_logged: 12,
+    lifts: {
+      back_squat: {
+        best_set: { weight: 400, reps: 5, rpe: 6, date: "2026-08-01" },
+        est_1rm: 460, // far above declared — must be IGNORED
+        sessions: 6,
+        last_performed: "2026-08-01",
+      },
+    },
+    movement_volume: { back_squat: { reps: 120, sessions: 6 } },
+    // deno-lint-ignore no-explicit-any
+  } as any;
+  const withLogs = buildAthleteModel(toStatic(FIXTURE_BEGINNER_FITNESS.profileRow), null, { trainingSummary: summary });
+  const without = buildAthleteModel(toStatic(FIXTURE_BEGINNER_FITNESS.profileRow), null);
+  // Capabilities identical with or without logs — declared numbers only.
+  assertEquals(
+    Object.fromEntries(Object.entries(withLogs.capabilities).map(([k, c]) => [k, c.value])),
+    Object.fromEntries(Object.entries(without.capabilities).map(([k, c]) => [k, c.value])),
+  );
+  for (const c of Object.values(withLogs.capabilities)) {
+    assert(c.source === "self_reported" || c.source === "missing");
+  }
+});
+
+Deno.test("v1.7: one logged session changes the fingerprint (the version-bump signal)", () => {
+  const mk = (sessions: number, reps: number) => ({
+    training_summary_version: "v1",
+    window_days: 90,
+    as_of: "2026-08-11",
+    sessions_logged: sessions,
+    lifts: {},
+    movement_volume: reps > 0 ? { burpee: { reps, sessions } } : {},
+    // deno-lint-ignore no-explicit-any
+  }) as any;
+  const before = buildAthleteModel(toStatic(FIXTURE_BEGINNER_FITNESS.profileRow), null, { trainingSummary: mk(3, 90) });
+  const after = buildAthleteModel(toStatic(FIXTURE_BEGINNER_FITNESS.profileRow), null, { trainingSummary: mk(4, 135) });
+  assert(JSON.stringify(before.training_fingerprint) !== JSON.stringify(after.training_fingerprint));
+  // And no summary at all → null fingerprint.
+  const none = buildAthleteModel(toStatic(FIXTURE_BEGINNER_FITNESS.profileRow), null);
+  assertEquals(none.training_fingerprint, null);
+});

@@ -24,7 +24,7 @@ function freshPayload(overrides: Partial<CoachStateAuditInputs> = {}): CoachStat
     previous_cycle: null,
     competition: null,
     athlete_model: {
-      capability_revisions: [],
+      training_fingerprint: null,
       logged_competition_results: [],
       outside_training: null,
       normative: {
@@ -90,9 +90,9 @@ function content(overrides: Partial<CoachStateContent> = {}): CoachStateContent 
 // allowedReasonCodes — shaping
 // ============================================================
 
-Deno.test("shaping strips goal/history/competition/observed codes for a fresh athlete", () => {
+Deno.test("shaping strips goal/history/competition/adherence codes for a fresh athlete", () => {
   const allowed = new Set(allowedReasonCodes(freshPayload()));
-  for (const gone of ["supports_stated_goal", "high_prior_load", "recent_competition", "observed_progress", "observed_plateau", "low_adherence"]) {
+  for (const gone of ["supports_stated_goal", "high_prior_load", "recent_competition", "low_adherence"]) {
     assert(!allowed.has(gone as never), `${gone} should be stripped`);
   }
   assert(allowed.has("below_relative_strength_floor"));
@@ -109,6 +109,15 @@ Deno.test("shaping keeps codes when the grounding data exists", () => {
   assert(allowed.has("supports_stated_goal"));
   assert(allowed.has("recent_competition"));
   assert(allowed.has("high_prior_load"));
+  assert(allowed.has("low_adherence")); // previous_cycle exists → adherence is judgeable
+});
+
+Deno.test("v1.8: a logging fingerprint alone grounds high_prior_load, never a strength change", () => {
+  const p = freshPayload();
+  p.athlete_model = { ...p.athlete_model, training_fingerprint: { sessions_logged: 1 } };
+  const allowed = new Set(allowedReasonCodes(p));
+  assert(allowed.has("high_prior_load"));
+  assert(!allowed.has("low_adherence" as never)); // no prior cycle → not judgeable
 });
 
 Deno.test("buildEmitCoachStateTool narrows every reasons enum when given a reason enum", () => {

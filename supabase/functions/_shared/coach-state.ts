@@ -64,7 +64,12 @@ export type EvidenceKey = AthleteModelKey | (string & {});
 // only when previous_cycle exists; persisted to training_evaluations by the
 // generation path (replaces the separate Sonnet training-analysis call:
 // one judgment, three renders).
-export const COACH_STATE_BUILDER_VERSION = "v1.7";
+// v1.8 (declared-1RMs ruling, 2026-08-11): the inference layer is gone —
+// capabilities are the athlete's declared numbers, the same numbers that load
+// their program (one truth). observed_progress/observed_plateau retired (they
+// cited capability revisions, which no longer exist). The coach still reads
+// every log — weights, hit rates, RPE — but never converts them into a max.
+export const COACH_STATE_BUILDER_VERSION = "v1.8";
 
 // ============================================================
 // Controlled vocabularies — LOCKED v1 (DATA, versioned with the schema;
@@ -126,10 +131,8 @@ export const REASON_CODES = [
   "recent_competition",
   "high_prior_load",
   "injury_constraint",
-  // OBSERVED training signals (Step 4 — from the synthesized Athlete Model:
-  // capability source="observed", capability_revisions, adherence).
-  "observed_progress",
-  "observed_plateau",
+  // Training-adherence signal (sparse logging against an existing program —
+  // NEVER a value cut; absence is neutral).
   "low_adherence",
 ] as const;
 export type ReasonCode = typeof REASON_CODES[number];
@@ -248,7 +251,7 @@ export interface ReasonShapingInputs {
   previous_cycle?: unknown | null;
   competition?: unknown | null;
   athlete_model: {
-    capability_revisions?: unknown[];
+    training_fingerprint?: { sessions_logged: number } | null;
     logged_competition_results?: unknown[];
     outside_training?: unknown | null;
   };
@@ -262,20 +265,20 @@ export interface ReasonShapingInputs {
 export function allowedReasonCodes(payload: ReasonShapingInputs): ReasonCode[] {
   const goal = payload.training_context?.goal_text;
   const hasGoal = typeof goal === "string" && goal.trim() !== "";
-  const revisions = payload.athlete_model.capability_revisions ?? [];
   const loggedComp = payload.athlete_model.logged_competition_results ?? [];
+  const fingerprint = payload.athlete_model.training_fingerprint ?? null;
+  const hasLogged = (fingerprint?.sessions_logged ?? 0) > 0;
   const hasLoadHistory = payload.previous_cycle != null ||
-    payload.athlete_model.outside_training != null || revisions.length > 0;
+    payload.athlete_model.outside_training != null || hasLogged;
   const hasCompetition = payload.competition != null || loggedComp.length > 0;
-  const hasObserved = revisions.length > 0;
 
   return REASON_CODES.filter((code) => {
     if (code === "supports_stated_goal") return hasGoal;
     if (code === "high_prior_load") return hasLoadHistory;
     if (code === "recent_competition") return hasCompetition;
-    if (code === "observed_progress" || code === "observed_plateau" || code === "low_adherence") {
-      return hasObserved;
-    }
+    // low_adherence only makes sense against a program the athlete HAS —
+    // sparse logging with no prior cycle is a brand-new athlete, not a signal.
+    if (code === "low_adherence") return payload.previous_cycle != null;
     return true;
   });
 }
@@ -484,6 +487,35 @@ export function coachStateDiff(
  *  explains it — the same content the athlete reads as their evaluation. */
 export function buildCoachStateDocumentBlock(coachState: CoachStateContent): string {
   return `COACH STATE DOCUMENT (JSON — the coach's full written judgment; the TrainingDesignInput above remains the locked plan):\n${JSON.stringify(coachState, null, 2)}`;
+}
+
+/** Compact letter render for the AI Coach chat (Pair 6, 2026-08-11): the chat
+ *  is the athlete's adjustment lever, so it must see the coach's decisions and
+ *  their reasons — without the full document's token weight. Deliberately
+ *  omits summary/month_in_review (the athlete reads those in the evals UI). */
+export function renderCoachStateForChat(cs: CoachStateContent): string {
+  const lines: string[] = [
+    "\n\nTHE ATHLETE'S CURRENT COACHING PLAN (their coach's decisions for this cycle — you are part of the same coaching staff; work WITHIN this plan):",
+    `Headline: ${cs.headline}`,
+    "Priorities (ranked):",
+    ...[...cs.priorities].sort((a, b) => a.rank - b.rank).map((p) =>
+      `  ${p.rank}. ${p.focus} — ${p.athlete_facing_rationale} Action: ${p.recommended_action}`
+    ),
+  ];
+  if (cs.maintain.length) {
+    lines.push(`Maintaining (strengths, not pushed): ${cs.maintain.map((m) => m.focus).join(", ")}`);
+  }
+  if (cs.deprioritize.length) {
+    lines.push(`Deliberately set aside this cycle: ${cs.deprioritize.map((d) => d.focus).join(", ")}`);
+  }
+  lines.push(`Recovery stance: ${cs.recovery_posture.stance} · Strength emphasis: ${cs.strength_emphasis.value}`);
+  if (cs.metcon_guidance?.trim()) {
+    lines.push(`Conditioning intent: ${cs.metcon_guidance.trim()}`);
+  }
+  lines.push(
+    "ADJUSTMENT RULES: when the athlete asks to trim, shorten, substitute, or rework a session, preserve the day's PURPOSE — each metcon's block notes state its intended stimulus; keep that stimulus and the plan's priorities intact while you trim volume or swap equivalent movements. Never remove a day's primary work, never add a movement their profile bans, and never re-litigate the coach's priorities or deprioritizations — explain them instead, in the plan's own reasoning.",
+  );
+  return lines.join("\n");
 }
 
 export function evaluationFromCoachState(cs: CoachStateContent): EvaluationOutput {

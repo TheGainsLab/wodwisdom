@@ -73,12 +73,12 @@ export async function persistAthleteModel(
   content: AthleteModelContent,
   profileSnapshot: AthleteProfileStatic,
 ): Promise<PersistAthleteModelResult> {
-  // Hash the deterministic BELIEF content. Exclude `as_of` (timestamps) and
-  // `capability_revisions` (a debugging trace whose evidence dates shift as the
-  // training window rolls) — those must not churn versions. A real belief change
-  // (capability value / source / confidence, ratios, normatives) still does.
+  // Hash the deterministic BELIEF content. Exclude `as_of` (timestamps) — it
+  // must not churn versions. A real change (declared capability values, ratios,
+  // normatives, or the v1.7 training_fingerprint — one saved log is sufficient)
+  // mints a new version.
   const modelHash = await sha256Hex(
-    stableStringify(content, new Set(["as_of", "capability_revisions"])),
+    stableStringify(content, new Set(["as_of"])),
   );
   const profileHash = await sha256Hex(stableStringify(profileSnapshot, new Set()));
 
