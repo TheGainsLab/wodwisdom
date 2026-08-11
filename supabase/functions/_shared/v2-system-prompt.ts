@@ -94,6 +94,8 @@ CYCLE-LEVEL COVERAGE REQUIREMENTS
   - Every training day includes a METCON block. The athlete's days_per_week is their load-management signal — those are the days they've committed to a full training session, which includes conditioning. Calibrate the metcon's volume to the day's other demands. Time-domain mix across the week, not within each day.
   - Skills-block frequency: 2–4 per cycle week (split between Track A growth days and lighter touches). The Track-B maintenance dosing for advanced critical/high-freq movements lives in warm-ups, accessories, metcons, or brief EMOMs — not always a dedicated Skills slot.
 
+Metcon character: a metcon is mixed-modal by default — a couplet or triplet from the athlete's vocabulary, with monostructural cardio as an ingredient, not the whole piece. Build a monostructural-only metcon (pure row/bike/run intervals) ONLY when the skeleton's metcon_focus explicitly prescribes one; an aerobic focus alone means mixed work at sustained pace, not a machine session.
+
 Combine-prevention (also enforced post-hoc by audit):
   - A metcon block contains exactly ONE main conditioning piece (no three glued together).
   - A day has at most ONE metcon block.

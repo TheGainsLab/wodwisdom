@@ -39,6 +39,7 @@ Each focus maps to a block where it is developed:
   - SKILLS block (skill_focus): gymnastics_pulling · gymnastics_pressing · midline · skill_coordination
   - METCON block (metcon_focus): aerobic_capacity · anaerobic_capacity · mixed_modal_conditioning
 Olympic lifts (snatch, clean & jerk, variants) are STRENGTH, never skills. Skills = gymnastics + monostructural / odd-object technique.
+A metcon focus names the target ADAPTATION, not a movement menu — all three conditioning focuses are normally expressed through mixed-modal work (see METCON CHARACTER).
 
 ALLOCATION — TRANSLATE INTENT INTO DOSE (this is your core job)
 Distribute the weekly block slots across the priorities by RANK, within the days_per_week × session_length budget and the recovery_stance cap:
@@ -65,13 +66,20 @@ The strength_scheme you emit drives loading (the fill can't override it). Defaul
   - Olympic lifts + variants: VOLUME IS THE BUILDER — submaximal reps, not heavy singles. Default 5–8 sets × 1–3 reps @ 70–80%. Examples: "6x2 @75%", "5x[Hang Power Snatch + Snatch] @72%", "EMOM 10 alt HPC + Front Squat @60%". Heavy singles rare — at most once per cycle per lift family.
 Singles/doubles ≥ 90% are the EXCEPTION across the cycle, not the rule.
 
+METCON CHARACTER — WHAT A METCON IS
+A metcon is a mixed-modal conditioning piece: typically a couplet or triplet drawn from the athlete's vocabulary — barbell/dumbbell/kettlebell implements, gymnastics, bodyweight, and monostructural cardio as INGREDIENTS — executed at the intensity and duration the day's focus calls for. The focus changes the pace, duration, and rest structure of the mixed work, NOT the movement menu:
+  - aerobic_capacity → mixed work at sustained, repeatable pace (steady pieces or intervals BUILT FROM MOVEMENTS — e.g. row + wall balls + burpees at conversational-to-threshold effort), not machine sessions by default.
+  - anaerobic_capacity → short, high-power mixed efforts with rest.
+  - mixed_modal_conditioning → varied combinations across movement families and formats.
+Monostructural-only pieces (a pure row/bike/run interval session) are a deliberate occasional tool — at most 1–2 per cycle, placed for a stated reason — never the default expression of ANY focus, including aerobic_capacity. VARIETY IS A PRODUCT REQUIREMENT: across the 4 weeks, vary movement selection and format week to week; never repeat the same modality pattern every week (e.g. row intervals every D1, bike every D2). previous_cycle and the vocabulary tell you what mixed work this athlete demonstrably absorbs — draw from it.
+
 METCON TIME DOMAINS
 Three buckets (state the bucket in metcon_focus):
   - short: under 8 min · medium: 8–15 min · long: 15+ min (cap ~25).
 Baseline: a roughly balanced mix across the cycle (≈ one-third each), each week touching all three when days_per_week ≥ 3; don't stack 3+ of the same in a row. Then BIAS the mix toward the conditioning PRIORITIES: aerobic_capacity → more long; anaerobic_capacity → more short; mixed_modal_conditioning → more mixed triplets/chippers. A deprioritized energy system still appears incidentally but gets no dedicated bias.
 
 SESSION-LENGTH BUDGET
-The metcon must fit inside session_length_minutes after the other blocks. Rough caps: 60-min → metcon ≤ 15 min (short/medium primarily); 75-min → ≤ 25 min; 90-min → ≤ 35 min. When in doubt, err shorter — a rushed metcon at the tail of an overstuffed session hurts more than a slightly-short one.
+Session length is advisory (see SESSION BUDGET below) — keep each metcon's stated duration in character with the athlete's typical session. Rough guides: 60-min session → metcon usually ≤ 15 min (short/medium primarily); longer sessions carry longer pieces. When in doubt, err shorter — a rushed metcon at the tail of an overstuffed session hurts more than a slightly-short one.
 
 PRIOR CYCLE CONTINUITY (when previous_cycle is non-null)
 previous_cycle is last cycle's prescription — PROGRESS from it, never penalize. The prescription is the backbone; logged actuals only let you push a lift faster or ease one back. Absence of logging is NEUTRAL: if logged_* / volume fields are null/low it may just mean the athlete didn't log — progress as normal; NEVER cut sessions, deload, trim volume, or regress on that basis.
