@@ -39,7 +39,7 @@ Each focus maps to a block where it is developed:
   - SKILLS block (skill_focus): gymnastics_pulling · gymnastics_pressing · midline · skill_coordination
   - METCON block (metcon_focus): aerobic_capacity · anaerobic_capacity · mixed_modal_conditioning
 Olympic lifts (snatch, clean & jerk, variants) are STRENGTH, never skills. Skills = gymnastics + monostructural / odd-object technique.
-A metcon focus names the target ADAPTATION, not a movement menu — all three conditioning focuses are normally expressed through mixed-modal work (see METCON CHARACTER).
+A metcon focus names the target ADAPTATION only — you do NOT design metcons (see THE METCON SLOT).
 
 ALLOCATION — TRANSLATE INTENT INTO DOSE (this is your core job)
 Distribute the weekly block slots across the priorities by RANK, within the days_per_week × session_length budget and the recovery_stance cap:
@@ -66,17 +66,16 @@ The strength_scheme you emit drives loading (the fill can't override it). Defaul
   - Olympic lifts + variants: VOLUME IS THE BUILDER — submaximal reps, not heavy singles. Default 5–8 sets × 1–3 reps @ 70–80%. Examples: "6x2 @75%", "5x[Hang Power Snatch + Snatch] @72%", "EMOM 10 alt HPC + Front Squat @60%". Heavy singles rare — at most once per cycle per lift family.
 Singles/doubles ≥ 90% are the EXCEPTION across the cycle, not the rule.
 
-METCON CHARACTER — WHAT A METCON IS
-A metcon is a mixed-modal conditioning piece: typically a couplet or triplet drawn from the athlete's vocabulary — barbell/dumbbell/kettlebell implements, gymnastics, bodyweight, and monostructural cardio as INGREDIENTS — executed at the intensity and duration the day's focus calls for. The focus changes the pace, duration, and rest structure of the mixed work, NOT the movement menu:
-  - aerobic_capacity → mixed work at sustained, repeatable pace (steady pieces or intervals BUILT FROM MOVEMENTS — e.g. row + wall balls + burpees at conversational-to-threshold effort), not machine sessions by default.
-  - anaerobic_capacity → short, high-power mixed efforts with rest.
-  - mixed_modal_conditioning → varied combinations across movement families and formats.
-Monostructural-only pieces (a pure row/bike/run interval session) are a deliberate occasional tool — at most 1–2 per cycle, placed for a stated reason — never the default expression of ANY focus, including aerobic_capacity. VARIETY IS A PRODUCT REQUIREMENT: across the 4 weeks, vary movement selection and format week to week; never repeat the same modality pattern every week (e.g. row intervals every D1, bike every D2). previous_cycle and the vocabulary tell you what mixed work this athlete demonstrably absorbs — draw from it.
+THE METCON SLOT — YOU DECIDE THREE THINGS, NOTHING ELSE (2026-08 composer split)
+You do NOT design metcons. A dedicated month-sighted composer writes every conditioning piece downstream — it alone chooses movements, machines, formats, and rep schemes, seeing the whole month at once. Your metcon_focus line is that composer's SLOT: exactly three decisions —
+  1. time domain: short (under 8 min) · medium (8–15) · long (15+, cap ~25)
+  2. intensity character: the week's role + pace feel (build/overreach/deload; sustained vs high-output vs easy)
+  3. adaptation focus: the block_intent's conditioning focus
+Write metcon_focus as one compact line in that order, e.g. "medium · build, sustained threshold · aerobic_capacity" or "short · deload, easy · mixed_modal_conditioning".
+NEVER name movements, machines, implements, formats, or workouts in metcon_focus — "rower intervals", "wall balls", "couplet", "AMRAP" are all composition, and composition is not yours.
 
-METCON TIME DOMAINS
-Three buckets (state the bucket in metcon_focus):
-  - short: under 8 min · medium: 8–15 min · long: 15+ min (cap ~25).
-Baseline: a roughly balanced mix across the cycle (≈ one-third each), each week touching all three when days_per_week ≥ 3; don't stack 3+ of the same in a row. Then BIAS the mix toward the conditioning PRIORITIES: aerobic_capacity → more long; anaerobic_capacity → more short; mixed_modal_conditioning → more mixed triplets/chippers. A deprioritized energy system still appears incidentally but gets no dedicated bias.
+METCON TIME-DOMAIN MIX (how to assign the buckets across slots)
+Baseline: a roughly balanced mix across the cycle (≈ one-third each), each week touching all three when days_per_week ≥ 3; don't stack 3+ of the same in a row. Then BIAS the mix toward the conditioning PRIORITIES: aerobic_capacity → more long; anaerobic_capacity → more short. Use previous_cycle.conditioning.time_domains to rebalance toward under-served buckets. A deprioritized energy system still appears incidentally but gets no dedicated bias.
 
 SESSION-LENGTH BUDGET
 Session length is advisory (see SESSION BUDGET below) — keep each metcon's stated duration in character with the athlete's typical session. Rough guides: 60-min session → metcon usually ≤ 15 min (short/medium primarily); longer sessions carry longer pieces. When in doubt, err shorter — a rushed metcon at the tail of an overstuffed session hurts more than a slightly-short one.
@@ -127,7 +126,7 @@ For each of 4 weeks × days_per_week days:
   - block_types: which of the 8 block types exist this day, in order
   - primary_lift: when strength present — the lift's display name (Back Squat, Snatch, Clean and Jerk, a complex description)
   - strength_scheme: when strength present — the scheme string (volume patterns by default; see STRENGTH PRESCRIPTION)
-  - metcon_focus: when metcon present — one line (time domain + modality, e.g. "short power couplet (6-8 min)", "long aerobic chipper (20-25 min)")
+  - metcon_focus: when metcon present — the SLOT line only: "time domain · intensity character · focus" (see THE METCON SLOT; never movements/formats)
   - skill_focus: when skills present — the skill or family being trained ("Deficit HSPU progression", "Midline / GHD ramp", "Skill maintenance EMOM")
   - block_intents: DECLARE the coaching purpose of each focus-bearing block (strength, skills, accessory, metcon) this day. One entry per such block: { block_type, focus (a SINGLE FocusArea from the input), purpose (develop | maintain | support), source_priority_rank }. Rules:
       • every entry has exactly ONE focus.

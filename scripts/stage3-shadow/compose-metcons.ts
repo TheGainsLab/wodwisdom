@@ -27,8 +27,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   callMetconComposer,
   type ComposedMetcon,
+  deriveMetconSlots,
   type MetconComposerInputs,
-  type MetconSlot,
 } from "../../supabase/functions/_shared/metcon-composer.ts";
 import {
   auditMetconVariety,
@@ -64,44 +64,8 @@ if (!skeleton || !tdi) {
   Deno.exit(1);
 }
 
-// ── Derive slots from the existing skeleton ──
-function parseTimeDomain(focus: string): "short" | "medium" | "long" {
-  const f = focus.toLowerCase();
-  const m = focus.match(/\((\d+)(?:\s*[-–—]\s*(\d+))?\s*min/i);
-  if (m) {
-    const upper = parseInt(m[2] ?? m[1], 10);
-    if (upper <= 8) return "short";
-    if (upper <= 15) return "medium";
-    return "long";
-  }
-  if (f.includes("short")) return "short";
-  if (f.includes("long")) return "long";
-  return "medium";
-}
-
-const slots: MetconSlot[] = [];
-for (const wk of skeleton.weeks ?? []) {
-  for (const day of wk.days ?? []) {
-    if (!(day.block_types ?? []).includes("metcon")) continue;
-    const metconIntent = (day.block_intents ?? []).find((b) => b.block_type === "metcon");
-    const accessory = (day.block_intents ?? [])
-      .filter((b) => b.block_type === "accessory")
-      .map((b) => b.focus);
-    slots.push({
-      week_num: wk.week_num,
-      day_num: day.day_num,
-      time_domain: parseTimeDomain(day.metcon_focus ?? ""),
-      intensity: `${wk.weekly_intent}`,
-      focus: metconIntent?.focus ?? "aerobic_capacity",
-      day_context: {
-        primary_lift: day.primary_lift,
-        strength_scheme: day.strength_scheme,
-        skill_focus: day.skill_focus,
-        accessory_focuses: accessory,
-      },
-    });
-  }
-}
+// ── Derive slots via the SHARED helper (same code the pipeline stage runs) ──
+const slots = deriveMetconSlots(skeleton);
 console.log(`Derived ${slots.length} conditioning slots from ${ARM} skeleton.`);
 
 // ── Examples (soft-optional) ──
@@ -136,9 +100,16 @@ const banned = new Set((tdi.do_not_program ?? []).map((s: string) => s.toLowerCa
 const barbellCapable = (tdi.equipment?.barbell ?? false) &&
   (tdi.vocabulary ?? []).some((v: string) => isBarbellMetconMovement(v) && !banned.has(v.toLowerCase()));
 
+const auditOpts = {
+  slots,
+  barbellCapable,
+  vocabulary: tdi.vocabulary ?? [],
+  doNotProgram: tdi.do_not_program ?? [],
+  equipment: tdi.equipment ?? {},
+};
 console.log(`Composing ${slots.length} metcons with ${MODEL} (barbell-capable: ${barbellCapable})…`);
 let output = await callMetconComposer(inputs, { model: MODEL });
-let audit = auditMetconVariety(output, { slots, barbellCapable });
+let audit = auditMetconVariety(output, auditOpts);
 let retried = false;
 if (!audit.passed) {
   console.log(`  variety audit FAIL (${audit.violations.length}) — one retry:\n    ${audit.violations.join("\n    ")}`);
@@ -147,7 +118,7 @@ if (!audit.passed) {
     model: MODEL,
     retryViolations: formatMetconVarietyViolationsForRetry(audit.violations),
   });
-  audit = auditMetconVariety(output, { slots, barbellCapable });
+  audit = auditMetconVariety(output, auditOpts);
 }
 console.log(
   `  variety audit: ${audit.passed ? "PASS" : `FAIL (${audit.violations.length})`}${retried ? " (after retry)" : ""}` +

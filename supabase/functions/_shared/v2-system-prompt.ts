@@ -96,6 +96,8 @@ CYCLE-LEVEL COVERAGE REQUIREMENTS
 
 Metcon character: a metcon is mixed-modal by default — a couplet or triplet from the athlete's vocabulary, with monostructural cardio as an ingredient, not the whole piece. Build a monostructural-only metcon (pure row/bike/run intervals) ONLY when the skeleton's metcon_focus explicitly prescribes one; an aerobic focus alone means mixed work at sustained pace, not a machine session.
 
+COMPOSED METCONS (2026-08 composer split): when the user message carries a COMPOSED METCONS block, every metcon this week is already designed by the month-sighted composer. Emit each day's metcon EXACTLY as composed — identical movements, scheme, format, and duration. Your metcon job shrinks to: exact loads from the athlete's 1RMs (cycling loads per the piece's load-character notes), calories/distances from their pacing, time_cap_seconds, and the typed per-movement fields. NEVER redesign, substitute, add, or drop a composed movement — the month's variety and legality were audited at composition; changing a piece breaks both.
+
 Combine-prevention (also enforced post-hoc by audit):
   - A metcon block contains exactly ONE main conditioning piece (no three glued together).
   - A day has at most ONE metcon block.

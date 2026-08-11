@@ -24,6 +24,7 @@ import type { runAudits } from "../audit-runner.ts";
 import type { BlockLocation } from "../compute-block-benchmark.ts";
 import type { Gender } from "../compute-benchmarks.ts";
 import type { DomainPack } from "../domain-packs/types.ts";
+import type { ComposedMetcon } from "../metcon-composer.ts";
 import { MODELS } from "../model-profiles.ts";
 
 /** Failure list shape from a hard-audit run (type-only; erased at runtime). */
@@ -191,12 +192,17 @@ export async function callWeekFill(
   priorWeeks: WeekPrescription[],
   extraContext: string,
   pack: DomainPack,
+  // 2026-08 composer split: this week's pre-composed metcons. When present the
+  // fill TRANSCRIBES each piece (movements/scheme/format as given) and its job
+  // shrinks to exact loads, calories/distances, and typed fields.
+  composedMetcons?: ComposedMetcon[],
 ): Promise<WeekPrescription> {
   if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
   const daysPerWeek = payload.training_context.days_per_week;
   const units = payload.basics.units ?? "lbs";
   const weekSkeleton = skeleton.weeks.find((w) => w.week_num === weekNum) ?? null;
+  const hasComposed = (composedMetcons?.length ?? 0) > 0;
 
   const ruleRecap = [
     "=== KEY RULES (re-check before emit) ===",
@@ -207,12 +213,17 @@ export async function callWeekFill(
     "- At most one metcon block per day. Every metcon block must declare a block_scheme.",
     "- Every movement in strength / accessory / metcon / skills blocks must populate at least one of {sets, reps, weight, time_seconds, distance} > 0.",
     "- Read injuries_constraints_text + injuries_structured.do_not_program. Substitute or scale any contraindicated movement.",
-    "- The metcon's EXPECTED completion time must land inside the skeleton's stated metcon_focus window; a time cap may sit above it as a ceiling, never below.",
+    hasComposed
+      ? "- Each day's metcon is PRE-COMPOSED (see COMPOSED METCONS): emit it EXACTLY — same movements, same scheme, same format, same duration. Your job on metcons is exact loads from the athlete's 1RMs, calories/distances from their pacing, and the typed per-movement fields. NEVER redesign, swap, add, or drop a composed movement."
+      : "- The metcon's EXPECTED completion time must land inside the skeleton's stated metcon_focus window; a time cap may sit above it as a ceiling, never below.",
     priorWeeks.length > 0
       ? `- PROGRESS from the prior weeks below per the month_plan's arc (add load/volume, advance schemes) — do NOT copy them verbatim.`
       : `- This is week 1 — set the cycle's opening baseline.`,
   ].join("\n");
 
+  const composedBlock = hasComposed
+    ? `COMPOSED METCONS FOR THIS WEEK (transcribe each EXACTLY as this day's metcon block — assign loads, don't redesign):\n${JSON.stringify(composedMetcons, null, 2)}`
+    : "";
   const thisWeekBlock = `THIS WEEK TO FILL (week ${weekNum} skeleton):\n${JSON.stringify(weekSkeleton, null, 2)}`;
   const arcBlock = `FULL 4-WEEK SKELETON (context — the whole arc + month_plan was already decided):\n${JSON.stringify(skeleton, null, 2)}`;
   const priorBlock = priorWeeks.length > 0
@@ -228,7 +239,8 @@ export async function callWeekFill(
     ...fillPayload
   } = payload;
   const payloadBlock = `ATHLETE PAYLOAD (JSON):\n${JSON.stringify(fillPayload, null, 2)}`;
-  const baseMessage = `${thisWeekBlock}\n\n${priorBlock}\n\n${arcBlock}\n\n${payloadBlock}\n\n${ruleRecap}`;
+  const baseMessage = [thisWeekBlock, composedBlock, priorBlock, arcBlock, payloadBlock, ruleRecap]
+    .filter(Boolean).join("\n\n");
   const userMessage = extraContext ? `${extraContext}\n\n---\n\n${baseMessage}` : baseMessage;
 
   let lastErr: unknown = null;

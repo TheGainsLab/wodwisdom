@@ -120,7 +120,39 @@ Deno.test("shuttle run is a floor movement: doesn't count mono, doesn't trip one
   assertEquals(r.violations.filter((v) => v.includes("modalities")), []);
   const twoMachines = [...m.slice(0, 11), piece(["Row", "Bike"], { format: "intervals" })];
   const r2 = auditMetconVariety({ metcons: twoMachines });
-  assert(r2.violations.some((v) => v.includes("one machine per piece")));
+  assert(r2.violations.some((v) => v.includes("one machine per round-based piece")));
+});
+
+Deno.test("chipper may touch two machines; equipment ownership still enforced", () => {
+  const m = goodMonth();
+  m[8] = piece(["Run", "Single Under", "Row"], { format: "chipper", block_scheme: "For time (cap 22)" });
+  const equipped = auditMetconVariety({ metcons: m }, {
+    equipment: { rower: true, assault_bike: true, ski_erg: false },
+  });
+  assertEquals(equipped.violations.filter((v) => v.includes("modalities")), []);
+  assertEquals(equipped.passed, true);
+
+  // Same chipper for an athlete with no rower → equipment violation.
+  const unequipped = auditMetconVariety({ metcons: m }, { equipment: { rower: false } });
+  assert(unequipped.violations.some((v) => v.includes("requires rower")));
+});
+
+Deno.test("banned and out-of-vocabulary movements are violations", () => {
+  const m = goodMonth();
+  const r = auditMetconVariety({ metcons: m }, {
+    vocabulary: ["Row", "Wall Ball", "Burpee", "Run", "Kettlebell Swing", "Bike", "Sit Up",
+      "Thruster", "Pull Up", "Deadlift", "Bar Facing Burpee", "Box Jump Over", "Dumbbell Snatch",
+      "Wall Walk", "Burpee Box Jump Over", "Goblet Squat", "Push Up", "Walking Lunge",
+      "Toes To Bar", "Shuttle Run", "Dumbbell Thruster", "Double Under"],
+    doNotProgram: ["Toes To Bar"],
+  });
+  assertEquals(r.passed, false);
+  assert(r.violations.some((v) => v.includes("do-not-program")));
+
+  const invented = goodMonth();
+  invented[0].movements.push({ movement: "Ski Erg", prescription: "10 cal" });
+  const r2 = auditMetconVariety({ metcons: invented }, { vocabulary: ["Row", "Wall Ball", "Burpee"] });
+  assert(r2.violations.some((v) => v.includes("not in this athlete's allowed vocabulary")));
 });
 
 Deno.test("previous-cycle signatures are never re-served", () => {

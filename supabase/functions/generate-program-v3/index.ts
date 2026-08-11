@@ -28,6 +28,18 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { buildWriterPayload, type WriterPayload } from "../_shared/build-writer-payload.ts";
 import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts";
 import { buildCoachStateDocumentBlock } from "../_shared/coach-state.ts";
+import {
+  callMetconComposer,
+  deriveMetconSlots,
+  type MetconComposerInputs,
+} from "../_shared/metcon-composer.ts";
+import {
+  auditMetconVariety,
+  formatMetconVarietyViolationsForRetry,
+  isBarbellMetconMovement,
+} from "../_shared/metcon-variety-audits.ts";
+import { buildStratifiedMetconExamples } from "../_shared/metcon-examples.ts";
+import { MODELS } from "../_shared/model-profiles.ts";
 import { buildTrainingDesignInput } from "../_shared/training-design-input.ts";
 import { type SkeletonOutput } from "../_shared/v3-output-schema.ts";
 import {
@@ -303,11 +315,89 @@ async function stageSkeleton(
   const skeleton = await generateSkeletonWithAudits(tdi, PACK, undefined, intentDocument);
   console.log("[generate-program-v3] skeleton passed audits");
   return {
-    next: "fill_week_1",
+    next: "metcons",
     resumeState: { ...rs, skeleton, weeks: [] },
     displayStage: "skeleton_done",
     // Mirror to skeleton_json for the admin V3 panel.
     extraPatch: { skeleton_json: skeleton },
+  };
+}
+
+/**
+ * metcons stage (2026-08 composer split) — ONE month-sighted Fable call that
+ * composes every conditioning piece from the skeleton's slots, the letter's
+ * metcon_guidance, the athlete's full legal vocabulary, and stratified example
+ * workouts. The set-level variety audit fences it (one retry); persistent
+ * violations are accepted-with-log (programs must ship; the audit trail is the
+ * fix signal), EXCEPT legality violations (bans/vocabulary/equipment) which are
+ * hard failures — a banned movement must never reach the fill.
+ */
+async function stageMetcons(
+  supa: SupabaseClient,
+  _job: ProgramJobRow,
+  rs: ResumeState,
+): Promise<StageOutcome> {
+  const payload = rs.payload!;
+  const skeleton = rs.skeleton!;
+  const tdi = rs.trainingDesignInput!;
+
+  const slots = deriveMetconSlots(skeleton);
+  const examples = await buildStratifiedMetconExamples(supa);
+  const inputs: MetconComposerInputs = {
+    slots,
+    metcon_guidance: rs.coachState?.metcon_guidance ?? "",
+    vocabulary: tdi.vocabulary,
+    equipment: tdi.equipment,
+    do_not_program: tdi.do_not_program,
+    skills: payload.skills,
+    lifts: tdi.lifts,
+    conditioning_benchmarks: payload.conditioning,
+    athlete_context: [
+      payload.basics.age ? `age ${payload.basics.age}` : "",
+      `${tdi.days_per_week} days/week`,
+      tdi.session_length_minutes ? `${tdi.session_length_minutes}-min sessions` : "",
+      `recovery stance ${tdi.recovery_stance}`,
+    ].filter(Boolean).join(", "),
+    previous_cycle_metcons: [], // per-month metcon detail needs the scoped RPC (parked)
+    examples,
+  };
+  const bannedSet = new Set(tdi.do_not_program.map((s) => s.toLowerCase()));
+  const auditOpts = {
+    slots,
+    barbellCapable: (tdi.equipment.barbell ?? false) &&
+      tdi.vocabulary.some((v) => isBarbellMetconMovement(v) && !bannedSet.has(v.toLowerCase())),
+    vocabulary: tdi.vocabulary,
+    doNotProgram: tdi.do_not_program,
+    equipment: tdi.equipment,
+  };
+
+  let output = await callMetconComposer(inputs, { model: MODELS.fable });
+  let audit = auditMetconVariety(output, auditOpts);
+  if (!audit.passed) {
+    console.warn(`[generate-program-v3] metcon variety violations (retrying once): ${audit.violations.join(" | ")}`);
+    output = await callMetconComposer(inputs, {
+      model: MODELS.fable,
+      retryViolations: formatMetconVarietyViolationsForRetry(audit.violations),
+    });
+    audit = auditMetconVariety(output, auditOpts);
+    if (!audit.passed) {
+      const legality = audit.violations.filter((v) =>
+        v.includes("do-not-program") || v.includes("allowed vocabulary") || v.includes("requires"),
+      );
+      if (legality.length > 0) {
+        throw new Error(`Metcon composer emitted illegal movements after retry: ${legality.join(" | ")}`);
+      }
+      console.warn(`[generate-program-v3] metcon variety violations persist (accepting): ${audit.violations.join(" | ")}`);
+    }
+  }
+  if (audit.warnings.length) {
+    console.log(`[generate-program-v3] metcon variety warnings: ${audit.warnings.join(" | ")}`);
+  }
+  console.log(`[generate-program-v3] composed ${output.metcons.length} metcons for ${slots.length} slots`);
+  return {
+    next: "fill_week_1",
+    resumeState: { ...rs, composedMetcons: output.metcons },
+    displayStage: "metcons_done",
   };
 }
 
@@ -320,7 +410,8 @@ async function stageFillWeek(
   const payload = rs.payload!;
   const skeleton = rs.skeleton!;
   const priorWeeks = rs.weeks ?? [];
-  const wk = await callWeekFill(payload, skeleton, weekNum, priorWeeks, "", PACK);
+  const weekMetcons = (rs.composedMetcons ?? []).filter((m) => m.week_num === weekNum);
+  const wk = await callWeekFill(payload, skeleton, weekNum, priorWeeks, "", PACK, weekMetcons);
   const weeks = [...priorWeeks, wk];
   const next: Stage = weekNum < 4 ? (`fill_week_${weekNum + 1}` as Stage) : "benchmark_audit";
   return { next, resumeState: { ...rs, weeks }, displayStage: next };
@@ -675,6 +766,8 @@ async function runStage(jobId: string): Promise<void> {
       return runStageWithLease(supa, jobId, userId, FUNCTION_NAME, stage, (j, rs) => stageCoachState(supa, j, rs));
     case "skeleton":
       return runStageWithLease(supa, jobId, userId, FUNCTION_NAME, stage, (j, rs) => stageSkeleton(supa, j, rs));
+    case "metcons":
+      return runStageWithLease(supa, jobId, userId, FUNCTION_NAME, stage, (j, rs) => stageMetcons(supa, j, rs));
     case "fill_week_1":
     case "fill_week_2":
     case "fill_week_3":
