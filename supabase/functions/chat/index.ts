@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { MODELS } from "../_shared/model-profiles.ts";
+import { renderCoachStateForChat, type CoachState } from "../_shared/coach-state.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { buildConditioningState } from "../_shared/conditioning-state.ts";
 import { buildActivityChatContext, fetchOutsideTraining } from "../_shared/athlete-activities.ts";
@@ -886,6 +887,28 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── The coach's letter (Pair 6, 2026-08-11): the chat is the athlete's
+    //    official adjustment lever, so it works INSIDE the same judgment
+    //    everything else renders from — one coach, four renders (eval, review,
+    //    program, conversation). Soft-fails to "" (chat never blocks on it). ──
+    let coachLetterContext = "";
+    if (userTier === "ai_programming" || userTier === "all_access") {
+      try {
+        const { data: csRow } = await supa
+          .from("coach_states")
+          .select("coach_state")
+          .eq("user_id", user.id)
+          .order("version", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (csRow?.coach_state) {
+          coachLetterContext = renderCoachStateForChat(csRow.coach_state as CoachState);
+        }
+      } catch (err) {
+        console.error("[chat] coach letter context failed (continuing without):", err);
+      }
+    }
+
     // ── AI Program context: derive position from workout logs ──
     let aiProgramContext = "";
     if ((userTier === "ai_programming" || userTier === "all_access") && !workout_id) {
@@ -1197,6 +1220,8 @@ Deno.serve(async (req) => {
           engineAthleteCard +
           // AI Program context (if applicable)
           aiProgramContext +
+          // The coach's current plan + adjustment rules (programming tiers)
+          coachLetterContext +
           // Logged outside activities (Programming tiers): exact aggregates +
           // recent detail + benchmark trends.
           activityContext +

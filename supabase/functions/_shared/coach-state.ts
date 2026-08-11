@@ -489,6 +489,35 @@ export function buildCoachStateDocumentBlock(coachState: CoachStateContent): str
   return `COACH STATE DOCUMENT (JSON — the coach's full written judgment; the TrainingDesignInput above remains the locked plan):\n${JSON.stringify(coachState, null, 2)}`;
 }
 
+/** Compact letter render for the AI Coach chat (Pair 6, 2026-08-11): the chat
+ *  is the athlete's adjustment lever, so it must see the coach's decisions and
+ *  their reasons — without the full document's token weight. Deliberately
+ *  omits summary/month_in_review (the athlete reads those in the evals UI). */
+export function renderCoachStateForChat(cs: CoachStateContent): string {
+  const lines: string[] = [
+    "\n\nTHE ATHLETE'S CURRENT COACHING PLAN (their coach's decisions for this cycle — you are part of the same coaching staff; work WITHIN this plan):",
+    `Headline: ${cs.headline}`,
+    "Priorities (ranked):",
+    ...[...cs.priorities].sort((a, b) => a.rank - b.rank).map((p) =>
+      `  ${p.rank}. ${p.focus} — ${p.athlete_facing_rationale} Action: ${p.recommended_action}`
+    ),
+  ];
+  if (cs.maintain.length) {
+    lines.push(`Maintaining (strengths, not pushed): ${cs.maintain.map((m) => m.focus).join(", ")}`);
+  }
+  if (cs.deprioritize.length) {
+    lines.push(`Deliberately set aside this cycle: ${cs.deprioritize.map((d) => d.focus).join(", ")}`);
+  }
+  lines.push(`Recovery stance: ${cs.recovery_posture.stance} · Strength emphasis: ${cs.strength_emphasis.value}`);
+  if (cs.metcon_guidance?.trim()) {
+    lines.push(`Conditioning intent: ${cs.metcon_guidance.trim()}`);
+  }
+  lines.push(
+    "ADJUSTMENT RULES: when the athlete asks to trim, shorten, substitute, or rework a session, preserve the day's PURPOSE — each metcon's block notes state its intended stimulus; keep that stimulus and the plan's priorities intact while you trim volume or swap equivalent movements. Never remove a day's primary work, never add a movement their profile bans, and never re-litigate the coach's priorities or deprioritizations — explain them instead, in the plan's own reasoning.",
+  );
+  return lines.join("\n");
+}
+
 export function evaluationFromCoachState(cs: CoachStateContent): EvaluationOutput {
   const ranked = [...cs.priorities].sort((a, b) => a.rank - b.rank);
   return {

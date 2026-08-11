@@ -410,6 +410,17 @@ async function stageFillWeek(
   const priorWeeks = rs.weeks ?? [];
   const weekMetcons = (rs.composedMetcons ?? []).filter((m) => m.week_num === weekNum);
   const wk = await callWeekFill(payload, skeleton, weekNum, priorWeeks, "", PACK, weekMetcons);
+  // Persist each composed piece's stimulus into its metcon block's notes
+  // (deterministic — never trust transcription for it). The note is the
+  // workout's PURPOSE; it reaches storage, the athlete's UI, and the AI Coach
+  // chat, which needs it to adjust sessions without destroying their intent.
+  for (const m of weekMetcons) {
+    const day = wk.days?.find((d) => d.day_num === m.day_num);
+    const metconBlock = day?.blocks?.find((b) => b.block_type === "metcon");
+    if (metconBlock && m.stimulus_note?.trim()) {
+      metconBlock.block_notes = m.stimulus_note.trim().slice(0, 500);
+    }
+  }
   const weeks = [...priorWeeks, wk];
   const next: Stage = weekNum < 4 ? (`fill_week_${weekNum + 1}` as Stage) : "benchmark_audit";
   return { next, resumeState: { ...rs, weeks }, displayStage: next };
