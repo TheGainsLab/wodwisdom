@@ -217,6 +217,18 @@ function monostructuralFamily(movement: string): string {
   return n;
 }
 
+/** Round-based schemes swap machines mid-workout (the thing the rule exists to
+ *  prevent). A single-pass piece — a chipper — touches each station once, which
+ *  was ruled fine (2026-08-11) provided the athlete owns the machines (the
+ *  do_not_program/vocabulary audits carry ownership). Rep-scheme ladders
+ *  (21-15-9) are multiple passes, so they count as round-based. */
+function isRoundBasedScheme(scheme: string | null | undefined): boolean {
+  const s = (scheme ?? "").toLowerCase();
+  if (/\bround|amrap|emom|rft\b/.test(s)) return true;
+  if (/\d+\s*[-–]\s*\d+/.test(s)) return true; // "21-15-9", "10-8-6-4-2"
+  return false;
+}
+
 export function auditMetconMonostructural(output: WriterOutput): AuditResult {
   const violations: string[] = [];
   for (const week of safeWeeks(output)) {
@@ -225,13 +237,14 @@ export function auditMetconMonostructural(output: WriterOutput): AuditResult {
       for (let i = 0; i < blocks.length; i++) {
         const b = blocks[i];
         if (b.block_type !== "metcon") continue;
+        if (!isRoundBasedScheme(b.block_scheme)) continue; // single-pass chipper: multi-station allowed
         const families = new Set<string>();
         for (const m of safeMovements(b)) {
           if (isMonostructural(m.movement)) families.add(monostructuralFamily(m.movement));
         }
         if (families.size > 1) {
           violations.push(
-            `Week ${week.week_num} Day ${day.day_num} block[${i}] (metcon): contains ${families.size} monostructural cardio modalities (${[...families].join(", ")}). Pick one per metcon block — athletes typically have one machine available; mid-workout machine swaps are bad programming.`,
+            `Week ${week.week_num} Day ${day.day_num} block[${i}] (metcon): contains ${families.size} monostructural cardio modalities (${[...families].join(", ")}) in a round-based scheme. Pick one per round-based metcon — mid-workout machine swaps are bad programming (single-pass chippers are exempt).`,
           );
         }
       }

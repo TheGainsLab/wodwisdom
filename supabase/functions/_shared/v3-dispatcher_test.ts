@@ -33,7 +33,9 @@ Deno.test("linear stage order is the full pipeline with no skips", () => {
   }
   assertEquals(walked, [
     "payload_building",
+    "coach_state",
     "skeleton",
+    "metcons",
     "fill_week_1",
     "fill_week_2",
     "fill_week_3",

@@ -134,6 +134,72 @@ export interface MetconComposerInputs {
 }
 
 // ============================================================
+// Slot derivation — skeleton → composer slots (shared by the pipeline stage
+// and the shadow harness so they can never drift).
+// ============================================================
+
+interface SkeletonLikeDay {
+  day_num: number;
+  block_types?: string[];
+  metcon_focus?: string;
+  primary_lift?: string;
+  strength_scheme?: string;
+  skill_focus?: string;
+  block_intents?: Array<{ block_type: string; focus: string }>;
+}
+interface SkeletonLike {
+  weeks?: Array<{ week_num: number; weekly_intent?: string; days?: SkeletonLikeDay[] }>;
+}
+
+/** Parse the slot's time domain from a metcon_focus line. Handles BOTH the
+ *  demoted slot format ("medium · build, sustained · aerobic_capacity") and
+ *  legacy prose ("long aerobic chipper (18-22 min)") so old skeletons stay
+ *  composable in the harness. */
+export function parseSlotTimeDomain(focus: string): MetconTimeDomain {
+  const f = focus.toLowerCase();
+  const m = focus.match(/\((\d+)(?:\s*[-–—]\s*(\d+))?\s*min/i);
+  if (m) {
+    const upper = parseInt(m[2] ?? m[1], 10);
+    if (upper <= 8) return "short";
+    if (upper <= 15) return "medium";
+    return "long";
+  }
+  if (/\bshort\b/.test(f)) return "short";
+  if (/\blong\b/.test(f)) return "long";
+  return "medium";
+}
+
+/** Derive the month's conditioning slots from a skeleton — one slot per day
+ *  that declares a metcon block. Days without one (active recovery) are
+ *  correctly skipped. */
+export function deriveMetconSlots(skeleton: SkeletonLike): MetconSlot[] {
+  const slots: MetconSlot[] = [];
+  for (const wk of skeleton.weeks ?? []) {
+    for (const day of wk.days ?? []) {
+      if (!(day.block_types ?? []).includes("metcon")) continue;
+      const metconIntent = (day.block_intents ?? []).find((b) => b.block_type === "metcon");
+      const accessory = (day.block_intents ?? [])
+        .filter((b) => b.block_type === "accessory")
+        .map((b) => b.focus);
+      slots.push({
+        week_num: wk.week_num,
+        day_num: day.day_num,
+        time_domain: parseSlotTimeDomain(day.metcon_focus ?? ""),
+        intensity: `${wk.weekly_intent ?? ""} · ${day.metcon_focus ?? ""}`.trim(),
+        focus: metconIntent?.focus ?? "aerobic_capacity",
+        day_context: {
+          primary_lift: day.primary_lift,
+          strength_scheme: day.strength_scheme,
+          skill_focus: day.skill_focus,
+          accessory_focuses: accessory,
+        },
+      });
+    }
+  }
+  return slots;
+}
+
+// ============================================================
 // EMIT tool
 // ============================================================
 

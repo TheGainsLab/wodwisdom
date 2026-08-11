@@ -56,6 +56,7 @@ export type Stage =
   | "payload_building"
   | "coach_state"
   | "skeleton"
+  | "metcons"
   | "fill_week_1"
   | "fill_week_2"
   | "fill_week_3"
@@ -74,6 +75,7 @@ const LINEAR_ORDER: Stage[] = [
   "payload_building",
   "coach_state",
   "skeleton",
+  "metcons",
   "fill_week_1",
   "fill_week_2",
   "fill_week_3",
@@ -93,6 +95,7 @@ export function nextLinearStage(s: Stage): Stage | "complete" {
 const WRITER_STAGES = new Set<Stage>([
   "coach_state",
   "skeleton",
+  "metcons",
   "fill_week_1",
   "fill_week_2",
   "fill_week_3",
@@ -141,6 +144,10 @@ export interface ResumeState {
   trainingDesignInput?: TrainingDesignInput;
   /** Also mirrored to program_jobs.skeleton_json for the admin panel. */
   skeleton?: SkeletonOutput;
+  /** The month's composed metcons (2026-08 month-sighted composer stage) —
+   *  one distinct piece per conditioning slot; the fill transcribes these
+   *  with exact loads instead of composing. */
+  composedMetcons?: import("./metcon-composer.ts").ComposedMetcon[];
   /** Accumulated one per fill_week_N stage. */
   weeks?: WeekPrescription[];
   /** Output after benchmark_audit (full recompute + first audit + programmatic

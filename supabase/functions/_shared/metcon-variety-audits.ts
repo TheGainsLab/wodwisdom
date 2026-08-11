@@ -102,6 +102,16 @@ const TIME_BUCKETS: Record<string, (min: number) => boolean> = {
  * time-domain fit are checked too (the harness and pipeline pass it; unit
  * fixtures may not).
  */
+/** Which equipment key owns each machine family (run needs none — policy:
+ *  Run is always available; swim has no key and is vocabulary-gated only). */
+const MACHINE_EQUIPMENT: Record<string, string | null> = {
+  row: "rower",
+  bike: "assault_bike",
+  ski: "ski_erg",
+  run: null,
+  swim: null,
+};
+
 export function auditMetconVariety(
   output: MetconComposerOutput,
   opts: {
@@ -110,6 +120,12 @@ export function auditMetconVariety(
     barbellCapable?: boolean;
     /** Normalized signatures of last cycle's pieces (never re-serve). */
     previousCycleSignatures?: string[];
+    /** Allowed movement display names — every composed movement must be one. */
+    vocabulary?: string[];
+    /** Hard bans — a banned movement anywhere is a violation. */
+    doNotProgram?: string[];
+    /** Equipment map — machine movements require the owning equipment. */
+    equipment?: Record<string, boolean>;
   } = {},
 ): MetconVarietyAuditResult {
   const violations: string[] = [];
@@ -233,8 +249,12 @@ export function auditMetconVariety(
     violations.push(`${named.length} named benchmark pieces — keep named WODs infrequent (at most 2).`);
   }
 
-  // 8. One machine max per piece (mirror of the fill-layer rule, pre-fill).
+  // 8. One machine max per ROUND-BASED piece. Single-pass chippers may touch
+  //    multiple machines (ruled 2026-08-11: each station used once is fine —
+  //    the rule exists to prevent mid-round machine swapping). Equipment
+  //    ownership is checked separately in rule 9 for every piece.
   for (const m of pieces) {
+    if (m.format === "chipper") continue;
     const machines = new Set(
       m.movements.map((mv) => norm(mv.movement)).filter((x) => isMonoMovement(x)).map((x) => {
         for (const k of MONO_KEYWORDS) if (x.includes(k)) return k;
@@ -242,7 +262,40 @@ export function auditMetconVariety(
       }),
     );
     if (machines.size > 1) {
-      violations.push(`${at(m)}: ${machines.size} cardio modalities (${[...machines].join(", ")}) — one machine per piece.`);
+      violations.push(
+        `${at(m)}: ${machines.size} cardio modalities (${[...machines].join(", ")}) in a ${m.format} — one machine per round-based piece (only a single-pass chipper may use two).`,
+      );
+    }
+  }
+
+  // 9. Legality — every movement must be in the vocabulary, never banned, and
+  //    machine movements require the owning equipment. Belt-and-braces with the
+  //    prompt inputs: a banned or invented movement must never survive to the
+  //    fill (found 2026-08-11: a composed month used Ski Erg unchecked).
+  const vocab = opts.vocabulary?.length ? new Set(opts.vocabulary.map(norm)) : null;
+  const bans = opts.doNotProgram?.length ? new Set(opts.doNotProgram.map(norm)) : null;
+  for (const m of pieces) {
+    for (const mv of m.movements) {
+      const x = norm(mv.movement);
+      if (bans?.has(x)) {
+        violations.push(`${at(m)}: "${mv.movement}" is on this athlete's do-not-program list.`);
+        continue;
+      }
+      if (vocab && !vocab.has(x)) {
+        violations.push(`${at(m)}: "${mv.movement}" is not in this athlete's allowed vocabulary.`);
+        continue;
+      }
+      if (opts.equipment && isMonoMovement(x)) {
+        for (const k of MONO_KEYWORDS) {
+          if (x.includes(k)) {
+            const eq = MACHINE_EQUIPMENT[k];
+            if (eq && !opts.equipment[eq]) {
+              violations.push(`${at(m)}: "${mv.movement}" requires ${eq} the athlete doesn't have.`);
+            }
+            break;
+          }
+        }
+      }
     }
   }
 
@@ -252,6 +305,7 @@ export function auditMetconVariety(
 export function formatMetconVarietyViolationsForRetry(violations: string[]): string {
   return [
     "Your previous month of metcons failed the set-level variety audit. Re-emit the FULL month via emit_metcon_month, fixing ONLY these violations — keep every piece not named below unchanged.",
+    "For each named piece, RECOMPOSE it: change its movements and/or format so the rule is satisfied. Re-labeling a piece, toggling its monostructural flag, or editing its stimulus_note does NOT fix a violation about its content.",
     "",
     ...violations.map((v) => `  - ${v}`),
   ].join("\n");

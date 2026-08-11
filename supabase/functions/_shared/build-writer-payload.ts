@@ -12,7 +12,7 @@
  *   - one SELECT against athlete_profiles
  *   - optionally one Tier 4 bundle fetch (when athlete is linked)
  *   - one SELECT against movements for the vocabulary
- *   - RAG passthrough (TODO: wire to v1's searchChunks chain)
+ *   - rag: retired 2026-08-11 (empty string; composer owns example retrieval)
  *
  * Locked design rules (see competition_history_feature_plan.md):
  *   - 9 top-level payload keys: basics, lifts, skills, conditioning,
@@ -41,7 +41,6 @@ import {
 } from "./tier-status.ts";
 import { computeEquipmentBlockedMovements } from "./equipment-movements.ts";
 import { fetchTier4Bundle, type Tier4Bundle } from "./fetch-tier4-bundle.ts";
-import { buildRagContext } from "./build-rag-context.ts";
 import {
   type AthleteModel,
   buildAthleteModel,
@@ -644,10 +643,13 @@ export async function buildWriterPayload(
     skills[displayName] = skillsBySnakeKey[k];
   }
 
-  // 5. RAG — same v1 chain, hydrated maps in.
-  const rag = await buildRagContext(supa, lifts, skillsBySnakeKey);
+  // 5. RAG — RETIRED from generation (2026-08-11). The v1 reference block was
+  // built here for three months with no v3 consumer (skeleton/fill never read
+  // payload.rag). Example anchoring now lives in the metcon composer's
+  // stratified retrieval (metcon-examples.ts). Field kept for type compat.
+  const rag = "";
 
-  // 6. Hydrate the remaining JSONB blobs (after RAG kicked off).
+  // 6. Hydrate the remaining JSONB blobs.
   const conditioning: Record<string, string | number | null> = {};
   for (const k of ALL_CONDITIONING_KEYS) {
     conditioning[k] = asConditioningValue((profile.conditioning ?? {})[k]);

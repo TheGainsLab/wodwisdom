@@ -34,6 +34,10 @@ const MACHINE_PATH = arg("machine");
 const ARM = arg("arm", "claude-fable-5")!;
 /** Match the month the skeleton was generated as (see run-shadow-pairs --month). */
 const MONTH = Math.max(1, parseInt(arg("month", "1")!, 10) || 1);
+/** Composed-metcon handoff (2026-08 composer split): path to a compose-metcons
+ *  output json. When given, each week's fill receives its composed pieces and
+ *  transcribes them — the exact production handoff. */
+const METCONS_PATH = arg("metcons");
 
 if (!MACHINE_PATH) {
   console.error("Missing --machine=<path to a pair's machine.json>");
@@ -57,13 +61,22 @@ if (!skeleton) {
 // deno-lint-ignore no-explicit-any
 const supa = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!) as any;
 
+// deno-lint-ignore no-explicit-any
+let composedMetcons: any[] = [];
+if (METCONS_PATH) {
+  const composed = JSON.parse(await Deno.readTextFile(METCONS_PATH));
+  composedMetcons = composed.output?.metcons ?? composed.metcons ?? [];
+  console.log(`Composed metcons: ${composedMetcons.length} pieces from ${METCONS_PATH}`);
+}
+
 console.log(`Filling ${ARM} skeleton for ${userId} (${machine.category ?? "?"})…`);
 const payload = await buildWriterPayload(supa, userId, { monthNumber: MONTH, includeEvaluations: true });
 
 const weeks: WeekPrescription[] = [];
 for (let w = 1; w <= 4; w++) {
   console.log(`  week ${w}…`);
-  const week = await callWeekFill(payload, skeleton, w, weeks, "", CROSSFIT_PACK);
+  const weekMetcons = composedMetcons.filter((m) => m.week_num === w);
+  const week = await callWeekFill(payload, skeleton, w, weeks, "", CROSSFIT_PACK, weekMetcons);
   weeks.push(week);
 }
 const output: WriterOutput = { month_plan: skeleton.month_plan, weeks };

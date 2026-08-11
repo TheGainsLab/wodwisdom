@@ -263,6 +263,26 @@ Deno.test("auditMetconMonostructural: shuttle run beside a machine → passes (f
   assert(auditMetconMonostructural(out).passed);
 });
 
+Deno.test("auditMetconMonostructural: single-pass chipper may touch two machines", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks.push(
+    block("metcon", [
+      mv("Run", { distance: 1200 }),
+      mv("Single Under", { reps: 150 }),
+      mv("Row", { distance: 1000 }),
+    ], { block_scheme: "For time, steady (cap 22)" }),
+  );
+  assert(auditMetconMonostructural(out).passed);
+  // Same two machines in a rep-scheme ladder (multiple passes) still fail.
+  const ladder = baselineOutput();
+  ladder.weeks[0].days[0].blocks.push(
+    block("metcon", [mv("Run", { distance: 200 }), mv("Row", { distance: 250 })], {
+      block_scheme: "21-15-9 for time",
+    }),
+  );
+  assert(!auditMetconMonostructural(ladder).passed);
+});
+
 Deno.test("auditMetconMonostructural: strength-row variants beside a machine → passes", () => {
   const out = baselineOutput();
   out.weeks[0].days[0].blocks.push(

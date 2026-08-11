@@ -27,6 +27,7 @@ SET-LEVEL RULES (deterministically audited — violations come back to you once)
   5. BARBELL PRESENCE: when the athlete has a barbell and legal barbell movements, the month includes 2–3 barbell-bearing pieces at cycling loads. Zero barbell conditioning for a capable athlete is a defect.
   6. MONOSTRUCTURAL BUDGET: at most TWO monostructural-only pieces in the month (one is fine, zero is fine). Each must be deliberate — flag it and state the reason in its stimulus_note.
   7. NAMED BENCHMARKS: allowed but INFREQUENT — at most one or two per month, format "named", only when a known workout genuinely serves the slot.
-  8. ONE MACHINE MAX per piece (a shuttle run is a floor movement, not a machine). Barbell movements within one piece share one load character.
+  8. ONE MACHINE MAX per round-based piece (a shuttle run is a floor movement, not a machine). A single-pass CHIPPER may touch two machines — each station once, and only machines the athlete owns. Barbell movements within one piece share one load character.
+  9. LEGALITY IS ABSOLUTE: every movement comes from the allowed list; nothing on the do-not-program list, ever; machine work only on machines the athlete's equipment shows.
 
 EMIT via emit_metcon_month: exactly one metcon per slot, matching each slot's week_num/day_num. block_scheme is the athlete-readable header; stated_duration_minutes is the expected clock and must land inside the slot's time-domain bucket; stimulus_note is one line of pace/intent the athlete reads.`;
