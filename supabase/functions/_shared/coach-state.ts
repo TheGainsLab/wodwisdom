@@ -64,7 +64,12 @@ export type EvidenceKey = AthleteModelKey | (string & {});
 // only when previous_cycle exists; persisted to training_evaluations by the
 // generation path (replaces the separate Sonnet training-analysis call:
 // one judgment, three renders).
-export const COACH_STATE_BUILDER_VERSION = "v1.7";
+// v1.8 (declared-1RMs ruling, 2026-08-11): the inference layer is gone —
+// capabilities are the athlete's declared numbers, the same numbers that load
+// their program (one truth). observed_progress/observed_plateau retired (they
+// cited capability revisions, which no longer exist). The coach still reads
+// every log — weights, hit rates, RPE — but never converts them into a max.
+export const COACH_STATE_BUILDER_VERSION = "v1.8";
 
 // ============================================================
 // Controlled vocabularies — LOCKED v1 (DATA, versioned with the schema;
@@ -126,10 +131,8 @@ export const REASON_CODES = [
   "recent_competition",
   "high_prior_load",
   "injury_constraint",
-  // OBSERVED training signals (Step 4 — from the synthesized Athlete Model:
-  // capability source="observed", capability_revisions, adherence).
-  "observed_progress",
-  "observed_plateau",
+  // Training-adherence signal (sparse logging against an existing program —
+  // NEVER a value cut; absence is neutral).
   "low_adherence",
 ] as const;
 export type ReasonCode = typeof REASON_CODES[number];
@@ -248,7 +251,7 @@ export interface ReasonShapingInputs {
   previous_cycle?: unknown | null;
   competition?: unknown | null;
   athlete_model: {
-    capability_revisions?: unknown[];
+    training_fingerprint?: { sessions_logged: number } | null;
     logged_competition_results?: unknown[];
     outside_training?: unknown | null;
   };
@@ -262,20 +265,20 @@ export interface ReasonShapingInputs {
 export function allowedReasonCodes(payload: ReasonShapingInputs): ReasonCode[] {
   const goal = payload.training_context?.goal_text;
   const hasGoal = typeof goal === "string" && goal.trim() !== "";
-  const revisions = payload.athlete_model.capability_revisions ?? [];
   const loggedComp = payload.athlete_model.logged_competition_results ?? [];
+  const fingerprint = payload.athlete_model.training_fingerprint ?? null;
+  const hasLogged = (fingerprint?.sessions_logged ?? 0) > 0;
   const hasLoadHistory = payload.previous_cycle != null ||
-    payload.athlete_model.outside_training != null || revisions.length > 0;
+    payload.athlete_model.outside_training != null || hasLogged;
   const hasCompetition = payload.competition != null || loggedComp.length > 0;
-  const hasObserved = revisions.length > 0;
 
   return REASON_CODES.filter((code) => {
     if (code === "supports_stated_goal") return hasGoal;
     if (code === "high_prior_load") return hasLoadHistory;
     if (code === "recent_competition") return hasCompetition;
-    if (code === "observed_progress" || code === "observed_plateau" || code === "low_adherence") {
-      return hasObserved;
-    }
+    // low_adherence only makes sense against a program the athlete HAS —
+    // sparse logging with no prior cycle is a brand-new athlete, not a signal.
+    if (code === "low_adherence") return payload.previous_cycle != null;
     return true;
   });
 }
