@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, ADJUST_WORKOUT_ENDPOINT, getAuthHeaders } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { localDateString } from '../lib/localDate';
 import Nav from '../components/Nav';
 import CoachChat from '../components/CoachChat';
 import {
-  V3DayView, v3BlocksToProse, reconcileReps,
-  type ProgramBlockV2, type ProgramMovementV2, type BlockProposal,
+  V3DayView, v3BlocksToProse,
+  type ProgramBlockV2, type ProgramMovementV2,
 } from './ProgramDetailPage';
 import type { DayLogController, SaveBlockPayload } from '../components/blockLog';
 
 // DayPage — the single surface for an AI-programming training day. Renders the
-// real V3DayView (colored cards + per-block Edit / AI Edit / Coach ▾ + Session
+// real V3DayView (colored cards + per-block Edit / Coach ▾ + Session
 // intent + Sources) with this page's own data + handlers. Logging lands on these
 // cards next. Engine days are separate (their own timer route).
 const MOVEMENT_SELECT = 'id, block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order';
@@ -23,8 +23,9 @@ export default function DayPage(_props: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [blocks, setBlocks] = useState<ProgramBlockV2[]>([]);
-  const [aiEditedBlockIds, setAiEditedBlockIds] = useState<Set<string>>(new Set());
   const [meta, setMeta] = useState<{ week_num: number; day_num: number; program_id: string; program_name: string } | null>(null);
+  // Bumped when the AI Coach applies a block edit — re-runs the day fetch.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!workoutId) return;
@@ -51,23 +52,20 @@ export default function DayPage(_props: { session: Session }) {
       const blks = ((blockRows as (ProgramBlockV2 & { program_workout_id: string })[] | null) ?? []).map(b => ({ ...b, movements: [] as ProgramMovementV2[] }));
       if (blks.length) {
         const blockIds = blks.map(b => b.id);
-        const [{ data: movRows }, { data: aiLogs }] = await Promise.all([
-          supabase.from('program_movements_v2').select(MOVEMENT_SELECT).in('block_id', blockIds).order('sort_order'),
-          supabase.from('ai_edit_log').select('block_id').in('block_id', blockIds),
-        ]);
+        const { data: movRows } = await supabase
+          .from('program_movements_v2').select(MOVEMENT_SELECT).in('block_id', blockIds).order('sort_order');
         const byBlock = new Map<string, ProgramMovementV2[]>();
         for (const m of (movRows as (ProgramMovementV2 & { block_id: string })[] | null) ?? []) {
           const arr = byBlock.get(m.block_id) ?? []; arr.push(m); byBlock.set(m.block_id, arr);
         }
         for (const b of blks) b.movements = byBlock.get(b.id) ?? [];
-        if (active) setAiEditedBlockIds(new Set(((aiLogs as { block_id: string }[]) ?? []).map(l => l.block_id)));
       }
       if (!active) return;
       setBlocks(blks);
       setLoading(false);
     })();
     return () => { active = false; };
-  }, [workoutId]);
+  }, [workoutId, reloadKey]);
 
   const workoutText = useMemo(() => v3BlocksToProse(blocks), [blocks]);
 
@@ -121,7 +119,7 @@ export default function DayPage(_props: { session: Session }) {
     reopen: (s) => setSavedSorts(prev => { const n = new Set(prev); n.delete(s); return n; }),
   }), [workoutDate, userUnits, savedSorts, savingSort, saveBlock]);
 
-  // ── Edit + AI Edit handlers (operate on this page's flat blocks state) ──
+  // ── Edit handlers (operate on this page's flat blocks state) ──
   const updateMovementField = async (movementId: string, patch: Partial<ProgramMovementV2>) => {
     let previous: ProgramMovementV2 | undefined;
     setBlocks(prev => prev.map(b => {
@@ -172,53 +170,6 @@ export default function DayPage(_props: { session: Session }) {
     setBlocks(prev => prev.map(b => ({ ...b, movements: b.movements.filter(m => m.id !== movementId) })));
   };
 
-  const proposeAiEdit = async (blockId: string, request: string) => {
-    const resp = await fetch(ADJUST_WORKOUT_ENDPOINT, {
-      method: 'POST', headers: await getAuthHeaders(), body: JSON.stringify({ block_id: blockId, request }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data?.error || `AI Edit failed (${resp.status})`);
-    return data as { proposal: BlockProposal; original: BlockProposal; ai_edit_log_id: string };
-  };
-
-  const applyAiProposal = async (blockId: string, proposal: BlockProposal, aiLogId: string) => {
-    const { error: bErr } = await supabase.from('program_blocks_v2').update({
-      block_type: proposal.block_type, block_label: proposal.block_label ?? null,
-      block_scheme: proposal.block_scheme ?? null, time_cap_seconds: proposal.time_cap_seconds ?? null,
-      block_notes: proposal.block_notes ?? null, cardio_modality: proposal.cardio_modality ?? null,
-    }).eq('id', blockId);
-    if (bErr) throw bErr;
-    await supabase.from('program_movements_v2').delete().eq('block_id', blockId);
-    const inserts = proposal.movements.map((m, i) => {
-      const { reps, rep_scheme } = reconcileReps(m.reps, m.rep_scheme);
-      return {
-        block_id: blockId, movement: m.movement, sets: m.sets ?? null, reps, rep_scheme,
-        weight: m.weight ?? null, weight_unit: m.weight_unit ?? null, rpe: m.rpe ?? null,
-        time_seconds: m.time_seconds ?? null, distance: m.distance ?? null, distance_unit: m.distance_unit ?? null,
-        calories: m.calories ?? null, cardio_modality: m.cardio_modality ?? null,
-        scaling_note: m.scaling_note ?? null, target_pct_1rm: m.target_pct_1rm ?? null, sort_order: i,
-      };
-    });
-    let insertedRows: ProgramMovementV2[] = [];
-    if (inserts.length) {
-      const { data, error: insErr } = await supabase.from('program_movements_v2').insert(inserts).select(MOVEMENT_SELECT);
-      if (insErr) throw insErr;
-      insertedRows = (data ?? []) as ProgramMovementV2[];
-    }
-    await supabase.from('ai_edit_log').update({ outcome: 'accepted', resolved_at: new Date().toISOString() }).eq('id', aiLogId);
-    setBlocks(prev => prev.map(b => b.id === blockId ? {
-      ...b, block_type: proposal.block_type, block_label: proposal.block_label ?? null,
-      block_scheme: proposal.block_scheme ?? null, time_cap_seconds: proposal.time_cap_seconds ?? null,
-      block_notes: proposal.block_notes ?? null, movements: insertedRows,
-    } : b));
-    setAiEditedBlockIds(prev => new Set(prev).add(blockId));
-  };
-
-  const refuseAiProposal = async (blockId: string, aiLogId: string) => {
-    await supabase.from('ai_edit_log').update({ outcome: 'refused', resolved_at: new Date().toISOString() }).eq('id', aiLogId);
-    setAiEditedBlockIds(prev => new Set(prev).add(blockId));
-  };
-
   if (!workoutId) { navigate('/training-log', { replace: true }); return null; }
 
   const title = meta ? `${meta.program_name} · Wk ${meta.week_num} Day ${meta.day_num}` : 'Training Day';
@@ -261,14 +212,10 @@ export default function DayPage(_props: { session: Session }) {
                   onUpdateBlock={updateBlockField}
                   onAddMovement={addMovementToBlock}
                   onRemoveMovement={removeMovementFromBlock}
-                  aiEditedBlockIds={aiEditedBlockIds}
-                  onProposeAiEdit={proposeAiEdit}
-                  onApplyAiProposal={applyAiProposal}
-                  onRefuseAiProposal={refuseAiProposal}
                 />
 
                 {/* Ask the AI Coach about this day — the day is passed as context. */}
-                <CoachChat session={_props.session} workoutId={workoutId ?? null} />
+                <CoachChat session={_props.session} workoutId={workoutId ?? null} onDayChanged={() => setReloadKey(k => k + 1)} />
 
                 {/* Done — the day auto-completes as each block is saved; this
                     just leaves. (Log a block via its own Save on the card.) */}
