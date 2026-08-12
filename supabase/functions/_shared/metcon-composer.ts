@@ -296,7 +296,14 @@ interface ClaudeResponse {
   usage?: { input_tokens?: number; output_tokens?: number };
 }
 
-const COMPOSER_TIMEOUT_MS = 130_000;
+// The composer emits one metcon per slot — a 24-slot (6-day) month can run
+// 10k+ tokens, several minutes of Fable generation. The stage makes at most
+// TWO calls (initial + one variety retry — the only multiplier), so per the
+// house rule keep calls × timeout under the ~400s edge wall-clock
+// (2 × 195s = 390s). A timeout here THROWS, and metcons is a writer stage
+// (no retry on throw → job fails) — the deadline must outlast the biggest
+// legal month, not the average one. Sized 2026-08-12 after 130s proved thin.
+const COMPOSER_TIMEOUT_MS = 195_000;
 
 /** One composer call. `model` defaults to the fill's model (Sonnet) pending the
  *  side-by-side; retryViolations prepends a failed variety audit for the single
@@ -321,7 +328,10 @@ export async function callMetconComposer(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 12000,
+      // 16k matches the skeleton's budget: a hit cap truncates the tool JSON
+      // mid-object and fails the job, so the ceiling must fit a verbose
+      // 24-slot month with margin. Unused headroom costs nothing.
+      max_tokens: 16000,
       stream: false,
       system: METCON_COMPOSER_SYSTEM_PROMPT,
       tools: [EMIT_METCON_MONTH_TOOL],

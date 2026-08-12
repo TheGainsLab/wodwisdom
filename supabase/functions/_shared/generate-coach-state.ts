@@ -85,7 +85,10 @@ async function callCoachState(
       tool_choice: { type: "tool", name: "emit_coach_state" },
       messages: [{ role: "user", content: userMessage }],
     }),
-    signal: AbortSignal.timeout(120_000),
+    // v1.8 letters (metcon_guidance + month_in_review) run longer than the
+    // letters 120s was sized for. Two attempts is the only multiplier —
+    // 2 × 180s = 360s stays under the ~400s edge wall-clock (house rule).
+    signal: AbortSignal.timeout(180_000),
   });
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
