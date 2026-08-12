@@ -887,12 +887,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── The coach's letter (Pair 6, 2026-08-11): the chat is the athlete's
-    //    official adjustment lever, so it works INSIDE the same judgment
-    //    everything else renders from — one coach, four renders (eval, review,
-    //    program, conversation). Soft-fails to "" (chat never blocks on it). ──
+    // ── The coach's letter (Pair 6, 2026-08-11; widened 2026-08-12): the
+    //    evaluation persists a CoachState for ANY athlete who completes it, so
+    //    every paid tier chats inside the same judgment — one coach, four
+    //    renders (eval, review, program, conversation). Programming tiers also
+    //    get the ADJUSTMENT RULES lever (chat is their official adjustment
+    //    channel); engine/standalone get the judgment without the lever (no
+    //    program exists to adjust). Athletes with no evaluation simply have no
+    //    row. Soft-fails to "" (chat never blocks on it). ──
     let coachLetterContext = "";
-    if (userTier === "ai_programming" || userTier === "all_access") {
+    if (userTier !== "free_trial") {
       try {
         const { data: csRow } = await supa
           .from("coach_states")
@@ -902,7 +906,9 @@ Deno.serve(async (req) => {
           .limit(1)
           .maybeSingle();
         if (csRow?.coach_state) {
-          coachLetterContext = renderCoachStateForChat(csRow.coach_state as CoachState);
+          coachLetterContext = renderCoachStateForChat(csRow.coach_state as CoachState, {
+            includeAdjustmentRules: userTier === "ai_programming" || userTier === "all_access",
+          });
         }
       } catch (err) {
         console.error("[chat] coach letter context failed (continuing without):", err);
