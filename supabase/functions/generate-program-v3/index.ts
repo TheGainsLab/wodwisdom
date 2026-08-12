@@ -39,6 +39,7 @@ import {
   isBarbellMetconMovement,
 } from "../_shared/metcon-variety-audits.ts";
 import { buildStratifiedMetconExamples } from "../_shared/metcon-examples.ts";
+import { formatAuditFailuresForLog, logGenerationAudit } from "../_shared/generation-audit-log.ts";
 import { MODELS } from "../_shared/model-profiles.ts";
 import { buildTrainingDesignInput } from "../_shared/training-design-input.ts";
 import { type SkeletonOutput } from "../_shared/v3-output-schema.ts";
@@ -333,7 +334,7 @@ async function stageSkeleton(
  */
 async function stageMetcons(
   supa: SupabaseClient,
-  _job: ProgramJobRow,
+  job: ProgramJobRow,
   rs: ResumeState,
 ): Promise<StageOutcome> {
   const payload = rs.payload!;
@@ -371,7 +372,11 @@ async function stageMetcons(
 
   let output = await callMetconComposer(inputs, { model: MODELS.fable });
   let audit = auditMetconVariety(output, auditOpts);
+  let retried = false;
+  let firstPassViolations: string[] = [];
   if (!audit.passed) {
+    retried = true;
+    firstPassViolations = audit.violations;
     console.warn(`[generate-program-v3] metcon variety violations (retrying once): ${audit.violations.join(" | ")}`);
     output = await callMetconComposer(inputs, {
       model: MODELS.fable,
@@ -383,6 +388,15 @@ async function stageMetcons(
         v.includes("do-not-program") || v.includes("allowed vocabulary") || v.includes("requires"),
       );
       if (legality.length > 0) {
+        await logGenerationAudit(supa, {
+          user_id: job.user_id,
+          program_id: rs.continuation.programId ?? null,
+          month_number: rs.continuation.monthNumber,
+          stage: "metcons",
+          violations: audit.violations,
+          retried,
+          meta: { hard_fail: true, first_pass_violations: firstPassViolations },
+        });
         throw new Error(`Metcon composer emitted illegal movements after retry: ${legality.join(" | ")}`);
       }
       console.warn(`[generate-program-v3] metcon variety violations persist (accepting): ${audit.violations.join(" | ")}`);
@@ -391,6 +405,17 @@ async function stageMetcons(
   if (audit.warnings.length) {
     console.log(`[generate-program-v3] metcon variety warnings: ${audit.warnings.join(" | ")}`);
   }
+  // Persist the outcome (findings-only: clean unretried months write nothing).
+  await logGenerationAudit(supa, {
+    user_id: job.user_id,
+    program_id: rs.continuation.programId ?? null,
+    month_number: rs.continuation.monthNumber,
+    stage: "metcons",
+    violations: audit.violations,
+    warnings: audit.warnings,
+    retried,
+    meta: retried ? { first_pass_violations: firstPassViolations } : {},
+  });
   console.log(`[generate-program-v3] composed ${output.metcons.length} metcons for ${slots.length} slots`);
   return {
     next: "fill_week_1",
@@ -724,11 +749,34 @@ async function stageSaving(
         console.warn(`[generate-program-v3] SOFT AUDIT FAIL [${failure.rule}]:`);
         for (const v of failure.violations) console.warn(`  - ${v}`);
       }
+      if (!alreadySaved) {
+        await logGenerationAudit(supa, {
+          user_id: userId,
+          program_id: programId,
+          month_number: monthNumber,
+          stage: "soft_audit",
+          warnings: formatAuditFailuresForLog(soft.failures),
+        });
+      }
     } else {
       console.log(`[generate-program-v3] soft audits: ${summarizeAuditRun(soft)}`);
     }
   } catch (softErr) {
     console.warn("[generate-program-v3] soft audit error (non-fatal):", softErr);
+  }
+
+  // Persist hard-audit residuals that surgical couldn't resolve (they already
+  // ride in result_json, but this table is where recurrence gets analyzed).
+  // Gated on !alreadySaved so idempotent re-runs don't double-log.
+  const residuals = rs.residualFailures ?? [];
+  if (!alreadySaved && residuals.length > 0) {
+    await logGenerationAudit(supa, {
+      user_id: userId,
+      program_id: programId,
+      month_number: monthNumber,
+      stage: "fill_residual",
+      violations: formatAuditFailuresForLog(residuals),
+    });
   }
 
   const elapsedMs = rs.startedAtMs ? Date.now() - rs.startedAtMs : null;
