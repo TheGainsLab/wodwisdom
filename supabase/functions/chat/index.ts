@@ -1,6 +1,16 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { MODELS } from "../_shared/model-profiles.ts";
 import { renderCoachStateForChat, type CoachState } from "../_shared/coach-state.ts";
+import {
+  type BlockEditContext,
+  buildBlockEditContext,
+  buildProposeBlockEditTool,
+  type DayBlockRef,
+  loadDayBlocks,
+  loadOwnedBlock,
+  validateBlockProposal,
+} from "../_shared/block-edit.ts";
+import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
 import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
 import { buildConditioningState } from "../_shared/conditioning-state.ts";
 import { buildActivityChatContext, fetchOutsideTraining } from "../_shared/athlete-activities.ts";
@@ -835,6 +845,14 @@ Deno.serve(async (req) => {
     let contextId: string | null = null;
     // context_id is a uuid — Engine day numbers go in context_day instead.
     let contextDay: number | null = null;
+    // ── The coach's hands (2026-08-12): in day-scoped programming chat, the
+    //    coach can PROPOSE a structured edit to one of today's blocks via the
+    //    propose_block_edit tool. Programming tiers only, and only when the
+    //    day has v3 structured blocks — Engine and general chat never mount
+    //    the tool, so those surfaces are structurally unable to edit.
+    let editTool: ReturnType<typeof buildProposeBlockEditTool> | null = null;
+    let editContext: BlockEditContext | null = null;
+    let editDayBlocks: DayBlockRef[] = [];
     if (workout_id) {
       const { data: workout } = await supa
         .from("program_workouts")
@@ -854,6 +872,26 @@ Deno.serve(async (req) => {
         }
         if (workoutText) {
           workoutContext = `\n\nTODAY'S TRAINING (Week ${workout.week_num}, Day ${workout.day_num}):\n${workoutText}`;
+        }
+        if (userTier === "ai_programming" || userTier === "all_access") {
+          try {
+            const [dayBlocks, ctx] = await Promise.all([
+              loadDayBlocks(supa, workout.id as string),
+              buildBlockEditContext(supa, user.id),
+            ]);
+            if (dayBlocks.length > 0) {
+              editDayBlocks = dayBlocks;
+              editContext = ctx;
+              editTool = buildProposeBlockEditTool(ctx.units, dayBlocks);
+              const blockLines = dayBlocks.map((b) =>
+                `  - ${b.id} · ${b.block_type}${b.block_label ? ` · ${b.block_label}` : ""}${b.block_scheme ? ` · ${b.block_scheme}` : ""}`
+              ).join("\n");
+              workoutContext += `\n\nTODAY'S BLOCKS (block_id references for propose_block_edit):\n${blockLines}` +
+                `\n\nATHLETE EDIT CONTEXT (constraints for any proposal):\n${JSON.stringify(ctx.promptContext)}`;
+            }
+          } catch (err) {
+            console.error("[chat] block-edit context failed (edits disabled this turn):", err);
+          }
         }
       }
     }
@@ -1171,7 +1209,9 @@ Deno.serve(async (req) => {
     }
 
     // Build conversation messages
-    const messages: { role: string; content: string }[] = [];
+    // content is a string for plain turns; an array of content blocks on the
+    // tool legs (assistant text+tool_use, user tool_result).
+    const messages: { role: string; content: unknown }[] = [];
     for (const m of (history || []).slice(-10)) {
       if (m.role === "user" || m.role === "assistant") {
         messages.push({ role: m.role, content: m.content });
@@ -1179,20 +1219,28 @@ Deno.serve(async (req) => {
     }
     messages.push({ role: "user", content: question });
 
-    // Call Claude with streaming
-    const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY!,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: MODELS.sonnet,
-        max_tokens: 1024,
-        temperature: 0.3,
-        stream: true,
-        system:
+    // ── Editing behavior addendum — only when the tool is mounted ──
+    const editPromptAddendum = editTool
+      ? "\n\nPROPOSING EDITS (propose_block_edit): You can propose a revision to ONE of today's blocks. The athlete sees a card with the change and Apply / Keep buttons — nothing changes unless they tap Apply.\n" +
+        "- Diagnose before prescribing: make sure you understand what the athlete actually needs (one clarifying question is often right) before proposing. Questions about the workout get answers, not proposals.\n" +
+        "- One proposal per message, targeting one block_id from TODAY'S BLOCKS. The block payload REPLACES that block entirely — include every movement the revised block should contain, loads in the athlete's units.\n" +
+        "- Preserve the day's purpose: keep the block's intent, time domain, and stimulus unless the athlete explicitly asks to change them. Honor the coaching plan — shrink primary work rather than delete it, and say why in the rationale.\n" +
+        "- The do_not_program list is ABSOLUTE: never propose a movement on it even when asked by name. Explain, offer the closest safe alternative, and note they can update their profile if the constraint no longer applies.\n" +
+        "- Cycle-level requests (\"more squatting this cycle\", \"add a training day\") are conversation, not edits — explain that consistent logging shapes the next cycle's evaluation.\n" +
+        "- If the athlete keeps reversing recent changes, pause and help them decide what they actually want instead of proposing again.\n" +
+        "- After a card is shown, conclude in one or two sentences; never restate the block's contents in text."
+      : "";
+
+    // Request body shared by every leg of the turn; `messages` grows when the
+    // coach proposes an edit (tool_use → tool_result → continuation leg).
+    const claudeBody: Record<string, unknown> = {
+      model: MODELS.sonnet,
+      // Proposals carry a full block as tool JSON — give the turn room.
+      max_tokens: editTool ? 2048 : 1024,
+      temperature: 0.3,
+      stream: true,
+      ...(editTool ? { tools: [editTool] } : {}),
+      system:
           // Base prompt (persona + mode focus)
           (workoutContext || engineCoachingMode
             ? WORKOUT_COACHING_PROMPT
@@ -1241,10 +1289,22 @@ Deno.serve(async (req) => {
           (programContext ? "\n\n" + programContext : "") +
           // Workout coaching context (specific day)
           workoutContext +
+          // Edit-proposal behavior (day-scoped programming chat only)
+          editPromptAddendum +
           // RAG-retrieved articles
           context,
-        messages,
-      }),
+      messages,
+    };
+
+    const ANTHROPIC_HEADERS = {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY!,
+      "anthropic-version": "2023-06-01",
+    };
+    const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: ANTHROPIC_HEADERS,
+      body: JSON.stringify(claudeBody),
     });
 
     if (!claudeResp.ok) {
@@ -1265,8 +1325,83 @@ Deno.serve(async (req) => {
 
     const userId = user.id;
 
-    // Stream SSE back to the client
+    // Stream SSE back to the client. One TURN may span multiple model LEGS:
+    // when the coach proposes an edit (tool_use), we validate it server-side,
+    // emit a `proposal` event to the client, answer the tool, and let the
+    // model finish its message on a fresh streamed leg.
     const encoder = new TextEncoder();
+
+    type LegBlock =
+      | { type: "text"; text: string }
+      | { type: "tool_use"; id: string; name: string; input: unknown; parse_failed: boolean };
+
+    /** Read one streamed model response: forward text deltas to the client,
+     *  accumulate content blocks (text + tool JSON) for the next leg. */
+    const readLeg = async (resp: Response, controller: ReadableStreamDefaultController) => {
+      const reader = resp.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let stopReason: string | null = null;
+      let legInput = 0;
+      let legOutput = 0;
+      const raw: Array<{ kind: "text"; text: string } | { kind: "tool"; id: string; name: string; json: string }> = [];
+      const byIndex = new Map<number, number>();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") continue;
+          try {
+            const event = JSON.parse(data);
+            if (event.type === "message_start" && event.message?.usage) {
+              legInput = event.message.usage.input_tokens || 0;
+            }
+            if (event.type === "content_block_start" && typeof event.index === "number") {
+              const cb = event.content_block;
+              byIndex.set(event.index, raw.length);
+              if (cb?.type === "tool_use") raw.push({ kind: "tool", id: cb.id, name: cb.name, json: "" });
+              else raw.push({ kind: "text", text: "" });
+            }
+            if (event.type === "content_block_delta" && typeof event.index === "number") {
+              const pos = byIndex.get(event.index);
+              const blk = pos != null ? raw[pos] : undefined;
+              if (event.delta?.type === "input_json_delta" && blk?.kind === "tool") {
+                blk.json += event.delta.partial_json || "";
+              } else if (event.delta?.text) {
+                if (blk?.kind === "text") blk.text += event.delta.text;
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({ type: "delta", text: event.delta.text })}\n\n`)
+                );
+              }
+            }
+            if (event.type === "message_delta") {
+              if (event.usage) legOutput = event.usage.output_tokens || 0;
+              if (event.delta?.stop_reason) stopReason = event.delta.stop_reason;
+            }
+          } catch {
+            // Skip unparseable lines
+          }
+        }
+      }
+      const content: LegBlock[] = raw.map((b) => {
+        if (b.kind === "text") return { type: "text", text: b.text };
+        let input: unknown = {};
+        let parse_failed = false;
+        try {
+          input = b.json ? JSON.parse(b.json) : {};
+        } catch {
+          parse_failed = true;
+        }
+        return { type: "tool_use", id: b.id, name: b.name, input, parse_failed };
+      });
+      return { stopReason, content, legInput, legOutput };
+    };
+
     const stream = new ReadableStream({
       async start(controller) {
         // Send sources as the first event so the frontend has them ready
@@ -1278,44 +1413,124 @@ Deno.serve(async (req) => {
         let inputTokens = 0;
         let outputTokens = 0;
 
-        const reader = claudeResp.body!.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
         try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+          let resp = claudeResp;
+          let invalidBounces = 0;
+          let proposalsEmitted = 0;
+          const MAX_LEGS = 4;
+          for (let leg = 1; leg <= MAX_LEGS; leg++) {
+            const result = await readLeg(resp, controller);
+            inputTokens += result.legInput;
+            outputTokens += result.legOutput;
+            const legText = result.content
+              .filter((c): c is Extract<LegBlock, { type: "text" }> => c.type === "text")
+              .map((c) => c.text)
+              .join("");
+            if (legText.trim()) fullAnswer += (fullAnswer ? "\n\n" : "") + legText;
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
+            const toolUses = result.content
+              .filter((c): c is Extract<LegBlock, { type: "tool_use" }> => c.type === "tool_use");
+            if (result.stopReason !== "tool_use" || toolUses.length === 0 || !editTool || !editContext || leg === MAX_LEGS) {
+              break;
+            }
 
-            for (const line of lines) {
-              if (!line.startsWith("data: ")) continue;
-              const data = line.slice(6).trim();
-              if (data === "[DONE]") continue;
-
-              try {
-                const event = JSON.parse(data);
-
-                if (event.type === "content_block_delta" && event.delta?.text) {
-                  fullAnswer += event.delta.text;
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ type: "delta", text: event.delta.text })}\n\n`)
-                  );
-                }
-
-                if (event.type === "message_delta" && event.usage) {
-                  outputTokens = event.usage.output_tokens || 0;
-                }
-
-                if (event.type === "message_start" && event.message?.usage) {
-                  inputTokens = event.message.usage.input_tokens || 0;
-                }
-              } catch {
-                // Skip unparseable lines
+            // Answer every tool call; at most ONE becomes a proposal card.
+            const toolResults: Array<Record<string, unknown>> = [];
+            for (const tu of toolUses) {
+              const answer = (content: string, isError = false) =>
+                toolResults.push({
+                  type: "tool_result",
+                  tool_use_id: tu.id,
+                  content,
+                  ...(isError ? { is_error: true } : {}),
+                });
+              if (tu.name !== "propose_block_edit" || tu.parse_failed) {
+                answer("Unrecognized or malformed tool call.", true);
+                continue;
               }
+              if (proposalsEmitted > 0) {
+                answer("One proposal per message — the athlete already has a card. Wrap up in text.", true);
+                continue;
+              }
+              const input = tu.input as { block_id?: string; rationale?: string; block?: BlockPrescription };
+              const blockRef = editDayBlocks.find((b) => b.id === input.block_id);
+              if (!blockRef || !input.block) {
+                answer("block_id must be one of TODAY'S BLOCKS and block is required.", true);
+                continue;
+              }
+              const problems = validateBlockProposal(input.block, {
+                doNotProgram: editContext.doNotProgram,
+                vocabulary: editContext.vocabulary,
+              });
+              if (problems.length > 0) {
+                invalidBounces++;
+                answer(
+                  invalidBounces > 1
+                    ? `Still invalid: ${problems.join(" ")} Do NOT propose again this turn — explain to the athlete in text instead.`
+                    : `Proposal rejected: ${problems.join(" ")} Fix and re-propose, or explain instead.`,
+                  true,
+                );
+                continue;
+              }
+              const owned = await loadOwnedBlock(supa, blockRef.id, userId);
+              if (!owned) {
+                answer("That block no longer exists — do not propose against it.", true);
+                continue;
+              }
+              const { data: logRow, error: logErr } = await supa
+                .from("ai_edit_log")
+                .insert({
+                  user_id: userId,
+                  block_id: blockRef.id,
+                  request: question.slice(0, 2000),
+                  original: owned.original,
+                  proposal: input.block,
+                  outcome: null,
+                })
+                .select("id")
+                .single();
+              if (logErr || !logRow) {
+                console.error("[chat] ai_edit_log insert failed:", logErr?.message);
+                answer("Could not record the proposal — explain the change in text instead.", true);
+                continue;
+              }
+              proposalsEmitted++;
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({
+                  type: "proposal",
+                  ai_edit_log_id: logRow.id,
+                  block_id: blockRef.id,
+                  block_type: input.block.block_type,
+                  rationale: input.rationale ?? "",
+                  original: owned.original,
+                  proposal: input.block,
+                })}\n\n`)
+              );
+              answer("The proposal card is now on the athlete's screen with Apply / Keep buttons. Conclude in one or two sentences — do not restate the block's contents.");
+            }
+
+            // Continue the turn: assistant leg (text + tool_use) + tool results.
+            messages.push({
+              role: "assistant",
+              content: result.content
+                .filter((c) => c.type === "tool_use" || (c.type === "text" && c.text.trim().length > 0))
+                .map((c) =>
+                  c.type === "text"
+                    ? { type: "text", text: c.text }
+                    : { type: "tool_use", id: c.id, name: c.name, input: c.input }
+                ),
+            });
+            messages.push({ role: "user", content: toolResults });
+            claudeBody.messages = messages;
+            resp = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: ANTHROPIC_HEADERS,
+              body: JSON.stringify(claudeBody),
+            });
+            if (!resp.ok) {
+              const errBody = await resp.text().catch(() => "");
+              console.error(`[chat] continuation leg ${leg + 1} failed: ${resp.status} ${errBody.slice(0, 300)}`);
+              break;
             }
           }
 

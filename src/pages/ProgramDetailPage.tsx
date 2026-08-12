@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, ADJUST_WORKOUT_ENDPOINT, getAuthHeaders } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { useMovementVocab, matchMovements } from '../lib/movementVocab';
 import { GainsName } from '../components/GainsLogo';
@@ -193,7 +193,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [workoutBlocks, setWorkoutBlocks] = useState<Map<string, ProgramBlock[]>>(new Map());
   // v3-only: structured blocks + movements per program_workout_id.
   const [v3BlocksByWorkout, setV3BlocksByWorkout] = useState<Map<string, ProgramBlockV2[]>>(new Map());
-  const [aiEditedBlockIds, setAiEditedBlockIds] = useState<Set<string>>(new Set());
   // workoutId → { id, scheduled_date } for days the user has put on the calendar.
   const [scheduleByWorkout, setScheduleByWorkout] = useState<Map<string, { id: string; scheduled_date: string }>>(new Map());
   const [scheduleError, setScheduleError] = useState<string | null>(null);
@@ -306,96 +305,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       }
       return next;
     });
-  }, []);
-
-  // AI Edit — propose (edge fn), then accept (apply) or refuse. One shot per
-  // block: the ai_edit_log row written on propose IS the lock.
-  const proposeAiEdit = useCallback(async (blockId: string, request: string): Promise<{
-    proposal: BlockProposal; original: BlockProposal; ai_edit_log_id: string;
-  }> => {
-    const resp = await fetch(ADJUST_WORKOUT_ENDPOINT, {
-      method: 'POST',
-      headers: await getAuthHeaders(),
-      body: JSON.stringify({ block_id: blockId, request }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data?.error || `AI Edit failed (${resp.status})`);
-    return data;
-  }, []);
-
-  const applyAiProposal = useCallback(async (blockId: string, proposal: BlockProposal, aiLogId: string) => {
-    const { error: bErr } = await supabase.from('program_blocks_v2').update({
-      block_type: proposal.block_type,
-      block_label: proposal.block_label ?? null,
-      block_scheme: proposal.block_scheme ?? null,
-      time_cap_seconds: proposal.time_cap_seconds ?? null,
-      block_notes: proposal.block_notes ?? null,
-      cardio_modality: proposal.cardio_modality ?? null,
-    }).eq('id', blockId);
-    if (bErr) throw bErr;
-
-    await supabase.from('program_movements_v2').delete().eq('block_id', blockId);
-    const inserts = proposal.movements.map((m, i) => {
-      const { reps, rep_scheme } = reconcileReps(m.reps, m.rep_scheme);
-      return {
-        block_id: blockId,
-        movement: m.movement,
-        sets: m.sets ?? null,
-        reps, rep_scheme,
-        weight: m.weight ?? null,
-        weight_unit: m.weight_unit ?? null,
-        rpe: m.rpe ?? null,
-        time_seconds: m.time_seconds ?? null,
-        distance: m.distance ?? null,
-        distance_unit: m.distance_unit ?? null,
-        calories: m.calories ?? null,
-        cardio_modality: m.cardio_modality ?? null,
-        scaling_note: m.scaling_note ?? null,
-        target_pct_1rm: m.target_pct_1rm ?? null,
-        sort_order: i,
-      };
-    });
-    let insertedRows: ProgramMovementV2[] = [];
-    if (inserts.length) {
-      const { data, error: insErr } = await supabase
-        .from('program_movements_v2')
-        .insert(inserts)
-        .select('id, block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order');
-      if (insErr) throw insErr;
-      insertedRows = (data ?? []) as ProgramMovementV2[];
-    }
-
-    await supabase.from('ai_edit_log')
-      .update({ outcome: 'accepted', resolved_at: new Date().toISOString() })
-      .eq('id', aiLogId);
-
-    setV3BlocksByWorkout(prev => {
-      const next = new Map(prev);
-      for (const [wid, blocks] of next) {
-        const idx = blocks.findIndex(b => b.id === blockId);
-        if (idx >= 0) {
-          const updated: ProgramBlockV2 = {
-            ...blocks[idx],
-            block_type: proposal.block_type,
-            block_label: proposal.block_label ?? null,
-            block_scheme: proposal.block_scheme ?? null,
-            time_cap_seconds: proposal.time_cap_seconds ?? null,
-            block_notes: proposal.block_notes ?? null,
-            movements: insertedRows,
-          };
-          next.set(wid, blocks.map((b, i2) => i2 === idx ? updated : b));
-        }
-      }
-      return next;
-    });
-    setAiEditedBlockIds(prev => new Set(prev).add(blockId));
-  }, []);
-
-  const refuseAiProposal = useCallback(async (blockId: string, aiLogId: string) => {
-    await supabase.from('ai_edit_log')
-      .update({ outcome: 'refused', resolved_at: new Date().toISOString() })
-      .eq('id', aiLogId);
-    setAiEditedBlockIds(prev => new Set(prev).add(blockId));
   }, []);
 
   // Calendar: assign / reschedule a program day to a date. One program day per
@@ -564,7 +473,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
 
     // ── Wave B/C: everything keyed by block id (from A) or by log id ───
     // (from A). B and C depend on A but not on each other, so they overlap.
-    const [movements, editLocks, savedRows, totalRows] = await Promise.all([
+    const [movements, savedRows, totalRows] = await Promise.all([
       fetchInBatches<ProgramMovementV2>(
         blockIds,
         (batch) => supabase
@@ -572,11 +481,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
           .select('id, block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order')
           .in('block_id', batch)
           .order('sort_order'),
-      ),
-      // Which blocks have already used their one AI Edit (lock).
-      fetchInBatches<{ block_id: string }>(
-        blockIds,
-        (batch) => supabase.from('ai_edit_log').select('block_id').in('block_id', batch),
       ),
       // Saved-block and total-block tallies for the in-progress badges. These
       // were two `count` queries per in-progress workout, awaited inside the
@@ -620,7 +524,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
         blocksByWorkout.set(b.program_workout_id, arr);
       }
       setV3BlocksByWorkout(blocksByWorkout);
-      setAiEditedBlockIds(new Set(editLocks.map((l) => l.block_id)));
     }
 
     const savedByLog = new Map<string, number>();
@@ -954,10 +857,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                                         onUpdateBlock={updateBlockField}
                                         onAddMovement={addMovementToBlock}
                                         onRemoveMovement={removeMovementFromBlock}
-                                        aiEditedBlockIds={aiEditedBlockIds}
-                                        onProposeAiEdit={proposeAiEdit}
-                                        onApplyAiProposal={applyAiProposal}
-                                        onRefuseAiProposal={refuseAiProposal}
                                       />
                                     ) : workoutBlocks.has(w.id) && workoutBlocks.get(w.id)!.length > 0 ? (
                                       <div className="workout-blocks">
@@ -1164,14 +1063,7 @@ export function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
 // scaling notes inline in dim text.
 // ============================================================
 
-interface AiEditHandlers {
-  aiEditedBlockIds?: Set<string>;
-  onProposeAiEdit?: (blockId: string, request: string) => Promise<{ proposal: BlockProposal; original: BlockProposal; ai_edit_log_id: string }>;
-  onApplyAiProposal?: (blockId: string, proposal: BlockProposal, aiLogId: string) => Promise<void>;
-  onRefuseAiProposal?: (blockId: string, aiLogId: string) => Promise<void>;
-}
-
-interface V3DayViewProps extends AiEditHandlers {
+interface V3DayViewProps {
   blocks: ProgramBlockV2[];
   onUpdateMovement?: (movementId: string, patch: Partial<ProgramMovementV2>) => Promise<void>;
   onUpdateBlock?: (blockId: string, patch: Partial<ProgramBlockV2>) => Promise<void>;
@@ -1377,7 +1269,7 @@ export function V3DayView({ blocks, sourceId, workoutText, logging, onUpdateMove
   );
 }
 
-function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, onRemoveMovement, aiEditedBlockIds, onProposeAiEdit, onApplyAiProposal, onRefuseAiProposal, canCoach, coaching, coachingLoading, coachingError, onEnsureCoaching, logging }: AiEditHandlers & {
+function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, onRemoveMovement, canCoach, coaching, coachingLoading, coachingError, onEnsureCoaching, logging }: {
   block: ProgramBlockV2;
   onUpdateMovement?: (movementId: string, patch: Partial<ProgramMovementV2>) => Promise<void>;
   onUpdateBlock?: (blockId: string, patch: Partial<ProgramBlockV2>) => Promise<void>;
@@ -1426,9 +1318,6 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
     try { await onUpdateBlock(block.id, { block_scheme: next }); }
     catch { setScheme(block.block_scheme ?? ''); }
   };
-  const aiEditAllowedType = !NON_EDITABLE_TYPES.includes(block.block_type);
-  const canAiEdit = !!onProposeAiEdit && !!onApplyAiProposal && !!onRefuseAiProposal && aiEditAllowedType;
-  const locked = aiEditedBlockIds?.has(block.id) ?? false;
   // Inline coaching disclosure (skills/strength/metcon). Collapsed by default;
   // opening it lazily generates the day's review.
   const showCoach = !!canCoach && COACHABLE_BLOCK_TYPES.includes(block.block_type);
@@ -1438,54 +1327,13 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
   const [coachOpen, setCoachOpen] = useState(false);
   const toggleCoach = () => { const n = !coachOpen; setCoachOpen(n); if (n) onEnsureCoaching?.(); };
 
-  // AI Edit state machine (one-shot per block).
-  const [aiState, setAiState] = useState<'idle' | 'input' | 'loading' | 'review'>('idle');
-  const [aiRequest, setAiRequest] = useState('');
-  const [aiProposal, setAiProposal] = useState<BlockProposal | null>(null);
-  const [aiLogId, setAiLogId] = useState<string | null>(null);
-  const [aiError, setAiError] = useState<string | null>(null);
-
-  const runPropose = async () => {
-    if (!aiRequest.trim() || !onProposeAiEdit) return;
-    setAiState('loading');
-    setAiError(null);
-    try {
-      const { proposal, ai_edit_log_id } = await onProposeAiEdit(block.id, aiRequest.trim());
-      setAiProposal(proposal);
-      setAiLogId(ai_edit_log_id);
-      setAiState('review');
-    } catch (err) {
-      setAiError((err as Error).message || 'AI Edit failed');
-      setAiState('input');
-    }
-  };
-
-  const acceptProposal = async () => {
-    if (!aiProposal || !aiLogId || !onApplyAiProposal) return;
-    setAiState('loading');
-    try {
-      await onApplyAiProposal(block.id, aiProposal, aiLogId);
-      setAiState('idle');
-    } catch (err) {
-      setAiError((err as Error).message || 'Failed to apply');
-      setAiState('review');
-    }
-  };
-
-  const refuseProposal = async () => {
-    if (!aiLogId || !onRefuseAiProposal) return;
-    try { await onRefuseAiProposal(block.id, aiLogId); } catch { /* lock applies regardless */ }
-    setAiState('idle');
-    setAiProposal(null);
-  };
-
   return (
     <div className="workout-block" data-block={block.block_type}>
       <div style={isLogged ? { opacity: 0.5, transition: 'opacity 0.15s' } : undefined}>
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <span className="workout-block-label" data-block={block.block_type}>{displayLabel}</span>
         {block.block_label && <span style={labelStyle}>{block.block_label}</span>}
-        {(canEdit || canAiEdit) && (
+        {canEdit && (
           <span style={{ display: 'inline-flex', gap: 6, marginLeft: 'auto' }}>
             {canEdit && (
               <button
@@ -1506,21 +1354,6 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
                   </>
                 )}
               </button>
-            )}
-            {canAiEdit && !editing && (
-              locked ? (
-                <span className="block-ai-edited-tag" title="AI Edit has been used on this block">AI edited</span>
-              ) : (
-                <button
-                  type="button"
-                  className="block-ai-edit-toggle"
-                  onClick={() => { setAiState(s => s === 'idle' ? 'input' : 'idle'); setAiError(null); }}
-                  disabled={aiState === 'loading'}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3z" /></svg>
-                  AI Edit
-                </button>
-              )
             )}
             {showCoach && (
               <button
@@ -1569,20 +1402,6 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
 
       {logging && !editing && <BlockLog block={block} controller={logging} coaching={coaching ?? null} onEnsureCoaching={onEnsureCoaching} />}
 
-      {canAiEdit && !locked && aiState !== 'idle' && (
-        <V3AiEditPanel
-          state={aiState}
-          request={aiRequest}
-          setRequest={setAiRequest}
-          proposal={aiProposal}
-          error={aiError}
-          onSubmit={runPropose}
-          onAccept={acceptProposal}
-          onRefuse={refuseProposal}
-          onCancel={() => { setAiState('idle'); setAiError(null); setAiRequest(''); }}
-        />
-      )}
-
       {showCoach && coachOpen && (
         <div className="block-coach-body" style={{ marginTop: 10 }}>
           {coaching ? (
@@ -1601,7 +1420,7 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
 }
 
 /** Render a movement (live row or proposal) as a single readable line. */
-function movementToLine(m: BlockProposalMovement): string {
+export function movementToLine(m: BlockProposalMovement): string {
   const parts: string[] = [];
   const hasDistance = m.distance != null;
   if (!hasDistance) {
@@ -1621,57 +1440,6 @@ function movementToLine(m: BlockProposalMovement): string {
   const presc = parts.join(' · ');
   const scaling = m.scaling_note ? ` — ${m.scaling_note}` : '';
   return `${m.movement}${presc ? `  ${presc}` : ''}${scaling}`;
-}
-
-function V3AiEditPanel({ state, request, setRequest, proposal, error, onSubmit, onAccept, onRefuse, onCancel }: {
-  state: 'input' | 'loading' | 'review';
-  request: string;
-  setRequest: (v: string) => void;
-  proposal: BlockProposal | null;
-  error: string | null;
-  onSubmit: () => void;
-  onAccept: () => void;
-  onRefuse: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="ai-block-edit-panel">
-      {state !== 'review' && (
-        <div className="ai-block-edit-input-row">
-          <input
-            type="text"
-            className="ai-block-edit-input"
-            value={request}
-            onChange={e => setRequest(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && request.trim() && state !== 'loading') onSubmit(); }}
-            placeholder="What do you need to change? e.g. lighter, no barbell, add a third round"
-            disabled={state === 'loading'}
-            autoFocus
-          />
-          <button type="button" className="ai-block-edit-go" onClick={onSubmit} disabled={state === 'loading' || !request.trim()}>
-            {state === 'loading' ? 'Thinking…' : 'Ask AI'}
-          </button>
-          <button type="button" className="ai-block-edit-cancel" onClick={onCancel} disabled={state === 'loading'}>Cancel</button>
-        </div>
-      )}
-      {error && <div className="ai-block-edit-error">{error}</div>}
-      {state === 'review' && proposal && (
-        <div className="ai-block-edit-review">
-          <div className="ai-block-edit-note">One AI Edit per block — accept or refuse. For more, use Coach.</div>
-          <div className="ai-block-edit-proposal">
-            {(proposal.block_scheme) && <div className="ai-block-edit-scheme">{proposal.block_scheme}</div>}
-            {proposal.movements.map((m, i) => (
-              <div key={i} className="ai-block-edit-mvline">{movementToLine(m)}</div>
-            ))}
-          </div>
-          <div className="ai-block-edit-actions">
-            <button type="button" className="ai-block-edit-accept" onClick={onAccept}>Accept</button>
-            <button type="button" className="ai-block-edit-refuse" onClick={onRefuse}>Refuse</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 }
 
 function V3MovementRow({ movement }: { movement: ProgramMovementV2 }) {
