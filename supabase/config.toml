@@ -148,9 +148,6 @@ verify_jwt = false
 [functions.adjust-workout]
 verify_jwt = false
 
-[functions.training-analysis]
-verify_jwt = false
-
 [functions.nutrition-analysis]
 verify_jwt = false
 

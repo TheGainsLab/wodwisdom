@@ -493,7 +493,22 @@ export function buildCoachStateDocumentBlock(coachState: CoachStateContent): str
  *  is the athlete's adjustment lever, so it must see the coach's decisions and
  *  their reasons — without the full document's token weight. Deliberately
  *  omits summary/month_in_review (the athlete reads those in the evals UI). */
-export function renderCoachStateForChat(cs: CoachStateContent): string {
+/**
+ * Compact letter render for the AI Coach chat prompt.
+ *
+ * The letter's JUDGMENT (priorities, gaps, recovery stance, conditioning
+ * intent) is universal — any paid athlete who completed an evaluation has a
+ * letter and the chat should hold it (2026-08-12 ruling: one coach, the eval
+ * is free, the chat must not answer blind to it). The ADJUSTMENT RULES
+ * paragraph is the letter's LEVER — it instructs the coach to rework
+ * programmed sessions, which only exists as a feature on programming tiers.
+ * `includeAdjustmentRules: false` serves the judgment without promising the
+ * lever (engine / coach_standalone tiers).
+ */
+export function renderCoachStateForChat(
+  cs: CoachStateContent,
+  opts: { includeAdjustmentRules?: boolean } = {},
+): string {
   const lines: string[] = [
     "\n\nTHE ATHLETE'S CURRENT COACHING PLAN (their coach's decisions for this cycle — you are part of the same coaching staff; work WITHIN this plan):",
     `Headline: ${cs.headline}`,
@@ -512,9 +527,15 @@ export function renderCoachStateForChat(cs: CoachStateContent): string {
   if (cs.metcon_guidance?.trim()) {
     lines.push(`Conditioning intent: ${cs.metcon_guidance.trim()}`);
   }
-  lines.push(
-    "ADJUSTMENT RULES: when the athlete asks to trim, shorten, substitute, or rework a session, preserve the day's PURPOSE — each metcon's block notes state its intended stimulus; keep that stimulus and the plan's priorities intact while you trim volume or swap equivalent movements. Never remove a day's primary work, never add a movement their profile bans, and never re-litigate the coach's priorities or deprioritizations — explain them instead, in the plan's own reasoning.",
-  );
+  if (opts.includeAdjustmentRules ?? true) {
+    lines.push(
+      "ADJUSTMENT RULES: when the athlete asks to trim, shorten, substitute, or rework a session, preserve the day's PURPOSE — each metcon's block notes state its intended stimulus; keep that stimulus and the plan's priorities intact while you trim volume or swap equivalent movements. Never remove a day's primary work, never add a movement their profile bans, and never re-litigate the coach's priorities or deprioritizations — explain them instead, in the plan's own reasoning.",
+    );
+  } else {
+    lines.push(
+      "This plan comes from the athlete's evaluation — ground your coaching in it (their gaps, priorities, and recovery stance) and don't contradict or re-litigate it; explain it in its own reasoning. They do not have an AI-generated program, so never promise program adjustments.",
+    );
+  }
   return lines.join("\n");
 }
 

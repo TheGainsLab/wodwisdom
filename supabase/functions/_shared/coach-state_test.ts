@@ -16,6 +16,7 @@ import {
   evaluationFromCoachState,
   FOCUS_AREAS,
   REASON_CODES,
+  renderCoachStateForChat,
 } from "./coach-state.ts";
 import { NORMATIVE_KEYS } from "./athlete-model.ts";
 
@@ -61,6 +62,23 @@ function sampleCoachState(): CoachStateContent {
     strength_emphasis: { value: "technical", confidence: "high", reasons: ["oly_imbalance"] },
   };
 }
+
+// ============================================================
+// Chat render: judgment for every paid tier, lever only for programming
+// ============================================================
+
+Deno.test("chat render includes adjustment rules by default (programming tiers)", () => {
+  const text = renderCoachStateForChat(sampleCoachState());
+  assert(text.includes("ADJUSTMENT RULES"));
+  assert(text.includes("Priorities (ranked)"));
+});
+
+Deno.test("chat render without the lever keeps the judgment, drops the program promises", () => {
+  const text = renderCoachStateForChat(sampleCoachState(), { includeAdjustmentRules: false });
+  assert(!text.includes("ADJUSTMENT RULES"));
+  assert(text.includes("Priorities (ranked)"));
+  assert(text.includes("never promise program adjustments"));
+});
 
 // ============================================================
 // Deterministic projection → EvaluationOutput
@@ -115,7 +133,7 @@ Deno.test("no duplicate enum members", () => {
 
 Deno.test("locked vocabulary counts (guards accidental edits)", () => {
   assertEquals(FOCUS_AREAS.length, 11);
-  assertEquals(REASON_CODES.length, 23); // +3 observed signals (Step 4)
+  assertEquals(REASON_CODES.length, 21); // v1.8: observed_progress/observed_plateau retired with the inference layer
   assertEquals(NORMATIVE_KEYS.length, 12);
 });
 

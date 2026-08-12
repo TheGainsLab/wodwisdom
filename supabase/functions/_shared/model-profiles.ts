@@ -17,7 +17,7 @@
  * MODELS.* / resolveModelProfile() (call-claude and its callers, the generation
  * _shared modules, and the ~16 functions that called the Anthropic API directly:
  * chat, generate-program(-v2), nutrition-*, chat-nudge-classify, analyze-workout,
- * adjust-workout, summarize, training-analysis, incorporate-movements,
+ * adjust-workout, summarize, incorporate-movements,
  * preprocess-program, parse-injuries-constraints, _shared/extract-movements-ai,
  * _shared/generate-notices-ai). A model retirement is a config change: set the
  * MODEL_SONNET / MODEL_HAIKU / MODEL_OPUS secret and redeploy. Verify no literals
