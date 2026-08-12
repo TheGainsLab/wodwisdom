@@ -907,7 +907,9 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (csRow?.coach_state) {
           coachLetterContext = renderCoachStateForChat(csRow.coach_state as CoachState, {
-            includeAdjustmentRules: userTier === "ai_programming" || userTier === "all_access",
+            closing: (userTier === "ai_programming" || userTier === "all_access")
+              ? "adjustment-rules"
+              : "no-program",
           });
         }
       } catch (err) {

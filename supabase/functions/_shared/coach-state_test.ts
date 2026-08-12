@@ -73,11 +73,18 @@ Deno.test("chat render includes adjustment rules by default (programming tiers)"
   assert(text.includes("Priorities (ranked)"));
 });
 
-Deno.test("chat render without the lever keeps the judgment, drops the program promises", () => {
-  const text = renderCoachStateForChat(sampleCoachState(), { includeAdjustmentRules: false });
+Deno.test("no-program closing keeps the judgment, drops the program promises", () => {
+  const text = renderCoachStateForChat(sampleCoachState(), { closing: "no-program" });
   assert(!text.includes("ADJUSTMENT RULES"));
   assert(text.includes("Priorities (ranked)"));
   assert(text.includes("never promise program adjustments"));
+});
+
+Deno.test("plan-grounding closing (workout review): connect, never negotiate", () => {
+  const text = renderCoachStateForChat(sampleCoachState(), { closing: "plan-grounding" });
+  assert(!text.includes("ADJUSTMENT RULES"));
+  assert(text.includes("Priorities (ranked)"));
+  assert(text.includes("never propose changing the programmed session"));
 });
 
 // ============================================================

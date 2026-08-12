@@ -494,20 +494,26 @@ export function buildCoachStateDocumentBlock(coachState: CoachStateContent): str
  *  their reasons — without the full document's token weight. Deliberately
  *  omits summary/month_in_review (the athlete reads those in the evals UI). */
 /**
- * Compact letter render for the AI Coach chat prompt.
+ * Compact letter render for AI-facing surfaces (chat, workout review).
  *
  * The letter's JUDGMENT (priorities, gaps, recovery stance, conditioning
  * intent) is universal — any paid athlete who completed an evaluation has a
- * letter and the chat should hold it (2026-08-12 ruling: one coach, the eval
- * is free, the chat must not answer blind to it). The ADJUSTMENT RULES
- * paragraph is the letter's LEVER — it instructs the coach to rework
- * programmed sessions, which only exists as a feature on programming tiers.
- * `includeAdjustmentRules: false` serves the judgment without promising the
- * lever (engine / coach_standalone tiers).
+ * letter and the coach should hold it (2026-08-12 ruling: one coach, the eval
+ * is free, no surface answers blind to it). What varies per surface is the
+ * CLOSING — what the reader is licensed to do with the plan:
+ *
+ *   - "adjustment-rules" (default): the chat's lever for programming tiers —
+ *     the conversation is where the athlete officially reworks sessions.
+ *   - "no-program": chat for engine/standalone tiers — same judgment, but no
+ *     AI program exists, so the coach must never promise program adjustments.
+ *   - "plan-grounding": the workout-review pipeline — the review describes a
+ *     programmed day; it grounds advice in the cycle but never negotiates it.
  */
+export type CoachStateRenderClosing = "adjustment-rules" | "no-program" | "plan-grounding";
+
 export function renderCoachStateForChat(
   cs: CoachStateContent,
-  opts: { includeAdjustmentRules?: boolean } = {},
+  opts: { closing?: CoachStateRenderClosing } = {},
 ): string {
   const lines: string[] = [
     "\n\nTHE ATHLETE'S CURRENT COACHING PLAN (their coach's decisions for this cycle — you are part of the same coaching staff; work WITHIN this plan):",
@@ -527,13 +533,18 @@ export function renderCoachStateForChat(
   if (cs.metcon_guidance?.trim()) {
     lines.push(`Conditioning intent: ${cs.metcon_guidance.trim()}`);
   }
-  if (opts.includeAdjustmentRules ?? true) {
+  const closing = opts.closing ?? "adjustment-rules";
+  if (closing === "adjustment-rules") {
     lines.push(
       "ADJUSTMENT RULES: when the athlete asks to trim, shorten, substitute, or rework a session, preserve the day's PURPOSE — each metcon's block notes state its intended stimulus; keep that stimulus and the plan's priorities intact while you trim volume or swap equivalent movements. Never remove a day's primary work, never add a movement their profile bans, and never re-litigate the coach's priorities or deprioritizations — explain them instead, in the plan's own reasoning.",
     );
-  } else {
+  } else if (closing === "no-program") {
     lines.push(
       "This plan comes from the athlete's evaluation — ground your coaching in it (their gaps, priorities, and recovery stance) and don't contradict or re-litigate it; explain it in its own reasoning. They do not have an AI-generated program, so never promise program adjustments.",
+    );
+  } else {
+    lines.push(
+      "Use this plan to connect today's coaching to the cycle — when a block serves a ranked priority, say so in the plan's own reasoning. Never contradict or re-litigate the coach's decisions, and never propose changing the programmed session here.",
     );
   }
   return lines.join("\n");

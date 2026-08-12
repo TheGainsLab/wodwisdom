@@ -4,6 +4,7 @@ import { buildConditioningState } from "../_shared/conditioning-state.ts";
 import { searchChunks, deduplicateChunks, formatChunksAsContext } from "../_shared/rag.ts";
 import { callClaude } from "../_shared/call-claude.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { renderCoachStateForChat, type CoachState } from "../_shared/coach-state.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -75,7 +76,7 @@ Rules:
 - Use recent training to note fatigue or progression context.
 - Be concise and practical. Athlete-focused voice.`;
 
-const METCON_PROMPT = `You are an expert CrossFit coach preparing an athlete for a conditioning workout. Focus ONLY on the Metcon / Conditioning portion of the workout below. Ignore strength, skills, warm-up, and cool-down blocks.
+const METCON_PROMPT = `You are an expert CrossFit coach preparing an athlete for a conditioning workout. Coach ONLY the Metcon / Conditioning portion of the workout below. The day's other blocks may appear as FULL DAY context — factor their fatigue and interference (shared muscle groups, grip, spine load, sequencing) into your advice, but never coach or restate them.
 
 Output valid JSON only, no markdown or extra text:
 {
@@ -97,7 +98,7 @@ Rules:
 - Use recent training to account for fatigue or similar recent volume.
 - Be concise and practical. Athlete-focused voice.`;
 
-const STRENGTH_PROMPT = `You are an expert strength & conditioning coach preparing an athlete for their strength work. Focus ONLY on the Strength portion of the workout below. Ignore metcon, skills, warm-up, and cool-down blocks.
+const STRENGTH_PROMPT = `You are an expert strength & conditioning coach preparing an athlete for their strength work. Coach ONLY the Strength portion of the workout below. The day's other blocks may appear as FULL DAY context — factor their fatigue and interference (shared muscle groups, grip, spine load, sequencing) into your advice, but never coach or restate them.
 
 Output valid JSON only, no markdown or extra text:
 {
@@ -119,7 +120,7 @@ Rules:
 - Use recent training to account for fatigue or similar recent volume.
 - Be concise and practical. Athlete-focused voice.`;
 
-const SKILLS_PROMPT = `You are an expert gymnastics and skills coach preparing an athlete for their skill work. Focus ONLY on the Skills portion of the workout below. Ignore metcon, strength, warm-up, and cool-down blocks.
+const SKILLS_PROMPT = `You are an expert gymnastics and skills coach preparing an athlete for their skill work. Coach ONLY the Skills portion of the workout below. The day's other blocks may appear as FULL DAY context — factor their fatigue and interference (CNS freshness, shared muscle groups, what follows this block) into your advice, but never coach or restate them.
 
 Output valid JSON only, no markdown or extra text:
 {
@@ -147,9 +148,11 @@ const COACH_OUTPUT_RULES = `
 
 OUTPUT RULES (these OVERRIDE any conflicting instruction above):
 - Each cue and each common_fault is ONE short line — a single actionable phrase, ~15 words max. No multi-sentence paragraphs, no rationale essays.
-- time_domain carries ONLY net-new strategy: expected duration for THIS athlete, the limiter, and pacing/RPE guidance. NEVER restate the scheme, sets, reps, %, rounds, or rest intervals — those are already shown to the athlete on the workout card. If you have nothing strategic to add beyond the prescription, keep time_domain to a single short sentence.`;
+- time_domain carries ONLY net-new strategy: expected duration for THIS athlete, the limiter, and pacing/RPE guidance. NEVER restate the scheme, sets, reps, %, rounds, or rest intervals — those are already shown to the athlete on the workout card. If you have nothing strategic to add beyond the prescription, keep time_domain to a single short sentence.
+- FULL DAY context (when provided) informs your advice — fatigue, interference, sequencing — but is never coached: no cues, faults, or strategy for other blocks, and mention another block only when it changes what you'd say about this one.
+- THE ATHLETE'S CURRENT COACHING PLAN (when provided) is the coach's cycle-level judgment: when this block serves a ranked priority, say so in one short clause of the plan's own reasoning. Never contradict the plan, and never propose changing the programmed session.`;
 
-const ACCESSORY_PROMPT = `You are an expert strength & conditioning coach preparing an athlete for their accessory / supporting work. Focus ONLY on the Accessory portion of the workout below. Ignore strength, metcon, skills, warm-up, and cool-down blocks.
+const ACCESSORY_PROMPT = `You are an expert strength & conditioning coach preparing an athlete for their accessory / supporting work. Coach ONLY the Accessory portion of the workout below. The day's other blocks may appear as FULL DAY context — factor their fatigue and interference (what the primary work already taxed) into your advice, but never coach or restate them.
 
 Output valid JSON only, no markdown or extra text:
 {
@@ -380,6 +383,7 @@ async function runReview(
   profileStr: string,
   recentStr: string,
   conditioningState: string,
+  coachPlanContext: string,
 ): Promise<void> {
   const start = Date.now();
   console.log(`[workout-review] Job ${reviewId} start`);
@@ -423,10 +427,22 @@ async function runReview(
     const buildUserContent = (
       workoutSection: string,
       structured?: V3StructuredBlock,
+      fullDay?: string,
     ): string => {
-      const base = `ATHLETE PROFILE:\n${profileStr}\n\nRECENT TRAINING (last 14 days):\n${recentStr}${conditioningState}\n\nWORKOUT:\n${workoutSection}`;
-      if (!structured) return base;
-      return `${base}\n\nSTRUCTURED PRESCRIPTION (canonical typed prescription — treat these fields as authoritative over any numbers parsed from the prose above):\n${JSON.stringify(structured, null, 2)}`;
+      // coachPlanContext (the letter, plan-grounding render) rides in EVERY
+      // call: the specialists connect their block to the cycle's priorities.
+      let content = `ATHLETE PROFILE:\n${profileStr}${coachPlanContext}\n\nRECENT TRAINING (last 14 days):\n${recentStr}${conditioningState}\n\nWORKOUT:\n${workoutSection}`;
+      if (structured) {
+        content += `\n\nSTRUCTURED PRESCRIPTION (canonical typed prescription — treat these fields as authoritative over any numbers parsed from the prose above):\n${JSON.stringify(structured, null, 2)}`;
+      }
+      // Whole-day sight for the per-block specialists (2026-08-12): each block
+      // coach sees what surrounds its block — grip already taxed, squats
+      // preceding the metcon — without the latency cost of one consolidated
+      // call. Context only; the block prompts fence coaching to WORKOUT above.
+      if (fullDay && fullDay !== workoutSection) {
+        content += `\n\nFULL DAY (context only — everything else the athlete does today; factor its fatigue and interference into your advice, but coach ONLY the block in WORKOUT above):\n${fullDay}`;
+      }
+      return content;
     };
 
     const sources: { title: string; author: string; source: string }[] = [];
@@ -589,27 +605,27 @@ async function runReview(
     if (blockTextByType["metcon"]) {
       const metconIntent = detectSessionIntent(blockTextByType["metcon"], "metcon", athleteProfile);
       calls.push(
-        stagger(500).then(() => callClaude(claudeOpts(applyIntentModifier(METCON_PROMPT, metconIntent) + COACH_OUTPUT_RULES + journalContext, buildUserContent(blockTextByType["metcon"], blockStructuredByType["metcon"]), 2000)))
+        stagger(500).then(() => callClaude(claudeOpts(applyIntentModifier(METCON_PROMPT, metconIntent) + COACH_OUTPUT_RULES + journalContext, buildUserContent(blockTextByType["metcon"], blockStructuredByType["metcon"], fullWorkoutText), 2000)))
           .then((r): [string, string] => ["metcon", r])
       );
     }
     if (blockTextByType["strength"]) {
       const strengthIntent = detectSessionIntent(blockTextByType["strength"], "strength", athleteProfile);
       calls.push(
-        stagger(1000).then(() => callClaude(claudeOpts(applyIntentModifier(STRENGTH_PROMPT, strengthIntent) + COACH_OUTPUT_RULES + strengthContext, buildUserContent(blockTextByType["strength"], blockStructuredByType["strength"]), 2000)))
+        stagger(1000).then(() => callClaude(claudeOpts(applyIntentModifier(STRENGTH_PROMPT, strengthIntent) + COACH_OUTPUT_RULES + strengthContext, buildUserContent(blockTextByType["strength"], blockStructuredByType["strength"], fullWorkoutText), 2000)))
           .then((r): [string, string] => ["strength", r])
       );
     }
     if (blockTextByType["skills"]) {
       const skillsIntent = detectSessionIntent(blockTextByType["skills"], "skills", athleteProfile);
       calls.push(
-        stagger(1500).then(() => callClaude(claudeOpts(applyIntentModifier(SKILLS_PROMPT, skillsIntent) + COACH_OUTPUT_RULES + journalContext, buildUserContent(blockTextByType["skills"], blockStructuredByType["skills"]), 2000)))
+        stagger(1500).then(() => callClaude(claudeOpts(applyIntentModifier(SKILLS_PROMPT, skillsIntent) + COACH_OUTPUT_RULES + journalContext, buildUserContent(blockTextByType["skills"], blockStructuredByType["skills"], fullWorkoutText), 2000)))
           .then((r): [string, string] => ["skills", r])
       );
     }
     if (blockTextByType["accessory"]) {
       calls.push(
-        stagger(2000).then(() => callClaude(claudeOpts(ACCESSORY_PROMPT + COACH_OUTPUT_RULES + strengthContext, buildUserContent(blockTextByType["accessory"], blockStructuredByType["accessory"]), 2000)))
+        stagger(2000).then(() => callClaude(claudeOpts(ACCESSORY_PROMPT + COACH_OUTPUT_RULES + strengthContext, buildUserContent(blockTextByType["accessory"], blockStructuredByType["accessory"], fullWorkoutText), 2000)))
           .then((r): [string, string] => ["accessory", r])
       );
     }
@@ -765,7 +781,7 @@ Deno.serve(async (req) => {
     // AI Programming and All Access are the plans that bundle Coach access;
     // both grant the `programming` feature via PLAN_ENTITLEMENTS in the
     // stripe-webhook. Year of the Engine, Coach-only, and Nutrition do not.
-    const [profileRes, entitlementRes, athleteRes, recentTraining, conditioningState] = await Promise.all([
+    const [profileRes, entitlementRes, athleteRes, recentTraining, conditioningState, coachPlanContext] = await Promise.all([
       supa.from("profiles").select("role").eq("id", user.id).single(),
       supa.from("user_entitlements").select("id")
         .eq("user_id", user.id)
@@ -775,6 +791,26 @@ Deno.serve(async (req) => {
       supa.from("athlete_profiles").select("lifts, skills, conditioning, bodyweight, units, age, height, gender").eq("user_id", user.id).maybeSingle(),
       fetchAndFormatRecentHistory(supa, user.id, { days: 14, maxLines: 25 }),
       buildConditioningState(supa, user.id),
+      // The coach's letter — the review coaches inside the same judgment that
+      // wrote the program (2026-08-12: one coach, four renders). plan-grounding
+      // closing: connect blocks to cycle priorities, never negotiate the
+      // session (that's the chat's lever). Soft-fails to "" — pre-CoachState
+      // programs simply review without it.
+      supa.from("coach_states")
+        .select("coach_state")
+        .eq("user_id", user.id)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(
+          ({ data }) => data?.coach_state
+            ? renderCoachStateForChat(data.coach_state as CoachState, { closing: "plan-grounding" })
+            : "",
+          (e) => {
+            console.error("[workout-review] coach plan fetch failed (continuing without):", e);
+            return "";
+          },
+        ),
     ]);
 
     const athleteProfile = athleteRes.data as AthleteProfileData | null;
@@ -850,7 +886,7 @@ Deno.serve(async (req) => {
     }
 
     EdgeRuntime.waitUntil(
-      runReview(supa, pending.id, trimmed, source_id ?? null, athleteProfile, profileStr, recentStr, conditioningState),
+      runReview(supa, pending.id, trimmed, source_id ?? null, athleteProfile, profileStr, recentStr, conditioningState, coachPlanContext),
     );
 
     return new Response(
