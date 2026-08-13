@@ -93,22 +93,42 @@ function StructuredEvalView({ e, onUpgrade }: { e: SafeEvaluation; onUpgrade?: (
           </ol>
         </div>
       )}
-      {/* Soft CTA — the app talking, not the coach: visually distinct from the
-          eval body, rendered only for users without AI Programming. */}
+      {/* CTA — the app talking, not the coach: visually distinct from the
+          eval body, rendered only for users without AI Programming. Every
+          claim here is a shipped feature: goal-fused personalized cycles,
+          the day-scoped coach (letter + proposal cards), and the logging
+          loop that sharpens the next cycle. */}
       {onUpgrade && (
-        <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
-            The coach that wrote this evaluation can write your program — a full cycle from your
-            priorities, your schedule, your equipment. And it shows up every training day: coaching
-            each session, answering questions, adjusting as you go.
+        <div style={{ marginTop: 16, padding: '16px 18px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
+            Turn This Evaluation Into Your Program
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div>
+              Add your goals and training preferences. Our AI combines them with your evaluation to
+              build your personalized program.
+            </div>
+            <div>
+              Your program includes your AI Coach. AI Coach is not a chatbot. It is trained on our
+              methodology and has access to your evaluation, goals, program, and training history —
+              so it can answer questions, coach your sessions, and adjust your training in real
+              time. It&rsquo;s like having a high-level coach by your side, every session.
+            </div>
+            <div>
+              Log your results and AI reviews what actually happened — then updates your program to
+              keep you on track.
+            </div>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '12px 0' }}>
+            Personalized training and coaching. Every day.
           </div>
           <button
             type="button"
             className="auth-btn"
-            style={{ padding: '8px 16px', fontSize: 13, width: 'auto' }}
+            style={{ padding: '10px 20px', fontSize: 13, width: 'auto', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}
             onClick={onUpgrade}
           >
-            Get AI Programming →
+            Build My Program
           </button>
         </div>
       )}
