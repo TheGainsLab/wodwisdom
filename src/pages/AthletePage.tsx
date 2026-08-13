@@ -98,9 +98,9 @@ function StructuredEvalView({ e, onUpgrade }: { e: SafeEvaluation; onUpgrade?: (
       {onUpgrade && (
         <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8 }}>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
-            This evaluation is built from your numbers. AI Programming takes it the rest of the way —
-            your priorities, your schedule, your equipment, turned into a personalized training cycle
-            that updates as you log.
+            The coach that wrote this evaluation can write your program — a full cycle from your
+            priorities, your schedule, your equipment. And it shows up every training day: coaching
+            each session, answering questions, adjusting as you go.
           </div>
           <button
             type="button"
