@@ -42,15 +42,13 @@ const FEATURE_NEXT_STEPS: { feature: string; label: string; path: string; descri
 // Standalone Nutrition and Coach+Nutrition are retired from NEW sales —
 // existing subscribers keep them (PLAN_FEATURES still knows every key), the
 // browse list just no longer offers them.
+//
+// Aug '26 reorder: Programming leads. The free evaluation is the funnel's
+// front door, so checkout arrivals are programming-shaped leads — Programming
+// anchors at $29.99, then All Access prices relationally against it (+$20
+// adds Engine; separately the pair is $59.98 — save $120/year). Engine and
+// the standalone Coach stay quietly available below.
 const PLANS: { key: PlanKey; name: string; monthly: string; quarterly: string; features: string[]; badge?: string; featured?: boolean; compact?: boolean }[] = [
-  {
-    key: 'engine',
-    name: 'Year of the Engine',
-    monthly: '$29.99',
-    quarterly: '$74.99',
-    badge: 'Includes AI Coach & Nutrition',
-    features: ['20 distinct training frameworks', 'Machine-learning calibrated targets', 'Real-time pacing coach', 'An AI coach that knows your training data'],
-  },
   {
     key: 'programming',
     name: 'AI Programming',
@@ -66,7 +64,15 @@ const PLANS: { key: PlanKey; name: string; monthly: string; quarterly: string; f
     quarterly: '$119.99',
     badge: 'Best value',
     featured: true,
-    features: ['AI Programming', 'Year of the Engine', 'AI Coach & full Nutrition tracking', 'All future features included'],
+    features: ['Everything in AI Programming', 'Plus Year of the Engine — save $120/year vs buying both', 'AI Coach & full Nutrition tracking', 'All future features included'],
+  },
+  {
+    key: 'engine',
+    name: 'Year of the Engine',
+    monthly: '$29.99',
+    quarterly: '$74.99',
+    badge: 'Includes AI Coach & Nutrition',
+    features: ['20 distinct training frameworks', 'Machine-learning calibrated targets', 'Real-time pacing coach', 'An AI coach that knows your training data'],
   },
   {
     key: 'coach',
