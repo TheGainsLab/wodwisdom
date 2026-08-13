@@ -105,21 +105,22 @@ function StructuredEvalView({ e, onUpgrade }: { e: SafeEvaluation; onUpgrade?: (
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div>
-              Add your goals and training preferences. Then, AI builds your personalized program,
-              guiding you to your goals as fast as possible.
+              Add your goals and training preferences. Our AI combines them with your evaluation to
+              build your personalized program.
             </div>
             <div>
-              Your program includes our AI Coach. The coach is not a chatbot. It is an AI trained on
-              the methodology which sees your evaluation, goals and training at all times, and it can
-              update your program in real time.
+              Your program includes your AI Coach. AI Coach is not a chatbot. It is trained on our
+              methodology and has access to your evaluation, goals, program, and training history —
+              so it can answer questions, coach your sessions, and adjust your training in real
+              time. It&rsquo;s like having a high-level coach by your side, every session.
             </div>
             <div>
-              Log your results and Gains AI reviews what actually happened — then updates your
-              program to keep you moving toward your goals.
+              Log your results and AI reviews what actually happened — then updates your program to
+              keep you on track.
             </div>
           </div>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '12px 0' }}>
-            Personalized training. Every day.
+            Personalized training and coaching. Every day.
           </div>
           <button
             type="button"
