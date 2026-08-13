@@ -55,6 +55,16 @@ const EVAL_SECTION_LABEL: React.CSSProperties = {
   marginBottom: 6,
 };
 
+/** Accent kickers for the upgrade CTA's three beats (Program / Coach / Gains). */
+const CTA_KICKER: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '1px',
+  color: 'var(--accent)',
+  marginBottom: 3,
+};
+
 /** Shared structured-evaluation renderer (admin v2 panel + user eval history):
  *  green strengths (bulleted), red weaknesses (numbered), synthesizing prose,
  *  numbered recommendations. */
@@ -99,33 +109,38 @@ function StructuredEvalView({ e, onUpgrade }: { e: SafeEvaluation; onUpgrade?: (
           the day-scoped coach (letter + proposal cards), and the logging
           loop that sharpens the next cycle. */}
       {onUpgrade && (
-        <div style={{ marginTop: 16, padding: '16px 18px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>
+        <div style={{ marginTop: 16, padding: '20px 22px', background: 'var(--surface2)', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 10 }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
             Turn This Evaluation Into Your Program
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.65, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
+              <div style={CTA_KICKER}>Your Program</div>
               Add your goals and training preferences. Our AI combines them with your evaluation to
               build your personalized program.
             </div>
             <div>
-              Your program includes your AI Coach. AI Coach is not a chatbot. It is trained on our
-              methodology and has access to your evaluation, goals, program, and training history —
-              so it can answer questions, coach your sessions, and adjust your training in real
-              time. It&rsquo;s like having a high-level coach by your side, every session.
+              <div style={CTA_KICKER}>Your Coach</div>
+              Your program includes your AI Coach.{' '}
+              <strong style={{ color: 'var(--text)', fontWeight: 700 }}>AI Coach is not a chatbot.</strong>{' '}
+              It is trained on our methodology and has access to your evaluation, goals, program,
+              and training history — so it can answer questions, coach your sessions, and adjust
+              your training in real time. It&rsquo;s like having a high-level coach by your side,
+              every session.
             </div>
             <div>
+              <div style={CTA_KICKER}>Your Gains</div>
               Log your results and AI reviews what actually happened — then updates your program to
               keep you on track.
             </div>
           </div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '12px 0' }}>
-            Personalized training and coaching. Every day.
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: '14px 0' }}>
+            Personalized training and coaching. <span style={{ color: 'var(--accent)' }}>Every day.</span>
           </div>
           <button
             type="button"
             className="auth-btn"
-            style={{ padding: '10px 20px', fontSize: 13, width: 'auto', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}
+            style={{ padding: '14px 20px', fontSize: 14, width: '100%', fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase' }}
             onClick={onUpgrade}
           >
             Build My Program
