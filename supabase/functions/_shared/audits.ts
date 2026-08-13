@@ -791,6 +791,14 @@ export function auditVocabularyCompliance(
 // has reps-per-set = 1 → does NOT trip. A fixed-load scheme ("5x3 @85%")
 // carries no work-up language → does NOT trip. Block-local: surgical rewrites
 // the block down to the top set (+ a separate back-off row if prescribed).
+//
+// False-positive guard (Aug '26, masters fill test): a block whose scheme says
+// "build to a heavy single" can legitimately pair a resolved top-set row
+// (sets = 1) with fixed multi-rep work — "4×3 across, then build to a heavy
+// single." The ramp landed correctly in its own row; the 4×3 is sets-across /
+// back-off volume, not a flattened ramp. When ANY movement in the block is a
+// resolved top set, the whole block passes — only fire when the work-up
+// language resolved into nothing but multi-rep rows.
 
 const WORKUP_LANGUAGE = ["work up", "work-up", "build to", "build up", "ascend"];
 
@@ -822,6 +830,8 @@ export function auditWorkupTopSet(output: WriterOutput): AuditResult {
         if (b.block_type !== "strength") continue;
         if (!isWorkupScheme(b)) continue;
         const movements = safeMovements(b);
+        const hasResolvedTopSet = movements.some((m) => (m.sets ?? 0) === 1 && repsPerSet(m) >= 1);
+        if (hasResolvedTopSet) continue;
         for (let j = 0; j < movements.length; j++) {
           const m = movements[j];
           const sets = m.sets ?? 0;

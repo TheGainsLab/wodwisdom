@@ -610,6 +610,40 @@ Deno.test("auditWorkupTopSet: fixed-load 5x3 @85% with no work-up language passe
   assert(auditWorkupTopSet(out).passed);
 });
 
+Deno.test("auditWorkupTopSet: fixed 4×3 alongside a resolved heavy single passes (masters false positive)", () => {
+  // "4×3 across, then build to a heavy single" — the ramp resolved into its own
+  // sets=1 row, so the multi-rep row is sets-across volume, not a flattened ramp.
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks = [
+    block(
+      "strength",
+      [
+        mv("Back Squat", { sets: 4, reps: undefined, rep_scheme: [3], weight: 315 }),
+        mv("Back Squat", { sets: 1, reps: undefined, rep_scheme: [1], weight: 365 }),
+      ],
+      { block_scheme: "4×3 across, then build to a heavy single" },
+    ),
+  ];
+  assert(auditWorkupTopSet(out).passed);
+});
+
+Deno.test("auditWorkupTopSet: work-up language with ONLY multi-rep rows still fails", () => {
+  // No resolved top set anywhere in the block — the flattened-ramp failure mode
+  // the rule exists for. The guard must not blind it.
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks = [
+    block(
+      "strength",
+      [
+        mv("Back Squat", { sets: 4, reps: undefined, rep_scheme: [3], weight: 315 }),
+        mv("Back Squat", { sets: 3, reps: undefined, rep_scheme: [2], weight: 335 }),
+      ],
+      { block_scheme: "Build to a heavy single" },
+    ),
+  ];
+  assert(!auditWorkupTopSet(out).passed);
+});
+
 Deno.test("auditWorkupTopSet: non-strength block with work-up language is ignored", () => {
   const out = baselineOutput();
   out.weeks[0].days[0].blocks = [

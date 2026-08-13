@@ -7,8 +7,10 @@
  *   T1 — Basics (age, height, bodyweight, gender, units)
  *   T2 — Athletic data (required lifts, all skills rated, all conditioning
  *        benchmarks filled). Required to run the free Profile Evaluation.
- *   T3 — Training context (days/week, session length, injuries text,
- *        goal, equipment). Required to run AI Programming.
+ *   T3 — Training context (days/week, injuries text, goal, equipment).
+ *        Required to run AI Programming. Session length was dropped as a
+ *        requirement in Aug '26 — stored values still feed the writer, but
+ *        new users are no longer asked for it.
  */
 
 export const REQUIRED_T1_FIELDS = [
@@ -113,7 +115,6 @@ export const ALL_CONDITIONING_KEYS = [
 
 export const REQUIRED_T3_FIELDS = [
   'days_per_week',
-  'session_length_minutes',
   'injuries_constraints',
   'goal',
   'equipment',
@@ -208,7 +209,6 @@ export function getTierStatus(profile: AthleteProfileInput | null | undefined): 
   // --- T3: Training context ---
   const t3Missing: string[] = [];
   if (!isNumberSet(p.days_per_week)) t3Missing.push('days_per_week');
-  if (!isNumberSet(p.session_length_minutes)) t3Missing.push('session_length_minutes');
   if (!isStringSet(p.injuries_constraints)) t3Missing.push('injuries_constraints');
   if (!isStringSet(p.goal)) t3Missing.push('goal');
   const equipment = p.equipment ?? {};

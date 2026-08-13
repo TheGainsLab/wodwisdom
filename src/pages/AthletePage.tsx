@@ -322,12 +322,14 @@ async function sha256Hex(text: string): Promise<string> {
 // Open-ended coaching-intake prompts (free-text / voice). Extracted server-side
 // (process-coaching-intake) into the structured coaching_intake object. Kept
 // distinct from Tier-3's structured goal/injuries fields to avoid duplication.
-const INTAKE_QUESTIONS: { key: string; label: string; placeholder: string }[] = [
-  { key: 'loved_disliked', label: 'Which exercises do you love — and which would you rather skip?', placeholder: 'e.g. "Love heavy deadlifts and rowing. Hate wall balls and thrusters — grip and lungs give out."' },
-  { key: 'strong_weak', label: 'Where do you feel strongest and weakest?', placeholder: 'e.g. "Strong on the barbell, weak on gymnastics and anything long."' },
-  { key: 'history', label: "How long have you trained consistently? What's your athletic background?", placeholder: 'e.g. "CrossFit ~4 years; before that college soccer and some powerlifting."' },
-  { key: 'past_programs', label: "What's worked — or really not worked — in past training?", placeholder: 'e.g. "High volume burns me out. Loved a strength-biased block last year."' },
-  { key: 'anything_else', label: 'Anything else you want your coach to know?', placeholder: 'Tap the mic on your keyboard and just talk — the more you share, the better.' },
+//
+// Trimmed Aug '26 (founder ruling): the essay prompts (loved_disliked,
+// strong_weak, history, past_programs) overwhelmed the intake and their answers
+// competed with hard data in the writer prompt. Only the catch-all remains.
+// Stored answers under the retired keys are KEPT — they load into intakeAnswers
+// and ride along on every save — we just stop asking new users.
+const INTAKE_QUESTIONS: { key: string; label: string; helper: string }[] = [
+  { key: 'anything_else', label: 'Anything else we should know? (optional)', helper: 'Training background, schedule, how you like to train — anything that helps your coach understand you.' },
 ];
 
 const LEVEL_LABELS: Record<SkillLevel, string> = {
@@ -1615,20 +1617,9 @@ export default function AthletePage({ session }: { session: Session }) {
                           onChange={e => { setDaysPerWeek(e.target.value); markDirty(); }}
                         />
                       </div>
-                      <div className="lift-item">
-                        <span className="lift-label">Typical session length <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11 }}>(30–180 min)</span></span>
-                        <input
-                          className="lift-input"
-                          type="number"
-                          min="30"
-                          max="180"
-                          step="5"
-                          placeholder="—"
-                          value={sessionLengthMinutes}
-                          onChange={e => { setSessionLengthMinutes(e.target.value); markDirty(); }}
-                        />
-                      </div>
                     </div>
+                    {/* Session length dropped from the form Aug '26 — no longer
+                        required for T3; stored values still feed the writer. */}
                   </div>
 
                   <CollapsibleSection title="Equipment">
@@ -1663,15 +1654,21 @@ export default function AthletePage({ session }: { session: Session }) {
                   <div className="settings-card" style={{ padding: 16, marginTop: 16 }}>
                     <p className="athlete-card-subtitle" style={{ marginBottom: 4 }}>Tell your coach about you</p>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-                      Optional, but powerful. Type your answers — or tap the mic on your keyboard and just talk. The AI reads everything you share to personalize your coaching.
+                      Type your answers — or tap the mic on your keyboard and just talk. The AI reads everything you share to personalize your coaching.
                     </div>
 
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>What are your goals?</div>
+                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 4 }}>
+                        What are you working toward? <span style={{ color: 'var(--accent)', fontWeight: 600 }}>(required)</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                        General goals are useful — specific ones are even better. This is what your program gets built around.
+                      </div>
                       <textarea
                         className="lift-input"
                         rows={3}
                         maxLength={500}
+                        placeholder='e.g. "Get stronger overall" · "First bar muscle-up by spring" · "Sub-20 5k without losing my squat"'
                         value={goal}
                         onChange={e => { setGoal(e.target.value); markDirty(); setIntakeSaved(false); }}
                         style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
@@ -1682,8 +1679,11 @@ export default function AthletePage({ session }: { session: Session }) {
                     </div>
 
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>
-                        Exercises you'd prefer we avoid <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional — leave blank if none)</span>
+                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 4 }}>
+                        Any injuries or exercises we should avoid? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                        Anything you list here stays out of your program — we'll never program it. No injuries? Great, leave this blank. You can update it any time as things change.
                       </div>
                       {/* Deliberately a PREFERENCE, not a health question (founder decision
                           2026-07-12, supersedes the 3.1 consent line): we never ask WHY, so the
@@ -1693,10 +1693,14 @@ export default function AthletePage({ session }: { session: Session }) {
                       <textarea
                         className="lift-input"
                         rows={3}
+                        maxLength={500}
                         value={injuriesConstraints}
                         onChange={e => { setInjuriesConstraints(e.target.value); markDirty(); setIntakeSaved(false); }}
                         style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
                       />
+                      <div style={{ fontSize: 11, color: injuriesConstraints.length >= 500 ? '#e5484d' : 'var(--text-muted)', textAlign: 'right', marginTop: 4 }}>
+                        {injuriesConstraints.length} / 500
+                      </div>
                       {injuryConfirmedNote && !injuryShowback && (
                         <div style={{ marginTop: 8, fontSize: 12, color: '#2ec486' }}>
                           ✓ Avoidances confirmed — we'll keep these out of your programming.
@@ -1760,14 +1764,19 @@ export default function AthletePage({ session }: { session: Session }) {
 
                     {INTAKE_QUESTIONS.map(q => (
                       <div key={q.key} style={{ marginBottom: 16 }}>
-                        <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>{q.label}</div>
+                        <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 4 }}>{q.label}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{q.helper}</div>
                         <textarea
                           className="lift-input"
                           rows={3}
+                          maxLength={500}
                           value={intakeAnswers[q.key] ?? ''}
                           onChange={e => { setIntakeAnswers(prev => ({ ...prev, [q.key]: e.target.value })); setIntakeSaved(false); }}
                           style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
                         />
+                        <div style={{ fontSize: 11, color: (intakeAnswers[q.key] ?? '').length >= 500 ? '#e5484d' : 'var(--text-muted)', textAlign: 'right', marginTop: 4 }}>
+                          {(intakeAnswers[q.key] ?? '').length} / 500
+                        </div>
                       </div>
                     ))}
                     <button
