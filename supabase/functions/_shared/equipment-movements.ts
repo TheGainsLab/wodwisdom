@@ -2,8 +2,9 @@
  * equipment-movements.ts
  *
  * Static map: which movements are blocked when the athlete doesn't have
- * each equipment piece. Used by build-writer-payload to expand the 18-key
- * boolean equipment map into a list of movements the writer must avoid.
+ * each equipment piece. Used by build-writer-payload to expand the canonical
+ * boolean equipment map (ALL_EQUIPMENT_KEYS) into a list of movements the
+ * writer must avoid.
  *
  * Display names match the canonical movement-name conventions used by the
  * v2 writer payload elsewhere (e.g. SKILL_DISPLAY_NAMES).
@@ -23,6 +24,7 @@ export const EQUIPMENT_TO_MOVEMENTS: Record<string, string[]> = {
   assault_bike: ["Assault Bike", "Echo Bike", "Bike Calories", "Bike Erg"],
   ski_erg: ["Ski Erg", "Ski Calories"],
   treadmill: [],
+  jump_rope: ["Double-Unders", "Single-Unders", "Crossovers", "Jump Rope"],
 
   // Barbell & free weights.
   barbell: [
@@ -46,6 +48,8 @@ export const EQUIPMENT_TO_MOVEMENTS: Record<string, string[]> = {
     "Kettlebell Press", "Kettlebell Thruster",
     "Turkish Get-Up", "Goblet Squat", "Farmer Carry",
   ],
+  // Floor press deliberately absent — it's the standard no-bench substitute.
+  bench: ["Bench Press", "Dumbbell Bench Press"],
 
   // Gymnastics rigs.
   pull_up_bar: [

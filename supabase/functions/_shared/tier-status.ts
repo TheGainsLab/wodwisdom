@@ -56,10 +56,12 @@ export const ALL_EQUIPMENT_KEYS = [
   'assault_bike',
   'ski_erg',
   'treadmill',
+  'jump_rope',
   // Barbell & Weights
   'barbell',
   'dumbbells',
   'kettlebells',
+  'bench',
   // Gymnastics
   'pull_up_bar',
   'rings',

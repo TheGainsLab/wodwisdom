@@ -261,12 +261,13 @@ const SKILL_GROUPS = [
 
 const EQUIPMENT_GROUPS = [
   {
-    title: 'Cardio Machines',
+    title: 'Cardio',
     items: [
       { key: 'rower', label: 'Rower' },
       { key: 'assault_bike', label: 'Assault/Echo Bike' },
       { key: 'ski_erg', label: 'Ski Erg' },
       { key: 'treadmill', label: 'Treadmill' },
+      { key: 'jump_rope', label: 'Jump Rope' },
     ],
   },
   {
@@ -275,6 +276,7 @@ const EQUIPMENT_GROUPS = [
       { key: 'barbell', label: 'Barbell & Plates' },
       { key: 'dumbbells', label: 'Dumbbells' },
       { key: 'kettlebells', label: 'Kettlebells' },
+      { key: 'bench', label: 'Bench' },
     ],
   },
   {
@@ -282,7 +284,7 @@ const EQUIPMENT_GROUPS = [
     items: [
       { key: 'pull_up_bar', label: 'Pull-Up Bar' },
       { key: 'rings', label: 'Rings' },
-      { key: 'rope', label: 'Rope' },
+      { key: 'rope', label: 'Climbing Rope' },
       { key: 'ghd', label: 'GHD' },
       { key: 'parallettes', label: 'Parallettes' },
       { key: 'pegboard', label: 'Pegboard' },

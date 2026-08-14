@@ -25,6 +25,8 @@ import {
   FIXTURE_BEGINNER_FITNESS,
   type FixtureProfileRow,
 } from "./fixtures/profile-fixtures.ts";
+import { hydrateEquipment } from "./tier-status.ts";
+import { computeEquipmentBlockedMovements } from "./equipment-movements.ts";
 
 function toStatic(row: FixtureProfileRow): AthleteProfileStatic {
   return {
@@ -321,6 +323,37 @@ Deno.test("profileStaticFromRow: EMPTY equipment record = unreviewed = fully equ
   assertEquals(sEmpty.equipment.ghd, true);
   const sNull = profileStaticFromRow({ ...base, equipment: null });
   assertEquals(sNull.equipment.pegboard, true);
+});
+
+Deno.test("equipment: new canonical keys (jump_rope, bench) hydrate + block correctly", () => {
+  const base = {
+    age: null, height: null, bodyweight: null, gender: null, units: "lbs",
+    lifts: {}, skills: {}, conditioning: {},
+  };
+  // A legacy 18-key record from before the Aug '26 key additions, POST-backfill:
+  // the migration wrote jump_rope/bench = true into every non-empty record.
+  const backfilled = profileStaticFromRow({
+    ...base,
+    equipment: { rower: true, barbell: true, jump_rope: true, bench: true },
+  });
+  assertEquals(backfilled.equipment.jump_rope, true);
+  assertEquals(backfilled.equipment.bench, true);
+  // Unreviewed (empty record) hydrates the new keys true like everything else.
+  const unreviewed = profileStaticFromRow({ ...base, equipment: {} });
+  assertEquals(unreviewed.equipment.jump_rope, true);
+  assertEquals(unreviewed.equipment.bench, true);
+  // A reviewed athlete who unchecked them: the new keys block their movements.
+  // (barbell owned — Floor Press must stay legal via the BENCH key, not get
+  // blocked by a missing barbell.)
+  const blocked = computeEquipmentBlockedMovements(
+    hydrateEquipment({ rower: true, barbell: true, jump_rope: false, bench: false }),
+  );
+  assert(blocked.includes("Double-Unders"));
+  assert(blocked.includes("Bench Press"));
+  assert(blocked.includes("Dumbbell Bench Press"));
+  assert(!blocked.includes("Floor Press")); // the no-bench substitute stays legal
+  // Fully equipped blocks nothing.
+  assertEquals(computeEquipmentBlockedMovements(hydrateEquipment({})), []);
 });
 
 Deno.test("asOf stamped on present capabilities only", () => {
