@@ -19,7 +19,9 @@
  *     equipment, training_context, competition, vocabulary, rag.
  *   - JSONB blobs (lifts/skills/conditioning/equipment) hydrate to
  *     complete canonical-key maps; missing values = null (equipment
- *     missing = false).
+ *     missing = false in a non-empty record; an EMPTY record means the
+ *     athlete never did the equipment review and hydrates all-true —
+ *     see hydrateEquipment in tier-status.ts).
  *   - days_per_week defaults to 5, clamped to [3, 6].
  *   - Tier 4 bundle is sliced: character_affinity + identity dropped;
  *     everything else passed through.
@@ -36,8 +38,8 @@ import {
   ALL_SKILL_KEYS,
   ALL_CONDITIONING_KEYS,
   ALL_LIFT_KEYS,
-  ALL_EQUIPMENT_KEYS,
   SKILL_DISPLAY_NAMES,
+  hydrateEquipment,
 } from "./tier-status.ts";
 import { computeEquipmentBlockedMovements } from "./equipment-movements.ts";
 import { fetchTier4Bundle, type Tier4Bundle } from "./fetch-tier4-bundle.ts";
@@ -176,7 +178,8 @@ export interface WriterPayload {
   skills: Record<string, SkillLevel | null>;
   /** All 7 conditioning benchmark keys; null when user hasn't entered. */
   conditioning: Record<string, string | number | null>;
-  /** All canonical equipment keys; false when absent. */
+  /** All canonical equipment keys; false when absent from a non-empty
+   *  record. Empty record = unreviewed = all true (hydrateEquipment). */
   equipment: Record<string, boolean>;
   training_context: TrainingContextPayload;
   /** Deterministic Athlete Model (coaching-state Step 1) — the authoritative,
@@ -241,10 +244,6 @@ function asConditioningValue(v: unknown): string | number | null {
   return null;
 }
 
-function asEquipmentValue(v: unknown): boolean {
-  return v === true;
-}
-
 function asString(v: unknown): string | null {
   return typeof v === "string" && v.trim() !== "" ? v.trim() : null;
 }
@@ -288,10 +287,9 @@ export function computeMergedAvoidance(profile: {
   injuries_constraints_hash?: string | null;
   injuries_avoidance_confirmed?: AvoidanceConfirmed | null;
 }): { equipment: Record<string, boolean>; injuries_structured: InjuryConstraints } {
-  const equipment: Record<string, boolean> = {};
-  for (const k of ALL_EQUIPMENT_KEYS) {
-    equipment[k] = asEquipmentValue((profile.equipment ?? {})[k]);
-  }
+  // Empty record = never reviewed = assume fully equipped (see hydrateEquipment) —
+  // otherwise an unreviewed profile would block EVERY equipment movement here.
+  const equipment = hydrateEquipment(profile.equipment);
   const equipmentBlocked = computeEquipmentBlockedMovements(equipment);
 
   const base: InjuryConstraints = profile.injuries_structured ?? {

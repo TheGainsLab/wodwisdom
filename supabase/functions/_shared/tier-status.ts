@@ -76,6 +76,31 @@ export const ALL_EQUIPMENT_KEYS = [
 ] as const;
 
 /**
+ * Hydrate a raw equipment JSONB into the canonical full-key boolean map.
+ *
+ * An EMPTY (or missing) record means the athlete has never done the
+ * equipment review — treat as fully equipped, the same default the intake
+ * form renders, so an unreviewed profile never reads as "owns nothing"
+ * (which would poison evals and chat-edit vocabulary with all-blocked
+ * equipment). A NON-empty record is the athlete's confirmed review and is
+ * authoritative: missing keys hydrate to false.
+ *
+ * Note the gate above is unchanged: an empty record still leaves T3
+ * incomplete, so programs stay blocked until the review is saved. This
+ * default only protects the surfaces that run before that gate (the free
+ * eval, chat).
+ */
+export function hydrateEquipment(
+  raw: Record<string, unknown> | null | undefined
+): Record<string, boolean> {
+  const src = raw ?? {};
+  const reviewed = Object.keys(src).length > 0;
+  const out: Record<string, boolean> = {};
+  for (const k of ALL_EQUIPMENT_KEYS) out[k] = reviewed ? src[k] === true : true;
+  return out;
+}
+
+/**
  * Canonical display names for each skill key. Used by the v2 writer
  * payload so the LLM reads "Muscle-Ups" / "Toes-to-Bar" / "HSPU" /
  * "L-Sit" directly instead of having to translate from snake_case.
