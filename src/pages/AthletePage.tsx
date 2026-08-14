@@ -300,6 +300,18 @@ const EQUIPMENT_GROUPS = [
   },
 ];
 
+/** The Tier 3 equipment review persists the FULL key map, never a partial one:
+ *  downstream hydration treats missing keys in a non-empty record as false
+ *  ("owns nothing but what's listed"), so a one-key record would be a lie.
+ *  Unset keys default to checked, matching what the checklist renders. */
+function materializeEquipment(current: Record<string, boolean>): Record<string, boolean> {
+  const full: Record<string, boolean> = {};
+  for (const group of EQUIPMENT_GROUPS) {
+    for (const item of group.items) full[item.key] = current[item.key] ?? true;
+  }
+  return full;
+}
+
 const SKILL_LEVEL_GUIDELINE = 'Beginner = basic grasp · Intermediate = good unless tired · Advanced = reliable when fatigued';
 
 const CONDITIONING_GROUPS = [
@@ -595,15 +607,16 @@ export default function AthletePage({ session }: { session: Session }) {
   const [units, setUnits] = useState<'lbs' | 'kg'>('lbs');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [lifts, setLifts] = useState<Record<string, number>>({});
-  const [equipment, setEquipment] = useState<Record<string, boolean>>(() => {
-    const defaults: Record<string, boolean> = {};
-    for (const group of EQUIPMENT_GROUPS) {
-      for (const item of group.items) {
-        defaults[item.key] = true;
-      }
-    }
-    return defaults;
-  });
+  // Starts EMPTY, not seeded with defaults: the record only becomes non-empty
+  // once the athlete actually reviews equipment (checkbox touch or Save
+  // Equipment). An empty record is the "review required" signal — it keeps T3
+  // incomplete, so programs can't generate against equipment nobody confirmed.
+  const [equipment, setEquipment] = useState<Record<string, boolean>>({});
+  // True once a non-empty equipment record has been persisted (loaded from the
+  // DB, or saved this session). Drives the amber "review required" → green
+  // "reviewed" header on the equipment card.
+  const [equipmentReviewed, setEquipmentReviewed] = useState(false);
+  const [equipSaved, setEquipSaved] = useState(false);
   const [skills, setSkills] = useState<Record<string, SkillLevel>>({});
   const [conditioning, setConditioning] = useState<Record<string, string | number>>({});
   const [loading, setLoading] = useState(true);
@@ -739,12 +752,20 @@ export default function AthletePage({ session }: { session: Session }) {
       setHasGeneratedProgram(!!(programsRes.data && programsRes.data.length > 0));
       if (!profileRes.data) {
         setIsNewUser(true);
+        setEquipExpanded(true); // brand-new profile: equipment review pending
       }
       if (profileRes.data) {
         const d = profileRes.data;
         setLifts(d.lifts || {});
         if (d.equipment && Object.keys(d.equipment).length > 0) {
-          setEquipment(prev => ({ ...prev, ...d.equipment }));
+          // Non-empty record = the athlete (or a pre-review save) already
+          // confirmed their equipment — grandfathered straight to green.
+          setEquipment(d.equipment);
+          setEquipmentReviewed(true);
+        } else {
+          // Review pending: open the checklist so the required step is in
+          // front of them the moment they expand Tier 3.
+          setEquipExpanded(true);
         }
         setSkills(d.skills || {});
         setConditioning(d.conditioning || {});
@@ -981,7 +1002,11 @@ export default function AthletePage({ session }: { session: Session }) {
     }
   };
 
-  const saveProfile = async (): Promise<boolean> => {
+  // `overrides.equipment` lets the Save Equipment button persist the freshly
+  // materialized full map in the same call that sets state — React state
+  // updates are async, so reading `equipment` here right after setEquipment
+  // would still see the stale map.
+  const saveProfile = async (overrides?: { equipment?: Record<string, boolean> }): Promise<boolean> => {
     setSaving(true);
     setError('');
 
@@ -1043,7 +1068,10 @@ export default function AthletePage({ session }: { session: Session }) {
     const payload = {
       user_id: session.user.id,
       lifts: cleanLifts,
-      equipment,
+      // Untouched equipment saves as {} — the review stays pending. The record
+      // only becomes non-empty via checkbox interaction or Save Equipment
+      // (both materialize the FULL key map first, never a partial one).
+      equipment: overrides?.equipment ?? equipment,
       skills: filledSkills,
       conditioning: cleanConditioning,
       bodyweight: bw && !isNaN(bw) ? bw : null,
@@ -1100,6 +1128,10 @@ export default function AthletePage({ session }: { session: Session }) {
     // flow by unmounting the component mid-click.
     if (isNewUser) setIsNewUser(false);
     setIsDirty(false);
+    // Any save that persisted a non-empty equipment record completes the
+    // review — this is exactly the signal the T3 gate reads, so header state
+    // and gate can never drift.
+    if (Object.keys(payload.equipment).length > 0) setEquipmentReviewed(true);
 
     // Parse the (possibly updated) injuries text into a structured do-not-program
     // list. The edge fn hash-checks internally, so an unchanged text returns a
@@ -1646,66 +1678,78 @@ export default function AthletePage({ session }: { session: Session }) {
                     </div>
                   </div>
 
-                  {/* Card 2 — YOUR EQUIPMENT: the collapsed header answers "do I
-                      need to open this?" by summarizing the current selection. */}
-                  {(() => {
-                    const allItems = EQUIPMENT_GROUPS.flatMap(g => g.items);
-                    const excluded = allItems.filter(i => !(equipment[i.key] ?? true));
-                    const summary = excluded.length === 0
-                      ? { head: `All ${allItems.length} selected`, tail: ' — nothing to change unless your gym is missing something' }
-                      : {
-                          head: `${allItems.length - excluded.length} of ${allItems.length} selected`,
-                          tail: excluded.length <= 3
-                            ? ` — ${excluded.map(i => `no ${i.label}`).join(', ')}`
-                            : ` — ${excluded.length} excluded`,
-                        };
-                    return (
-                      <div className="settings-card" style={{ ...T3_CARD, marginTop: 16 }}>
-                        <button
-                          type="button"
-                          onClick={() => setEquipExpanded(v => !v)}
-                          aria-expanded={equipExpanded}
-                          style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 0, margin: 0, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
-                        >
-                          <div>
-                            <div style={{ ...CTA_KICKER, marginBottom: 4 }}>Your Equipment</div>
-                            <div style={{ fontSize: 14 }}>
-                              <span style={{ color: '#2ec486', fontWeight: 600 }}>✓ {summary.head}</span>
-                              <span style={{ color: 'var(--text-muted)' }}>{summary.tail}</span>
-                            </div>
-                          </div>
-                          <span style={{ fontSize: 14, color: 'var(--text-dim)', flex: 'none' }}>{equipExpanded ? '▲' : '▼'}</span>
-                        </button>
-                        {equipExpanded && (
-                          <div style={{ marginTop: 16 }}>
-                            <p className="athlete-card-subtitle">Uncheck any equipment you don't have or don't want programmed — we'll remove every movement that needs it (e.g. unchecking the rower means no rowing).</p>
-                            {EQUIPMENT_GROUPS.map(group => (
-                              <div key={group.title} style={{ marginBottom: 20 }}>
-                                <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
-                                <div className="skill-list">
-                                  {group.items.map(item => (
-                                    <label
-                                      key={item.key}
-                                      className="skill-row"
-                                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                                    >
-                                      <span className="skill-name">{item.label}</span>
-                                      <input
-                                        type="checkbox"
-                                        checked={equipment[item.key] ?? true}
-                                        onChange={e => { setEquipment(prev => ({ ...prev, [item.key]: e.target.checked })); markDirty(); }}
-                                        style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer' }}
-                                      />
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
+                  {/* Card 2 — YOUR EQUIPMENT: a required one-time review. The
+                      record persists empty until the athlete saves it, which
+                      keeps T3 incomplete — no programs against equipment
+                      nobody confirmed. Header: amber demand → green done. */}
+                  <div className="settings-card" style={{ ...T3_CARD, marginTop: 16 }}>
+                    <button
+                      type="button"
+                      onClick={() => setEquipExpanded(v => !v)}
+                      aria-expanded={equipExpanded}
+                      style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 0, margin: 0, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+                    >
+                      <div>
+                        <div style={{ ...CTA_KICKER, marginBottom: 4 }}>Your Equipment</div>
+                        {equipmentReviewed ? (
+                          <div style={{ fontSize: 14, color: '#2ec486', fontWeight: 600 }}>✓ Equipment reviewed</div>
+                        ) : (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--warning, #f39c12)', fontWeight: 600 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--warning, #f39c12)', flex: 'none' }} />
+                            Equipment review required
                           </div>
                         )}
                       </div>
-                    );
-                  })()}
+                      <span style={{ fontSize: 14, color: 'var(--text-dim)', flex: 'none' }}>{equipExpanded ? '▲' : '▼'}</span>
+                    </button>
+                    {equipExpanded && (
+                      <div style={{ marginTop: 16 }}>
+                        <p className="athlete-card-subtitle">Uncheck anything you don't have. We'll never program it.</p>
+                        {EQUIPMENT_GROUPS.map(group => (
+                          <div key={group.title} style={{ marginBottom: 20 }}>
+                            <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
+                            <div className="skill-list">
+                              {group.items.map(item => (
+                                <label
+                                  key={item.key}
+                                  className="skill-row"
+                                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                                >
+                                  <span className="skill-name">{item.label}</span>
+                                  <input
+                                    type="checkbox"
+                                    checked={equipment[item.key] ?? true}
+                                    onChange={e => {
+                                      // Materialize the FULL map on any touch so a
+                                      // save never persists a partial (= lying) record.
+                                      setEquipment(prev => ({ ...materializeEquipment(prev), [item.key]: e.target.checked }));
+                                      markDirty();
+                                      setEquipSaved(false);
+                                    }}
+                                    style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                                  />
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="auth-btn"
+                          disabled={saving}
+                          onClick={async () => {
+                            const full = materializeEquipment(equipment);
+                            setEquipment(full);
+                            const ok = await saveProfile({ equipment: full });
+                            if (ok) setEquipSaved(true);
+                          }}
+                          style={{ padding: '8px 16px', fontSize: 13, ...(equipSaved && !saving ? { background: '#2ec486', color: 'white' } : {}) }}
+                        >
+                          {saving ? 'Saving…' : equipSaved ? 'Saved ✓' : 'Save Equipment'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Card 3 — YOUR COACH: ALL the free-text / voice. One
                       "Save & analyze" persists goals/injuries (via the full

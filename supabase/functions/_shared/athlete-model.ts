@@ -32,9 +32,9 @@
 
 import {
   ALL_CONDITIONING_KEYS,
-  ALL_EQUIPMENT_KEYS,
   ALL_LIFT_KEYS,
   ALL_SKILL_KEYS,
+  hydrateEquipment,
 } from "./tier-status.ts";
 import type { TrainingSummary } from "./training-summary.ts";
 import type { CoachingIntake } from "./coaching-intake.ts";
@@ -489,8 +489,8 @@ export function profileStaticFromRow(row: RawProfileRow): AthleteProfileStatic {
   const conditioning: Record<string, string | number | null> = {};
   for (const k of ALL_CONDITIONING_KEYS) conditioning[k] = asCond((row.conditioning ?? {})[k]);
 
-  const equipment: Record<string, boolean> = {};
-  for (const k of ALL_EQUIPMENT_KEYS) equipment[k] = (row.equipment ?? {})[k] === true;
+  // Empty record = never reviewed = assume fully equipped (see hydrateEquipment).
+  const equipment = hydrateEquipment(row.equipment);
 
   const units = row.units === "lbs" || row.units === "kg" ? row.units : null;
 

@@ -306,6 +306,23 @@ Deno.test("profileStaticFromRow tolerates junk / missing JSONB", () => {
   assertEquals(s.units, null); // invalid unit
 });
 
+Deno.test("profileStaticFromRow: EMPTY equipment record = unreviewed = fully equipped", () => {
+  // An athlete who never did the equipment review must not read as "owns
+  // nothing" — empty/null records hydrate to all-true (the form's default),
+  // while any NON-empty record stays authoritative (missing keys = false,
+  // covered by the tests above).
+  const base = {
+    age: null, height: null, bodyweight: null, gender: null, units: "lbs",
+    lifts: {}, skills: {}, conditioning: {},
+  };
+  const sEmpty = profileStaticFromRow({ ...base, equipment: {} });
+  assertEquals(sEmpty.equipment.rower, true);
+  assertEquals(sEmpty.equipment.barbell, true);
+  assertEquals(sEmpty.equipment.ghd, true);
+  const sNull = profileStaticFromRow({ ...base, equipment: null });
+  assertEquals(sNull.equipment.pegboard, true);
+});
+
 Deno.test("asOf stamped on present capabilities only", () => {
   const p = toStatic(FIXTURE_BEGINNER_FITNESS.profileRow);
   const m = buildAthleteModel(p, null, { asOf: "2026-06-27T00:00:00Z" });
