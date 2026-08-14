@@ -65,6 +65,26 @@ const CTA_KICKER: React.CSSProperties = {
   marginBottom: 3,
 };
 
+/** Tier 3's three cards (Schedule / Equipment / Coach) share the eval CTA's
+ *  treatment — white outline + accent kicker — so the profile speaks the same
+ *  visual language as the CTA that sent the user here. */
+const T3_CARD: React.CSSProperties = {
+  padding: 16,
+  border: '1px solid rgba(255,255,255,0.35)',
+};
+
+/** Char counter for the Tier 3 text boxes: invisible until the box has focus
+ *  or content, so an untouched form shows zero bookkeeping. */
+function t3CounterStyle(len: number, show: boolean): React.CSSProperties {
+  return {
+    fontSize: 11,
+    color: len >= 480 ? '#e5484d' : 'var(--text-muted)',
+    textAlign: 'right',
+    visibility: show ? 'visible' : 'hidden',
+    fontVariantNumeric: 'tabular-nums',
+  };
+}
+
 /** Shared structured-evaluation renderer (admin v2 panel + user eval history):
  *  green strengths (bulleted), red weaknesses (numbered), synthesizing prose,
  *  numbered recommendations. */
@@ -329,7 +349,7 @@ async function sha256Hex(text: string): Promise<string> {
 // Stored answers under the retired keys are KEPT — they load into intakeAnswers
 // and ride along on every save — we just stop asking new users.
 const INTAKE_QUESTIONS: { key: string; label: string; helper: string }[] = [
-  { key: 'anything_else', label: 'Anything else we should know? (optional)', helper: 'Training background, schedule, how you like to train — anything that helps your coach understand you.' },
+  { key: 'anything_else', label: 'Anything else we should know?', helper: 'Training background, schedule, how you like to train. Tap the mic on your keyboard and just talk.' },
 ];
 
 const LEVEL_LABELS: Record<SkillLevel, string> = {
@@ -607,6 +627,10 @@ export default function AthletePage({ session }: { session: Session }) {
   const [sessionLengthMinutes, setSessionLengthMinutes] = useState<string>('');
   const [injuriesConstraints, setInjuriesConstraints] = useState<string>('');
   const [goal, setGoal] = useState<string>('');
+  // Tier 3 card chrome: equipment collapse + which text box has focus (drives
+  // the show-on-focus char counters).
+  const [equipExpanded, setEquipExpanded] = useState(false);
+  const [t3FocusedBox, setT3FocusedBox] = useState<string | null>(null);
   // Injury show-back confirmation (handoff 1.1). When a save re-parses non-empty
   // injuries text into a do-not-program list, we surface it against the athlete's
   // own words for sign-off BEFORE it becomes the active safety filter. `hash` binds
@@ -1601,68 +1625,98 @@ export default function AthletePage({ session }: { session: Session }) {
                   lockMessage="Requires AI Programming or All Access subscription"
                   onUpgrade={() => navigate('/features/programs')}
                 >
-                  {/* Section 1 — how you train (hard logistics: schedule + equipment) */}
-                  <div className="settings-card" style={{ padding: 16 }}>
-                    <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>How you train</p>
-                    <div className="lift-grid">
-                      <div className="lift-item">
-                        <span className="lift-label">Days / week <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11 }}>(3–6 days)</span></span>
-                        <input
-                          className="lift-input"
-                          type="number"
-                          min="3"
-                          max="6"
-                          placeholder="—"
-                          value={daysPerWeek}
-                          onChange={e => { setDaysPerWeek(e.target.value); markDirty(); }}
-                        />
-                      </div>
+                  {/* Card 1 — YOUR SCHEDULE (session length dropped Aug '26 — no
+                      longer required for T3; stored values still feed the writer) */}
+                  <div className="settings-card" style={T3_CARD}>
+                    <div style={CTA_KICKER}>Your Schedule</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>How many days a week can you train?</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <input
+                        className="lift-input"
+                        type="number"
+                        min="3"
+                        max="6"
+                        placeholder="—"
+                        aria-label="Days per week"
+                        value={daysPerWeek}
+                        onChange={e => { setDaysPerWeek(e.target.value); markDirty(); }}
+                        style={{ width: 92, textAlign: 'center', fontSize: 18, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
+                      />
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>3–6 days. Your program is built to fit — no filler days.</span>
                     </div>
-                    {/* Session length dropped from the form Aug '26 — no longer
-                        required for T3; stored values still feed the writer. */}
                   </div>
 
-                  <CollapsibleSection title="Equipment">
-                    <p className="athlete-card-subtitle">Uncheck any equipment you don't have or don't want programmed — we'll remove every movement that needs it (e.g. unchecking the rower means no rowing).</p>
-                    {EQUIPMENT_GROUPS.map(group => (
-                      <div key={group.title} style={{ marginBottom: 20 }}>
-                        <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
-                        <div className="skill-list">
-                          {group.items.map(item => (
-                            <label
-                              key={item.key}
-                              className="skill-row"
-                              style={{ cursor: 'pointer', userSelect: 'none' }}
-                            >
-                              <span className="skill-name">{item.label}</span>
-                              <input
-                                type="checkbox"
-                                checked={equipment[item.key] ?? true}
-                                onChange={e => { setEquipment(prev => ({ ...prev, [item.key]: e.target.checked })); markDirty(); }}
-                                style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer' }}
-                              />
-                            </label>
-                          ))}
-                        </div>
+                  {/* Card 2 — YOUR EQUIPMENT: the collapsed header answers "do I
+                      need to open this?" by summarizing the current selection. */}
+                  {(() => {
+                    const allItems = EQUIPMENT_GROUPS.flatMap(g => g.items);
+                    const excluded = allItems.filter(i => !(equipment[i.key] ?? true));
+                    const summary = excluded.length === 0
+                      ? { head: `All ${allItems.length} selected`, tail: ' — nothing to change unless your gym is missing something' }
+                      : {
+                          head: `${allItems.length - excluded.length} of ${allItems.length} selected`,
+                          tail: excluded.length <= 3
+                            ? ` — ${excluded.map(i => `no ${i.label}`).join(', ')}`
+                            : ` — ${excluded.length} excluded`,
+                        };
+                    return (
+                      <div className="settings-card" style={{ ...T3_CARD, marginTop: 16 }}>
+                        <button
+                          type="button"
+                          onClick={() => setEquipExpanded(v => !v)}
+                          aria-expanded={equipExpanded}
+                          style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 0, margin: 0, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+                        >
+                          <div>
+                            <div style={{ ...CTA_KICKER, marginBottom: 4 }}>Your Equipment</div>
+                            <div style={{ fontSize: 14 }}>
+                              <span style={{ color: '#2ec486', fontWeight: 600 }}>✓ {summary.head}</span>
+                              <span style={{ color: 'var(--text-muted)' }}>{summary.tail}</span>
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 14, color: 'var(--text-dim)', flex: 'none' }}>{equipExpanded ? '▲' : '▼'}</span>
+                        </button>
+                        {equipExpanded && (
+                          <div style={{ marginTop: 16 }}>
+                            <p className="athlete-card-subtitle">Uncheck any equipment you don't have or don't want programmed — we'll remove every movement that needs it (e.g. unchecking the rower means no rowing).</p>
+                            {EQUIPMENT_GROUPS.map(group => (
+                              <div key={group.title} style={{ marginBottom: 20 }}>
+                                <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
+                                <div className="skill-list">
+                                  {group.items.map(item => (
+                                    <label
+                                      key={item.key}
+                                      className="skill-row"
+                                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                                    >
+                                      <span className="skill-name">{item.label}</span>
+                                      <input
+                                        type="checkbox"
+                                        checked={equipment[item.key] ?? true}
+                                        onChange={e => { setEquipment(prev => ({ ...prev, [item.key]: e.target.checked })); markDirty(); }}
+                                        style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                                      />
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </CollapsibleSection>
+                    );
+                  })()}
 
-                  {/* Section 2 — "tell your coach about you": ALL the free-text /
-                      voice. One "Save & analyze" persists goals/injuries (via the
-                      full profile save) AND runs the intake extraction. */}
-                  <div className="settings-card" style={{ padding: 16, marginTop: 16 }}>
-                    <p className="athlete-card-subtitle" style={{ marginBottom: 4 }}>Tell your coach about you</p>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-                      Type your answers — or tap the mic on your keyboard and just talk. The AI reads everything you share to personalize your coaching.
-                    </div>
+                  {/* Card 3 — YOUR COACH: ALL the free-text / voice. One
+                      "Save & analyze" persists goals/injuries (via the full
+                      profile save) AND runs the intake extraction. */}
+                  <div className="settings-card" style={{ ...T3_CARD, marginTop: 16 }}>
+                    <div style={{ ...CTA_KICKER, marginBottom: 12 }}>Your Coach</div>
 
-                    <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 4 }}>
-                        What are you working toward? <span style={{ color: 'var(--accent)', fontWeight: 600 }}>(required)</span>
-                      </div>
+                    <div style={{ marginBottom: 18 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>What are you working toward?</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-                        General goals are useful — specific ones are even better. This is what your program gets built around.
+                        General goals are useful — specific ones are even better. <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>This is what your program gets built around.</span>
                       </div>
                       <textarea
                         className="lift-input"
@@ -1671,19 +1725,30 @@ export default function AthletePage({ session }: { session: Session }) {
                         placeholder='e.g. "Get stronger overall" · "First bar muscle-up by spring" · "Sub-20 5k without losing my squat"'
                         value={goal}
                         onChange={e => { setGoal(e.target.value); markDirty(); setIntakeSaved(false); }}
-                        style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
+                        onFocus={() => setT3FocusedBox('goal')}
+                        onBlur={() => setT3FocusedBox(f => (f === 'goal' ? null : f))}
+                        style={{
+                          width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left',
+                          // The page's one accent element: red border while the
+                          // required box is empty, settles to neutral once filled.
+                          ...(goal.trim() === '' ? { borderColor: 'var(--accent)' } : {}),
+                        }}
                       />
-                      <div style={{ fontSize: 11, color: goal.length >= 500 ? '#e5484d' : 'var(--text-muted)', textAlign: 'right', marginTop: 4 }}>
-                        {goal.length} / 500
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 5 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: goal.trim() ? '#2ec486' : 'var(--text-dim)' }}>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: goal.trim() ? '#2ec486' : 'var(--accent)', flex: 'none' }} />
+                          {goal.trim() ? 'Got it — your program builds around this' : "Required — this is the one your coach can't skip"}
+                        </span>
+                        <span style={t3CounterStyle(goal.length, t3FocusedBox === 'goal' || goal.length > 0)}>{goal.length} / 500</span>
                       </div>
                     </div>
 
-                    <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 4 }}>
-                        Any injuries or exercises we should avoid? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
+                    <div style={{ marginBottom: 18 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>
+                        Any injuries or exercises we should avoid? <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>(optional)</span>
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-                        Anything you list here stays out of your program — we'll never program it. No injuries? Great, leave this blank. You can update it any time as things change.
+                        Anything you list here stays out of your program — we'll never program it. No injuries? Leave this blank.
                       </div>
                       {/* Deliberately a PREFERENCE, not a health question (founder decision
                           2026-07-12, supersedes the 3.1 consent line): we never ask WHY, so the
@@ -1692,13 +1757,15 @@ export default function AthletePage({ session }: { session: Session }) {
                           parser emits movement names, never reasons. */}
                       <textarea
                         className="lift-input"
-                        rows={3}
+                        rows={2}
                         maxLength={500}
                         value={injuriesConstraints}
                         onChange={e => { setInjuriesConstraints(e.target.value); markDirty(); setIntakeSaved(false); }}
+                        onFocus={() => setT3FocusedBox('injuries')}
+                        onBlur={() => setT3FocusedBox(f => (f === 'injuries' ? null : f))}
                         style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
                       />
-                      <div style={{ fontSize: 11, color: injuriesConstraints.length >= 500 ? '#e5484d' : 'var(--text-muted)', textAlign: 'right', marginTop: 4 }}>
+                      <div style={{ ...t3CounterStyle(injuriesConstraints.length, t3FocusedBox === 'injuries' || injuriesConstraints.length > 0), marginTop: 4 }}>
                         {injuriesConstraints.length} / 500
                       </div>
                       {injuryConfirmedNote && !injuryShowback && (
@@ -1764,17 +1831,21 @@ export default function AthletePage({ session }: { session: Session }) {
 
                     {INTAKE_QUESTIONS.map(q => (
                       <div key={q.key} style={{ marginBottom: 16 }}>
-                        <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 4 }}>{q.label}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>
+                          {q.label} <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>(optional)</span>
+                        </div>
                         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{q.helper}</div>
                         <textarea
                           className="lift-input"
-                          rows={3}
+                          rows={2}
                           maxLength={500}
                           value={intakeAnswers[q.key] ?? ''}
                           onChange={e => { setIntakeAnswers(prev => ({ ...prev, [q.key]: e.target.value })); setIntakeSaved(false); }}
+                          onFocus={() => setT3FocusedBox(q.key)}
+                          onBlur={() => setT3FocusedBox(f => (f === q.key ? null : f))}
                           style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
                         />
-                        <div style={{ fontSize: 11, color: (intakeAnswers[q.key] ?? '').length >= 500 ? '#e5484d' : 'var(--text-muted)', textAlign: 'right', marginTop: 4 }}>
+                        <div style={{ ...t3CounterStyle((intakeAnswers[q.key] ?? '').length, t3FocusedBox === q.key || (intakeAnswers[q.key] ?? '').length > 0), marginTop: 4 }}>
                           {(intakeAnswers[q.key] ?? '').length} / 500
                         </div>
                       </div>
