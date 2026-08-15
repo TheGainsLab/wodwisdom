@@ -12,7 +12,8 @@ interface PreviewResult {
   reason?: string;
   dry_run?: boolean;
   currentDay?: number;
-  currentPhase?: number;
+  month?: number;
+  allowed_day_types?: string[];
   maxDays?: number;
   days_to_generate?: number;
   pinned_time_trials?: number[];
@@ -106,7 +107,7 @@ export default function AdminEngineResequencePage({ session }: { session: Sessio
         <div style={{ marginTop: 20 }}>
           <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
             <Stat label="Current day" value={currentDay} />
-            <Stat label="Phase" value={result.currentPhase ?? '—'} />
+            <Stat label="Program month" value={result.month ?? '—'} sub={result.allowed_day_types ? `${result.allowed_day_types.length} day-types available` : undefined} />
             <Stat label="Days generated" value={accepted.length} sub={`of ${result.maxDays ?? '?'} requested`} />
           </div>
 

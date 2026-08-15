@@ -38,8 +38,14 @@ export interface SequenceProposal {
 }
 
 export interface SequenceContext {
-  /** Phase the athlete has unlocked (1-12); gates which day-types are legal. */
-  currentPhase: number;
+  /**
+   * Day-types legal at this point in the athlete's PROGRAM: the distinct types
+   * the program's own curation maps at months <= the block's month (plus
+   * time_trial, always). Replaces the old phase gating, which sampled the
+   * main_5day arc through catalog day numbers and produced nonsense for
+   * specialty/varied programs — the curation IS the unlock curve.
+   */
+  allowedDayTypes: Set<string>;
   maxDays?: number;
 }
 
@@ -47,6 +53,29 @@ export interface ValidationResult {
   ok: boolean;
   accepted: ProposedDay[];
   errors: string[];
+}
+
+/**
+ * Compute the day-type pool for a block: every type this program's mapping
+ * places at months <= blockMonth (the month of the furthest position being
+ * generated — position-month, never the athlete's paid months_unlocked, so a
+ * payment edge can never widen the pool). time_trial is always included: the
+ * AI holds a standing right to insert a recalibration when signals demand it.
+ * Pure; month values come from engine_program_mapping.month (program-scoped,
+ * NOT NULL since the 20260418 backfill).
+ */
+export function computeAllowedDayTypes(
+  mapping: { day: number; month: number }[],
+  typeByDay: Map<number, string>,
+  blockMonth: number,
+): Set<string> {
+  const allowed = new Set<string>(["time_trial"]);
+  for (const m of mapping) {
+    if (m.month > blockMonth) continue;
+    const t = typeByDay.get(m.day);
+    if (t) allowed.add(t);
+  }
+  return allowed;
 }
 
 // ─── Envelope checks ─────────────────────────────────────────────────────────
@@ -250,8 +279,8 @@ export function validateProposal(
       errors.push(`"${day.day_type}": unknown day_type — not in catalogue.`);
       continue;
     }
-    if (dt.phase_requirement > ctx.currentPhase) {
-      errors.push(`"${day.day_type}": locked — needs phase ${dt.phase_requirement}, athlete at ${ctx.currentPhase}.`);
+    if (!ctx.allowedDayTypes.has(day.day_type)) {
+      errors.push(`"${day.day_type}": not available at this point in the program.`);
       continue;
     }
     if (!day.reason?.trim()) {

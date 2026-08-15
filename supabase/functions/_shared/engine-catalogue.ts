@@ -50,8 +50,8 @@ export const PARAM_LEGEND = `BLOCK PARAMETER VOCABULARY (how to read block_N_par
 - Flux family: basePace, baseDuration (Zone-2 segment), fluxDuration, fluxPaceRange, fluxIntensityByDuration {seconds:intensity},
     fluxStartIntensity + fluxIncrement (flux_stages increases flux pace each round).
 - Polarized: basePace + burstTiming (e.g. every_7_minutes), burstDuration, burstIntensity (max_effort).
-- HARD LIMITS to respect: phase_requirement (earliest phase the type may appear), max_duration_minutes (total session cap),
-    and every chosen value must stay inside the [min,max] / option set the day type defines. Never invent a new day type or a parameter outside these.`;
+- HARD LIMITS to respect: max_duration_minutes (total session cap), and every chosen value must stay inside the
+    [min,max] / option set the day type defines. Never invent a new day type or a parameter outside these.`;
 
 /** Load all day-type definitions, ordered by when they're introduced. */
 export async function loadDayTypeCatalogue(supa: SupabaseClient): Promise<EngineDayTypeRow[]> {
@@ -71,8 +71,9 @@ export function formatDayTypeCatalogue(rows: EngineDayTypeRow[]): string {
   const parts: string[] = [PARAM_LEGEND, "", `DAY TYPES (${rows.length}):`];
 
   for (const dt of rows) {
+    // No phase fragment: availability is decided upstream — the catalogue the
+    // model sees is already filtered to what the program has unlocked.
     const gating = [
-      `phase>=${dt.phase_requirement}`,
       `${dt.block_count} block${dt.block_count === 1 ? "" : "s"}`,
       dt.max_duration_minutes != null ? `cap ${dt.max_duration_minutes}min` : null,
       dt.set_rest_seconds != null ? `set-rest ${dt.set_rest_seconds}s` : null,
