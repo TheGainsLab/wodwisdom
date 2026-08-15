@@ -114,7 +114,9 @@ export async function runResequence(
     .eq("user_id", userId)
     .eq("completed", true);
   if ((completed ?? 0) < MIN_COMPLETED_DAYS) {
-    return { status: "skipped", reason: `needs ${MIN_COMPLETED_DAYS} completed days, has ${completed ?? 0}` };
+    const reason = `needs ${MIN_COMPLETED_DAYS} completed days, has ${completed ?? 0}`;
+    console.log(`[run-resequence] user=${userId} skip: ${reason}`);
+    return { status: "skipped", reason };
   }
 
   // 2) Diagnosis + catalogue rows. The prompt's catalogue TEXT is formatted
@@ -124,7 +126,10 @@ export async function runResequence(
     buildConditioningState(supa, userId),
     loadDayTypeCatalogue(supa),
   ]);
-  if (!diagnosis) return { status: "skipped", reason: "no conditioning diagnosis available" };
+  if (!diagnosis) {
+    console.log(`[run-resequence] user=${userId} skip: no conditioning diagnosis available`);
+    return { status: "skipped", reason: "no conditioning diagnosis available" };
+  }
 
   // 3) Program + cadence. The athlete's program defines the position space:
   // specialty programs curate NON-consecutive catalog days via engine_program_mapping,
@@ -236,6 +241,7 @@ export async function runResequence(
   const aiPositions = aiPairs.map((p) => p.seq);
   const daysToGenerate = aiPositions.length;
   if (daysToGenerate === 0) {
+    console.log(`[run-resequence] user=${userId} skip: block entirely pinned time trials`);
     return { status: "skipped", reason: "block is entirely pinned time trials", currentDay, pinned_time_trials: ttPositions };
   }
 
@@ -327,10 +333,21 @@ export async function runResequence(
   });
 
   const proposal = parseProposal(raw);
-  if (!proposal) return { status: "unparseable", error: "AI returned unparseable output", raw };
+  if (!proposal) {
+    console.error(`[run-resequence] user=${userId} UNPARSEABLE AI output; first 300 chars: ${raw.slice(0, 300)}`);
+    return { status: "unparseable", error: "AI returned unparseable output", raw };
+  }
 
   const result = validateProposal(proposal, catalogueRows, { allowedDayTypes, maxDays: daysToGenerate });
 
+  if (!dryRun && result.accepted.length === 0) {
+    // Live run produced NOTHING — this must never be silent (a quiet cron
+    // once hid exactly this for hours). The validator's rejections are the
+    // whole story; put them in the log.
+    console.error(
+      `[run-resequence] user=${userId} ZERO days accepted on live run; validation errors: ${result.errors.join(" | ") || "(none — empty proposal)"}`,
+    );
+  }
   if (dryRun || result.accepted.length === 0) {
     return {
       status: "preview",

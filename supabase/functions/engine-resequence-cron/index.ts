@@ -116,9 +116,21 @@ Deno.serve(async (_req) => {
         generations += 1;
         results.push({ user: uid, action: result.status, persisted: result.persisted ?? 0, reason: result.reason });
       } catch (e) {
-        results.push({ user: uid, action: "error", error: e instanceof Error ? e.message : String(e) });
+        // LOUD: this catch once swallowed every failure into a response JSON
+        // nobody reads — hourly ticks looked healthy while generating nothing.
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`[engine-resequence-cron] user=${uid} ERROR: ${msg}`);
+        results.push({ user: uid, action: "error", error: msg });
       }
     }
+
+    // One summary line per tick, always — so a tick that did nothing says so.
+    const counts: Record<string, number> = {};
+    for (const r of results) counts[String(r.action)] = (counts[String(r.action)] ?? 0) + 1;
+    console.log(
+      `[engine-resequence-cron] tick done: processed=${results.length} generations=${generations} ` +
+        Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(" "),
+    );
 
     return new Response(JSON.stringify({ processed: results.length, results }), {
       status: 200,
