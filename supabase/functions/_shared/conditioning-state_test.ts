@@ -19,7 +19,7 @@ import {
 const NOW = new Date("2026-06-19T00:00:00Z");
 
 function metric(p: Partial<PerfMetricRow> & Pick<PerfMetricRow, "day_type" | "modality">): PerfMetricRow {
-  return { rolling_avg_ratio: 1.0, rolling_count: 4, last_4_ratios: [1, 1, 1, 1], learned_max_pace: 100, ...p };
+  return { rolling_avg_ratio: 1.0, rolling_count: 4, last_5_ratios: [1, 1, 1, 1], learned_max_pace: 100, ...p };
 }
 function tt(modality: string, date: string, rpm = 300, is_current = true, units = "cal"): TimeTrialRow {
   return { modality, units, calculated_rpm: rpm, date, is_current };
@@ -29,7 +29,7 @@ function tt(modality: string, date: string, rpm = 300, is_current = true, units 
 Deno.test("computeConditioningDiagnosis: passes ratios through and tags by taxonomy", () => {
   const diag = computeConditioningDiagnosis({
     metrics: [
-      metric({ day_type: "threshold", modality: "c2_row", rolling_avg_ratio: 0.91, last_4_ratios: [0.95, 0.93, 0.9, 0.91] }),
+      metric({ day_type: "threshold", modality: "c2_row", rolling_avg_ratio: 0.91, last_5_ratios: [0.95, 0.93, 0.9, 0.91] }),
       metric({ day_type: "endurance", modality: "c2_row", rolling_avg_ratio: 1.05 }),
     ],
     timeTrials: [tt("c2_row", "2026-06-10")],
@@ -40,7 +40,7 @@ Deno.test("computeConditioningDiagnosis: passes ratios through and tags by taxon
   const thr = diag.competencies.find((c) => c.day_type === "threshold")!;
   // raw number untouched, no labeling
   assertEquals(thr.rolling_avg_ratio, 0.91);
-  assertEquals(thr.last_4_ratios, [0.95, 0.93, 0.9, 0.91]);
+  assertEquals(thr.last_5_ratios, [0.95, 0.93, 0.9, 0.91]);
   // taxonomy tags
   assertEquals(thr.systems, ["LT"]);
   assertEquals(thr.is_root, true);
@@ -97,7 +97,7 @@ Deno.test("formatConditioningState: empty → no-op", () => {
 Deno.test("formatConditioningState: emits raw numbers + tags, zero verdict words", () => {
   const out = formatConditioningState({
     metrics: [
-      metric({ day_type: "threshold", modality: "c2_row", rolling_avg_ratio: 0.91, last_4_ratios: [0.95, 0.93, 0.9, 0.91] }),
+      metric({ day_type: "threshold", modality: "c2_row", rolling_avg_ratio: 0.91, last_5_ratios: [0.95, 0.93, 0.9, 0.91] }),
     ],
     timeTrials: [tt("c2_row", "2026-06-10")],
     sessions: [{ date: "2026-06-10" }],
@@ -105,7 +105,7 @@ Deno.test("formatConditioningState: emits raw numbers + tags, zero verdict words
   });
   // raw numbers present
   assert(out.includes("ratio 0.91"));
-  assert(out.includes("last4 [0.95,0.93,0.90,0.91]"));
+  assert(out.includes("recent [0.95,0.93,0.90,0.91]"));
   assert(out.includes("trains[LT] root"));
   assert(out.includes("Days since last completed session: 9"));
   assert(out.includes("9d old")); // calibration age, raw
@@ -115,4 +115,30 @@ Deno.test("formatConditioningState: emits raw numbers + tags, zero verdict words
   }
   // phosphagen scope note kept (a fact, not a verdict)
   assert(out.toLowerCase().includes("phosphagen"));
+});
+
+// ── Drift guard — the column-name fence ─────────────────────────────────
+// Production's column is last_5_ratios; the repo once said last_4_ratios and
+// every read 400'd SILENTLY for months (pace multiplier pinned at 1.0, the
+// sequencer's diagnosis blind). This test greps the actual reader sources so
+// the name can never quietly fork again: if the schema evolves, this test,
+// the readers, and a migration must all move together.
+Deno.test("drift guard: no reader references the retired last_4_ratios column", async () => {
+  const readers = [
+    "./supabase/functions/_shared/conditioning-state.ts",
+    "./src/lib/engineService.ts",
+  ];
+  // Test cwd may be repo root or supabase/functions — resolve from either.
+  for (const rel of readers) {
+    let src: string | null = null;
+    for (const prefix of ["", "../../"]) {
+      try {
+        src = await Deno.readTextFile(prefix + rel);
+        break;
+      } catch { /* try next prefix */ }
+    }
+    if (src === null) throw new Error(`drift guard could not read ${rel}`);
+    assert(!src.includes("last_4_ratios"), `${rel} references retired column last_4_ratios`);
+    assert(src.includes("last_5_ratios"), `${rel} must read the production column last_5_ratios`);
+  }
 });
