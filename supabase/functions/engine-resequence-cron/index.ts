@@ -23,9 +23,17 @@ import { runResequence } from "../_shared/run-resequence.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Generations are serial and each carries a generous AI deadline (150s/attempt),
+// so one tick can't safely run many. Cap generations per tick; deferred users
+// are picked up on the next 15-min tick — a rollout-day backlog drains within
+// hours, and steady state rarely has more than a couple eligible per tick.
+// Consumed-check queries are cheap and stay uncapped.
+const MAX_GENERATIONS_PER_TICK = 2;
+
 Deno.serve(async (_req) => {
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   const results: Record<string, unknown>[] = [];
+  let generations = 0;
 
   try {
     // Only athletes explicitly opted in (test users first).
@@ -81,6 +89,14 @@ Deno.serve(async (_req) => {
           continue;
         }
 
+        // Tick cap: this athlete is eligible, but the tick's generation budget
+        // is spent. Defer BEFORE the stale-override cleanup so the whole
+        // consume-and-regenerate step happens atomically on a later tick.
+        if (generations >= MAX_GENERATIONS_PER_TICK) {
+          results.push({ user: uid, action: "deferred", reason: "tick generation cap reached" });
+          continue;
+        }
+
         // Skip-through: the uncompleted overrides are behind the athlete's
         // frontier — stale content written for an athlete-state that no longer
         // exists. Delete them (their pages revert to curated content);
@@ -97,6 +113,7 @@ Deno.serve(async (_req) => {
         }
 
         const result = await runResequence(supa, uid, { dryRun: false });
+        generations += 1;
         results.push({ user: uid, action: result.status, persisted: result.persisted ?? 0, reason: result.reason });
       } catch (e) {
         results.push({ user: uid, action: "error", error: e instanceof Error ? e.message : String(e) });

@@ -38,6 +38,7 @@ async function attempt(
   messages: { role: string; content: string }[],
   maxTokens: number,
   stream: boolean,
+  timeoutMs: number = ATTEMPT_TIMEOUT_MS,
 ): Promise<Response> {
   return fetchWithTimeout("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -53,7 +54,7 @@ async function attempt(
       system,
       messages,
     }),
-  }, ATTEMPT_TIMEOUT_MS);
+  }, timeoutMs);
 }
 
 // ---------------------------------------------------------------------------
@@ -64,14 +65,39 @@ export async function callClaude(opts: {
   system: string;
   userContent: string;
   maxTokens: number;
+  /** Per-attempt deadline. Default 45s fits short calls; size longer for
+   *  big structured generations (house rule: attempts × timeout must stay
+   *  inside the ~400s edge wall clock). */
+  timeoutMs?: number;
+  /** Default true. Set false for judgment seats where a degraded model is
+   *  worse than no result — the caller (e.g. the resequence cron) simply
+   *  tries again later. */
+  fallbackToHaiku?: boolean;
 }): Promise<string> {
-  const { apiKey, system, userContent, maxTokens } = opts;
+  const {
+    apiKey,
+    system,
+    userContent,
+    maxTokens,
+    timeoutMs = ATTEMPT_TIMEOUT_MS,
+    fallbackToHaiku = true,
+  } = opts;
   const msgs = [{ role: "user", content: userContent }];
 
+  // A thrown attempt (timeout / transport abort) is as retryable as a 529 —
+  // it used to escape this loop entirely and hard-fail the first slow call.
+  let lastThrown = "";
   for (let i = 0; i < MAX_RETRIES; i++) {
     if (RETRY_DELAYS[i] > 0) await new Promise((r) => setTimeout(r, RETRY_DELAYS[i]));
 
-    const resp = await attempt(SONNET_MODEL, apiKey, system, msgs, maxTokens, false);
+    let resp: Response;
+    try {
+      resp = await attempt(SONNET_MODEL, apiKey, system, msgs, maxTokens, false, timeoutMs);
+    } catch (e) {
+      lastThrown = e instanceof Error ? e.message : String(e);
+      console.warn(`Claude Sonnet attempt ${i + 1}/${MAX_RETRIES} threw: ${lastThrown}`);
+      continue;
+    }
 
     if (resp.ok) {
       const data = await resp.json();
@@ -89,9 +115,22 @@ export async function callClaude(opts: {
     }
   }
 
+  if (!fallbackToHaiku) {
+    throw new Error(
+      `Claude API call failed: Sonnet retries exhausted${lastThrown ? ` (last: ${lastThrown})` : ""}; fallback disabled`,
+    );
+  }
+
   // Sonnet exhausted — single Haiku attempt
   console.warn("Sonnet retries exhausted, falling back to Haiku");
-  const resp = await attempt(HAIKU_MODEL, apiKey, system, msgs, maxTokens, false);
+  let resp: Response;
+  try {
+    resp = await attempt(HAIKU_MODEL, apiKey, system, msgs, maxTokens, false, timeoutMs);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("Haiku fallback also threw:", msg);
+    throw new Error(`Claude API call failed (Sonnet + Haiku): ${msg}`);
+  }
 
   if (resp.ok) {
     const data = await resp.json();
