@@ -450,6 +450,7 @@ async function buildEngineAthleteCard(
   userId: string,
   programVersion: string,
   currentDay: number | null,
+  engineGoal: string | null = null,
 ): Promise<string> {
   const [{ data: mapping }, { data: timeTrials }, { data: pref }, { data: recentModalities }] = await Promise.all([
     // engine_current_day is a SEQUENCE position (post sequence-identity) —
@@ -517,6 +518,9 @@ async function buildEngineAthleteCard(
   }
 
   const parts: string[] = ["\n\nENGINE ATHLETE CONTEXT (Year of the Engine subscriber):"];
+  if (engineGoal) {
+    parts.push(`Stated goal: "${engineGoal}" — connect your coaching to what they're chasing where it's relevant.`);
+  }
   if (currentDay) {
     // Athlete-facing label is the sequence number; the catalog number is
     // internal plumbing the athlete never sees.
@@ -655,7 +659,7 @@ Deno.serve(async (req) => {
     // Fetch athlete profile for prompt personalization (including Engine state)
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
-      .select("lifts, skills, conditioning, bodyweight, units, gender, engine_program_version, engine_current_day, engine_months_unlocked, competition_athlete_id")
+      .select("lifts, skills, conditioning, bodyweight, units, gender, engine_program_version, engine_current_day, engine_months_unlocked, engine_goal, competition_athlete_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -1121,6 +1125,9 @@ Deno.serve(async (req) => {
             user.id,
             athleteProfile.engine_program_version,
             (athleteProfile?.engine_current_day as number | null) ?? null,
+            typeof athleteProfile?.engine_goal === "string" && athleteProfile.engine_goal.trim() !== ""
+              ? athleteProfile.engine_goal.trim()
+              : null,
           ).catch((e) => {
             console.error("[chat] engine athlete card failed:", e);
             return "";

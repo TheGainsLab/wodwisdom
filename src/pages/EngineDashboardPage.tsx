@@ -8,12 +8,13 @@ import {
   loadUserProgress,
   getWorkoutsForProgram,
   loadCompletedSessions,
+  saveEngineGoal,
   type EngineWorkout,
   type EngineUserProgress,
   calculateWorkDurationMinutes,
 } from '../lib/engineService';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ChevronLeft, Lock, Check, Play, Settings, BarChart3, Calendar, Trophy } from 'lucide-react';
+import { ChevronLeft, Lock, Check, Play, Settings, BarChart3, Calendar, Trophy, Target } from 'lucide-react';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -77,6 +78,12 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
   const [completedDays, setCompletedDays] = useState<Set<number>>(new Set());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [showSwitcher, setShowSwitcher] = useState(false);
+  // Goal row: one quiet line between the stat tiles and Start. Tap to edit
+  // inline; blank clears. The sequencer + chat read engine_goal — unset means
+  // they behave exactly as before the feature existed.
+  const [goalEditing, setGoalEditing] = useState(false);
+  const [goalDraft, setGoalDraft] = useState('');
+  const [goalSaving, setGoalSaving] = useState(false);
   const { hasFeature, hasEngineAccess, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
 
   const load = async () => {
@@ -345,6 +352,64 @@ export default function EngineDashboardPage({ session }: { session: Session }) {
                   <div className="engine-stat-value">{completedCount}</div>
                   <div className="engine-stat-label">Completed</div>
                 </div>
+              </div>
+
+              {/* Goal row — one quiet line, never a fifth red bar. Unset copy
+                  doubles as the sequencer's announcement to existing users. */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGoalDraft(progress?.engine_goal ?? '');
+                    setGoalEditing(v => !v);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '2px 4px', background: 'none', border: 'none', fontFamily: 'inherit', fontSize: 14, textAlign: 'left', cursor: 'pointer', color: progress?.engine_goal ? 'var(--text)' : 'var(--text-muted)' }}
+                >
+                  <Target size={17} style={{ flex: 'none', color: progress?.engine_goal ? 'var(--accent)' : 'currentColor' }} />
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {progress?.engine_goal || 'Set a goal — your AI sequencer will train toward it'}
+                  </span>
+                  <span style={{ flex: 'none', color: 'var(--text-muted)', fontSize: 13 }}>{progress?.engine_goal ? '✎' : '→'}</span>
+                </button>
+                {goalEditing && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '6px 2px 4px' }}>
+                    <textarea
+                      className="lift-input"
+                      rows={2}
+                      maxLength={500}
+                      placeholder='e.g. "Row a 10k under 40:00" · "Sub-20 5k" · "Improve my mile"'
+                      value={goalDraft}
+                      onChange={e => setGoalDraft(e.target.value)}
+                      style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left', fontSize: 14 }}
+                    />
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                      Your AI sequencer weighs upcoming days toward this. General is fine — specific is better. Leave blank any time.
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        className="engine-btn engine-btn-secondary engine-btn-sm"
+                        disabled={goalSaving}
+                        onClick={async () => {
+                          setGoalSaving(true);
+                          try {
+                            await saveEngineGoal(goalDraft);
+                            setProgress(p => (p ? { ...p, engine_goal: goalDraft.trim() || null } : p));
+                            setGoalEditing(false);
+                          } catch {
+                            // leave the editor open; user can retry
+                          }
+                          setGoalSaving(false);
+                        }}
+                      >
+                        {goalSaving ? 'Saving…' : 'Save Goal'}
+                      </button>
+                      <button type="button" onClick={() => setGoalEditing(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontFamily: 'inherit', fontSize: 13, cursor: 'pointer' }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Start button — locked when the pointer sits in a month beyond entitlement */}

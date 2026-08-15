@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Zap, Activity, Shuffle, Loader2, Check, RotateCcw } from 'lucide-react';
+import { Zap, Activity, Shuffle, Loader2, Check, RotateCcw, Target } from 'lucide-react';
 import {
   loadPrograms,
+  loadUserProgress,
+  saveEngineGoal,
   saveProgramVersion,
   switchProgram,
   restartProgram,
@@ -27,6 +29,9 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
   const [saving, setSaving] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmRestart, setConfirmRestart] = useState(false);
+  // Optional conditioning goal, saved alongside the program pick. Pre-filled
+  // in switcher mode — a program change is the natural goal-review moment.
+  const [goal, setGoal] = useState('');
   const isSwitching = currentProgram != null;
 
   const restart = async () => {
@@ -43,8 +48,10 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
   };
 
   useEffect(() => {
-    loadPrograms()
-      .then(setPrograms)
+    Promise.all([
+      loadPrograms().then(setPrograms),
+      loadUserProgress().then((p) => setGoal(p?.engine_goal ?? '')).catch(() => {}),
+    ])
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -63,6 +70,8 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
       } else {
         await saveProgramVersion(programId);
       }
+      // Best-effort: the goal riding along must never block the program pick.
+      await saveEngineGoal(goal).catch(() => {});
       onSelected(programId);
     } catch {
       // user can retry
@@ -171,6 +180,28 @@ export default function ProgramSelection({ onSelected, currentProgram }: Props) 
                 </button>
               );
             })}
+          </div>
+
+          {/* Optional goal — saved with the program pick. The AI sequencer
+              weighs upcoming days toward it once it engages (after 10
+              completed days); blank changes nothing. */}
+          <hr className="engine-divider" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+              <Target size={16} style={{ color: 'var(--accent)' }} /> What are you working toward? <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>(optional)</span>
+            </div>
+            <textarea
+              className="lift-input"
+              rows={2}
+              maxLength={500}
+              placeholder='e.g. "Row a 10k under 40:00" · "Sub-20 5k" · "Improve my mile"'
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left', fontSize: 14 }}
+            />
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              As you train, the AI starts personalizing your upcoming days — this is what it aims at. Saved when you pick a program; edit any time from the dashboard.
+            </div>
           </div>
 
           {/* Restart current program — the "start over" affordance users kept
