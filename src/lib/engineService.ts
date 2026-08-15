@@ -584,9 +584,38 @@ export async function findPrecedingRocketRacesA(
     .sort((a, b) => b.program_sequence_order - a.program_sequence_order);
   if (preceding.length === 0) return null;
 
-  // Day-type lives on the catalog rows; fetch types for the preceding days
-  // (bounded window — Rocket Races pairs sit within a couple of weeks).
+  // Bounded window — Rocket Races pairs sit within a couple of weeks.
   const window = preceding.slice(0, 30);
+
+  // Effective day-type per position = override ?? catalog — the same rule the
+  // day page renders by. Resolving through the catalog alone both
+  // false-matches (catalog says A, but the sequencer replaced that day — B
+  // would inherit from a session of the wrong type) and misses (the sequencer
+  // placed an A where the catalog has something else).
+  const ovTypeByPos = new Map<number, string>();
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth?.user?.id;
+  if (uid) {
+    const { data: ovs } = await supabase
+      .from('engine_user_day_overrides')
+      .select('sequence_position, engine_workout_id')
+      .eq('user_id', uid)
+      .eq('program_version', programId)
+      .in('sequence_position', window.map((m) => m.program_sequence_order));
+    const ids = (ovs ?? []).map((o) => o.engine_workout_id as string).filter(Boolean);
+    if (ids.length > 0) {
+      const { data: gen } = await supabase
+        .from('engine_workouts')
+        .select('id, day_type')
+        .in('id', ids);
+      const typeById = new Map((gen ?? []).map((w) => [w.id as string, w.day_type as string]));
+      for (const o of ovs ?? []) {
+        const t = typeById.get(o.engine_workout_id as string);
+        if (t) ovTypeByPos.set(o.sequence_position as number, t);
+      }
+    }
+  }
+
   const { data: workouts } = await supabase
     .from('engine_workouts')
     .select('day_number, day_type')
@@ -594,7 +623,11 @@ export async function findPrecedingRocketRacesA(
     .in('day_number', window.map((m) => m.engine_workout_day_number));
   const typeByDay = new Map((workouts ?? []).map((w) => [w.day_number, w.day_type]));
 
-  const partA = window.find((m) => typeByDay.get(m.engine_workout_day_number) === 'rocket_races_a');
+  const partA = window.find(
+    (m) =>
+      (ovTypeByPos.get(m.program_sequence_order) ?? typeByDay.get(m.engine_workout_day_number)) ===
+        'rocket_races_a',
+  );
   if (!partA) return null;
 
   const partADay = partA.program_sequence_order;
