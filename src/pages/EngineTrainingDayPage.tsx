@@ -385,6 +385,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   // ── Core state ──
   const [stage, setStage] = useState<Stage>('loading');
   const [workout, setWorkout] = useState<EngineWorkout | null>(null);
+  // The sequencer's "why today" line for generated days — quiet coach voice
+  // on the preview, no AI labeling. Catalog days have none and show nothing.
+  const [dayReason, setDayReason] = useState<string | null>(null);
   // True only after the load CONFIRMED the day has no content — never while
   // the fetch is in flight, so the not-found card can't flash during loading.
   const [dayNotFound, setDayNotFound] = useState(false);
@@ -464,6 +467,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         const override = await loadDayOverride(dayNumber).catch(() => null);
         const wk = override ?? (catDay != null ? await loadWorkoutForDay(catDay) : null);
         setWorkout(wk ? { ...wk, sequence_position: dayNumber } : null);
+        setDayReason(override?.override_reason ?? null);
 
         // Load workout history for this day type
         if (wk?.day_type) {
@@ -968,6 +972,15 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 <p className="engine-subheader">
                   All-out effort for {formatDuration(resolveNum(blocks[0]?.bp.workDuration, 600))}.
                   Your result sets pace targets for future workouts.
+                </p>
+              )}
+
+              {/* "Why today" — the sequencer's one-line reason, coach voice.
+                  Deliberately unlabeled (no "AI", no badge): the program simply
+                  explains itself. Absent on catalog days. */}
+              {dayReason && (
+                <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: 0, textAlign: 'center', fontStyle: 'italic' }}>
+                  {dayReason}
                 </p>
               )}
 

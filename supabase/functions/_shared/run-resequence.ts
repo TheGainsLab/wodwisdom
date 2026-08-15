@@ -63,8 +63,16 @@ const SYSTEM_PROMPT =
   `- Pace choices (paceRange/basePace/fluxPaceRange) are [lo,hi] fractions of baseline and must sit inside ` +
   `the envelope's [min,max].\n` +
   `- Stay within max_duration_minutes.\n\n` +
+  `The "reason" field is READ BY THE ATHLETE, on their workout screen, as their coach explaining the day. ` +
+  `Write it as one or two plain sentences addressed to them ("you"/"your") in a confident coach voice. ` +
+  `Ground it in their actual training — what they've been doing well, what today builds — but NEVER use ` +
+  `analyst vocabulary: no "ratio", "n=", "baseline", "envelope", "mid-envelope", "parameters", no numbers ` +
+  `with arrows, no day-type jargon beyond natural words. ` +
+  `Good: "You've beaten your interval targets four sessions straight, so today's pace is set higher — a notch ` +
+  `below where you left off, coming back from ten days away." Bad: "Interval ratio 1.15 (n=4) justifies ` +
+  `pace above baseline." The "summary" field is operator-facing — technical detail belongs there.\n\n` +
   `Output ONLY JSON, no prose, in this shape:\n` +
-  `{"summary":"one-line rationale","days":[{"day_type":"<id>","reason":"<why this day>","blocks":[{ ...params... }]}]}`;
+  `{"summary":"one-line technical rationale (operator-facing)","days":[{"day_type":"<id>","reason":"<the athlete-facing line>","blocks":[{ ...params... }]}]}`;
 
 /** Rough total minutes for display: work (rounds×workDuration) + numeric rest per block. */
 function estimateMinutes(blocks: Record<string, unknown>[]): number {
