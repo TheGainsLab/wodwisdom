@@ -261,7 +261,19 @@ export async function runResequence(
     ttNote + `\n` +
     `${catalogueText}`;
 
-  const raw = await callClaude({ apiKey: apiKey!, system: SYSTEM_PROMPT, userContent, maxTokens: 4096 });
+  // Generous deadline: up to 5 days × 4 blocks of structured params is a big
+  // generation, and this runs from a cron ahead of the athlete — latency is
+  // worthless here. 2 × 150s + 3s backoff ≈ 303s, inside the ~400s edge wall.
+  // No Haiku fallback: sequencing is a judgment seat — on failure we change
+  // nothing (athlete keeps the curated day) and the next cron tick retries.
+  const raw = await callClaude({
+    apiKey: apiKey!,
+    system: SYSTEM_PROMPT,
+    userContent,
+    maxTokens: 4096,
+    timeoutMs: 150_000,
+    fallbackToHaiku: false,
+  });
 
   const proposal = parseProposal(raw);
   if (!proposal) return { status: "unparseable", error: "AI returned unparseable output", raw };

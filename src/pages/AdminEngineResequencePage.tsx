@@ -46,7 +46,20 @@ export default function AdminEngineResequencePage({ session }: { session: Sessio
       const { data, error: invokeErr } = await supabase.functions.invoke('engine-resequence', {
         body: { target_user_id: id, dry_run: true },
       });
-      if (invokeErr) throw invokeErr;
+      if (invokeErr) {
+        // FunctionsHttpError.message is always the useless "non-2xx" line —
+        // the real error is in the response body on .context.
+        const ctx = (invokeErr as { context?: Response }).context;
+        let real: string | null = null;
+        if (ctx && typeof ctx.json === 'function') {
+          try {
+            const body = await ctx.json();
+            const e = (body as { error?: unknown } | null)?.error;
+            if (typeof e === 'string' && e.trim()) real = e;
+          } catch { /* body not JSON / already consumed */ }
+        }
+        throw new Error(real ?? invokeErr.message);
+      }
       if (data?.error) throw new Error(data.error);
       setResult(data as PreviewResult);
     } catch (e) {
