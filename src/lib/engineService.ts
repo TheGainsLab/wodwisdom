@@ -218,8 +218,12 @@ export async function loadWorkoutForDay(
   return data;
 }
 
-/** Load the current user's generated workout at a SEQUENCE position, if any. */
-export async function loadDayOverride(position: number): Promise<EngineWorkout | null> {
+/** Load the current user's generated workout at a SEQUENCE position, if any.
+ *  Carries the sequencer's "why today" line (override_reason) — written for
+ *  the athlete and shown on the day preview. */
+export async function loadDayOverride(
+  position: number
+): Promise<(EngineWorkout & { override_reason: string | null }) | null> {
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth?.user?.id;
   if (!uid) return null;
@@ -233,7 +237,7 @@ export async function loadDayOverride(position: number): Promise<EngineWorkout |
   const version = prof?.engine_program_version ?? 'main_5day';
   const { data: ov } = await supabase
     .from('engine_user_day_overrides')
-    .select('engine_workout_id')
+    .select('engine_workout_id, reason')
     .eq('user_id', uid)
     .eq('program_version', version)
     .eq('sequence_position', position)
@@ -244,7 +248,9 @@ export async function loadDayOverride(position: number): Promise<EngineWorkout |
     .select('*')
     .eq('id', ov.engine_workout_id)
     .maybeSingle();
-  return w ?? null;
+  if (!w) return null;
+  const reason = typeof ov.reason === 'string' && ov.reason.trim() !== '' ? ov.reason.trim() : null;
+  return { ...w, override_reason: reason };
 }
 
 /** Load all day type definitions. */
