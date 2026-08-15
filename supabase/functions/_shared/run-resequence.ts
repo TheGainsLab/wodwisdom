@@ -18,8 +18,8 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callClaude } from "./call-claude.ts";
 import { buildConditioningState } from "./conditioning-state.ts";
 import { buildOtherTrainingLoadBlock } from "./athlete-activities.ts";
-import { buildDayTypeCatalogue, loadDayTypeCatalogue } from "./engine-catalogue.ts";
-import { parseProposal, type ProposedDay, validateProposal } from "./engine-sequence.ts";
+import { formatDayTypeCatalogue, loadDayTypeCatalogue } from "./engine-catalogue.ts";
+import { computeAllowedDayTypes, parseProposal, type ProposedDay, validateProposal } from "./engine-sequence.ts";
 
 export const MIN_COMPLETED_DAYS = 10; // loop starts after the athlete completes 10 Engine days
 
@@ -29,8 +29,9 @@ const SYSTEM_PROMPT =
   `their authored envelopes.\n\n` +
   `You are given: (1) the athlete's RAW conditioning signals (per-competency rolling ratios + recent ` +
   `trend, time-trial/calibration age, days since last session — no labels; you interpret them), ` +
-  `(2) the day-type catalogue with each type's parameter envelope, (3) the athlete's ` +
-  `current phase and how many days to generate, and (4) when present, their OTHER TRAINING LOAD — ` +
+  `(2) the day-type catalogue with each type's parameter envelope — it contains exactly the day-types ` +
+  `available at this point in the athlete's program, (3) how many days to generate, and (4) when present, ` +
+  `their OTHER TRAINING LOAD — ` +
   `real recent training Engine did not prescribe (program strength days, self-logged activities). ` +
   `That load draws on the same recovery budget: factor it into intensity and day-type placement, ` +
   `but never into day count — the program's length and cadence are fixed.\n\n` +
@@ -49,7 +50,8 @@ const SYSTEM_PROMPT =
   `holds — e.g. a long layoff, a modality change, or recent paces that clearly contradict it — not merely ` +
   `because the baseline is aging.\n\n` +
   `Rules:\n` +
-  `- Only use day_types whose phase_requirement <= the athlete's current phase.\n` +
+  `- Only use day_types from the catalogue below — it already contains exactly what is available at this ` +
+  `point in the athlete's program.\n` +
   `- Supply exactly block_count blocks per day, in order. Emit ONLY the parameters where the envelope ` +
   `offers a real choice: a [min,max] range with min < max, or an Options list. Every fixed value — fixed ` +
   `strings/numbers, rest keywords, pinned [x,x] ranges, inherit_from_part_a sentinels, lookup tables — is ` +
@@ -105,10 +107,11 @@ export async function runResequence(
     return { status: "skipped", reason: `needs ${MIN_COMPLETED_DAYS} completed days, has ${completed ?? 0}` };
   }
 
-  // 2) Diagnosis + catalogue (text for the prompt, rows for validation).
-  const [diagnosis, catalogueText, catalogueRows] = await Promise.all([
+  // 2) Diagnosis + catalogue rows. The prompt's catalogue TEXT is formatted
+  // later, after the month-availability pool is known — the model only ever
+  // sees the day-types the program has unlocked.
+  const [diagnosis, catalogueRows] = await Promise.all([
     buildConditioningState(supa, userId),
-    buildDayTypeCatalogue(supa),
     loadDayTypeCatalogue(supa),
   ]);
   if (!diagnosis) return { status: "skipped", reason: "no conditioning diagnosis available" };
@@ -125,12 +128,10 @@ export async function runResequence(
 
   // 3b) How far the athlete has progressed. program_day_number == the catalog
   // day_number; scope by program_version (a switch resets to that program's own
-  // progress). We derive two things from their completions:
-  //   - the furthest catalog day reached -> currentPhase (max phase unlocked; the
-  //     5-day phase arc is monotonic in day_number, so max day = max phase).
-  //   - the furthest SEQUENCE position reached -> which days come next. Curated
-  //     programs (hyrox/vo2) map NON-monotonic catalog days, so "next" must be
-  //     walked in program_sequence_order, never by catalog day number.
+  // progress). What matters is the furthest SEQUENCE position reached ->
+  // which days come next. Curated programs (hyrox/vo2) map NON-monotonic
+  // catalog days, so "next" must be walked in program_sequence_order, never
+  // by catalog day number.
   const { data: doneRows } = await supa
     .from("engine_workout_sessions")
     .select("program_day_number, sequence_position")
@@ -141,14 +142,17 @@ export async function runResequence(
   const currentDay = highestCompleted + 1;
 
   // Full position<->catalog-day mapping for this program, in sequence order.
+  // month is program-scoped (engine_program_mapping.month, NOT NULL since the
+  // 20260418 backfill) — it drives the availability pool below.
   const { data: mapAll } = await supa
     .from("engine_program_mapping")
-    .select("engine_workout_day_number, program_sequence_order")
+    .select("engine_workout_day_number, program_sequence_order, month")
     .eq("engine_program_id", version)
     .order("program_sequence_order", { ascending: true });
   const mapping = (mapAll ?? []).map((m) => ({
     day: m.engine_workout_day_number as number,
     seq: m.program_sequence_order as number,
+    month: (m.month as number) ?? 1,
   }));
 
   // Furthest SEQUENCE position completed. sessions.sequence_position is the
@@ -183,30 +187,35 @@ export async function runResequence(
     blockPairs = Array.from({ length: maxDays }, (_, i) => ({ seq: currentDay + i, day: currentDay + i }));
   }
 
-  // 3d) Phase at the current position (read from the curated catalog day).
-  let currentPhase = 1;
-  if (highestCompleted > 0) {
-    const { data: w } = await supa
-      .from("engine_workouts")
-      .select("phase")
-      .eq("program_type", "main_5day")
-      .eq("day_number", highestCompleted).maybeSingle();
-    currentPhase = (w?.phase as number) ?? 1;
-  }
+  // 3d) Catalog day -> day_type for the whole authored catalog (720 rows,
+  // two columns): one query serves TT pinning, the prescribed-slot baseline,
+  // and the month-availability pool.
+  const { data: catalogTypes } = await supa
+    .from("engine_workouts")
+    .select("day_number, day_type")
+    .eq("program_type", "main_5day");
+  const typeByDay = new Map<number, string>(
+    (catalogTypes ?? []).map((w) => [w.day_number as number, w.day_type as string]),
+  );
+
+  // 3e) Month-availability pool — replaces phase gating. The program's own
+  // curation is the unlock curve: legal day-types are the ones this program
+  // maps at months <= the block's month (month of the furthest position being
+  // generated — position-month, never the athlete's paid months_unlocked).
+  // A mapping-less program (plain-catalog fallback above) gets the full
+  // catalogue: it has no curation to define an unlock curve.
+  const blockMonth = mapping.length > 0
+    ? Math.max(1, ...blockPairs.map((p) => mapping.find((m) => m.seq === p.seq)?.month ?? 1))
+    : 1;
+  const allowedDayTypes = mapping.length > 0
+    ? computeAllowedDayTypes(mapping, typeByDay, blockMonth)
+    : new Set<string>(catalogueRows.map((r) => r.id));
 
   // 4) Pin month-boundary time trials (left as the catalog TT; AI fills the
   // rest). Day-typing is per catalog day; pinning is per POSITION, so a
   // repeated TT catalog day pins every position it occupies in the window.
-  const { data: catalogBlock } = await supa
-    .from("engine_workouts")
-    .select("day_number, day_type")
-    .eq("program_type", "main_5day")
-    .in("day_number", blockPairs.map((p) => p.day));
-  const ttDays = new Set(
-    (catalogBlock ?? []).filter((d) => d.day_type === "time_trial").map((d) => d.day_number as number),
-  );
-  const ttPositions = blockPairs.filter((p) => ttDays.has(p.day)).map((p) => p.seq);
-  const aiPairs = blockPairs.filter((p) => !ttDays.has(p.day));
+  const ttPositions = blockPairs.filter((p) => typeByDay.get(p.day) === "time_trial").map((p) => p.seq);
+  const aiPairs = blockPairs.filter((p) => typeByDay.get(p.day) !== "time_trial");
   const aiPositions = aiPairs.map((p) => p.seq);
   const daysToGenerate = aiPositions.length;
   if (daysToGenerate === 0) {
@@ -226,17 +235,14 @@ export async function runResequence(
   // specialty programs (hyrox/vo2) come out generic. The curated day-type is a
   // baseline, not a lock — the AI adapts block params to the athlete's signals
   // and may substitute the day-type when the data clearly warrants. Either way
-  // the result still passes phase-gating + envelope validation downstream.
+  // the result still passes availability + envelope validation downstream.
   const programGoal = program?.name
     ? `PROGRAM: ${program.name}${program.description ? ` — ${program.description}` : ""}\n` +
       `Bias your day-type choices toward this program's intent.\n`
     : "";
-  const curatedByDay = new Map<number, string>(
-    (catalogBlock ?? []).map((d) => [d.day_number as number, d.day_type as string]),
-  );
   // Day-types are keyed by CATALOG day; walk the {seq, day} pairs.
   const prescribedSlots = aiPairs
-    .map((p, i) => `  day ${i + 1}: program prescribes "${curatedByDay.get(p.day) ?? "unspecified"}"`)
+    .map((p, i) => `  day ${i + 1}: program prescribes "${typeByDay.get(p.day) ?? "unspecified"}"`)
     .join("\n");
   const prescribedNote = prescribedSlots
     ? `PROGRAM-PRESCRIBED DAY-TYPES FOR THESE SLOTS (your baseline — keep each unless the ` +
@@ -253,11 +259,19 @@ export async function runResequence(
     return "";
   });
 
+  // The catalogue the model sees is pre-filtered to the availability pool —
+  // it cannot propose a day-type it was never shown (the validator enforces
+  // the same set as the second fence).
+  const catalogueText = formatDayTypeCatalogue(
+    catalogueRows.filter((r) => allowedDayTypes.has(r.id)),
+  );
+
   const userContent =
     `${diagnosis}\n\n` +
     (otherLoad ? `${otherLoad}\n\n` : "") +
     programGoal +
-    `ATHLETE CURRENT PHASE: ${currentPhase} (only day_types with phase_requirement <= ${currentPhase} are legal)\n` +
+    `PROGRAM MONTH: ${blockMonth} — the catalogue below contains exactly the day-types the program has ` +
+    `made available through this month.\n` +
     `GENERATE THE NEXT ${daysToGenerate} ENGINE DAYS.\n` +
     prescribedNote +
     ttNote + `\n` +
@@ -280,7 +294,7 @@ export async function runResequence(
   const proposal = parseProposal(raw);
   if (!proposal) return { status: "unparseable", error: "AI returned unparseable output", raw };
 
-  const result = validateProposal(proposal, catalogueRows, { currentPhase, maxDays: daysToGenerate });
+  const result = validateProposal(proposal, catalogueRows, { allowedDayTypes, maxDays: daysToGenerate });
 
   if (dryRun || result.accepted.length === 0) {
     return {
@@ -288,7 +302,8 @@ export async function runResequence(
       dry_run: dryRun,
       persisted: 0,
       currentDay,
-      currentPhase,
+      month: blockMonth,
+      allowed_day_types: Array.from(allowedDayTypes).sort(),
       maxDays,
       days_to_generate: daysToGenerate,
       pinned_time_trials: ttPositions,
@@ -327,7 +342,9 @@ export async function runResequence(
           program_type: programType,
           day_number: nextGenNumber,
           day_type: day.day_type,
-          phase: currentPhase,
+          // For gen rows this column records the block's PROGRAM MONTH (the
+          // availability pool it was generated under), not the retired phase.
+          phase: blockMonth,
           block_count: blocks.length,
           block_1_params: blocks[0] ?? null,
           block_2_params: blocks[1] ?? null,
@@ -353,12 +370,12 @@ export async function runResequence(
     }
   }
 
-  console.log(`[run-resequence] user=${userId} currentDay=${currentDay} phase=${currentPhase} placed=${placed.length} errors=${result.errors.length + persistErrors.length}`);
+  console.log(`[run-resequence] user=${userId} currentDay=${currentDay} month=${blockMonth} placed=${placed.length} errors=${result.errors.length + persistErrors.length}`);
 
   return {
     status: "applied",
     currentDay,
-    currentPhase,
+    month: blockMonth,
     maxDays,
     summary: proposal.summary,
     persisted: placed.length,

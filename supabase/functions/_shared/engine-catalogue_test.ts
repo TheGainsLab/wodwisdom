@@ -47,9 +47,10 @@ Deno.test("formatDayTypeCatalogue: includes legend, gating, intent, and raw enve
   // legend present
   assert(out.includes(PARAM_LEGEND));
   assert(out.includes("DAY TYPES (2):"));
-  // gating line
-  assert(out.includes("### threshold (Threshold) — phase>=1, 1 block, cap 18min"));
-  assert(out.includes("### hybrid_aerobic (Hybrid Aerobic) — phase>=5, 2 blocks, cap 40min"));
+  // gating line — no phase fragment: availability is decided upstream, the
+  // catalogue the model sees is already filtered to the program's pool.
+  assert(out.includes("### threshold (Threshold) — 1 block, cap 18min"));
+  assert(out.includes("### hybrid_aerobic (Hybrid Aerobic) — 2 blocks, cap 40min"));
   // intent
   assert(out.includes("lactate threshold"));
   // raw envelopes (authoritative params), both blocks for the 2-block type
