@@ -50,12 +50,14 @@ const SYSTEM_PROMPT =
   `because the baseline is aging.\n\n` +
   `Rules:\n` +
   `- Only use day_types whose phase_requirement <= the athlete's current phase.\n` +
-  `- Supply exactly block_count blocks, each an object with the same keys as the day-type's block_N_params.\n` +
-  `- Choose a SINGLE concrete value for every parameter — never return a range/array where the envelope ` +
-  `expects one value (e.g. workDuration must be a number like 120, not [90,210]).\n` +
-  `- Durations are SECONDS. paceRange is [lo,hi] as a fraction of baseline and must sit inside the envelope's [min,max].\n` +
-  `- Keep workProgression/paceProgression/restProgression EXACTLY as the envelope specifies. Use the exact ` +
-  `rest keyword (e.g. one_third_work) when the envelope uses one.\n` +
+  `- Supply exactly block_count blocks per day, in order. Emit ONLY the parameters where the envelope ` +
+  `offers a real choice: a [min,max] range with min < max, or an Options list. Every fixed value — fixed ` +
+  `strings/numbers, rest keywords, pinned [x,x] ranges, inherit_from_part_a sentinels, lookup tables — is ` +
+  `filled in by the system; omit them. A block with no choices is just {}.\n` +
+  `- Choose a SINGLE concrete value for each ranged scalar — never return a range where one value is ` +
+  `expected (e.g. workDuration must be a number like 120, not [90,210]). Durations are SECONDS.\n` +
+  `- Pace choices (paceRange/basePace/fluxPaceRange) are [lo,hi] fractions of baseline and must sit inside ` +
+  `the envelope's [min,max].\n` +
   `- Stay within max_duration_minutes.\n\n` +
   `Output ONLY JSON, no prose, in this shape:\n` +
   `{"summary":"one-line rationale","days":[{"day_type":"<id>","reason":"<why this day>","blocks":[{ ...params... }]}]}`;

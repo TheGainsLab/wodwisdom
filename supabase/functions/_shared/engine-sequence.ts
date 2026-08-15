@@ -68,6 +68,59 @@ function isNumPair(v: unknown): v is [number, number] {
   return Array.isArray(v) && v.length === 2 && typeof v[0] === "number" && typeof v[1] === "number";
 }
 
+/**
+ * Fill every envelope key that admits exactly ONE legal value into the
+ * generated block, in canonical shape — so the model only ever answers real
+ * questions. Born from the first live preview, where 3 of 5 days died of
+ * transcription: a scalar 0.7 emitted against polarized's pinned [0.7, 0.7]
+ * basePace, and computed values where rocket_races_b demands the
+ * inherit_from_part_a sentinel. No judgment error — pure format loss.
+ *
+ * Single-legal-value shapes (mirrors validateBlock's dispatch, so the two
+ * can't drift):
+ *   - fixed string  (mode keywords, rest keywords, "max_effort", sentinels)
+ *   - fixed number
+ *   - pinned pair   [x, x] — canonical shape depends on the key class:
+ *                   pace keys keep the pair, scalar keys collapse to x
+ *   - reversed pair [start, end] with start > end (progression endpoints)
+ *   - plain object  (e.g. fluxIntensityByDuration lookup tables)
+ * These are SET unconditionally: for such keys the model's value carries no
+ * information, so canonical always wins — a mistyped keyword or mis-shaped
+ * constant can never cost a training day again.
+ *
+ * Real choices are left untouched for validation: [min,max] ranges with
+ * min < max, and *Options lists (the Options key defines the choice for its
+ * base key and is itself never a block param).
+ */
+export function fillDeterministicParams(
+  gen: GeneratedBlock,
+  envelope: Record<string, unknown> | null | undefined,
+): GeneratedBlock {
+  if (!envelope) return gen;
+  const out: GeneratedBlock = { ...gen };
+  for (const [key, env] of Object.entries(envelope)) {
+    if (key.endsWith("Options")) continue;
+    if (typeof env === "string" || typeof env === "number") {
+      out[key] = env;
+      continue;
+    }
+    if (isNumPair(env)) {
+      if (env[0] === env[1]) {
+        out[key] = SCALAR_KEYS.has(key) ? env[0] : [env[0], env[1]];
+      } else if (env[0] > env[1]) {
+        out[key] = [env[0], env[1]];
+      }
+      // min < max: a real choice — the model's value stands.
+      continue;
+    }
+    if (env && typeof env === "object" && !Array.isArray(env)) {
+      out[key] = env;
+      continue;
+    }
+  }
+  return out;
+}
+
 /** Validate one generated block against its authored envelope. Returns error strings. */
 export function validateBlock(
   gen: GeneratedBlock,
@@ -210,14 +263,21 @@ export function validateProposal(
       continue;
     }
 
+    // Deterministic fill BEFORE validation: single-legal-value keys are
+    // supplied by code in canonical shape, so the model is only ever graded
+    // on its real choices. Accepted days carry the FILLED blocks — that is
+    // what persists and what the workout runner executes.
     const envelopes = [dt.block_1_params, dt.block_2_params, dt.block_3_params, dt.block_4_params];
+    const filledBlocks: GeneratedBlock[] = [];
     const blockErrs: string[] = [];
     let totalWork = 0;
     for (let i = 0; i < dt.block_count; i++) {
       const env = envelopes[i];
+      const filled = fillDeterministicParams(day.blocks[i] ?? {}, env);
+      filledBlocks.push(filled);
       if (!env) continue;
-      blockErrs.push(...validateBlock(day.blocks[i], env, `"${day.day_type}" block ${i + 1}`));
-      totalWork += blockWorkSeconds(day.blocks[i]);
+      blockErrs.push(...validateBlock(filled, env, `"${day.day_type}" block ${i + 1}`));
+      totalWork += blockWorkSeconds(filled);
     }
     if (dt.max_duration_minutes != null && totalWork > dt.max_duration_minutes * 60) {
       blockErrs.push(`"${day.day_type}": work ${Math.round(totalWork / 60)}min exceeds cap ${dt.max_duration_minutes}min.`);
@@ -227,7 +287,7 @@ export function validateProposal(
       errors.push(...blockErrs);
       continue;
     }
-    accepted.push(day);
+    accepted.push({ ...day, blocks: filledBlocks });
   }
 
   return { ok: accepted.length > 0 && errors.length === 0, accepted, errors };
