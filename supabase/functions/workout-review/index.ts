@@ -790,7 +790,12 @@ Deno.serve(async (req) => {
         .limit(1),
       supa.from("athlete_profiles").select("lifts, skills, conditioning, bodyweight, units, age, height, gender").eq("user_id", user.id).maybeSingle(),
       fetchAndFormatRecentHistory(supa, user.id, { days: 14, maxLines: 25 }),
-      buildConditioningState(supa, user.id),
+      // Soft-fail: a review without conditioning context beats no review —
+      // but log loudly (buildConditioningState now throws on fetch errors).
+      buildConditioningState(supa, user.id).catch((err) => {
+        console.error(JSON.stringify({ tag: "conditioning_state_failed", at: "workout-review", error: err instanceof Error ? err.message : String(err) }));
+        return "";
+      }),
       // The coach's letter — the review coaches inside the same judgment that
       // wrote the program (2026-08-12: one coach, four renders). plan-grounding
       // closing: connect blocks to cycle priorities, never negotiate the

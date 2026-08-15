@@ -103,7 +103,7 @@ export interface EnginePerformanceMetrics {
   learned_max_pace: number | null;
   rolling_avg_ratio: number | null;
   rolling_count: number;
-  last_4_ratios: number[];
+  last_5_ratios: number[];
 }
 
 export interface EngineUserProgress {
@@ -725,7 +725,7 @@ export async function getPerformanceMetrics(
 ): Promise<EnginePerformanceMetrics | null> {
   const { data, error } = await supabase
     .from('engine_user_performance_metrics')
-    .select('day_type, modality, learned_max_pace, rolling_avg_ratio, rolling_count, last_4_ratios')
+    .select('day_type, modality, learned_max_pace, rolling_avg_ratio, rolling_count, last_5_ratios')
     .eq('day_type', dayType)
     .eq('modality', modality)
     .maybeSingle();
@@ -738,7 +738,7 @@ export async function getPerformanceMetrics(
 export async function getAllPerformanceMetrics(): Promise<EnginePerformanceMetrics[]> {
   const { data, error } = await supabase
     .from('engine_user_performance_metrics')
-    .select('day_type, modality, learned_max_pace, rolling_avg_ratio, rolling_count, last_4_ratios');
+    .select('day_type, modality, learned_max_pace, rolling_avg_ratio, rolling_count, last_5_ratios');
 
   if (error) throw error;
   return data ?? [];

@@ -62,7 +62,7 @@ export interface PerfMetricRow {
   modality: string;
   rolling_avg_ratio: number | null;
   rolling_count: number;
-  last_4_ratios: unknown; // jsonb array
+  last_5_ratios: unknown; // jsonb array
   learned_max_pace: number | null;
 }
 
@@ -106,8 +106,8 @@ export interface CompetencySignal {
   modality: string;
   systems: EnergySystem[]; // which energy systems this day_type trains
   is_root: boolean; // a load-bearing energy-system primitive
-  rolling_avg_ratio: number | null; // mean of last 4 (actual ÷ target); 1.0 = on adaptive target
-  last_4_ratios: number[]; // raw recent sequence, oldest→newest
+  rolling_avg_ratio: number | null; // mean of last up-to-5 (actual ÷ target); 1.0 = on adaptive target
+  last_5_ratios: number[]; // raw recent sequence, oldest→newest
   rolling_count: number; // sessions in the window (confidence)
   learned_max_pace: number | null; // best actual pace ever for this competency
 }
@@ -187,8 +187,8 @@ export function computeConditioningDiagnosis(inputs: ConditioningInputs): Condit
 
   const competencies: CompetencySignal[] = inputs.metrics.map((m) => {
     const meta = DAY_TYPE_META[m.day_type];
-    const last4 = Array.isArray(m.last_4_ratios)
-      ? m.last_4_ratios.map(num).filter((x): x is number => x !== null)
+    const recent = Array.isArray(m.last_5_ratios)
+      ? m.last_5_ratios.map(num).filter((x): x is number => x !== null)
       : [];
     return {
       day_type: m.day_type,
@@ -196,7 +196,7 @@ export function computeConditioningDiagnosis(inputs: ConditioningInputs): Condit
       systems: meta?.systems ?? [],
       is_root: meta?.isRoot ?? false,
       rolling_avg_ratio: num(m.rolling_avg_ratio),
-      last_4_ratios: last4,
+      last_5_ratios: recent,
       rolling_count: m.rolling_count ?? 0,
       learned_max_pace: num(m.learned_max_pace),
     };
@@ -215,8 +215,8 @@ export function computeConditioningDiagnosis(inputs: ConditioningInputs): Condit
 // ─── Format (raw signals — no labels) ────────────────────────────────────────
 
 const METRIC_EXPLAINER =
-  "rolling_avg_ratio = mean of the athlete's last 4 (actual_pace ÷ target_pace) for that day_type+modality; " +
-  "1.0 = exactly on their adaptive target, >1.0 beating it, <1.0 under it. last4 is the raw recent sequence " +
+  "rolling_avg_ratio = mean of the athlete's last up-to-5 (actual_pace ÷ target_pace) for that day_type+modality; " +
+  "1.0 = exactly on their adaptive target, >1.0 beating it, <1.0 under it. recent is the raw sequence " +
   "(oldest→newest). n = sessions in the window (confidence). max = best pace ever logged (units vary by modality). " +
   "No labels are applied — judge each system's state, its trend, recovery, and any need to recalibrate from the numbers yourself.";
 
@@ -238,9 +238,9 @@ export function formatConditioningState(inputs: ConditioningInputs): string {
       const sys = c.systems.length ? c.systems.join(",") : "—";
       const root = c.is_root ? " root" : "";
       const ratio = c.rolling_avg_ratio != null ? c.rolling_avg_ratio.toFixed(2) : "—";
-      const last4 = c.last_4_ratios.length ? `[${c.last_4_ratios.map((x) => x.toFixed(2)).join(",")}]` : "[]";
+      const recent = c.last_5_ratios.length ? `[${c.last_5_ratios.map((x) => x.toFixed(2)).join(",")}]` : "[]";
       const max = c.learned_max_pace != null ? ` max ${c.learned_max_pace}` : "";
-      parts.push(`- ${dt} / ${mod}  trains[${sys}]${root}  ratio ${ratio}  n${c.rolling_count}  last4 ${last4}${max}`);
+      parts.push(`- ${dt} / ${mod}  trains[${sys}]${root}  ratio ${ratio}  n${c.rolling_count}  recent ${recent}${max}`);
     }
   }
 
@@ -275,10 +275,10 @@ export async function buildConditioningState(
   const recentDays = opts?.recentDays ?? 90;
   const cutoff = new Date(Date.now() - recentDays * 86400000).toISOString().slice(0, 10);
 
-  const [{ data: metrics }, { data: timeTrials }, { data: sessions }] = await Promise.all([
+  const [metricsRes, ttRes, sessRes] = await Promise.all([
     supa
       .from("engine_user_performance_metrics")
-      .select("day_type, modality, rolling_avg_ratio, rolling_count, last_4_ratios, learned_max_pace")
+      .select("day_type, modality, rolling_avg_ratio, rolling_count, last_5_ratios, learned_max_pace")
       .eq("user_id", userId),
     supa
       .from("engine_time_trials")
@@ -293,6 +293,21 @@ export async function buildConditioningState(
       .gte("date", cutoff)
       .order("date", { ascending: false }),
   ]);
+
+  // LOUD on fetch failure — never an empty diagnosis. A schema drift on this
+  // exact query (a stale 4-window column name vs production's last_5_ratios)
+  // once blinded the sequencer's primary signal for every athlete, silently,
+  // because errors were swallowed into `data: null`. Throw; soft-fail
+  // consumers (chat, workout-review) catch at their call sites, hard
+  // consumers (resequence) surface it as a real error.
+  for (const [name, res] of [["performance_metrics", metricsRes], ["time_trials", ttRes], ["sessions", sessRes]] as const) {
+    if (res.error) {
+      throw new Error(`[conditioning-state] ${name} fetch failed: ${res.error.message}`);
+    }
+  }
+  const metrics = metricsRes.data;
+  const timeTrials = ttRes.data;
+  const sessions = sessRes.data;
 
   return formatConditioningState({
     metrics: (metrics as PerfMetricRow[]) ?? [],
