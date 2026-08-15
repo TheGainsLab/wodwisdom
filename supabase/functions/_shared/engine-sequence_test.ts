@@ -7,7 +7,7 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 
 import type { EngineDayTypeRow } from "./engine-catalogue.ts";
-import { parseProposal, validateBlock, validateProposal } from "./engine-sequence.ts";
+import { fillDeterministicParams, parseProposal, validateBlock, validateProposal } from "./engine-sequence.ts";
 
 function row(id: string, phase: number, params: Partial<EngineDayTypeRow>): EngineDayTypeRow {
   return {
@@ -33,7 +33,25 @@ const HYBRID = row("hybrid_aerobic", 5, {
 });
 const TOWERS = row("towers", 9, { block_1_params: { rounds: 4, paceRange: [0.75, 0.90], restDuration: 0, workDuration: 120, workProgression: "continuous" } });
 
-const CATALOGUE = [THRESHOLD, INTERVAL, HYBRID, TOWERS];
+// Real seed envelopes carrying the single-legal-value shapes the fill covers.
+const POLARIZED = row("polarized", 2, {
+  max_duration_minutes: 60,
+  block_1_params: { rounds: 1, basePace: [0.70, 0.70], burstTiming: "every_7_minutes", restDuration: 0, workDuration: [1200, 3600], burstDuration: 7, burstIntensity: "max_effort", workProgression: "continuous_with_bursts" },
+});
+const ROCKET_B = row("rocket_races_b", 3, {
+  max_duration_minutes: 40,
+  block_1_params: { rounds: "inherit_from_part_a", paceRange: "inherit_from_part_a", restDuration: "one_to_one_point_five_times_work", workDuration: "inherit_from_part_a", workProgression: "consistent" },
+});
+const DESCENDING_DEVOUR = row("descending_devour", 7, {
+  max_duration_minutes: 36,
+  block_1_params: { rounds: [4, 8], paceRange: [0.90, 1.05], restDuration: [75, 15], workDuration: 180, restProgression: "decreasing", workProgression: "consistent" },
+});
+const FLUX = row("flux", 4, {
+  max_duration_minutes: 42,
+  block_1_params: { rounds: [4, 8], basePace: [0.70, 0.70], baseDuration: [300, 360], fluxDuration: [30, 120], fluxPaceRange: [0.75, 0.95], workProgression: "alternating_paces", fluxIntensityByDuration: { "30": 0.90, "60": 0.85, "120": 0.80 } },
+});
+
+const CATALOGUE = [THRESHOLD, INTERVAL, HYBRID, TOWERS, POLARIZED, ROCKET_B, DESCENDING_DEVOUR, FLUX];
 
 // ── validateBlock: envelope enforcement ──────────────────────────────────
 Deno.test("validateBlock: in-envelope generation passes", () => {
@@ -82,6 +100,84 @@ Deno.test("validateBlock: fixed value must be matched", () => {
     THRESHOLD.block_1_params!, "b1",
   );
   assert(errs.some((e) => e.includes("rounds"))); // threshold rounds fixed at 1
+});
+
+// ── fillDeterministicParams: single-legal-value keys are code's job ──────
+// Each test pins one of the six shapes to the real day type that carries it.
+
+Deno.test("fill: pinned [x,x] pace range — scalar emission normalized (polarized live failure)", () => {
+  // The model emitted basePace 0.7 against the pinned [0.7, 0.7] envelope and
+  // lost the day on shape. Fill makes the canonical pair unconditionally.
+  const filled = fillDeterministicParams({ workDuration: 1800, basePace: 0.7 }, POLARIZED.block_1_params!);
+  assertEquals(filled.basePace, [0.70, 0.70]);
+  const r = validateProposal(
+    { summary: "", days: [day("polarized", [{ workDuration: 1800, basePace: 0.7 }])] },
+    CATALOGUE, { currentPhase: 2 },
+  );
+  assert(r.ok, r.errors.join("; "));
+});
+
+Deno.test("fill: inherit_from_part_a sentinels — rocket_races_b is fully deterministic (live failure)", () => {
+  // Every key is a sentinel or fixed: the model has nothing to decide. An
+  // empty block must come back complete and valid — even when the model
+  // previously computed concrete values here, canonical wins.
+  const r = validateProposal(
+    { summary: "", days: [day("rocket_races_b", [{}])] },
+    CATALOGUE, { currentPhase: 3 },
+  );
+  assert(r.ok, r.errors.join("; "));
+  const b = r.accepted[0].blocks[0];
+  assertEquals(b.rounds, "inherit_from_part_a");
+  assertEquals(b.paceRange, "inherit_from_part_a");
+  assertEquals(b.workDuration, "inherit_from_part_a");
+  assertEquals(b.restDuration, "one_to_one_point_five_times_work");
+  assertEquals(b.workProgression, "consistent");
+});
+
+Deno.test("fill: fixed strings and numbers set unconditionally — wrong emissions can't cost the day", () => {
+  const filled = fillDeterministicParams(
+    { rounds: 8, paceRange: [0.85, 1.0], workDuration: 120, workProgression: "increasing", restDuration: "equal_to_work" },
+    INTERVAL.block_1_params!,
+  );
+  assertEquals(filled.workProgression, "consistent"); // canonical overwrites the mistake
+  assertEquals(filled.restDuration, "one_third_work");
+});
+
+Deno.test("fill: reversed [start,end] progression endpoints copied verbatim", () => {
+  const filled = fillDeterministicParams({ rounds: 6, paceRange: [0.95, 1.0] }, DESCENDING_DEVOUR.block_1_params!);
+  assertEquals(filled.restDuration, [75, 15]);
+  assertEquals(filled.workDuration, 180);
+  assertEquals(filled.restProgression, "decreasing");
+});
+
+Deno.test("fill: lookup objects copied; real choices untouched and still validated", () => {
+  const filled = fillDeterministicParams(
+    { rounds: 6, baseDuration: 330, fluxDuration: 60, fluxPaceRange: [0.80, 0.90] },
+    FLUX.block_1_params!,
+  );
+  assertEquals(filled.fluxIntensityByDuration, { "30": 0.90, "60": 0.85, "120": 0.80 });
+  assertEquals(filled.basePace, [0.70, 0.70]);
+  assertEquals(filled.fluxPaceRange, [0.80, 0.90]); // model's real choice stands
+  // A genuinely out-of-envelope choice still rejects the day — fill never
+  // papers over real errors.
+  const r = validateProposal(
+    { summary: "", days: [day("flux", [{ rounds: 6, baseDuration: 330, fluxDuration: 60, fluxPaceRange: [0.80, 1.10] }])] },
+    CATALOGUE, { currentPhase: 4 },
+  );
+  assert(!r.ok);
+  assert(r.errors.some((e) => e.includes("fluxPaceRange")));
+});
+
+Deno.test("fill: accepted days persist the FILLED blocks", () => {
+  const r = validateProposal(
+    { summary: "", days: [day("interval", [{ rounds: 6, paceRange: [0.85, 1.05], workDuration: 120 }])] },
+    CATALOGUE, { currentPhase: 1 },
+  );
+  assert(r.ok, r.errors.join("; "));
+  const b = r.accepted[0].blocks[0];
+  assertEquals(b.restDuration, "one_third_work"); // omitted by the model, filled by code
+  assertEquals(b.workProgression, "consistent");
+  assertEquals(b.rounds, 6); // choices preserved
 });
 
 // ── validateProposal ─────────────────────────────────────────────────────
