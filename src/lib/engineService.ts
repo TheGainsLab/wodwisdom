@@ -110,6 +110,9 @@ export interface EngineUserProgress {
   engine_program_version: string | null;
   engine_current_day: number;
   engine_months_unlocked: number;
+  /** Athlete-stated conditioning objective (optional). The sequencer and the
+   *  chat athlete card read it; null means unset and changes nothing. */
+  engine_goal: string | null;
 }
 
 export interface EngineProgram {
@@ -771,11 +774,27 @@ export async function updatePerformanceMetrics(
 export async function loadUserProgress(): Promise<EngineUserProgress | null> {
   const { data, error } = await supabase
     .from('athlete_profiles')
-    .select('engine_program_version, engine_current_day, engine_months_unlocked')
+    .select('engine_program_version, engine_current_day, engine_months_unlocked, engine_goal')
     .maybeSingle();
 
   if (error) throw error;
   return data;
+}
+
+/** Save the athlete's Engine goal (blank clears it). Upsert so an engine-only
+ *  athlete with no profile row yet still gets one. */
+export async function saveEngineGoal(goal: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { error } = await supabase
+    .from('athlete_profiles')
+    .upsert(
+      { user_id: user.id, engine_goal: goal.trim() || null },
+      { onConflict: 'user_id' }
+    );
+
+  if (error) throw error;
 }
 
 /** Save the user's chosen program version (initial selection). engine_months_unlocked is owned by the payment path (stripe-webhook) — never set here. */

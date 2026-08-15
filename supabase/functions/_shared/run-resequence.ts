@@ -30,7 +30,9 @@ const SYSTEM_PROMPT =
   `You are given: (1) the athlete's RAW conditioning signals (per-competency rolling ratios + recent ` +
   `trend, time-trial/calibration age, days since last session — no labels; you interpret them), ` +
   `(2) the day-type catalogue with each type's parameter envelope — it contains exactly the day-types ` +
-  `available at this point in the athlete's program, (3) how many days to generate, and (4) when present, ` +
+  `available at this point in the athlete's program, (3) how many days to generate, (4) when present, ` +
+  `ATHLETE CONTEXT — their age (factor recovery capacity into intensity placement and the hard/easy mix; ` +
+  `weigh it against the actual signals, never as a rulebook) and their stated goal, and (5) when present, ` +
   `their OTHER TRAINING LOAD — ` +
   `real recent training Engine did not prescribe (program strength days, self-logged activities). ` +
   `That load draws on the same recovery budget: factor it into intensity and day-type placement, ` +
@@ -120,8 +122,15 @@ export async function runResequence(
   // specialty programs curate NON-consecutive catalog days via engine_program_mapping,
   // so "the next N positions" must come from the mapping, not currentDay+i.
   const { data: prof } = await supa
-    .from("athlete_profiles").select("engine_program_version").eq("user_id", userId).maybeSingle();
+    .from("athlete_profiles")
+    .select("engine_program_version, age, engine_goal")
+    .eq("user_id", userId)
+    .maybeSingle();
   const version = (prof?.engine_program_version as string) ?? "main_5day";
+  const athleteAge = typeof prof?.age === "number" && prof.age > 0 ? prof.age : null;
+  const athleteGoal = typeof prof?.engine_goal === "string" && prof.engine_goal.trim() !== ""
+    ? prof.engine_goal.trim().slice(0, 500)
+    : null;
   const { data: program } = await supa
     .from("engine_programs").select("days_per_week, name, description").eq("id", version).maybeSingle();
   const maxDays = (program?.days_per_week as number) ?? 5;
@@ -240,6 +249,23 @@ export async function runResequence(
     ? `PROGRAM: ${program.name}${program.description ? ` — ${program.description}` : ""}\n` +
       `Bias your day-type choices toward this program's intent.\n`
     : "";
+
+  // Athlete context — pure enrichment. Either line absent leaves the prompt
+  // byte-identical to the pre-feature prompt; the sequencer owes a goal-less,
+  // age-less athlete exactly its old behavior. Goal text is athlete-authored
+  // free text: it steers judgment only — day-types, envelopes, cadence, and
+  // validation are unchanged fences around whatever it says.
+  const athleteContextLines: string[] = [];
+  if (athleteAge != null) athleteContextLines.push(`ATHLETE: age ${athleteAge}`);
+  if (athleteGoal) {
+    athleteContextLines.push(
+      `ATHLETE'S STATED GOAL: "${athleteGoal}"\n` +
+        `Weigh day-type selection, modality emphasis, and intensity placement toward this goal where the ` +
+        `signals permit. The program's intent is the frame; the goal refines within it — where they ` +
+        `conflict, honor the program.`,
+    );
+  }
+  const athleteContext = athleteContextLines.length > 0 ? athleteContextLines.join("\n") + "\n" : "";
   // Day-types are keyed by CATALOG day; walk the {seq, day} pairs.
   const prescribedSlots = aiPairs
     .map((p, i) => `  day ${i + 1}: program prescribes "${typeByDay.get(p.day) ?? "unspecified"}"`)
@@ -270,6 +296,7 @@ export async function runResequence(
     `${diagnosis}\n\n` +
     (otherLoad ? `${otherLoad}\n\n` : "") +
     programGoal +
+    athleteContext +
     `PROGRAM MONTH: ${blockMonth} — the catalogue below contains exactly the day-types the program has ` +
     `made available through this month.\n` +
     `GENERATE THE NEXT ${daysToGenerate} ENGINE DAYS.\n` +
