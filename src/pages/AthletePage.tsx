@@ -316,6 +316,27 @@ function materializeEquipment(current: Record<string, boolean>): Record<string, 
 
 const SKILL_LEVEL_GUIDELINE = 'Beginner = basic grasp · Intermediate = good unless tired · Advanced = reliable when fatigued';
 
+/** Athlete-voice names for blank benchmarks, used by the pre-run checkpoint's
+ *  "would sharpen the read" line (bike labels need the machine spelled out). */
+const CONDITIONING_GAP_PHRASES: Record<string, string> = {
+  '1_mile_run': '1-mile run',
+  '5k_run': '5k run',
+  '1k_row': '1k row',
+  '2k_row': '2k row',
+  '5k_row': '5k row',
+  '1min_bike_cals': '1-min bike cals',
+  '10min_bike_cals': '10-min bike cals',
+};
+
+/** "your 5k row and 1-min bike cals (and 3 more)" — names the first two
+ *  blanks, counts the rest. Callers guarantee at least one phrase. */
+function describeGaps(phrases: string[]): string {
+  const named = phrases.slice(0, 2);
+  const rest = phrases.length - named.length;
+  const base = named.length === 1 ? `your ${named[0]}` : `your ${named[0]} and ${named[1]}`;
+  return rest > 0 ? `${base} (and ${rest} more)` : base;
+}
+
 const CONDITIONING_GROUPS = [
   {
     title: 'Running',
@@ -498,6 +519,9 @@ function TierCard({
   unlocks,
   status,
   defaultExpanded = false,
+  expanded: controlledExpanded,
+  onToggle,
+  cardRef,
   locked = false,
   lockMessage,
   onUpgrade,
@@ -508,6 +532,11 @@ function TierCard({
   unlocks: string;
   status: TierSection;
   defaultExpanded?: boolean;
+  /** Controlled expansion (same contract as CollapsibleSection): pass both
+   *  expanded + onToggle to let a parent open the card programmatically. */
+  expanded?: boolean;
+  onToggle?: (next: boolean) => void;
+  cardRef?: React.Ref<HTMLDivElement>;
   /** When true, the card is visually muted and the children are replaced with a locked message + upgrade CTA. */
   locked?: boolean;
   /** Replaces the "Unlocks: ..." line when locked. E.g., "Requires AI Programming subscription". */
@@ -516,7 +545,14 @@ function TierCard({
   onUpgrade?: () => void;
   children: React.ReactNode;
 }) {
-  const [expanded, setExpanded] = useState(defaultExpanded && !locked);
+  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded && !locked);
+  const isControlled = controlledExpanded !== undefined;
+  const expanded = isControlled ? controlledExpanded : internalExpanded;
+  const setExpanded = (updater: (prev: boolean) => boolean) => {
+    const next = updater(expanded);
+    if (!isControlled) setInternalExpanded(next);
+    onToggle?.(next);
+  };
   const accent = locked
     ? 'var(--text-muted)'
     : status.complete
@@ -525,6 +561,7 @@ function TierCard({
   return (
     <div
       className="settings-card"
+      ref={cardRef}
       style={{
         borderColor: locked ? 'var(--border)' : status.complete ? '#2ec486' : undefined,
         opacity: locked ? 0.75 : 1,
@@ -631,6 +668,14 @@ export default function AthletePage({ session }: { session: Session }) {
   // used to feed v1's evaluation_id). Setter kept for the eval-complete flow.
   const [, setAnalysisResult] = useState<{ kind: 'profile'; text: string; evaluationId?: string | null } | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState<'profile' | null>(null);
+  // Pre-run checkpoint on the eval button (Aug '26 relaxed conditioning gate):
+  // 'required' blocks the run (no 2k row / no run time yet); 'soft' nudges when
+  // the required numbers are in but optional athletic fields are still blank.
+  const [evalCheckpoint, setEvalCheckpoint] = useState<null | 'required' | 'soft'>(null);
+  // Tier 2 card + conditioning section expansion is controlled so the
+  // checkpoint's "Add benchmarks" button can open them and scroll there.
+  const [t2Expanded, setT2Expanded] = useState(false);
+  const [condSectionOpen, setCondSectionOpen] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
   // TDEE override is no longer edited here (the TDEE card was removed from the
@@ -676,6 +721,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const [expandedEvalId, setExpandedEvalId] = useState<string | null>(null);
   const [evalHistoryOpen, setEvalHistoryOpen] = useState(false);
   const evalHistoryRef = useRef<HTMLDivElement | null>(null);
+  const tier2Ref = useRef<HTMLDivElement | null>(null);
   const [evalCreditsRemaining, setEvalCreditsRemaining] = useState<number>(1);
 
   // Tier 4 — competition-history linkage. The /profile card only needs to know
@@ -1260,6 +1306,46 @@ export default function AthletePage({ session }: { session: Session }) {
   };
   const tierStatus = getTierStatus(tierStatusInput);
 
+  // --- Pre-run checkpoint inputs (mirrors the tier-status conditioning gate,
+  // computed from live form state so the flag reflects what's on screen). ---
+  const isCondFilled = (v: string | number | null | undefined): boolean =>
+    v != null && (typeof v === 'number' ? v > 0 : String(v).trim() !== '');
+  const condRequiredMissing =
+    !isCondFilled(conditioning['2k_row']) ||
+    !(isCondFilled(conditioning['1_mile_run']) || isCondFilled(conditioning['5k_run']));
+  // Blank optional athletic fields, most-valuable first (conditioning depth,
+  // then the non-required lifts), for the soft checkpoint's specifics line.
+  const softGapPhrases: string[] = [];
+  for (const group of CONDITIONING_GROUPS) {
+    for (const bm of group.benchmarks) {
+      if (!isCondFilled(conditioning[bm.key])) {
+        softGapPhrases.push(CONDITIONING_GAP_PHRASES[bm.key] ?? bm.label.toLowerCase());
+      }
+    }
+  }
+  for (const group of LIFT_GROUPS) {
+    for (const lift of group.lifts) {
+      if (!(lifts[lift.key] > 0)) softGapPhrases.push(`${lift.label.toLowerCase()} 1RM`);
+    }
+  }
+
+  const proceedWithEval = async () => {
+    setEvalCheckpoint(null);
+    if (isDirty) {
+      const ok = await saveProfile();
+      if (!ok) return;
+    }
+    fetchProfileAnalysis();
+  };
+  const jumpToConditioning = () => {
+    setEvalCheckpoint(null);
+    setT2Expanded(true);
+    setCondSectionOpen(true);
+    requestAnimationFrame(() => {
+      tier2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
   return (
     <div className="app-layout">
       <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
@@ -1398,33 +1484,90 @@ export default function AthletePage({ session }: { session: Session }) {
                       </div>
                     );
                   }
-                  if (canRun) {
+                  // The run card also shows when ONLY the conditioning requirement
+                  // (2k row + one run) is still open — clicking Run then flags the
+                  // gap instead of the form marking fields required. Any other gap
+                  // (basics, key lifts) keeps the card hidden as before.
+                  const onlyCondBlocking =
+                    !tierStatus.canRunEval &&
+                    tierStatus.tier1.complete &&
+                    tierStatus.tier2.missing.every((m) => m === 'conditioning');
+                  if (canRun || (hasEvalCredit && onlyCondBlocking)) {
+                    const showRequired = evalCheckpoint === 'required' && condRequiredMissing;
+                    const showSoft = evalCheckpoint === 'soft' && !condRequiredMissing && softGapPhrases.length > 0;
                     return (
-                      <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                          <div>
-                            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 4 }}>
-                              Free AI Evaluation · Ready to run
+                      <>
+                        <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 4 }}>
+                                {canRun ? 'Free AI Evaluation · Ready to run' : 'Free AI Evaluation'}
+                              </div>
+                              <div style={{ fontSize: 15, fontWeight: 600 }}>
+                                {canRun ? 'Your profile is ready — run your free evaluation' : 'Run your free evaluation'}
+                              </div>
+                              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Takes 20–30 seconds. You'll get a personalized breakdown of your strengths, weaknesses, and priorities.</div>
                             </div>
-                            <div style={{ fontSize: 15, fontWeight: 600 }}>Your profile is ready — run your free evaluation</div>
-                            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Takes 20–30 seconds. You'll get a personalized breakdown of your strengths, weaknesses, and priorities.</div>
+                            <button
+                              className="auth-btn"
+                              style={{ padding: '10px 20px', fontSize: 14, background: 'var(--accent)', color: 'white' }}
+                              onClick={async () => {
+                                if (condRequiredMissing) {
+                                  setEvalCheckpoint('required');
+                                  return;
+                                }
+                                if (softGapPhrases.length > 0) {
+                                  setEvalCheckpoint('soft');
+                                  return;
+                                }
+                                await proceedWithEval();
+                              }}
+                              disabled={saving || !!analysisLoading}
+                            >
+                              Run Evaluation →
+                            </button>
                           </div>
-                          <button
-                            className="auth-btn"
-                            style={{ padding: '10px 20px', fontSize: 14, background: 'var(--accent)', color: 'white' }}
-                            onClick={async () => {
-                              if (isDirty) {
-                                const ok = await saveProfile();
-                                if (!ok) return;
-                              }
-                              fetchProfileAnalysis();
-                            }}
-                            disabled={saving || !!analysisLoading}
-                          >
-                            Run Evaluation →
-                          </button>
                         </div>
-                      </div>
+                        {showRequired && (
+                          <div className="settings-card" style={{ borderColor: 'var(--text-dim)' }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 8 }}>
+                              Almost there
+                            </div>
+                            <p style={{ margin: '0 0 6px', fontSize: 14, lineHeight: 1.55 }}>
+                              <strong>Two benchmarks anchor your conditioning read:</strong> a 2k row, and one run — your mile or your 5k, whichever you do.
+                            </p>
+                            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-dim)' }}>
+                              An estimate is fine. Add those and your evaluation is ready to run.
+                            </p>
+                            <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+                              <button type="button" className="auth-btn" style={{ padding: '10px 18px', fontSize: 13, background: 'var(--accent)', color: 'white' }} onClick={jumpToConditioning}>
+                                Add benchmarks
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {showSoft && (
+                          <div className="settings-card" style={{ borderColor: 'var(--text-dim)' }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 8 }}>
+                              Before you run it
+                            </div>
+                            <p style={{ margin: '0 0 6px', fontSize: 14, lineHeight: 1.55 }}>
+                              <strong>This is your free evaluation</strong> — one letter, built from everything you've entered.
+                            </p>
+                            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-dim)' }}>
+                              A few numbers are still blank — {describeGaps(softGapPhrases)} would sharpen the read.
+                            </p>
+                            <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+                              <button type="button" className="auth-btn" style={{ padding: '10px 16px', fontSize: 13, background: 'var(--surface2)', color: 'var(--text)' }} onClick={jumpToConditioning}>
+                                Add numbers first
+                              </button>
+                              <button type="button" className="auth-btn" style={{ padding: '10px 18px', fontSize: 13, background: 'var(--accent)', color: 'white' }} onClick={proceedWithEval} disabled={saving || !!analysisLoading}>
+                                Run with what I have
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     );
                   }
                   // Locked — render nothing. The intro card ("Complete your profile
@@ -1559,8 +1702,14 @@ export default function AthletePage({ session }: { session: Session }) {
                   title="Athletic Data"
                   unlocks="Free AI Evaluation"
                   status={tierStatus.tier2}
-                  defaultExpanded={false}
+                  expanded={t2Expanded}
+                  onToggle={setT2Expanded}
+                  cardRef={tier2Ref}
                 >
+                <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>
+                  We don't need scientific precision — a general idea is enough to build your evaluation.
+                  Once you're training, your real numbers take over.
+                </p>
                 <CollapsibleSection title={`1RM Lifts (${units})`}>
                   <p className="athlete-card-subtitle">Enter your one-rep max weights in {units}</p>
                   {LIFT_GROUPS.map(group => (
@@ -1617,8 +1766,9 @@ export default function AthletePage({ session }: { session: Session }) {
                 </CollapsibleSection>
 
                 {/* Conditioning Benchmarks */}
-                <CollapsibleSection title="Conditioning Benchmarks">
-                  <p className="athlete-card-subtitle">Running and rowing times (MM:SS), bike in calories. Fill at least 2.</p>
+                <CollapsibleSection title="Conditioning Benchmarks" expanded={condSectionOpen} onToggle={setCondSectionOpen}>
+                  <p className="athlete-card-subtitle" style={{ fontStyle: 'italic' }}>Your evaluation is built from these numbers — enter everything you can.</p>
+                  <p className="athlete-card-subtitle">Running and rowing times (MM:SS), bike in calories.</p>
                   {CONDITIONING_GROUPS.map(group => (
                     <div key={group.title} style={{ marginBottom: 20 }}>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
@@ -1927,7 +2077,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       </button>
                       {!tierStatus.canRunEval && !hasGeneratedProgram && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
-                          Finish your Basics, Lifts, Skills, and Conditioning to run your free evaluation.
+                          Finish your Basics, key lifts, a 2k row, and one run (mile or 5k) to run your free evaluation.
                         </span>
                       )}
                     </>

@@ -263,7 +263,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           error: "TIER_INCOMPLETE",
-          message: "Finish your Basics, Lifts, Skills, and Conditioning to run your free evaluation.",
+          message: "Finish your Basics, key lifts, a 2k row, and one run (mile or 5k) to run your free evaluation.",
           missing_fields: missing,
         }),
         { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
