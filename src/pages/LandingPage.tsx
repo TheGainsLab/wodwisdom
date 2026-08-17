@@ -62,8 +62,8 @@ function CoachChat() {
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
         <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)', padding: '16px 18px', borderRadius: '16px 16px 16px 4px', maxWidth: '92%', fontSize: 16, lineHeight: 1.65 }}>
-          <p style={{ margin: '0 0 12px' }}>Looking at your numbers, you're genuinely strong on the erg. A 2:59 1k and 6:20 2k put you well above average, and your competition data backs that up — rowing shows up as one of your better monostructural movements, averaging around the 90th percentile in Open events. That's a real asset, but it also creates a specific pacing trap worth knowing about.</p>
-          <p style={{ margin: 0 }}>Strong rowers tend to go out too hot on the row calories in a couplet like today's metcon because the calories feel easy relative to their capacity. The problem is that 16 calories at a hard pace will spike your heart rate and blow up your legs for the thrusters, even at 95 lbs. At your strength level, 95 lbs is essentially unloaded — your thruster 1RM is well north of 200 lbs — so the thrusters should never be the limiting factor. Don't let aggressive rowing make them one.</p>
+          <p style={{ margin: '0 0 12px' }}>Your numbers confirm it: a 2:59 1k and 6:20 2k make rowing one of your strengths. The trap is letting that strength cost you somewhere else.</p>
+          <p style={{ margin: 0 }}>On today's couplet, don't attack the row just because the calories feel easy. A hard 16 calories can spike your heart rate and load your legs before the thrusters. At your strength level, 95 lbs should never be the limiter — so pace the row to keep it that way.</p>
         </div>
       </div>
     </div>
@@ -115,7 +115,7 @@ function TrainingIntentCard() {
       <div style={{ border: '1px solid var(--border)', borderRadius: 14, background: 'var(--bg)', padding: '20px 22px' }}>
         <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 }}>Training Intent</div>
         <p style={{ fontSize: 18, lineHeight: 1.7, color: 'var(--text-dim)', margin: 0 }}>
-          This session builds pulling strength through heavy deadlift work while developing midline stability via GHD sit-up progressions practiced early when the nervous system is fresh for optimal motor learning. The short power couplet tests metabolic power and movement efficiency under fatigue, with thrusters challenging the hip hinge pattern established in deadlifts while rowing provides a different pulling pattern that complements but doesn't interfere with the strength work.
+          This session builds pulling strength through heavy deadlifts, develops midline stability with GHD sit-up practice, and finishes with a short power couplet that tests the same hinge pattern under fatigue.
         </p>
       </div>
     </div>
@@ -123,14 +123,14 @@ function TrainingIntentCard() {
 }
 
 // Real-HTML metcon history (replaces a screenshot) — the logged training that
-// feeds the coach. Each row: date · score · Rx, W/kg, then the workout.
+// feeds the coach. Three entries chosen for RANGE (short / medium / long), not
+// quantity: the W/kg column across the trio quietly demonstrates the
+// power-duration curve the One Scale section just promised.
 function MetconHistory() {
   const entries = [
     { date: 'Tue, Jun 9', score: '3:42', wkg: '3.70', title: 'Short sprint couplet', moves: ['Thruster — 21-15-9 reps · 95 lbs', 'Pull-ups — 21-15-9 reps'] },
     { date: 'Sun, Jun 7', score: '4+13', wkg: '2.01', title: 'Medium mixed modal', moves: ['Wall Ball — 20 reps · 20 lbs (to 10-foot target)', 'Double Under — 30 reps', 'Clean — 10 reps · 155 lbs'] },
     { date: 'Fri, May 22', score: '17:45', wkg: '2.73', title: 'Long Steady Pace', moves: ['Row — 2000 m', 'Push Up — 50 reps', 'Air Squat — 100 reps', 'Wall Ball — 150 reps · 20 lbs'] },
-    { date: 'Fri, May 22', score: '6:15', wkg: '2.35', title: 'Short Couplet', moves: ['Thruster — 21 reps · 115 lbs', 'Pull Up — 21 reps', 'Thruster — 15 reps · 115 lbs', 'Pull Up — 15 reps', 'Thruster — 9 reps · 115 lbs', 'Pull Up — 9 reps'] },
-    { date: 'Fri, May 22', score: '10+9', wkg: '2.04', title: 'Mixed conditioning', moves: ['Thruster — 8 reps · 95 lbs', 'Chest To Bar — 10 reps'] },
   ];
   return (
     <div style={{ ...IMG_FRAME, background: 'var(--surface)', padding: 6 }}>
@@ -183,10 +183,6 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
     a: 'Your AI coach, full nutrition tracking, full analytics, and competition rankings.',
   },
   {
-    q: 'What is All Access?',
-    a: <>Both programs — <PN>AI Programming</PN> and <PN>Year of the Engine</PN> — under one subscription, coach included.</>,
-  },
-  {
     q: 'I have additional questions. How can I contact you?',
     a: <>You can send us an email anytime to <a href="mailto:coach@thegainslab.com" style={{ color: 'var(--accent)' }}>coach@thegainslab.com</a></>,
   },
@@ -231,13 +227,18 @@ export default function LandingPage() {
           <a href="#how-it-works" className="landing-cta landing-cta-outline">See How It Works &rarr;</a>
         </div>
 
-        {/* Framer: introduce the evaluation as proof + what every athlete gets.
-            Keeps the hero in its "proof it's real" lane; the full how-it-works
-            (build profile → add history → get evaluation) lives in section 3. */}
+        {/* Merged opening (Aug '26 tightening): the hero flows straight from
+            "we learn everything about you" into the eval excerpt and the
+            foundation line. The old "How It Knows You" re-introduction is gone —
+            the visitor is looking at an Evaluation; the next section explains
+            how to GET one, not what it is. */}
         <div style={{ maxWidth: 640, margin: '48px auto 0', textAlign: 'center' }}>
           <Eyebrow>Personal from day one</Eyebrow>
           <p style={{ fontSize: 18, lineHeight: 1.7, color: 'var(--text-dim)', margin: 0 }}>
-            Most programs know nothing about you. GAINS starts by learning everything: your ability, your history, what's holding you back — and exactly what to do about it. Here's an excerpt from a real athlete's evaluation:
+            Most programs know nothing about you. GAINS starts by learning everything: your ability, your history, what's holding you back — and exactly what to do about it.
+          </p>
+          <p style={{ fontSize: 18, lineHeight: 1.7, color: 'var(--text-dim)', margin: '12px 0 0' }}>
+            Here's an excerpt from a real athlete's Evaluation:
           </p>
         </div>
 
@@ -246,25 +247,22 @@ export default function LandingPage() {
           <Placeholder src="/images/hero-eval.png" alt="A real GAINS athlete evaluation" label="[ Image placeholder — Evaluation screenshot (~820×512) ]" />
         </div>
 
-        <p style={{ ...bodyP, marginTop: 18 }}>
-          This is a preview. Your full evaluation is a complete map of your fitness — every number measured against <span style={{ color: 'var(--accent)' }}>15 million</span> real competition scores, so you know exactly where you stand.
+        <p style={{ ...bodyP, marginTop: 18, maxWidth: 680 }}>
+          Your full Evaluation is a complete map of your fitness — your strengths, weaknesses, and where you stand against <span style={{ color: 'var(--accent)' }}>15 million</span> real competition scores.
+        </p>
+        <p style={{ ...bodyP, marginTop: 0, maxWidth: 680 }}>
+          If you train with us, it becomes the foundation of your program. If not, it's yours to keep — <span style={{ fontWeight: 600, color: 'var(--text)' }}>free.</span>
         </p>
       </section>
 
-      {/* ===== How It Knows You ===== */}
+      {/* ===== How It Works — the steps explain how to GET the Evaluation
+             (the hero above already showed what it is) ===== */}
       <section id="how-it-works" className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="landing-container">
-          <Eyebrow>How It Knows You</Eyebrow>
-          <h2 style={sectionHeadline}>It starts with your Evaluation.</h2>
-          <p style={{ ...bodyP, maxWidth: 720 }}>
-            Before we write a single rep of programming, your coach assesses you across strength, conditioning, gymnastics, movement, and competition performance. The result is your Evaluation: a candid read on exactly where you are today.
-          </p>
-          <p style={{ ...bodyP, maxWidth: 720 }}>
-            No obligation. If you train with us, it becomes the foundation of your program. If not, it's yours to keep — free.
-          </p>
+          <Eyebrow>How It Works</Eyebrow>
 
           {/* Numbered path: build profile → add history → get evaluation (the destination). */}
-          <div style={{ maxWidth: 640, marginTop: 28 }}>
+          <div style={{ maxWidth: 640, marginTop: 16 }}>
             {/* ① Build your profile */}
             <div style={{ display: 'flex', gap: 16 }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -273,7 +271,7 @@ export default function LandingPage() {
               </div>
               <div style={{ paddingBottom: 28 }}>
                 <div style={stepTitle}>Tell us about you <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>— in about five minutes.</span></div>
-                <p style={{ ...bodyP, marginTop: 8, marginBottom: 0 }}>Strength numbers, key ratios, skills, benchmark workouts, and goals.</p>
+                <p style={{ ...bodyP, marginTop: 8, marginBottom: 0 }}>Strength, skills, benchmarks, and goals.</p>
               </div>
             </div>
             {/* ② Add your history */}
@@ -283,9 +281,9 @@ export default function LandingPage() {
                 <div style={{ flex: 1, width: 2, background: 'var(--accent)', minHeight: 16 }} />
               </div>
               <div style={{ paddingBottom: 28 }}>
-                <div style={stepTitle}>Add your competition history <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional, but powerful).</span></div>
+                <div style={stepTitle}>Add your competition history <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>— optional, but powerful.</span></div>
                 <p style={{ ...bodyP, marginTop: 8, marginBottom: 0 }}>
-                  Connect your results in seconds and we'll benchmark you against athletes at every level. No history? No problem — your profile is all we need.
+                  Connect your results in seconds and we'll benchmark you against athletes at every level. No history? No problem.
                 </p>
               </div>
             </div>
@@ -295,9 +293,9 @@ export default function LandingPage() {
                 <div style={{ ...stepBadge, background: 'var(--accent)', borderColor: 'var(--accent)', color: '#fff' }}>3</div>
               </div>
               <div>
-                <div style={stepTitle}>Get your evaluation.</div>
+                <div style={stepTitle}>Get your Evaluation.</div>
                 <p style={{ ...bodyP, marginTop: 8, marginBottom: 0 }}>
-                  Your strengths, your hidden bottlenecks, and exactly where you rank. Delivered instantly.
+                  See your strengths, bottlenecks, and where you rank. Delivered instantly.
                 </p>
               </div>
             </div>
@@ -310,7 +308,7 @@ export default function LandingPage() {
               And that's just the beginning.
             </p>
             <p style={{ ...bodyP, textAlign: 'center', maxWidth: 640, margin: '8px auto 0' }}>
-              Your free account unlocks our entire archive of past competition workouts. Test yourself against levels you never reached. Compare yourself to where you were years ago. All included.
+              Your free account also unlocks our archive of past competition workouts. Test yourself against levels you never reached, or compare yourself to where you were years ago.
             </p>
             <div style={{ textAlign: 'center', marginTop: 24 }}>
               <Link to="/auth?signup=1" className="landing-cta">Get Your Free Evaluation</Link>
@@ -325,7 +323,7 @@ export default function LandingPage() {
           <Eyebrow>Data comes to life</Eyebrow>
           <h2 style={sectionHeadline}>Most Apps Save a Number. GAINS Saves the Whole Story.</h2>
           <p style={{ ...bodyP, maxWidth: 680, marginBottom: 36 }}>
-            They log &ldquo;3:42 RX&rdquo; and move on. Your coach records everything that number hides: power output, percentile, time domain, movement quality — even the faults it spotted.
+            Most apps log &ldquo;3:42 RX&rdquo; and move on. GAINS captures what that score actually means: power output, percentile, time domain, movement quality — even faults it observed.
           </p>
 
           {/* Bare logged result, then the personalized coach read — stacked (mobile-first, single column) */}
@@ -350,9 +348,6 @@ export default function LandingPage() {
                 With GAINS
               </div>
               <FranReadCard />
-              <p style={{ fontSize: 15, color: 'var(--text-muted)', marginTop: 10, marginBottom: 0 }}>
-                That 97th percentile is measured against 15 million workout results.
-              </p>
             </div>
           </div>
         </div>
@@ -364,7 +359,7 @@ export default function LandingPage() {
           <Eyebrow>One Scale for Everything</Eyebrow>
           <h2 style={sectionHeadline}>Fitness Needs a Common Language.</h2>
           <p style={bodyP}>
-            A rowing workout doesn't look like a lifting workout. A two-minute sprint doesn't look like a twenty-minute chipper. So how do you measure them on the same terms? Fitness is work capacity — so your coach converts every result into power: watts, and watts per kilogram. One scale for every workout you do.
+            A rowing workout doesn't look like a lifting workout. A two-minute sprint doesn't look like a twenty-minute chipper. But fitness is work capacity — so GAINS converts every result into power, watts and watts per kilogram, and measures everything on one scale.
           </p>
 
           <div style={{ margin: '24px 0' }}>
@@ -372,13 +367,13 @@ export default function LandingPage() {
           </div>
 
           <p style={bodyP}>
-            All on one scale — which unlocks two things you couldn't see before:
+            That unlocks two things:
           </p>
           <p style={bodyP}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Progress over time.</span> You can finally tell what's improving and what's stalling — across every time domain, not just the workouts you happen to repeat.
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Progress over time.</span> See what's improving and what's stalling across every time domain — not just workouts you happen to repeat.
           </p>
           <p style={{ ...bodyP, marginBottom: 0 }}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Where you rank.</span> Every number is ranked against 15 million competition scores — you know exactly how far you are from the top, and you'll watch the gap close as you improve. No other app can tell you that.
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Where you rank.</span> See how you stack up against real competition scores — and watch the gap close as you improve.
           </p>
         </div>
       </section>
@@ -401,7 +396,7 @@ export default function LandingPage() {
             <TrainingIntentCard />
           </div>
           <p style={{ ...bodyP, marginBottom: 0 }}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Ask the Coach:</span> And when you have a question, the coach answers with everything in view — your profile, your history, today's workout, your strengths and weaknesses. The answer is specific to you, not generic internet advice.
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Ask the Coach:</span> Have a question? Your coach answers with your profile, history, today's workout, strengths, and weaknesses in view — so the answer is specific to you, not generic advice.
           </p>
           {/* Coach-chat screen (rowing-pacing example). */}
           <div style={{ marginTop: 20 }}>
@@ -416,19 +411,19 @@ export default function LandingPage() {
           <Eyebrow>It Learns From Every Workout</Eyebrow>
           <h2 style={sectionHeadline}>Most programs stay fixed. Yours adapts.</h2>
           <p style={bodyP}>
-            Every workout you've ever done — every score, every RPE, every quality rating — becomes context. When your coach designs your next session, it doesn't start from scratch. It starts with all of it.
+            Every score, RPE, and quality rating becomes context. Your coach doesn't start each session from scratch — it starts with your training history.
           </p>
           <div style={{ maxWidth: 640, margin: '24px auto' }}>
             <MetconHistory />
           </div>
           <p style={bodyP}>
-            This is the raw material your coach uses to understand you. Not just a searchable list — context that shapes every decision.
+            This is the raw material your coach uses to understand you — not just a log, but context that shapes what comes next.
           </p>
           <p style={bodyP}>
-            Over time, it calibrates to you. The coach learns how your reported effort and quality align with your actual output. The more you train, the sharper its read on you gets.
+            Over time, it learns how your reported effort and quality line up with your actual output. The more you train, the sharper its read on you gets.
           </p>
           <p style={{ ...bodyP, marginBottom: 0 }}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Always available. Never forgets. Getting smarter with every rep.</span>
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Never forgets. Gets smarter with every rep.</span>
           </p>
         </div>
       </section>
@@ -443,20 +438,20 @@ export default function LandingPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, margin: '0 auto 24px', maxWidth: 480 }}>
             <Link to="/features/programs" className="landing-offering-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
               <h3>AI Programming &rarr;</h3>
-              <p>Your program, built and adapted around you, with coaching guidance on every exercise.</p>
+              <p>Personalized training built around your evaluation, goals, and progress — with coaching guidance every session.</p>
             </Link>
             <Link to="/features/engine" className="landing-offering-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
               <h3>Year of the Engine &rarr;</h3>
-              <p>Conditioning calibrated to you, every interval paced to your fitness.</p>
+              <p>Conditioning calibrated to your fitness, with every interval paced to you.</p>
             </Link>
             <Link to="/auth?signup=1" className="landing-offering-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
               <h3>All Access &rarr;</h3>
-              <p>Both programs together. The complete system.</p>
+              <p>AI Programming + Year of the Engine. The complete system.</p>
             </Link>
           </div>
           <p style={{ ...bodyP, marginBottom: 8 }}>Every plan includes your AI coach, full analytics, and competition rankings. No add-ons. No hidden fees.</p>
           <p style={{ ...bodyP, marginBottom: 0 }}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Not ready to commit?</span> Start with your free evaluation. No obligation. No credit card. Just a complete picture of where you stand — and unlimited access to every past-Open workout. Pick a plan when you're ready.
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Not ready to commit?</span> Start with your free evaluation. No obligation. No credit card. See exactly where you stand, then decide what you want to do about it.
           </p>
         </div>
       </section>
