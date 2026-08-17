@@ -5,8 +5,10 @@
  *
  * Tiers:
  *   T1 — Basics (age, height, bodyweight, gender, units)
- *   T2 — Athletic data (required lifts, all skills rated, all conditioning
- *        benchmarks filled). Required to run the free Profile Evaluation.
+ *   T2 — Athletic data (required lifts, all skills rated, and the required
+ *        conditioning benchmarks: a 2k row plus one run — mile or 5k. The
+ *        other benchmarks are optional depth, relaxed Aug '26). Required to
+ *        run the free Profile Evaluation.
  *   T3 — Training context (days/week, injuries text, goal, equipment).
  *        Required to run AI Programming. Session length was dropped as a
  *        requirement in Aug '26 — stored values still feed the writer, but
@@ -125,11 +127,11 @@ export const ALL_SKILL_KEYS = [
   'ghd_sit_ups',
 ] as const;
 
-export const MIN_CONDITIONING_BENCHMARKS = 2; // retained for external callers; T2 now requires every key filled
+export const MIN_CONDITIONING_BENCHMARKS = 2; // retained for external callers; matches the 2 required slots below
 
 /** All conditioning benchmark keys the form asks about. Must match
- *  CONDITIONING_GROUPS in AthletePage.tsx — T2 is only complete when
- *  the user has filled every one of these. */
+ *  CONDITIONING_GROUPS in AthletePage.tsx. Only the REQUIRED keys below
+ *  gate T2 — the rest are optional depth for the evaluation. */
 export const ALL_CONDITIONING_KEYS = [
   '1_mile_run',
   '5k_run',
@@ -139,6 +141,14 @@ export const ALL_CONDITIONING_KEYS = [
   '1min_bike_cals',
   '10min_bike_cals',
 ] as const;
+
+/** Conditioning gate (relaxed Aug '26): a 2k row plus ONE run — whichever
+ *  the athlete actually runs. Everything else in ALL_CONDITIONING_KEYS is
+ *  optional; the eval prompt turns blanks into an assigned testing plan. */
+export const REQUIRED_CONDITIONING_KEYS = ['2k_row'] as const;
+export const RUN_BENCHMARK_KEYS = ['1_mile_run', '5k_run'] as const;
+/** Human-legible label used in `missing` when neither run time is set. */
+export const RUN_BENCHMARK_MISSING_LABEL = 'run (mile or 5k)';
 
 export const REQUIRED_T3_FIELDS = [
   'days_per_week',
@@ -195,6 +205,26 @@ function isStringSet(v: unknown): boolean {
   return typeof v === 'string' && v.trim() !== '';
 }
 
+function isConditioningSet(v: string | number | null | undefined): boolean {
+  if (v == null) return false;
+  if (typeof v === 'number') return v > 0;
+  return String(v).trim() !== '';
+}
+
+/** Required-only conditioning gaps: 2k row, plus one run (mile or 5k). */
+function conditioningMissingRequired(
+  conditioning: Record<string, string | number | null | undefined>
+): string[] {
+  const missing: string[] = [];
+  for (const k of REQUIRED_CONDITIONING_KEYS) {
+    if (!isConditioningSet(conditioning[k])) missing.push(k);
+  }
+  if (!RUN_BENCHMARK_KEYS.some((k) => isConditioningSet(conditioning[k]))) {
+    missing.push(RUN_BENCHMARK_MISSING_LABEL);
+  }
+  return missing;
+}
+
 
 export function getTierStatus(profile: AthleteProfileInput | null | undefined): TierStatus {
   const p: AthleteProfileInput = profile ?? {};
@@ -219,13 +249,7 @@ export function getTierStatus(profile: AthleteProfileInput | null | undefined): 
   });
 
   const conditioning = p.conditioning ?? {};
-  const conditioningMissing = ALL_CONDITIONING_KEYS.filter((k) => {
-    const v = conditioning[k];
-    if (v == null) return true;
-    if (typeof v === 'number') return !(v > 0);
-    return String(v).trim() === '';
-  });
-  const conditioningComplete = conditioningMissing.length === 0;
+  const conditioningComplete = conditioningMissingRequired(conditioning).length === 0;
 
   const t2Missing: string[] = [];
   if (liftsMissing.length > 0) t2Missing.push('lifts');
@@ -291,17 +315,13 @@ export function conditioningStatus(
   conditioning: Record<string, string | number | null | undefined> | null | undefined
 ): TierSection & { count: number; required: number } {
   const c = conditioning ?? {};
-  const missing = ALL_CONDITIONING_KEYS.filter((k) => {
-    const v = c[k];
-    if (v == null) return true;
-    if (typeof v === 'number') return !(v > 0);
-    return String(v).trim() === '';
-  });
-  const count = ALL_CONDITIONING_KEYS.length - missing.length;
-  const complete = missing.length === 0;
+  const missing = conditioningMissingRequired(c);
+  // count/required are informational fill counts over ALL benchmarks (for
+  // "X of Y" displays); complete/missing carry the actual (required-only) gate.
+  const count = ALL_CONDITIONING_KEYS.filter((k) => isConditioningSet(c[k])).length;
   return {
-    complete,
-    missing: complete ? [] : missing.map((k) => String(k)),
+    complete: missing.length === 0,
+    missing,
     count,
     required: ALL_CONDITIONING_KEYS.length,
   };

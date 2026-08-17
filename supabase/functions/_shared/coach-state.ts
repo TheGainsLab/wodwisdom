@@ -69,7 +69,12 @@ export type EvidenceKey = AthleteModelKey | (string & {});
 // their program (one truth). observed_progress/observed_plateau retired (they
 // cited capability revisions, which no longer exist). The coach still reads
 // every log — weights, hit rates, RPE — but never converts them into a max.
-export const COACH_STATE_BUILDER_VERSION = "v1.8";
+// v1.9 (relaxed conditioning intake, 2026-08-17): intake now requires only a
+// 2k row + one run (mile or 5k); other benchmarks and lifts may be null.
+// Prompt gains the missing-numbers rule — blanks are neutral (never penalized,
+// never guessed), and the one or two that would sharpen the read are assigned
+// as early-cycle tests inside the plan.
+export const COACH_STATE_BUILDER_VERSION = "v1.9";
 
 // ============================================================
 // Controlled vocabularies — LOCKED v1 (DATA, versioned with the schema;
