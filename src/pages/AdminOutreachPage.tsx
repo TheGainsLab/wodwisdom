@@ -21,11 +21,22 @@ interface OutreachRow {
   full_name: string | null;
   signup_date: string;
   email_confirmed: boolean;
-  has_profile: boolean;
+  stage: string;
   last_email_at: string | null;
   handled: boolean;
   handled_at: string | null;
 }
+
+/** Where each athlete actually stalled (admin_outreach_list's stage CASE),
+ *  in funnel order — each stage maps to a different manual-email angle. */
+const STAGES: { key: string; label: string; color: string }[] = [
+  { key: 'no_activity', label: 'no activity', color: 'var(--text-muted)' },
+  { key: 'started_basics', label: 'started basics', color: '#6ea8fe' },
+  { key: 'needs_lifts', label: 'needs lifts', color: '#b389f0' },
+  { key: 'needs_conditioning', label: 'needs conditioning', color: '#ff8c5a' },
+  { key: 'eval_ready', label: 'eval ready', color: '#2ec486' },
+];
+const stageOf = (key: string) => STAGES.find((s) => s.key === key) ?? STAGES[0];
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
@@ -49,6 +60,7 @@ export default function AdminOutreachPage({ session }: { session: Session }) {
   const [rows, setRows] = useState<OutreachRow[]>([]);
   const [filter, setFilter] = useState('');
   const [showHandled, setShowHandled] = useState(false);
+  const [stageFilter, setStageFilter] = useState<string>('all');
 
   // Admin gate (mirrors AdminActivityFeedPage)
   useEffect(() => {
@@ -75,14 +87,23 @@ export default function AdminOutreachPage({ session }: { session: Session }) {
   }, [adminCheck]);
 
   const handledCount = useMemo(() => rows.filter((r) => r.handled).length, [rows]);
+  const stageCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const r of rows) {
+      if (r.handled) continue;
+      counts[r.stage] = (counts[r.stage] ?? 0) + 1;
+    }
+    return counts;
+  }, [rows]);
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
     return rows.filter((r) => {
       if (!showHandled && r.handled) return false;
+      if (stageFilter !== 'all' && r.stage !== stageFilter) return false;
       if (!q) return true;
       return r.email.toLowerCase().includes(q) || (r.full_name ?? '').toLowerCase().includes(q);
     });
-  }, [rows, filter, showHandled]);
+  }, [rows, filter, showHandled, stageFilter]);
 
   if (adminCheck === 'denied') {
     return (
@@ -137,6 +158,40 @@ export default function AdminOutreachPage({ session }: { session: Session }) {
               </span>
             </div>
 
+            {/* Stage filter chips — work one stage at a time, one email angle per stage */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setStageFilter('all')}
+                style={{
+                  background: stageFilter === 'all' ? 'var(--accent-glow)' : 'var(--surface)',
+                  color: stageFilter === 'all' ? 'var(--accent)' : 'var(--text-dim)',
+                  border: `1px solid ${stageFilter === 'all' ? 'var(--accent)' : 'var(--border)'}`,
+                  borderRadius: 999, padding: '4px 12px', fontSize: 12, fontWeight: 600,
+                  fontFamily: "'Outfit', sans-serif", cursor: 'pointer',
+                }}
+              >
+                all
+              </button>
+              {STAGES.map((s) => (
+                <button
+                  key={s.key}
+                  type="button"
+                  onClick={() => setStageFilter(stageFilter === s.key ? 'all' : s.key)}
+                  style={{
+                    background: stageFilter === s.key ? 'var(--accent-glow)' : 'var(--surface)',
+                    color: s.color,
+                    border: `1px solid ${stageFilter === s.key ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: 999, padding: '4px 12px', fontSize: 12, fontWeight: 600,
+                    fontFamily: "'Outfit', sans-serif", cursor: 'pointer', whiteSpace: 'nowrap',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {s.label} · {stageCounts[s.key] ?? 0}
+                </button>
+              ))}
+            </div>
+
             {error && <div className="auth-error" style={{ display: 'block', marginBottom: 12 }}>{error}</div>}
             {loading ? (
               <div className="page-loading"><div className="loading-pulse" /></div>
@@ -171,9 +226,7 @@ export default function AdminOutreachPage({ session }: { session: Session }) {
                       ) : (
                         <>
                           {!r.email_confirmed && <Badge color="#e8a33d">unconfirmed</Badge>}
-                          <Badge color={r.has_profile ? '#6ea8fe' : 'var(--text-muted)'}>
-                            {r.has_profile ? 'profile started' : 'no activity'}
-                          </Badge>
+                          <Badge color={stageOf(r.stage).color}>{stageOf(r.stage).label}</Badge>
                           {r.last_email_at && (
                             <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>last emailed {fmtDate(r.last_email_at)}</span>
                           )}

@@ -153,8 +153,12 @@ function renderCustom(subject: string, body: string, name: string, attachments: 
   // because…" footer. They should read like a regular note from a person.
   // Templated sends (e.g. welcome_back) still carry their own disclosure
   // and, eventually, an unsubscribe link for bulk campaigns.
+  // Left-aligned (margin: 0, not auto): a personal note hugs the left edge
+  // of the mail client like human-typed email does — a centered column in a
+  // wide Gmail window reads as newsletter chrome. Max-width kept for line
+  // length.
   const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a1a; line-height: 1.6;">
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0; color: #1a1a1a; line-height: 1.6;">
       ${withImages.map((p) => `<p>${p}</p>`).join("\n      ")}
     </div>
   `.trim();
