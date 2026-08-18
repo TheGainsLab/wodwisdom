@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { track } from '../lib/appEvents';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
@@ -36,7 +36,7 @@ import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertT
 
 // ── Types & Constants ────────────────────────────────────────────────
 
-type Stage = 'loading' | 'equipment' | 'preview' | 'ready' | 'active' | 'logging' | 'complete';
+type Stage = 'loading' | 'equipment' | 'preview' | 'ready' | 'countdown' | 'active' | 'logging' | 'complete';
 
 interface BlockParams {
   rounds?: number | number[] | string;
@@ -423,8 +423,23 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const [timeLeft, setTimeLeft] = useState(0);
   const [totalElapsed, setTotalElapsed] = useState(0);
   const [isPaused, setIsPaused] = useState(true);
+  // 3-2-1-GO pre-start countdown (stage 'countdown'); not counted as elapsed.
+  const [countdownVal, setCountdownVal] = useState<number | 'go'>(3);
   const segIndexRef = useRef(0);
   const segmentsRef = useRef<Segment[]>([]);
+  // Wall-clock anchor (Aug '26, screen-off fix): elapsed time and the current
+  // segment are DERIVED from Date.now() against these refs, never accumulated
+  // from interval ticks — mobile browsers suspend timers when the screen
+  // locks, which froze the old tick-counted clock. The interval below only
+  // refreshes the display; a visibilitychange resync snaps it the moment the
+  // screen wakes. Pausing is intentional (the Pause button) and stays frozen
+  // regardless of screen state.
+  const startedAtRef = useRef<number | null>(null);
+  const pausedAccumRef = useRef(0);
+  const pausedAtRef = useRef<number | null>(null);
+  const finishedRef = useRef(false);
+  const stageRef = useRef<Stage>('loading');
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   // ── Logging state ──
   const [logOutput, setLogOutput] = useState('');
@@ -534,29 +549,116 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   // Sync refs
   useEffect(() => { segIndexRef.current = segIndex; }, [segIndex]);
   useEffect(() => { segmentsRef.current = segments; }, [segments]);
+  useEffect(() => { stageRef.current = stage; }, [stage]);
 
-  // ── Timer effect ──
+  // ── Timer engine (wall-clock derived) ──
+  // Recompute elapsed + current segment from the anchor. Safe to call from
+  // anywhere (reads refs only); no-ops unless a workout is live.
+  const syncClock = useCallback(() => {
+    if (stageRef.current !== 'active' || startedAtRef.current == null || finishedRef.current) return;
+    const now = Date.now();
+    const pausedMs = pausedAccumRef.current +
+      (pausedAtRef.current != null ? now - pausedAtRef.current : 0);
+    const elapsedSec = Math.max(0, Math.floor((now - startedAtRef.current - pausedMs) / 1000));
+
+    const segs = segmentsRef.current;
+    let acc = 0;
+    let idx = 0;
+    for (; idx < segs.length; idx++) {
+      if (elapsedSec < acc + segs[idx].duration) break;
+      acc += segs[idx].duration;
+    }
+    if (idx >= segs.length) {
+      // Workout ran to completion (possibly while the screen was off).
+      finishedRef.current = true;
+      setTotalElapsed(acc);
+      setTimeLeft(0);
+      track('log_started', { kind: 'engine' });
+      setStage('logging');
+      return;
+    }
+    if (idx !== segIndexRef.current) {
+      segIndexRef.current = idx;
+      setSegIndex(idx);
+    }
+    setTimeLeft(acc + segs[idx].duration - elapsedSec);
+    setTotalElapsed(elapsedSec);
+  }, []);
+
+  // Display refresh while live. The interval only repaints — correctness
+  // comes from syncClock's wall-clock math, so suspended ticks cost nothing.
   useEffect(() => {
     if (stage !== 'active' || isPaused) return;
-    const id = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          const nextIdx = segIndexRef.current + 1;
-          if (nextIdx >= segmentsRef.current.length) {
-            track('log_started', { kind: 'engine' });
-    setStage('logging');
-            return 0;
-          }
-          segIndexRef.current = nextIdx;
-          setSegIndex(nextIdx);
-          return segmentsRef.current[nextIdx].duration;
-        }
-        return prev - 1;
-      });
-      setTotalElapsed(prev => prev + 1);
-    }, 1000);
+    syncClock();
+    const id = setInterval(syncClock, 500);
     return () => clearInterval(id);
-  }, [stage, isPaused]);
+  }, [stage, isPaused, syncClock]);
+
+  // Snap the clock the moment the page becomes visible again (screen wake,
+  // tab return) — don't wait for the next interval tick.
+  useEffect(() => {
+    const onWake = () => {
+      if (document.visibilityState === 'visible') syncClock();
+    };
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('pageshow', onWake);
+    return () => {
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('pageshow', onWake);
+    };
+  }, [syncClock]);
+
+  // ── Screen wake lock ──
+  // Hold the screen on from countdown through the live workout (what every
+  // timer app does); re-acquire on visibility return since the OS releases
+  // the lock whenever the page hides. Best-effort: unsupported browsers and
+  // denials are non-fatal — the wall-clock engine keeps time regardless.
+  useEffect(() => {
+    if (stage !== 'countdown' && stage !== 'active') return;
+    let cancelled = false;
+    const acquire = async () => {
+      try {
+        if ('wakeLock' in navigator && document.visibilityState === 'visible') {
+          const lock = await navigator.wakeLock.request('screen');
+          if (cancelled) lock.release().catch(() => {});
+          else wakeLockRef.current = lock;
+        }
+      } catch {
+        // unsupported / low battery / denied — screen may dim; timer stays correct
+      }
+    };
+    acquire();
+    const onVis = () => { if (document.visibilityState === 'visible') acquire(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVis);
+      wakeLockRef.current?.release().catch(() => {});
+      wakeLockRef.current = null;
+    };
+  }, [stage]);
+
+  // ── 3-2-1-GO countdown ──
+  useEffect(() => {
+    if (stage !== 'countdown') return;
+    if (countdownVal === 'go') {
+      const t = setTimeout(() => {
+        // Anchor the clock at the true start — countdown time never counts.
+        startedAtRef.current = Date.now();
+        pausedAccumRef.current = 0;
+        pausedAtRef.current = null;
+        finishedRef.current = false;
+        setIsPaused(false);
+        track('timer_started', { kind: 'engine' });
+        setStage('active');
+      }, 500);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => {
+      setCountdownVal(v => (typeof v === 'number' && v > 1 ? v - 1 : 'go'));
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [stage, countdownVal]);
 
   // ── Handlers ──
 
@@ -632,9 +734,23 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   };
 
   const handleBeginCountdown = () => {
-    setIsPaused(false);
-    track('timer_started', { kind: 'engine' });
-    setStage('active');
+    setCountdownVal(3);
+    setStage('countdown');
+  };
+
+  // Pause freezes the wall-clock anchor (paused time is subtracted from
+  // elapsed), so a paused workout stays paused no matter what the screen does.
+  const handleTogglePause = () => {
+    if (isPaused) {
+      if (pausedAtRef.current != null) {
+        pausedAccumRef.current += Date.now() - pausedAtRef.current;
+        pausedAtRef.current = null;
+      }
+      setIsPaused(false);
+    } else {
+      pausedAtRef.current = Date.now();
+      setIsPaused(true);
+    }
   };
 
   const handleEndWorkout = () => {
@@ -1453,7 +1569,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         </div>
 
         <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center' }}>
-          The timer starts when you press Start.
+          Press Start for a 3-2-1 countdown.
         </div>
 
         <div style={{ display: 'flex', gap: 12, width: '100%', maxWidth: 320 }}>
@@ -1471,6 +1587,39 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           >
             <Play size={18} /> Start
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render: 3-2-1-GO countdown ──
+
+  function renderCountdown() {
+    return (
+      <div className="engine-page" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 32, minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <span
+            className={'engine-badge ' + dayTypeBadge(workout?.day_type ?? '')}
+            style={{ fontSize: 14, padding: '6px 16px' }}
+          >
+            {(workout?.day_type ?? '').replace(/_/g, ' ')}
+          </span>
+        </div>
+
+        <div
+          className="engine-timer"
+          aria-live="assertive"
+          style={{
+            fontSize: 'clamp(96px, 30vw, 160px)',
+            lineHeight: 1,
+            color: countdownVal === 'go' ? 'var(--accent)' : 'var(--text)',
+          }}
+        >
+          {countdownVal === 'go' ? 'GO' : countdownVal}
+        </div>
+
+        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+          {segments.length > 0 && segments[0].label} — Block 1
         </div>
       </div>
     );
@@ -1599,7 +1748,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         <div className="engine-workout-controls" style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
           <button
             className="engine-btn engine-btn-secondary"
-            onClick={() => setIsPaused(!isPaused)}
+            onClick={handleTogglePause}
             style={{ flex: 1, maxWidth: 200 }}
           >
             {isPaused ? <><Play size={18} /> Resume</> : <><Pause size={18} /> Pause</>}
@@ -1924,6 +2073,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         {hasAccess && !monthLocked && stage === 'equipment' && renderEquipment()}
         {hasAccess && !monthLocked && stage === 'preview' && renderPreview()}
         {hasAccess && !monthLocked && stage === 'ready' && renderReady()}
+        {hasAccess && !monthLocked && stage === 'countdown' && renderCountdown()}
         {hasAccess && !monthLocked && stage === 'active' && renderActive()}
         {hasAccess && !monthLocked && stage === 'logging' && renderLogging()}
         {hasAccess && !monthLocked && stage === 'complete' && renderComplete()}
