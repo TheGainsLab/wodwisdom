@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { track } from '../lib/appEvents';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
@@ -36,7 +36,7 @@ import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertT
 
 // ── Types & Constants ────────────────────────────────────────────────
 
-type Stage = 'loading' | 'equipment' | 'preview' | 'ready' | 'active' | 'logging' | 'complete';
+type Stage = 'loading' | 'equipment' | 'preview' | 'ready' | 'countdown' | 'active' | 'logging' | 'complete';
 
 interface BlockParams {
   rounds?: number | number[] | string;
@@ -423,11 +423,34 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const [timeLeft, setTimeLeft] = useState(0);
   const [totalElapsed, setTotalElapsed] = useState(0);
   const [isPaused, setIsPaused] = useState(true);
+  // 3-2-1-GO pre-start countdown (stage 'countdown'); not counted as elapsed.
+  const [countdownVal, setCountdownVal] = useState<number | 'go'>(3);
   const segIndexRef = useRef(0);
   const segmentsRef = useRef<Segment[]>([]);
+  // Wall-clock anchor (Aug '26, screen-off fix): elapsed time and the current
+  // segment are DERIVED from Date.now() against these refs, never accumulated
+  // from interval ticks — mobile browsers suspend timers when the screen
+  // locks, which froze the old tick-counted clock. The interval below only
+  // refreshes the display; a visibilitychange resync snaps it the moment the
+  // screen wakes. Pausing is intentional (the Pause button) and stays frozen
+  // regardless of screen state.
+  const startedAtRef = useRef<number | null>(null);
+  const pausedAccumRef = useRef(0);
+  const pausedAtRef = useRef<number | null>(null);
+  const finishedRef = useRef(false);
+  const stageRef = useRef<Stage>('loading');
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   // ── Logging state ──
   const [logOutput, setLogOutput] = useState('');
+  // Optional per-interval scores (one slot per WORK segment, '' = not entered).
+  // Only offered when the day has 2+ work segments — a single-interval day's
+  // "interval" IS the total. When every slot is filled the total auto-derives
+  // (sum for additive units, average for rate units); a manually typed total
+  // always wins and turns the auto flag off.
+  const [intervalScores, setIntervalScores] = useState<string[]>([]);
+  const [intervalsOpen, setIntervalsOpen] = useState(false);
+  const [totalIsAuto, setTotalIsAuto] = useState(false);
   const [logAvgHR, setLogAvgHR] = useState('');
   const [logPeakHR, setLogPeakHR] = useState('');
   const [logRPE, setLogRPE] = useState(5);
@@ -534,29 +557,116 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   // Sync refs
   useEffect(() => { segIndexRef.current = segIndex; }, [segIndex]);
   useEffect(() => { segmentsRef.current = segments; }, [segments]);
+  useEffect(() => { stageRef.current = stage; }, [stage]);
 
-  // ── Timer effect ──
+  // ── Timer engine (wall-clock derived) ──
+  // Recompute elapsed + current segment from the anchor. Safe to call from
+  // anywhere (reads refs only); no-ops unless a workout is live.
+  const syncClock = useCallback(() => {
+    if (stageRef.current !== 'active' || startedAtRef.current == null || finishedRef.current) return;
+    const now = Date.now();
+    const pausedMs = pausedAccumRef.current +
+      (pausedAtRef.current != null ? now - pausedAtRef.current : 0);
+    const elapsedSec = Math.max(0, Math.floor((now - startedAtRef.current - pausedMs) / 1000));
+
+    const segs = segmentsRef.current;
+    let acc = 0;
+    let idx = 0;
+    for (; idx < segs.length; idx++) {
+      if (elapsedSec < acc + segs[idx].duration) break;
+      acc += segs[idx].duration;
+    }
+    if (idx >= segs.length) {
+      // Workout ran to completion (possibly while the screen was off).
+      finishedRef.current = true;
+      setTotalElapsed(acc);
+      setTimeLeft(0);
+      track('log_started', { kind: 'engine' });
+      setStage('logging');
+      return;
+    }
+    if (idx !== segIndexRef.current) {
+      segIndexRef.current = idx;
+      setSegIndex(idx);
+    }
+    setTimeLeft(acc + segs[idx].duration - elapsedSec);
+    setTotalElapsed(elapsedSec);
+  }, []);
+
+  // Display refresh while live. The interval only repaints — correctness
+  // comes from syncClock's wall-clock math, so suspended ticks cost nothing.
   useEffect(() => {
     if (stage !== 'active' || isPaused) return;
-    const id = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          const nextIdx = segIndexRef.current + 1;
-          if (nextIdx >= segmentsRef.current.length) {
-            track('log_started', { kind: 'engine' });
-    setStage('logging');
-            return 0;
-          }
-          segIndexRef.current = nextIdx;
-          setSegIndex(nextIdx);
-          return segmentsRef.current[nextIdx].duration;
-        }
-        return prev - 1;
-      });
-      setTotalElapsed(prev => prev + 1);
-    }, 1000);
+    syncClock();
+    const id = setInterval(syncClock, 500);
     return () => clearInterval(id);
-  }, [stage, isPaused]);
+  }, [stage, isPaused, syncClock]);
+
+  // Snap the clock the moment the page becomes visible again (screen wake,
+  // tab return) — don't wait for the next interval tick.
+  useEffect(() => {
+    const onWake = () => {
+      if (document.visibilityState === 'visible') syncClock();
+    };
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('pageshow', onWake);
+    return () => {
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('pageshow', onWake);
+    };
+  }, [syncClock]);
+
+  // ── Screen wake lock ──
+  // Hold the screen on from countdown through the live workout (what every
+  // timer app does); re-acquire on visibility return since the OS releases
+  // the lock whenever the page hides. Best-effort: unsupported browsers and
+  // denials are non-fatal — the wall-clock engine keeps time regardless.
+  useEffect(() => {
+    if (stage !== 'countdown' && stage !== 'active') return;
+    let cancelled = false;
+    const acquire = async () => {
+      try {
+        if ('wakeLock' in navigator && document.visibilityState === 'visible') {
+          const lock = await navigator.wakeLock.request('screen');
+          if (cancelled) lock.release().catch(() => {});
+          else wakeLockRef.current = lock;
+        }
+      } catch {
+        // unsupported / low battery / denied — screen may dim; timer stays correct
+      }
+    };
+    acquire();
+    const onVis = () => { if (document.visibilityState === 'visible') acquire(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVis);
+      wakeLockRef.current?.release().catch(() => {});
+      wakeLockRef.current = null;
+    };
+  }, [stage]);
+
+  // ── 3-2-1-GO countdown ──
+  useEffect(() => {
+    if (stage !== 'countdown') return;
+    if (countdownVal === 'go') {
+      const t = setTimeout(() => {
+        // Anchor the clock at the true start — countdown time never counts.
+        startedAtRef.current = Date.now();
+        pausedAccumRef.current = 0;
+        pausedAtRef.current = null;
+        finishedRef.current = false;
+        setIsPaused(false);
+        track('timer_started', { kind: 'engine' });
+        setStage('active');
+      }, 500);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => {
+      setCountdownVal(v => (typeof v === 'number' && v > 1 ? v - 1 : 'go'));
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [stage, countdownVal]);
 
   // ── Handlers ──
 
@@ -628,18 +738,54 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
     setTimeLeft(segs[0].duration);
     setTotalElapsed(0);
     setIsPaused(true);
+    setIntervalScores(segs.filter(s => s.type === 'work').map(() => ''));
+    setIntervalsOpen(false);
+    setTotalIsAuto(false);
     setStage('ready');
   };
 
   const handleBeginCountdown = () => {
-    setIsPaused(false);
-    track('timer_started', { kind: 'engine' });
-    setStage('active');
+    setCountdownVal(3);
+    setStage('countdown');
+  };
+
+  // Pause freezes the wall-clock anchor (paused time is subtracted from
+  // elapsed), so a paused workout stays paused no matter what the screen does.
+  const handleTogglePause = () => {
+    if (isPaused) {
+      if (pausedAtRef.current != null) {
+        pausedAccumRef.current += Date.now() - pausedAtRef.current;
+        pausedAtRef.current = null;
+      }
+      setIsPaused(false);
+    } else {
+      pausedAtRef.current = Date.now();
+      setIsPaused(true);
+    }
   };
 
   const handleEndWorkout = () => {
     setIsPaused(true);
     setStage('logging');
+  };
+
+  const handleIntervalChange = (idx: number, value: string) => {
+    const next = [...intervalScores];
+    next[idx] = value;
+    setIntervalScores(next);
+    const parsed = next.map(v => (v.trim() === '' ? null : parseFloat(v)));
+    const allFilled = next.length > 0 && parsed.every(v => v != null && Number.isFinite(v));
+    if (allFilled) {
+      const nums = parsed as number[];
+      const sum = nums.reduce((a, b) => a + b, 0);
+      const total = isRateUnit(selectedUnit) ? sum / nums.length : sum;
+      setLogOutput(String(Math.round(total * 10) / 10));
+      setTotalIsAuto(true);
+    } else if (totalIsAuto) {
+      // Un-filling a round retracts the derived total (it no longer holds).
+      setLogOutput('');
+      setTotalIsAuto(false);
+    }
   };
 
   // Weighted target pace across all work segments (matches mobile app) — the
@@ -719,6 +865,12 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
       const totalRestSeconds = restSegs.reduce((sum, s) => sum + s.duration, 0);
       const avgWorkRestRatio = totalRestSeconds > 0 ? totalWorkSeconds / totalRestSeconds : null;
 
+      // Optional per-interval scores: one slot per work segment, null = not
+      // entered. Only persisted when at least one round was scored, so
+      // total-only sessions keep their exact historical workout_data shape.
+      const parsedIntervalScores = intervalScores.map(v => (v.trim() === '' ? null : parseFloat(v)));
+      const hasIntervalScores = parsedIntervalScores.some(v => v != null && Number.isFinite(v));
+
       // Save session. Sequence identity: sequence_position is THE position
       // trained; program_day/program_day_number keep the catalog content
       // reference (historical continuity + phase/analytics reads).
@@ -744,6 +896,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           total_work_time: totalWorkSeconds,
           total_rest_time: totalRestSeconds,
           avg_work_rest_ratio: avgWorkRestRatio,
+          ...(hasIntervalScores ? { interval_scores: parsedIntervalScores } : {}),
         },
         completed: true,
         program_version: programVersion,
@@ -1453,7 +1606,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         </div>
 
         <div style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'center' }}>
-          The timer starts when you press Start.
+          Press Start for a 3-2-1 countdown.
         </div>
 
         <div style={{ display: 'flex', gap: 12, width: '100%', maxWidth: 320 }}>
@@ -1471,6 +1624,39 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           >
             <Play size={18} /> Start
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render: 3-2-1-GO countdown ──
+
+  function renderCountdown() {
+    return (
+      <div className="engine-page" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 32, minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <span
+            className={'engine-badge ' + dayTypeBadge(workout?.day_type ?? '')}
+            style={{ fontSize: 14, padding: '6px 16px' }}
+          >
+            {(workout?.day_type ?? '').replace(/_/g, ' ')}
+          </span>
+        </div>
+
+        <div
+          className="engine-timer"
+          aria-live="assertive"
+          style={{
+            fontSize: 'clamp(96px, 30vw, 160px)',
+            lineHeight: 1,
+            color: countdownVal === 'go' ? 'var(--accent)' : 'var(--text)',
+          }}
+        >
+          {countdownVal === 'go' ? 'GO' : countdownVal}
+        </div>
+
+        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+          {segments.length > 0 && segments[0].label} — Block 1
         </div>
       </div>
     );
@@ -1599,7 +1785,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         <div className="engine-workout-controls" style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
           <button
             className="engine-btn engine-btn-secondary"
-            onClick={() => setIsPaused(!isPaused)}
+            onClick={handleTogglePause}
             style={{ flex: 1, maxWidth: 200 }}
           >
             {isPaused ? <><Play size={18} /> Resume</> : <><Pause size={18} /> Pause</>}
@@ -1637,16 +1823,97 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
             {/* Output */}
             <div>
-              <span className="engine-label">{isRateUnit(selectedUnit) ? 'Average' : 'Total Output'} ({SCORE_UNITS.find(u => u.value === selectedUnit)?.label ?? selectedUnit})</span>
+              <span className="engine-label">
+                {isRateUnit(selectedUnit) ? 'Average' : 'Total Output'} ({SCORE_UNITS.find(u => u.value === selectedUnit)?.label ?? selectedUnit})
+                {totalIsAuto && (
+                  <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: '#2ec486', textTransform: 'none', letterSpacing: 0 }}>
+                    auto from intervals — edit to override
+                  </span>
+                )}
+              </span>
               <input
                 className="engine-input"
                 type="number"
                 inputMode="decimal"
                 placeholder="e.g. 150"
                 value={logOutput}
-                onChange={e => setLogOutput(e.target.value)}
+                onChange={e => { setLogOutput(e.target.value); setTotalIsAuto(false); }}
               />
             </div>
+
+            {/* Optional per-interval scores — only for days with 2+ work
+                segments (a single-interval day's "interval" IS the total).
+                Inputs derive from the live segment array, so AI-sequencer
+                days render the right count and grouping automatically. */}
+            {(() => {
+              const workSegsLog = segments.filter(s => s.type === 'work');
+              if (isTimeTrial || workSegsLog.length < 2) return null;
+              const groups: { blockIndex: number; globalIdxs: number[] }[] = [];
+              workSegsLog.forEach((s, i) => {
+                const last = groups[groups.length - 1];
+                if (!last || last.blockIndex !== s.blockIndex) groups.push({ blockIndex: s.blockIndex, globalIdxs: [i] });
+                else last.globalIdxs.push(i);
+              });
+              const filled = intervalScores
+                .map(v => (v.trim() === '' ? null : parseFloat(v)))
+                .filter((v): v is number => v != null && Number.isFinite(v));
+              const fadePct = filled.length >= 2 && filled[0] > 0
+                ? Math.round(((filled[filled.length - 1] - filled[0]) / filled[0]) * 100)
+                : null;
+              return (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setIntervalsOpen(o => !o)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%',
+                      background: 'var(--surface2)', border: `1px ${intervalsOpen ? 'solid' : 'dashed'} var(--border)`,
+                      borderRadius: intervalsOpen ? '10px 10px 0 0' : 10, padding: '12px 14px',
+                      color: 'var(--text-dim)', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600,
+                      cursor: 'pointer', textAlign: 'left',
+                    }}
+                  >
+                    <span>Add interval scores <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></span>
+                    <ChevronDown size={18} style={{ transform: intervalsOpen ? 'rotate(180deg)' : undefined, transition: 'transform .2s', flexShrink: 0 }} />
+                  </button>
+                  {intervalsOpen && (
+                    <div style={{ border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 10px 10px', background: 'var(--surface2)', padding: 14 }}>
+                      {groups.map((g, gi) => (
+                        <div key={g.blockIndex}>
+                          <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--accent)', margin: gi === 0 ? '0 0 8px' : '12px 0 8px' }}>
+                            Block {g.blockIndex + 1}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                            {g.globalIdxs.map(idx => (
+                              <div key={idx}>
+                                <span className="engine-label" style={{ fontSize: 10, textAlign: 'center', display: 'block', marginBottom: 4 }}>Rd {idx + 1}</span>
+                                <input
+                                  className="engine-input"
+                                  type="number"
+                                  inputMode="decimal"
+                                  placeholder="–"
+                                  value={intervalScores[idx] ?? ''}
+                                  onChange={e => handleIntervalChange(idx, e.target.value)}
+                                  style={{ padding: '9px 6px', textAlign: 'center', fontSize: 14 }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      {fadePct != null && (
+                        <div style={{ fontSize: 12.5, color: 'var(--text-dim)', marginTop: 10, fontVariantNumeric: 'tabular-nums' }}>
+                          First → last round: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{filled[0]} → {filled[filled.length - 1]} {selectedUnit}</span> ({fadePct >= 0 ? '+' : ''}{fadePct}%)
+                        </div>
+                      )}
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '12px 0 0', lineHeight: 1.5 }}>
+                        Fill what you have — blank rounds are fine. Filling every round totals it for you.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Heart rate */}
             {!isTimeTrial && (
@@ -1924,6 +2191,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         {hasAccess && !monthLocked && stage === 'equipment' && renderEquipment()}
         {hasAccess && !monthLocked && stage === 'preview' && renderPreview()}
         {hasAccess && !monthLocked && stage === 'ready' && renderReady()}
+        {hasAccess && !monthLocked && stage === 'countdown' && renderCountdown()}
         {hasAccess && !monthLocked && stage === 'active' && renderActive()}
         {hasAccess && !monthLocked && stage === 'logging' && renderLogging()}
         {hasAccess && !monthLocked && stage === 'complete' && renderComplete()}
