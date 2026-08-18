@@ -443,6 +443,14 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
   // ── Logging state ──
   const [logOutput, setLogOutput] = useState('');
+  // Optional per-interval scores (one slot per WORK segment, '' = not entered).
+  // Only offered when the day has 2+ work segments — a single-interval day's
+  // "interval" IS the total. When every slot is filled the total auto-derives
+  // (sum for additive units, average for rate units); a manually typed total
+  // always wins and turns the auto flag off.
+  const [intervalScores, setIntervalScores] = useState<string[]>([]);
+  const [intervalsOpen, setIntervalsOpen] = useState(false);
+  const [totalIsAuto, setTotalIsAuto] = useState(false);
   const [logAvgHR, setLogAvgHR] = useState('');
   const [logPeakHR, setLogPeakHR] = useState('');
   const [logRPE, setLogRPE] = useState(5);
@@ -730,6 +738,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
     setTimeLeft(segs[0].duration);
     setTotalElapsed(0);
     setIsPaused(true);
+    setIntervalScores(segs.filter(s => s.type === 'work').map(() => ''));
+    setIntervalsOpen(false);
+    setTotalIsAuto(false);
     setStage('ready');
   };
 
@@ -756,6 +767,25 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
   const handleEndWorkout = () => {
     setIsPaused(true);
     setStage('logging');
+  };
+
+  const handleIntervalChange = (idx: number, value: string) => {
+    const next = [...intervalScores];
+    next[idx] = value;
+    setIntervalScores(next);
+    const parsed = next.map(v => (v.trim() === '' ? null : parseFloat(v)));
+    const allFilled = next.length > 0 && parsed.every(v => v != null && Number.isFinite(v));
+    if (allFilled) {
+      const nums = parsed as number[];
+      const sum = nums.reduce((a, b) => a + b, 0);
+      const total = isRateUnit(selectedUnit) ? sum / nums.length : sum;
+      setLogOutput(String(Math.round(total * 10) / 10));
+      setTotalIsAuto(true);
+    } else if (totalIsAuto) {
+      // Un-filling a round retracts the derived total (it no longer holds).
+      setLogOutput('');
+      setTotalIsAuto(false);
+    }
   };
 
   // Weighted target pace across all work segments (matches mobile app) — the
@@ -835,6 +865,12 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
       const totalRestSeconds = restSegs.reduce((sum, s) => sum + s.duration, 0);
       const avgWorkRestRatio = totalRestSeconds > 0 ? totalWorkSeconds / totalRestSeconds : null;
 
+      // Optional per-interval scores: one slot per work segment, null = not
+      // entered. Only persisted when at least one round was scored, so
+      // total-only sessions keep their exact historical workout_data shape.
+      const parsedIntervalScores = intervalScores.map(v => (v.trim() === '' ? null : parseFloat(v)));
+      const hasIntervalScores = parsedIntervalScores.some(v => v != null && Number.isFinite(v));
+
       // Save session. Sequence identity: sequence_position is THE position
       // trained; program_day/program_day_number keep the catalog content
       // reference (historical continuity + phase/analytics reads).
@@ -860,6 +896,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           total_work_time: totalWorkSeconds,
           total_rest_time: totalRestSeconds,
           avg_work_rest_ratio: avgWorkRestRatio,
+          ...(hasIntervalScores ? { interval_scores: parsedIntervalScores } : {}),
         },
         completed: true,
         program_version: programVersion,
@@ -1786,16 +1823,97 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
             {/* Output */}
             <div>
-              <span className="engine-label">{isRateUnit(selectedUnit) ? 'Average' : 'Total Output'} ({SCORE_UNITS.find(u => u.value === selectedUnit)?.label ?? selectedUnit})</span>
+              <span className="engine-label">
+                {isRateUnit(selectedUnit) ? 'Average' : 'Total Output'} ({SCORE_UNITS.find(u => u.value === selectedUnit)?.label ?? selectedUnit})
+                {totalIsAuto && (
+                  <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: '#2ec486', textTransform: 'none', letterSpacing: 0 }}>
+                    auto from intervals — edit to override
+                  </span>
+                )}
+              </span>
               <input
                 className="engine-input"
                 type="number"
                 inputMode="decimal"
                 placeholder="e.g. 150"
                 value={logOutput}
-                onChange={e => setLogOutput(e.target.value)}
+                onChange={e => { setLogOutput(e.target.value); setTotalIsAuto(false); }}
               />
             </div>
+
+            {/* Optional per-interval scores — only for days with 2+ work
+                segments (a single-interval day's "interval" IS the total).
+                Inputs derive from the live segment array, so AI-sequencer
+                days render the right count and grouping automatically. */}
+            {(() => {
+              const workSegsLog = segments.filter(s => s.type === 'work');
+              if (isTimeTrial || workSegsLog.length < 2) return null;
+              const groups: { blockIndex: number; globalIdxs: number[] }[] = [];
+              workSegsLog.forEach((s, i) => {
+                const last = groups[groups.length - 1];
+                if (!last || last.blockIndex !== s.blockIndex) groups.push({ blockIndex: s.blockIndex, globalIdxs: [i] });
+                else last.globalIdxs.push(i);
+              });
+              const filled = intervalScores
+                .map(v => (v.trim() === '' ? null : parseFloat(v)))
+                .filter((v): v is number => v != null && Number.isFinite(v));
+              const fadePct = filled.length >= 2 && filled[0] > 0
+                ? Math.round(((filled[filled.length - 1] - filled[0]) / filled[0]) * 100)
+                : null;
+              return (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setIntervalsOpen(o => !o)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%',
+                      background: 'var(--surface2)', border: `1px ${intervalsOpen ? 'solid' : 'dashed'} var(--border)`,
+                      borderRadius: intervalsOpen ? '10px 10px 0 0' : 10, padding: '12px 14px',
+                      color: 'var(--text-dim)', fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600,
+                      cursor: 'pointer', textAlign: 'left',
+                    }}
+                  >
+                    <span>Add interval scores <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></span>
+                    <ChevronDown size={18} style={{ transform: intervalsOpen ? 'rotate(180deg)' : undefined, transition: 'transform .2s', flexShrink: 0 }} />
+                  </button>
+                  {intervalsOpen && (
+                    <div style={{ border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 10px 10px', background: 'var(--surface2)', padding: 14 }}>
+                      {groups.map((g, gi) => (
+                        <div key={g.blockIndex}>
+                          <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--accent)', margin: gi === 0 ? '0 0 8px' : '12px 0 8px' }}>
+                            Block {g.blockIndex + 1}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                            {g.globalIdxs.map(idx => (
+                              <div key={idx}>
+                                <span className="engine-label" style={{ fontSize: 10, textAlign: 'center', display: 'block', marginBottom: 4 }}>Rd {idx + 1}</span>
+                                <input
+                                  className="engine-input"
+                                  type="number"
+                                  inputMode="decimal"
+                                  placeholder="–"
+                                  value={intervalScores[idx] ?? ''}
+                                  onChange={e => handleIntervalChange(idx, e.target.value)}
+                                  style={{ padding: '9px 6px', textAlign: 'center', fontSize: 14 }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      {fadePct != null && (
+                        <div style={{ fontSize: 12.5, color: 'var(--text-dim)', marginTop: 10, fontVariantNumeric: 'tabular-nums' }}>
+                          First → last round: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{filled[0]} → {filled[filled.length - 1]} {selectedUnit}</span> ({fadePct >= 0 ? '+' : ''}{fadePct}%)
+                        </div>
+                      )}
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '12px 0 0', lineHeight: 1.5 }}>
+                        Fill what you have — blank rounds are fine. Filling every round totals it for you.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Heart rate */}
             {!isTimeTrial && (
