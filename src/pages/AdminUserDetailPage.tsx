@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
@@ -228,6 +228,10 @@ function statusColor(status: string): string {
 }
 
 function EmailSection({ userId, userEmail, userName }: { userId: string; userEmail: string; userName: string }) {
+  // ?outreach=1 (the /admin/outreach worklist links here with it) pre-checks
+  // the outreach tag so working the list marks each user handled on send.
+  const [searchParams] = useSearchParams();
+  const [outreach, setOutreach] = useState(searchParams.get('outreach') === '1');
   const [templateKey, setTemplateKey] = useState<'welcome_back' | 'custom'>('custom');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -383,9 +387,12 @@ function EmailSection({ userId, userEmail, userName }: { userId: string; userEma
             content_base64: img.content_base64,
           }))
         : [];
+      // The eval_outreach campaign tag marks this user "handled" for the
+      // automated eval-reminder sweep (its candidates RPC excludes the tag).
+      const campaign_key = outreach ? 'eval_outreach' : undefined;
       const payload = templateKey === 'custom'
-        ? { user_id: userId, template_key: 'custom', subject, body, attachments }
-        : { user_id: userId, template_key: 'welcome_back' };
+        ? { user_id: userId, template_key: 'custom', subject, body, attachments, campaign_key }
+        : { user_id: userId, template_key: 'welcome_back', campaign_key };
       const { data, error: invokeErr } = await supabase.functions.invoke('admin-send-email', { body: payload });
       if (invokeErr) throw new Error(invokeErr.message || 'Send failed');
       if (data?.error) throw new Error(data.error);
@@ -424,6 +431,19 @@ function EmailSection({ userId, userEmail, userName }: { userId: string; userEma
             <option value="welcome_back">Welcome Back (reactivation)</option>
           </select>
         </div>
+
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1.5 }}>
+          <input
+            type="checkbox"
+            checked={outreach}
+            onChange={(e) => { setOutreach(e.target.checked); setConfirmArmed(false); }}
+            style={{ marginTop: 3, accentColor: 'var(--accent)' }}
+          />
+          <span>
+            <strong style={{ color: 'var(--text)' }}>Count as outreach</strong> — marks this user handled: the automated
+            eval reminder will permanently skip them. Leave unchecked for support replies and one-off notes.
+          </span>
+        </label>
 
         {templateKey === 'custom' ? (
           <>
