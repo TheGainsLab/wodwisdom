@@ -98,20 +98,14 @@ export default function ProgramsListPage({ session }: { session: Session }) {
     e.stopPropagation();
     if (!window.confirm(`Delete Month ${month}? This will remove all Month ${month} workouts and cannot be undone.`)) return;
 
-    // Delete all workouts for this month
-    const { error: wkErr } = await supabase
-      .from('program_workouts')
-      .delete()
-      .eq('program_id', programId)
-      .eq('month_number', month);
-    if (wkErr) return;
-
-    // Update generated_months to month - 1 (so next generation will produce this month again)
-    await supabase
-      .from('programs')
-      .update({ generated_months: Math.max(month - 1, 1) })
-      .eq('id', programId)
-      .eq('user_id', session.user.id);
+    // Server-side RPC: deletes the month's workouts AND the program_months
+    // idempotency marker (service-role only, unreachable from the client),
+    // then rolls generated_months back so the month can be regenerated.
+    const { error: rpcErr } = await supabase.rpc('admin_delete_program_month', {
+      p_program_id: programId,
+      p_month: month,
+    });
+    if (rpcErr) return;
 
     // Refresh the list
     loadAll();
@@ -375,7 +369,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                           <span className="history-question">{label}</span>
                           <span className="history-time">{workoutLabel}</span>
                           <div className="program-list-actions" onClick={e => e.stopPropagation()}>
-                            {(!isMonthCard || isAdmin) && (
+                            {isAdmin && (
                               <button
                                 type="button"
                                 className="program-list-btn program-list-btn-delete"
