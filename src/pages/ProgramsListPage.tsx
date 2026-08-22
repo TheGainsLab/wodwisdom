@@ -375,7 +375,7 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                           <span className="history-question">{label}</span>
                           <span className="history-time">{workoutLabel}</span>
                           <div className="program-list-actions" onClick={e => e.stopPropagation()}>
-                            {(!isMonthCard || isAdmin) && (
+                            {isAdmin && (
                               <button
                                 type="button"
                                 className="program-list-btn program-list-btn-delete"
