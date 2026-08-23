@@ -314,7 +314,15 @@ function materializeEquipment(current: Record<string, boolean>): Record<string, 
   return full;
 }
 
-const SKILL_LEVEL_GUIDELINE = 'Beginner = basic grasp · Intermediate = good unless tired · Advanced = reliable when fatigued';
+// Rating legend (founder copy, 2026-08-23): capacity-in-workouts framing works
+// for every skill, and "pick lower" resolves the I-don't-know-which paralysis
+// with the training-correct rule.
+const SKILL_LEVEL_LEGEND: Array<[string, string]> = [
+  ['None', "can't do it yet."],
+  ['Beginner', 'small sets only, not consistent.'],
+  ['Intermediate', 'can do it comfortably in workouts.'],
+  ['Advanced', 'big unbroken sets even under fatigue.'],
+];
 
 /** Athlete-voice names for blank benchmarks, used by the pre-run checkpoint's
  *  "would sharpen the read" line (bike labels need the machine spelled out). */
@@ -1788,7 +1796,13 @@ export default function AthletePage({ session }: { session: Session }) {
 
                 {/* Skills Assessment */}
                 <CollapsibleSection title="Skills Assessment">
-                  <p className="athlete-card-subtitle">Every skill defaults to <strong>None</strong> — tap to upgrade any you can do. {SKILL_LEVEL_GUIDELINE}</p>
+                  <p className="athlete-card-subtitle">Every skill defaults to <strong>None</strong> — tap to upgrade any you can do.</p>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 16 }}>
+                    {SKILL_LEVEL_LEGEND.map(([level, desc]) => (
+                      <div key={level}><strong style={{ color: 'var(--text)' }}>{level}</strong> — {desc}</div>
+                    ))}
+                    <div style={{ marginTop: 4, fontStyle: 'italic' }}>Not sure? Pick lower. Your program adjusts fast from your results.</div>
+                  </div>
                   {SKILL_GROUPS.map(group => (
                     <div key={group.title} style={{ marginBottom: 24 }}>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 12 }}>{group.title}</h3>
