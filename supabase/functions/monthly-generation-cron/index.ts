@@ -137,7 +137,17 @@ Deno.serve(async (_req) => {
           const program = programs[0];
           const generatedMonths = program.generated_months || 1;
 
-          if (generatedMonths < entitledMonths) {
+          // Returner pause: while resume-pending is set, the athlete (or the
+          // reconciler's 7-day fallback) owns generation — the drip must not
+          // barrel through it.
+          const { data: resumeRow } = await supa
+            .from("athlete_profiles")
+            .select("programming_resume_pending_at")
+            .eq("user_id", userId)
+            .maybeSingle();
+          if (resumeRow?.programming_resume_pending_at) {
+            results.push(`Programming: resume-pending for user ${userId} — drip deferred`);
+          } else if (generatedMonths < entitledMonths) {
             const nextMonth = generatedMonths + 1;
             results.push(`Programming: triggering month ${nextMonth} for user ${userId} (entitled=${entitledMonths}, inv=${paidInvoiceCount}, into_quarter=${monthsIntoCurrentQuarter})`);
 

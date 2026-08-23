@@ -879,23 +879,42 @@ serve(async (req) => {
 
           if (programs && programs.length > 0) {
             const program = programs[0];
-            const nextMonth = (program.generated_months || 1) + 1;
-            console.log(`[webhook] Triggering month ${nextMonth} generation for program ${program.id}`);
+            // RETURNER PAUSE: the first invoice of a NEW subscription
+            // (billing_reason=subscription_create) from a user who already has a
+            // generated program is a re-subscriber. Their next month must not be
+            // built from a profile they haven't looked at since they left — so
+            // instead of generating, flag resume-pending. The Athlete page shows
+            // the welcome-back banner + "Build my next month" (which clears the
+            // flag via generate-next-month), and the daily reconciler
+            // auto-generates after 7 days of silence so a paid month never
+            // silently evaporates. Renewals (subscription_cycle) are untouched.
+            if (invoice.billing_reason === "subscription_create") {
+              console.log(`[webhook] Returner detected (subscription_create + existing program) — pausing generation for user ${payUserId}`);
+              await supa
+                .from("athlete_profiles")
+                .upsert(
+                  { user_id: payUserId, programming_resume_pending_at: new Date().toISOString() },
+                  { onConflict: "user_id" }
+                );
+            } else {
+              const nextMonth = (program.generated_months || 1) + 1;
+              console.log(`[webhook] Triggering month ${nextMonth} generation for program ${program.id}`);
 
-            // Call generate-next-month using service role (no user token needed)
-            const genUrl = `${SUPABASE_URL}/functions/v1/generate-next-month`;
-            try {
-              await fetchWithTimeout(genUrl, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
-                  "x-webhook-user-id": payUserId,
-                },
-                body: JSON.stringify({ program_id: program.id, user_id: payUserId }),
-              }, 30_000);
-            } catch (e) {
-              console.error("[webhook] Failed to trigger program generation:", e);
+              // Call generate-next-month using service role (no user token needed)
+              const genUrl = `${SUPABASE_URL}/functions/v1/generate-next-month`;
+              try {
+                await fetchWithTimeout(genUrl, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
+                    "x-webhook-user-id": payUserId,
+                  },
+                  body: JSON.stringify({ program_id: program.id, user_id: payUserId }),
+                }, 30_000);
+              } catch (e) {
+                console.error("[webhook] Failed to trigger program generation:", e);
+              }
             }
           }
         }

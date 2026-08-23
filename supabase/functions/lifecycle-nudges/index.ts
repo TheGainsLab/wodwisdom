@@ -120,6 +120,41 @@ function renderLoggingNudge(firstName: string | null, unsubUrl: string | null): 
   );
 }
 
+// ── Sweeps 5+6: returner resume nudges ──────────────────────────────────────
+// A re-subscriber's next month is PAUSED until they review their numbers (the
+// stripe webhook sets programming_resume_pending_at; the Athlete page shows
+// the Build button). These are service messages about a paid deliverable —
+// "your month is waiting on your tap" — not marketing, so they run
+// unconditionally (no ENABLE_SUBSCRIBER_NUDGES gate). Day 2 and day 5; the
+// reconciler auto-builds at day 7 regardless.
+
+const RESUME_1_SUBJECT = "Your next month is ready to build";
+
+function renderResume1(firstName: string | null, unsubUrl: string | null): string {
+  return emailWrap(
+    `<p>${hi(firstName)}</p>` +
+    `<p>Welcome back — great to have you training with us again.</p>` +
+    `<p>One thing before your next month gets built: it's generated from your numbers, and yours have been sitting untouched since you were last here. Two minutes to ${emailLink("/profile", "review them", "resume_nudge_1")} — update anything that changed, confirm what didn't — then hit <strong>Build my next month</strong> and your program is minutes away.</p>` +
+    emailButton("/profile", "Review my numbers & build", "resume_nudge_1") +
+    `<p>If everything's still accurate, it's literally one tap.</p>` +
+    `<p>-Matt</p>`,
+    { unsubUrl },
+  );
+}
+
+const RESUME_2_SUBJECT = "Still holding your month — one tap to build it";
+
+function renderResume2(firstName: string | null, unsubUrl: string | null): string {
+  return emailWrap(
+    `<p>${hi(firstName)}</p>` +
+    `<p>Your next training month is paid for and waiting — I just don't want to build it from stale numbers. ${emailLink("/profile", "Take a quick look at your profile", "resume_nudge_2")}, adjust anything that changed while you were away, and tap <strong>Build my next month</strong>.</p>` +
+    emailButton("/profile", "Build my next month", "resume_nudge_2") +
+    `<p>If I don't hear from you in the next couple of days I'll build it from what's on file, so you don't lose the month either way — but it'll be better if you look first.</p>` +
+    `<p>-Matt</p>`,
+    { unsubUrl },
+  );
+}
+
 // ── The sweep runner ────────────────────────────────────────────────────────
 
 interface Candidate { user_id: string; email: string; full_name: string | null }
@@ -131,8 +166,9 @@ async function runSweep(
   templateKey: string,
   subject: string,
   render: (firstName: string | null, unsubUrl: string | null) => string,
+  rpcArgs: Record<string, unknown> = {},
 ): Promise<SweepResult> {
-  const { data, error } = await supa.rpc(rpc, { p_limit: 25 });
+  const { data, error } = await supa.rpc(rpc, { p_limit: 25, ...rpcArgs });
   if (error) {
     console.error(`[lifecycle-nudges] ${rpc} failed:`, error);
     return { candidates: 0, sent: 0, failed: 0, error: `${rpc}: ${error.message}` };
@@ -167,8 +203,12 @@ Deno.serve(async (req) => {
   const logging = subscriberNudgesOn
     ? await runSweep(supa, "logging_nudge_candidates", "logging_nudge", LOGGING_SUBJECT, renderLoggingNudge)
     : { candidates: 0, sent: 0, failed: 0 } as SweepResult;
+  const resume1 = await runSweep(supa, "resume_nudge_candidates", "resume_nudge_1", RESUME_1_SUBJECT, renderResume1,
+    { p_template_key: "resume_nudge_1", p_min_days: 2 });
+  const resume2 = await runSweep(supa, "resume_nudge_candidates", "resume_nudge_2", RESUME_2_SUBJECT, renderResume2,
+    { p_template_key: "resume_nudge_2", p_min_days: 5 });
 
-  const results = { welcome, free_limit: freeLimit, eval_followup: evalFollowup, logging };
+  const results = { welcome, free_limit: freeLimit, eval_followup: evalFollowup, logging, resume_1: resume1, resume_2: resume2 };
   const errors = Object.values(results).map((r) => r.error).filter(Boolean) as string[];
 
   // A broken sweep must be LOUD: alert the founder and return non-200 so the

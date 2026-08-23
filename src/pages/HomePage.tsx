@@ -25,6 +25,7 @@ export default function HomePage({ session }: { session: Session }) {
   const [hasEvaluation, setHasEvaluation] = useState(false);
   const [hasProgram, setHasProgram] = useState(false);
   const [hasCompetitionLink, setHasCompetitionLink] = useState(false);
+  const [resumePending, setResumePending] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const hasProgramming = isAdmin || hasFeature('programming');
@@ -41,12 +42,13 @@ export default function HomePage({ session }: { session: Session }) {
       try {
         const [progRes, profileRes, evalRes] = await Promise.all([
           supabase.from('programs').select('id').eq('user_id', session.user.id).neq('committed', false).limit(1),
-          supabase.from('athlete_profiles').select('lifts, skills, conditioning, competition_athlete_id').eq('user_id', session.user.id).maybeSingle(),
+          supabase.from('athlete_profiles').select('lifts, skills, conditioning, competition_athlete_id, programming_resume_pending_at').eq('user_id', session.user.id).maybeSingle(),
           supabase.from('profile_evaluations').select('id').eq('user_id', session.user.id).limit(1),
         ]);
         if (cancelled) return;
         if (profileRes.data) {
-          const d = profileRes.data as { lifts?: Record<string, unknown>; skills?: Record<string, unknown>; conditioning?: Record<string, unknown>; competition_athlete_id?: string | null };
+          const d = profileRes.data as { lifts?: Record<string, unknown>; skills?: Record<string, unknown>; conditioning?: Record<string, unknown>; competition_athlete_id?: string | null; programming_resume_pending_at?: string | null };
+          setResumePending(!!d.programming_resume_pending_at);
           const hasLifts = d.lifts && Object.values(d.lifts).some((v) => typeof v === 'number' && v > 0);
           const hasSkills = d.skills && Object.values(d.skills).some((v) => v && v !== 'none');
           const hasConditioning = d.conditioning && Object.values(d.conditioning).some((v) => !!v);
@@ -64,6 +66,10 @@ export default function HomePage({ session }: { session: Session }) {
 
   // ── Context card: the single most relevant next action. ──
   const primary = (() => {
+    // Returner pause outranks everything: their paid month is waiting on them.
+    if (resumePending && hasProgram) {
+      return { title: 'Welcome back — build your next month', body: 'Your next training month is paid for and waiting. Review your numbers on your profile, then tap Build my next month.', cta: 'Review & build', to: '/profile' };
+    }
     if (hasProgramming && !hasProfile) {
       return { title: 'Set up your athlete profile', body: 'Add your lifts, skills, and benchmarks so the AI can build a program tailored to you.', cta: 'Go to Profile', to: '/profile' };
     }
