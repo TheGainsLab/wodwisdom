@@ -57,6 +57,8 @@ export interface WorkoutLogEntryRow {
   quality: string | null;
   variation: string | null;
   faults_observed: string[] | null;
+  /** false = the athlete explicitly skipped this set. */
+  completed: boolean | null;
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -106,13 +108,17 @@ function formatBlock(
       let p = formatMovementName(movement);
       const isPerSet = rows.length > 1 && rows.every((r) => r.set_number != null);
       if (isPerSet) {
-        const totalSets = rows.length;
-        const reps = rows[0].reps;
-        const weights = rows.map((r) => r.weight).filter((w) => w != null);
-        const rpes = rows.map((r) => r.rpe).filter((r) => r != null);
+        // Skipped sets (completed:false) are excluded from the numbers but
+        // named — "planned 5, did 4" is coaching signal, not noise.
+        const done = rows.filter((r) => r.completed !== false);
+        const skipped = rows.length - done.length;
+        const totalSets = done.length;
+        const reps = done[0]?.reps ?? null;
+        const weights = done.map((r) => r.weight).filter((w) => w != null);
+        const rpes = done.map((r) => r.rpe).filter((r) => r != null);
         if (reps != null) p += ` ${totalSets}×${reps}`;
         if (weights.length > 0) {
-          const unit = rows[0].weight_unit === "kg" ? "kg" : "lbs";
+          const unit = done[0]?.weight_unit === "kg" ? "kg" : "lbs";
           const unique = [...new Set(weights)];
           p += unique.length === 1 ? ` @${unique[0]}${unit}` : ` @${Math.min(...weights)}-${Math.max(...weights)}${unit}`;
         }
@@ -121,6 +127,7 @@ function formatBlock(
           const max = Math.max(...rpes);
           p += min === max ? ` RPE ${min}` : ` RPE ${min}-${max}`;
         }
+        if (skipped > 0) p += ` (skipped ${skipped} set${skipped === 1 ? "" : "s"})`;
       } else {
         const e = rows[0];
         if (e.sets != null && e.reps != null) p += ` ${e.sets}×${e.reps}`;
@@ -459,7 +466,7 @@ export async function fetchAndFormatRecentHistory(
         .in("log_id", logIds),
       supa
         .from("workout_log_entries")
-        .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, calories, quality, variation, faults_observed")
+        .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, calories, quality, variation, faults_observed, completed")
         .in("log_id", logIds),
     ]);
 

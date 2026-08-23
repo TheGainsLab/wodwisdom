@@ -268,9 +268,15 @@ const useChecked = () => {
   return { checked, toggle };
 };
 
-// ── Shared per-set grid: strength / skills / accessory ──
-// A row is a set, prefilled from the prescription. showWeight adds the load
-// column (strength + accessory); skills is bodyweight/technique work.
+// ── Shared per-set rows: strength / skills / accessory ──
+// A row is a set. Three states per row — the athlete's three options:
+//   accept (default) — plain text of the prescription; Save logs it as written.
+//   edit (✎)         — that row alone becomes prefilled inputs.
+//   skipped (✕)      — struck through, saved as completed:false so "planned 5,
+//                      did 4" is legible downstream; tap to restore.
+// Rows with no prefill ("3 sets max pull-ups") start in edit — the blank is
+// the feature; there's nothing to accept. Added work goes in Notes.
+type RowMode = 'accept' | 'edit' | 'skipped';
 function PerSetLog({ block, controller, coaching, label, type, showWeight, faultsPerMovement }: {
   block: ProgramBlockV2;
   controller: DayLogController;
@@ -281,23 +287,28 @@ function PerSetLog({ block, controller, coaching, label, type, showWeight, fault
   faultsPerMovement: boolean;
 }) {
   const saving = controller.saving === block.sort_order;
-  const initial = useMemo(() => {
+  const { initial, initialModes } = useMemo(() => {
     const rows: Record<string, { weight: string; value: string }> = {};
+    const modes: Record<string, RowMode> = {};
     for (const m of block.movements) {
       const { count, prefill } = plannedSets(m);
       for (let i = 0; i < count; i++) {
-        rows[`${m.id}-${i}`] = {
+        const k = `${m.id}-${i}`;
+        rows[k] = {
           weight: m.weight != null ? String(m.weight) : '',
           value: prefill[i] != null ? String(prefill[i]) : '',
         };
+        modes[k] = prefill[i] != null ? 'accept' : 'edit';
       }
     }
-    return rows;
+    return { initial: rows, initialModes: modes };
   }, [block]);
   const [vals, setVals] = useState(initial);
+  const [modes, setModes] = useState(initialModes);
   const [blockRpe, setBlockRpe] = useState('');
   const [notes, setNotes] = useState('');
   const set = (k: string, f: 'weight' | 'value', v: string) => setVals(p => ({ ...p, [k]: { ...p[k], [f]: v } }));
+  const setMode = (k: string, m: RowMode) => setModes(p => ({ ...p, [k]: m }));
   const { checked, toggle } = useChecked();
   const sharedFaults = faultsPerMovement ? [] : blockFaults(coaching, block.movements);
 
@@ -308,7 +319,23 @@ function PerSetLog({ block, controller, coaching, label, type, showWeight, fault
       const { kind, count, prefill } = plannedSets(m);
       const movementFaults = faultsPerMovement ? (checked[m.id] ?? []) : blockFaultsChecked;
       for (let i = 0; i < count; i++) {
-        const r = vals[`${m.id}-${i}`] ?? { weight: '', value: '' };
+        const k = `${m.id}-${i}`;
+        const prescribed = {
+          prescribed_weight: m.weight ?? null,
+          // Per-set prescription (was the movement's TOTAL pre-redesign, which
+          // made every logged set read as an 80% miss to any comparer).
+          prescribed_reps: kind === 'reps' ? (prefill[i] ?? null) : null,
+        };
+        if (modes[k] === 'skipped') {
+          // Recorded, not omitted: null actuals keep it out of e1RM/volume/
+          // hit-rate math; completed:false makes the skip itself the signal.
+          entries.push(emptyEntry(m.movement, {
+            sets: 1, set_number: i + 1, completed: false, skip_reason: 'skipped',
+            weight_unit: m.weight_unit || controller.userUnits, ...prescribed,
+          }));
+          continue;
+        }
+        const r = vals[k] ?? { weight: '', value: '' };
         const v = kind === 'distance' ? numOrNull(r.value) : intOrNull(r.value);
         entries.push(emptyEntry(m.movement, {
           sets: 1,
@@ -320,10 +347,7 @@ function PerSetLog({ block, controller, coaching, label, type, showWeight, fault
           weight: showWeight ? numOrNull(r.weight) : null,
           weight_unit: m.weight_unit || controller.userUnits,
           faults_observed: movementFaults.length ? movementFaults : null,
-          prescribed_weight: m.weight ?? null,
-          // Per-set prescription (was the movement's TOTAL pre-redesign, which
-          // made every logged set read as an 80% miss to any comparer).
-          prescribed_reps: kind === 'reps' ? (prefill[i] ?? null) : null,
+          ...prescribed,
         }));
       }
     }
@@ -333,7 +357,10 @@ function PerSetLog({ block, controller, coaching, label, type, showWeight, fault
     });
   };
 
-  const cols = showWeight ? '28px 1fr 1fr' : '28px 1fr';
+  const iconBtn: React.CSSProperties = {
+    background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+    color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', flexShrink: 0,
+  };
   return (
     <div className="block-log" style={wrapStyle}>
       {block.movements.map((m) => {
@@ -342,18 +369,50 @@ function PerSetLog({ block, controller, coaching, label, type, showWeight, fault
         return (
           <div key={m.id} style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{formatMovementName(m.movement)}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 6, alignItems: 'center' }}>
-              <span />
-              {showWeight && <span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>{controller.userUnits}</span>}
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>{unitLabel}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {Array.from({ length: count }, (_, i) => {
-                const k = `${m.id}-${i}`; const r = vals[k] ?? { weight: '', value: '' };
+                const k = `${m.id}-${i}`;
+                const mode = modes[k] ?? 'accept';
+                const r = vals[k] ?? { weight: '', value: '' };
+                const rowBase: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, minHeight: 34 };
+                const setLabel = <span style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 600, width: 24, flexShrink: 0 }}>S{i + 1}</span>;
+                if (mode === 'skipped') {
+                  return (
+                    <div key={k} style={{ ...rowBase, cursor: 'pointer' }} onClick={() => setMode(k, 'accept')}>
+                      {setLabel}
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)', textDecoration: 'line-through' }}>
+                        {showWeight && r.weight ? `${r.weight} ${controller.userUnits} × ` : ''}{r.value || '—'} {unitLabel}
+                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>skipped — tap to restore</span>
+                    </div>
+                  );
+                }
+                if (mode === 'edit') {
+                  return (
+                    <div key={k} style={rowBase}>
+                      {setLabel}
+                      {showWeight && <input style={{ ...inputStyle, flex: 1 }} inputMode="decimal" placeholder={controller.userUnits} value={r.weight} onChange={e => set(k, 'weight', e.target.value)} />}
+                      <input style={{ ...inputStyle, flex: 1 }} inputMode="decimal" placeholder={unitLabel} value={r.value} onChange={e => set(k, 'value', e.target.value)} />
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{unitLabel}</span>
+                      <button type="button" style={iconBtn} title="Skip this set" onClick={() => setMode(k, 'skipped')}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      </button>
+                    </div>
+                  );
+                }
                 return (
-                  <>
-                    <span key={`${k}-l`} style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 600 }}>S{i + 1}</span>
-                    {showWeight && <input key={`${k}-w`} style={inputStyle} inputMode="decimal" value={r.weight} onChange={e => set(k, 'weight', e.target.value)} />}
-                    <input key={`${k}-v`} style={inputStyle} inputMode="decimal" value={r.value} onChange={e => set(k, 'value', e.target.value)} />
-                  </>
+                  <div key={k} style={rowBase}>
+                    {setLabel}
+                    <span style={{ fontSize: 13, flex: 1 }}>
+                      {showWeight && r.weight ? `${r.weight} ${controller.userUnits} × ` : ''}{r.value} {unitLabel}
+                    </span>
+                    <button type="button" style={iconBtn} title="Edit this set" onClick={() => setMode(k, 'edit')}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
+                    </button>
+                    <button type="button" style={iconBtn} title="Skip this set" onClick={() => setMode(k, 'skipped')}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </button>
+                  </div>
                 );
               })}
             </div>
