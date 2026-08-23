@@ -169,13 +169,30 @@ function formatDuration(seconds: number): string {
   return `${seconds}s`;
 }
 
+/**
+ * Rower/ski monitors show pace as a /500m split (e.g. 1:52/500m), not
+ * meters-per-minute — convert so the athlete can match the erg screen without
+ * mid-workout math. Only for the 'meters' unit (km/miles are running units
+ * where /500m splits aren't the convention).
+ */
+function split500(metersPerMin: number): string | null {
+  if (!Number.isFinite(metersPerMin) || metersPerMin <= 0) return null;
+  const secPer500 = (500 / metersPerMin) * 60;
+  let m = Math.floor(secPer500 / 60);
+  let s = Math.round(secPer500 % 60);
+  if (s === 60) { m += 1; s = 0; }
+  return `${m}:${String(s).padStart(2, '0')}/500m`;
+}
+
 function formatGoalWithPace(goal: number, durationSeconds: number, unit: string): string {
   // Rate units (watts): the goal IS the pace — show it directly, no "/min".
   if (isRateUnit(unit)) return `~${Math.round(goal)} ${unit}`;
   const durationMinutes = durationSeconds / 60;
   const perMin = durationMinutes > 0 ? Math.round(goal / durationMinutes) : null;
   const goalStr = Math.round(goal);
-  return perMin ? `~${goalStr} ${unit} (${perMin} ${unit}/min)` : `~${goalStr} ${unit}`;
+  if (!perMin) return `~${goalStr} ${unit}`;
+  const split = unit === 'meters' ? split500(perMin) : null;
+  return `~${goalStr} ${unit} (${perMin} ${unit}/min${split ? ` · ${split}` : ''})`;
 }
 
 function formatPace(pace: number[] | string | undefined): string {
@@ -1061,7 +1078,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   </div>
                   <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
                     {/* Rate units (watts): total_output above already IS the pace; no "/min" line. */}
-                    {!isRateUnit(baseline.units ?? '') && baseline.calculated_rpm ? `${baseline.calculated_rpm.toFixed(1)} ${baseline.units ?? 'cal'}/min` : ''}
+                    {!isRateUnit(baseline.units ?? '') && baseline.calculated_rpm ? `${baseline.calculated_rpm.toFixed(1)} ${baseline.units ?? 'cal'}/min${baseline.units === 'meters' && split500(baseline.calculated_rpm) ? ` · ${split500(baseline.calculated_rpm)}` : ''}` : ''}
                   </div>
                   </div>
                 </>
@@ -1495,7 +1512,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'right' }}>
                               {s.actual_pace != null && (
                                 <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                                  {Number(s.actual_pace).toFixed(1)} {s.units ?? ''}/min
+                                  {Number(s.actual_pace).toFixed(1)} {s.units ?? ''}/min{s.units === 'meters' && split500(Number(s.actual_pace)) ? ` \u00b7 ${split500(Number(s.actual_pace))}` : ''}
                                 </span>
                               )}
                               {s.perceived_exertion != null && (
@@ -1979,7 +1996,11 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 <span>
                   {isRateUnit(selectedUnit)
                     ? `Pace: ${Math.round(parseFloat(logOutput))} ${selectedUnit}`
-                    : `Pace: ${(parseFloat(logOutput) / ((workout ? calculateWorkDurationMinutes(workout) : 0) || Math.max(totalElapsed / 60, 1))).toFixed(1)} ${selectedUnit}/min`}
+                    : (() => {
+                        const rate = parseFloat(logOutput) / ((workout ? calculateWorkDurationMinutes(workout) : 0) || Math.max(totalElapsed / 60, 1));
+                        const split = selectedUnit === 'meters' ? split500(rate) : null;
+                        return `Pace: ${rate.toFixed(1)} ${selectedUnit}/min${split ? ` \u00b7 ${split}` : ''}`;
+                      })()}
                 </span>
               )}
             </div>
