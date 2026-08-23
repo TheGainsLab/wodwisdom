@@ -230,9 +230,16 @@ function SavedBadge({ onEdit }: { onEdit: () => void }) {
  * that go?" moment. Unprefilled on purpose: this is the first real effort
  * signal the system collects (per-set RPE was prescription-prefilled noise).
  */
-function SaveButton({ saving, onSave, rpe, onRpe }: { saving: boolean; onSave: () => void; rpe: string; onRpe: (v: string) => void }) {
+function SaveButton({ saving, onSave, rpe, onRpe, notes, onNotes }: { saving: boolean; onSave: () => void; rpe: string; onRpe: (v: string) => void; notes: string; onNotes: (v: string) => void }) {
   return (
     <>
+      <input
+        style={{ ...inputStyle, textAlign: 'left', marginTop: 10 }}
+        placeholder="Notes (optional)"
+        maxLength={1000}
+        value={notes}
+        onChange={e => onNotes(e.target.value)}
+      />
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
         <span style={{ fontSize: 12, color: 'var(--text-dim)', flex: 1 }}>How hard was this block? (RPE 1–10)</span>
         <select
@@ -289,6 +296,7 @@ function PerSetLog({ block, controller, coaching, label, type, showWeight, fault
   }, [block]);
   const [vals, setVals] = useState(initial);
   const [blockRpe, setBlockRpe] = useState('');
+  const [notes, setNotes] = useState('');
   const set = (k: string, f: 'weight' | 'value', v: string) => setVals(p => ({ ...p, [k]: { ...p[k], [f]: v } }));
   const { checked, toggle } = useChecked();
   const sharedFaults = faultsPerMovement ? [] : blockFaults(coaching, block.movements);
@@ -320,7 +328,7 @@ function PerSetLog({ block, controller, coaching, label, type, showWeight, fault
       }
     }
     controller.saveBlock({
-      label: block.block_label || label, type, text: blockText(block), score: null, rx: false, notes: null,
+      label: block.block_label || label, type, text: blockText(block), score: null, rx: false, notes: notes.trim() || null,
       sort_order: block.sort_order, entries, capped: false, capped_reps: null, rpe: numOrNull(blockRpe),
     });
   };
@@ -354,7 +362,7 @@ function PerSetLog({ block, controller, coaching, label, type, showWeight, fault
         );
       })}
       {!faultsPerMovement && <FaultChecklist faults={sharedFaults} checked={checked['block'] ?? []} onToggle={(f) => toggle('block', f)} />}
-      <SaveButton saving={saving} onSave={save} rpe={blockRpe} onRpe={setBlockRpe} />
+      <SaveButton saving={saving} onSave={save} rpe={blockRpe} onRpe={setBlockRpe} notes={notes} onNotes={setNotes} />
     </div>
   );
 }
@@ -435,7 +443,6 @@ function MetconLog({ block, controller, coaching }: { block: ProgramBlockV2; con
           )}
         </div>
       )}
-      <input style={{ ...inputStyle, textAlign: 'left' }} placeholder="Notes (optional)" value={notes} onChange={e => setNotes(e.target.value)} />
       {block.movements.map((m) => {
         const mFaults = faultsForMovement(coaching, m.movement);
         if (!mFaults.length) return null;
@@ -446,7 +453,7 @@ function MetconLog({ block, controller, coaching }: { block: ProgramBlockV2; con
           </div>
         );
       })}
-      <SaveButton saving={saving} onSave={save} rpe={blockRpe} onRpe={setBlockRpe} />
+      <SaveButton saving={saving} onSave={save} rpe={blockRpe} onRpe={setBlockRpe} notes={notes} onNotes={setNotes} />
     </div>
   );
 }
@@ -457,10 +464,11 @@ function CardioLog({ block, controller }: { block: ProgramBlockV2; controller: D
   const [watts, setWatts] = useState('');
   const [time, setTime] = useState('');
   const [blockRpe, setBlockRpe] = useState('');
+  const [notes, setNotes] = useState('');
   const save = () => {
     const entries: LogEntry[] = block.movements.map((m) => emptyEntry(m.movement, { distance: m.distance ?? null, distance_unit: m.distance_unit ?? null }));
     controller.saveBlock({
-      label: block.block_label || 'Cardio', type: 'cardio', text: blockText(block), score: null, rx: false, notes: null,
+      label: block.block_label || 'Cardio', type: 'cardio', text: blockText(block), score: null, rx: false, notes: notes.trim() || null,
       sort_order: block.sort_order, entries, capped: false, capped_reps: null, rpe: numOrNull(blockRpe),
       cardio_avg_watts: numOrNull(watts), cardio_work_seconds: parseClock(time), cardio_modality: null,
     });
@@ -471,7 +479,7 @@ function CardioLog({ block, controller }: { block: ProgramBlockV2; controller: D
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Avg watts</div><input style={inputStyle} inputMode="decimal" placeholder="watts" value={watts} onChange={e => setWatts(e.target.value)} /></div>
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Work time</div><input style={inputStyle} placeholder="mm:ss" value={time} onChange={e => setTime(e.target.value)} /></div>
       </div>
-      <SaveButton saving={saving} onSave={save} rpe={blockRpe} onRpe={setBlockRpe} />
+      <SaveButton saving={saving} onSave={save} rpe={blockRpe} onRpe={setBlockRpe} notes={notes} onNotes={setNotes} />
     </div>
   );
 }

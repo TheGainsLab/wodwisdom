@@ -30,6 +30,8 @@ export interface WorkoutLogBlockRow {
   /** For-time metcon that hit the cap — score holds the cap time. */
   capped: boolean | null;
   capped_reps: number | null;
+  /** The athlete's own free-text note typed at log time. */
+  notes: string | null;
   sort_order: number;
 }
 
@@ -453,7 +455,7 @@ export async function fetchAndFormatRecentHistory(
     const [{ data: blocks }, { data: entries }] = await Promise.all([
       supa
         .from("workout_log_blocks")
-        .select("id, log_id, block_type, block_label, block_text, score, rx, rpe, capped, capped_reps, sort_order")
+        .select("id, log_id, block_type, block_label, block_text, score, rx, rpe, capped, capped_reps, notes, sort_order")
         .in("log_id", logIds),
       supa
         .from("workout_log_entries")
@@ -497,9 +499,15 @@ export async function fetchAndFormatRecentHistory(
         const byLabel = entriesByBlock.get(`${log.id}::${block.block_label ?? ""}`) || [];
         const blockEntries = byId.length > 0 ? byId : byLabel;
         const summary = formatBlock(block, blockEntries);
+        // Block RPE and the athlete's own note ride along — the effort signal
+        // and their words about how it went are exactly what a coach asks for.
+        const rpePart = block.rpe != null ? ` — RPE ${block.rpe}` : "";
+        const notePart = block.notes?.trim()
+          ? ` — athlete note: "${block.notes.trim().replace(/\s*\n\s*/g, " ").slice(0, 200)}"`
+          : "";
         workoutLines.push({
           date: log.workout_date,
-          line: `${dateLabel} — ${summary}`,
+          line: `${dateLabel} — ${summary}${rpePart}${notePart}`,
         });
       }
     }

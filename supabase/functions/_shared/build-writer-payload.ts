@@ -168,6 +168,15 @@ export interface PreviousCycleSummary {
     total_hold_seconds: number;
     days: number;
   }>;
+  /** The athlete's own logged block notes from the prior cycle, newest first
+   *  (bounded: latest 30, each ≤500 chars). Free text typed at log time —
+   *  qualitative evidence for month_in_review and load decisions. Absent on
+   *  pre-migration RPC results; empty array when nothing was noted. */
+  block_notes?: Array<{
+    date: string | null;
+    block_type: string;
+    note: string;
+  }>;
 }
 
 export interface WriterPayload {
