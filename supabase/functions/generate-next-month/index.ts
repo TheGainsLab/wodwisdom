@@ -342,6 +342,16 @@ Deno.serve(async (req) => {
     const genData = await genResp.json();
     console.log(`[generate-next-month] Generation started, mode=${mode} month=${targetMonth}`);
 
+    // Generation kicked off — clear any returner resume-pending flag (set by the
+    // stripe webhook on a re-subscribe) regardless of which path got us here:
+    // the athlete's Build button, the 7-day cron fallback, or an admin.
+    await supa
+      .from("athlete_profiles")
+      .update({ programming_resume_pending_at: null })
+      .eq("user_id", userId)
+      .not("programming_resume_pending_at", "is", null)
+      .then(() => {}, () => {});
+
     return new Response(
       JSON.stringify({
         job_id: genData.job_id,

@@ -678,6 +678,10 @@ export default function AthletePage({ session }: { session: Session }) {
   const [condSectionOpen, setCondSectionOpen] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
+  // Returner pause: set by the stripe webhook on a re-subscribe; the athlete
+  // reviews their numbers and taps Build (which clears it server-side).
+  const [resumePending, setResumePending] = useState(false);
+  const [resumeBuildState, setResumeBuildState] = useState<'idle' | 'building' | 'error'>('idle');
   // TDEE override is no longer edited here (the TDEE card was removed from the
   // profile — to be reintegrated under Nutrition later). Kept so the saved value
   // round-trips through load/save and isn't lost.
@@ -773,7 +777,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, eval_credits_remaining, competition_athlete_id, competition_athlete_label, coaching_intake_raw, injuries_structured, injuries_constraints_hash, injuries_avoidance_confirmed')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, eval_credits_remaining, competition_athlete_id, competition_athlete_label, coaching_intake_raw, injuries_structured, injuries_constraints_hash, injuries_avoidance_confirmed, programming_resume_pending_at')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -798,6 +802,7 @@ export default function AthletePage({ session }: { session: Session }) {
         .limit(1),
     ]).then(([profileRes, evalRes, trainingEvalRes, programsRes]) => {
       setHasGeneratedProgram(!!(programsRes.data && programsRes.data.length > 0));
+      setResumePending(!!profileRes.data?.programming_resume_pending_at);
       if (!profileRes.data) {
         setIsNewUser(true);
         setEquipExpanded(true); // brand-new profile: equipment review pending
@@ -1388,6 +1393,51 @@ export default function AthletePage({ session }: { session: Session }) {
               </div>
             ) : (
               <>
+                {/* Returner welcome-back banner — the stripe webhook paused this
+                    re-subscriber's next month (resume-pending) so it builds from
+                    numbers they've just reviewed, not the profile they left
+                    behind. Build calls generate-next-month (continuation path —
+                    appends month N+1 to their existing program; the first-gen
+                    button below stays hidden since a program exists) and the
+                    server clears the flag on kickoff. */}
+                {resumePending && hasGeneratedProgram && (
+                  <div className="workout-review-section" style={{ border: '1px solid var(--accent)', borderRadius: 12, padding: 18, marginBottom: 16 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>Welcome back 👋</div>
+                    {resumeBuildState === 'building' ? (
+                      <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: 0 }}>
+                        Building your next month from your numbers — it'll appear in <a href="/programs" style={{ color: 'var(--accent)' }}>your programs</a> in a few minutes.
+                      </p>
+                    ) : (
+                      <>
+                        <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: '0 0 12px' }}>
+                          Your next training month gets built from the numbers below. Take a minute to review them — update anything that changed while you were away — then build.
+                        </p>
+                        <button
+                          type="button"
+                          className="auth-btn"
+                          onClick={async () => {
+                            setResumeBuildState('building');
+                            // Unsaved profile edits ride along: save first so the
+                            // generation reads what the athlete just confirmed.
+                            if (isDirty) await saveProfile();
+                            const { error } = await supabase.functions.invoke('generate-next-month', { body: {} });
+                            // Success keeps the banner in its 'building' state; the
+                            // server cleared the flag, so next page load it's gone.
+                            if (error) setResumeBuildState('error');
+                          }}
+                          style={{ maxWidth: 260 }}
+                        >
+                          Build my next month
+                        </button>
+                        {resumeBuildState === 'error' && (
+                          <div className="auth-error" style={{ display: 'block', marginTop: 10 }}>
+                            Couldn't start the build — try again in a minute, or just leave it: your month builds automatically within a few days either way.
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
                 {/* Evaluation Status Card — first-class entry point for the free Tier 2 evaluation.
                     Four states based on tier completeness + evaluation existence + current analysis run. */}
                 {(() => {

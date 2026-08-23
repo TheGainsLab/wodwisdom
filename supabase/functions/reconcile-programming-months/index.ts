@@ -140,6 +140,60 @@ async function reconcileOne(
     return { user_id: userId, email, reason: "no_stripe_customer" };
   }
 
+  // --- Returner pause: a re-subscriber flagged by the stripe webhook is
+  // waiting to review their numbers before their next month builds. The pause
+  // preempts ALL normal reconciliation for them: for 7 days the athlete owns
+  // the Build button; after that, a paid month must not evaporate on silence —
+  // fall back to generating from what's on file (generate-next-month clears
+  // the flag when the kickoff succeeds).
+  const { data: resumeRow } = await supa
+    .from("athlete_profiles")
+    .select("programming_resume_pending_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const resumeAt = resumeRow?.programming_resume_pending_at as string | null | undefined;
+  if (resumeAt) {
+    const resumeAgeDays = (Date.now() - Date.parse(resumeAt)) / MS_PER_DAY;
+    if (resumeAgeDays < 7) {
+      return { user_id: userId, email, reason: `resume_pending:awaiting_athlete:${resumeAgeDays.toFixed(1)}d` };
+    }
+    const { count: resumeInFlight } = await supa
+      .from("program_jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .in("status", ["pending", "processing"]);
+    if ((resumeInFlight ?? 0) > 0) {
+      return { user_id: userId, email, reason: "resume_pending:generation_in_flight" };
+    }
+    if (dryRun) {
+      return { user_id: userId, email, reason: "resume_pending:would_fire_fallback" };
+    }
+    try {
+      const resp = await fetchWithTimeout(
+        `${SUPABASE_URL}/functions/v1/generate-next-month`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+            "x-webhook-user-id": userId,
+          },
+          body: JSON.stringify({}),
+        },
+        60_000,
+      );
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        return { user_id: userId, email, reason: `resume_pending:fallback_rejected:${resp.status}:${err?.error ?? ""}` };
+      }
+      return { user_id: userId, email, reason: "resume_pending:fallback_fired" };
+    } catch (e) {
+      // A timeout is not a failure — the call outlives our wait; tomorrow's
+      // sweep sees either the delivered month or the still-set flag.
+      return { user_id: userId, email, reason: `resume_pending:fallback_timeout:${(e as Error).message}` };
+    }
+  }
+
   // --- Ground truth: what have they PAID for? (same math as reconcile-engine-months)
   const subsResp = await fetchWithTimeout(
     `https://api.stripe.com/v1/subscriptions?customer=${profile.stripe_customer_id}&status=active&limit=1`,
