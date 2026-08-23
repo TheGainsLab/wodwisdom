@@ -170,28 +170,35 @@ function formatDuration(seconds: number): string {
 }
 
 /**
- * Rower/ski monitors show pace as a /500m split (e.g. 1:52/500m), not
- * meters-per-minute — convert so the athlete can match the erg screen without
- * mid-workout math. Only for the 'meters' unit (km/miles are running units
- * where /500m splits aren't the convention).
+ * Concept2-style split pace, matched to the machine's own monitor convention:
+ * rower and ski erg display /500m, the C2 BikeErg displays /1000m. Convert
+ * meters-per-minute so the athlete can match the erg screen without
+ * mid-workout math. Fan bikes, treadmills, and runs get no split — those
+ * machines don't think in erg splits. Only meaningful for the 'meters' unit.
  */
-function split500(metersPerMin: number): string | null {
+function ergSplit(metersPerMin: number, modalityValue: string | null | undefined): string | null {
   if (!Number.isFinite(metersPerMin) || metersPerMin <= 0) return null;
-  const secPer500 = (500 / metersPerMin) * 60;
-  let m = Math.floor(secPer500 / 60);
-  let s = Math.round(secPer500 % 60);
+  const category = MODALITIES.find((mo) => mo.value === modalityValue)?.category;
+  const splitMeters =
+    category === 'Rowing' || category === 'Ski' ? 500
+    : modalityValue === 'c2_bike_erg' ? 1000
+    : null;
+  if (!splitMeters) return null;
+  const sec = (splitMeters / metersPerMin) * 60;
+  let m = Math.floor(sec / 60);
+  let s = Math.round(sec % 60);
   if (s === 60) { m += 1; s = 0; }
-  return `${m}:${String(s).padStart(2, '0')}/500m`;
+  return `${m}:${String(s).padStart(2, '0')}/${splitMeters}m`;
 }
 
-function formatGoalWithPace(goal: number, durationSeconds: number, unit: string): string {
+function formatGoalWithPace(goal: number, durationSeconds: number, unit: string, modalityValue?: string | null): string {
   // Rate units (watts): the goal IS the pace — show it directly, no "/min".
   if (isRateUnit(unit)) return `~${Math.round(goal)} ${unit}`;
   const durationMinutes = durationSeconds / 60;
   const perMin = durationMinutes > 0 ? Math.round(goal / durationMinutes) : null;
   const goalStr = Math.round(goal);
   if (!perMin) return `~${goalStr} ${unit}`;
-  const split = unit === 'meters' ? split500(perMin) : null;
+  const split = unit === 'meters' ? ergSplit(perMin, modalityValue) : null;
   return `~${goalStr} ${unit} (${perMin} ${unit}/min${split ? ` · ${split}` : ''})`;
 }
 
@@ -1078,7 +1085,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   </div>
                   <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
                     {/* Rate units (watts): total_output above already IS the pace; no "/min" line. */}
-                    {!isRateUnit(baseline.units ?? '') && baseline.calculated_rpm ? `${baseline.calculated_rpm.toFixed(1)} ${baseline.units ?? 'cal'}/min${baseline.units === 'meters' && split500(baseline.calculated_rpm) ? ` · ${split500(baseline.calculated_rpm)}` : ''}` : ''}
+                    {!isRateUnit(baseline.units ?? '') && baseline.calculated_rpm ? `${baseline.calculated_rpm.toFixed(1)} ${baseline.units ?? 'cal'}/min${baseline.units === 'meters' && ergSplit(baseline.calculated_rpm, modality) ? ` · ${ergSplit(baseline.calculated_rpm, modality)}` : ''}` : ''}
                   </div>
                   </div>
                 </>
@@ -1267,7 +1274,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                 <span className="engine-breakdown-label">WORK</span>
                                 <span className="engine-breakdown-dur">{formatDuration(bSeg)}</span>
                                 <span className="engine-breakdown-goal">
-                                  {baseGoal != null ? formatGoalWithPace(baseGoal, bSeg, selectedUnit) : pace || '—'}
+                                  {baseGoal != null ? formatGoalWithPace(baseGoal, bSeg, selectedUnit, modality) : pace || '—'}
                                 </span>
                               </div>
                             );
@@ -1281,7 +1288,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                 <span className="engine-breakdown-label engine-breakdown-label--flux">FLUX</span>
                                 <span className="engine-breakdown-dur">{formatDuration(fSeg)}</span>
                                 <span className="engine-breakdown-goal engine-breakdown-goal--flux">
-                                  {fluxGoal != null ? formatGoalWithPace(fluxGoal, fSeg, selectedUnit) : formatPace(bp.fluxPaceRange ?? bp.paceRange) || '—'}
+                                  {fluxGoal != null ? formatGoalWithPace(fluxGoal, fSeg, selectedUnit, modality) : formatPace(bp.fluxPaceRange ?? bp.paceRange) || '—'}
                                 </span>
                               </div>
                             );
@@ -1317,7 +1324,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                 <span className="engine-breakdown-label">BASE</span>
                                 <span className="engine-breakdown-dur">{formatDuration(baseSeg)}</span>
                                 <span className="engine-breakdown-goal">
-                                  {baseGoal != null ? formatGoalWithPace(baseGoal, baseSeg, selectedUnit) : pace || '—'}
+                                  {baseGoal != null ? formatGoalWithPace(baseGoal, baseSeg, selectedUnit, modality) : pace || '—'}
                                 </span>
                               </div>
                             );
@@ -1366,7 +1373,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                 <span className="engine-breakdown-label">WORK</span>
                                 <span className="engine-breakdown-dur">{formatDuration(bSeg)}</span>
                                 <span className="engine-breakdown-goal">
-                                  {baseGoal != null ? formatGoalWithPace(baseGoal, bSeg, selectedUnit) : pace || '—'}
+                                  {baseGoal != null ? formatGoalWithPace(baseGoal, bSeg, selectedUnit, modality) : pace || '—'}
                                 </span>
                               </div>
                             );
@@ -1383,7 +1390,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                 <span className="engine-breakdown-label engine-breakdown-label--flux">FLUX</span>
                                 <span className="engine-breakdown-dur">{formatDuration(fSeg)}</span>
                                 <span className="engine-breakdown-goal engine-breakdown-goal--flux">
-                                  {fluxGoal != null ? formatGoalWithPace(fluxGoal, fSeg, selectedUnit) : `${Math.round(fluxIntensity * 100)}%`}
+                                  {fluxGoal != null ? formatGoalWithPace(fluxGoal, fSeg, selectedUnit, modality) : `${Math.round(fluxIntensity * 100)}%`}
                                 </span>
                               </div>
                             );
@@ -1406,7 +1413,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                   const totalDur = workDur * rounds;
                                   const goal = calculateIntervalGoal(bp, totalDur, 'Work', baselineRpm, rollingAdj, isRateUnit(selectedUnit));
                                   const isMax = bp.paceRange === 'max_effort';
-                                  return isMax ? 'Max Effort' : goal != null ? formatGoalWithPace(goal, totalDur, selectedUnit) : pace || '—';
+                                  return isMax ? 'Max Effort' : goal != null ? formatGoalWithPace(goal, totalDur, selectedUnit, modality) : pace || '—';
                                 })()}
                               </span>
                             </div>
@@ -1436,7 +1443,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                     <span className="engine-breakdown-label">R{r + 1}</span>
                                     <span className="engine-breakdown-dur">{formatDuration(roundWorkDur)}</span>
                                     <span className="engine-breakdown-goal">
-                                      {isMax ? 'Max Effort' : intervalGoal != null ? formatGoalWithPace(intervalGoal, roundWorkDur, selectedUnit) : pace || '—'}
+                                      {isMax ? 'Max Effort' : intervalGoal != null ? formatGoalWithPace(intervalGoal, roundWorkDur, selectedUnit, modality) : pace || '—'}
                                     </span>
                                   </div>
                                   {roundRestDur > 0 && r < rounds - 1 && (
@@ -1512,7 +1519,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'right' }}>
                               {s.actual_pace != null && (
                                 <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                                  {Number(s.actual_pace).toFixed(1)} {s.units ?? ''}/min{s.units === 'meters' && split500(Number(s.actual_pace)) ? ` \u00b7 ${split500(Number(s.actual_pace))}` : ''}
+                                  {Number(s.actual_pace).toFixed(1)} {s.units ?? ''}/min{s.units === 'meters' && ergSplit(Number(s.actual_pace), modality) ? ` · ${ergSplit(Number(s.actual_pace), modality)}` : ''}
                                 </span>
                               )}
                               {s.perceived_exertion != null && (
@@ -1998,8 +2005,8 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                     ? `Pace: ${Math.round(parseFloat(logOutput))} ${selectedUnit}`
                     : (() => {
                         const rate = parseFloat(logOutput) / ((workout ? calculateWorkDurationMinutes(workout) : 0) || Math.max(totalElapsed / 60, 1));
-                        const split = selectedUnit === 'meters' ? split500(rate) : null;
-                        return `Pace: ${rate.toFixed(1)} ${selectedUnit}/min${split ? ` \u00b7 ${split}` : ''}`;
+                        const split = selectedUnit === 'meters' ? ergSplit(rate, modality) : null;
+                        return `Pace: ${rate.toFixed(1)} ${selectedUnit}/min${split ? ` · ${split}` : ''}`;
                       })()}
                 </span>
               )}
