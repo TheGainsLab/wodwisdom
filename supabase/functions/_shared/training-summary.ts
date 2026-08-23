@@ -228,7 +228,7 @@ export async function buildTrainingSummary(
   try {
     const { data, error } = await supa
       .from("workout_log_entries")
-      .select("movement, reps, weight, weight_unit, rpe, sets, workout_logs!inner(user_id, workout_date)")
+      .select("movement, reps, weight, weight_unit, rpe, sets, workout_log_blocks(rpe), workout_logs!inner(user_id, workout_date)")
       .eq("workout_logs.user_id", userId)
       .gte("workout_logs.workout_date", cutoff);
     if (error) throw error;
@@ -238,12 +238,17 @@ export async function buildTrainingSummary(
       // normalize either to a single workout_date.
       const wl = r.workout_logs as { workout_date?: string } | Array<{ workout_date?: string }> | null;
       const workout_date = Array.isArray(wl) ? (wl[0]?.workout_date ?? "") : (wl?.workout_date ?? "");
+      // Effort moved to the block in the logging-fidelity redesign
+      // (workout_log_entries.rpe is null on every post-redesign log); the
+      // block's RPE is the live signal, per-set rpe still wins on old logs.
+      const wlb = r.workout_log_blocks as { rpe?: number | null } | Array<{ rpe?: number | null }> | null;
+      const blockRpe = (Array.isArray(wlb) ? wlb[0]?.rpe : wlb?.rpe) ?? null;
       return {
         movement: String(r.movement ?? ""),
         reps: (r.reps as number | null) ?? null,
         weight: (r.weight as number | null) ?? null,
         weight_unit: (r.weight_unit as string | null) ?? null,
-        rpe: (r.rpe as number | null) ?? null,
+        rpe: (r.rpe as number | null) ?? blockRpe,
         sets: (r.sets as number | null) ?? null,
         workout_date,
       };

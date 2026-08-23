@@ -264,7 +264,7 @@ Deno.serve(async (req) => {
           block_text: blockText,
           score: isCapped ? null : (b.score?.trim() || null),
           rx: b.rx ?? false,
-          notes: b.notes?.trim() || null,
+          notes: b.notes?.trim().slice(0, 1000) || null,
           sort_order: i,
           // Keep the block's original performed date; new blocks default to the
           // workout's date (Phase 1 training journal).

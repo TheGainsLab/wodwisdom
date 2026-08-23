@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
         score: block.score?.trim() || null,
         rx: block.rx ?? false,
         rpe: block.rpe != null && block.rpe >= 1 && block.rpe <= 10 ? block.rpe : null,
-        notes: block.notes?.trim() || null,
+        notes: block.notes?.trim().slice(0, 1000) || null,
         sort_order: block.sort_order,
         // Preserve a re-saved block's original date; omit for new blocks so the
         // column's CURRENT_DATE default stamps the save day.
