@@ -191,15 +191,56 @@ function ergSplit(metersPerMin: number, modalityValue: string | null | undefined
   return `${m}:${String(s).padStart(2, '0')}/${splitMeters}m`;
 }
 
+/**
+ * Rogue's published Echo Bike conversion curve: [cadence RPM, watts, cal/min].
+ * RPM is the number the Echo monitor shows biggest, so targets in calories or
+ * watts also show the ≈RPM to hold. Echo Bike ONLY — Assault/AirDyne monitors
+ * calibrate differently. Outside the table (40-90 RPM) nothing is shown; the
+ * curve is too steep to extrapolate honestly.
+ */
+const ECHO_BIKE_TABLE: Array<[number, number, number]> = [
+  [40, 92, 4.6], [41, 97, 4.9], [42, 102, 5.1], [43, 107, 5.3], [44, 113, 5.6],
+  [45, 119, 6.0], [46, 125, 6.2], [47, 131, 6.5], [48, 138, 6.9], [49, 145, 7.2],
+  [50, 152, 7.6], [51, 160, 8.0], [52, 167, 8.3], [53, 176, 8.8], [54, 184, 9.2],
+  [55, 193, 9.6], [56, 202, 10.1], [57, 212, 10.6], [58, 222, 11.1], [59, 232, 11.6],
+  [60, 243, 12.1], [61, 254, 12.7], [62, 266, 13.3], [63, 278, 13.9], [64, 290, 14.5],
+  [65, 303, 15.1], [66, 316, 15.8], [67, 330, 16.5], [68, 344, 17.2], [69, 358, 17.9],
+  [70, 373, 18.6], [71, 389, 19.4], [72, 404, 20.2], [73, 421, 21.0], [74, 438, 21.9],
+  [75, 455, 22.7], [76, 473, 23.6], [77, 491, 24.5], [78, 510, 25.5], [79, 529, 26.4],
+  [80, 549, 27.4], [81, 569, 28.4], [82, 590, 29.5], [83, 612, 30.6], [84, 634, 31.7],
+  [85, 656, 32.8], [86, 680, 34.0], [87, 703, 35.1], [88, 728, 36.4], [89, 753, 37.6],
+  [90, 778, 38.9],
+];
+
+/** ≈RPM for an Echo Bike pace in watts or cal/min; null off-table or off-machine. */
+function echoRpm(value: number, kind: 'watts' | 'cal_min', modalityValue: string | null | undefined): string | null {
+  if (modalityValue !== 'echo_bike' || !Number.isFinite(value)) return null;
+  const col = kind === 'watts' ? 1 : 2;
+  const t = ECHO_BIKE_TABLE;
+  if (value < t[0][col] || value > t[t.length - 1][col]) return null;
+  for (let i = 1; i < t.length; i++) {
+    if (value <= t[i][col]) {
+      const frac = (value - t[i - 1][col]) / ((t[i][col] - t[i - 1][col]) || 1);
+      return `\u2248${Math.round(t[i - 1][0] + frac * (t[i][0] - t[i - 1][0]))} RPM`;
+    }
+  }
+  return null;
+}
+
 function formatGoalWithPace(goal: number, durationSeconds: number, unit: string, modalityValue?: string | null): string {
   // Rate units (watts): the goal IS the pace — show it directly, no "/min".
-  if (isRateUnit(unit)) return `~${Math.round(goal)} ${unit}`;
+  if (isRateUnit(unit)) {
+    const rpm = echoRpm(goal, 'watts', modalityValue);
+    return `~${Math.round(goal)} ${unit}${rpm ? ` (${rpm})` : ''}`;
+  }
   const durationMinutes = durationSeconds / 60;
   const perMin = durationMinutes > 0 ? Math.round(goal / durationMinutes) : null;
   const goalStr = Math.round(goal);
   if (!perMin) return `~${goalStr} ${unit}`;
-  const split = unit === 'meters' ? ergSplit(perMin, modalityValue) : null;
-  return `~${goalStr} ${unit} (${perMin} ${unit}/min${split ? ` · ${split}` : ''})`;
+  const extra = unit === 'meters'
+    ? ergSplit(perMin, modalityValue)
+    : unit === 'cal' ? echoRpm(goal / durationMinutes, 'cal_min', modalityValue) : null;
+  return `~${goalStr} ${unit} (${perMin} ${unit}/min${extra ? ` · ${extra}` : ''})`;
 }
 
 function formatPace(pace: number[] | string | undefined): string {
@@ -1085,7 +1126,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   </div>
                   <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
                     {/* Rate units (watts): total_output above already IS the pace; no "/min" line. */}
-                    {!isRateUnit(baseline.units ?? '') && baseline.calculated_rpm ? `${baseline.calculated_rpm.toFixed(1)} ${baseline.units ?? 'cal'}/min${baseline.units === 'meters' && ergSplit(baseline.calculated_rpm, modality) ? ` · ${ergSplit(baseline.calculated_rpm, modality)}` : ''}` : ''}
+                    {isRateUnit(baseline.units ?? '') ? (echoRpm(baseline.total_output ?? NaN, 'watts', modality) ?? '') : baseline.calculated_rpm ? `${baseline.calculated_rpm.toFixed(1)} ${baseline.units ?? 'cal'}/min${(baseline.units === 'meters' ? ergSplit(baseline.calculated_rpm, modality) : baseline.units === 'cal' ? echoRpm(baseline.calculated_rpm, 'cal_min', modality) : null) ? ` · ${baseline.units === 'meters' ? ergSplit(baseline.calculated_rpm, modality) : echoRpm(baseline.calculated_rpm, 'cal_min', modality)}` : ''}` : ''}
                   </div>
                   </div>
                 </>
@@ -1519,7 +1560,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'right' }}>
                               {s.actual_pace != null && (
                                 <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                                  {Number(s.actual_pace).toFixed(1)} {s.units ?? ''}/min{s.units === 'meters' && ergSplit(Number(s.actual_pace), modality) ? ` · ${ergSplit(Number(s.actual_pace), modality)}` : ''}
+                                  {Number(s.actual_pace).toFixed(1)} {s.units ?? ''}/min{(s.units === 'meters' ? ergSplit(Number(s.actual_pace), modality) : s.units === 'cal' ? echoRpm(Number(s.actual_pace), 'cal_min', modality) : null) ? ` · ${s.units === 'meters' ? ergSplit(Number(s.actual_pace), modality) : echoRpm(Number(s.actual_pace), 'cal_min', modality)}` : ''}
                                 </span>
                               )}
                               {s.perceived_exertion != null && (
@@ -2002,11 +2043,12 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
               {logOutput && (
                 <span>
                   {isRateUnit(selectedUnit)
-                    ? `Pace: ${Math.round(parseFloat(logOutput))} ${selectedUnit}`
+                    ? `Pace: ${Math.round(parseFloat(logOutput))} ${selectedUnit}${echoRpm(parseFloat(logOutput), 'watts', modality) ? ` · ${echoRpm(parseFloat(logOutput), 'watts', modality)}` : ''}`
                     : (() => {
                         const rate = parseFloat(logOutput) / ((workout ? calculateWorkDurationMinutes(workout) : 0) || Math.max(totalElapsed / 60, 1));
-                        const split = selectedUnit === 'meters' ? ergSplit(rate, modality) : null;
-                        return `Pace: ${rate.toFixed(1)} ${selectedUnit}/min${split ? ` · ${split}` : ''}`;
+                        const extra = selectedUnit === 'meters' ? ergSplit(rate, modality)
+                          : selectedUnit === 'cal' ? echoRpm(rate, 'cal_min', modality) : null;
+                        return `Pace: ${rate.toFixed(1)} ${selectedUnit}/min${extra ? ` · ${extra}` : ''}`;
                       })()}
                 </span>
               )}
