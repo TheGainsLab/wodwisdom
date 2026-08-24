@@ -599,7 +599,7 @@ function TierCard({
               fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px',
               color: accent,
             }}>
-              Tier {tierNumber}
+              Step {tierNumber}
             </span>
             {locked ? (
               <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1380,16 +1380,36 @@ export default function AthletePage({ session }: { session: Session }) {
                 </p>
               </div>
             )}
-            {isNewUser && (
-              <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
-                <h2 className="settings-card-title" style={{ marginBottom: 8 }}>Complete your profile to unlock more</h2>
-                <ul style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.6, margin: 0, paddingLeft: 18 }}>
-                  <li><strong style={{ color: 'var(--text)' }}>Tier 1 —</strong> Tell the <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Coach</span> who you are</li>
-                  <li><strong style={{ color: 'var(--text)' }}>Tier 2 —</strong> Unlocks your free <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Evaluation</span></li>
-                  <li><strong style={{ color: 'var(--text)' }}>Tier 3 —</strong> Subscribe to unlock <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Programming</span> built around your goals, fitness level, and schedule</li>
-                </ul>
-              </div>
-            )}
+            {/* ONE orientation card while setting up (replaces the old new-user
+                intro AND the locked-state eval progress line — two meta-cards
+                narrating the same journey). Live checkmarks + a "next up" line;
+                hides once the eval unlocks and the Run Evaluation card takes
+                over as the hero. "Step", never "Tier", in user-facing copy. */}
+            {!loading && !loadError && !tierStatus.canRunEval && (() => {
+              const hasProgramming = isAdmin || hasFeature('programming');
+              const steps: Array<[boolean, string, React.ReactNode]> = [
+                [tierStatus.tier1.complete, 'Basics', <>tailored answers from the <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Coach</span></>],
+                [tierStatus.tier2.complete, 'Athletic Data', <>unlocks your free <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Evaluation</span></>],
+                [tierStatus.tier3.complete, 'Training Context', hasProgramming
+                  ? <>powers your <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Programming</span> — built around your goals, fitness level, and schedule</>
+                  : <>subscribe to unlock <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Programming</span> built around your goals, fitness level, and schedule</>],
+              ];
+              const next = !tierStatus.tier1.complete ? 'Basics' : 'Athletic Data';
+              return (
+                <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
+                  <h2 className="settings-card-title" style={{ marginBottom: 8 }}>Your profile powers everything</h2>
+                  <ul style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.6, margin: 0, paddingLeft: 4, listStyle: 'none' }}>
+                    {steps.map(([done, name, desc], i) => (
+                      <li key={name} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                        <span aria-hidden style={{ color: done ? '#2ec486' : 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}>{done ? '✓' : '○'}</span>
+                        <span><strong style={{ color: 'var(--text)' }}>Step {i + 1} — {name}</strong> · {desc}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 10 }}>Next up: {next} ↓</div>
+                </div>
+              );
+            })()}
             {error && <div className="auth-error" style={{ display: 'block' }}>{error}</div>}
 
             {loading ? (
@@ -1628,24 +1648,9 @@ export default function AthletePage({ session }: { session: Session }) {
                       </>
                     );
                   }
-                  // Locked — a slim progress line narrating the top-down journey
-                  // ("1 of 2 sections done — finish Athletic Data…"). Replaces the
-                  // old render-nothing choice: the tier cards say what's missing,
-                  // but nothing above the fold said how close the eval is.
-                  if (hasEvalCredit) {
-                    const done = (tierStatus.tier1.complete ? 1 : 0) + (tierStatus.tier2.complete ? 1 : 0);
-                    const next = !tierStatus.tier1.complete ? 'Basics' : 'Athletic Data';
-                    return (
-                      <div className="settings-card">
-                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--text-muted)', marginBottom: 4 }}>
-                          Free AI Evaluation
-                        </div>
-                        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                          {done} of 2 sections done — finish <strong style={{ color: 'var(--text)' }}>{next}</strong> below to unlock your evaluation.
-                        </div>
-                      </div>
-                    );
-                  }
+                  // Locked — render nothing here: the orientation card at the
+                  // top ("Your profile powers everything", live checkmarks +
+                  // next-up line) narrates the journey until the eval unlocks.
                   return null;
                 })()}
 
