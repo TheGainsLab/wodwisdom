@@ -1628,9 +1628,24 @@ export default function AthletePage({ session }: { session: Session }) {
                       </>
                     );
                   }
-                  // Locked — render nothing. The intro card ("Complete your profile
-                  // to unlock more") + the tier cards below already tell the user
-                  // what's missing, so a separate locked eval card was redundant.
+                  // Locked — a slim progress line narrating the top-down journey
+                  // ("1 of 2 sections done — finish Athletic Data…"). Replaces the
+                  // old render-nothing choice: the tier cards say what's missing,
+                  // but nothing above the fold said how close the eval is.
+                  if (hasEvalCredit) {
+                    const done = (tierStatus.tier1.complete ? 1 : 0) + (tierStatus.tier2.complete ? 1 : 0);
+                    const next = !tierStatus.tier1.complete ? 'Basics' : 'Athletic Data';
+                    return (
+                      <div className="settings-card">
+                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--text-muted)', marginBottom: 4 }}>
+                          Free AI Evaluation
+                        </div>
+                        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                          {done} of 2 sections done — finish <strong style={{ color: 'var(--text)' }}>{next}</strong> below to unlock your evaluation.
+                        </div>
+                      </div>
+                    );
+                  }
                   return null;
                 })()}
 
