@@ -1628,45 +1628,26 @@ export default function AthletePage({ session }: { session: Session }) {
                       </>
                     );
                   }
-                  // Locked — render nothing. The intro card ("Complete your profile
-                  // to unlock more") + the tier cards below already tell the user
-                  // what's missing, so a separate locked eval card was redundant.
+                  // Locked — a slim progress line narrating the top-down journey
+                  // ("1 of 2 sections done — finish Athletic Data…"). Replaces the
+                  // old render-nothing choice: the tier cards say what's missing,
+                  // but nothing above the fold said how close the eval is.
+                  if (hasEvalCredit) {
+                    const done = (tierStatus.tier1.complete ? 1 : 0) + (tierStatus.tier2.complete ? 1 : 0);
+                    const next = !tierStatus.tier1.complete ? 'Basics' : 'Athletic Data';
+                    return (
+                      <div className="settings-card">
+                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--text-muted)', marginBottom: 4 }}>
+                          Free AI Evaluation
+                        </div>
+                        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                          {done} of 2 sections done — finish <strong style={{ color: 'var(--text)' }}>{next}</strong> below to unlock your evaluation.
+                        </div>
+                      </div>
+                    );
+                  }
                   return null;
                 })()}
-
-                {/* Competition History — an OPTIONAL add-on, NOT a tier (it doesn't
-                    gate the eval or programmer and has no prerequisite). Sits with the
-                    eval status card, above the profile tiers. The feature itself is the
-                    /athletedata route. Public to ALL athletes via ATHLETEDATA_PUBLIC_TIER
-                    (currently on); only admin-only if that flag is turned off. */}
-                {(isAdmin || ATHLETEDATA_PUBLIC_TIER) && (
-                  <div className="settings-card" style={{ borderColor: competitionAthleteId ? '#2ec486' : undefined }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', marginBottom: 4 }}>
-                      <span style={{ color: competitionAthleteId ? '#2ec486' : 'var(--accent)' }}>Competition History</span>
-                      {competitionAthleteId
-                        ? <span style={{ color: '#2ec486' }}> · Linked ✓</span>
-                        : <span style={{ color: 'var(--text-muted)' }}> (Free)</span>}
-                    </div>
-                    <h2 className="settings-card-title" style={{ marginBottom: 2 }}>
-                      {competitionAthleteId
-                        ? `Linked: ${competitionAthleteLabel ?? 'your competition profile'}`
-                        : 'Import your competition history'}
-                    </h2>
-                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
-                      {competitionAthleteId
-                        ? 'Your Open / Quarterfinals / Games history, a completion map, and throwbacks.'
-                        : 'Unlock a detailed analysis of your fitness over the years. No competition history? Start one, with access to every year’s workouts.'}
-                    </div>
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ padding: '8px 16px', fontSize: 13 }}
-                      onClick={() => navigate('/athletedata')}
-                    >
-                      {competitionAthleteId ? 'View your competition history →' : 'Get started →'}
-                    </button>
-                  </div>
-                )}
 
                 {/* Tier 1 — Basics */}
                 <TierCard
@@ -1765,8 +1746,8 @@ export default function AthletePage({ session }: { session: Session }) {
                   cardRef={tier2Ref}
                 >
                 <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>
-                  We don't need scientific precision — a general idea is enough to build your evaluation.
-                  Once you're training, your real numbers take over.
+                  We use this information to build your evaluation. Enter as much as you can — scientific
+                  precision not required, a general idea is fine.
                 </p>
                 <CollapsibleSection title={`1RM Lifts (${units})`}>
                   <p className="athlete-card-subtitle">Enter your one-rep max weights in {units}</p>
@@ -1831,7 +1812,6 @@ export default function AthletePage({ session }: { session: Session }) {
 
                 {/* Conditioning Benchmarks */}
                 <CollapsibleSection title="Conditioning Benchmarks" expanded={condSectionOpen} onToggle={setCondSectionOpen}>
-                  <p className="athlete-card-subtitle" style={{ fontStyle: 'italic' }}>Your evaluation is built from these numbers — enter everything you can.</p>
                   <p className="athlete-card-subtitle">Running and rowing times (MM:SS), bike in calories.</p>
                   {CONDITIONING_GROUPS.map(group => (
                     <div key={group.title} style={{ marginBottom: 20 }}>
@@ -2123,6 +2103,41 @@ export default function AthletePage({ session }: { session: Session }) {
                   </div>
                 </TierCard>
 
+                {/* Competition History — an OPTIONAL add-on, NOT a tier (it doesn't
+                    gate the eval or programmer and has no prerequisite). Sits AFTER the
+                    profile tiers (2026-08 reorder): optional enrichment must not
+                    read as step two of the eval funnel. The feature itself is the
+                    /athletedata route. Public to ALL athletes via ATHLETEDATA_PUBLIC_TIER
+                    (currently on); only admin-only if that flag is turned off. */}
+                {(isAdmin || ATHLETEDATA_PUBLIC_TIER) && (
+                  <div className="settings-card" style={{ borderColor: competitionAthleteId ? '#2ec486' : undefined }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', marginBottom: 4 }}>
+                      <span style={{ color: competitionAthleteId ? '#2ec486' : 'var(--accent)' }}>Competition History</span>
+                      {competitionAthleteId
+                        ? <span style={{ color: '#2ec486' }}> · Linked ✓</span>
+                        : <span style={{ color: 'var(--text-muted)' }}> (Free)</span>}
+                    </div>
+                    <h2 className="settings-card-title" style={{ marginBottom: 2 }}>
+                      {competitionAthleteId
+                        ? `Linked: ${competitionAthleteLabel ?? 'your competition profile'}`
+                        : 'Import your competition history'}
+                    </h2>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
+                      {competitionAthleteId
+                        ? 'Your Open / Quarterfinals / Games history, a completion map, and throwbacks.'
+                        : 'Unlock a detailed analysis of your fitness over the years. No competition history? Start one, with access to every year’s workouts.'}
+                    </div>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      style={{ padding: '8px 16px', fontSize: 13 }}
+                      onClick={() => navigate('/athletedata')}
+                    >
+                      {competitionAthleteId ? 'View your competition history →' : 'Get started →'}
+                    </button>
+                  </div>
+                )}
+
                 {(() => {
                   // Pure SAVE button. Running the free evaluation lives entirely in
                   // the Evaluation Status Card above (which saves first if dirty) —
@@ -2162,14 +2177,20 @@ export default function AthletePage({ session }: { session: Session }) {
                   const genTitle = tierBlocked
                     ? 'Fill in your training context to generate a program tailored to your week.'
                     : undefined;
+                  // Ready = entitled, tier-complete, not generating. The old
+                  // surface2 styling made an ARMED button look dormant — ready
+                  // now reads as the primary action it is.
+                  const ready = canGenerate && !tierBlocked && !generateLoading;
                   return (
                     <>
                       <button
                         type="button"
                         className="auth-btn"
                         style={{
-                          background: 'var(--surface2)',
-                          color: 'var(--text)',
+                          background: ready ? 'var(--accent-glow)' : 'var(--surface2)',
+                          color: ready ? 'var(--accent)' : 'var(--text)',
+                          border: ready ? '1px solid var(--accent)' : undefined,
+                          fontWeight: ready ? 700 : undefined,
                           opacity: tierBlocked ? 0.55 : undefined,
                           cursor: tierBlocked ? 'not-allowed' : undefined,
                         }}
@@ -2178,7 +2199,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         title={genTitle}
                       >
                         {canGenerate ? (
-                          generateLoading ? 'Generating...' : 'Generate Program'
+                          generateLoading ? 'Generating...' : ready ? 'Generate Program →' : 'Generate Program'
                         ) : (
                           <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
@@ -2186,6 +2207,11 @@ export default function AthletePage({ session }: { session: Session }) {
                           </span>
                         )}
                       </button>
+                      {(ready || generateLoading) && (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
+                          Generation takes a few minutes — your full month, warm-ups to cool-downs.
+                        </span>
+                      )}
                       {!canGenerate && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Requires AI Programming or All Access subscription</span>
                       )}

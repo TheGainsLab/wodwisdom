@@ -89,10 +89,14 @@ export default function ProfileBanner({ userId }: Props) {
 
   return (
     <div
+      className="profile-banner"
       style={{
         background: 'var(--accent)',
         color: 'white',
-        padding: '12px 20px',
+        // Topmost element on the page: in the installed PWA the app draws under
+        // the phone's status bar (viewport-fit=cover), so start the content
+        // below it. In a browser tab the inset is 0 and this collapses to 12px.
+        padding: 'calc(12px + env(safe-area-inset-top, 0px)) 20px 12px',
         display: 'flex',
         alignItems: 'center',
         gap: 16,
