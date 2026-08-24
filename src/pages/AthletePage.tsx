@@ -2196,9 +2196,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   const upgradeRoute = isFreeUser ? '/checkout' : '/settings';
                   const tierBlocked = canGenerate && !tierStatus.canRunPrograms;
                   const disabled = (canGenerate && generateLoading) || tierBlocked;
-                  const genTitle = tierBlocked
-                    ? 'Fill in your training context to generate a program tailored to your week.'
-                    : undefined;
+                  const genTitle = tierBlocked ? 'Complete Step 3 to Generate.' : undefined;
                   // Ready = entitled, tier-complete, not generating. The old
                   // surface2 styling made an ARMED button look dormant — ready
                   // now reads as the primary action it is.
@@ -2239,7 +2237,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       )}
                       {tierBlocked && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
-                          Fill in your training context to generate a program tailored to your week.
+                          Complete Step 3 to Generate.
                         </span>
                       )}
                     </>
