@@ -611,6 +611,9 @@ body.landing-body{overflow:auto;height:auto}
 .review-card-status{padding:14px 18px;border-top:1px solid var(--border);font-size:13px;color:var(--text-dim)}
 @media(max-width:640px){
   .chat-header{padding:10px 12px;padding-top:calc(10px + env(safe-area-inset-top))}
+  /* The profile banner (when shown) is the topmost element and carries the
+     safe-area inset itself — the header below it must not pad again. */
+  .profile-banner + .chat-header{padding-top:10px}
   .page-header{flex-wrap:wrap;padding-top:calc(12px + env(safe-area-inset-top))}
   .source-btn{padding:6px 10px;font-size:11px;min-height:44px}
   .messages{padding:16px 12px}
@@ -634,6 +637,7 @@ body.landing-body{overflow:auto;height:auto}
 @media(display-mode:standalone){
   .chat-header,.page-header{padding-top:calc(12px + env(safe-area-inset-top))}
   .auth-screen{padding-top:calc(20px + env(safe-area-inset-top))}
+  .profile-banner + .chat-header{padding-top:12px}
 }
 
 /* ── Workout Calendar Heatmap ────────────────────────────── */
