@@ -392,7 +392,7 @@ async function sha256Hex(text: string): Promise<string> {
 // Stored answers under the retired keys are KEPT — they load into intakeAnswers
 // and ride along on every save — we just stop asking new users.
 const INTAKE_QUESTIONS: { key: string; label: string; helper: string }[] = [
-  { key: 'anything_else', label: 'Anything else we should know?', helper: 'Training background, schedule, how you like to train. Tap the mic on your keyboard and just talk.' },
+  { key: 'anything_else', label: 'Anything else we should know?', helper: 'Training background? Preferences? Let us know here.' },
 ];
 
 const LEVEL_LABELS: Record<SkillLevel, string> = {
@@ -702,6 +702,7 @@ export default function AthletePage({ session }: { session: Session }) {
   // Tier 3 card chrome: equipment collapse + which text box has focus (drives
   // the show-on-focus char counters).
   const [equipExpanded, setEquipExpanded] = useState(false);
+  const [coachExpanded, setCoachExpanded] = useState(false);
   const [t3FocusedBox, setT3FocusedBox] = useState<string | null>(null);
   // Injury show-back confirmation (handoff 1.1). When a save re-parses non-empty
   // injuries text into a do-not-program list, we surface it against the athlete's
@@ -813,7 +814,8 @@ export default function AthletePage({ session }: { session: Session }) {
       setResumePending(!!profileRes.data?.programming_resume_pending_at);
       if (!profileRes.data) {
         setIsNewUser(true);
-        setEquipExpanded(true); // brand-new profile: equipment review pending
+        // Equipment stays collapsed — its amber "review required" header badge
+        // carries the signal; the user opens sections at their own pace.
       }
       if (profileRes.data) {
         const d = profileRes.data;
@@ -823,11 +825,9 @@ export default function AthletePage({ session }: { session: Session }) {
           // confirmed their equipment — grandfathered straight to green.
           setEquipment(d.equipment);
           setEquipmentReviewed(true);
-        } else {
-          // Review pending: open the checklist so the required step is in
-          // front of them the moment they expand Tier 3.
-          setEquipExpanded(true);
         }
+        // Review pending: stays collapsed too — the amber header badge is the
+        // prompt. Nothing expands except by the user's tap.
         setSkills(d.skills || {});
         setConditioning(d.conditioning || {});
         setAge(d.age != null ? String(d.age) : '');
@@ -1851,7 +1851,7 @@ export default function AthletePage({ session }: { session: Session }) {
                 <TierCard
                   tierNumber={3}
                   title="Training Context"
-                  unlocks="AI Programming tailored to your week"
+                  unlocks="Personalized AI Programming"
                   status={tierStatus.tier3}
                   defaultExpanded={false}
                   locked={!isAdmin && !hasFeature('programming')}
@@ -1956,12 +1956,32 @@ export default function AthletePage({ session }: { session: Session }) {
                       "Save & analyze" persists goals/injuries (via the full
                       profile save) AND runs the intake extraction. */}
                   <div className="settings-card" style={{ ...T3_CARD, marginTop: 16 }}>
-                    <div style={{ ...CTA_KICKER, marginBottom: 12 }}>Your Coach</div>
+                    <button
+                      type="button"
+                      onClick={() => setCoachExpanded(v => !v)}
+                      aria-expanded={coachExpanded}
+                      style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 0, margin: 0, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+                    >
+                      <div>
+                        <div style={{ ...CTA_KICKER, marginBottom: 4 }}>Your Coach</div>
+                        {goal.trim() ? (
+                          <div style={{ fontSize: 14, color: '#2ec486', fontWeight: 600 }}>✓ Goal set</div>
+                        ) : (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--warning, #f39c12)', fontWeight: 600 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--warning, #f39c12)', flex: 'none' }} />
+                            Goal required
+                          </div>
+                        )}
+                      </div>
+                      <span style={{ fontSize: 14, color: 'var(--text-dim)', flex: 'none' }}>{coachExpanded ? '▲' : '▼'}</span>
+                    </button>
+                    {coachExpanded && (<div style={{ marginTop: 16 }}>
+                    <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>Share anything you can. You can tap the microphone and just talk.</p>
 
                     <div style={{ marginBottom: 18 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>What are you working toward?</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-                        General goals are useful — specific ones are even better. <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>This is what your program gets built around.</span>
+                        Be specific. <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Required for your program.</span>
                       </div>
                       <textarea
                         className="lift-input"
@@ -1980,9 +2000,8 @@ export default function AthletePage({ session }: { session: Session }) {
                         }}
                       />
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 5 }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: goal.trim() ? '#2ec486' : 'var(--text-dim)' }}>
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: goal.trim() ? '#2ec486' : 'var(--accent)', flex: 'none' }} />
-                          {goal.trim() ? 'Got it — your program builds around this' : "Required — this is the one your coach can't skip"}
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#2ec486' }}>
+                          {goal.trim() ? <><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2ec486', flex: 'none' }} />Got it — your program builds around this</> : null}
                         </span>
                         <span style={t3CounterStyle(goal.length, t3FocusedBox === 'goal' || goal.length > 0)}>{goal.length} / 500</span>
                       </div>
@@ -1991,9 +2010,6 @@ export default function AthletePage({ session }: { session: Session }) {
                     <div style={{ marginBottom: 18 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>
                         Any injuries or exercises we should avoid? <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>(optional)</span>
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-                        Anything you list here stays out of your program — we'll never program it. No injuries? Leave this blank.
                       </div>
                       {/* Deliberately a PREFERENCE, not a health question (founder decision
                           2026-07-12, supersedes the 3.1 consent line): we never ask WHY, so the
@@ -2105,6 +2121,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       {intakeSaving ? 'Saving…' : intakeSaved ? 'Saved ✓' : 'Save & analyze'}
                     </button>
                     {intakeError && <div className="auth-error" style={{ display: 'block', marginTop: 12 }}>{intakeError}</div>}
+                    </div>)}
                   </div>
                 </TierCard>
 
@@ -2179,9 +2196,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   const upgradeRoute = isFreeUser ? '/checkout' : '/settings';
                   const tierBlocked = canGenerate && !tierStatus.canRunPrograms;
                   const disabled = (canGenerate && generateLoading) || tierBlocked;
-                  const genTitle = tierBlocked
-                    ? 'Fill in your training context to generate a program tailored to your week.'
-                    : undefined;
+                  const genTitle = tierBlocked ? 'Complete Step 3 to Generate.' : undefined;
                   // Ready = entitled, tier-complete, not generating. The old
                   // surface2 styling made an ARMED button look dormant — ready
                   // now reads as the primary action it is.
@@ -2222,7 +2237,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       )}
                       {tierBlocked && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
-                          Fill in your training context to generate a program tailored to your week.
+                          Complete Step 3 to Generate.
                         </span>
                       )}
                     </>
