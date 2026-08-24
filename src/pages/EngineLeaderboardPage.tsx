@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import Nav from '../components/Nav';
 import { supabase } from '../lib/supabase';
+import { useEntitlements } from '../hooks/useEntitlements';
 import { ChevronLeft, Trophy, Menu } from 'lucide-react';
 
 type Board = 'days' | 'time_trials' | 'improvement';
@@ -18,6 +19,9 @@ const labelModality = (m: string) =>
 export default function EngineLeaderboardPage({ session }: { session: Session }) {
   const navigate = useNavigate();
   const uid = session.user.id;
+  // Engine-only surface: appearing on the boards requires Engine, and viewing
+  // now matches — non-entitled visitors are sent to the Engine feature page.
+  const { hasEngineAccess, loading: entLoading } = useEntitlements(uid);
   const [navOpen, setNavOpen] = useState(false);
   const [board, setBoard] = useState<Board>('days');
 
@@ -110,6 +114,34 @@ export default function EngineLeaderboardPage({ session }: { session: Session })
     );
   };
 
+  if (entLoading) {
+    return (
+      <div className="app-layout">
+        <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
+        <div className="app-main">
+          <div className="page-loading"><div className="loading-pulse" /></div>
+        </div>
+      </div>
+    );
+  }
+  if (!hasEngineAccess) {
+    return (
+      <div className="app-layout">
+        <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
+        <div className="app-main">
+          <div className="settings-card" style={{ maxWidth: 480, margin: '48px auto', textAlign: 'center' }}>
+            <h2 className="settings-card-title" style={{ marginBottom: 6 }}>Engine leaderboards</h2>
+            <p style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16 }}>
+              The boards belong to Year of the Engine athletes — subscribe and your training days and time trials rank here.
+            </p>
+            <button type="button" className="auth-btn" style={{ maxWidth: 240, margin: '0 auto' }} onClick={() => navigate('/features/engine')}>
+              Explore Year of the Engine →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="app-layout">
       <Nav isOpen={navOpen} onClose={() => setNavOpen(false)} />
