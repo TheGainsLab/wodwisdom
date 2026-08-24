@@ -71,7 +71,7 @@ export default function HomePage({ session }: { session: Session }) {
       return { title: 'Welcome back — build your next month', body: 'Your next training month is paid for and waiting. Review your numbers on your profile, then tap Build my next month.', cta: 'Review & build', to: '/profile' };
     }
     if (hasProgramming && !hasProfile) {
-      return { title: 'Set up your athlete profile', body: 'Add your lifts, skills, and benchmarks so the AI can build a program tailored to you.', cta: 'Go to Profile', to: '/profile' };
+      return { title: 'Set up your athlete profile', body: 'Add your lifts, skills, and benchmarks — they power your program and make your AI Coach personal.', cta: 'Go to Profile', to: '/profile' };
     }
     if (hasProgramming && !hasEvaluation) {
       return { title: 'Run your evaluation', body: 'Your profile is set up. Run your AI evaluation to unlock program generation.', cta: 'Go to Profile', to: '/profile' };
@@ -133,7 +133,11 @@ export default function HomePage({ session }: { session: Session }) {
                   </button>
                 )}
 
-                {(!hasProfile || !hasCompetitionLink) && (
+                {/* One next-action per screen: this card is the FREE journey's
+                    hero (no primary card above it) or the link-history nudge once
+                    the profile is done. It never stacks under a primary card that
+                    is already saying "set up your profile". */}
+                {((!hasProfile && !primary) || (hasProfile && !hasCompetitionLink)) && (
                   <div className="settings-card" style={{ textAlign: 'left' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                       <MessageSquare size={18} style={{ color: 'var(--accent)' }} />
