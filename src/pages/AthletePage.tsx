@@ -392,7 +392,7 @@ async function sha256Hex(text: string): Promise<string> {
 // Stored answers under the retired keys are KEPT — they load into intakeAnswers
 // and ride along on every save — we just stop asking new users.
 const INTAKE_QUESTIONS: { key: string; label: string; helper: string }[] = [
-  { key: 'anything_else', label: 'Anything else we should know?', helper: 'Training background, schedule, how you like to train. Tap the mic on your keyboard and just talk.' },
+  { key: 'anything_else', label: 'Anything else we should know?', helper: 'Training background? Preferences? Let us know here.' },
 ];
 
 const LEVEL_LABELS: Record<SkillLevel, string> = {
@@ -1976,11 +1976,12 @@ export default function AthletePage({ session }: { session: Session }) {
                       <span style={{ fontSize: 14, color: 'var(--text-dim)', flex: 'none' }}>{coachExpanded ? '▲' : '▼'}</span>
                     </button>
                     {coachExpanded && (<div style={{ marginTop: 16 }}>
+                    <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>Share anything you can. You can tap the microphone and just talk.</p>
 
                     <div style={{ marginBottom: 18 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>What are you working toward?</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-                        General goals are useful — specific ones are even better. <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>This is what your program gets built around.</span>
+                        Be specific. <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Required for your program.</span>
                       </div>
                       <textarea
                         className="lift-input"
@@ -1999,9 +2000,8 @@ export default function AthletePage({ session }: { session: Session }) {
                         }}
                       />
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 5 }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: goal.trim() ? '#2ec486' : 'var(--text-dim)' }}>
-                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: goal.trim() ? '#2ec486' : 'var(--accent)', flex: 'none' }} />
-                          {goal.trim() ? 'Got it — your program builds around this' : "Required — this is the one your coach can't skip"}
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#2ec486' }}>
+                          {goal.trim() ? <><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2ec486', flex: 'none' }} />Got it — your program builds around this</> : null}
                         </span>
                         <span style={t3CounterStyle(goal.length, t3FocusedBox === 'goal' || goal.length > 0)}>{goal.length} / 500</span>
                       </div>
@@ -2010,9 +2010,6 @@ export default function AthletePage({ session }: { session: Session }) {
                     <div style={{ marginBottom: 18 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>
                         Any injuries or exercises we should avoid? <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12 }}>(optional)</span>
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-                        Anything you list here stays out of your program — we'll never program it. No injuries? Leave this blank.
                       </div>
                       {/* Deliberately a PREFERENCE, not a health question (founder decision
                           2026-07-12, supersedes the 3.1 consent line): we never ask WHY, so the
