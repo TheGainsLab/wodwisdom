@@ -1851,7 +1851,7 @@ export default function AthletePage({ session }: { session: Session }) {
                 <TierCard
                   tierNumber={3}
                   title="Training Context"
-                  unlocks="AI Programming tailored to your week"
+                  unlocks="Personalized AI Programming"
                   status={tierStatus.tier3}
                   defaultExpanded={false}
                   locked={!isAdmin && !hasFeature('programming')}
