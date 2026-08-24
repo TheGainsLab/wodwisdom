@@ -435,17 +435,21 @@ export default function CompetitionHistoryExperience({
       {/* Up-front heads-up: personalized power + cohort percentiles need Tier-1
           basics, and they're stamped at log time — so prompt BEFORE they log,
           not only in the Power tab's empty state (which appears after logging). */}
-      {needsBasics && (
+      {/* Basics prompt: personalized power + cohort percentiles need bodyweight,
+          stamped at log time — so it shows where logging happens (linked or
+          browsing workouts), never on the search screen, whose ONE job is
+          linking. No internal tier vocabulary in user-facing copy. */}
+      {needsBasics && !(mode === 'unlinked' && !browseUnlinked) && (
         <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 8, background: 'var(--accent-glow)', border: '1px solid var(--accent)', fontSize: 12.5, color: 'var(--text)' }}>
-          <strong>Complete Tier 1</strong> to unlock personalized power and performance data on the workouts you log.{' '}
-          <a href="/profile" style={{ color: 'var(--accent)', fontWeight: 600 }}>Complete Tier 1 →</a>
+          <strong>Add your basics</strong> — age and bodyweight — to unlock personalized power and performance data on the workouts you log.{' '}
+          <a href="/profile" style={{ color: 'var(--accent)', fontWeight: 600 }}>Add basics →</a>
         </div>
       )}
       {mode === 'unlinked' && !browseUnlinked && (
         <div>
           <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>
-            Search for your competition profile to import your data and link it to your account.{' '}
-            <strong style={{ color: 'var(--text)' }}>Once confirmed, this linkage is permanent.</strong>
+            <strong style={{ color: 'var(--text)' }}>See your competition history, analyzed</strong> — your Open,
+            Quarterfinals, and Games results with percentiles, trends, and a completion map.
           </p>
           <p style={{ marginBottom: 12, fontSize: 13 }}>
             <button
