@@ -702,6 +702,7 @@ export default function AthletePage({ session }: { session: Session }) {
   // Tier 3 card chrome: equipment collapse + which text box has focus (drives
   // the show-on-focus char counters).
   const [equipExpanded, setEquipExpanded] = useState(false);
+  const [coachExpanded, setCoachExpanded] = useState(false);
   const [t3FocusedBox, setT3FocusedBox] = useState<string | null>(null);
   // Injury show-back confirmation (handoff 1.1). When a save re-parses non-empty
   // injuries text into a do-not-program list, we surface it against the athlete's
@@ -813,7 +814,8 @@ export default function AthletePage({ session }: { session: Session }) {
       setResumePending(!!profileRes.data?.programming_resume_pending_at);
       if (!profileRes.data) {
         setIsNewUser(true);
-        setEquipExpanded(true); // brand-new profile: equipment review pending
+        // Equipment stays collapsed — its amber "review required" header badge
+        // carries the signal; the user opens sections at their own pace.
       }
       if (profileRes.data) {
         const d = profileRes.data;
@@ -823,11 +825,9 @@ export default function AthletePage({ session }: { session: Session }) {
           // confirmed their equipment — grandfathered straight to green.
           setEquipment(d.equipment);
           setEquipmentReviewed(true);
-        } else {
-          // Review pending: open the checklist so the required step is in
-          // front of them the moment they expand Tier 3.
-          setEquipExpanded(true);
         }
+        // Review pending: stays collapsed too — the amber header badge is the
+        // prompt. Nothing expands except by the user's tap.
         setSkills(d.skills || {});
         setConditioning(d.conditioning || {});
         setAge(d.age != null ? String(d.age) : '');
@@ -1956,7 +1956,26 @@ export default function AthletePage({ session }: { session: Session }) {
                       "Save & analyze" persists goals/injuries (via the full
                       profile save) AND runs the intake extraction. */}
                   <div className="settings-card" style={{ ...T3_CARD, marginTop: 16 }}>
-                    <div style={{ ...CTA_KICKER, marginBottom: 12 }}>Your Coach</div>
+                    <button
+                      type="button"
+                      onClick={() => setCoachExpanded(v => !v)}
+                      aria-expanded={coachExpanded}
+                      style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 0, margin: 0, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+                    >
+                      <div>
+                        <div style={{ ...CTA_KICKER, marginBottom: 4 }}>Your Coach</div>
+                        {goal.trim() ? (
+                          <div style={{ fontSize: 14, color: '#2ec486', fontWeight: 600 }}>✓ Goal set</div>
+                        ) : (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--warning, #f39c12)', fontWeight: 600 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--warning, #f39c12)', flex: 'none' }} />
+                            Goal required
+                          </div>
+                        )}
+                      </div>
+                      <span style={{ fontSize: 14, color: 'var(--text-dim)', flex: 'none' }}>{coachExpanded ? '▲' : '▼'}</span>
+                    </button>
+                    {coachExpanded && (<div style={{ marginTop: 16 }}>
 
                     <div style={{ marginBottom: 18 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>What are you working toward?</div>
@@ -2105,6 +2124,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       {intakeSaving ? 'Saving…' : intakeSaved ? 'Saved ✓' : 'Save & analyze'}
                     </button>
                     {intakeError && <div className="auth-error" style={{ display: 'block', marginTop: 12 }}>{intakeError}</div>}
+                    </div>)}
                   </div>
                 </TierCard>
 
