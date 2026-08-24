@@ -1765,8 +1765,8 @@ export default function AthletePage({ session }: { session: Session }) {
                   cardRef={tier2Ref}
                 >
                 <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>
-                  We don't need scientific precision — a general idea is enough to build your evaluation.
-                  Once you're training, your real numbers take over.
+                  We use this information to build your evaluation. Enter as much as you can — scientific
+                  precision not required, a general idea is fine.
                 </p>
                 <CollapsibleSection title={`1RM Lifts (${units})`}>
                   <p className="athlete-card-subtitle">Enter your one-rep max weights in {units}</p>
@@ -1831,7 +1831,6 @@ export default function AthletePage({ session }: { session: Session }) {
 
                 {/* Conditioning Benchmarks */}
                 <CollapsibleSection title="Conditioning Benchmarks" expanded={condSectionOpen} onToggle={setCondSectionOpen}>
-                  <p className="athlete-card-subtitle" style={{ fontStyle: 'italic' }}>Your evaluation is built from these numbers — enter everything you can.</p>
                   <p className="athlete-card-subtitle">Running and rowing times (MM:SS), bike in calories.</p>
                   {CONDITIONING_GROUPS.map(group => (
                     <div key={group.title} style={{ marginBottom: 20 }}>
