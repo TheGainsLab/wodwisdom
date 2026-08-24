@@ -1649,40 +1649,6 @@ export default function AthletePage({ session }: { session: Session }) {
                   return null;
                 })()}
 
-                {/* Competition History — an OPTIONAL add-on, NOT a tier (it doesn't
-                    gate the eval or programmer and has no prerequisite). Sits with the
-                    eval status card, above the profile tiers. The feature itself is the
-                    /athletedata route. Public to ALL athletes via ATHLETEDATA_PUBLIC_TIER
-                    (currently on); only admin-only if that flag is turned off. */}
-                {(isAdmin || ATHLETEDATA_PUBLIC_TIER) && (
-                  <div className="settings-card" style={{ borderColor: competitionAthleteId ? '#2ec486' : undefined }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', marginBottom: 4 }}>
-                      <span style={{ color: competitionAthleteId ? '#2ec486' : 'var(--accent)' }}>Competition History</span>
-                      {competitionAthleteId
-                        ? <span style={{ color: '#2ec486' }}> · Linked ✓</span>
-                        : <span style={{ color: 'var(--text-muted)' }}> (Free)</span>}
-                    </div>
-                    <h2 className="settings-card-title" style={{ marginBottom: 2 }}>
-                      {competitionAthleteId
-                        ? `Linked: ${competitionAthleteLabel ?? 'your competition profile'}`
-                        : 'Import your competition history'}
-                    </h2>
-                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
-                      {competitionAthleteId
-                        ? 'Your Open / Quarterfinals / Games history, a completion map, and throwbacks.'
-                        : 'Unlock a detailed analysis of your fitness over the years. No competition history? Start one, with access to every year’s workouts.'}
-                    </div>
-                    <button
-                      type="button"
-                      className="auth-btn"
-                      style={{ padding: '8px 16px', fontSize: 13 }}
-                      onClick={() => navigate('/athletedata')}
-                    >
-                      {competitionAthleteId ? 'View your competition history →' : 'Get started →'}
-                    </button>
-                  </div>
-                )}
-
                 {/* Tier 1 — Basics */}
                 <TierCard
                   tierNumber={1}
@@ -2136,6 +2102,41 @@ export default function AthletePage({ session }: { session: Session }) {
                     {intakeError && <div className="auth-error" style={{ display: 'block', marginTop: 12 }}>{intakeError}</div>}
                   </div>
                 </TierCard>
+
+                {/* Competition History — an OPTIONAL add-on, NOT a tier (it doesn't
+                    gate the eval or programmer and has no prerequisite). Sits AFTER the
+                    profile tiers (2026-08 reorder): optional enrichment must not
+                    read as step two of the eval funnel. The feature itself is the
+                    /athletedata route. Public to ALL athletes via ATHLETEDATA_PUBLIC_TIER
+                    (currently on); only admin-only if that flag is turned off. */}
+                {(isAdmin || ATHLETEDATA_PUBLIC_TIER) && (
+                  <div className="settings-card" style={{ borderColor: competitionAthleteId ? '#2ec486' : undefined }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', marginBottom: 4 }}>
+                      <span style={{ color: competitionAthleteId ? '#2ec486' : 'var(--accent)' }}>Competition History</span>
+                      {competitionAthleteId
+                        ? <span style={{ color: '#2ec486' }}> · Linked ✓</span>
+                        : <span style={{ color: 'var(--text-muted)' }}> (Free)</span>}
+                    </div>
+                    <h2 className="settings-card-title" style={{ marginBottom: 2 }}>
+                      {competitionAthleteId
+                        ? `Linked: ${competitionAthleteLabel ?? 'your competition profile'}`
+                        : 'Import your competition history'}
+                    </h2>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
+                      {competitionAthleteId
+                        ? 'Your Open / Quarterfinals / Games history, a completion map, and throwbacks.'
+                        : 'Unlock a detailed analysis of your fitness over the years. No competition history? Start one, with access to every year’s workouts.'}
+                    </div>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      style={{ padding: '8px 16px', fontSize: 13 }}
+                      onClick={() => navigate('/athletedata')}
+                    >
+                      {competitionAthleteId ? 'View your competition history →' : 'Get started →'}
+                    </button>
+                  </div>
+                )}
 
                 {(() => {
                   // Pure SAVE button. Running the free evaluation lives entirely in
