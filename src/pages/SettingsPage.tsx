@@ -222,7 +222,11 @@ export default function SettingsPage({ session }: { session: Session }) {
                   </button>
                 </div>
 
-                {/* Leaderboard Privacy */}
+                {/* Leaderboard Privacy — leaderboards exist only in Engine, so
+                    the anonymity toggle only shows to accounts that can appear
+                    on one. The column keeps its default for everyone else; the
+                    toggle appears if they later subscribe. */}
+                {(userFeatures.includes('engine') || profile.role === 'admin') && (
                 <div className="settings-card">
                   <h2 className="settings-card-title">Leaderboard</h2>
                   <div className="settings-row" style={{ alignItems: 'flex-start', gap: 12 }}>
@@ -243,6 +247,7 @@ export default function SettingsPage({ session }: { session: Session }) {
                     />
                   </div>
                 </div>
+                )}
 
                 {/* Password Section */}
                 <div className="settings-card">
