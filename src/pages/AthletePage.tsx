@@ -2177,14 +2177,20 @@ export default function AthletePage({ session }: { session: Session }) {
                   const genTitle = tierBlocked
                     ? 'Fill in your training context to generate a program tailored to your week.'
                     : undefined;
+                  // Ready = entitled, tier-complete, not generating. The old
+                  // surface2 styling made an ARMED button look dormant — ready
+                  // now reads as the primary action it is.
+                  const ready = canGenerate && !tierBlocked && !generateLoading;
                   return (
                     <>
                       <button
                         type="button"
                         className="auth-btn"
                         style={{
-                          background: 'var(--surface2)',
-                          color: 'var(--text)',
+                          background: ready ? 'var(--accent-glow)' : 'var(--surface2)',
+                          color: ready ? 'var(--accent)' : 'var(--text)',
+                          border: ready ? '1px solid var(--accent)' : undefined,
+                          fontWeight: ready ? 700 : undefined,
                           opacity: tierBlocked ? 0.55 : undefined,
                           cursor: tierBlocked ? 'not-allowed' : undefined,
                         }}
@@ -2193,7 +2199,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         title={genTitle}
                       >
                         {canGenerate ? (
-                          generateLoading ? 'Generating...' : 'Generate Program'
+                          generateLoading ? 'Generating...' : ready ? 'Generate Program →' : 'Generate Program'
                         ) : (
                           <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
@@ -2201,6 +2207,11 @@ export default function AthletePage({ session }: { session: Session }) {
                           </span>
                         )}
                       </button>
+                      {(ready || generateLoading) && (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
+                          Generation takes a few minutes — your full month, warm-ups to cool-downs.
+                        </span>
+                      )}
                       {!canGenerate && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Requires AI Programming or All Access subscription</span>
                       )}
