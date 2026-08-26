@@ -93,6 +93,10 @@ const AILogDashboardPage = lazy(() => import('./pages/AILogDashboardPage'));
 const AILogUploadPage = lazy(() => import('./pages/AILogUploadPage'));
 const AILogProgramPage = lazy(() => import('./pages/AILogProgramPage'));
 
+// Public Q&A library (both trees — visitors and members)
+const QALibraryPage = lazy(() => import('./pages/QALibraryPage'));
+const QAEntryPage = lazy(() => import('./pages/QAEntryPage'));
+
 // Feature landing pages
 const FeaturesHubPage = lazy(() => import('./pages/features/FeaturesHubPage'));
 const AICoachingFeaturePage = lazy(() => import('./pages/features/AICoachingFeaturePage'));
@@ -175,6 +179,8 @@ export default function App() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/qa" element={<QALibraryPage />} />
+            <Route path="/qa/:slug" element={<QAEntryPage />} />
             <Route path="/features" element={<FeaturesHubPage />} />
             <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
             <Route path="/features/programs" element={<ProgramsFeaturePage />} />
@@ -212,7 +218,8 @@ function AuthenticatedApp({ session }: { session: Session }) {
     track('page_view', { path: routePattern(location.pathname) });
   }, [location.pathname]);
   const hideTabBar = HIDE_TAB_BAR_ROUTES.some(r => location.pathname === r) ||
-    location.pathname.startsWith('/features');
+    location.pathname.startsWith('/features') ||
+    location.pathname.startsWith('/qa');
 
   return (
     <>
@@ -223,6 +230,8 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/join/engine/:token" element={<RetiredInviteNotice />} />
             <Route path="/claim/:token" element={<RetiredInviteNotice />} />
             {/* REMOVED (Decision 11): the /gym, /gym/leaderboard, /tv/:token class surfaces are deleted. */}
+            <Route path="/qa" element={<QALibraryPage signedIn />} />
+            <Route path="/qa/:slug" element={<QAEntryPage signedIn />} />
             <Route path="/chat" element={<ChatPage session={session} />} />
             <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
             <Route path="/workout/start" element={<StartWorkoutPage session={session} />} />

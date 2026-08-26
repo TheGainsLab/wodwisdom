@@ -80,6 +80,7 @@ export default function FeaturesHubPage() {
           <nav className="feature-nav">
             <a href="/#how-it-works">How It Works</a>
             <a href="/#pricing">Pricing</a>
+            <Link to="/qa">Q&amp;A</Link>
           </nav>
           <Link to="/auth" className="feature-signin-btn">Sign In</Link>
         </div>

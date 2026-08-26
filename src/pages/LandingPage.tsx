@@ -210,6 +210,7 @@ export default function LandingPage() {
           <nav className="landing-nav">
             <a href="#pricing">Pricing</a>
             <a href="#faq">FAQ</a>
+            <Link to="/qa">Q&amp;A</Link>
           </nav>
           <button className="landing-signin-btn" onClick={goToAuth}>Sign In</button>
         </div>
