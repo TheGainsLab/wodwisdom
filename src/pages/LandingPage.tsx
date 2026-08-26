@@ -538,6 +538,12 @@ export default function LandingPage() {
 
       <footer className="landing-footer">
         <GainsLogo />
+        {/* Visible on mobile too — the header nav is display:none under 640px. */}
+        <div style={{ marginTop: 10 }}>
+          <Link to="/qa" style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+            Q&amp;A: Ask a Coach
+          </Link>
+        </div>
       </footer>
     </div>
   );
