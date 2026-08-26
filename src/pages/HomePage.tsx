@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
-import { MessageSquare, Trophy, Flame, Dumbbell, Apple, User, ChevronRight, Lock, Settings } from 'lucide-react';
+import { MessageSquare, Trophy, Flame, Dumbbell, Apple, User, ChevronRight, Lock, Settings, Shield } from 'lucide-react';
 
 /**
  * HomePage — the persistent landing at `/` (chat moved to `/chat`).
@@ -101,6 +101,8 @@ export default function HomePage({ session }: { session: Session }) {
     { key: 'athletedata', label: 'Athlete Data', sub: 'Competition history', to: '/athletedata', icon: <Trophy size={20} />, locked: false, plan: '' },
     { key: 'profile', label: 'Profile', sub: 'Your athlete data', to: '/profile', icon: <User size={20} />, locked: false, plan: '' },
     { key: 'settings', label: 'Settings', sub: 'Billing, account & sign out', to: '/settings', icon: <Settings size={20} />, locked: false, plan: '' },
+    // Admin-only: the sidebar menu is awkward on mobile, so admins get a tile.
+    ...(isAdmin ? [{ key: 'admin', label: 'Admin', sub: 'Users, reports & ops', to: '/admin', icon: <Shield size={20} />, locked: false, plan: '' }] : []),
   ];
 
   const onTile = (t: { locked: boolean; plan: string; to: string }) =>
