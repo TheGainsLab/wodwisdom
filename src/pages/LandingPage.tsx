@@ -210,6 +210,7 @@ export default function LandingPage() {
           <nav className="landing-nav">
             <a href="#pricing">Pricing</a>
             <a href="#faq">FAQ</a>
+            <Link to="/qa">Q&amp;A</Link>
           </nav>
           <button className="landing-signin-btn" onClick={goToAuth}>Sign In</button>
         </div>
@@ -537,6 +538,12 @@ export default function LandingPage() {
 
       <footer className="landing-footer">
         <GainsLogo />
+        {/* Visible on mobile too — the header nav is display:none under 640px. */}
+        <div style={{ marginTop: 10 }}>
+          <Link to="/qa" style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+            Q&amp;A: Ask a Coach
+          </Link>
+        </div>
       </footer>
     </div>
   );
