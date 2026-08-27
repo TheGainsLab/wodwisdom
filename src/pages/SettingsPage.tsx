@@ -28,6 +28,27 @@ export default function SettingsPage({ session }: { session: Session }) {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
 
+  // AI sequencing opt-out (athlete_profiles.engine_ai_sequencing — on by
+  // default; the flag gates generation only, so turning it off lets any
+  // already-generated block finish before the fixed sequence resumes).
+  // null = no athlete_profiles row yet; the toggle upserts one on first use.
+  const [aiSequencing, setAiSequencing] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!navigator.onLine) return;
+    supabase.from('athlete_profiles').select('engine_ai_sequencing')
+      .eq('user_id', session.user.id).maybeSingle()
+      .then(({ data }) => setAiSequencing(data ? data.engine_ai_sequencing : null));
+  }, [session.user.id]);
+
+  const toggleAiSequencing = async (v: boolean) => {
+    setAiSequencing(v);
+    await supabase.from('athlete_profiles').upsert(
+      { user_id: session.user.id, engine_ai_sequencing: v },
+      { onConflict: 'user_id' },
+    );
+  };
+
   useEffect(() => {
     const uid = session.user.id;
 
@@ -244,6 +265,31 @@ export default function SettingsPage({ session }: { session: Session }) {
                         setProfile({ ...profile, leaderboard_anonymous: v });
                         await supabase.from('profiles').update({ leaderboard_anonymous: v }).eq('id', session.user.id);
                       }}
+                    />
+                  </div>
+                </div>
+                )}
+
+                {/* AI Sequencing — Engine-only, like the Leaderboard card.
+                    On by default; this is the opt-out back to the fixed
+                    authored sequence. Finish-your-block semantics: the flag
+                    stops future generation, already-composed days play out. */}
+                {(userFeatures.includes('engine') || profile.role === 'admin') && (
+                <div className="settings-card">
+                  <h2 className="settings-card-title">AI Sequencing</h2>
+                  <div className="settings-row" style={{ alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div className="settings-label">Compose my next Engine days for me</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                        Your upcoming training days are built from your results and goal.
+                        Turn off to follow the fixed program sequence — any days already
+                        composed for you finish first.
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={aiSequencing ?? true}
+                      onChange={e => toggleAiSequencing(e.target.checked)}
                     />
                   </div>
                 </div>
