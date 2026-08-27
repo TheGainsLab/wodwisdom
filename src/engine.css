@@ -207,3 +207,15 @@
 .ea-ratio-label{font-size:10px}
 .ea-ratio-col{max-width:80px}
 }
+
+/* Breakdown goal line, responsive: the full "~356 meters (238 meters/min · 2:06/500m)"
+   string overflows a phone-width card, so under 640px the inline form hides and a
+   stacked target-over-detail pair renders instead (GoalWithPace in EngineTrainingDayPage). */
+.goal-stacked{display:none}
+@media (max-width:640px){
+  .engine-breakdown-goal{flex-shrink:1;min-width:0}
+  .engine-breakdown-goal .goal-inline{display:none}
+  .engine-breakdown-goal .goal-stacked{display:flex;flex-direction:column;align-items:flex-end;line-height:1.3}
+  .goal-stacked-main{font-size:15px;font-weight:700}
+  .goal-stacked-sub{font-size:11.5px;font-weight:500;color:var(--text-muted)}
+}

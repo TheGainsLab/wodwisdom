@@ -243,6 +243,45 @@ function formatGoalWithPace(goal: number, durationSeconds: number, unit: string,
   return `~${goalStr} ${unit} (${perMin} ${unit}/min${extra ? ` · ${extra}` : ''})`;
 }
 
+/**
+ * Goal target for a breakdown row, responsive: one inline line on desktop
+ * (formatGoalWithPace verbatim), a stacked target-over-detail pair on narrow
+ * screens where the full string overflows the card. CSS (.goal-inline /
+ * .goal-stacked in engine.css) picks which renders.
+ */
+function GoalWithPace({ goal, durationSeconds, unit, modality }: {
+  goal: number; durationSeconds: number; unit: string; modality?: string | null;
+}) {
+  let main: string;
+  let sub: string | null;
+  if (isRateUnit(unit)) {
+    main = `~${Math.round(goal)} ${unit}`;
+    sub = echoRpm(goal, 'watts', modality);
+  } else {
+    const durationMinutes = durationSeconds / 60;
+    const perMin = durationMinutes > 0 ? Math.round(goal / durationMinutes) : null;
+    const shortUnit = unit === 'meters' ? 'm' : unit;
+    main = `~${Math.round(goal)} ${shortUnit}`;
+    if (!perMin) {
+      sub = null;
+    } else {
+      const extra = unit === 'meters'
+        ? ergSplit(perMin, modality)
+        : unit === 'cal' ? echoRpm(goal / durationMinutes, 'cal_min', modality) : null;
+      sub = `${perMin} ${shortUnit}/min${extra ? ` · ${extra}` : ''}`;
+    }
+  }
+  return (
+    <>
+      <span className="goal-inline">{formatGoalWithPace(goal, durationSeconds, unit, modality)}</span>
+      <span className="goal-stacked">
+        <span className="goal-stacked-main">{main}</span>
+        {sub && <span className="goal-stacked-sub">{sub}</span>}
+      </span>
+    </>
+  );
+}
+
 function formatPace(pace: number[] | string | undefined): string {
   if (!pace) return '';
   if (pace === 'max_effort') return 'MAX';
@@ -1315,7 +1354,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                 <span className="engine-breakdown-label">WORK</span>
                                 <span className="engine-breakdown-dur">{formatDuration(bSeg)}</span>
                                 <span className="engine-breakdown-goal">
-                                  {baseGoal != null ? formatGoalWithPace(baseGoal, bSeg, selectedUnit, modality) : pace || '—'}
+                                  {baseGoal != null ? <GoalWithPace goal={baseGoal} durationSeconds={bSeg} unit={selectedUnit} modality={modality} /> : pace || '—'}
                                 </span>
                               </div>
                             );
@@ -1329,7 +1368,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                 <span className="engine-breakdown-label engine-breakdown-label--flux">FLUX</span>
                                 <span className="engine-breakdown-dur">{formatDuration(fSeg)}</span>
                                 <span className="engine-breakdown-goal engine-breakdown-goal--flux">
-                                  {fluxGoal != null ? formatGoalWithPace(fluxGoal, fSeg, selectedUnit, modality) : formatPace(bp.fluxPaceRange ?? bp.paceRange) || '—'}
+                                  {fluxGoal != null ? <GoalWithPace goal={fluxGoal} durationSeconds={fSeg} unit={selectedUnit} modality={modality} /> : formatPace(bp.fluxPaceRange ?? bp.paceRange) || '—'}
                                 </span>
                               </div>
                             );
@@ -1365,7 +1404,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                 <span className="engine-breakdown-label">BASE</span>
                                 <span className="engine-breakdown-dur">{formatDuration(baseSeg)}</span>
                                 <span className="engine-breakdown-goal">
-                                  {baseGoal != null ? formatGoalWithPace(baseGoal, baseSeg, selectedUnit, modality) : pace || '—'}
+                                  {baseGoal != null ? <GoalWithPace goal={baseGoal} durationSeconds={baseSeg} unit={selectedUnit} modality={modality} /> : pace || '—'}
                                 </span>
                               </div>
                             );
@@ -1414,7 +1453,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                 <span className="engine-breakdown-label">WORK</span>
                                 <span className="engine-breakdown-dur">{formatDuration(bSeg)}</span>
                                 <span className="engine-breakdown-goal">
-                                  {baseGoal != null ? formatGoalWithPace(baseGoal, bSeg, selectedUnit, modality) : pace || '—'}
+                                  {baseGoal != null ? <GoalWithPace goal={baseGoal} durationSeconds={bSeg} unit={selectedUnit} modality={modality} /> : pace || '—'}
                                 </span>
                               </div>
                             );
@@ -1431,7 +1470,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                 <span className="engine-breakdown-label engine-breakdown-label--flux">FLUX</span>
                                 <span className="engine-breakdown-dur">{formatDuration(fSeg)}</span>
                                 <span className="engine-breakdown-goal engine-breakdown-goal--flux">
-                                  {fluxGoal != null ? formatGoalWithPace(fluxGoal, fSeg, selectedUnit, modality) : `${Math.round(fluxIntensity * 100)}%`}
+                                  {fluxGoal != null ? <GoalWithPace goal={fluxGoal} durationSeconds={fSeg} unit={selectedUnit} modality={modality} /> : `${Math.round(fluxIntensity * 100)}%`}
                                 </span>
                               </div>
                             );
@@ -1454,7 +1493,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                   const totalDur = workDur * rounds;
                                   const goal = calculateIntervalGoal(bp, totalDur, 'Work', baselineRpm, rollingAdj, isRateUnit(selectedUnit));
                                   const isMax = bp.paceRange === 'max_effort';
-                                  return isMax ? 'Max Effort' : goal != null ? formatGoalWithPace(goal, totalDur, selectedUnit, modality) : pace || '—';
+                                  return isMax ? 'Max Effort' : goal != null ? <GoalWithPace goal={goal} durationSeconds={totalDur} unit={selectedUnit} modality={modality} /> : pace || '—';
                                 })()}
                               </span>
                             </div>
@@ -1484,7 +1523,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                                     <span className="engine-breakdown-label">R{r + 1}</span>
                                     <span className="engine-breakdown-dur">{formatDuration(roundWorkDur)}</span>
                                     <span className="engine-breakdown-goal">
-                                      {isMax ? 'Max Effort' : intervalGoal != null ? formatGoalWithPace(intervalGoal, roundWorkDur, selectedUnit, modality) : pace || '—'}
+                                      {isMax ? 'Max Effort' : intervalGoal != null ? <GoalWithPace goal={intervalGoal} durationSeconds={roundWorkDur} unit={selectedUnit} modality={modality} /> : pace || '—'}
                                     </span>
                                   </div>
                                   {roundRestDur > 0 && r < rounds - 1 && (
