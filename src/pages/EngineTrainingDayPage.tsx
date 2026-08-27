@@ -240,6 +240,11 @@ function formatGoalWithPace(goal: number, durationSeconds: number, unit: string,
   const extra = unit === 'meters'
     ? ergSplit(perMin, modalityValue)
     : unit === 'cal' ? echoRpm(goal / durationMinutes, 'cal_min', modalityValue) : null;
+  // Split-first when one exists: the /500m (or /1000m) split is the number the
+  // athlete actually holds on the monitor — the distance is the result.
+  if (unit === 'meters' && extra) {
+    return `${extra} · ~${goalStr} ${unit} (${perMin} ${unit}/min)`;
+  }
   return `~${goalStr} ${unit} (${perMin} ${unit}/min${extra ? ` · ${extra}` : ''})`;
 }
 
@@ -261,14 +266,20 @@ function GoalWithPace({ goal, durationSeconds, unit, modality }: {
     const durationMinutes = durationSeconds / 60;
     const perMin = durationMinutes > 0 ? Math.round(goal / durationMinutes) : null;
     const shortUnit = unit === 'meters' ? 'm' : unit;
-    main = `~${Math.round(goal)} ${shortUnit}`;
-    if (!perMin) {
-      sub = null;
+    const split = unit === 'meters' && perMin ? ergSplit(perMin, modality) : null;
+    if (split) {
+      // Split-first: the number the athlete holds on the monitor leads; the
+      // distance and per-minute rate become the reference line.
+      main = split;
+      sub = `~${Math.round(goal)} ${shortUnit} · ${perMin} ${shortUnit}/min`;
     } else {
-      const extra = unit === 'meters'
-        ? ergSplit(perMin, modality)
-        : unit === 'cal' ? echoRpm(goal / durationMinutes, 'cal_min', modality) : null;
-      sub = `${perMin} ${shortUnit}/min${extra ? ` · ${extra}` : ''}`;
+      main = `~${Math.round(goal)} ${shortUnit}`;
+      if (!perMin) {
+        sub = null;
+      } else {
+        const extra = unit === 'cal' ? echoRpm(goal / durationMinutes, 'cal_min', modality) : null;
+        sub = `${perMin} ${shortUnit}/min${extra ? ` · ${extra}` : ''}`;
+      }
     }
   }
   return (
