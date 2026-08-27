@@ -74,7 +74,7 @@ export type EvidenceKey = AthleteModelKey | (string & {});
 // Prompt gains the missing-numbers rule — blanks are neutral (never penalized,
 // never guessed), and the one or two that would sharpen the read are assigned
 // as early-cycle tests inside the plan.
-export const COACH_STATE_BUILDER_VERSION = "v1.12";
+export const COACH_STATE_BUILDER_VERSION = "v1.13";
 
 // ============================================================
 // Controlled vocabularies — LOCKED v1 (DATA, versioned with the schema;
