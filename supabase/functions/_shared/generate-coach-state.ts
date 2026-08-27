@@ -69,27 +69,38 @@ async function callCoachState(
     ? `${retryViolations}\n\n---\n\n${payloadBlock}`
     : payloadBlock;
 
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 8000,
-      stream: false,
-      system: COACH_STATE_SYSTEM_PROMPT,
-      tools: [tool],
-      tool_choice: { type: "tool", name: "emit_coach_state" },
-      messages: [{ role: "user", content: userMessage }],
-    }),
-    // v1.8 letters (metcon_guidance + month_in_review) run longer than the
-    // letters 120s was sized for. Two attempts is the only multiplier —
-    // 2 × 180s = 360s stays under the ~400s edge wall-clock (house rule).
-    signal: AbortSignal.timeout(180_000),
-  });
+  const doFetch = () =>
+    fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 8000,
+        stream: false,
+        system: COACH_STATE_SYSTEM_PROMPT,
+        tools: [tool],
+        tool_choice: { type: "tool", name: "emit_coach_state" },
+        messages: [{ role: "user", content: userMessage }],
+      }),
+      // v1.8 letters (metcon_guidance + month_in_review) run longer than the
+      // letters 120s was sized for. Two attempts is the only multiplier —
+      // 2 × 180s = 360s stays under the ~400s edge wall-clock (house rule).
+      signal: AbortSignal.timeout(180_000),
+    });
+
+  let resp = await doFetch();
+  // Transient API failures (5xx/429) return in seconds, not at the timeout —
+  // one short-delay retry absorbs them without threatening the wall-clock
+  // budget. Timeouts are NOT retried: a second 180s attempt would blow it.
+  if (!resp.ok && (resp.status >= 500 || resp.status === 429)) {
+    console.warn(`[generate-coach-state] Claude HTTP ${resp.status}, retrying once in 3s`);
+    await new Promise((r) => setTimeout(r, 3000));
+    resp = await doFetch();
+  }
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
     throw new Error(`Claude HTTP ${resp.status}: ${body.slice(0, 500)}`);

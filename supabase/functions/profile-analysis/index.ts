@@ -150,6 +150,7 @@ async function runAnalysis(
   userId: string,
   monthNumber: number,
   profileData: ProfileData,
+  creditConsumed = false,
 ): Promise<void> {
   const supa = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
   const start = Date.now();
@@ -194,6 +195,21 @@ async function runAnalysis(
     const message = (e as Error).message || "Analysis failed";
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
     console.error(`[profile-analysis] Job ${evalId} FAILED after ${elapsed}s:`, message);
+    // A failure must not cost a free user their only evaluation — hand the
+    // consumed credit back so a retry is possible.
+    if (creditConsumed) {
+      const { data: ap } = await supa
+        .from("athlete_profiles")
+        .select("eval_credits_remaining")
+        .eq("user_id", userId)
+        .maybeSingle();
+      const { error: refundErr } = await supa
+        .from("athlete_profiles")
+        .update({ eval_credits_remaining: (ap?.eval_credits_remaining ?? 0) + 1 })
+        .eq("user_id", userId);
+      if (refundErr) console.error(`[profile-analysis] Job ${evalId} credit refund failed:`, refundErr);
+      else console.log(`[profile-analysis] Job ${evalId} refunded eval credit`);
+    }
     try {
       await supa
         .from("profile_evaluations")
@@ -287,6 +303,7 @@ Deno.serve(async (req) => {
     // Admins bypass. Service calls (continuation + v1→v3 migration, run on the
     // user's behalf by the cron/webhook) don't consume the pool either — those
     // are bundled with the active subscription.
+    let creditConsumed = false;
     if (!isContinuation && !isServiceCall) {
       const { data: profile } = await supa
         .from("profiles")
@@ -300,6 +317,7 @@ Deno.serve(async (req) => {
           "consume_eval_credit",
           { p_user_id: userId }
         );
+        if (!creditErr && remaining != null && remaining >= 0) creditConsumed = true;
         if (creditErr) {
           console.error("consume_eval_credit failed:", creditErr);
           return new Response(
@@ -365,7 +383,7 @@ Deno.serve(async (req) => {
     // request alive for the return below and the task continues after.
     // deno-lint-ignore no-explicit-any
     (globalThis as any).EdgeRuntime?.waitUntil?.(
-      runAnalysis(savedEval.id, userId, monthNumber, profileData)
+      runAnalysis(savedEval.id, userId, monthNumber, profileData, creditConsumed)
     );
 
     return new Response(

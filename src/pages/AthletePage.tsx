@@ -1000,7 +1000,11 @@ export default function AthletePage({ session }: { session: Session }) {
           return;
         }
         if (status?.status === 'failed') {
-          throw new Error(status.error || 'Analysis failed');
+          // Raw errors ("Claude HTTP 500: ...") are for the console, not the
+          // athlete. The server refunds the eval credit on failure, so the
+          // retry framing is honest.
+          console.error('[AthletePage] evaluation failed:', status.error);
+          throw new Error("That didn't work on our end — nothing was used up. Please try again in a minute.");
         }
         delay = Math.min(delay + 1000, maxDelay);
       }
