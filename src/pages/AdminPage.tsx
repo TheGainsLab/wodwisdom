@@ -19,11 +19,43 @@ const USER_SORTS: { key: UserSort; label: string; kind: 'date' | 'number' }[] = 
   { key: 'total_tokens', label: 'Tokens', kind: 'number' },
 ];
 
+// ── Tile → user-list view filters ──
+//
+// Each key names a saved filter over admin_user_list_v2 rows; clicking a
+// mapped stat tile on Overview jumps to the Users tab with it applied, so
+// every dashboard number is one click from the people behind it. 'ent:<f>'
+// keys filter by active entitlement feature and are generated dynamically.
+const VIEW_FILTERS: Record<string, { label: string; test: (u: any) => boolean }> = {
+  signups_7d: { label: 'Signed up in the last 7 days', test: u => !!u.signup_date && Date.now() - new Date(u.signup_date).getTime() <= 7 * 86400000 },
+  signups_30d: { label: 'Signed up in the last 30 days', test: u => !!u.signup_date && Date.now() - new Date(u.signup_date).getTime() <= 30 * 86400000 },
+  with_lifts: { label: 'Profiles with lifts', test: u => !!u.has_lifts },
+  with_eval: { label: 'Ran an evaluation', test: u => !!u.has_evaluation },
+  with_program: { label: 'Has a generated program', test: u => !!u.has_generated_program },
+  lifts_no_eval: { label: 'Lifts entered, no evaluation yet', test: u => !!u.has_lifts && !u.has_evaluation },
+  eval_no_program: { label: 'Evaluated, no program yet', test: u => !!u.has_evaluation && !u.has_generated_program },
+  with_access: { label: 'Users with access', test: u => (u.entitlements ?? []).length > 0 },
+};
+
+function getViewFilter(key: string | null): { label: string; test: (u: any) => boolean } | null {
+  if (!key) return null;
+  if (key.startsWith('ent:')) {
+    const feature = key.slice(4);
+    return { label: `Entitlement: ${feature.replace(/_/g, ' ')}`, test: u => (u.entitlements ?? []).includes(feature) };
+  }
+  return VIEW_FILTERS[key] ?? null;
+}
+
 // ── Shared Components ──
 
-function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+function StatCard({ label, value, sub, onClick }: { label: string; value: string | number; sub?: string; onClick?: () => void }) {
   return (
-    <div className="admin-stat-card">
+    <div
+      className="admin-stat-card"
+      onClick={onClick}
+      style={onClick ? { cursor: 'pointer', transition: 'border-color .15s' } : undefined}
+      onMouseEnter={onClick ? e => (e.currentTarget.style.borderColor = 'var(--accent)') : undefined}
+      onMouseLeave={onClick ? e => (e.currentTarget.style.borderColor = '') : undefined}
+    >
       <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text)', marginBottom: 8 }}>
         {label}
       </div>
@@ -94,6 +126,7 @@ export default function AdminPage({ session }: { session: Session }) {
 
   // Users data
   const [users, setUsers] = useState<any[]>([]);
+  const [viewFilter, setViewFilter] = useState<string | null>(null);
   const [userSearch, setUserSearch] = useState('');
   const [userSort, setUserSort] = useState<UserSort>('last_active');
   const [subscriberFilter, setSubscriberFilter] = useState<SubscriberFilter>('all');
@@ -145,6 +178,12 @@ export default function AdminPage({ session }: { session: Session }) {
   const switchTab = (tab: Tab) => {
     setActiveTab(tab);
     loadTab(tab);
+  };
+
+  // A dashboard tile was clicked: jump to Users with its filter applied.
+  const openUserView = (key: string) => {
+    setViewFilter(key);
+    switchTab('users');
   };
 
   // Access denied
@@ -234,7 +273,9 @@ export default function AdminPage({ session }: { session: Session }) {
   };
 
   // Filtered users
+  const activeViewFilter = getViewFilter(viewFilter);
   const filteredUsers = users.filter(u => {
+    if (activeViewFilter && !activeViewFilter.test(u)) return false;
     if (subscriberFilter === 'subscribers' && !u.is_paid_subscriber) return false;
     if (subscriberFilter === 'non_subscribers' && u.is_paid_subscriber) return false;
     if (competitionFilter === 'linked' && !u.competition_linked) return false;
@@ -350,23 +391,38 @@ export default function AdminPage({ session }: { session: Session }) {
 
                 <SectionHeader>Signups</SectionHeader>
                 <div className="admin-stats-grid">
-                  <StatCard label="Last 7 Days" value={overviewStats.new_signups_7d} />
-                  <StatCard label="Last 30 Days" value={overviewStats.new_signups_30d} />
+                  <StatCard label="Last 7 Days" value={overviewStats.new_signups_7d} onClick={() => openUserView('signups_7d')} />
+                  <StatCard label="Last 30 Days" value={overviewStats.new_signups_30d} onClick={() => openUserView('signups_30d')} />
                 </div>
 
                 <SectionHeader>Entitlements</SectionHeader>
                 <div className="admin-stats-grid">
-                  <StatCard label="Users with Access" value={overviewStats.users_with_entitlements} sub={`of ${overviewStats.total_users} total`} />
+                  <StatCard label="Users with Access" value={overviewStats.users_with_entitlements} sub={`of ${overviewStats.total_users} total`} onClick={() => openUserView('with_access')} />
                   {overviewStats.entitled_users && overviewStats.entitled_users.map((e: any) => (
-                    <StatCard key={e.feature} label={e.feature.replace(/_/g, ' ')} value={e.count} />
+                    <StatCard key={e.feature} label={e.feature.replace(/_/g, ' ')} value={e.count} onClick={() => openUserView(`ent:${e.feature}`)} />
                   ))}
                 </div>
 
                 <SectionHeader>Profile → Program Funnel</SectionHeader>
                 <div className="admin-stats-grid">
-                  <StatCard label="Profiles with Lifts" value={overviewStats.profiles_with_lifts} />
-                  <StatCard label="With Evaluation" value={overviewStats.profiles_with_evaluation} />
-                  <StatCard label="With Program" value={overviewStats.profiles_with_program} />
+                  <StatCard label="Profiles with Lifts" value={overviewStats.profiles_with_lifts} onClick={() => openUserView('with_lifts')} />
+                  <StatCard label="With Evaluation" value={overviewStats.profiles_with_evaluation} onClick={() => openUserView('with_eval')} />
+                  <StatCard label="With Program" value={overviewStats.profiles_with_program} onClick={() => openUserView('with_program')} />
+                  {/* The engagement lists: where people stalled. Values are the
+                      stat differences (close, not exact — a user can have an
+                      eval without lifts); the click-through list is exact. */}
+                  <StatCard
+                    label="Lifts, No Eval"
+                    value={Math.max(0, (overviewStats.profiles_with_lifts ?? 0) - (overviewStats.profiles_with_evaluation ?? 0))}
+                    sub="stalled before evaluation"
+                    onClick={() => openUserView('lifts_no_eval')}
+                  />
+                  <StatCard
+                    label="Eval, No Program"
+                    value={Math.max(0, (overviewStats.profiles_with_evaluation ?? 0) - (overviewStats.profiles_with_program ?? 0))}
+                    sub="stalled before program"
+                    onClick={() => openUserView('eval_no_program')}
+                  />
                 </div>
               </>
             ) :
@@ -537,6 +593,28 @@ export default function AdminPage({ session }: { session: Session }) {
             /* ===== Users Tab ===== */
             activeTab === 'users' ? (
               <>
+                {/* Active tile-view filter (set by clicking a dashboard stat) */}
+                {activeViewFilter && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
+                    padding: '10px 14px', background: 'var(--accent-glow)',
+                    border: '1px solid var(--accent)', borderRadius: 8,
+                  }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', flex: 1 }}>
+                      {activeViewFilter.label} — {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}
+                    </span>
+                    <button
+                      onClick={() => setViewFilter(null)}
+                      style={{
+                        background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer',
+                        fontSize: 13, fontWeight: 700, fontFamily: "'Outfit', sans-serif", padding: '2px 6px',
+                      }}
+                    >
+                      ✕ Clear
+                    </button>
+                  </div>
+                )}
+
                 {/* Search */}
                 <div style={{ marginBottom: 12 }}>
                   <input
@@ -728,6 +806,20 @@ export default function AdminPage({ session }: { session: Session }) {
                         {u.role === 'admin' && (
                           <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: 'var(--accent)', background: 'var(--accent-glow)', padding: '2px 8px', borderRadius: 4 }}>Admin</span>
                         )}
+                        {/* Quick outreach: straight to the detail page's email
+                            composer with the outreach tag pre-checked. */}
+                        <button
+                          onClick={e => { e.stopPropagation(); navigate(`/admin/users/${u.id}?outreach=1`); }}
+                          title="Email this user (opens the composer, outreach-tagged)"
+                          style={{
+                            fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6,
+                            border: '1px solid var(--border)', background: 'var(--surface2)',
+                            color: 'var(--text-dim)', cursor: 'pointer', fontFamily: "'Outfit', sans-serif",
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          ✉ Message
+                        </button>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
                       </div>
 
