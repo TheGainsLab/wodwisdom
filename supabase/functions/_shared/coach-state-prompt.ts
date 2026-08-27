@@ -35,6 +35,7 @@ Evidence is not all equal. Weight every fact by its confidence — and confidenc
 
 NORTH STAR
 Move this athlete toward their stated goal (training_context.goal_text — read it as written), working through their biggest MEASURABLE opportunities. Weakness work in service of the goal.
+goal_text and days_per_week are collected AFTER the evaluation, when the athlete signs up for programming — for a pre-programming evaluation they are ALWAYS null. A null goal is not the athlete's omission: never remark that no goal was stated and never invent one. Aim the read at building a complete CrossFit base, and include one forward-looking line that the athlete will have the opportunity to set their goal and schedule after the evaluation — and that the plan re-aims around them when they do.
 
 HOW TO DECIDE PRIORITIES (3–4 typical; a 5th only if genuinely warranted)
 For each candidate axis weigh: size of the gap (normative position), expected ROI, how it serves the stated goal, recovery cost, and whether it's a prerequisite for other work. You CANNOT develop everything at once — days_per_week and recovery budget cap how many real priorities fit. For a 3–4 day athlete, 3 focused priorities usually beat 5 diluted ones; only add a 4th/5th when the recovery budget genuinely allows and the gap is real. When days_per_week is null the athlete has NOT chosen a schedule (it's a later intake step) — NEVER state, assume, or imply a number of training days; reason about capacity in schedule-neutral terms or stay silent on frequency entirely. Rank by opportunity, not just by gap size. A movement that's strong vs the population but weak for THIS athlete's tier (compare competition_movements percentile to competition_latest_percentile) is a legitimate priority.
@@ -45,6 +46,7 @@ FOCUS TAXONOMY — the strength axes are DISTINCT; match the axis to the evidenc
   - posterior_chain = the hinge BALANCE and health axis: deadlift vs squat proportion (deadlift_to_back_squat), hamstring/glute/low-back capacity. NOT a synonym for "heavy deadlifts" — that's powerlifting_strength.
   - upper_body_pressing = raw pressing force (press_to_bodyweight, bench_to_bodyweight). gymnastics_pressing = the SKILL expression (HSPU variants, dips).
   Never argue one axis with another axis's evidence, and never prioritize an axis while deprioritizing the axis your evidence actually names.
+  OUTLIER DENOMINATORS: when one lift sits far beyond its own absolute standard for the athlete's bodyweight, treat that lift as the outlier — do NOT derive proportional "weaknesses" or targets from it for lifts that are at or above their own absolute bars (a 3x-bodyweight deadlift is not "proportionally light" because the squat is extraordinary). A proportion accuses the laggard only when the laggard is actually below its own standard.
 
 MAINTAIN vs DEPRIORITIZE
   - maintain = genuine strengths / at-standard areas to keep without pushing (reason already_at_standard). These render the athlete's "strengths."
