@@ -321,4 +321,28 @@ export function buildIntentAlertEmail(args: {
   return { subject, html };
 }
 
+/** Founder-facing alert: a user just completed their evaluation — the warmest
+ *  lead in the funnel. A personal note from the composer beats the automated
+ *  eval follow-up (which waits 5 days after any manual send). */
+export function buildEvalCompletedAlert(args: {
+  email: string | null;
+  fullName: string | null;
+  userId: string;
+  headline: string | null;
+}): { subject: string; html: string } {
+  const who = args.email ?? args.userId;
+  const subject = `Evaluation completed: ${who}`;
+  const nameLine = args.fullName ? `<p><strong>${escapeHtml(args.fullName)}</strong> (${escapeHtml(who)})` : `<p><strong>${escapeHtml(who)}</strong>`;
+  const headlineBlock = args.headline
+    ? `<p style="border-left:3px solid #ccc;padding-left:12px;color:#5a584f">${escapeHtml(args.headline)}</p>`
+    : "";
+  const html = emailWrap(
+    `${nameLine} just completed their evaluation.</p>` +
+    headlineBlock +
+    `<p><a href="${SITE}/admin/users/${args.userId}">Open their admin page →</a> — the ✉ Message button opens the composer; a send from there delays the automated follow-up to 5 days after yours.</p>` +
+    `<p style="color:#5a584f">If you do nothing, the eval-aware follow-up goes out automatically in 2–3 days.</p>`,
+  );
+  return { subject, html };
+}
+
 export { ALERT_EMAIL };
