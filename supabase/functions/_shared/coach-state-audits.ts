@@ -136,6 +136,10 @@ export function auditCoachState(
   const validEvidence = new Set([
     ...Object.keys(normative),
     ...Object.keys(model.competition_movements ?? {}),
+    // Skill-pair flags count as evidence only when TRUE for this athlete.
+    ...Object.entries((model as { derived_metrics?: Record<string, unknown> }).derived_metrics ?? {})
+      .filter(([, v]) => v === true)
+      .map(([k]) => k),
   ]);
   if (validEvidence.size > 0) {
     for (const p of cs.priorities) {

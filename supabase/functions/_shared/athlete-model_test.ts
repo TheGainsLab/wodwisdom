@@ -413,3 +413,94 @@ Deno.test("v1.7: one logged session changes the fingerprint (the version-bump si
   const none = buildAthleteModel(toStatic(FIXTURE_BEGINNER_FITNESS.profileRow), null);
   assertEquals(none.training_fingerprint, null);
 });
+
+// ============================================================
+// Thresholds v2: chain ratios, conditioning retention, skill-pair flags
+// ============================================================
+
+Deno.test("v2 chain ratios: jerk_to_clean names the C&J's capping link", () => {
+  const profile = toStatic({
+    ...FIXTURE_BEGINNER_FITNESS.profileRow,
+    gender: "male",
+    bodyweight: 197,
+    lifts: {
+      jerk: 300, clean: 290, clean_and_jerk: 285, back_squat: 375,
+      snatch: 240, power_snatch: 225, power_clean: 275,
+      press: 200, push_press: 250,
+    },
+  } as FixtureProfileRow);
+  const m = buildAthleteModel(profile, null);
+  // 300/290 ≈ 1.034 vs bar 1.02 → at/above: the jerk is NOT the limiter.
+  assert(m.strength_ratios.jerk_to_clean! > 1.02);
+  assertEquals(m.normative.jerk_to_clean?.position, "at_or_near");
+  // full snatch 240 vs power 225 → 1.067 ≥ bar 1.05: catch is used.
+  assert(m.strength_ratios.snatch_to_power_snatch! >= 1.05);
+  // push_press_to_press 250/200 = 1.25 vs bar 1.30 → slightly below.
+  assertEquals(m.normative.push_press_to_press?.position, "at_or_near");
+  // Target estimate present for chain ratios (threshold × denominator).
+  assert(m.normative.jerk_to_clean?.target_estimate != null);
+});
+
+Deno.test("v2 retention: computed from parsed times, positions attached", () => {
+  const profile = toStatic({
+    ...FIXTURE_BEGINNER_FITNESS.profileRow,
+    conditioning: { "2k_row": "7:45", "5k_row": "20:00", "1_mile_run": "8:00", "5k_run": "25:00" },
+  } as FixtureProfileRow);
+  const m = buildAthleteModel(profile, null);
+  // row: (465/4)/(1200/10) = 0.969 — holds pace, at/above the 0.95 bar.
+  assert(Math.abs(m.derived_metrics.row_2k_to_5k_retention! - 0.969) < 0.005);
+  assertEquals(m.normative.row_2k_to_5k_retention?.position, "at_or_near");
+  // run: 480 / (1500/3.107) = 0.994 vs bar 0.90 → well within.
+  assert(m.derived_metrics.run_mile_to_5k_retention! > 0.95);
+  assert(m.normative.run_mile_to_5k_retention != null);
+});
+
+Deno.test("v2 retention: implausible pairs emit null, never a position", () => {
+  const profile = toStatic({
+    ...FIXTURE_BEGINNER_FITNESS.profileRow,
+    // 2k at 11:00 but 5k at 20:00 — per-500m FASTER over 5k. Garbage entry.
+    conditioning: { "2k_row": "11:00", "5k_row": "20:00" },
+  } as FixtureProfileRow);
+  const m = buildAthleteModel(profile, null);
+  assertEquals(m.derived_metrics.row_2k_to_5k_retention, null);
+  assertEquals(m.normative.row_2k_to_5k_retention, undefined);
+});
+
+Deno.test("v2 skill flags: strict-ahead + pressing-ahead fire on the real-eval pattern", () => {
+  const profile = toStatic({
+    ...FIXTURE_BEGINNER_FITNESS.profileRow,
+    gender: "male",
+    bodyweight: 175,
+    lifts: { press: 145, bench_press: 265 },
+    skills: {
+      strict_pull_ups: "advanced", kipping_pull_ups: "intermediate",
+      butterfly_pull_ups: "none", bar_muscle_ups: "beginner",
+      hspu: "beginner", strict_hspu: "none",
+    },
+  } as FixtureProfileRow);
+  const m = buildAthleteModel(profile, null);
+  assertEquals(m.derived_metrics.strict_pulling_ahead_of_dynamic, true);
+  assertEquals(m.derived_metrics.dynamic_pulling_ahead_of_strict, false);
+  // bench 265/175 = 1.51 ≥ men's 1.46 bar; HSPU family lags.
+  assertEquals(m.derived_metrics.pressing_strength_ahead_of_inverted_skill, true);
+  // True flags become citable evidence; false ones don't.
+  const keys = athleteModelEvidenceKeys(m);
+  assert(keys.includes("strict_pulling_ahead_of_dynamic"));
+  assert(!keys.includes("dynamic_pulling_ahead_of_strict"));
+});
+
+Deno.test("v2 skill flags: unset when inputs are missing; backwards-kipping fires", () => {
+  const missing = toStatic({
+    ...FIXTURE_BEGINNER_FITNESS.profileRow,
+    skills: { strict_pull_ups: "advanced" }, // dynamic family unfilled
+  } as FixtureProfileRow);
+  const m1 = buildAthleteModel(missing, null);
+  assertEquals(m1.derived_metrics.strict_pulling_ahead_of_dynamic, undefined);
+
+  const backwards = toStatic({
+    ...FIXTURE_BEGINNER_FITNESS.profileRow,
+    skills: { strict_pull_ups: "beginner", kipping_pull_ups: "intermediate" },
+  } as FixtureProfileRow);
+  const m2 = buildAthleteModel(backwards, null);
+  assertEquals(m2.derived_metrics.dynamic_pulling_ahead_of_strict, true);
+});

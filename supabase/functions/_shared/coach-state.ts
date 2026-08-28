@@ -77,7 +77,7 @@ export type EvidenceKey = AthleteModelKey | (string & {});
 // v1.14 = the v1.12 prompt restored verbatim. v1.13's absurd-entry rule
 // over-triggered (flagged legitimate numbers as typos) and was removed;
 // the version still moves forward so v1.13-cached states regenerate.
-export const COACH_STATE_BUILDER_VERSION = "v1.14";
+export const COACH_STATE_BUILDER_VERSION = "v1.15";
 
 // ============================================================
 // Controlled vocabularies — LOCKED v1 (DATA, versioned with the schema;
