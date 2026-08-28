@@ -102,6 +102,21 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+/** Free-text row: label above, wrapped text below (Row's right-aligned
+ *  monospace value doesn't suit sentence-length goal/injury text). */
+function TextRow({ label, text }: { label: string; text: string | null | undefined }) {
+  return (
+    <div style={{
+      padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13,
+    }}>
+      <div style={{ color: 'var(--text-dim)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontWeight: 500, whiteSpace: 'pre-wrap' }}>
+        {text?.trim() ? text : '—'}
+      </div>
+    </div>
+  );
+}
+
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{
@@ -174,6 +189,25 @@ export default function AdminAthleteProfilePage({ session }: { session: Session 
             <Row label="Height" value={profile.height ? `${profile.height} in` : null} />
             <Row label="Bodyweight" value={profile.bodyweight ? `${profile.bodyweight}${unitSuffix}` : null} />
             <Row label="Preferred Units" value={profile.units} />
+          </Section>
+
+          <Section title="Training Setup">
+            <TextRow label="Goal" text={profile.goal} />
+            <Row label="Days / Week" value={profile.days_per_week} />
+            <TextRow label="Injuries & Constraints" text={profile.injuries_constraints} />
+            {(() => {
+              // Confirmation only matters when there IS a real injury note —
+              // mirror the server's no-injury sentinels.
+              const text = (profile.injuries_constraints ?? '').trim();
+              const hasInjuries = text !== '' && !/^(none|no|nothing|no injuries|n\/a)$/i.test(text);
+              if (!hasInjuries) return null;
+              return (
+                <Row
+                  label="Avoidance Confirmation"
+                  value={profile.injuries_avoidance_confirmed ? 'Recorded' : 'Not recorded'}
+                />
+              );
+            })()}
           </Section>
 
           <Section title={`Lifts (${profile.units ?? ''})`}>
