@@ -65,8 +65,8 @@ import type { OutsideTrainingFacts } from "./athlete-activities.ts";
 // training_fingerprint (a compact digest of logged work) replaces capability
 // revision as the version-bump signal, so one saved log still triggers a
 // fresh judgment at the next evaluation/generation.
-export const MODEL_BUILDER_VERSION = "v1.7";
-export const THRESHOLDS_VERSION = "v1";
+export const MODEL_BUILDER_VERSION = "v1.8";
+export const THRESHOLDS_VERSION = "v2";
 
 // ============================================================
 // Types
@@ -128,6 +128,15 @@ export const NORMATIVE_KEYS = [
   "front_squat_to_back_squat",
   "overhead_squat_to_snatch",
   "deadlift_to_back_squat",
+  // intra-lift chains (thresholds v2)
+  "jerk_to_clean",
+  "snatch_to_power_snatch",
+  "clean_to_power_clean",
+  "push_press_to_press",
+  "jerk_to_push_press",
+  // conditioning pace retention (higher = holds pace across distance)
+  "row_2k_to_5k_retention",
+  "run_mile_to_5k_retention",
   // relative strength (÷ bodyweight, gender-keyed bars)
   "back_squat_to_bodyweight",
   "deadlift_to_bodyweight",
@@ -169,10 +178,29 @@ export interface MovementNormative {
 /** Build the per-call CoachState evidence keyspace = the static strength
  *  normative keys + this athlete's competition-movement keys. */
 export function athleteModelEvidenceKeys(
-  model: { competition_movements?: Record<string, unknown> | null } | null | undefined,
+  model:
+    | {
+      competition_movements?: Record<string, unknown> | null;
+      derived_metrics?: Record<string, unknown> | null;
+    }
+    | null
+    | undefined,
 ): string[] {
-  return [...NORMATIVE_KEYS, ...Object.keys(model?.competition_movements ?? {})];
+  // Skill-pair flags are citable only when TRUE for this athlete — a false or
+  // absent flag is not evidence of anything.
+  const flags = SKILL_PAIR_FLAG_KEYS.filter(
+    (k) => (model?.derived_metrics ?? {})[k] === true,
+  );
+  return [...NORMATIVE_KEYS, ...flags, ...Object.keys(model?.competition_movements ?? {})];
 }
+
+/** Skill-pair pattern flags (derived_metrics booleans) — citable as evidence
+ *  like normative keys when true. */
+export const SKILL_PAIR_FLAG_KEYS = [
+  "strict_pulling_ahead_of_dynamic",
+  "dynamic_pulling_ahead_of_strict",
+  "pressing_strength_ahead_of_inverted_skill",
+] as const;
 
 export type RecoveryClass =
   | "open"
@@ -251,6 +279,16 @@ export interface DerivedMetrics {
     medium: number | null;
     long: number | null;
   };
+  /** Pace retention across distance (also normatives). Present only when both
+   *  times parsed and the ratio is physically plausible. */
+  row_2k_to_5k_retention?: number | null;
+  run_mile_to_5k_retention?: number | null;
+  /** Skill-pair pattern flags — deterministic detections of "the strength
+   *  exists but its skill expression lags" (and the unsafe inverse). Present
+   *  only when every input needed for the call is filled in. */
+  strict_pulling_ahead_of_dynamic?: boolean;
+  dynamic_pulling_ahead_of_strict?: boolean;
+  pressing_strength_ahead_of_inverted_skill?: boolean;
   // future: consistency_score, training_age, avg_w_per_kg, competition_movement_bias
 }
 
@@ -336,6 +374,7 @@ export interface Thresholds {
   version: string;
   ratios: Record<string, number>;
   relative_strength: { men: Record<string, number>; women: Record<string, number> };
+  conditioning_retention: Record<string, number>;
 }
 
 export const THRESHOLDS_V1: Thresholds = {
@@ -347,10 +386,24 @@ export const THRESHOLDS_V1: Thresholds = {
     front_squat_to_back_squat: 0.85,
     overhead_squat_to_snatch: 0.95,
     deadlift_to_back_squat: 1.30,
+    // v2: intra-lift chains — which link caps the composite lift.
+    jerk_to_clean: 1.02, //          jerk should slightly exceed the clean
+    snatch_to_power_snatch: 1.05, // full ≥ power = the athlete uses the catch
+    clean_to_power_clean: 1.10,
+    push_press_to_press: 1.30, //    leg drive contribution
+    jerk_to_push_press: 1.15, //     receiving speed past the push press
   },
   relative_strength: {
     men: { back_squat: 1.90, deadlift: 2.50, press: 0.86, bench: 1.46 },
     women: { back_squat: 1.50, deadlift: 2.00, press: 0.60, bench: 1.00 },
+  },
+  // Pace retention across distance, framed so HIGHER = better (holds pace)
+  // and the standard position semantics apply: "below" = fades hard.
+  //   row:  2k /500m pace ÷ 5k /500m pace (a ~5% fade sits at the bar)
+  //   run: mile pace ÷ 5k per-mile pace (a ~10% fade sits at the bar)
+  conditioning_retention: {
+    row_2k_to_5k_retention: 0.95,
+    run_mile_to_5k_retention: 0.90,
   },
 };
 
@@ -384,6 +437,18 @@ function round(n: number, places = 3): number {
 }
 
 /** Safe ratio: null when numerator/denominator missing or denominator 0. */
+/** "mm:ss" / "h:mm:ss" / plain seconds → seconds; null when unparseable. */
+export function parseTimeSeconds(v: string | number | null | undefined): number | null {
+  if (typeof v === "number") return Number.isFinite(v) && v > 0 ? v : null;
+  if (typeof v !== "string") return null;
+  const parts = v.trim().split(":").map((p) => Number(p));
+  if (parts.some((p) => !Number.isFinite(p) || p < 0)) return null;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 1 && parts[0] > 0) return parts[0];
+  return null;
+}
+
 function ratio(a: number | null, b: number | null): number | null {
   if (a == null || b == null || b === 0) return null;
   return round(a / b);
@@ -640,12 +705,41 @@ export function buildAthleteModel(
     press_to_bodyweight: ratio(L("press"), bw),
     bench_to_bodyweight: ratio(L("bench_press"), bw),
     deadlift_to_back_squat: ratio(L("deadlift"), L("back_squat")),
+    // intra-lift chains (thresholds v2): which link caps the composite lift.
+    jerk_to_clean: ratio(L("jerk"), L("clean")),
+    snatch_to_power_snatch: ratio(L("snatch"), L("power_snatch")),
+    clean_to_power_clean: ratio(L("clean"), L("power_clean")),
+    push_press_to_press: ratio(L("push_press"), L("press")),
+    jerk_to_push_press: ratio(L("jerk"), L("push_press")),
   };
 
   const recovery_class = recoveryClassForAge(num(profile.age));
 
   // --- Derived metrics (non-ratio analytics from competition) ---
   const derived_metrics: DerivedMetrics = {};
+
+  // Pace retention across distance (thresholds v2). Framed higher-is-better so
+  // standard position semantics hold: "below" = fades hard over distance.
+  // Ratios outside [0.5, 1.15] mean at least one entry is garbage (e.g. a 2k
+  // faster per-500m than physics of the 5k allows only up to ~15%) — emit null
+  // rather than classify nonsense.
+  {
+    const cond = profile.conditioning ?? {};
+    const plausible = (r: number | null): number | null =>
+      r != null && r >= 0.5 && r <= 1.15 ? round(r, 3) : null;
+    const t2k = parseTimeSeconds(cond["2k_row"] ?? null);
+    const t5kRow = parseTimeSeconds(cond["5k_row"] ?? null);
+    if (t2k != null && t5kRow != null) {
+      // /500m paces: 2k has 4 × 500m, 5k has 10.
+      derived_metrics.row_2k_to_5k_retention = plausible((t2k / 4) / (t5kRow / 10));
+    }
+    const tMile = parseTimeSeconds(cond["1_mile_run"] ?? null);
+    const t5kRun = parseTimeSeconds(cond["5k_run"] ?? null);
+    if (tMile != null && t5kRun != null) {
+      // per-mile paces: 5k = 3.107 miles.
+      derived_metrics.run_mile_to_5k_retention = plausible(tMile / (t5kRun / (5000 / 1609.34)));
+    }
+  }
   if (competition) {
     const tier = competition.competition_summary?.overall_competitive_tier ?? null;
     if (tier != null) derived_metrics.competition_tier = tier;
@@ -666,6 +760,13 @@ export function buildAthleteModel(
 
   for (const key of Object.keys(thresholds.ratios)) {
     const n = makeNormative(strength_ratios[key], thresholds.ratios[key]);
+    if (n) normative[key] = n;
+  }
+
+  // Conditioning retention normatives (values live in derived_metrics).
+  for (const [key, bar] of Object.entries(thresholds.conditioning_retention ?? {})) {
+    const v = (derived_metrics as Record<string, unknown>)[key];
+    const n = makeNormative(typeof v === "number" ? v : null, bar);
     if (n) normative[key] = n;
   }
 
@@ -695,6 +796,11 @@ export function buildAthleteModel(
     front_squat_to_back_squat: L("back_squat"),
     overhead_squat_to_snatch: L("snatch"),
     deadlift_to_back_squat: L("back_squat"),
+    jerk_to_clean: L("clean"),
+    snatch_to_power_snatch: L("power_snatch"),
+    clean_to_power_clean: L("power_clean"),
+    push_press_to_press: L("press"),
+    jerk_to_push_press: L("push_press"),
     back_squat_to_bodyweight: bw,
     deadlift_to_bodyweight: bw,
     press_to_bodyweight: bw,
@@ -742,6 +848,43 @@ export function buildAthleteModel(
     const powerOverall = num(competition.power_profile?.overall?.cohort_percentile);
     const n2 = makeNormative(powerOverall, 50);
     if (n2) normative.power_overall_percentile = n2;
+  }
+
+  // --- Skill-pair pattern flags (thresholds v2) ---
+  // "The strength exists but its skill expression lags" (and the unsafe
+  // inverse: kipping built on a missing strict base). Deterministic pattern
+  // DETECTION only — whether it's a priority stays Coaching Strategy's call.
+  // Each flag is set only when every input it needs is filled in.
+  {
+    const RANK: Record<string, number> = { none: 0, beginner: 1, intermediate: 2, advanced: 3 };
+    const skills = profile.skills ?? {};
+    const rank = (k: string): number | null => {
+      const s = skills[k];
+      return s != null && s in RANK ? RANK[s] : null;
+    };
+
+    const strict = rank("strict_pull_ups");
+    const kip = rank("kipping_pull_ups");
+    const butterfly = rank("butterfly_pull_ups");
+    const barMu = rank("bar_muscle_ups");
+    if (strict != null && kip != null && butterfly != null && barMu != null) {
+      derived_metrics.strict_pulling_ahead_of_dynamic =
+        strict >= 3 && Math.min(kip, butterfly, barMu) <= 1;
+    }
+    if (strict != null && kip != null) {
+      derived_metrics.dynamic_pulling_ahead_of_strict = kip >= 2 && strict <= 1;
+    }
+
+    const pressPos = normative.press_to_bodyweight?.position;
+    const benchPos = normative.bench_to_bodyweight?.position;
+    const atBar = (p: Position | undefined) =>
+      p === "at_or_near" || p === "above" || p === "well_above";
+    const hspu = rank("hspu");
+    const strictHspu = rank("strict_hspu");
+    if ((pressPos != null || benchPos != null) && hspu != null && strictHspu != null) {
+      derived_metrics.pressing_strength_ahead_of_inverted_skill =
+        (atBar(pressPos) || atBar(benchPos)) && hspu <= 2 && strictHspu <= 1;
+    }
   }
 
   // --- ranked_by_position: FACTUAL ordering, most-below-benchmark first ---
