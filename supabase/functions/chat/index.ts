@@ -240,8 +240,26 @@ async function buildEngineCoachingContext(
     .maybeSingle();
   if (!mapping) return "";
 
-  // Fetch catalog workout, program metadata, recent sessions, upcoming
-  // mapping rows, and time trial baselines in parallel.
+  // Sequencer override for the scoped day. The training-day page renders
+  // override-first with catalogue fallback (engineService.loadDayOverride) —
+  // the chat MUST resolve the same way, or on sequenced days the coach
+  // describes a workout that is not on the athlete's screen (the original
+  // "day 2 is different from what the AI prescribes" complaint).
+  const { data: scopedOverride } = await supa
+    .from("engine_user_day_overrides")
+    .select("engine_workout_id, reason")
+    .eq("user_id", userId)
+    .eq("program_version", programVersion)
+    .eq("sequence_position", scopedSeq)
+    .maybeSingle();
+  const overrideWorkoutId = scopedOverride?.engine_workout_id ?? null;
+
+  const WORKOUT_COLS =
+    "day_type, phase, block_count, set_rest_seconds, base_intensity_percent, block_1_params, block_2_params, block_3_params, block_4_params";
+
+  // Fetch the effective workout (override row by id, else catalog day),
+  // program metadata, recent sessions, upcoming mapping rows, and time trial
+  // baselines in parallel.
   const [
     { data: workout },
     { data: programInfo },
@@ -252,13 +270,20 @@ async function buildEngineCoachingContext(
     // The 720-day catalog is program_type='main_5day' (every variant maps into it —
     // same filter the client uses). Without it, AI-sequencer rows (program_type
     // 'gen:<uuid>') sharing this day_number make maybeSingle() error → null → the
-    // whole context silently comes back empty.
-    supa
-      .from("engine_workouts")
-      .select("day_type, phase, block_count, set_rest_seconds, base_intensity_percent, block_1_params, block_2_params, block_3_params, block_4_params")
-      .eq("program_type", "main_5day")
-      .eq("day_number", mapping.engine_workout_day_number)
-      .maybeSingle(),
+    // whole context silently comes back empty. Override rows are fetched by id —
+    // they ARE those 'gen:' rows.
+    overrideWorkoutId
+      ? supa
+        .from("engine_workouts")
+        .select(WORKOUT_COLS)
+        .eq("id", overrideWorkoutId)
+        .maybeSingle()
+      : supa
+        .from("engine_workouts")
+        .select(WORKOUT_COLS)
+        .eq("program_type", "main_5day")
+        .eq("day_number", mapping.engine_workout_day_number)
+        .maybeSingle(),
     supa
       .from("engine_programs")
       .select("name, total_days, total_months")
@@ -297,18 +322,44 @@ async function buildEngineCoachingContext(
         .maybeSingle()
     : { data: null };
 
-  // Resolve day-type names for upcoming days
+  // Resolve day-type names for upcoming days. Effective type per position =
+  // override ?? catalog — the same rule the day page renders by, so the coach
+  // previews the days the athlete will actually see.
   let upcomingBlock = "";
   if (upcomingMappings && upcomingMappings.length > 0) {
     const upcomingDayNumbers = upcomingMappings.map((m) => m.engine_workout_day_number);
-    const { data: upcomingWorkouts } = await supa
-      .from("engine_workouts")
-      .select("day_number, day_type")
-      .eq("program_type", "main_5day")
-      .in("day_number", upcomingDayNumbers);
+    const upcomingPositions = upcomingMappings.map((m) => m.program_sequence_order);
+    const [{ data: upcomingWorkouts }, { data: upcomingOvs }] = await Promise.all([
+      supa
+        .from("engine_workouts")
+        .select("day_number, day_type")
+        .eq("program_type", "main_5day")
+        .in("day_number", upcomingDayNumbers),
+      supa
+        .from("engine_user_day_overrides")
+        .select("sequence_position, engine_workout_id")
+        .eq("user_id", userId)
+        .eq("program_version", programVersion)
+        .in("sequence_position", upcomingPositions),
+    ]);
+
+    // Override rows' day types (their content lives in engine_workouts by id).
+    const ovIds = (upcomingOvs || []).map((o) => o.engine_workout_id as string).filter(Boolean);
+    const { data: ovWorkouts } = ovIds.length > 0
+      ? await supa.from("engine_workouts").select("id, day_type").in("id", ovIds)
+      : { data: [] as { id: string; day_type: string }[] };
+    const ovTypeById = new Map((ovWorkouts || []).map((w) => [w.id, w.day_type]));
+    const ovTypeByPos = new Map<number, string>();
+    for (const o of upcomingOvs || []) {
+      const t = ovTypeById.get(o.engine_workout_id as string);
+      if (t) ovTypeByPos.set(o.sequence_position as number, t);
+    }
 
     const dayTypeIds = Array.from(
-      new Set((upcomingWorkouts || []).map((w: { day_type: string }) => w.day_type).filter(Boolean)),
+      new Set([
+        ...(upcomingWorkouts || []).map((w: { day_type: string }) => w.day_type),
+        ...ovTypeByPos.values(),
+      ].filter(Boolean)),
     );
     const { data: dayTypeRows } = dayTypeIds.length > 0
       ? await supa.from("engine_day_types").select("id, name").in("id", dayTypeIds)
@@ -320,9 +371,11 @@ async function buildEngineCoachingContext(
     );
 
     const lines = upcomingMappings.map((m) => {
-      const catalogType = typeByDayNum.get(m.engine_workout_day_number) ?? "";
-      const typeName = (nameById.get(catalogType) as string | undefined) ?? "unknown";
-      return `- Day ${m.program_sequence_order} (Month ${m.month}): ${typeName}`;
+      const effType = ovTypeByPos.get(m.program_sequence_order) ??
+        typeByDayNum.get(m.engine_workout_day_number) ?? "";
+      const typeName = (nameById.get(effType) as string | undefined) ?? "unknown";
+      const sequenced = ovTypeByPos.has(m.program_sequence_order) ? " (AI-sequenced)" : "";
+      return `- Day ${m.program_sequence_order} (Month ${m.month}): ${typeName}${sequenced}`;
     });
     upcomingBlock = "\nUPCOMING DAYS:\n" + lines.join("\n");
   }
@@ -346,6 +399,14 @@ async function buildEngineCoachingContext(
   }
 
   parts.push("\nTODAY'S SESSION:");
+  if (overrideWorkoutId) {
+    const reason = typeof scopedOverride?.reason === "string" && scopedOverride.reason.trim() !== ""
+      ? scopedOverride.reason.trim()
+      : null;
+    parts.push(
+      `This session was PERSONALIZED by the AI sequencer — it replaces the original catalogue day, and it is what the athlete's training-day page shows. Coach THIS session; never reference or reconstruct the replaced catalogue workout.${reason ? ` Why the sequencer chose it: ${reason}` : ""}`,
+    );
+  }
   if (dayTypeRow?.name) parts.push(`Day type: ${dayTypeRow.name}`);
   if (dayTypeRow?.coaching_intent) parts.push("", dayTypeRow.coaching_intent);
 
@@ -498,13 +559,37 @@ async function buildEngineAthleteCard(
   let nextTTSeq: number | null = null;
   if (upcoming.length > 0) {
     const catalogDays = [...new Set(upcoming.map((m) => m.engine_workout_day_number))];
-    const { data: ws } = await supa
-      .from("engine_workouts")
-      .select("day_number, day_type")
-      .eq("program_type", "main_5day")
-      .in("day_number", catalogDays);
+    // Effective type per position = sequencer override ?? catalog — the day
+    // page's rule. Without this, the card names the wrong type for a sequenced
+    // current day and can mis-locate the next time trial across the window.
+    const [{ data: ws }, { data: ovs }] = await Promise.all([
+      supa
+        .from("engine_workouts")
+        .select("day_number, day_type")
+        .eq("program_type", "main_5day")
+        .in("day_number", catalogDays),
+      supa
+        .from("engine_user_day_overrides")
+        .select("sequence_position, engine_workout_id")
+        .eq("user_id", userId)
+        .eq("program_version", programVersion)
+        .in("sequence_position", upcoming.map((m) => m.program_sequence_order)),
+    ]);
     const typeByDay = new Map((ws ?? []).map((w) => [w.day_number as number, w.day_type as string]));
-    const currentType = currentRow ? typeByDay.get(currentRow.engine_workout_day_number) : null;
+    const ovIds = (ovs ?? []).map((o) => o.engine_workout_id as string).filter(Boolean);
+    const { data: ovWs } = ovIds.length > 0
+      ? await supa.from("engine_workouts").select("id, day_type").in("id", ovIds)
+      : { data: [] as { id: string; day_type: string }[] };
+    const ovTypeById = new Map((ovWs ?? []).map((w) => [w.id as string, w.day_type as string]));
+    const ovTypeByPos = new Map<number, string>();
+    for (const o of ovs ?? []) {
+      const t = ovTypeById.get(o.engine_workout_id as string);
+      if (t) ovTypeByPos.set(o.sequence_position as number, t);
+    }
+    const effType = (m: { program_sequence_order: number; engine_workout_day_number: number }): string | undefined =>
+      ovTypeByPos.get(m.program_sequence_order) ??
+        (typeByDay.get(m.engine_workout_day_number) as string | undefined);
+    const currentType = currentRow ? effType(currentRow) : null;
     if (currentType) {
       const { data: dt } = await supa
         .from("engine_day_types")
@@ -513,7 +598,7 @@ async function buildEngineAthleteCard(
         .maybeSingle();
       nextDayType = dt?.name ?? currentType.replace(/_/g, " ");
     }
-    const tt = upcoming.find((m) => typeByDay.get(m.engine_workout_day_number) === "time_trial");
+    const tt = upcoming.find((m) => effType(m) === "time_trial");
     if (tt) nextTTSeq = tt.program_sequence_order;
   }
 
