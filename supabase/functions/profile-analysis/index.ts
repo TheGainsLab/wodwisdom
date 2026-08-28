@@ -31,6 +31,7 @@ import { getTierStatus } from "../_shared/tier-status.ts";
 import { buildWriterPayload } from "../_shared/build-writer-payload.ts";
 import { type EvaluationOutput } from "../_shared/v2-output-schema.ts";
 import { generateAndPersistCoachState } from "../_shared/generate-coach-state.ts";
+import { ALERT_EMAIL, buildEvalCompletedAlert, sendViaResend } from "../_shared/checkout-emails.ts";
 import { evaluationFromCoachState } from "../_shared/coach-state.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -151,6 +152,7 @@ async function runAnalysis(
   monthNumber: number,
   profileData: ProfileData,
   creditConsumed = false,
+  notifyAdmin = false,
 ): Promise<void> {
   const supa = createClient(SUPABASE_URL!, SUPABASE_SERVICE_KEY!);
   const start = Date.now();
@@ -191,6 +193,26 @@ async function runAnalysis(
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
     console.log(`[profile-analysis] Job ${evalId} complete in ${elapsed}s (${analysis.length} chars)`);
+
+    // Warm-lead alert: a person just ran their evaluation (never fired for
+    // service-initiated regenerations or monthly continuations). Best-effort —
+    // the eval is already saved; an alert failure must not mark the job failed.
+    if (notifyAdmin) {
+      try {
+        const { data: prof } = await supa
+          .from("profiles").select("email, full_name").eq("id", userId).maybeSingle();
+        const { subject, html } = buildEvalCompletedAlert({
+          email: prof?.email ?? null,
+          fullName: prof?.full_name ?? null,
+          userId,
+          headline: evaluation.headline_takeaway ?? null,
+        });
+        const messageId = await sendViaResend(ALERT_EMAIL, subject, html);
+        console.log(`[profile-analysis] eval-completed alert ${messageId ? "sent" : "FAILED"} for ${prof?.email ?? userId}`);
+      } catch (alertErr) {
+        console.error(`[profile-analysis] eval-completed alert error:`, alertErr);
+      }
+    }
   } catch (e) {
     const message = (e as Error).message || "Analysis failed";
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
@@ -345,6 +367,9 @@ Deno.serve(async (req) => {
       status: "pending",
       month_number: monthNumber,
       visible: isContinuation ? false : true,
+      // Only person-initiated evals alert the founder / enter the follow-up
+      // window — service regenerations and continuations stay out of the funnel.
+      initiated_by: isServiceCall ? "service" : "user",
       profile_snapshot: {
         lifts: profileData.lifts || {},
         skills: profileData.skills || {},
@@ -383,7 +408,7 @@ Deno.serve(async (req) => {
     // request alive for the return below and the task continues after.
     // deno-lint-ignore no-explicit-any
     (globalThis as any).EdgeRuntime?.waitUntil?.(
-      runAnalysis(savedEval.id, userId, monthNumber, profileData, creditConsumed)
+      runAnalysis(savedEval.id, userId, monthNumber, profileData, creditConsumed, !isServiceCall && !isContinuation)
     );
 
     return new Response(

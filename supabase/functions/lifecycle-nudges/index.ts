@@ -29,6 +29,7 @@ import {
   emailButton,
   emailLink,
   emailWrap,
+  escapeHtml,
   firstNameOf,
   logEmailSend,
   sendViaResend,
@@ -98,6 +99,88 @@ function renderEvalFollowup(firstName: string | null, unsubUrl: string | null): 
     `<p>-Matt</p>`,
     { unsubUrl },
   );
+}
+
+// Eval-aware variant: quotes the athlete's own evaluation back at them —
+// the headline verdict and the top priority — so the email reads as a coach
+// following up on a real assessment, not a template. Falls back to the
+// generic render when the structured evaluation isn't available.
+function renderEvalFollowupAware(
+  firstName: string | null,
+  unsubUrl: string | null,
+  headline: string,
+  topPriority: string | null,
+): string {
+  const priorityBlock = topPriority
+    ? `<p>And the highest-return work it found:</p>` +
+      `<p style="border-left:3px solid #ccc;padding-left:12px;color:#5a584f">${escapeHtml(topPriority)}</p>`
+    : "";
+  return emailWrap(
+    `<p>${hi(firstName)}</p>` +
+    `<p>A few days ago our AI took an honest look at your fitness — your lifting, your skills, and your engine. Here's the one-line verdict it reached:</p>` +
+    `<p style="border-left:3px solid #ccc;padding-left:12px;color:#5a584f"><strong>${escapeHtml(headline)}</strong></p>` +
+    priorityBlock +
+    `<p>An assessment you don't act on is just interesting reading. The whole reason we built the evaluation is that it feeds directly into training:</p>` +
+    `<p><strong>If your engine was the flag</strong> — ${emailLink("/features/engine", "Year of the Engine", "eval_followup")} turns that into 8 conditioning programs with targets calibrated to <em>your</em> baseline, recalibrated as you improve.</p>` +
+    `<p><strong>If lifting or skills need the work</strong> — ${emailLink("/features/programs", "AI Programming", "eval_followup")} builds your whole program around exactly those gaps — including the priority above — and rebuilds it monthly based on what you log.</p>` +
+    `<p><strong>If the honest answer is "more than one thing"</strong> — ${emailLink("/features", "All Access", "eval_followup")} is both programs under one subscription, at $49.99/mo the best value on the board.</p>` +
+    `<p>The work of knowing where you stand is done. The next step is training on it.</p>` +
+    emailButton("/features", "Pick your plan", "eval_followup") +
+    `<p>-Matt</p>`,
+    { unsubUrl },
+  );
+}
+
+/** First 1–2 sentences of a coach-prose bullet, capped so the email quote
+ *  stays a quote and not a reprint. */
+function excerptSentences(text: string, maxChars = 240): string {
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  let out = "";
+  for (const s of sentences) {
+    if (out && (out + " " + s).length > maxChars) break;
+    out = out ? out + " " + s : s;
+    if (out.length > maxChars) break;
+  }
+  return out || text.slice(0, maxChars);
+}
+
+/** Eval follow-up sweep: same candidates RPC + guards as the other sweeps,
+ *  but each send is personalized from the lead's own evaluation. */
+async function runEvalFollowupSweep(supa: SupabaseClient): Promise<SweepResult> {
+  const { data, error } = await supa.rpc("eval_followup_candidates", { p_limit: 25 });
+  if (error) {
+    console.error(`[lifecycle-nudges] eval_followup_candidates failed:`, error);
+    return { candidates: 0, sent: 0, failed: 0, error: `eval_followup_candidates: ${error.message}` };
+  }
+  let sent = 0;
+  let failed = 0;
+  for (const c of (data ?? []) as Candidate[]) {
+    const { data: evalRow } = await supa
+      .from("profile_evaluations")
+      .select("structured_evaluation")
+      .eq("user_id", c.user_id)
+      .eq("status", "complete")
+      .eq("initiated_by", "user")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const se = (evalRow?.structured_evaluation ?? null) as
+      | { headline_takeaway?: string; weaknesses_and_priorities?: string[] }
+      | null;
+    const headline = se?.headline_takeaway?.trim() || null;
+    const topPriority = se?.weaknesses_and_priorities?.[0]
+      ? excerptSentences(se.weaknesses_and_priorities[0])
+      : null;
+
+    const unsubUrl = await unsubscribeUrl(c.user_id);
+    const html = headline
+      ? renderEvalFollowupAware(firstNameOf(c.full_name), unsubUrl, headline, topPriority)
+      : renderEvalFollowup(firstNameOf(c.full_name), unsubUrl);
+    const messageId = await sendViaResend(c.email, EVAL_FOLLOWUP_SUBJECT, html);
+    await logEmailSend(supa, c.user_id, "eval_followup", EVAL_FOLLOWUP_SUBJECT, messageId);
+    if (messageId) sent++; else failed++;
+  }
+  return { candidates: (data ?? []).length, sent, failed };
 }
 
 // ── Sweep 4: logging nudge ──────────────────────────────────────────────────
@@ -194,7 +277,7 @@ Deno.serve(async (req) => {
 
   const welcome = await runSweep(supa, "welcome_nudge_candidates", "welcome_nudge", WELCOME_SUBJECT, renderWelcome);
   const freeLimit = await runSweep(supa, "free_limit_candidates", "free_limit_nudge", FREE_LIMIT_SUBJECT, renderFreeLimit);
-  const evalFollowup = await runSweep(supa, "eval_followup_candidates", "eval_followup", EVAL_FOLLOWUP_SUBJECT, renderEvalFollowup);
+  const evalFollowup = await runEvalFollowupSweep(supa);
   // Sweep #4 emails SUBSCRIBERS — a different relationship than prospect
   // nudges (founder distinction, 2026-07-18: OK emailing users, undecided on
   // emailing paying customers). Dormant until ENABLE_SUBSCRIBER_NUDGES is
