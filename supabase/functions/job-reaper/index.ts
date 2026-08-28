@@ -28,7 +28,9 @@ import {
   STALENESS_SECONDS,
   MAX_DISPATCH_ATTEMPTS,
   forceMarkFailed,
+  notifyGenerationFailed,
   type ProgramJobRow,
+  type ResumeState,
 } from "../_shared/v3-dispatcher.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -75,10 +77,14 @@ Deno.serve(async (_req) => {
   for (const job of stale) {
     const attempts = job.stage_dispatch_attempts ?? 0;
     if (attempts >= MAX_DISPATCH_ATTEMPTS) {
-      await forceMarkFailed(
-        supa,
-        job.id,
-        `Stage '${job.next_stage}' exhausted ${MAX_DISPATCH_ATTEMPTS} reaper re-dispatch attempts.`,
+      const message = `Stage '${job.next_stage}' exhausted ${MAX_DISPATCH_ATTEMPTS} reaper re-dispatch attempts.`;
+      await forceMarkFailed(supa, job.id, message);
+      // Founder alert — this job is now terminally failed and the athlete has
+      // no program from it. Best-effort inside the helper.
+      const rs = (job.resume_state ?? {}) as ResumeState;
+      await notifyGenerationFailed(
+        supa, job.user_id, job.next_stage, message,
+        rs.continuation?.monthNumber ?? null,
       );
       results.push({ job: job.id, action: "failed_exhausted", stage: job.next_stage });
       continue;
