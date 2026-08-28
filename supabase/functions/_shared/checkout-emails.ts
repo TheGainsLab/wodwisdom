@@ -345,4 +345,36 @@ export function buildEvalCompletedAlert(args: {
   return { subject, html };
 }
 
+/** Founder-facing alert: a program generation job failed terminally. The
+ *  athlete saw a failure message in the app and has no new program — without
+ *  this alert the failure is invisible until someone stumbles on it (Wesley
+ *  waited 8 days after an Aug '26 legality-guard failure before retrying). */
+export function buildGenerationFailedAlert(args: {
+  email: string | null;
+  fullName: string | null;
+  userId: string;
+  stage: string | null;
+  error: string;
+  monthNumber: number | null;
+}): { subject: string; html: string } {
+  const who = args.email ?? args.userId;
+  const subject = `Program generation FAILED: ${who}`;
+  const nameLine = args.fullName
+    ? `<p><strong>${escapeHtml(args.fullName)}</strong> (${escapeHtml(who)})`
+    : `<p><strong>${escapeHtml(who)}</strong>`;
+  const monthBit = args.monthNumber != null ? ` (month ${args.monthNumber})` : "";
+  const continuationNote = (args.monthNumber ?? 1) >= 2
+    ? `<p style="color:#5a584f">This was a continuation — their existing months are untouched; only the new month failed to generate.</p>`
+    : `<p style="color:#5a584f">This was a first program — they currently have nothing, and the app told them generation failed. A quick personal note may save the signup.</p>`;
+  const html = emailWrap(
+    `${nameLine}'s program generation${monthBit} failed.</p>` +
+    `<p style="border-left:3px solid #c0392b;padding-left:12px;color:#5a584f">` +
+    (args.stage ? `Stage: <strong>${escapeHtml(args.stage)}</strong><br>` : "") +
+    `${escapeHtml(args.error)}</p>` +
+    continuationNote +
+    `<p><a href="${SITE}/admin/users/${args.userId}">Open their admin page →</a></p>`,
+  );
+  return { subject, html };
+}
+
 export { ALERT_EMAIL };

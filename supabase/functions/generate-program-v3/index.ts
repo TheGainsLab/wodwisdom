@@ -676,6 +676,11 @@ async function stageSaving(
   const alreadySaved = markerErr != null &&
     (markerErr.code === "23505" || /duplicate key|already exists/i.test(markerErr.message ?? ""));
   if (markerErr && !alreadySaved) {
+    // Don't orphan a just-created shell behind this throw — without the delete
+    // the user is left with an empty "program with no workouts" row.
+    if (createdShell) {
+      await supa.from("programs").delete().eq("id", programId).then(() => {}, () => {});
+    }
     throw new Error(`[generate-program-v3] program_months marker insert failed: ${markerErr.message}`);
   }
 

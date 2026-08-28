@@ -30,6 +30,7 @@ import type { WriterOutput, WeekPrescription } from "./v2-output-schema.ts";
 import type { BlockLocation } from "./compute-block-benchmark.ts";
 import type { CoachState } from "./coach-state.ts";
 import type { TrainingDesignInput } from "./training-design-input.ts";
+import { ALERT_EMAIL, buildGenerationFailedAlert, sendViaResend } from "./checkout-emails.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -331,15 +332,16 @@ export async function completeJob(
 /** Token-gated failure (the worker's own throw). A superseded worker should NOT
  *  call this — check heartbeat.superseded() first. The gate is a second guard:
  *  if the token already changed, this matches 0 rows and the new owner's run is
- *  untouched. */
+ *  untouched. Returns true when the failure actually committed (we owned the
+ *  job) — the caller uses this to alert exactly once per failed job. */
 export async function failStageGated(
   supa: SupabaseClient,
   jobId: string,
   claimToken: string,
   message: string,
   resultJson?: Record<string, unknown>,
-): Promise<void> {
-  await commitGated(supa, jobId, claimToken, {
+): Promise<boolean> {
+  return await commitGated(supa, jobId, claimToken, {
     status: "failed",
     stage: null,
     next_stage: null,
@@ -348,6 +350,38 @@ export async function failStageGated(
     error: message.slice(0, 1000),
     ...(resultJson ? { result_json: resultJson } : {}),
   });
+}
+
+/** Founder inbox alert for a TERMINALLY failed generation job. Best-effort —
+ *  an alert failure must never mask or compound the generation failure. Called
+ *  from the two terminal-failure sites only (worker throw via runStageWithLease,
+ *  reaper exhaustion via job-reaper), each of which fires at most once per job,
+ *  so a lead's failed generation produces exactly one email. */
+export async function notifyGenerationFailed(
+  supa: SupabaseClient,
+  userId: string,
+  stage: string | null,
+  message: string,
+  monthNumber: number | null,
+): Promise<void> {
+  try {
+    const { data: prof } = await supa
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", userId)
+      .maybeSingle();
+    const { subject, html } = buildGenerationFailedAlert({
+      email: prof?.email ?? null,
+      fullName: prof?.full_name ?? null,
+      userId,
+      stage,
+      error: message,
+      monthNumber,
+    });
+    await sendViaResend(ALERT_EMAIL, subject, html);
+  } catch (e) {
+    console.error("[dispatcher] generation-failed alert send failed (non-fatal):", e);
+  }
 }
 
 /** Unconditional failure (the reaper, which holds no claim — used when a job
@@ -470,6 +504,13 @@ export async function runStageWithLease(
     // carrying the last skeleton + failures for the admin panel).
     const resultJson = (err as { resultJson?: Record<string, unknown> })?.resultJson;
     console.error(`[dispatcher] stage ${expectedStage} failed:`, err);
-    await failStageGated(supa, jobId, claim.claimToken, message, resultJson);
+    const committed = await failStageGated(supa, jobId, claim.claimToken, message, resultJson);
+    if (committed) {
+      const rs = (claim.job.resume_state ?? {}) as ResumeState;
+      await notifyGenerationFailed(
+        supa, userId, expectedStage, message,
+        rs.continuation?.monthNumber ?? null,
+      );
+    }
   }
 }

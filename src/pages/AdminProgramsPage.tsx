@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import AdminSubPageLayout from '../components/admin/AdminSubPageLayout';
+import { formatRepPrescription } from '../lib/formatMovement';
+import { formatMovementName } from '../lib/movementName';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -27,6 +29,7 @@ interface Workout {
   sort_order: number;
   workout_text: string;
   blocks: BlockRow[] | null;
+  blocks_v2: BlockV2Row[] | null;
   log_id: string | null;
 }
 
@@ -35,6 +38,37 @@ interface BlockRow {
   block_type: string;
   block_order: number;
   block_text: string;
+}
+
+// v3 structured content (program_blocks_v2 + program_movements_v2). Present
+// only for program_version='v3' programs; v1 rows carry blocks/workout_text.
+interface MovementV2Row {
+  id: string;
+  movement: string;
+  sets: number | null;
+  reps: number | null;
+  rep_scheme: number[] | null;
+  weight: number | null;
+  weight_unit: string | null;
+  rpe: number | null;
+  time_seconds: number | null;
+  distance: number | null;
+  distance_unit: string | null;
+  calories: number | null;
+  scaling_note: string | null;
+  target_pct_1rm: number | null;
+  sort_order: number;
+}
+
+interface BlockV2Row {
+  id: string;
+  block_type: string;
+  block_label: string | null;
+  block_scheme: string | null;
+  time_cap_seconds: number | null;
+  block_notes: string | null;
+  sort_order: number;
+  movements: MovementV2Row[];
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -53,6 +87,33 @@ function sourceBadgeColor(source: string): string {
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatDuration(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = Math.round(totalSeconds % 60);
+  return s === 0 ? `${m} min` : `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/** One-line v3 prescription, mirroring the athlete-facing formatter:
+ *  "Back Squat — 5×5 · 225lbs (75%) · RPE 8 (scale as needed)". */
+function v3MovementLine(m: MovementV2Row): string {
+  const parts: string[] = [];
+  const hasDistance = m.distance != null;
+  if (!hasDistance) {
+    const r = formatRepPrescription(m);
+    if (r) parts.push(r);
+  }
+  if (m.weight != null) {
+    const pct = m.target_pct_1rm != null ? ` (${Math.round(m.target_pct_1rm)}%)` : '';
+    parts.push(`${m.weight}${m.weight_unit ?? 'lbs'}${pct}`);
+  }
+  if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
+  if (m.time_seconds != null) parts.push(formatDuration(m.time_seconds));
+  if (hasDistance) parts.push(`${m.distance}${m.distance_unit ?? ''}`);
+  const scheme = parts.length > 0 ? ` — ${parts.join(' · ')}` : '';
+  const scaling = m.scaling_note ? ` (${m.scaling_note})` : '';
+  return `${formatMovementName(m.movement)}${scheme}${scaling}`;
 }
 
 // ── Page ─────────────────────────────────────────────────────────────
@@ -303,6 +364,11 @@ export default function AdminProgramsPage({ session }: { session: Session }) {
 function DayRow({ userId, day, onNavigate }: { userId: string; day: Workout; onNavigate: (path: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const completed = !!day.log_id;
+  const isV3 = !!day.blocks_v2?.length;
+  const blockCount = isV3 ? day.blocks_v2!.length : (day.blocks?.length ?? 0);
+  const blockTypes = isV3
+    ? Array.from(new Set(day.blocks_v2!.map(b => b.block_type)))
+    : Array.from(new Set((day.blocks ?? []).map(b => b.block_type)));
   return (
     <div style={{
       background: 'var(--bg)', border: '1px solid var(--border)',
@@ -326,11 +392,11 @@ function DayRow({ userId, day, onNavigate }: { userId: string; day: Workout; onN
           Day {day.day_num}
         </span>
         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>
-          {day.blocks?.length ?? 0} block{(day.blocks?.length ?? 0) !== 1 ? 's' : ''}
+          {blockCount} block{blockCount !== 1 ? 's' : ''}
         </span>
-        {day.blocks && day.blocks.length > 0 && (
+        {blockTypes.length > 0 && (
           <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 4 }}>
-            · {Array.from(new Set(day.blocks.map(b => b.block_type))).join(', ')}
+            · {blockTypes.join(', ')}
           </span>
         )}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
@@ -361,7 +427,32 @@ function DayRow({ userId, day, onNavigate }: { userId: string; day: Workout; onN
 
       {expanded && (
         <div style={{ marginTop: 10, paddingLeft: 24 }}>
-          {day.blocks && day.blocks.length > 0 ? (
+          {isV3 ? (
+            day.blocks_v2!.map(b => (
+              <div key={b.id} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--accent)', marginBottom: 3 }}>
+                  {humanize(b.block_type)}
+                  {b.block_label && <span style={{ color: 'var(--text-dim)', textTransform: 'none', letterSpacing: 0 }}> — {b.block_label}</span>}
+                  {b.time_cap_seconds != null && <span style={{ color: 'var(--text-dim)', textTransform: 'none', letterSpacing: 0 }}> · cap {Math.round(b.time_cap_seconds / 60)} min</span>}
+                </div>
+                {b.block_scheme && (
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>
+                    {b.block_scheme}
+                  </div>
+                )}
+                {(b.movements ?? []).map(m => (
+                  <div key={m.id} style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 1 }}>
+                    {v3MovementLine(m)}
+                  </div>
+                ))}
+                {b.block_notes && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 3, whiteSpace: 'pre-wrap' }}>
+                    {b.block_notes}
+                  </div>
+                )}
+              </div>
+            ))
+          ) : day.blocks && day.blocks.length > 0 ? (
             day.blocks.map(b => (
               <div key={b.id} style={{ marginBottom: 8 }}>
                 <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--accent)', marginBottom: 3 }}>
@@ -374,7 +465,7 @@ function DayRow({ userId, day, onNavigate }: { userId: string; day: Workout; onN
             ))
           ) : (
             <div style={{ fontSize: 12, color: 'var(--text-dim)', whiteSpace: 'pre-wrap' }}>
-              {day.workout_text}
+              {day.workout_text || <span style={{ color: 'var(--text-muted)' }}>No content stored for this day.</span>}
             </div>
           )}
         </div>
