@@ -182,6 +182,45 @@ function fmtMoney(cents: number, currency: string): string {
   return `${sym}${(cents / 100).toFixed(2)}`;
 }
 
+interface ProfileRow {
+  email: string | null;
+  full_name: string | null;
+  stripe_customer_id: string | null;
+}
+
+/** The accept itself: un-cancel + coupon + attribution stamp in ONE Stripe
+ *  call, then the founder alert. Shared by the legacy HTML form POST and the
+ *  JSON `accept` action the app's /stay page calls. Throws on Stripe error. */
+async function performAccept(prof: ProfileRow, userId: string, sub: SubView): Promise<void> {
+  const params = new URLSearchParams();
+  params.set("cancel_at_period_end", "false");
+  if (!sub.hasCoupon) params.set("coupon", COUPON_ID);
+  params.set("metadata[save_offer_accepted_at]", new Date().toISOString());
+  const updated = await stripePost(`subscriptions/${sub.id}`, params);
+  if ((updated as { error?: { message?: string } }).error) {
+    throw new Error(`subscription update failed: ${(updated as { error?: { message?: string } }).error?.message ?? "unknown"}`);
+  }
+
+  // Founder alert — the rich, attributed one (stripe-webhook sees the
+  // metadata stamp in the same event and skips its generic save alert).
+  const who = prof.full_name ? `${prof.full_name} (${prof.email ?? userId})` : (prof.email ?? userId);
+  const discounted = fmtMoney(Math.round(sub.amountCents * (100 - DISCOUNT_PCT) / 100), sub.currency);
+  try {
+    await sendViaResend(
+      ALERT_EMAIL,
+      `Save offer ACCEPTED: ${prof.email ?? userId}`,
+      `<p><strong>${escapeHtml(who)}</strong> clicked the save link and kept their subscription.</p>` +
+      `<p>${sub.cancelScheduled ? "Cancellation removed; " : "Subscription was already active; "}` +
+      `${sub.hasCoupon ? `${DISCOUNT_PCT}% coupon was already on the subscription` : `${DISCOUNT_PCT}% coupon applied`}` +
+      ` — price <strong>${discounted}/${sub.interval}</strong>, forever.</p>` +
+      `<p><a href="https://www.thegainslab.com/admin/users/${userId}">Open their admin page →</a></p>`,
+    );
+  } catch (e) {
+    console.error("[save-offer] acceptance alert failed (non-fatal):", e);
+  }
+  console.log(`[save-offer] accepted: user=${userId} sub=${sub.id} cancelWasScheduled=${sub.cancelScheduled} couponApplied=${!sub.hasCoupon}`);
+}
+
 // ── Pages ───────────────────────────────────────────────────────────────────
 
 function page(title: string, inner: string, status = 200): Response {
@@ -299,29 +338,69 @@ Deno.serve(async (req) => {
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   const url = new URL(req.url);
 
-  // ── Admin mint route (JSON POST with a user JWT) ──────────────────────────
+  // ── JSON API (POST with application/json) ─────────────────────────────────
+  //   mint   (admin JWT):      { action, user_id }  → { url } — the app-domain
+  //                            /stay link for the composer.
+  //   status (link token):     { action, u, t }     → offer state + prices,
+  //                            read-only. What the /stay page loads.
+  //   accept (link token):     { action, u, t }     → performs the save.
+  //                            Reached only by the page's button (a fetch from
+  //                            JS) — scanners don't execute page scripts.
+  const json = (payload: unknown, status = 200) =>
+    new Response(JSON.stringify(payload), { status, headers: { ...cors, "Content-Type": "application/json" } });
   if (req.method === "POST" && (req.headers.get("Content-Type") ?? "").includes("application/json")) {
     try {
       const body = await req.json().catch(() => ({}));
-      if (body?.action !== "mint" || !UUID_RE.test(body?.user_id ?? "")) {
-        return new Response(JSON.stringify({ error: "Bad request" }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
+      const action = body?.action;
+
+      if (action === "mint") {
+        if (!UUID_RE.test(body?.user_id ?? "")) return json({ error: "Bad request" }, 400);
+        const authHeader = req.headers.get("Authorization") ?? "";
+        const { data: { user } } = await supa.auth.getUser(authHeader.replace("Bearer ", ""));
+        if (!user) return json({ error: "Unauthorized" }, 401);
+        const { data: me } = await supa.from("profiles").select("role").eq("id", user.id).maybeSingle();
+        if (me?.role !== "admin") return json({ error: "Not authorized" }, 403);
+        const token = await mintToken(body.user_id);
+        if (!token) return json({ error: "Signing secret not configured" }, 500);
+        // App-domain page — renders in the athlete's browser like every other
+        // page of the site (no HTML-from-edge-function serving path involved).
+        return json({ url: `https://www.thegainslab.com/stay?u=${body.user_id}&t=${token}` });
       }
-      const authHeader = req.headers.get("Authorization") ?? "";
-      const { data: { user } } = await supa.auth.getUser(authHeader.replace("Bearer ", ""));
-      if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
-      const { data: me } = await supa.from("profiles").select("role").eq("id", user.id).maybeSingle();
-      if (me?.role !== "admin") {
-        return new Response(JSON.stringify({ error: "Not authorized" }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } });
+
+      if (action === "status" || action === "accept") {
+        const uid = String(body?.u ?? "");
+        const tok = String(body?.t ?? "");
+        if (!UUID_RE.test(uid) || !tok || !(await verifyToken(uid, tok))) {
+          return json({ error: "invalid_link" }, 403);
+        }
+        if (!STRIPE_SECRET_KEY) return json({ error: "server" }, 500);
+        const { data: prof } = await supa
+          .from("profiles")
+          .select("email, full_name, stripe_customer_id")
+          .eq("id", uid)
+          .maybeSingle();
+        if (!prof?.stripe_customer_id) return json({ state: "lapsed" });
+        const sub = await findLiveSubscription(prof.stripe_customer_id);
+        if (!sub) return json({ state: "lapsed" });
+        const base = {
+          amount_cents: sub.amountCents,
+          currency: sub.currency,
+          interval: sub.interval,
+          discount_pct: DISCOUNT_PCT,
+          cancel_scheduled: sub.cancelScheduled,
+        };
+        const already = sub.hasCoupon && !sub.cancelScheduled;
+        if (action === "status" || already) {
+          return json({ state: already ? "already" : "offer", ...base });
+        }
+        await performAccept(prof, uid, sub);
+        return json({ state: "accepted", ...base });
       }
-      const token = await mintToken(body.user_id);
-      if (!token) return new Response(JSON.stringify({ error: "Signing secret not configured" }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } });
-      return new Response(
-        JSON.stringify({ url: `${SUPABASE_URL}/functions/v1/save-offer?u=${body.user_id}&t=${token}` }),
-        { headers: { ...cors, "Content-Type": "application/json" } },
-      );
+
+      return json({ error: "Bad request" }, 400);
     } catch (e) {
-      console.error("[save-offer] mint failed:", e);
-      return new Response(JSON.stringify({ error: "Mint failed" }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } });
+      console.error("[save-offer] json route failed:", e);
+      return json({ error: "server" }, 500);
     }
   }
 
@@ -355,36 +434,8 @@ Deno.serve(async (req) => {
     // a scanner could redeem the offer without the athlete ever clicking.
     if (req.method !== "POST") return offerPage(sub, userId, token);
 
-    // ── Accept (form POST): un-cancel + coupon + attribution stamp, one call.
-    const params = new URLSearchParams();
-    params.set("cancel_at_period_end", "false");
-    if (!sub.hasCoupon) params.set("coupon", COUPON_ID);
-    params.set("metadata[save_offer_accepted_at]", new Date().toISOString());
-    const updated = await stripePost(`subscriptions/${sub.id}`, params);
-    if ((updated as { error?: { message?: string } }).error) {
-      console.error("[save-offer] subscription update failed:", (updated as { error?: unknown }).error);
-      return errorPage();
-    }
-
-    // Founder alert — the rich, attributed one (stripe-webhook sees the
-    // metadata stamp in the same event and skips its generic save alert).
-    const who = prof.full_name ? `${prof.full_name} (${prof.email ?? userId})` : (prof.email ?? userId);
-    const discounted = fmtMoney(Math.round(sub.amountCents * (100 - DISCOUNT_PCT) / 100), sub.currency);
-    try {
-      await sendViaResend(
-        ALERT_EMAIL,
-        `Save offer ACCEPTED: ${prof.email ?? userId}`,
-        `<p><strong>${escapeHtml(who)}</strong> clicked the save link and kept their subscription.</p>` +
-        `<p>${sub.cancelScheduled ? "Cancellation removed; " : "Subscription was already active; "}` +
-        `${sub.hasCoupon ? `${DISCOUNT_PCT}% coupon was already on the subscription` : `${DISCOUNT_PCT}% coupon applied`}` +
-        ` — price <strong>${discounted}/${sub.interval}</strong>, forever.</p>` +
-        `<p><a href="https://www.thegainslab.com/admin/users/${userId}">Open their admin page →</a></p>`,
-      );
-    } catch (e) {
-      console.error("[save-offer] acceptance alert failed (non-fatal):", e);
-    }
-
-    console.log(`[save-offer] accepted: user=${userId} sub=${sub.id} cancelWasScheduled=${sub.cancelScheduled} couponApplied=${!sub.hasCoupon}`);
+    // Legacy HTML form accept (links minted before the /stay page existed).
+    await performAccept(prof, userId, sub);
     return confirmationPage(sub);
   } catch (e) {
     console.error("[save-offer] failed:", e);

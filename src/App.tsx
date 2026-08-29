@@ -95,6 +95,7 @@ const AILogProgramPage = lazy(() => import('./pages/AILogProgramPage'));
 
 // Public Q&A library (both trees — visitors and members)
 const QALibraryPage = lazy(() => import('./pages/QALibraryPage'));
+const StayPage = lazy(() => import('./pages/StayPage'));
 const QAEntryPage = lazy(() => import('./pages/QAEntryPage'));
 
 // Feature landing pages
@@ -181,6 +182,7 @@ export default function App() {
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/qa" element={<QALibraryPage />} />
             <Route path="/qa/:slug" element={<QAEntryPage />} />
+            <Route path="/stay" element={<StayPage />} />
             <Route path="/features" element={<FeaturesHubPage />} />
             <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
             <Route path="/features/programs" element={<ProgramsFeaturePage />} />
@@ -219,7 +221,8 @@ function AuthenticatedApp({ session }: { session: Session }) {
   }, [location.pathname]);
   const hideTabBar = HIDE_TAB_BAR_ROUTES.some(r => location.pathname === r) ||
     location.pathname.startsWith('/features') ||
-    location.pathname.startsWith('/qa');
+    location.pathname.startsWith('/qa') ||
+    location.pathname.startsWith('/stay');
 
   return (
     <>
@@ -232,6 +235,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
             {/* REMOVED (Decision 11): the /gym, /gym/leaderboard, /tv/:token class surfaces are deleted. */}
             <Route path="/qa" element={<QALibraryPage signedIn />} />
             <Route path="/qa/:slug" element={<QAEntryPage signedIn />} />
+            <Route path="/stay" element={<StayPage />} />
             <Route path="/chat" element={<ChatPage session={session} />} />
             <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
             <Route path="/workout/start" element={<StartWorkoutPage session={session} />} />
