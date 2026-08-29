@@ -1,37 +1,33 @@
 /**
- * save-offer — the one-click(ish) cancellation-save flow (Aug '26).
+ * save-offer — the cancellation-save flow (Aug '26, rebuilt).
  *
- * The founder manually emails users who scheduled a cancellation over price,
- * offering 20% off forever (Stripe coupon GAINS20 / g0E6izH8). This endpoint
- * powers the link he pastes into that personal note:
+ * The founder manually emails users who scheduled a cancellation, offering
+ * 20% off forever. The link in that email is an app page
+ * (www.thegainslab.com/stay?u=..&t=..); this function is its JSON API.
  *
- *   GET  ?u=<user_id>&t=<hmac>   → landing page: current price vs. 20%-off
- *                                  price, one "Keep my subscription" button.
- *                                  The GET never mutates anything — email
- *                                  security scanners follow links, so the
- *                                  mutation lives behind the POST.
- *   POST (form: u, t)            → the accept: cancel_at_period_end=false +
- *                                  coupon applied + metadata stamp, then the
- *                                  confirmation page. Idempotent — re-clicks
- *                                  re-show confirmation.
- *   POST (JSON {action:"mint", user_id}, admin JWT)
- *                                → { url } — the signed link, for the admin
- *                                  "Copy save-offer link" button.
+ * PRICE-AGNOSTIC CONTRACT (the founder's rule): the offer is 20% off
+ * WHATEVER THE USER ACTUALLY PAYS — list price, $11.11, $3.00 after some
+ * other coupon, anything. Therefore:
+ *   - No amount in this file is ever derived from a price/plan object.
+ *     The displayed "current" number is Stripe's upcoming-invoice total —
+ *     the real next bill, existing discounts included.
+ *   - The accept ADDS the GAINS20 coupon to the subscription's existing
+ *     discounts (full-list write: existing + GAINS20). It never replaces
+ *     or removes a discount (v1 used the `coupon` param, which REPLACED a
+ *     user's better coupon and RAISED their price — the cardinal sin).
+ *   - After the write, the new upcoming-invoice total is re-read from
+ *     Stripe and VERIFIED lower than before. If it is not, the original
+ *     discount list is rolled back and the accept fails loudly. The code
+ *     can only ever lower a price.
  *
- * Token: HMAC-SHA256("save-offer:" + user_id) under LIFECYCLE_CRON_KEY —
- * same secret as unsubscribe links, distinct purpose prefix so the two token
- * families are not interchangeable.
+ * Routes:
+ *   POST json {action:"mint", user_id}  (admin JWT) → { url } app-domain link
+ *   POST json {action:"status", u, t}   (link token) → read-only state+amounts
+ *   POST json {action:"accept", u, t}   (link token) → the save (page button)
+ *   anything else (GET/HEAD/old form POST) → 302 to the /stay page. No HTML
+ *     is served from this function, and no non-JSON request can mutate.
  *
- * States: scheduled-cancel → offer; active-no-cancel → offer (clicking still
- * grants the promised discount even if they un-canceled via the portal
- * first); coupon already on the sub → "already active"; no live subscription
- * → "offer window has passed, reply to the email" (a lapsed user is a
- * different conversation, deliberately NOT an automated re-subscribe flow).
- *
- * Attribution: the accept stamps metadata.save_offer_accepted_at in the SAME
- * subscription update, so stripe-webhook's cancel-flip branch can tell a
- * link-accept from a portal un-cancel and skip its generic founder alert
- * (this function sends the richer one).
+ * Token: HMAC-SHA256("save-offer:" + user_id) under LIFECYCLE_CRON_KEY.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -44,8 +40,9 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
 const TOKEN_SECRET = Deno.env.get("LIFECYCLE_CRON_KEY");
 
-/** GAINS20 — 20% off, duration=forever, no redemption limit. Created in the
- *  Stripe dashboard Jun '26; the same coupon the founder applied by hand. */
+const STAY_URL = "https://www.thegainslab.com/stay";
+
+/** GAINS20 — 20% off, duration=forever, no redemption limit. */
 const COUPON_ID = "g0E6izH8";
 const DISCOUNT_PCT = 20;
 
@@ -71,13 +68,10 @@ async function verifyToken(userId: string, token: string): Promise<boolean> {
   return r === 0;
 }
 
-// ── Stripe helpers (raw REST, same pattern as create-portal-session) ────────
+// ── Stripe helpers ──────────────────────────────────────────────────────────
 
-/** Per-request API version pin. The ACCOUNT's default version predates
- *  2016-07-06 (verified live: `status=all` was rejected with exactly that
- *  message), so modern request params and response shapes are not guaranteed
- *  without this. Pinning here affects ONLY these requests — webhook event
- *  shapes still follow the webhook endpoint's own configured version. */
+/** Per-request API version pin (the account default predates 2016 — verified
+ *  live when `status=all` was rejected). */
 const STRIPE_API_VERSION = "2023-10-16";
 
 async function stripeGet(path: string): Promise<Record<string, unknown>> {
@@ -106,18 +100,16 @@ async function stripePost(path: string, params: URLSearchParams): Promise<Record
 interface SubView {
   id: string;
   cancelScheduled: boolean;
+  /** GAINS20 already on the subscription. */
   hasCoupon: boolean;
-  amountCents: number;
+  /** Existing discount ids (di_...), preserved verbatim on accept. */
+  existingDiscountIds: string[];
   currency: string;
   interval: string;
 }
 
-/** The user's live subscription, or null (lapsed / never subscribed). Prefers
- *  a scheduled-cancel sub, then any live one. THROWS on a Stripe API error —
- *  the caller renders the error page, never the lapsed page, so an API
- *  problem can't silently read as "your subscription ended". (v1 expanded
- *  data.discounts in the list call; older pinned API versions reject that
- *  expansion, which surfaced as exactly that misread.) */
+/** The user's live subscription, or null (lapsed). Throws on Stripe error so
+ *  an API problem can never masquerade as "your subscription ended". */
 async function findLiveSubscription(customerId: string): Promise<SubView | null> {
   const res = await stripeGet(`subscriptions?customer=${customerId}&status=all&limit=10`);
   if ((res as { error?: { message?: string } }).error) {
@@ -129,52 +121,65 @@ async function findLiveSubscription(customerId: string): Promise<SubView | null>
   if (live.length === 0) return null;
   const pick = live.find((s) => s.cancel_at_period_end === true) ?? live[0];
 
-  // Coupon check, tolerant of every API-version shape: legacy single
-  // `discount` object; `discounts` as objects; `discounts` as id strings
-  // (retrieve-with-expand inside a try — if THAT fails, assume no coupon:
-  // worst case we re-apply the same coupon, which is a no-op in effect).
+  // Collect existing discounts: ids for the preserve-on-write list, coupon
+  // ids to detect GAINS20. Handles every shape this API version can return:
+  // legacy single `discount` object, `discounts` as objects, or as id strings
+  // (resolved via a retrieve-with-expand; if that fails we still have the
+  // raw ids to preserve — only the GAINS20 check degrades, and the
+  // verify-and-rollback guard below backstops it).
+  const existingDiscountIds = new Set<string>();
   let hasCoupon = false;
+
   const legacy = pick.discount as Record<string, unknown> | null | undefined;
-  if ((legacy?.coupon as Record<string, unknown> | undefined)?.id === COUPON_ID) hasCoupon = true;
-  const discounts = (pick.discounts ?? []) as Array<Record<string, unknown> | string>;
-  if (!hasCoupon && discounts.length > 0) {
-    if (typeof discounts[0] === "object") {
-      hasCoupon = discounts.some((d) =>
-        typeof d === "object" && (d.coupon as Record<string, unknown> | undefined)?.id === COUPON_ID
-      );
-    } else {
-      try {
-        const full = await stripeGet(`subscriptions/${pick.id}?expand[]=discounts`);
-        const fullDiscounts = (full.discounts ?? []) as Array<Record<string, unknown>>;
-        hasCoupon = fullDiscounts.some((d) => (d?.coupon as Record<string, unknown> | undefined)?.id === COUPON_ID);
-      } catch {
-        hasCoupon = false;
-      }
+  if (legacy && typeof legacy.id === "string") {
+    existingDiscountIds.add(legacy.id);
+    if ((legacy.coupon as Record<string, unknown> | undefined)?.id === COUPON_ID) hasCoupon = true;
+  }
+  const rawDiscounts = (pick.discounts ?? []) as Array<Record<string, unknown> | string>;
+  const stringIds = rawDiscounts.filter((d): d is string => typeof d === "string");
+  for (const d of rawDiscounts) {
+    if (typeof d === "object" && typeof d.id === "string") {
+      existingDiscountIds.add(d.id);
+      if ((d.coupon as Record<string, unknown> | undefined)?.id === COUPON_ID) hasCoupon = true;
     }
+  }
+  if (stringIds.length > 0) {
+    for (const id of stringIds) existingDiscountIds.add(id);
+    try {
+      const full = await stripeGet(`subscriptions/${pick.id}?expand[]=discounts`);
+      const fullDiscounts = (full.discounts ?? []) as Array<Record<string, unknown>>;
+      for (const d of fullDiscounts) {
+        if ((d?.coupon as Record<string, unknown> | undefined)?.id === COUPON_ID) hasCoupon = true;
+      }
+    } catch { /* ids preserved above; rollback guard covers the rest */ }
   }
 
   const items = ((pick.items as Record<string, unknown> | undefined)?.data ?? []) as Array<Record<string, unknown>>;
-  let amountCents = 0;
-  let interval = "month";
-  let currency = (pick.currency as string) ?? "usd";
-  for (const it of items) {
-    const price = it.price as Record<string, unknown> | undefined;
-    const unit = (price?.unit_amount as number | null) ?? 0;
-    const qty = (it.quantity as number | null) ?? 1;
-    amountCents += unit * qty;
-    const rec = price?.recurring as Record<string, unknown> | undefined;
-    if (rec?.interval) interval = rec.interval as string;
-    if (price?.currency) currency = price.currency as string;
-  }
+  const firstPrice = items[0]?.price as Record<string, unknown> | undefined;
+  const interval = ((firstPrice?.recurring as Record<string, unknown> | undefined)?.interval as string) ?? "month";
+  const currency = (firstPrice?.currency as string) ?? ((pick.currency as string) ?? "usd");
 
   return {
     id: pick.id as string,
     cancelScheduled: pick.cancel_at_period_end === true,
     hasCoupon,
-    amountCents,
+    existingDiscountIds: [...existingDiscountIds],
     currency,
     interval,
   };
+}
+
+/** The REAL amount of the next bill, in cents — Stripe's upcoming invoice
+ *  total, all current discounts included. The only source of displayed
+ *  numbers. Throws on error. */
+async function upcomingTotal(customerId: string, subscriptionId: string): Promise<number> {
+  const res = await stripeGet(`invoices/upcoming?customer=${customerId}&subscription=${subscriptionId}`);
+  if ((res as { error?: { message?: string } }).error) {
+    throw new Error(`Stripe upcoming-invoice failed: ${(res as { error?: { message?: string } }).error?.message ?? "unknown"}`);
+  }
+  const total = res.total;
+  if (typeof total !== "number") throw new Error("Stripe upcoming-invoice returned no total");
+  return total;
 }
 
 function fmtMoney(cents: number, currency: string): string {
@@ -188,146 +193,63 @@ interface ProfileRow {
   stripe_customer_id: string | null;
 }
 
-/** The accept itself: un-cancel + coupon + attribution stamp in ONE Stripe
- *  call, then the founder alert. Shared by the legacy HTML form POST and the
- *  JSON `accept` action the app's /stay page calls. Throws on Stripe error. */
-async function performAccept(prof: ProfileRow, userId: string, sub: SubView): Promise<void> {
+/**
+ * The accept. Writes existing discounts + GAINS20 (never replacing anything)
+ * + un-cancel + attribution stamp in one call, then VERIFIES against
+ * Stripe's re-read upcoming total. If the new total is not lower, the
+ * original discount list is restored and the accept fails. Returns the
+ * verified new total in cents.
+ */
+async function performAccept(
+  customerId: string,
+  prof: ProfileRow,
+  userId: string,
+  sub: SubView,
+  currentTotal: number,
+): Promise<number> {
   const params = new URLSearchParams();
   params.set("cancel_at_period_end", "false");
-  if (!sub.hasCoupon) params.set("coupon", COUPON_ID);
+  sub.existingDiscountIds.forEach((id, i) => params.set(`discounts[${i}][discount]`, id));
+  params.set(`discounts[${sub.existingDiscountIds.length}][coupon]`, COUPON_ID);
   params.set("metadata[save_offer_accepted_at]", new Date().toISOString());
   const updated = await stripePost(`subscriptions/${sub.id}`, params);
   if ((updated as { error?: { message?: string } }).error) {
     throw new Error(`subscription update failed: ${(updated as { error?: { message?: string } }).error?.message ?? "unknown"}`);
   }
 
-  // Founder alert — the rich, attributed one (stripe-webhook sees the
-  // metadata stamp in the same event and skips its generic save alert).
+  // Verify with Stripe's own math. The price may only go DOWN.
+  const newTotal = await upcomingTotal(customerId, sub.id);
+  if (newTotal >= currentTotal) {
+    // Roll back to exactly the discounts they had; leave cancel flag as-is
+    // (un-canceling alone never hurts them) but report failure.
+    const rb = new URLSearchParams();
+    if (sub.existingDiscountIds.length === 0) rb.set("discounts", "");
+    else sub.existingDiscountIds.forEach((id, i) => rb.set(`discounts[${i}][discount]`, id));
+    await stripePost(`subscriptions/${sub.id}`, rb).catch(() => {});
+    console.error(
+      `[save-offer] VERIFY FAILED user=${userId} sub=${sub.id}: total ${currentTotal} -> ${newTotal} (not lower); rolled back`,
+    );
+    throw new Error("post-accept verification failed: price did not decrease");
+  }
+
   const who = prof.full_name ? `${prof.full_name} (${prof.email ?? userId})` : (prof.email ?? userId);
-  const discounted = fmtMoney(Math.round(sub.amountCents * (100 - DISCOUNT_PCT) / 100), sub.currency);
   try {
     await sendViaResend(
       ALERT_EMAIL,
       `Save offer ACCEPTED: ${prof.email ?? userId}`,
       `<p><strong>${escapeHtml(who)}</strong> clicked the save link and kept their subscription.</p>` +
-      `<p>${sub.cancelScheduled ? "Cancellation removed; " : "Subscription was already active; "}` +
-      `${sub.hasCoupon ? `${DISCOUNT_PCT}% coupon was already on the subscription` : `${DISCOUNT_PCT}% coupon applied`}` +
-      ` — price <strong>${discounted}/${sub.interval}</strong>, forever.</p>` +
+      `<p>${sub.cancelScheduled ? "Cancellation removed. " : "Subscription was already active. "}` +
+      `Next invoice: <strong>${fmtMoney(currentTotal, sub.currency)}</strong> → ` +
+      `<strong>${fmtMoney(newTotal, sub.currency)}</strong>/${sub.interval} (verified in Stripe), permanently.</p>` +
       `<p><a href="https://www.thegainslab.com/admin/users/${userId}">Open their admin page →</a></p>`,
     );
   } catch (e) {
     console.error("[save-offer] acceptance alert failed (non-fatal):", e);
   }
-  console.log(`[save-offer] accepted: user=${userId} sub=${sub.id} cancelWasScheduled=${sub.cancelScheduled} couponApplied=${!sub.hasCoupon}`);
-}
-
-// ── Pages ───────────────────────────────────────────────────────────────────
-
-function page(title: string, inner: string, status = 200): Response {
-  const html = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex">
-<title>${title}</title>
-<style>
-  body { margin:0; background:#111214; font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
-         min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; box-sizing:border-box; }
-  .card { background:#1b1c1f; border:1px solid #2a2b2f; border-radius:16px; padding:40px 32px;
-          max-width:420px; width:100%; text-align:center; color:#f2f2f0; }
-  .brand { font-weight:800; letter-spacing:2px; font-size:13px; color:#ff3a3a; margin-bottom:28px; }
-  h1 { font-size:22px; margin:0 0 12px; }
-  p { color:#a8a69e; line-height:1.6; font-size:15px; margin:0 0 14px; }
-  p strong { color:#f2f2f0; }
-  .price { margin:26px 0; font-size:20px; }
-  .price .old { text-decoration:line-through; color:#6d6b64; margin-right:12px; }
-  .price .new { color:#f2f2f0; font-weight:800; font-size:26px; }
-  .price .badge { display:block; margin-top:8px; font-size:12px; font-weight:700; letter-spacing:1px;
-                  text-transform:uppercase; color:#2ec486; }
-  button { background:#ff3a3a; color:#fff; border:none; padding:14px 32px; border-radius:10px;
-           font-size:16px; font-weight:700; cursor:pointer; width:100%; font-family:inherit; }
-  button:hover { background:#e42f2f; }
-  .fine { font-size:12px; color:#6d6b64; margin-top:16px; }
-</style>
-</head>
-<body><div class="card"><div class="brand">THE GAINS LAB</div>${inner}</div></body>
-</html>`;
-  return new Response(html, { status, headers: { "Content-Type": "text/html; charset=utf-8" } });
-}
-
-function priceBlock(sub: SubView): string {
-  const now = fmtMoney(sub.amountCents, sub.currency);
-  const discounted = fmtMoney(Math.round(sub.amountCents * (100 - DISCOUNT_PCT) / 100), sub.currency);
-  return `<div class="price"><span class="old">${now}/${sub.interval}</span>` +
-    `<span class="new">${discounted}/${sub.interval}</span>` +
-    `<span class="badge">${DISCOUNT_PCT}% off · forever</span></div>`;
-}
-
-function offerPage(sub: SubView, userId: string, token: string): Response {
-  const situation = sub.cancelScheduled
-    ? `Your subscription is currently set to cancel at the end of this billing period.`
-    : `Your subscription is active.`;
-  const action = sub.cancelScheduled
-    ? `One click keeps your training going and locks in the new price — permanently.`
-    : `One click locks in the new price — permanently, as offered.`;
-  return page(
-    "Your offer from The Gains Lab",
-    `<h1>Stay at ${DISCOUNT_PCT}% off — forever</h1>` +
-    `<p>${situation} ${action}</p>` +
-    priceBlock(sub) +
-    `<form method="POST" action="">` +
-    `<input type="hidden" name="u" value="${escapeHtml(userId)}">` +
-    `<input type="hidden" name="t" value="${escapeHtml(token)}">` +
-    `<button type="submit">Keep my subscription</button>` +
-    `</form>` +
-    `<p class="fine">The discount applies from your next invoice and never expires. Questions? Just reply to the email.</p>`,
+  console.log(
+    `[save-offer] accepted: user=${userId} sub=${sub.id} total ${currentTotal} -> ${newTotal} cancelWasScheduled=${sub.cancelScheduled}`,
   );
-}
-
-function confirmationPage(sub: SubView): Response {
-  const discounted = fmtMoney(Math.round(sub.amountCents * (100 - DISCOUNT_PCT) / 100), sub.currency);
-  return page(
-    "You're all set",
-    `<h1>You're all set 🎉</h1>` +
-    `<p>Your subscription continues at <strong>${discounted}/${sub.interval}</strong> — ${DISCOUNT_PCT}% off, permanently, starting with your next invoice.</p>` +
-    `<p>Glad you're staying. See you in the gym.</p>`,
-  );
-}
-
-function alreadyPage(sub: SubView): Response {
-  const discounted = fmtMoney(Math.round(sub.amountCents * (100 - DISCOUNT_PCT) / 100), sub.currency);
-  return page(
-    "Discount already active",
-    `<h1>Your discount is already active</h1>` +
-    `<p>Your subscription continues at <strong>${discounted}/${sub.interval}</strong> — nothing more to do.</p>`,
-  );
-}
-
-function lapsedPage(): Response {
-  return page(
-    "This offer window has passed",
-    `<h1>This offer window has passed</h1>` +
-    `<p>Your subscription has already ended, so this link can't restore it automatically. Reply to the email and we'll sort you out directly.</p>`,
-  );
-}
-
-function invalidPage(): Response {
-  return page(
-    "Invalid link",
-    `<h1>This link didn't check out</h1>` +
-    `<p>The link is incomplete or expired. Reply to the email and we'll take care of it by hand.</p>`,
-    403,
-  );
-}
-
-function errorPage(): Response {
-  return page(
-    "Something went wrong",
-    `<h1>Something went wrong</h1>` +
-    `<p>We couldn't process that just now. Reply to the email and we'll apply the offer by hand.</p>`,
-    500,
-  );
+  return newTotal;
 }
 
 // ── Handler ─────────────────────────────────────────────────────────────────
@@ -338,16 +260,9 @@ Deno.serve(async (req) => {
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   const url = new URL(req.url);
 
-  // ── JSON API (POST with application/json) ─────────────────────────────────
-  //   mint   (admin JWT):      { action, user_id }  → { url } — the app-domain
-  //                            /stay link for the composer.
-  //   status (link token):     { action, u, t }     → offer state + prices,
-  //                            read-only. What the /stay page loads.
-  //   accept (link token):     { action, u, t }     → performs the save.
-  //                            Reached only by the page's button (a fetch from
-  //                            JS) — scanners don't execute page scripts.
   const json = (payload: unknown, status = 200) =>
     new Response(JSON.stringify(payload), { status, headers: { ...cors, "Content-Type": "application/json" } });
+
   if (req.method === "POST" && (req.headers.get("Content-Type") ?? "").includes("application/json")) {
     try {
       const body = await req.json().catch(() => ({}));
@@ -362,9 +277,7 @@ Deno.serve(async (req) => {
         if (me?.role !== "admin") return json({ error: "Not authorized" }, 403);
         const token = await mintToken(body.user_id);
         if (!token) return json({ error: "Signing secret not configured" }, 500);
-        // App-domain page — renders in the athlete's browser like every other
-        // page of the site (no HTML-from-edge-function serving path involved).
-        return json({ url: `https://www.thegainslab.com/stay?u=${body.user_id}&t=${token}` });
+        return json({ url: `${STAY_URL}?u=${body.user_id}&t=${token}` });
       }
 
       if (action === "status" || action === "accept") {
@@ -382,8 +295,14 @@ Deno.serve(async (req) => {
         if (!prof?.stripe_customer_id) return json({ state: "lapsed" });
         const sub = await findLiveSubscription(prof.stripe_customer_id);
         if (!sub) return json({ state: "lapsed" });
+
+        // The one true current number: their actual next bill.
+        const currentTotal = await upcomingTotal(prof.stripe_customer_id, sub.id);
         const base = {
-          amount_cents: sub.amountCents,
+          current_cents: currentTotal,
+          // The PROMISE (20% off what they pay). The accept verifies against
+          // Stripe's real result and refuses if it doesn't come true.
+          discounted_cents: Math.round(currentTotal * (100 - DISCOUNT_PCT) / 100),
           currency: sub.currency,
           interval: sub.interval,
           discount_pct: DISCOUNT_PCT,
@@ -393,8 +312,18 @@ Deno.serve(async (req) => {
         if (action === "status" || already) {
           return json({ state: already ? "already" : "offer", ...base });
         }
-        await performAccept(prof, uid, sub);
-        return json({ state: "accepted", ...base });
+        if (sub.hasCoupon) {
+          // Coupon present but cancellation scheduled: just un-cancel; the
+          // discount they already have stays exactly as-is.
+          const p = new URLSearchParams();
+          p.set("cancel_at_period_end", "false");
+          p.set("metadata[save_offer_accepted_at]", new Date().toISOString());
+          const upd = await stripePost(`subscriptions/${sub.id}`, p);
+          if ((upd as { error?: unknown }).error) return json({ error: "server" }, 500);
+          return json({ state: "accepted", ...base, new_total_cents: currentTotal });
+        }
+        const newTotal = await performAccept(prof.stripe_customer_id, prof, uid, sub, currentTotal);
+        return json({ state: "accepted", ...base, new_total_cents: newTotal });
       }
 
       return json({ error: "Bad request" }, 400);
@@ -404,41 +333,10 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ── Public link routes (GET = landing page, form POST = accept) ───────────
-  let userId = url.searchParams.get("u") ?? "";
-  let token = url.searchParams.get("t") ?? "";
-  if (req.method === "POST") {
-    const form = await req.formData().catch(() => null);
-    userId = (form?.get("u") as string | null) ?? userId;
-    token = (form?.get("t") as string | null) ?? token;
-  }
-  if (!UUID_RE.test(userId) || !token || !(await verifyToken(userId, token))) return invalidPage();
-  if (!STRIPE_SECRET_KEY) return errorPage();
-
-  try {
-    const { data: prof } = await supa
-      .from("profiles")
-      .select("email, full_name, stripe_customer_id")
-      .eq("id", userId)
-      .maybeSingle();
-    if (!prof?.stripe_customer_id) return lapsedPage();
-
-    const sub = await findLiveSubscription(prof.stripe_customer_id);
-    if (!sub) return lapsedPage();
-    if (sub.hasCoupon && !sub.cancelScheduled) return alreadyPage(sub);
-
-    // ONLY an explicit form POST mutates. Everything else — GET, and the HEAD
-    // probes that mail scanners, SMS link previewers, and `curl -I` send —
-    // renders the offer read-only. The original gate (`=== "GET"` renders,
-    // everything else accepts) let a HEAD probe fall through into the accept:
-    // a scanner could redeem the offer without the athlete ever clicking.
-    if (req.method !== "POST") return offerPage(sub, userId, token);
-
-    // Legacy HTML form accept (links minted before the /stay page existed).
-    await performAccept(prof, userId, sub);
-    return confirmationPage(sub);
-  } catch (e) {
-    console.error("[save-offer] failed:", e);
-    return errorPage();
-  }
+  // Anything else — a clicked old-style link, a scanner's GET/HEAD probe, a
+  // stray form POST — redirects to the app page. Nothing here mutates.
+  const u = url.searchParams.get("u") ?? "";
+  const t = url.searchParams.get("t") ?? "";
+  const dest = u && t ? `${STAY_URL}?u=${encodeURIComponent(u)}&t=${encodeURIComponent(t)}` : STAY_URL;
+  return new Response(null, { status: 302, headers: { ...cors, "Location": dest } });
 });
