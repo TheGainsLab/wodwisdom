@@ -337,8 +337,9 @@ Deno.serve(async (req) => {
         ALERT_EMAIL,
         `Save offer ACCEPTED: ${prof.email ?? userId}`,
         `<p><strong>${escapeHtml(who)}</strong> clicked the save link and kept their subscription.</p>` +
-        `<p>${sub.cancelScheduled ? "Cancellation removed and " : "Subscription was already active; "}` +
-        `${DISCOUNT_PCT}% coupon applied — new price <strong>${discounted}/${sub.interval}</strong>, forever.</p>` +
+        `<p>${sub.cancelScheduled ? "Cancellation removed; " : "Subscription was already active; "}` +
+        `${sub.hasCoupon ? `${DISCOUNT_PCT}% coupon was already on the subscription` : `${DISCOUNT_PCT}% coupon applied`}` +
+        ` — price <strong>${discounted}/${sub.interval}</strong>, forever.</p>` +
         `<p><a href="https://www.thegainslab.com/admin/users/${userId}">Open their admin page →</a></p>`,
       );
     } catch (e) {
