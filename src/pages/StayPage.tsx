@@ -9,11 +9,15 @@ import { supabase } from '../lib/supabase';
 // accept call does, which an email scanner can't trigger (scanners don't run
 // page scripts, and prefetching the page only hits the read-only status call).
 
+// ALL amounts come from the server (which reads Stripe's real upcoming
+// invoice). The page does NO price math — currentCents is what they actually
+// pay next, discountedCents is the server's promised post-accept amount, and
+// newTotalCents is the Stripe-verified result after accepting.
 type OfferState =
   | { phase: 'loading' }
-  | { phase: 'offer'; amountCents: number; currency: string; interval: string; pct: number; cancelScheduled: boolean }
-  | { phase: 'accepted'; amountCents: number; currency: string; interval: string; pct: number }
-  | { phase: 'already'; amountCents: number; currency: string; interval: string; pct: number }
+  | { phase: 'offer'; currentCents: number; discountedCents: number; currency: string; interval: string; pct: number; cancelScheduled: boolean }
+  | { phase: 'accepted'; newTotalCents: number; currency: string; interval: string; pct: number }
+  | { phase: 'already'; currentCents: number; currency: string; interval: string }
   | { phase: 'lapsed' }
   | { phase: 'invalid' }
   | { phase: 'error' };
@@ -69,15 +73,23 @@ export default function StayPage() {
         setState({ phase: (error as { context?: { status?: number } } | null)?.context?.status === 403 ? 'invalid' : 'error' });
         return;
       }
-      const d = data as { state?: string; amount_cents?: number; currency?: string; interval?: string; discount_pct?: number; cancel_scheduled?: boolean; error?: string };
+      const d = data as { state?: string; current_cents?: number; discounted_cents?: number; currency?: string; interval?: string; discount_pct?: number; cancel_scheduled?: boolean; error?: string };
       if (d.error) { setState({ phase: d.error === 'invalid_link' ? 'invalid' : 'error' }); return; }
       if (d.state === 'lapsed') { setState({ phase: 'lapsed' }); return; }
-      const common = {
-        amountCents: d.amount_cents ?? 0, currency: d.currency ?? 'usd',
-        interval: d.interval ?? 'month', pct: d.discount_pct ?? 20,
-      };
-      if (d.state === 'already') setState({ phase: 'already', ...common });
-      else setState({ phase: 'offer', ...common, cancelScheduled: d.cancel_scheduled === true });
+      if (typeof d.current_cents !== 'number') { setState({ phase: 'error' }); return; }
+      if (d.state === 'already') {
+        setState({ phase: 'already', currentCents: d.current_cents, currency: d.currency ?? 'usd', interval: d.interval ?? 'month' });
+      } else {
+        setState({
+          phase: 'offer',
+          currentCents: d.current_cents,
+          discountedCents: d.discounted_cents ?? d.current_cents,
+          currency: d.currency ?? 'usd',
+          interval: d.interval ?? 'month',
+          pct: d.discount_pct ?? 20,
+          cancelScheduled: d.cancel_scheduled === true,
+        });
+      }
     })();
   }, [u, t]);
 
@@ -88,22 +100,16 @@ export default function StayPage() {
       body: { action: 'accept', u, t },
     });
     setAccepting(false);
-    const d = (data ?? {}) as { state?: string };
-    if (error || (d.state !== 'accepted' && d.state !== 'already')) {
-      setState({ phase: 'error' });
+    const d = (data ?? {}) as { state?: string; new_total_cents?: number; current_cents?: number; currency?: string; interval?: string; discount_pct?: number };
+    if (error || d.state === undefined) { setState({ phase: 'error' }); return; }
+    if (d.state === 'already') {
+      setState({ phase: 'already', currentCents: d.current_cents ?? state.currentCents, currency: state.currency, interval: state.interval });
       return;
     }
-    const { amountCents, currency, interval, pct } = state;
-    setState({ phase: d.state === 'already' ? 'already' : 'accepted', amountCents, currency, interval, pct });
+    if (d.state !== 'accepted' || typeof d.new_total_cents !== 'number') { setState({ phase: 'error' }); return; }
+    // Show the Stripe-verified post-accept amount, not our own arithmetic.
+    setState({ phase: 'accepted', newTotalCents: d.new_total_cents, currency: state.currency, interval: state.interval, pct: state.pct });
   };
-
-  const priceBlock = (amountCents: number, currency: string, interval: string, pct: number) => (
-    <div style={S.price}>
-      <span style={S.old}>{money(amountCents, currency)}/{interval}</span>
-      <span style={S.new}>{money(Math.round(amountCents * (100 - pct) / 100), currency)}/{interval}</span>
-      <span style={S.badge}>{pct}% off · forever</span>
-    </div>
-  );
 
   return (
     <div style={S.wrap}>
@@ -120,7 +126,11 @@ export default function StayPage() {
                 ? 'Your subscription is currently set to cancel at the end of this billing period. One click keeps your training going and locks in the new price — permanently.'
                 : 'Your subscription is active. One click locks in the new price — permanently, as offered.'}
             </p>
-            {priceBlock(state.amountCents, state.currency, state.interval, state.pct)}
+            <div style={S.price}>
+              <span style={S.old}>{money(state.currentCents, state.currency)}/{state.interval}</span>
+              <span style={S.new}>{money(state.discountedCents, state.currency)}/{state.interval}</span>
+              <span style={S.badge}>{state.pct}% off · forever</span>
+            </div>
             <button style={{ ...S.button, opacity: accepting ? 0.7 : 1 }} onClick={() => void accept()} disabled={accepting}>
               {accepting ? 'One moment…' : 'Keep my subscription'}
             </button>
@@ -133,7 +143,7 @@ export default function StayPage() {
             <h1 style={S.h1}>You're all set 🎉</h1>
             <p style={S.p}>
               Your subscription continues at{' '}
-              <strong style={S.strong}>{money(Math.round(state.amountCents * (100 - state.pct) / 100), state.currency)}/{state.interval}</strong>
+              <strong style={S.strong}>{money(state.newTotalCents, state.currency)}/{state.interval}</strong>
               {' '}— {state.pct}% off, permanently, starting with your next invoice.
             </p>
             <p style={S.p}>Glad you're staying. See you in the gym.</p>
@@ -145,7 +155,7 @@ export default function StayPage() {
             <h1 style={S.h1}>Your discount is already active</h1>
             <p style={S.p}>
               Your subscription continues at{' '}
-              <strong style={S.strong}>{money(Math.round(state.amountCents * (100 - state.pct) / 100), state.currency)}/{state.interval}</strong>
+              <strong style={S.strong}>{money(state.currentCents, state.currency)}/{state.interval}</strong>
               {' '}— nothing more to do.
             </p>
           </>
