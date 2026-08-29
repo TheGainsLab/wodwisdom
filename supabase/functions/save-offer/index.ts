@@ -73,9 +73,19 @@ async function verifyToken(userId: string, token: string): Promise<boolean> {
 
 // ── Stripe helpers (raw REST, same pattern as create-portal-session) ────────
 
+/** Per-request API version pin. The ACCOUNT's default version predates
+ *  2016-07-06 (verified live: `status=all` was rejected with exactly that
+ *  message), so modern request params and response shapes are not guaranteed
+ *  without this. Pinning here affects ONLY these requests — webhook event
+ *  shapes still follow the webhook endpoint's own configured version. */
+const STRIPE_API_VERSION = "2023-10-16";
+
 async function stripeGet(path: string): Promise<Record<string, unknown>> {
   const resp = await fetchWithTimeout(`https://api.stripe.com/v1/${path}`, {
-    headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+    headers: {
+      "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":"),
+      "Stripe-Version": STRIPE_API_VERSION,
+    },
   }, 15_000);
   return await resp.json();
 }
@@ -85,6 +95,7 @@ async function stripePost(path: string, params: URLSearchParams): Promise<Record
     method: "POST",
     headers: {
       "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":"),
+      "Stripe-Version": STRIPE_API_VERSION,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: params.toString(),
@@ -174,42 +185,64 @@ function fmtMoney(cents: number, currency: string): string {
 // ── Pages ───────────────────────────────────────────────────────────────────
 
 function page(title: string, inner: string, status = 200): Response {
-  return new Response(
-    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
-    `<meta name="robots" content="noindex"><title>${title}</title></head>` +
-    `<body style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:480px;margin:64px auto;padding:0 24px;color:#1a1a1a;text-align:center">` +
-    `<div style="font-weight:800;letter-spacing:1px;font-size:14px;color:#5a584f;margin-bottom:28px">THE GAINS LAB</div>` +
-    inner +
-    `</body></html>`,
-    { status, headers: { "Content-Type": "text/html; charset=utf-8" } },
-  );
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>${title}</title>
+<style>
+  body { margin:0; background:#111214; font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+         min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; box-sizing:border-box; }
+  .card { background:#1b1c1f; border:1px solid #2a2b2f; border-radius:16px; padding:40px 32px;
+          max-width:420px; width:100%; text-align:center; color:#f2f2f0; }
+  .brand { font-weight:800; letter-spacing:2px; font-size:13px; color:#ff3a3a; margin-bottom:28px; }
+  h1 { font-size:22px; margin:0 0 12px; }
+  p { color:#a8a69e; line-height:1.6; font-size:15px; margin:0 0 14px; }
+  p strong { color:#f2f2f0; }
+  .price { margin:26px 0; font-size:20px; }
+  .price .old { text-decoration:line-through; color:#6d6b64; margin-right:12px; }
+  .price .new { color:#f2f2f0; font-weight:800; font-size:26px; }
+  .price .badge { display:block; margin-top:8px; font-size:12px; font-weight:700; letter-spacing:1px;
+                  text-transform:uppercase; color:#2ec486; }
+  button { background:#ff3a3a; color:#fff; border:none; padding:14px 32px; border-radius:10px;
+           font-size:16px; font-weight:700; cursor:pointer; width:100%; font-family:inherit; }
+  button:hover { background:#e42f2f; }
+  .fine { font-size:12px; color:#6d6b64; margin-top:16px; }
+</style>
+</head>
+<body><div class="card"><div class="brand">THE GAINS LAB</div>${inner}</div></body>
+</html>`;
+  return new Response(html, { status, headers: { "Content-Type": "text/html; charset=utf-8" } });
 }
 
-const p = (s: string) => `<p style="color:#5a584f;line-height:1.6">${s}</p>`;
-
-function offerPage(sub: SubView, userId: string, token: string): Response {
+function priceBlock(sub: SubView): string {
   const now = fmtMoney(sub.amountCents, sub.currency);
   const discounted = fmtMoney(Math.round(sub.amountCents * (100 - DISCOUNT_PCT) / 100), sub.currency);
-  const per = `/${sub.interval}`;
+  return `<div class="price"><span class="old">${now}/${sub.interval}</span>` +
+    `<span class="new">${discounted}/${sub.interval}</span>` +
+    `<span class="badge">${DISCOUNT_PCT}% off · forever</span></div>`;
+}
+
+function offerPage(sub: SubView, userId: string, token: string): Response {
   const situation = sub.cancelScheduled
     ? `Your subscription is currently set to cancel at the end of this billing period.`
     : `Your subscription is active.`;
   const action = sub.cancelScheduled
-    ? `Click below to keep your subscription and lock in <strong>${DISCOUNT_PCT}% off, permanently</strong>.`
-    : `Click below to lock in the <strong>${DISCOUNT_PCT}% off, permanently</strong>, as offered.`;
+    ? `One click keeps your training going and locks in the new price — permanently.`
+    : `One click locks in the new price — permanently, as offered.`;
   return page(
     "Your offer from The Gains Lab",
-    `<h2 style="margin-bottom:8px">Stay at ${DISCOUNT_PCT}% off — forever</h2>` +
-    p(situation) +
-    p(`${action}`) +
-    `<div style="margin:24px 0;font-size:18px"><span style="text-decoration:line-through;color:#9a9890">${now}${per}</span>` +
-    ` &nbsp;→&nbsp; <strong>${discounted}${per}</strong></div>` +
+    `<h1>Stay at ${DISCOUNT_PCT}% off — forever</h1>` +
+    `<p>${situation} ${action}</p>` +
+    priceBlock(sub) +
     `<form method="POST" action="">` +
     `<input type="hidden" name="u" value="${escapeHtml(userId)}">` +
     `<input type="hidden" name="t" value="${escapeHtml(token)}">` +
-    `<button type="submit" style="background:#0074d4;color:#fff;border:none;padding:12px 28px;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer">Keep my subscription</button>` +
+    `<button type="submit">Keep my subscription</button>` +
     `</form>` +
-    p(`<span style="font-size:12px">The discount applies from your next invoice and never expires. Questions? Just reply to the email.</span>`),
+    `<p class="fine">The discount applies from your next invoice and never expires. Questions? Just reply to the email.</p>`,
   );
 }
 
@@ -217,9 +250,9 @@ function confirmationPage(sub: SubView): Response {
   const discounted = fmtMoney(Math.round(sub.amountCents * (100 - DISCOUNT_PCT) / 100), sub.currency);
   return page(
     "You're all set",
-    `<h2 style="margin-bottom:8px">You're all set 🎉</h2>` +
-    p(`Your subscription continues at <strong>${discounted}/${sub.interval}</strong> — ${DISCOUNT_PCT}% off, permanently, starting with your next invoice.`) +
-    p(`Glad you're staying. See you in the gym.`),
+    `<h1>You're all set 🎉</h1>` +
+    `<p>Your subscription continues at <strong>${discounted}/${sub.interval}</strong> — ${DISCOUNT_PCT}% off, permanently, starting with your next invoice.</p>` +
+    `<p>Glad you're staying. See you in the gym.</p>`,
   );
 }
 
@@ -227,24 +260,24 @@ function alreadyPage(sub: SubView): Response {
   const discounted = fmtMoney(Math.round(sub.amountCents * (100 - DISCOUNT_PCT) / 100), sub.currency);
   return page(
     "Discount already active",
-    `<h2 style="margin-bottom:8px">Your discount is already active</h2>` +
-    p(`Your subscription continues at <strong>${discounted}/${sub.interval}</strong> — nothing more to do.`),
+    `<h1>Your discount is already active</h1>` +
+    `<p>Your subscription continues at <strong>${discounted}/${sub.interval}</strong> — nothing more to do.</p>`,
   );
 }
 
 function lapsedPage(): Response {
   return page(
     "This offer window has passed",
-    `<h2 style="margin-bottom:8px">This offer window has passed</h2>` +
-    p(`Your subscription has already ended, so this link can't restore it automatically. Reply to the email and we'll sort you out directly.`),
+    `<h1>This offer window has passed</h1>` +
+    `<p>Your subscription has already ended, so this link can't restore it automatically. Reply to the email and we'll sort you out directly.</p>`,
   );
 }
 
 function invalidPage(): Response {
   return page(
     "Invalid link",
-    `<h2 style="margin-bottom:8px">This link didn't check out</h2>` +
-    p(`The link is incomplete or expired. Reply to the email and we'll take care of it by hand.`),
+    `<h1>This link didn't check out</h1>` +
+    `<p>The link is incomplete or expired. Reply to the email and we'll take care of it by hand.</p>`,
     403,
   );
 }
@@ -252,8 +285,8 @@ function invalidPage(): Response {
 function errorPage(): Response {
   return page(
     "Something went wrong",
-    `<h2 style="margin-bottom:8px">Something went wrong</h2>` +
-    p(`We couldn't process that just now. Reply to the email and we'll apply the offer by hand.`),
+    `<h1>Something went wrong</h1>` +
+    `<p>We couldn't process that just now. Reply to the email and we'll apply the offer by hand.</p>`,
     500,
   );
 }
