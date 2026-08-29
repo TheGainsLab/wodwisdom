@@ -102,25 +102,45 @@ interface SubView {
 }
 
 /** The user's live subscription, or null (lapsed / never subscribed). Prefers
- *  a scheduled-cancel sub, then any live one. */
+ *  a scheduled-cancel sub, then any live one. THROWS on a Stripe API error —
+ *  the caller renders the error page, never the lapsed page, so an API
+ *  problem can't silently read as "your subscription ended". (v1 expanded
+ *  data.discounts in the list call; older pinned API versions reject that
+ *  expansion, which surfaced as exactly that misread.) */
 async function findLiveSubscription(customerId: string): Promise<SubView | null> {
-  const res = await stripeGet(
-    `subscriptions?customer=${customerId}&status=all&limit=10&expand[]=data.discounts`,
-  );
+  const res = await stripeGet(`subscriptions?customer=${customerId}&status=all&limit=10`);
+  if ((res as { error?: { message?: string } }).error) {
+    throw new Error(`Stripe subscriptions list failed: ${(res as { error?: { message?: string } }).error?.message ?? "unknown"}`);
+  }
   const subs = (res.data ?? []) as Array<Record<string, unknown>>;
   const LIVE = new Set(["active", "trialing", "past_due"]);
   const live = subs.filter((s) => LIVE.has(s.status as string));
   if (live.length === 0) return null;
   const pick = live.find((s) => s.cancel_at_period_end === true) ?? live[0];
 
-  // Coupon check: expanded discounts (newer API) or legacy single discount.
-  const discounts = (pick.discounts ?? []) as Array<Record<string, unknown> | string>;
+  // Coupon check, tolerant of every API-version shape: legacy single
+  // `discount` object; `discounts` as objects; `discounts` as id strings
+  // (retrieve-with-expand inside a try — if THAT fails, assume no coupon:
+  // worst case we re-apply the same coupon, which is a no-op in effect).
+  let hasCoupon = false;
   const legacy = pick.discount as Record<string, unknown> | null | undefined;
-  const couponIds = [
-    ...discounts.map((d) => typeof d === "string" ? null : (d.coupon as Record<string, unknown> | undefined)?.id),
-    (legacy?.coupon as Record<string, unknown> | undefined)?.id,
-  ].filter(Boolean);
-  const hasCoupon = couponIds.includes(COUPON_ID);
+  if ((legacy?.coupon as Record<string, unknown> | undefined)?.id === COUPON_ID) hasCoupon = true;
+  const discounts = (pick.discounts ?? []) as Array<Record<string, unknown> | string>;
+  if (!hasCoupon && discounts.length > 0) {
+    if (typeof discounts[0] === "object") {
+      hasCoupon = discounts.some((d) =>
+        typeof d === "object" && (d.coupon as Record<string, unknown> | undefined)?.id === COUPON_ID
+      );
+    } else {
+      try {
+        const full = await stripeGet(`subscriptions/${pick.id}?expand[]=discounts`);
+        const fullDiscounts = (full.discounts ?? []) as Array<Record<string, unknown>>;
+        hasCoupon = fullDiscounts.some((d) => (d?.coupon as Record<string, unknown> | undefined)?.id === COUPON_ID);
+      } catch {
+        hasCoupon = false;
+      }
+    }
+  }
 
   const items = ((pick.items as Record<string, unknown> | undefined)?.data ?? []) as Array<Record<string, unknown>>;
   let amountCents = 0;
