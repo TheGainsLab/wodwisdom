@@ -127,6 +127,33 @@ export default function AdminPage({ session }: { session: Session }) {
   // Users data
   const [users, setUsers] = useState<any[]>([]);
   const [viewFilter, setViewFilter] = useState<string | null>(null);
+  // Save-offer link generation (✉ row button): which user's link was just
+  // copied, for transient button feedback.
+  const [saveLinkCopiedFor, setSaveLinkCopiedFor] = useState<string | null>(null);
+
+  // Mint the HMAC-signed save-offer URL server-side (the signing secret never
+  // reaches the client) and put it on the clipboard for pasting into a manual
+  // retention email.
+  const copySaveOfferLink = async (e: React.MouseEvent, userId: string) => {
+    e.stopPropagation();
+    const { data, error } = await supabase.functions.invoke('save-offer', {
+      body: { action: 'mint', user_id: userId },
+    });
+    const url = (data as { url?: string } | null)?.url;
+    if (error || !url) {
+      alert('Could not generate the save-offer link.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setSaveLinkCopiedFor(userId);
+      setTimeout(() => setSaveLinkCopiedFor(prev => (prev === userId ? null : prev)), 2500);
+    } catch {
+      // Clipboard blocked (some browsers outside a direct gesture) — show the
+      // link for manual copy instead of failing silently.
+      window.prompt('Copy the save-offer link:', url);
+    }
+  };
   const [userSearch, setUserSearch] = useState('');
   const [userSort, setUserSort] = useState<UserSort>('last_active');
   const [subscriberFilter, setSubscriberFilter] = useState<SubscriberFilter>('all');
@@ -819,6 +846,23 @@ export default function AdminPage({ session }: { session: Session }) {
                           }}
                         >
                           ✉ Message
+                        </button>
+                        {/* Cancellation-save flow: copy this user's signed
+                            offer link (un-cancel + 20% coupon behind one
+                            button) for pasting into a manual note. */}
+                        <button
+                          onClick={e => copySaveOfferLink(e, u.id)}
+                          title="Copy this user's save-offer link (removes scheduled cancellation + applies GAINS20, 20% off forever, when they accept)"
+                          style={{
+                            fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6,
+                            border: '1px solid var(--border)',
+                            background: saveLinkCopiedFor === u.id ? '#2ec48620' : 'var(--surface2)',
+                            color: saveLinkCopiedFor === u.id ? '#2ec486' : 'var(--text-dim)',
+                            cursor: 'pointer', fontFamily: "'Outfit', sans-serif",
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {saveLinkCopiedFor === u.id ? '✓ Copied' : '% Save link'}
                         </button>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
                       </div>

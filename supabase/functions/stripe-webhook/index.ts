@@ -428,6 +428,15 @@ serve(async (req) => {
         const prevAttrs = event.data.previous_attributes ?? {};
         if ("cancel_at_period_end" in prevAttrs && prevAttrs.cancel_at_period_end !== sub.cancel_at_period_end) {
           const scheduled = sub.cancel_at_period_end === true;
+          // A save-offer link accept flips the flag AND stamps
+          // metadata.save_offer_accepted_at in the same update — so the stamp
+          // appearing in this very event's changed attributes attributes the
+          // un-cancel to the link (save-offer already sent the richer founder
+          // alert; skip the generic one). A later portal un-cancel leaves
+          // metadata untouched → generic alert as before.
+          const savedViaOfferLink = !scheduled &&
+            "metadata" in prevAttrs &&
+            !!sub.metadata?.save_offer_accepted_at;
           const { data: cWho } = await supa.from("profiles").select("id, email, full_name").eq("stripe_customer_id", customerId).limit(1);
           const cw = cWho?.[0] ?? null;
           const cPlan = sub.metadata?.plan ?? sub.items?.data?.[0]?.price?.metadata?.plan ?? null;
@@ -442,7 +451,7 @@ serve(async (req) => {
             plan: cPlan,
             currency: sub.currency ?? null,
             tenure_days: sub.created ? Math.round((Date.now() / 1000 - sub.created) / 86400) : null,
-            details: { cancel_at: lapseSec, feedback, comment },
+            details: { cancel_at: lapseSec, feedback, comment, ...(savedViaOfferLink ? { saved_via: "save_offer_link" } : {}) },
           });
 
           // Founder alert with the dossier + lapse date + any exit feedback.
@@ -467,11 +476,11 @@ serve(async (req) => {
                 feedback ? `Stripe exit feedback: <strong>${escapeHtml(String(feedback))}</strong>${comment ? ` — "${escapeHtml(String(comment))}"` : ""}` : "No exit feedback captured.",
               ],
             );
-          } else {
+          } else if (!savedViaOfferLink) {
             await alertFounder(
               `Cancellation removed: ${cw?.full_name ?? cw?.email ?? customerId}${cPlan ? ` — ${cPlan}` : ""}`,
               [
-                `They un-scheduled their cancellation — a confirmed save. Subscription continues as normal.`,
+                `They un-scheduled their cancellation themselves (no save-offer link involved) — a confirmed save. Subscription continues as normal. No need to send the discount offer.`,
                 ...churnDossierLines({
                   name: cw?.full_name ?? null, email: cw?.email ?? null, userId: cw?.id ?? null,
                   plan: cPlan, features: cFeatures, subCreatedSec: sub.created ?? null,

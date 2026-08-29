@@ -291,3 +291,6 @@ verify_jwt = false
 # pg_cron — same no-JWT posture and key-drift rationale as the reconcilers;
 # responses carry counts/ids/labels only, never chat content.
 verify_jwt = false
+
+[functions.save-offer]
+verify_jwt = false
