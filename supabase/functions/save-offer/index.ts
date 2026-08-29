@@ -348,7 +348,12 @@ Deno.serve(async (req) => {
     if (!sub) return lapsedPage();
     if (sub.hasCoupon && !sub.cancelScheduled) return alreadyPage(sub);
 
-    if (req.method === "GET") return offerPage(sub, userId, token);
+    // ONLY an explicit form POST mutates. Everything else — GET, and the HEAD
+    // probes that mail scanners, SMS link previewers, and `curl -I` send —
+    // renders the offer read-only. The original gate (`=== "GET"` renders,
+    // everything else accepts) let a HEAD probe fall through into the accept:
+    // a scanner could redeem the offer without the athlete ever clicking.
+    if (req.method !== "POST") return offerPage(sub, userId, token);
 
     // ── Accept (form POST): un-cancel + coupon + attribution stamp, one call.
     const params = new URLSearchParams();
