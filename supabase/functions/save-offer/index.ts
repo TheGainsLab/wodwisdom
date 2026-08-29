@@ -182,6 +182,36 @@ async function upcomingTotal(customerId: string, subscriptionId: string): Promis
   return total;
 }
 
+/**
+ * What the next bill WOULD be if the subscription renews — the number the
+ * offer page shows. For a normal active sub this IS the upcoming invoice.
+ * For a CANCEL-SCHEDULED sub (the feature's whole audience) Stripe answers
+ * "no upcoming invoice", so we re-ask as a preview with the cancellation
+ * removed. The preview parameter's name changed across API versions, so we
+ * try the current form then the older form — every branch's number comes
+ * from Stripe's pricing engine; none of them is computed here.
+ */
+async function renewalTotal(
+  customerId: string,
+  subscriptionId: string,
+  cancelScheduled: boolean,
+): Promise<number> {
+  if (!cancelScheduled) return await upcomingTotal(customerId, subscriptionId);
+  const base = `invoices/upcoming?customer=${customerId}&subscription=${subscriptionId}`;
+  const attempts = [
+    `${base}&subscription_details[cancel_at_period_end]=false`, // 2023-08-16+ form
+    `${base}&subscription_cancel_at_period_end=false`,          // older form
+  ];
+  let lastErr = "unknown";
+  for (const path of attempts) {
+    const res = await stripeGet(path);
+    const err = (res as { error?: { message?: string } }).error;
+    if (!err && typeof res.total === "number") return res.total;
+    lastErr = err?.message ?? "no total in preview response";
+  }
+  throw new Error(`Stripe renewal preview failed: ${lastErr}`);
+}
+
 function fmtMoney(cents: number, currency: string): string {
   const sym = currency === "usd" ? "$" : `${currency.toUpperCase()} `;
   return `${sym}${(cents / 100).toFixed(2)}`;
@@ -296,8 +326,11 @@ Deno.serve(async (req) => {
         const sub = await findLiveSubscription(prof.stripe_customer_id);
         if (!sub) return json({ state: "lapsed" });
 
-        // The one true current number: their actual next bill.
-        const currentTotal = await upcomingTotal(prof.stripe_customer_id, sub.id);
+        // The one true current number: what their renewal actually costs —
+        // the upcoming invoice, or its renewal PREVIEW when a cancellation
+        // is scheduled (Stripe has no upcoming invoice for a sub it thinks
+        // is ending — which is precisely this feature's audience).
+        const currentTotal = await renewalTotal(prof.stripe_customer_id, sub.id, sub.cancelScheduled);
         const base = {
           current_cents: currentTotal,
           // The PROMISE (20% off what they pay). The accept verifies against
