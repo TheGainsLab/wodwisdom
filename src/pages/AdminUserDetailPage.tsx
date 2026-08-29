@@ -244,6 +244,43 @@ function EmailSection({ userId, userEmail, userName }: { userId: string; userEma
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imgCounterRef = useRef(0);
+  const [insertingSaveLink, setInsertingSaveLink] = useState(false);
+
+  // Cancellation-save flow: mint this user's HMAC-signed save-offer URL
+  // server-side (the signing secret never reaches the client) and insert it
+  // as a markdown link — the recipient sees clean link text, not the raw URL.
+  // Clicking it opens the offer page (current vs 20%-off price, one button
+  // that removes the scheduled cancellation and applies GAINS20).
+  const insertSaveOfferLink = async () => {
+    setInsertingSaveLink(true);
+    try {
+      const { data, error: mintErr } = await supabase.functions.invoke('save-offer', {
+        body: { action: 'mint', user_id: userId },
+      });
+      const url = (data as { url?: string } | null)?.url;
+      if (mintErr || !url) {
+        setError('Could not generate the save-offer link.');
+        return;
+      }
+      const md = `[Keep your subscription at 20% off — forever](${url})`;
+      const ta = textareaRef.current;
+      const start = ta?.selectionStart ?? body.length;
+      const end = ta?.selectionEnd ?? body.length;
+      const before = body.slice(0, start);
+      const after = body.slice(end);
+      const insertion = (before.length > 0 && !before.endsWith('\n') ? '\n\n' : '') + md;
+      setBody(before + insertion + after);
+      setConfirmArmed(false);
+      requestAnimationFrame(() => {
+        if (!ta) return;
+        const pos = before.length + insertion.length;
+        ta.focus();
+        ta.setSelectionRange(pos, pos);
+      });
+    } finally {
+      setInsertingSaveLink(false);
+    }
+  };
 
   const addImage = async (file: File): Promise<string | null> => {
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -491,6 +528,15 @@ function EmailSection({ userId, userEmail, userName }: { userId: string; userEma
                   style={{ background: 'transparent', color: 'var(--text-dim)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", cursor: images.length >= MAX_IMAGES_PER_EMAIL ? 'not-allowed' : 'pointer', opacity: images.length >= MAX_IMAGES_PER_EMAIL ? 0.5 : 1 }}
                 >
                   Attach image
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void insertSaveOfferLink()}
+                  disabled={insertingSaveLink}
+                  title="Insert this user's save-offer link: one click removes their scheduled cancellation and applies GAINS20 (20% off forever)"
+                  style={{ background: 'transparent', color: 'var(--text-dim)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: "'Outfit', sans-serif", cursor: insertingSaveLink ? 'wait' : 'pointer', opacity: insertingSaveLink ? 0.6 : 1 }}
+                >
+                  {insertingSaveLink ? 'Generating…' : '% Insert save-offer link'}
                 </button>
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                   {images.length}/{MAX_IMAGES_PER_EMAIL} · max 4MB each
