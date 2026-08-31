@@ -13,6 +13,7 @@ import {
   auditMetconVariety,
   isBarbellMetconMovement,
   movementSignature,
+  repairComposerEmission,
   stripStructuralRestRows,
 } from "./metcon-variety-audits.ts";
 import { loadClassForMovement } from "./conditioning-definitions.ts";
@@ -194,6 +195,105 @@ Deno.test("structural Rest rows are stripped before legality can see them (2026-
   const wrestler = goodMonth();
   wrestler[0].movements.push({ movement: "Wrestler Squat", prescription: "10" });
   assertEquals(stripStructuralRestRows({ metcons: wrestler }), 0);
+});
+
+// ── Emission repair: malformed composer output must NEVER crash a stage ──
+// (2026-08-31: a retry emission with a missing movements array crashed the
+// metcons stage. The repair converts every malformation into dropped pieces
+// that surface as slot-coverage findings.)
+
+Deno.test("repair: piece with missing movements array is dropped, not crashed on (the production failure)", () => {
+  const m = goodMonth() as unknown[];
+  delete (m[4] as Record<string, unknown>).movements;
+  const { output, repairs } = repairComposerEmission({ metcons: m });
+  assertEquals(output.metcons.length, 11);
+  assert(repairs.some((r) => r.includes("movements array missing")));
+});
+
+Deno.test("repair: missing metcons array, junk root, junk pieces, junk movement rows", () => {
+  // No metcons at all
+  const none = repairComposerEmission({});
+  assertEquals(none.output.metcons, []);
+  assert(none.repairs.length > 0);
+  // Root not an object
+  assertEquals(repairComposerEmission(null).output.metcons, []);
+  assertEquals(repairComposerEmission("garbage").output.metcons, []);
+  // Non-object piece + empty movements + malformed rows
+  const mixed = repairComposerEmission({
+    metcons: [
+      "junk",
+      { week_num: 1, day_num: 1, movements: [] },
+      {
+        week_num: 1,
+        day_num: 2,
+        format: "amrap",
+        block_scheme: "AMRAP 12",
+        stated_duration_minutes: 12,
+        stimulus_note: "steady",
+        monostructural: false,
+        movements: [{ movement: "Burpee", prescription: "10" }, { notaMovement: true }, null],
+      },
+    ],
+  });
+  assertEquals(mixed.output.metcons.length, 1);
+  assertEquals(mixed.output.metcons[0].movements.length, 1);
+  assert(mixed.repairs.some((r) => r.includes("non-object piece")));
+  assert(mixed.repairs.some((r) => r.includes("malformed movement row")));
+});
+
+Deno.test("repair: valid month passes through untouched", () => {
+  const m = goodMonth();
+  const { output, repairs } = repairComposerEmission({ metcons: m });
+  assertEquals(output.metcons.length, 12);
+  assertEquals(repairs, []);
+  assertEquals(output.metcons[0].movements.length, m[0].movements.length);
+});
+
+Deno.test("no-throw guarantee: repair → strip → audit runs the full gauntlet on malformed input", () => {
+  const malformed = {
+    metcons: [
+      { week_num: 1, day_num: 1 }, // no movements — the crash shape
+      { week_num: 1, day_num: 2, movements: [{ movement: "Rest", prescription: "2:00" }] }, // all-Rest piece
+      {
+        week_num: 1,
+        day_num: 3,
+        movements: [{ movement: "Burpee", prescription: "10" }, { movement: "Rest 90s", prescription: "" }],
+      },
+      "garbage",
+      null,
+    ],
+  };
+  const { output } = repairComposerEmission(malformed);
+  stripStructuralRestRows(output);
+  // The all-Rest piece survives repair but strips to zero movements — the
+  // audit must tolerate it (and full option surface must not throw).
+  const slots: MetconSlot[] = [1, 2, 3].map((d) => ({
+    week_num: 1,
+    day_num: d,
+    time_domain: "medium",
+    intensity: "build",
+    focus: "aerobic_capacity",
+    day_context: {},
+    allocated_minutes: 20,
+  }));
+  const r = auditMetconVariety(output, {
+    slots,
+    barbellCapable: true,
+    vocabulary: ["Burpee"],
+    doNotProgram: [],
+    equipment: {},
+    developmentAxes: ["gymnastics_pulling", "olympic_lifting"],
+    skills: { "Double-Unders": "beginner" },
+    loadingDeemphasis: false,
+    fatigueSkillExclusions: [],
+  });
+  // W1D1 was dropped by repair → slot coverage flags it. No exceptions anywhere.
+  assert(r.violations.some((v) => v.includes("no composed metcon")));
+});
+
+Deno.test("strip: tolerates pieces with missing movements (post-repair this can't occur; standalone it must not crash)", () => {
+  const weird = { metcons: [{ week_num: 1, day_num: 1 } as unknown as ComposedMetcon] };
+  assertEquals(stripStructuralRestRows(weird), 0);
 });
 
 // ── Athlete-match rules (2026-08-31) ──

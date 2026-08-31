@@ -34,6 +34,8 @@ import {
   auditMetconVariety,
   formatMetconVarietyViolationsForRetry,
   isBarbellMetconMovement,
+  repairComposerEmission,
+  stripStructuralRestRows,
 } from "../../supabase/functions/_shared/metcon-variety-audits.ts";
 import { buildStratifiedMetconExamples } from "../../supabase/functions/_shared/metcon-examples.ts";
 import type { SkeletonOutput } from "../../supabase/functions/_shared/v3-output-schema.ts";
@@ -122,16 +124,22 @@ const auditOpts = {
   fatigueSkillExclusions: inputs.fatigue_skill_exclusions,
 };
 console.log(`Composing ${slots.length} metcons with ${MODEL} (barbell-capable: ${barbellCapable})…`);
-let output = await callMetconComposer(inputs, { model: MODEL });
+const repaired1 = repairComposerEmission(await callMetconComposer(inputs, { model: MODEL }));
+if (repaired1.repairs.length) console.log(`  emission repaired: ${repaired1.repairs.join(" | ")}`);
+let output = repaired1.output;
+stripStructuralRestRows(output);
 let audit = auditMetconVariety(output, auditOpts);
 let retried = false;
 if (!audit.passed) {
   console.log(`  variety audit FAIL (${audit.violations.length}) — one retry:\n    ${audit.violations.join("\n    ")}`);
   retried = true;
-  output = await callMetconComposer(inputs, {
+  const repaired2 = repairComposerEmission(await callMetconComposer(inputs, {
     model: MODEL,
     retryViolations: formatMetconVarietyViolationsForRetry(audit.violations),
-  });
+  }));
+  if (repaired2.repairs.length) console.log(`  emission repaired: ${repaired2.repairs.join(" | ")}`);
+  output = repaired2.output;
+  stripStructuralRestRows(output);
   audit = auditMetconVariety(output, auditOpts);
 }
 console.log(

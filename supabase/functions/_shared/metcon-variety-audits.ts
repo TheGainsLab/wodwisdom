@@ -133,14 +133,77 @@ function parsePerRoundReps(prescription: string): number | null {
 export function stripStructuralRestRows(output: MetconComposerOutput): number {
   let stripped = 0;
   for (const m of output.metcons ?? []) {
-    const before = m.movements.length;
-    m.movements = m.movements.filter((mv) => {
-      const n = norm(mv.movement);
+    const rows = Array.isArray(m.movements) ? m.movements : [];
+    const kept = rows.filter((mv) => {
+      const n = norm(mv?.movement ?? "");
       return n !== "rest" && !n.startsWith("rest ");
     });
-    stripped += before - m.movements.length;
+    stripped += rows.length - kept.length;
+    m.movements = kept;
   }
   return stripped;
+}
+
+/**
+ * Normalize a raw composer emission into the audited shape. Anthropic's
+ * tool-schema enforcement is imperfect (same class as the skeleton's
+ * stringified month_plan, repaired in repairSkeletonEmission) — observed
+ * 2026-08-31: a retry emission carried a piece with NO movements array, which
+ * crashed the metcons stage. A malformed piece must surface as an AUDIT
+ * FINDING (its slot reads "no composed metcon" → the existing retry/residual
+ * machinery handles it), never as a stage crash.
+ *
+ * Repairs: missing/invalid metcons array → empty; non-object pieces dropped;
+ * pieces with a missing/empty movements array dropped; malformed movement
+ * rows dropped; missing prescription/stimulus_note defaulted. Returns the
+ * repaired output plus human-readable repair notes for the log.
+ */
+export function repairComposerEmission(
+  raw: unknown,
+): { output: MetconComposerOutput; repairs: string[] } {
+  const repairs: string[] = [];
+  const root = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const rawPieces = Array.isArray(root.metcons) ? root.metcons : null;
+  if (!rawPieces) {
+    repairs.push("metcons array missing from emission — treated as empty (every slot will flag)");
+    return { output: { metcons: [] }, repairs };
+  }
+  const pieces: ComposedMetcon[] = [];
+  for (const p of rawPieces) {
+    if (!p || typeof p !== "object") {
+      repairs.push("non-object piece dropped");
+      continue;
+    }
+    const piece = p as Record<string, unknown>;
+    const loc = `W${piece.week_num}D${piece.day_num}`;
+    if (!Array.isArray(piece.movements) || piece.movements.length === 0) {
+      repairs.push(`${loc}: movements array missing/empty — piece dropped (slot coverage will flag it)`);
+      continue;
+    }
+    const movements = (piece.movements as unknown[])
+      .filter((mv) => {
+        const ok = !!mv && typeof mv === "object" &&
+          typeof (mv as { movement?: unknown }).movement === "string";
+        if (!ok) repairs.push(`${loc}: malformed movement row dropped`);
+        return ok;
+      })
+      .map((mv) => ({ prescription: "", ...(mv as object) })) as ComposedMetcon["movements"];
+    if (movements.length === 0) {
+      repairs.push(`${loc}: no valid movement rows — piece dropped (slot coverage will flag it)`);
+      continue;
+    }
+    pieces.push({
+      week_num: typeof piece.week_num === "number" ? piece.week_num : 0,
+      day_num: typeof piece.day_num === "number" ? piece.day_num : 0,
+      format: (typeof piece.format === "string" ? piece.format : "amrap") as ComposedMetcon["format"],
+      block_scheme: typeof piece.block_scheme === "string" ? piece.block_scheme : "",
+      stated_duration_minutes: typeof piece.stated_duration_minutes === "number" ? piece.stated_duration_minutes : 0,
+      stimulus_note: typeof piece.stimulus_note === "string" ? piece.stimulus_note : "",
+      monostructural: piece.monostructural === true,
+      movements,
+    });
+  }
+  return { output: { metcons: pieces }, repairs };
 }
 
 /** A piece's identity for distinctness: its normalized movement multiset. */
@@ -399,8 +462,8 @@ export function auditMetconVariety(
   //     in prose without load_class/load_band regress the fill to guessing —
   //     that's how a 475-lb deadlifter got 185-lb "moderate" deadlifts.
   for (const m of pieces) {
-    for (const mv of m.movements) {
-      if (!isBarbellMetconMovement(mv.movement)) continue;
+    for (const mv of m.movements ?? []) {
+      if (!isBarbellMetconMovement(mv?.movement ?? "")) continue;
       if (!mv.load_class || !mv.load_band) {
         violations.push(
           `${at(m)}: "${mv.movement}" is a loaded movement with no typed load_class/load_band — state the band from the shared table (adjectives alone are a defect).`,
@@ -420,8 +483,8 @@ export function auditMetconVariety(
   //     justification quality; the proxy forces the composer to write one).
   if (opts.skills) {
     for (const m of pieces) {
-      for (const mv of m.movements) {
-        const def = skillFatigueDefForMovement(mv.movement);
+      for (const mv of m.movements ?? []) {
+        const def = skillFatigueDefForMovement(mv?.movement ?? "");
         if (!def) continue;
         const tier = athleteTierFor(def, opts.skills);
         if (tier == null) continue; // absence is neutral — no tier, no check
@@ -460,7 +523,7 @@ export function auditMetconVariety(
       if (!(axis in AXIS_MOVEMENT_KEYWORDS)) continue;
       for (const wk of weeks) {
         const expressed = pieces.some(
-          (m) => m.week_num === wk && m.movements.some((mv) => movementExpressesAxis(mv.movement, axis)),
+          (m) => m.week_num === wk && (m.movements ?? []).some((mv) => movementExpressesAxis(mv?.movement ?? "", axis)),
         );
         if (!expressed) {
           violations.push(
@@ -478,10 +541,10 @@ export function auditMetconVariety(
     const excluded = new Set(opts.fatigueSkillExclusions ?? []);
     const axes = opts.developmentAxes.filter((a) => !excluded.has(a) && a in AXIS_MOVEMENT_KEYWORDS);
     const fitPieces = pieces.filter((m) =>
-      m.movements.some(
+      (m.movements ?? []).some(
         (mv) =>
-          isBarbellMetconMovement(mv.movement) ||
-          axes.some((a) => movementExpressesAxis(mv.movement, a)),
+          isBarbellMetconMovement(mv?.movement ?? "") ||
+          axes.some((a) => movementExpressesAxis(mv?.movement ?? "", a)),
       )
     );
     const fitPct = Math.round((fitPieces.length / n) * 100);

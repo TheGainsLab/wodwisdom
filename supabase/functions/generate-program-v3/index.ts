@@ -37,6 +37,7 @@ import {
   auditMetconVariety,
   formatMetconVarietyViolationsForRetry,
   isBarbellMetconMovement,
+  repairComposerEmission,
   stripStructuralRestRows,
 } from "../_shared/metcon-variety-audits.ts";
 import { buildStratifiedMetconExamples } from "../_shared/metcon-examples.ts";
@@ -478,12 +479,23 @@ async function stageMetcons(
     fatigueSkillExclusions,
   };
 
-  let output = await callMetconComposer(inputs, { model: MODELS.fable });
-  // "Rest" rows are structure the composer occasionally makes explicit when
-  // doing interval arithmetic — a fact patch (rest is not a movement), applied
-  // before the audit so it never trips legality (2026-08-31 failure).
-  const strippedRest = stripStructuralRestRows(output);
-  if (strippedRest > 0) console.log(`[generate-program-v3] stripped ${strippedRest} structural Rest row(s) from composed metcons`);
+  // Every composer emission is repaired at the boundary BEFORE any code reads
+  // into it: malformed shapes (missing movements array, junk rows — observed
+  // 2026-08-31 crashing this stage) become dropped pieces that the slot-
+  // coverage audit flags, never a stage crash. Then the Rest-row fact patch.
+  const composeRepaired = async (retryViolations?: string) => {
+    const raw = await callMetconComposer(inputs, {
+      model: MODELS.fable,
+      ...(retryViolations ? { retryViolations } : {}),
+    });
+    const { output, repairs } = repairComposerEmission(raw);
+    if (repairs.length) console.warn(`[generate-program-v3] composer emission repaired: ${repairs.join(" | ")}`);
+    const strippedRest = stripStructuralRestRows(output);
+    if (strippedRest > 0) console.log(`[generate-program-v3] stripped ${strippedRest} structural Rest row(s) from composed metcons`);
+    return { output, repairs };
+  };
+
+  let { output, repairs } = await composeRepaired();
   let audit = auditMetconVariety(output, auditOpts);
   let retried = false;
   let firstPassViolations: string[] = [];
@@ -491,11 +503,9 @@ async function stageMetcons(
     retried = true;
     firstPassViolations = audit.violations;
     console.warn(`[generate-program-v3] metcon variety violations (retrying once): ${audit.violations.join(" | ")}`);
-    output = await callMetconComposer(inputs, {
-      model: MODELS.fable,
-      retryViolations: formatMetconVarietyViolationsForRetry(audit.violations),
-    });
-    stripStructuralRestRows(output);
+    const retry = await composeRepaired(formatMetconVarietyViolationsForRetry(audit.violations));
+    output = retry.output;
+    repairs = [...repairs, ...retry.repairs];
     audit = auditMetconVariety(output, auditOpts);
     if (!audit.passed) {
       const legality = audit.violations.filter((v) =>
@@ -509,7 +519,7 @@ async function stageMetcons(
           stage: "metcons",
           violations: audit.violations,
           retried,
-          meta: { hard_fail: true, first_pass_violations: firstPassViolations },
+          meta: { hard_fail: true, first_pass_violations: firstPassViolations, repairs },
         });
         throw new Error(`Metcon composer emitted illegal movements after retry: ${legality.join(" | ")}`);
       }
@@ -528,7 +538,10 @@ async function stageMetcons(
     violations: audit.violations,
     warnings: audit.warnings,
     retried,
-    meta: retried ? { first_pass_violations: firstPassViolations } : {},
+    meta: {
+      ...(retried ? { first_pass_violations: firstPassViolations } : {}),
+      ...(repairs.length ? { repairs } : {}),
+    },
   });
   console.log(`[generate-program-v3] composed ${output.metcons.length} metcons for ${slots.length} slots`);
   return {
