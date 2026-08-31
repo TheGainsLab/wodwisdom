@@ -276,8 +276,14 @@ serve(async (req) => {
           break;
         }
 
-        // Find user by email
-        const { data: profiles } = await supa.from("profiles").select("id").eq("email", email).limit(1);
+        // Find user by email — case-insensitively. The Aug '26 Carlos incident:
+        // a checkout email differing from the profile only in case missed this
+        // lookup, detoured the purchase through pending_subscriptions, and the
+        // claim path (which lacked the Engine month seed) left a paying
+        // subscriber at a locked catalog. ilike with escaped wildcards = exact
+        // case-insensitive match.
+        const emailPattern = (email ?? "").replace(/[%_\\]/g, "\\$&");
+        const { data: profiles } = await supa.from("profiles").select("id").ilike("email", emailPattern).limit(1);
         if (profiles && profiles.length > 0) {
           const userId = profiles[0].id;
           const source = subscriptionId;
@@ -827,7 +833,10 @@ serve(async (req) => {
             if (custResp.ok) {
               const cust = await custResp.json();
               if (cust?.email) {
-                const { data: byEmail } = await supa.from("profiles").select("id").eq("email", cust.email).limit(1);
+                // Case-insensitive for the same reason as the checkout
+                // handler's lookup (Carlos incident).
+                const custPattern = String(cust.email).replace(/[%_\\]/g, "\\$&");
+                const { data: byEmail } = await supa.from("profiles").select("id").ilike("email", custPattern).limit(1);
                 if (byEmail && byEmail.length > 0) {
                   payUserId = byEmail[0].id;
                   await supa.from("profiles").update({ stripe_customer_id: customerId }).eq("id", payUserId);
