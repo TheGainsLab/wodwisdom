@@ -37,6 +37,7 @@ import {
   auditMetconVariety,
   formatMetconVarietyViolationsForRetry,
   isBarbellMetconMovement,
+  stripStructuralRestRows,
 } from "../_shared/metcon-variety-audits.ts";
 import { buildStratifiedMetconExamples } from "../_shared/metcon-examples.ts";
 import { formatAuditFailuresForLog, logGenerationAudit } from "../_shared/generation-audit-log.ts";
@@ -478,6 +479,11 @@ async function stageMetcons(
   };
 
   let output = await callMetconComposer(inputs, { model: MODELS.fable });
+  // "Rest" rows are structure the composer occasionally makes explicit when
+  // doing interval arithmetic — a fact patch (rest is not a movement), applied
+  // before the audit so it never trips legality (2026-08-31 failure).
+  const strippedRest = stripStructuralRestRows(output);
+  if (strippedRest > 0) console.log(`[generate-program-v3] stripped ${strippedRest} structural Rest row(s) from composed metcons`);
   let audit = auditMetconVariety(output, auditOpts);
   let retried = false;
   let firstPassViolations: string[] = [];
@@ -489,6 +495,7 @@ async function stageMetcons(
       model: MODELS.fable,
       retryViolations: formatMetconVarietyViolationsForRetry(audit.violations),
     });
+    stripStructuralRestRows(output);
     audit = auditMetconVariety(output, auditOpts);
     if (!audit.passed) {
       const legality = audit.violations.filter((v) =>

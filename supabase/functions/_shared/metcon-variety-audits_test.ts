@@ -13,6 +13,7 @@ import {
   auditMetconVariety,
   isBarbellMetconMovement,
   movementSignature,
+  stripStructuralRestRows,
 } from "./metcon-variety-audits.ts";
 import { loadClassForMovement } from "./conditioning-definitions.ts";
 
@@ -180,6 +181,19 @@ Deno.test("more than 2 named pieces are flagged", () => {
   const r = auditMetconVariety({ metcons: m });
   assertEquals(r.passed, false);
   assert(r.violations.some((v) => v.includes("named")));
+});
+
+Deno.test("structural Rest rows are stripped before legality can see them (2026-08-31 hard-fail)", () => {
+  const m = goodMonth();
+  m[1].movements.push({ movement: "Rest", prescription: "2:00" });
+  m[3].movements.push({ movement: "Rest 90s", prescription: "" });
+  const stripped = stripStructuralRestRows({ metcons: m });
+  assertEquals(stripped, 2);
+  assert(!m[1].movements.some((mv) => mv.movement === "Rest"));
+  // A real movement containing "rest" as a substring is untouched.
+  const wrestler = goodMonth();
+  wrestler[0].movements.push({ movement: "Wrestler Squat", prescription: "10" });
+  assertEquals(stripStructuralRestRows({ metcons: wrestler }), 0);
 });
 
 // ── Athlete-match rules (2026-08-31) ──

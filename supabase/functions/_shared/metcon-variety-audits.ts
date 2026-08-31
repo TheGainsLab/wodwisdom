@@ -122,6 +122,27 @@ function parsePerRoundReps(prescription: string): number | null {
   return nums.length ? Math.max(...nums) : null;
 }
 
+/**
+ * Strip structural "Rest" rows the composer sometimes emits when making
+ * interval arithmetic explicit (observed 2026-08-31: a "Rest" movement row
+ * hard-failed legality — correctly, since rest is not a movement). Rest
+ * belongs in block_scheme prose; removing the row is a FACT patch, not a
+ * judgment. Mutates and returns the output; logs nothing — callers report.
+ * Returns the number of rows stripped.
+ */
+export function stripStructuralRestRows(output: MetconComposerOutput): number {
+  let stripped = 0;
+  for (const m of output.metcons ?? []) {
+    const before = m.movements.length;
+    m.movements = m.movements.filter((mv) => {
+      const n = norm(mv.movement);
+      return n !== "rest" && !n.startsWith("rest ");
+    });
+    stripped += before - m.movements.length;
+  }
+  return stripped;
+}
+
 /** A piece's identity for distinctness: its normalized movement multiset. */
 export function movementSignature(m: ComposedMetcon): string {
   return m.movements.map((mv) => norm(mv.movement)).sort().join(" | ");
