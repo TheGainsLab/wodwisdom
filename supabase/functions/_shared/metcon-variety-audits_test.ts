@@ -230,6 +230,16 @@ Deno.test("rule 11: skill volume above tier band without justification is a viol
   assertEquals(r.violations.filter((v) => v.includes("Toes To Bar")), []);
 });
 
+Deno.test("rule 11 resolves DISPLAY-NAME skills keys (the production payload shape)", () => {
+  // The writer payload keys skills by display name, not snake_case — the
+  // production shape that silently no-opped before the normalized lookup.
+  const displaySkills = { "Double-Unders": "beginner", "HSPU (kipping)": "intermediate" };
+  const over = goodMonth();
+  over[11].movements.find((mv) => mv.movement === "Double Under")!.prescription = "50";
+  const r = auditMetconVariety({ metcons: over }, { skills: displaySkills });
+  assert(r.violations.some((v) => v.includes("exceeds the beginner band")));
+});
+
 Deno.test("rule 11: a not-under-fatigue tier skill is a violation regardless of reps", () => {
   const m = goodMonth();
   m[7].movements.push({ movement: "Ring Muscle Up", prescription: "2" });
