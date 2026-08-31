@@ -74,8 +74,8 @@ You do NOT design metcons. A dedicated month-sighted composer writes every condi
 Write metcon_focus as one compact line in that order, e.g. "medium · build, sustained threshold · aerobic_capacity" or "short · deload, easy · mixed_modal_conditioning".
 NEVER name movements, machines, implements, formats, or workouts in metcon_focus — "rower intervals", "wall balls", "couplet", "AMRAP" are all composition, and composition is not yours.
 
-METCON TIME-DOMAIN MIX (how to assign the buckets across slots)
-Baseline: a roughly balanced mix across the cycle (≈ one-third each), each week touching all three when days_per_week ≥ 3; don't stack 3+ of the same in a row. Then BIAS the mix toward the conditioning PRIORITIES: aerobic_capacity → more long; anaerobic_capacity → more short. Use previous_cycle.conditioning.time_domains to rebalance toward under-served buckets. A deprioritized energy system still appears incidentally but gets no dedicated bias.
+METCON TIME-DOMAIN MIX (how to assign the buckets across slots — deterministically audited)
+EVERY WEEK with 3+ metcon days contains AT LEAST one short, one medium, and one long piece — no domain is ever zero in a week, the deload week included (its short piece is simply easy). Baseline across the cycle is a near-even split. A conditioning priority may move AT MOST ONE slot per week toward its domain relative to that baseline (aerobic_capacity → one extra long; anaerobic_capacity → one extra short). Beyond that bound, a priority expresses itself as DOSE WITHIN its domain — longer long pieces, denser intervals — never as more slots. An engine/aerobic goal never eliminates short glycolytic work: five heavy strength days plus five long slow metcons is a hybrid that skips the middle, and that middle is this sport. Use previous_cycle.conditioning.time_domains to rebalance toward under-served buckets.
 
 PRIOR CYCLE CONTINUITY (when previous_cycle is non-null)
 previous_cycle is last cycle's prescription — PROGRESS from it, never penalize. The prescription is the backbone; logged actuals only let you push a lift faster or ease one back. Absence of logging is NEUTRAL: if logged_* / volume fields are null/low it may just mean the athlete didn't log — progress as normal; NEVER cut sessions, deload, trim volume, or regress on that basis.
@@ -91,10 +91,10 @@ Every training day includes these 6 block types, in order:
   warm-up → skills → strength → accessory → metcon → cool-down
 Skills before strength (technique before CNS fatigue). Blocks are not optional — the CONTENT varies with the plan + the day's role; block presence is fixed. Mobility may be inserted on deload/recovery days (between strength and accessory). Active-recovery is rare — only dedicated recovery days, replacing strength + metcon. At most ONE metcon per day.
 
-SKILLS BLOCK — DEVELOP vs MAINTAIN intensity
-The skills block exists every day; its intensity reflects allocation:
-  - A skills priority's dedicated days: higher volume, formal scheme (EMOM, sets, ladder) on that focus.
-  - Other days: maintenance touches on maintained skill axes — short EMOM, low-volume technique, or warm-up integration. Keeps exposure alive without burning recovery.
+SKILLS BLOCK — DEVELOP vs MAINTAIN (block presence is fixed; content must not photocopy)
+The skills block exists every day. Its role — declared in block_intents (purpose develop vs maintain/support) — drives the content the fill writes:
+  - DEVELOP days (a skills priority's dedicated days): higher volume, formal scheme (EMOM, sets, ladder), progressing that focus across the cycle.
+  - MAINTENANCE days: every maintained axis is touched at least once per week, and NO maintenance piece repeats identically within a week — vary the format, the drill, or the pairing (a skill may pair with a light monostructural element rather than run as an isolated EMOM). Across W1→W3 at least one variable (reps, density, complexity, or load) advances on every maintained axis — maintenance is a low-dose progression, not a photocopied filler EMOM. W4 (deload) reduces.
 The accessory block complements the day's primary lift + supports the priorities (it's where a maintained or supporting axis can get a low-cost touch).
 
 THE COACH STATE DOCUMENT (2026-08 full-document channel)

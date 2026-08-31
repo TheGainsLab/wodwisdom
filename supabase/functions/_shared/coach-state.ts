@@ -77,7 +77,12 @@ export type EvidenceKey = AthleteModelKey | (string & {});
 // v1.14 = the v1.12 prompt restored verbatim. v1.13's absurd-entry rule
 // over-triggered (flagged legitimate numbers as typos) and was removed;
 // the version still moves forward so v1.13-cached states regenerate.
-export const COACH_STATE_BUILDER_VERSION = "v1.15";
+// v1.16 (athlete-match package, 2026-08-31): typed loading_deemphasis flag +
+// fatigue_skill_exclusions. Downstream (composer barbell target, skill-under-
+// fatigue requirement) reads the TYPED flag, never the prose — goal words like
+// "engine" can no longer implicitly zero out loading. Conditioning priorities
+// now explicitly describe time domain + dose, never modality.
+export const COACH_STATE_BUILDER_VERSION = "v1.16";
 
 // ============================================================
 // Controlled vocabularies — LOCKED v1 (DATA, versioned with the schema;
@@ -232,6 +237,20 @@ export interface CoachStateContent {
    *  cycle exists (audited); the generation path persists it to
    *  training_evaluations, replacing the separate training-analysis call. */
   month_in_review?: string | null;
+
+  /** v1.16 — TRUE only when the coach deliberately de-emphasizes loading under
+   *  fatigue this cycle (injury, explicit coach instruction, movement rated
+   *  none). Read by the composer's barbell target: absent/false, normal barbell
+   *  presence is assumed. Goal words ("engine", "aerobic") NEVER set this —
+   *  they shift time domains, not modality. Makes the 2026-08-11 letter-owns-
+   *  taste precedent auditable without parsing prose. */
+  loading_deemphasis?: boolean;
+
+  /** v1.16 — skill axes deliberately kept OUT of conditioning under fatigue
+   *  this cycle (e.g. gymnastics_pressing during a shoulder rehab). The
+   *  under-fatigue expression requirement skips these axes; the letter's prose
+   *  explains why. Empty/absent = no exclusions. */
+  fatigue_skill_exclusions?: FocusArea[];
 }
 
 /** The persisted, versioned snapshot. References the Athlete Model version it
@@ -436,6 +455,18 @@ export const EMIT_COACH_STATE_TOOL = {
         maxLength: 2500,
         description:
           "Athlete-facing review of the PREVIOUS training cycle — emit ONLY when the payload has a non-null previous_cycle. Second person, concrete: cite the real logged numbers (top lifts, hit rates, session counts, metcon coverage), name what moved and what held, connect it forward to this cycle's plan. Sparse logging is NEUTRAL — never scold or infer decline from absence. Omit this field entirely for a first cycle.",
+      },
+      loading_deemphasis: {
+        type: "boolean",
+        description:
+          "TRUE only when you are DELIBERATELY de-emphasizing loaded work under fatigue this cycle — an injury, an explicit coaching reason, or the athlete's movements rating none. When true, metcon_guidance must contain one explicit sentence stating the de-emphasis and its reason. A conditioning/engine/aerobic GOAL is NOT de-emphasis — it shifts time domains and dose, never modality. Omit (or false) in every other case: downstream assumes normal barbell and skill presence in conditioning.",
+      },
+      fatigue_skill_exclusions: {
+        type: "array",
+        maxItems: 4,
+        description:
+          "Skill axes to keep OUT of conditioning under fatigue this cycle (e.g. gymnastics_pressing during shoulder rehab). Only for deliberate, stated reasons — never because the athlete is merely developing the skill. Omit when there are none.",
+        items: { type: "string", enum: [...FOCUS_AREAS] },
       },
     },
     required: [

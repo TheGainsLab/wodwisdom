@@ -46,6 +46,61 @@ export interface SkeletonAuditContext {
   trainingDesignInput?: TrainingDesignInput;
 }
 
+/**
+ * Metcon time-domain mix (athlete-match package, 2026-08-31) — the
+ * deterministic mirror of the skeleton prompt's METCON TIME-DOMAIN MIX rule,
+ * which was the clause that failed hardest in the 2026-08-31 review (an
+ * "engine" goal produced four long slots + one medium per week, zero short).
+ *
+ * DELIBERATELY NOT part of runSkeletonAudits: that loop hard-fails the job on
+ * exhaustion, and this is a quality rule, not a contract. The caller
+ * (stageSkeleton) runs it separately — one retry, then accept-and-log — the
+ * same tier as the composer's variety fence.
+ *
+ * Checks per week (weeks with 3+ metcon days):
+ *   - every domain present (≥1 short, ≥1 medium, ≥1 long) — deload included
+ *   - no domain over ceil(n/3)+1 slots (a priority moves at most ~one slot)
+ */
+export function auditSkeletonMetconMix(skeleton: SkeletonOutput): SkeletonAuditResult {
+  const violations: string[] = [];
+  const parseDomain = (focus: string): "short" | "medium" | "long" => {
+    const f = (focus ?? "").toLowerCase();
+    const m = f.match(/\((\d+)(?:\s*[-–—]\s*(\d+))?\s*min/);
+    if (m) {
+      const upper = parseInt(m[2] ?? m[1], 10);
+      return upper <= 8 ? "short" : upper <= 15 ? "medium" : "long";
+    }
+    if (/\bshort\b/.test(f)) return "short";
+    if (/\blong\b/.test(f)) return "long";
+    return "medium";
+  };
+  for (const wk of skeleton.weeks ?? []) {
+    const domains = (wk.days ?? [])
+      .filter((d) => (d.block_types ?? []).includes("metcon") && d.metcon_focus)
+      .map((d) => parseDomain(d.metcon_focus!));
+    const n = domains.length;
+    if (n < 3) continue;
+    const count = { short: 0, medium: 0, long: 0 };
+    for (const d of domains) count[d]++;
+    for (const dom of ["short", "medium", "long"] as const) {
+      if (count[dom] === 0) {
+        violations.push(
+          `Week ${wk.week_num}: no ${dom} metcon across ${n} conditioning days — every week spans all three time domains (a priority biases dose within a domain, never eliminates one).`,
+        );
+      }
+    }
+    const cap = Math.ceil(n / 3) + 1;
+    for (const dom of ["short", "medium", "long"] as const) {
+      if (count[dom] > cap) {
+        violations.push(
+          `Week ${wk.week_num}: ${count[dom]}/${n} metcons are ${dom} (cap ${cap}) — a conditioning priority moves at most one slot toward its domain; express the rest as dose within the domain.`,
+        );
+      }
+    }
+  }
+  return { rule: "metcon_time_domain_mix", passed: violations.length === 0, violations };
+}
+
 /** Allocation invariants — the skeleton's declared block_intents must match the
  *  TrainingDesignInput (every priority developed, no deprioritized develop, etc.).
  *  Warnings are logged via violations only when hard; soft warnings are dropped

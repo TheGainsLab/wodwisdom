@@ -22,7 +22,7 @@ export interface GenerationAuditEntry {
   program_id?: string | null;
   month_number?: number | null;
   /** Pipeline stage that produced the finding. */
-  stage: "metcons" | "fill_residual" | "soft_audit";
+  stage: "metcons" | "fill_residual" | "soft_audit" | "duration_plan" | "skeleton_mix";
   violations?: string[];
   warnings?: string[];
   retried?: boolean;

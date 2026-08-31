@@ -213,11 +213,12 @@ export async function callWeekFill(
     "- At most one metcon block per day. Every metcon block must declare a block_scheme.",
     "- Every movement in strength / accessory / metcon / skills blocks must populate at least one of {sets, reps, weight, time_seconds, distance} > 0.",
     "- Read injuries_constraints_text + injuries_structured.do_not_program. Substitute or scale any contraindicated movement.",
-    // Session-budget observe phase: honor the skeleton's time allocation when
-    // it emitted one. Guidance only — nothing checks or enforces it.
+    // Session-budget phase: honor the skeleton's time allocation when it
+    // emitted one. Guidance only — nothing checks or enforces it.
     ...((payload.training_context.session_length_minutes ?? 0) > 0
       ? [
-        "- The skeleton's block_minutes (when present on a day) is that day's time allocation: size each block's work — interval lengths, set counts, rest — so the block realistically takes about its allotted minutes.",
+        "- The skeleton's block_minutes (when present on a day) is that day's time allocation and part of each block's PURPOSE: size the work — interval lengths, set counts, secondary movements, rest — so the block genuinely occupies about its allotted minutes. A large allocation is deliberate: a 28-minute strength slot carries more than a lone 5x5 (add working sets or a secondary movement); working sets plus realistic rest should approach the allocation.",
+        "- PRECEDENCE: skill volume caps beat time-fill. When a block's minutes exceed what tier-appropriate skill volume supports, fill the remainder with monostructural work, rest structure, or low-skill movements — never more reps of a capped skill.",
       ]
       : []),
     hasComposed

@@ -19,6 +19,12 @@ import type {
   MetconComposerOutput,
   MetconSlot,
 } from "./metcon-composer.ts";
+import {
+  athleteTierFor,
+  bandRange,
+  loadClassForMovement,
+  skillFatigueDefForMovement,
+} from "./conditioning-definitions.ts";
 
 export interface MetconVarietyAuditResult {
   passed: boolean;
@@ -84,6 +90,38 @@ function isMonoMovement(movement: string): boolean {
   return MONO_KEYWORDS.some((k) => n.includes(k));
 }
 
+// ── Development-axis movement mapping (athlete-match package) ──
+// Which movements EXPRESS each strength/gymnastics focus axis under fatigue.
+// Conditioning axes (aerobic/anaerobic/mixed) are deliberately absent — they
+// express as time domains via the slots, not as movements.
+const AXIS_MOVEMENT_KEYWORDS: Record<string, string[]> = {
+  olympic_lifting: ["snatch", "clean", "jerk", "ground to overhead"],
+  powerlifting_strength: ["deadlift", "back squat", "front squat", "bench press", "thruster"],
+  posterior_chain: ["deadlift", "kettlebell swing", "good morning", "hip extension", "sumo deadlift"],
+  upper_body_pressing: ["push press", "push jerk", "shoulder to overhead", "handstand push up", "hspu", "push up"],
+  gymnastics_pulling: ["pull up", "chest to bar", "toes to bar", "muscle up", "rope climb"],
+  gymnastics_pressing: ["handstand push up", "hspu", "ring dip", "wall walk", "handstand walk", "dip"],
+  midline: ["ghd", "toes to bar", "v up", "l sit", "hollow"],
+  skill_coordination: ["double under", "pistol", "handstand walk", "crossover"],
+};
+
+function movementExpressesAxis(movement: string, axis: string): boolean {
+  const n = norm(movement);
+  return (AXIS_MOVEMENT_KEYWORDS[axis] ?? []).some((kw) => n.includes(kw));
+}
+
+/** Best-effort per-round rep parse from a prescription string: the largest
+ *  dash/slash-separated leading integer ("15" → 15, "21-15-9" → 21). Null when
+ *  the prescription is calorie/distance/time-denominated or non-numeric. */
+function parsePerRoundReps(prescription: string): number | null {
+  const p = prescription.trim().toLowerCase();
+  if (/\b(cal|cals|calories|m|meter|meters|km|ft|yd|sec|s|min)\b/.test(p)) return null;
+  const m = p.match(/^(\d+(?:\s*[-\/]\s*\d+)*)/);
+  if (!m) return null;
+  const nums = m[1].split(/[-\/]/).map((x) => parseInt(x.trim(), 10)).filter((x) => Number.isFinite(x));
+  return nums.length ? Math.max(...nums) : null;
+}
+
 /** A piece's identity for distinctness: its normalized movement multiset. */
 export function movementSignature(m: ComposedMetcon): string {
   return m.movements.map((mv) => norm(mv.movement)).sort().join(" | ");
@@ -126,6 +164,18 @@ export function auditMetconVariety(
     doNotProgram?: string[];
     /** Equipment map — machine movements require the owning equipment. */
     equipment?: Record<string, boolean>;
+    /** Typed development axes (strength/gymnastics; conditioning axes excluded)
+     *  — drives the weekly-expression and fit rules. */
+    developmentAxes?: string[];
+    /** Athlete's skill tiers — drives the skill volume bands. */
+    skills?: Record<string, string | null>;
+    /** CoachState.loading_deemphasis (typed) — relaxes the barbell target.
+     *  Reads the FLAG, never the prose (2026-08-31: the flag is how the
+     *  2026-08-11 letter-owns-taste precedent became auditable — it quietly
+     *  covers the injured-athlete case that motivated the demotion). */
+    loadingDeemphasis?: boolean;
+    /** Skill axes the letter keeps out of conditioning under fatigue. */
+    fatigueSkillExclusions?: string[];
   } = {},
 ): MetconVarietyAuditResult {
   const violations: string[] = [];
@@ -150,10 +200,21 @@ export function auditMetconVariety(
       if (!want.has(key)) violations.push(`${key}: metcon composed for a slot that doesn't exist.`);
     }
     // Time-domain fit (warning tier — duration honesty, not a defect class yet).
+    // When the slot carries an exact allocation (session-budget phase), check
+    // against it (±20%, min 3-minute slack) instead of the coarse bucket.
     const slotByKey = new Map(opts.slots.map((s) => [`W${s.week_num}D${s.day_num}`, s]));
     for (const m of pieces) {
       const slot = slotByKey.get(at(m));
-      if (slot && !TIME_BUCKETS[slot.time_domain]?.(m.stated_duration_minutes)) {
+      if (!slot) continue;
+      const alloc = slot.allocated_minutes ?? null;
+      if (alloc && alloc > 0) {
+        const slack = Math.max(3, alloc * 0.2);
+        if (Math.abs(m.stated_duration_minutes - alloc) > slack) {
+          warnings.push(
+            `${at(m)}: stated ${m.stated_duration_minutes} min vs allocated ${alloc} min — the allocation is the design decision; size the piece to it.`,
+          );
+        }
+      } else if (!TIME_BUCKETS[slot.time_domain]?.(m.stated_duration_minutes)) {
         warnings.push(
           `${at(m)}: stated ${m.stated_duration_minutes} min vs slot time domain "${slot.time_domain}".`,
         );
@@ -225,10 +286,14 @@ export function auditMetconVariety(
   //    no letter has ever argued for.
   if (opts.barbellCapable) {
     const barbellPieces = pieces.filter((m) => m.movements.some((mv) => isBarbellMetconMovement(mv.movement)));
-    const floor = n >= 12 ? 2 : 1;
-    if (barbellPieces.length < floor) {
+    // 2026-08-31: the target rose from a floor of 2 (which the composer treated
+    // as the target — exactly 2 pieces at 39% loads) to 4–6, and the exemption
+    // now reads the TYPED loading_deemphasis flag rather than inferring from
+    // prose. A time-domain/engine priority is NOT de-emphasis.
+    const target = n >= 12 ? 4 : 2;
+    if (opts.loadingDeemphasis !== true && barbellPieces.length < target) {
       warnings.push(
-        `${barbellPieces.length} barbell-bearing piece(s) in ${n} for a barbell-capable athlete (typical floor ${floor}) — fine when the letter de-emphasizes loading; worth a look otherwise.`,
+        `${barbellPieces.length} barbell-bearing piece(s) in ${n} for a barbell-capable athlete (target ${target}-6) with loading_deemphasis NOT set — a capable athlete's month normally cycles barbells; add barbell-bearing pieces at cycling loads.`,
       );
     }
   }
@@ -307,14 +372,113 @@ export function auditMetconVariety(
     }
   }
 
+  // ── Athlete-match rules (2026-08-31) — the objective's deterministic floor ──
+
+  // 10. Typed load band present on every loaded barbell movement. Adjectives
+  //     in prose without load_class/load_band regress the fill to guessing —
+  //     that's how a 475-lb deadlifter got 185-lb "moderate" deadlifts.
+  for (const m of pieces) {
+    for (const mv of m.movements) {
+      if (!isBarbellMetconMovement(mv.movement)) continue;
+      if (!mv.load_class || !mv.load_band) {
+        violations.push(
+          `${at(m)}: "${mv.movement}" is a loaded movement with no typed load_class/load_band — state the band from the shared table (adjectives alone are a defect).`,
+        );
+      } else if (bandRange(mv.load_class, mv.load_band) == null && loadClassForMovement(mv.movement) != null) {
+        violations.push(
+          `${at(m)}: "${mv.movement}" declares band "${mv.load_band}" which class "${mv.load_class}" doesn't define — pick a defined band.`,
+        );
+      }
+    }
+  }
+
+  // 11. Skill volume within the athlete's tier band. Per-round reps only (round
+  //     counts live in prose block_scheme and aren't reliably parseable).
+  //     Above-band is allowed WITH a written justification — proxied as the
+  //     stimulus_note mentioning the movement (deterministic audits can't judge
+  //     justification quality; the proxy forces the composer to write one).
+  if (opts.skills) {
+    for (const m of pieces) {
+      for (const mv of m.movements) {
+        const def = skillFatigueDefForMovement(mv.movement);
+        if (!def) continue;
+        const tier = athleteTierFor(def, opts.skills);
+        if (tier == null) continue; // absence is neutral — no tier, no check
+        const band = def.perRound[tier];
+        if (band == null) {
+          violations.push(
+            `${at(m)}: "${mv.movement}" under fatigue for a ${tier}-tier athlete — this skill is not programmed under fatigue at that tier.`,
+          );
+          continue;
+        }
+        const reps = parsePerRoundReps(mv.prescription);
+        if (reps != null && reps > band[1]) {
+          const justified = norm(m.stimulus_note ?? "").includes(norm(mv.movement).split(" ")[0]);
+          if (!justified) {
+            violations.push(
+              `${at(m)}: "${mv.movement}" at ${reps}/round exceeds the ${tier} band (${band[0]}-${band[1]}) with no justification in stimulus_note — bring it in band or justify it.`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // 12. Development-axis expression — each development axis appears in at least
+  //     one piece per non-deload week (deload weeks detected from slot
+  //     intensity). The prompt's target is weekly everywhere; this is the
+  //     audited floor. Excluded axes are exempt.
+  if (opts.developmentAxes?.length && opts.slots?.length) {
+    const excluded = new Set(opts.fatigueSkillExclusions ?? []);
+    const deloadWeeks = new Set(
+      opts.slots.filter((s) => /deload/i.test(s.intensity)).map((s) => s.week_num),
+    );
+    const weeks = [...new Set(opts.slots.map((s) => s.week_num))].filter((w) => !deloadWeeks.has(w));
+    for (const axis of opts.developmentAxes) {
+      if (excluded.has(axis)) continue;
+      if (!(axis in AXIS_MOVEMENT_KEYWORDS)) continue;
+      for (const wk of weeks) {
+        const expressed = pieces.some(
+          (m) => m.week_num === wk && m.movements.some((mv) => movementExpressesAxis(mv.movement, axis)),
+        );
+        if (!expressed) {
+          violations.push(
+            `Week ${wk}: development axis "${axis}" appears in no metcon — what the athlete trains must be expressed under fatigue (add a piece carrying it, at tier-band volume).`,
+          );
+        }
+      }
+    }
+  }
+
+  // 13. Fit to athlete — ≥60% of pieces carry a movement from the athlete's
+  //     development axes or barbell strength work. The floor under the
+  //     objective: this rule alone would have flagged the generic month.
+  if (opts.developmentAxes?.length) {
+    const excluded = new Set(opts.fatigueSkillExclusions ?? []);
+    const axes = opts.developmentAxes.filter((a) => !excluded.has(a) && a in AXIS_MOVEMENT_KEYWORDS);
+    const fitPieces = pieces.filter((m) =>
+      m.movements.some(
+        (mv) =>
+          isBarbellMetconMovement(mv.movement) ||
+          axes.some((a) => movementExpressesAxis(mv.movement, a)),
+      )
+    );
+    const fitPct = Math.round((fitPieces.length / n) * 100);
+    if (n >= 8 && fitPct < 60) {
+      violations.push(
+        `Only ${fitPieces.length}/${n} pieces (${fitPct}%) draw from this athlete's strength or development-skill work (floor 60%) — the month reads as written for nobody in particular. Recompose pieces to express what the athlete trains.`,
+      );
+    }
+  }
+
   return { passed: violations.length === 0, violations, warnings };
 }
 
 export function formatMetconVarietyViolationsForRetry(violations: string[]): string {
   return [
     "Your previous month of metcons failed the variety audit. Re-emit the FULL month via emit_metcon_month, fixing these violations. Two kinds of violation, two obligations:",
-    "- PIECE violations (named by WxDx): recompose THAT piece — change its movements and/or format. Re-labeling it, toggling its monostructural flag, or editing its stimulus_note does NOT fix a content violation. Keep pieces not named by any violation unchanged.",
-    "- SET violations (a count across the month: the barbell floor, format spread, movement-frequency caps, mono budget): no piece is named — YOU choose which piece(s) to recompose, and you MUST change enough of them that the count is satisfied. Returning the month unchanged is a failure.",
+    "- PIECE violations (named by WxDx): recompose THAT piece — change its movements, loads (typed load_class/load_band), volumes, and/or format. Re-labeling it, toggling its monostructural flag, or editing its stimulus_note does NOT fix a content violation. Keep pieces not named by any violation unchanged.",
+    "- SET violations (a count across the month or week: format spread, movement-frequency caps, mono budget, a development axis missing from a week, the fit-to-athlete floor): no single piece is named — YOU choose which piece(s) to recompose, and you MUST change enough of them that the count is satisfied. Returning the month unchanged is a failure.",
     "",
     ...violations.map((v) => `  - ${v}`),
   ].join("\n");
