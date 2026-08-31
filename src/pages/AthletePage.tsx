@@ -1881,6 +1881,31 @@ export default function AthletePage({ session }: { session: Session }) {
                       />
                       <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>3–6 days. Your program is built to fit — no filler days.</span>
                     </div>
+
+                    {/* Session time budget (reinstated 2026-08-31, reversing the
+                        Aug duration ruling): optional slider, 30–120 in 15-min
+                        steps. Only persists once the athlete moves it — an
+                        untouched slider stays null, keeping "chose 60" distinct
+                        from "never said". Applies from the next generated month. */}
+                    <div style={{ fontSize: 14, fontWeight: 700, margin: '18px 0 10px' }}>About how long can you train per session?</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <input
+                        type="range"
+                        min={30}
+                        max={120}
+                        step={15}
+                        aria-label="Session length in minutes"
+                        value={sessionLengthMinutes ? parseInt(sessionLengthMinutes, 10) : 60}
+                        onChange={e => { setSessionLengthMinutes(e.target.value); markDirty(); }}
+                        style={{ flex: 1, maxWidth: 260, accentColor: 'var(--accent)' }}
+                      />
+                      <span style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', minWidth: 110 }}>
+                        {sessionLengthMinutes ? `${sessionLengthMinutes} min` : '60 min — default'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+                      Your next month is sized to this budget. Leave it if ~an hour is right.
+                    </div>
                   </div>
 
                   {/* Card 2 — YOUR EQUIPMENT: a required one-time review. The

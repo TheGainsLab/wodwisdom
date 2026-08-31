@@ -44,9 +44,17 @@ export const CROSSFIT_PACK: DomainPack = {
       buildEmitWeekTool(daysPerWeek, units, sessionLen),
     // BYTE-FOR-BYTE the recap that lived in pipeline.callSkeletonWriter before
     // the pack seam — retail behavior is unchanged by the move.
-    skeletonRuleRecap: (daysPerWeek) => [
+    skeletonRuleRecap: (daysPerWeek, tdi) => [
       "=== KEY RULES (re-check before emit) ===",
       `- Output exactly 4 weeks × ${daysPerWeek} days. day_num is 1..${daysPerWeek}.`,
+      // Session-budget observe phase (2026-08-31): stated only when the athlete
+      // gave a budget. The skeleton REASONS the allocation (which blocks get the
+      // time, per the priorities); nothing enforces, retries, or rescales it.
+      ...(tdi.session_length_minutes && tdi.session_length_minutes > 0
+        ? [
+          `- SESSION TIME BUDGET: this athlete trains ~${tdi.session_length_minutes} minutes per session. For EVERY day, emit block_minutes — one {block_type, minutes} entry per entry in block_types — distributing the budget in service of the priorities. Each day's minutes should total near the budget (the deload week may run lighter). YOU decide where the time goes; the fill will size each block to your allocation.`,
+        ]
+        : []),
       "- Every training day includes strength + accessory + metcon block types. Skills 2–4 days per week.",
       "- Emit STRUCTURE ONLY — no sets / reps / weight / movement names. Those are filled in subsequent per-week calls.",
       "- primary_lift uses canonical display names (Back Squat, Deadlift, Snatch, Clean and Jerk, etc.) or a complex description.",

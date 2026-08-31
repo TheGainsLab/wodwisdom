@@ -35,9 +35,12 @@ import type { PreviousCycleSummary } from "./build-writer-payload.ts";
  *  these are decision-data (no facts it could use to re-rank intent). */
 export interface TrainingDesignExecutionInputs {
   days_per_week: number;
-  /** RETAIL NEVER SETS THIS (duration ruling 2026-08-11: session duration is
-   *  not a programming concept for individual athletes). Present only for the
-   *  gym/class product line, where a class IS a fixed time slot. */
+  /** Session time budget. REVERSAL of the 2026-08-11 duration ruling
+   *  ("session duration is not a programming concept for individual
+   *  athletes"): a real athlete with an 85-minute budget received ~50-minute
+   *  days and manually padded every session for weeks — duration IS a retail
+   *  concept when the athlete states one (founder decision 2026-08-31,
+   *  observe-only phase). Also the gym/class product's fixed time slot. */
   session_length_minutes?: number | null;
   equipment: Record<string, boolean>;
   /** The HARD ban — injuries + equipment-blocked movements, merged. */
@@ -62,6 +65,9 @@ export interface TrainingDesignInput {
 
   // ── Execution constraints ──
   days_per_week: number;
+  /** Session time budget (minutes) — null when the athlete never stated one.
+   *  Serialized into the skeleton prompt; drives block_minutes emission. */
+  session_length_minutes?: number | null;
   equipment: Record<string, boolean>;
   do_not_program: string[];
   vocabulary: string[];
@@ -96,6 +102,7 @@ export function buildTrainingDesignInput(
     strength_emphasis: coachState.strength_emphasis.value,
 
     days_per_week: exec.days_per_week,
+    session_length_minutes: exec.session_length_minutes ?? null,
     equipment: exec.equipment,
     do_not_program: exec.do_not_program,
     vocabulary: exec.vocabulary,

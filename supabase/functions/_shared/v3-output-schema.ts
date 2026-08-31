@@ -97,6 +97,14 @@ export interface DaySkeleton {
    * explicit, not inferred. (Step 3 "explicit block intent".)
    */
   block_intents: BlockIntent[];
+  /**
+   * Time allocation (2026-08-31 session-budget observe phase): one entry per
+   * entry in block_types, sizing the day against the athlete's stated session
+   * budget. OPTIONAL in schema — the crossfit pack's rule recap requests it
+   * only when the athlete has a budget; emissions are OBSERVED (logged, stored
+   * in block_intent) and never enforced, retried, or rescaled in this phase.
+   */
+  block_minutes?: Array<{ block_type: string; minutes: number }>;
 }
 
 /**
@@ -157,6 +165,20 @@ function buildDaySkeletonSchema(daysPerWeek: number) {
             source_priority_rank: { type: "integer", minimum: 1, maximum: 5 },
           },
           required: ["block_type", "focus", "purpose"],
+          additionalProperties: false,
+        },
+      },
+      block_minutes: {
+        type: "array",
+        description:
+          "Time allocation for this day: one {block_type, minutes} entry per entry in block_types, distributing the athlete's session budget in service of the priorities. Emit when a SESSION TIME BUDGET is stated in the rules.",
+        items: {
+          type: "object",
+          properties: {
+            block_type: { type: "string", enum: BLOCK_TYPES },
+            minutes: { type: "integer", minimum: 3, maximum: 60 },
+          },
+          required: ["block_type", "minutes"],
           additionalProperties: false,
         },
       },
