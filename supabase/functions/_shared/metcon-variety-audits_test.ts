@@ -14,6 +14,7 @@ import {
   isBarbellMetconMovement,
   movementSignature,
 } from "./metcon-variety-audits.ts";
+import { loadClassForMovement } from "./conditioning-definitions.ts";
 
 let dayCounter = 0;
 function piece(movements: string[], overrides: Partial<ComposedMetcon> = {}): ComposedMetcon {
@@ -24,7 +25,12 @@ function piece(movements: string[], overrides: Partial<ComposedMetcon> = {}): Co
     format: "amrap",
     block_scheme: "AMRAP 12",
     stated_duration_minutes: 12,
-    movements: movements.map((m) => ({ movement: m, prescription: "10" })),
+    // Barbell movements carry typed loads (rule 10) so the base fixture stays legal.
+    movements: movements.map((m) =>
+      isBarbellMetconMovement(m)
+        ? { movement: m, prescription: "10", load_class: loadClassForMovement(m), load_band: "moderate" as const }
+        : { movement: m, prescription: "10" }
+    ),
     stimulus_note: "Sustained repeatable pace across all rounds.",
     monostructural: false,
     ...overrides,
@@ -174,6 +180,100 @@ Deno.test("more than 2 named pieces are flagged", () => {
   const r = auditMetconVariety({ metcons: m });
   assertEquals(r.passed, false);
   assert(r.violations.some((v) => v.includes("named")));
+});
+
+// ── Athlete-match rules (2026-08-31) ──
+
+Deno.test("rule 10: barbell movement without typed load band is a violation", () => {
+  const m = goodMonth();
+  m[2].movements = [{ movement: "Thruster", prescription: "10" }, { movement: "Pull Up", prescription: "10" }];
+  const r = auditMetconVariety({ metcons: m });
+  assertEquals(r.passed, false);
+  assert(r.violations.some((v) => v.includes("no typed load_class/load_band")));
+});
+
+Deno.test("rule 11: skill volume above tier band without justification is a violation; in-band passes; justification exempts; unmapped skills are skipped", () => {
+  const skills = { double_unders: "beginner" }; // band 15-30/round
+  const over = goodMonth();
+  const du = over[11].movements.find((mv) => mv.movement === "Double Under")!;
+  du.prescription = "50";
+  const r = auditMetconVariety({ metcons: over }, { skills });
+  assert(r.violations.some((v) => v.includes("exceeds the beginner band")));
+
+  const inBand = goodMonth();
+  inBand[11].movements.find((mv) => mv.movement === "Double Under")!.prescription = "25";
+  const ok = auditMetconVariety({ metcons: inBand }, { skills });
+  assertEquals(ok.violations.filter((v) => v.includes("exceeds the")), []);
+
+  const justified = goodMonth();
+  justified[11].movements.find((mv) => mv.movement === "Double Under")!.prescription = "50";
+  justified[11].stimulus_note = "Deliberate double-under density push — big unbroken sets are the stimulus.";
+  const j = auditMetconVariety({ metcons: justified }, { skills });
+  assertEquals(j.violations.filter((v) => v.includes("exceeds the")), []);
+
+  // Toes To Bar prescribes 10 in the fixture but toes_to_bar has no entry in
+  // this skills map — absence is neutral, so no violation for it.
+  assertEquals(r.violations.filter((v) => v.includes("Toes To Bar")), []);
+});
+
+Deno.test("rule 11: a not-under-fatigue tier skill is a violation regardless of reps", () => {
+  const m = goodMonth();
+  m[7].movements.push({ movement: "Ring Muscle Up", prescription: "2" });
+  const r = auditMetconVariety({ metcons: m }, { skills: { muscle_ups: "none" } });
+  assert(r.violations.some((v) => v.includes("not programmed under fatigue")));
+});
+
+Deno.test("rule 12: a development axis missing from a non-deload week is a violation; deload weeks exempt", () => {
+  const m = goodMonth();
+  const slots: MetconSlot[] = m.map((p) => ({
+    week_num: p.week_num,
+    day_num: p.day_num,
+    time_domain: "medium",
+    intensity: p.week_num === 4 ? "deload — easy" : "build",
+    focus: "aerobic_capacity",
+    day_context: {},
+  }));
+  // gymnastics_pressing appears in W2 (Wall Walk) but not W1/W3.
+  const r = auditMetconVariety({ metcons: m }, { slots, developmentAxes: ["gymnastics_pressing"], skills: {} });
+  assert(r.violations.some((v) => v.includes('Week 1: development axis "gymnastics_pressing"')));
+  assert(!r.violations.some((v) => v.includes("Week 4:")));
+});
+
+Deno.test("rule 13: fit floor flags a month that ignores the athlete's tracks", () => {
+  dayCounter = 0;
+  const generic = Array.from({ length: 12 }, (_, i) =>
+    piece([["Run", "Sit Up"], ["Row", "Lunge"], ["Bike", "Air Squat"], ["Run", "Burpee"]][i % 4], {
+      format: (["amrap", "rft", "intervals"] as const)[i % 3],
+      week_num: Math.floor(i / 3) + 1,
+      day_num: (i % 3) + 1,
+    }));
+  // Distinctness will also flag repeats; check the fit violation specifically.
+  const r = auditMetconVariety({ metcons: generic }, { developmentAxes: ["olympic_lifting", "gymnastics_pulling"] });
+  assert(r.violations.some((v) => v.includes("floor 60%")));
+});
+
+Deno.test("barbell target reads the typed loading_deemphasis flag", () => {
+  const m = goodMonth(); // 2 barbell pieces in 12 → below the 4-6 target
+  const flagged = auditMetconVariety({ metcons: m }, { barbellCapable: true });
+  assert(flagged.warnings.some((w) => w.includes("loading_deemphasis NOT set")));
+  const exempt = auditMetconVariety({ metcons: m }, { barbellCapable: true, loadingDeemphasis: true });
+  assertEquals(exempt.warnings.filter((w) => w.includes("barbell")), []);
+});
+
+Deno.test("allocated_minutes drives the duration warning when present", () => {
+  const m = goodMonth();
+  const slots: MetconSlot[] = m.map((p) => ({
+    week_num: p.week_num,
+    day_num: p.day_num,
+    time_domain: "long",
+    intensity: "build",
+    focus: "aerobic_capacity",
+    day_context: {},
+    allocated_minutes: 24,
+  }));
+  // Every piece states 12 min against a 24-min allocation → warned.
+  const r = auditMetconVariety({ metcons: m }, { slots });
+  assert(r.warnings.some((w) => w.includes("vs allocated 24 min")));
 });
 
 Deno.test("slot coverage: missing, doubled, and orphan slots are flagged; off-bucket duration warns", () => {

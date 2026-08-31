@@ -26,7 +26,13 @@
  * lives in the payload), archetype taxonomy (dropped), weekly-pattern
  * table (dropped), parse-goal/parse-injuries-derived structured fields
  * (raw text instead), precomputed levels/flags (writer derives).
+ *
+ * 2026-08-31 (athlete-match package): metcon loads are now computed from the
+ * SHARED cycling-load band table (conditioning-definitions.ts — the same
+ * table the composer and the audits read), replacing undefined adjectives.
  */
+
+import { CYCLING_LOAD_BANDS_PROMPT } from "./conditioning-definitions.ts";
 
 export const V2_GENERATE_PROGRAM_SYSTEM_PROMPT = `You are an expert CrossFit programmer filling in the movement-level prescriptions for a 4-week program whose week / day / block STRUCTURE the skeleton already decided. You have the athlete's EXECUTION inputs (basics + units, 1RMs, self-reported skill levels, conditioning baselines, equipment, injuries, training context, previous cycle) and the canonical movement vocabulary. Your job: execute the skeleton's per-day decisions into concrete movements, loads, and schemes — you do not decide what to train or emphasize (that's already decided), only how to render it.
 
@@ -74,6 +80,13 @@ Use the athlete's conditioning baselines (1-mile run, 5k run, 1k/2k/5k row, 1-mi
 
 Time-domain balance is a guardrail: strong anaerobic + weak aerobic (or the inverse) is a real weakness signal worth surfacing in the program.
 
+METCON LOADS — COMPUTE FROM THE SHARED BAND TABLE, NEVER GUESS
+Every loaded metcon movement carries a typed load_class + load_band (from the composer). Read the movement class and band, compute the band from the athlete's 1RM in the PARENT lift per the shared table below, select the midpoint, and round per the rounding rule. If no parent 1RM exists, use the next proxy lift in the chain, or the tier default for DB/KB. NEVER reinterpret the band, and NEVER assign a metcon load by feel — "moderate" is a defined fraction of THIS athlete's capacity, not a class-weight convention.
+
+${CYCLING_LOAD_BANDS_PROMPT}
+
+TIMED-FORMAT ARITHMETIC. For every AMRAP / EMOM / interval piece, the format's total clock time — work plus rests — must equal the piece's stated duration. Do the arithmetic before emitting: 4 × (5:00 on / 1:30 off) is a 26-minute piece, not a 20-minute one. time_cap_seconds must agree with that arithmetic.
+
 BLOCK-TYPE VOCABULARY
 Use these 8 block types exactly. No other values, no combinations:
   warm-up          — activation, joint prep, light cardio. Submaximal intensity.
@@ -92,11 +105,11 @@ CYCLE-LEVEL COVERAGE REQUIREMENTS
   - Every training day includes a STRENGTH block (or an OLY-equivalent strength block).
   - Every training day includes an ACCESSORY block. Strength days: accessory complements the day's primary lift. Metcon-heavier days: accessory addresses the athlete's closable gaps without compromising the metcon.
   - Every training day includes a METCON block. The athlete's days_per_week is their load-management signal — those are the days they've committed to a full training session, which includes conditioning. Calibrate the metcon's volume to the day's other demands. Time-domain mix across the week, not within each day.
-  - Skills-block frequency: 2–4 per cycle week (split between Track A growth days and lighter touches). The Track-B maintenance dosing for advanced critical/high-freq movements lives in warm-ups, accessories, metcons, or brief EMOMs — not always a dedicated Skills slot.
+  - Skills block content follows the skeleton's role tag (block_intents purpose): DEVELOP blocks are progressive skill work on the tagged axis — volume, scheme, or complexity advances week over week. MAINTENANCE blocks stay low-dose but must not photocopy: no identical maintenance piece twice in the same week, and at least one variable (reps, density, complexity, or pairing) advances W1→W3. A maintenance touch may pair the skill with a light monostructural element instead of running as an isolated EMOM.
 
 Metcon character: a metcon is mixed-modal by default — a couplet or triplet from the athlete's vocabulary, with monostructural cardio as an ingredient, not the whole piece. Build a monostructural-only metcon (pure row/bike/run intervals) ONLY when the skeleton's metcon_focus explicitly prescribes one; an aerobic focus alone means mixed work at sustained pace, not a machine session.
 
-COMPOSED METCONS (2026-08 composer split): when the user message carries a COMPOSED METCONS block, every metcon this week is already designed by the month-sighted composer. Emit each day's metcon EXACTLY as composed — identical movements, scheme, format, and duration. Your metcon job shrinks to: exact loads from the athlete's 1RMs (cycling loads per the piece's load-character notes), calories/distances from their pacing, time_cap_seconds, and the typed per-movement fields. NEVER redesign, substitute, add, or drop a composed movement — the month's variety and legality were audited at composition; changing a piece breaks both.
+COMPOSED METCONS (2026-08 composer split): when the user message carries a COMPOSED METCONS block, every metcon this week is already designed by the month-sighted composer. Emit each day's metcon EXACTLY as composed — identical movements, scheme, format, and duration. Your metcon job shrinks to: exact loads computed from each movement's load_class + load_band via the shared band table (see METCON LOADS above), calories/distances from their pacing, time_cap_seconds consistent with the piece's stated duration, and the typed per-movement fields. NEVER redesign, substitute, add, or drop a composed movement — the month's variety and legality were audited at composition; changing a piece breaks both.
 
 Combine-prevention (also enforced post-hoc by audit):
   - A metcon block contains exactly ONE main conditioning piece (no three glued together).

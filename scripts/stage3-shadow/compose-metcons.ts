@@ -94,6 +94,16 @@ const inputs: MetconComposerInputs = {
   athlete_context: `${machine.category ?? ""}; ${tdi.days_per_week} days/week`,
   previous_cycle_metcons: [],
   examples,
+  // Typed axis roles (athlete-match package). machine.json may override any of
+  // these for shadow-testing the de-emphasis path (flag injection).
+  development_axes: machine.development_axes ??
+    (tdi.priorities ?? [])
+      .map((p: { focus: string }) => p.focus)
+      .filter((f: string) => !["aerobic_capacity", "anaerobic_capacity", "mixed_modal_conditioning"].includes(f)),
+  maintain_axes: machine.maintain_axes ??
+    (tdi.maintain ?? []).filter((f: string) => !["aerobic_capacity", "anaerobic_capacity", "mixed_modal_conditioning"].includes(f)),
+  loading_deemphasis: machine.loading_deemphasis ?? false,
+  fatigue_skill_exclusions: machine.fatigue_skill_exclusions ?? [],
 };
 
 const banned = new Set((tdi.do_not_program ?? []).map((s: string) => s.toLowerCase()));
@@ -106,6 +116,10 @@ const auditOpts = {
   vocabulary: tdi.vocabulary ?? [],
   doNotProgram: tdi.do_not_program ?? [],
   equipment: tdi.equipment ?? {},
+  developmentAxes: inputs.development_axes,
+  skills: inputs.skills,
+  loadingDeemphasis: inputs.loading_deemphasis,
+  fatigueSkillExclusions: inputs.fatigue_skill_exclusions,
 };
 console.log(`Composing ${slots.length} metcons with ${MODEL} (barbell-capable: ${barbellCapable})…`);
 let output = await callMetconComposer(inputs, { model: MODEL });

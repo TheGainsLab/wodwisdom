@@ -59,8 +59,10 @@ import { type BlockLocation } from "../_shared/compute-block-benchmark.ts";
 // Engine core — the extracted generation pipeline. This function now CONSUMES the
 // Engine (payload -> skeleton -> audits -> fill -> audit suite -> recovery)
 // instead of inlining it. See _shared/engine/pipeline.ts.
+import { auditSkeletonMetconMix, formatSkeletonViolationsForRetry } from "../_shared/v3-skeleton-audits.ts";
 import {
   generateSkeletonWithAudits,
+  callSkeletonWriter,
   callWeekFill,
   resolveGender,
   auditOutput,
@@ -316,8 +318,55 @@ async function stageSkeleton(
   // execution; the audit loop enforces the boundary.
   const tdi = rs.trainingDesignInput!;
   const intentDocument = rs.coachState ? buildCoachStateDocumentBlock(rs.coachState) : "";
-  const skeleton = await generateSkeletonWithAudits(tdi, PACK, undefined, intentDocument);
+  let skeleton = await generateSkeletonWithAudits(tdi, PACK, undefined, intentDocument);
   console.log("[generate-program-v3] skeleton passed audits");
+
+  // Metcon time-domain mix (athlete-match package) — quality rule, not a
+  // contract: ONE retry with the violations, then accept-and-log (the same
+  // tier as the composer's variety fence; a mix miss must never fail the job).
+  let mix = auditSkeletonMetconMix(skeleton);
+  let mixRetried = false;
+  if (!mix.passed) {
+    mixRetried = true;
+    console.warn(`[generate-program-v3] skeleton mix violations (retrying once): ${mix.violations.join(" | ")}`);
+    try {
+      const retrySkeleton = await callSkeletonWriter(
+        tdi,
+        formatSkeletonViolationsForRetry([mix]),
+        PACK,
+        intentDocument,
+      );
+      // The retry must still satisfy the HARD skeleton audits — otherwise keep
+      // the first (hard-audit-passing) skeleton and ship its mix as-is.
+      const hard = PACK.audits.runSkeleton({
+        skeleton: retrySkeleton,
+        daysPerWeek: tdi.days_per_week,
+        trainingDesignInput: tdi,
+      });
+      const retryMix = auditSkeletonMetconMix(retrySkeleton);
+      if (hard.passed && retryMix.violations.length < mix.violations.length) {
+        skeleton = retrySkeleton;
+        mix = retryMix;
+        console.log(`[generate-program-v3] skeleton mix retry adopted (${mix.violations.length} residual)`);
+      } else {
+        console.warn(
+          `[generate-program-v3] skeleton mix retry rejected (hard=${hard.passed}, violations ${retryMix.violations.length} vs ${mix.violations.length}) — keeping first skeleton`,
+        );
+      }
+    } catch (e) {
+      console.warn("[generate-program-v3] skeleton mix retry call failed (accepting first skeleton):", e);
+    }
+  }
+  if (mixRetried || mix.violations.length > 0) {
+    await logGenerationAudit(supa, {
+      user_id: job.user_id,
+      program_id: rs.continuation.programId ?? null,
+      month_number: rs.continuation.monthNumber,
+      stage: "skeleton_mix",
+      violations: mix.violations,
+      retried: mixRetried,
+    }).catch((e) => console.warn("[generate-program-v3] skeleton_mix log failed (non-fatal):", e));
+  }
 
   // Session-budget OBSERVE log (2026-08-31): when the athlete stated a budget,
   // record how the skeleton allocated time — day sums vs budget, and any day
@@ -383,9 +432,23 @@ async function stageMetcons(
 
   const slots = deriveMetconSlots(skeleton);
   const examples = await buildStratifiedMetconExamples(supa);
+  // Typed axis roles (athlete-match package): the composer's AUTHORITATIVE
+  // channel for what must be expressed under fatigue. Conditioning axes are
+  // excluded — they express as time domains via the slots, not as movements.
+  const CONDITIONING_AXES = new Set(["aerobic_capacity", "anaerobic_capacity", "mixed_modal_conditioning"]);
+  const developmentAxes = tdi.priorities
+    .map((p) => p.focus as string)
+    .filter((f) => !CONDITIONING_AXES.has(f));
+  const maintainAxes = (tdi.maintain as string[]).filter((f) => !CONDITIONING_AXES.has(f));
+  const loadingDeemphasis = rs.coachState?.loading_deemphasis === true;
+  const fatigueSkillExclusions = rs.coachState?.fatigue_skill_exclusions ?? [];
   const inputs: MetconComposerInputs = {
     slots,
     metcon_guidance: rs.coachState?.metcon_guidance ?? "",
+    development_axes: developmentAxes,
+    maintain_axes: maintainAxes,
+    loading_deemphasis: loadingDeemphasis,
+    fatigue_skill_exclusions: fatigueSkillExclusions,
     vocabulary: tdi.vocabulary,
     equipment: tdi.equipment,
     do_not_program: tdi.do_not_program,
@@ -408,6 +471,10 @@ async function stageMetcons(
     vocabulary: tdi.vocabulary,
     doNotProgram: tdi.do_not_program,
     equipment: tdi.equipment,
+    developmentAxes,
+    skills: payload.skills as Record<string, string | null>,
+    loadingDeemphasis,
+    fatigueSkillExclusions,
   };
 
   let output = await callMetconComposer(inputs, { model: MODELS.fable });

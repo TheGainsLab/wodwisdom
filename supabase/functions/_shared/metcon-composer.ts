@@ -69,6 +69,11 @@ export interface MetconSlot {
   /** Conditioning focus (adaptation, never a movement menu): aerobic_capacity |
    *  anaerobic_capacity | mixed_modal_conditioning. */
   focus: string;
+  /** The skeleton's exact time allocation for this metcon block (block_minutes,
+   *  session-budget phase). Null when the athlete never stated a budget. When
+   *  present, the piece's stated_duration_minutes must land near it — a large
+   *  allocation is a deliberate design decision, not a suggestion. */
+  allocated_minutes?: number | null;
   day_context: {
     primary_lift?: string;
     strength_scheme?: string;
@@ -82,9 +87,16 @@ export interface ComposedMetconMovement {
   /** Display name from the athlete's vocabulary. */
   movement: string;
   /** Human prescription for this movement within the piece — reps ("15"),
-   *  calories ("12 cal"), distance ("400m"), or a load hint ("10 @ moderate
-   *  kettlebell"). Exact weights are the fill's job. */
+   *  calories ("12 cal"), distance ("400m"). Exact weights are the fill's job. */
   prescription: string;
+  /** TYPED load (athlete-match package): the movement class from the shared
+   *  cycling-load table (conditioning-definitions.ts) — REQUIRED on every
+   *  loaded movement (barbell / DB / KB / ball); omit for bodyweight,
+   *  gymnastics, and monostructural work. The fill computes the exact weight
+   *  from the athlete's parent-lift 1RM; the audit checks presence. Adjectives
+   *  in prose without these fields are a defect. */
+  load_class?: string | null;
+  load_band?: "light" | "moderate" | "heavy" | null;
 }
 
 export interface ComposedMetcon {
@@ -131,6 +143,18 @@ export interface MetconComposerInputs {
   previous_cycle_metcons: string[];
   /** Stratified example block from metcon-examples.ts. Empty string = none. */
   examples: string;
+  /** TYPED coaching decisions (athlete-match package) — the authoritative
+   *  channel for axis roles. The prose metcon_guidance informs character and
+   *  flavor ONLY; where the two appear to conflict, these fields win.
+   *  development_axes = the plan's ranked development focuses (strength +
+   *  gymnastics axes; conditioning axes express as time domains, not here). */
+  development_axes: string[];
+  maintain_axes: string[];
+  /** CoachState.loading_deemphasis (typed) — true ONLY when the letter
+   *  explicitly de-emphasizes loading under fatigue. Gates the barbell target. */
+  loading_deemphasis: boolean;
+  /** Skill axes the letter keeps OUT of conditioning under fatigue. */
+  fatigue_skill_exclusions: string[];
 }
 
 // ============================================================
@@ -146,6 +170,7 @@ interface SkeletonLikeDay {
   strength_scheme?: string;
   skill_focus?: string;
   block_intents?: Array<{ block_type: string; focus: string }>;
+  block_minutes?: Array<{ block_type: string; minutes: number }>;
 }
 interface SkeletonLike {
   weeks?: Array<{ week_num: number; weekly_intent?: string; days?: SkeletonLikeDay[] }>;
@@ -181,12 +206,14 @@ export function deriveMetconSlots(skeleton: SkeletonLike): MetconSlot[] {
       const accessory = (day.block_intents ?? [])
         .filter((b) => b.block_type === "accessory")
         .map((b) => b.focus);
+      const allocated = (day.block_minutes ?? []).find((b) => b.block_type === "metcon")?.minutes ?? null;
       slots.push({
         week_num: wk.week_num,
         day_num: day.day_num,
         time_domain: parseSlotTimeDomain(day.metcon_focus ?? ""),
         intensity: `${wk.weekly_intent ?? ""} · ${day.metcon_focus ?? ""}`.trim(),
         focus: metconIntent?.focus ?? "aerobic_capacity",
+        allocated_minutes: allocated,
         day_context: {
           primary_lift: day.primary_lift,
           strength_scheme: day.strength_scheme,
@@ -232,6 +259,28 @@ export const EMIT_METCON_MONTH_TOOL = {
                 properties: {
                   movement: { type: "string", minLength: 2, maxLength: 60 },
                   prescription: { type: "string", minLength: 1, maxLength: 80 },
+                  load_class: {
+                    type: "string",
+                    description:
+                      "REQUIRED for every loaded movement (barbell/DB/KB/ball): the movement class from the shared cycling-load table. Omit for bodyweight, gymnastics, and machine work.",
+                    enum: [
+                      "deadlift",
+                      "clean",
+                      "snatch",
+                      "thruster",
+                      "shoulder_to_overhead",
+                      "back_squat",
+                      "dumbbell",
+                      "kettlebell",
+                      "medicine_ball",
+                    ],
+                  },
+                  load_band: {
+                    type: "string",
+                    description:
+                      "REQUIRED alongside load_class: the band from the shared table. The fill computes the exact weight from the athlete's parent-lift 1RM — an adjective in prose without this field is a defect.",
+                    enum: ["light", "moderate", "heavy"],
+                  },
                 },
                 required: ["movement", "prescription"],
                 additionalProperties: false,
@@ -268,6 +317,15 @@ export function buildComposerUserMessage(inputs: MetconComposerInputs): string {
   parts.push(
     `CONDITIONING SLOTS (${inputs.slots.length} — compose exactly one distinct metcon per slot):\n` +
       JSON.stringify(inputs.slots, null, 2),
+  );
+  parts.push(
+    [
+      `TYPED COACHING DECISIONS (AUTHORITATIVE — these govern axis roles, loading, and modality; the guidance paragraph below informs character and flavor only; where they appear to conflict, these fields win):`,
+      `  development axes (each must be EXPRESSED under fatigue — see the system prompt): ${inputs.development_axes.length ? inputs.development_axes.join(", ") : "(none)"}`,
+      `  maintain axes: ${inputs.maintain_axes.length ? inputs.maintain_axes.join(", ") : "(none)"}`,
+      `  loading_deemphasis: ${inputs.loading_deemphasis} ${inputs.loading_deemphasis ? "(the letter explicitly de-emphasizes loading under fatigue — the barbell target relaxes)" : "(normal barbell + skill presence assumed)"}`,
+      `  fatigue_skill_exclusions: ${inputs.fatigue_skill_exclusions.length ? inputs.fatigue_skill_exclusions.join(", ") : "(none)"}`,
+    ].join("\n"),
   );
   parts.push(
     `COACH'S CONDITIONING GUIDANCE (the letter's judgment — honor its intent):\n` +
