@@ -287,6 +287,10 @@ async function stageCoachState(
 
   const trainingDesignInput = buildTrainingDesignInput(coachState, {
     days_per_week: payload.training_context.days_per_week,
+    // Session-budget observe phase (2026-08-31): thread the athlete's stated
+    // time budget to the skeleton. Null when never stated — the skeleton then
+    // gets no budget guidance and behaves exactly as before.
+    session_length_minutes: payload.training_context.session_length_minutes ?? null,
     equipment: payload.equipment,
     do_not_program: payload.training_context.injuries_structured?.do_not_program ?? [],
     vocabulary: payload.vocabulary,
@@ -302,8 +306,8 @@ async function stageCoachState(
 }
 
 async function stageSkeleton(
-  _supa: SupabaseClient,
-  _job: ProgramJobRow,
+  supa: SupabaseClient,
+  job: ProgramJobRow,
   rs: ResumeState,
 ): Promise<StageOutcome> {
   // The skeleton consumes the TrainingDesignInput CONTRACT (the locked plan)
@@ -314,6 +318,42 @@ async function stageSkeleton(
   const intentDocument = rs.coachState ? buildCoachStateDocumentBlock(rs.coachState) : "";
   const skeleton = await generateSkeletonWithAudits(tdi, PACK, undefined, intentDocument);
   console.log("[generate-program-v3] skeleton passed audits");
+
+  // Session-budget OBSERVE log (2026-08-31): when the athlete stated a budget,
+  // record how the skeleton allocated time — day sums vs budget, and any day
+  // that omitted block_minutes. Pure observation: nothing is enforced,
+  // retried, or rescaled; the AI's numbers ship as emitted. This log is the
+  // dataset for deciding whether any guard is ever needed.
+  const budget = tdi.session_length_minutes ?? 0;
+  if (budget > 0) {
+    try {
+      const lines: string[] = [];
+      for (const wk of skeleton.weeks ?? []) {
+        for (const day of wk.days ?? []) {
+          const bm = day.block_minutes;
+          if (!bm || bm.length === 0) {
+            lines.push(`W${wk.week_num}D${day.day_num}: block_minutes MISSING (budget=${budget})`);
+          } else {
+            const sum = bm.reduce((a, b) => a + (b.minutes || 0), 0);
+            lines.push(
+              `W${wk.week_num}D${day.day_num}: sum=${sum} vs budget=${budget} [${bm.map((b) => `${b.block_type}=${b.minutes}`).join(" ")}]`,
+            );
+          }
+        }
+      }
+      for (const l of lines) console.log(`[generate-program-v3] duration-plan ${l}`);
+      await logGenerationAudit(supa, {
+        user_id: job.user_id,
+        program_id: rs.continuation.programId ?? null,
+        month_number: rs.continuation.monthNumber,
+        stage: "duration_plan",
+        warnings: lines,
+      });
+    } catch (e) {
+      console.warn("[generate-program-v3] duration-plan observe log failed (non-fatal):", e);
+    }
+  }
+
   return {
     next: "metcons",
     resumeState: { ...rs, skeleton, weeks: [] },

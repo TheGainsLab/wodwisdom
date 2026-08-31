@@ -213,6 +213,13 @@ export async function callWeekFill(
     "- At most one metcon block per day. Every metcon block must declare a block_scheme.",
     "- Every movement in strength / accessory / metcon / skills blocks must populate at least one of {sets, reps, weight, time_seconds, distance} > 0.",
     "- Read injuries_constraints_text + injuries_structured.do_not_program. Substitute or scale any contraindicated movement.",
+    // Session-budget observe phase: honor the skeleton's time allocation when
+    // it emitted one. Guidance only — nothing checks or enforces it.
+    ...((payload.training_context.session_length_minutes ?? 0) > 0
+      ? [
+        "- The skeleton's block_minutes (when present on a day) is that day's time allocation: size each block's work — interval lengths, set counts, rest — so the block realistically takes about its allotted minutes.",
+      ]
+      : []),
     hasComposed
       ? "- Each day's metcon is PRE-COMPOSED (see COMPOSED METCONS): emit it EXACTLY — same movements, same scheme, same format, same duration. Your job on metcons is exact loads from the athlete's 1RMs, calories/distances from their pacing, and the typed per-movement fields. NEVER redesign, swap, add, or drop a composed movement."
       : "- The metcon's EXPECTED completion time must land inside the skeleton's stated metcon_focus window; a time cap may sit above it as a ceiling, never below.",

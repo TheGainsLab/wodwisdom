@@ -77,12 +77,17 @@ function buildBlockIntent(
         purpose: string;
         source_priority_rank?: number;
       }>;
+      block_minutes?: Array<{ block_type: string; minutes: number }>;
     }
     | undefined,
   blockType: string,
 ): Record<string, unknown> | null {
   if (!daySkel) return null;
   const base: Record<string, unknown> = { day_intent: daySkel.day_intent };
+  // Session-budget observe phase: persist the skeleton's time allocation for
+  // this block so planned-vs-actual is queryable per stored program.
+  const tm = daySkel.block_minutes?.find((b) => b.block_type === blockType);
+  if (tm) base.target_minutes = tm.minutes;
   // Movement-level focus the fill reads (the lift / skill / metcon descriptor).
   if (blockType === "strength") {
     if (daySkel.primary_lift) base.focus = daySkel.primary_lift;
@@ -213,6 +218,7 @@ export async function saveProgramV3(
         metcon_focus?: string;
         skill_focus?: string;
         block_intents?: Array<{ block_type: string; focus: string; purpose: string; source_priority_rank?: number }>;
+        block_minutes?: Array<{ block_type: string; minutes: number }>;
       }
     >();
     if (opts.skeleton) {
