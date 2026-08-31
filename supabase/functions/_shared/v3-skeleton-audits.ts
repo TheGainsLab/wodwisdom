@@ -101,6 +101,82 @@ export function auditSkeletonMetconMix(skeleton: SkeletonOutput): SkeletonAuditR
   return { rule: "metcon_time_domain_mix", passed: violations.length === 0, violations };
 }
 
+/**
+ * Part D (2026-08-31) — the ENTITLEMENT gate for dedicated cardio, applied in
+ * CODE because entitlements are facts: an Engine-entitled athlete must never
+ * receive a cardio block even if the skeleton emits one (Engine IS their
+ * dedicated conditioning product). Removes cardio from block_types,
+ * block_minutes, and block_intents on every day; returns the stripped
+ * locations for the log. Mutates the skeleton.
+ */
+export function stripCardioBlocks(skeleton: SkeletonOutput): string[] {
+  const stripped: string[] = [];
+  for (const wk of skeleton.weeks ?? []) {
+    for (const day of wk.days ?? []) {
+      // deno-lint-ignore no-explicit-any
+      const d = day as any;
+      if ((d.block_types ?? []).includes("cardio")) {
+        stripped.push(`W${wk.week_num}D${day.day_num}`);
+        d.block_types = (d.block_types ?? []).filter((b: string) => b !== "cardio");
+        if (Array.isArray(d.block_minutes)) {
+          d.block_minutes = d.block_minutes.filter((b: { block_type?: string }) => b?.block_type !== "cardio");
+        }
+        if (Array.isArray(d.block_intents)) {
+          d.block_intents = d.block_intents.filter((b: { block_type?: string }) => b?.block_type !== "cardio");
+        }
+      }
+    }
+  }
+  return stripped;
+}
+
+/**
+ * Part D — LOG-ONLY cardio plan check (never blocks, never retries; the
+ * limits are ceilings the prompt states and this observes):
+ *   - any cardio block without a typed dedicated_cardio authorization
+ *   - more than 1 cardio block on a day / more than 3 in a week
+ *   - a block outside 10-30 minutes (when block_minutes present)
+ *   - cardio over 25% of weekly minutes (only when a session budget exists)
+ *   - max-dose weeks (3 blocks) when the authorizing priority isn't rank 1
+ */
+export function auditCardioPlan(
+  skeleton: SkeletonOutput,
+  authorized: { source_priority_rank: number } | null | undefined,
+  sessionLengthMinutes: number | null,
+  daysPerWeek: number,
+): string[] {
+  const lines: string[] = [];
+  const weeklyBudget = sessionLengthMinutes && sessionLengthMinutes > 0
+    ? sessionLengthMinutes * daysPerWeek
+    : null;
+  for (const wk of skeleton.weeks ?? []) {
+    let weekCount = 0;
+    let weekMinutes = 0;
+    for (const day of wk.days ?? []) {
+      // deno-lint-ignore no-explicit-any
+      const d = day as any;
+      const dayCount = (d.block_types ?? []).filter((b: string) => b === "cardio").length;
+      if (dayCount === 0) continue;
+      weekCount += dayCount;
+      if (dayCount > 1) lines.push(`W${wk.week_num}D${day.day_num}: ${dayCount} cardio blocks (cap 1/day)`);
+      if (!authorized) lines.push(`W${wk.week_num}D${day.day_num}: cardio block WITHOUT typed dedicated_cardio authorization — cardio is never a default`);
+      const mins = (d.block_minutes ?? []).find((b: { block_type?: string }) => b?.block_type === "cardio")?.minutes;
+      if (typeof mins === "number") {
+        weekMinutes += mins;
+        if (mins < 10 || mins > 30) lines.push(`W${wk.week_num}D${day.day_num}: cardio block ${mins} min (band 10-30)`);
+      }
+    }
+    if (weekCount > 3) lines.push(`Week ${wk.week_num}: ${weekCount} cardio blocks (cap 3/week)`);
+    if (weekCount >= 3 && authorized && authorized.source_priority_rank > 1) {
+      lines.push(`Week ${wk.week_num}: max cardio dose (${weekCount}/week) but the authorizing priority is rank ${authorized.source_priority_rank} — ceilings are for rank 1`);
+    }
+    if (weeklyBudget && weekMinutes > weeklyBudget * 0.25) {
+      lines.push(`Week ${wk.week_num}: ${weekMinutes} cardio min of ${weeklyBudget} weekly (cap 25% = ${Math.round(weeklyBudget * 0.25)})`);
+    }
+  }
+  return lines;
+}
+
 /** Allocation invariants — the skeleton's declared block_intents must match the
  *  TrainingDesignInput (every priority developed, no deprioritized develop, etc.).
  *  Warnings are logged via violations only when hard; soft warnings are dropped

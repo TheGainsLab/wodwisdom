@@ -38,7 +38,11 @@ export type BlockType =
   | "cool-down"
   | "other";
 
-/** Generation block types — what generate-program emits (no cardio/other). */
+/** Generation block types — what generate-program emits. 'cardio' joined the
+ *  set 2026-08-31 (Part D): a dedicated monostructural aerobic block, emitted
+ *  ONLY when the coach letter's typed dedicated_cardio authorization exists
+ *  (never a default) and structurally stripped for Engine-entitled athletes
+ *  (Engine IS the dedicated conditioning product). */
 export const BLOCK_TYPES: BlockType[] = [
   "warm-up",
   "mobility",
@@ -46,18 +50,18 @@ export const BLOCK_TYPES: BlockType[] = [
   "strength",
   "accessory",
   "metcon",
+  "cardio",
   "active-recovery",
   "cool-down",
 ];
 
 /**
- * Ingestion block types — the generation set plus 'cardio' (ingested cardio
- * pieces) and 'other' (the escape hatch for rest days / unclassifiable
- * blocks). preprocess-program classifies into this wider set.
+ * Ingestion block types — the generation set plus 'other' (the escape hatch
+ * for rest days / unclassifiable blocks). preprocess-program classifies into
+ * this wider set.
  */
 export const INGEST_BLOCK_TYPES: BlockType[] = [
   ...BLOCK_TYPES,
-  "cardio",
   "other",
 ];
 

@@ -88,13 +88,14 @@ ${CYCLING_LOAD_BANDS_PROMPT}
 TIMED-FORMAT ARITHMETIC. For every AMRAP / EMOM / interval piece, the format's total clock time — work plus rests — must equal the piece's stated duration. Do the arithmetic before emitting: 4 × (5:00 on / 1:30 off) is a 26-minute piece, not a 20-minute one. time_cap_seconds must agree with that arithmetic.
 
 BLOCK-TYPE VOCABULARY
-Use these 8 block types exactly. No other values, no combinations:
+Use these block types exactly. No other values, no combinations:
   warm-up          — activation, joint prep, light cardio. Submaximal intensity.
   mobility         — static + dynamic stretching, foam roll. Often paired with warm-up.
   skills           — gymnastics + monostructural / odd-object technique. NOT barbell technical work (that's Strength).
   strength         — primary heavy lift(s) with a defined scheme. Foundational lift OR Olympic lift OR strength complex (e.g., snatch + OHS + snatch balance).
   accessory        — supplementary work addressing the athlete's closable gaps + complementing the day's primary lift. Hypertrophy schemes typical (3–4 sets × 8–15 reps).
   metcon           — main conditioning piece. One main piece per day, with a single time-domain target (short / medium / long).
+  cardio           — DEDICATED monostructural aerobic block. Emit ONLY on days where the skeleton placed one — NEVER add one yourself. ONE modality the athlete's equipment supports (do_not_program already blocks unowned machines); prescription from their pacing benchmarks (distance/calories/time in the typed fields, the pace cue and any work/rest structure in block_scheme); steady-state or intervals per the day_intent; total clock fills the block's block_minutes.
   active-recovery  — easy aerobic movement at conversational pace. Blood flow, parasympathetic recovery. Not a training stimulus.
   cool-down        — easy walk/bike + static stretches on the day's taxed areas.
 
@@ -293,7 +294,7 @@ Two patterns the example shows that the rules alone don't:
 Strength blocks may also be complexes — e.g., movements: [{movement: "Snatch"}, {movement: "Overhead Squat"}, {movement: "Snatch Balance"}] together as one block, with the scheme described in block_scheme.
 
 AUDIT RULES (echoed so you can self-check before output):
-  - block_type values must be in the 8-type enum above. Anything else is rejected.
+  - block_type values must be in the block-type enum above. Anything else is rejected. cardio appears ONLY where the skeleton placed it.
   - metcon block: exactly one main conditioning piece per day; multiple metcons → split into separate days or move secondary to accessory.
   - prescribed barbell weight must be ≤ 100% of the athlete's relevant 1RM (with one exception: "1rm_attempt" scheme).
   - output must contain exactly 4 weeks × days_per_week days.

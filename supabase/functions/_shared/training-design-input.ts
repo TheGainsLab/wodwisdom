@@ -50,6 +50,11 @@ export interface TrainingDesignExecutionInputs {
   /** 1RMs — threaded for the week-fill's load math (% × 1RM). */
   lifts: Record<string, number | null>;
   previous_cycle: PreviousCycleSummary | null;
+  /** Part D (2026-08-31): FALSE when the athlete holds an active Engine
+   *  entitlement (Engine IS the dedicated conditioning product — a retail
+   *  cardio block would double their conditioning across two systems).
+   *  Entitlements are facts; this is a code decision, never AI judgment. */
+  cardio_allowed?: boolean;
 }
 
 export interface TrainingDesignInput {
@@ -73,6 +78,16 @@ export interface TrainingDesignInput {
   vocabulary: string[];
   lifts: Record<string, number | null>;
   previous_cycle: PreviousCycleSummary | null;
+  /** Part D: false for Engine-entitled athletes — the skeleton is never
+   *  offered the cardio block type, and any emission is stripped in code. */
+  cardio_allowed?: boolean;
+  /** Part D: the coach letter's typed dedicated-cardio authorization (null =
+   *  no cardio blocks, the default). Dose follows source_priority_rank. */
+  dedicated_cardio?: {
+    modality: string;
+    source_priority_rank: number;
+    reason: string;
+  } | null;
   /** GROUP-CLASS ONLY (crossfit_class pack): the owner's weekly focus split —
    *  how many days carry a strength vs a skills focus block. Optional +
    *  additive: no retail path sets it, and packs other than crossfit_class
@@ -108,6 +123,8 @@ export function buildTrainingDesignInput(
     vocabulary: exec.vocabulary,
     lifts: exec.lifts,
     previous_cycle: exec.previous_cycle,
+    cardio_allowed: exec.cardio_allowed ?? true,
+    dedicated_cardio: exec.cardio_allowed === false ? null : (coachState.dedicated_cardio ?? null),
 
     coach_state_version: coachState.version,
     athlete_model_version: coachState.athlete_model_version,

@@ -125,3 +125,61 @@ Deno.test("runSkeletonAudits fails via M6 when the plan promises an unprogrammed
   assertEquals(result.passed, false);
   assert(result.failures.some((f) => f.rule === "machine_row_m6"));
 });
+
+// ============================================================
+// Part D (2026-08-31): dedicated cardio — entitlement strip + plan check
+// ============================================================
+
+import { auditCardioPlan, stripCardioBlocks } from "./v3-skeleton-audits.ts";
+
+function cardioDay(num: number, minutes = 20): DaySkeleton {
+  return day(num, {
+    block_types: ["warm-up", "strength", "accessory", "metcon", "cardio", "cool-down"],
+    // deno-lint-ignore no-explicit-any
+    ...( { block_minutes: [
+      { block_type: "warm-up", minutes: 10 },
+      { block_type: "strength", minutes: 25 },
+      { block_type: "accessory", minutes: 12 },
+      { block_type: "metcon", minutes: 15 },
+      { block_type: "cardio", minutes },
+      { block_type: "cool-down", minutes: 8 },
+    ] } as any),
+  });
+}
+
+Deno.test("stripCardioBlocks removes cardio everywhere and reports locations (Engine entitlement gate)", () => {
+  const s = baseSkeleton();
+  s.weeks[0].days[0] = cardioDay(1);
+  s.weeks[2].days[1] = cardioDay(2);
+  const stripped = stripCardioBlocks(s);
+  assertEquals(stripped, ["W1D1", "W3D2"]);
+  for (const wk of s.weeks) {
+    for (const d of wk.days) {
+      assert(!(d.block_types ?? []).includes("cardio"));
+      // deno-lint-ignore no-explicit-any
+      assert(!((d as any).block_minutes ?? []).some((b: { block_type: string }) => b.block_type === "cardio"));
+    }
+  }
+});
+
+Deno.test("auditCardioPlan: clean authorized plan produces no lines", () => {
+  const s = baseSkeleton();
+  s.weeks[0].days[0] = cardioDay(1, 20);
+  const lines = auditCardioPlan(s, { source_priority_rank: 1 }, 90, 5);
+  assertEquals(lines, []);
+});
+
+Deno.test("auditCardioPlan flags: unauthorized, over-count, out-of-band minutes, weekly % cap, rank-vs-dose", () => {
+  const s = baseSkeleton();
+  // Week 1: 3 cardio days (2-day weeks in fixture — add a third day)
+  s.weeks[0].days = [cardioDay(1, 35), cardioDay(2, 30), cardioDay(3, 30)];
+  const unauthorized = auditCardioPlan(s, null, 90, 5);
+  assert(unauthorized.some((l) => l.includes("WITHOUT typed dedicated_cardio")));
+  const lines = auditCardioPlan(s, { source_priority_rank: 3 }, 60, 3); // weekly budget 180, cap 45
+  assert(lines.some((l) => l.includes("35 min (band 10-30)")));
+  assert(lines.some((l) => l.includes("cap 25%")));
+  assert(lines.some((l) => l.includes("rank 3")));
+  // No budget stated → % check silently skipped, count checks remain
+  const noBudget = auditCardioPlan(s, { source_priority_rank: 1 }, null, 3);
+  assert(!noBudget.some((l) => l.includes("25%")));
+});

@@ -55,6 +55,17 @@ export const CROSSFIT_PACK: DomainPack = {
           `- SESSION TIME BUDGET: this athlete trains ~${tdi.session_length_minutes} minutes per session. For EVERY day, emit block_minutes — one {block_type, minutes} entry per entry in block_types — distributing the budget in service of the priorities. Each day's minutes should total near the budget (the deload week may run lighter). YOU decide where the time goes; the fill will size each block to your allocation.`,
         ]
         : []),
+      // Part D (2026-08-31): dedicated cardio — offered ONLY when the coach
+      // letter authorized it AND the athlete holds no Engine entitlement.
+      // The caps are CEILINGS, never targets; dose follows the linked
+      // priority's rank. Absent this line, the skeleton must not emit cardio.
+      ...(tdi.cardio_allowed !== false && tdi.dedicated_cardio
+        ? [
+          `- DEDICATED CARDIO (authorized): the coach's plan calls for standalone ${tdi.dedicated_cardio.modality} work — "${tdi.dedicated_cardio.reason}" (serving priority rank ${tdi.dedicated_cardio.source_priority_rank}). You MAY place cardio blocks: 10-30 minutes each, at most ONE per day and THREE per week${tdi.session_length_minutes && tdi.session_length_minutes > 0 ? `, and at most 25% of total weekly training minutes` : ""}. These caps are CEILINGS reachable only when this is the athlete's TOP priority (rank 1); at rank ${tdi.dedicated_cardio.source_priority_rank}${tdi.dedicated_cardio.source_priority_rank > 1 ? " place 1-2 shorter blocks" : " dose up to the ceilings as the plan warrants"}. Each cardio block gets a block_minutes entry; state its intent (steady-state vs intervals) in day_intent.`,
+        ]
+        : [
+          "- NO dedicated cardio blocks this cycle — never emit the cardio block type. Aerobic work lives in the metcon time domains.",
+        ]),
       "- Every training day includes strength + accessory + metcon block types. Skills 2–4 days per week.",
       "- Emit STRUCTURE ONLY — no sets / reps / weight / movement names. Those are filled in subsequent per-week calls.",
       "- primary_lift uses canonical display names (Back Squat, Deadlift, Snatch, Clean and Jerk, etc.) or a complex description.",
