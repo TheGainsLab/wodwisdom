@@ -178,13 +178,32 @@ export function skillFatigueDefForMovement(movement: string): SkillFatigueDef | 
  *  non-null skillKey wins; "none" reads as beginner-with-caution (legality /
  *  vocabulary gates handle true inability). NULL when the athlete's map holds
  *  no value for any of the skill's keys — absence is NEUTRAL: the audit skips
- *  rather than assuming a tier. */
+ *  rather than assuming a tier.
+ *
+ *  Key matching is NORMALIZED with an inclusion fallback because the writer
+ *  payload's skills map is keyed by DISPLAY NAMES ("Toes-to-Bar", "HSPU
+ *  (kipping)") while skillKeys are snake_case profile keys — the exact-key
+ *  lookup alone silently never matched in production (2026-08-31). Exact
+ *  normalized equality wins over inclusion so "strict_hspu" prefers "Strict
+ *  HSPU" over any other HSPU variant. */
 export function athleteTierFor(
   def: SkillFatigueDef,
   skills: Record<string, string | null>,
 ): SkillTier | null {
+  const byNorm = new Map<string, string>();
+  for (const [k, v] of Object.entries(skills)) {
+    if (typeof v === "string") byNorm.set(normalize(k), v);
+  }
+  const resolve = (key: string): string | undefined => {
+    const nk = normalize(key);
+    if (byNorm.has(nk)) return byNorm.get(nk);
+    for (const [k2, v2] of byNorm) {
+      if (k2.includes(nk) || nk.includes(k2)) return v2;
+    }
+    return undefined;
+  };
   for (const k of def.skillKeys) {
-    const v = skills[k];
+    const v = resolve(k);
     if (v === "advanced" || v === "intermediate" || v === "beginner") return v;
     if (v === "none") return "beginner";
   }

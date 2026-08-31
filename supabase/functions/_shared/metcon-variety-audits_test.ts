@@ -13,6 +13,7 @@ import {
   auditMetconVariety,
   isBarbellMetconMovement,
   movementSignature,
+  stripStructuralRestRows,
 } from "./metcon-variety-audits.ts";
 import { loadClassForMovement } from "./conditioning-definitions.ts";
 
@@ -182,6 +183,19 @@ Deno.test("more than 2 named pieces are flagged", () => {
   assert(r.violations.some((v) => v.includes("named")));
 });
 
+Deno.test("structural Rest rows are stripped before legality can see them (2026-08-31 hard-fail)", () => {
+  const m = goodMonth();
+  m[1].movements.push({ movement: "Rest", prescription: "2:00" });
+  m[3].movements.push({ movement: "Rest 90s", prescription: "" });
+  const stripped = stripStructuralRestRows({ metcons: m });
+  assertEquals(stripped, 2);
+  assert(!m[1].movements.some((mv) => mv.movement === "Rest"));
+  // A real movement containing "rest" as a substring is untouched.
+  const wrestler = goodMonth();
+  wrestler[0].movements.push({ movement: "Wrestler Squat", prescription: "10" });
+  assertEquals(stripStructuralRestRows({ metcons: wrestler }), 0);
+});
+
 // ── Athlete-match rules (2026-08-31) ──
 
 Deno.test("rule 10: barbell movement without typed load band is a violation", () => {
@@ -214,6 +228,16 @@ Deno.test("rule 11: skill volume above tier band without justification is a viol
   // Toes To Bar prescribes 10 in the fixture but toes_to_bar has no entry in
   // this skills map — absence is neutral, so no violation for it.
   assertEquals(r.violations.filter((v) => v.includes("Toes To Bar")), []);
+});
+
+Deno.test("rule 11 resolves DISPLAY-NAME skills keys (the production payload shape)", () => {
+  // The writer payload keys skills by display name, not snake_case — the
+  // production shape that silently no-opped before the normalized lookup.
+  const displaySkills = { "Double-Unders": "beginner", "HSPU (kipping)": "intermediate" };
+  const over = goodMonth();
+  over[11].movements.find((mv) => mv.movement === "Double Under")!.prescription = "50";
+  const r = auditMetconVariety({ metcons: over }, { skills: displaySkills });
+  assert(r.violations.some((v) => v.includes("exceeds the beginner band")));
 });
 
 Deno.test("rule 11: a not-under-fatigue tier skill is a violation regardless of reps", () => {
