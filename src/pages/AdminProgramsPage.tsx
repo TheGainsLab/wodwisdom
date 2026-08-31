@@ -68,6 +68,8 @@ interface BlockV2Row {
   time_cap_seconds: number | null;
   block_notes: string | null;
   sort_order: number;
+  /** Skeleton's time allocation (session-budget observe phase); null pre-rollout. */
+  target_minutes: number | null;
   movements: MovementV2Row[];
 }
 
@@ -394,6 +396,16 @@ function DayRow({ userId, day, onNavigate }: { userId: string; day: Workout; onN
         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>
           {blockCount} block{blockCount !== 1 ? 's' : ''}
         </span>
+        {(() => {
+          // Day total of the skeleton's time allocation, when present.
+          const mins = (day.blocks_v2 ?? []).map(b => b.target_minutes).filter((m): m is number => m != null);
+          if (mins.length === 0) return null;
+          return (
+            <span style={{ fontSize: 11, color: '#2ec486', fontWeight: 600, marginLeft: 4 }}>
+              · ~{mins.reduce((a, b) => a + b, 0)} min
+            </span>
+          );
+        })()}
         {blockTypes.length > 0 && (
           <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 4 }}>
             · {blockTypes.join(', ')}
@@ -433,6 +445,7 @@ function DayRow({ userId, day, onNavigate }: { userId: string; day: Workout; onN
                 <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--accent)', marginBottom: 3 }}>
                   {humanize(b.block_type)}
                   {b.block_label && <span style={{ color: 'var(--text-dim)', textTransform: 'none', letterSpacing: 0 }}> — {b.block_label}</span>}
+                  {b.target_minutes != null && <span style={{ color: '#2ec486', textTransform: 'none', letterSpacing: 0 }}> · ~{b.target_minutes} min</span>}
                   {b.time_cap_seconds != null && <span style={{ color: 'var(--text-dim)', textTransform: 'none', letterSpacing: 0 }}> · cap {Math.round(b.time_cap_seconds / 60)} min</span>}
                 </div>
                 {b.block_scheme && (
