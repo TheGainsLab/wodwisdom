@@ -82,7 +82,12 @@ export type EvidenceKey = AthleteModelKey | (string & {});
 // fatigue requirement) reads the TYPED flag, never the prose — goal words like
 // "engine" can no longer implicitly zero out loading. Conditioning priorities
 // now explicitly describe time domain + dose, never modality.
-export const COACH_STATE_BUILDER_VERSION = "v1.16";
+// v1.17 (Part D dedicated cardio, 2026-08-31): typed dedicated_cardio
+// authorization — set ONLY for an explicitly modality-specific goal (a named
+// race, "run 2x/week", a machine-specific target). Absent = the program never
+// emits a cardio block. Dose follows the linked priority's rank; the caps are
+// ceilings, reachable only at rank 1.
+export const COACH_STATE_BUILDER_VERSION = "v1.17";
 
 // ============================================================
 // Controlled vocabularies — LOCKED v1 (DATA, versioned with the schema;
@@ -251,6 +256,19 @@ export interface CoachStateContent {
    *  under-fatigue expression requirement skips these axes; the letter's prose
    *  explains why. Empty/absent = no exclusions. */
   fatigue_skill_exclusions?: FocusArea[];
+
+  /** v1.17 (Part D) — typed authorization for DEDICATED cardio blocks (plain
+   *  monostructural aerobic work as its own block). Set ONLY when the athlete's
+   *  goal is explicitly modality-specific (a named race, "run twice a week",
+   *  "improve my 5k row") — never from generic engine/conditioning language
+   *  (that shapes metcon time domains instead). Absent = zero cardio blocks.
+   *  source_priority_rank links the dose to the plan: rank 1 may approach the
+   *  ceilings (3/week); lower ranks earn 1–2 short blocks. */
+  dedicated_cardio?: {
+    modality: "run" | "row" | "bike" | "ski" | "swim" | "mixed";
+    source_priority_rank: number;
+    reason: string;
+  } | null;
 }
 
 /** The persisted, versioned snapshot. References the Athlete Model version it
@@ -467,6 +485,18 @@ export const EMIT_COACH_STATE_TOOL = {
         description:
           "Skill axes to keep OUT of conditioning under fatigue this cycle (e.g. gymnastics_pressing during shoulder rehab). Only for deliberate, stated reasons — never because the athlete is merely developing the skill. Omit when there are none.",
         items: { type: "string", enum: [...FOCUS_AREAS] },
+      },
+      dedicated_cardio: {
+        type: "object",
+        description:
+          "Authorization for DEDICATED cardio blocks (standalone monostructural aerobic work). Emit ONLY when the athlete's goal is EXPLICITLY modality-specific — a named race (HYROX, a 10k), a stated frequency ('run twice a week'), or a machine-specific target ('improve my 5k row'). Generic engine/conditioning/aerobic goal language NEVER qualifies — that shapes metcon time domains, not program structure. Omit in every other case: without this field the program contains zero cardio blocks. source_priority_rank = the rank of the priority this serves; dose scales with it (rank 1 may approach 3 blocks/week; lower ranks earn 1-2 short blocks). reason cites the athlete's own goal words.",
+        properties: {
+          modality: { type: "string", enum: ["run", "row", "bike", "ski", "swim", "mixed"] },
+          source_priority_rank: { type: "integer", minimum: 1, maximum: 5 },
+          reason: { type: "string", minLength: 10, maxLength: 300 },
+        },
+        required: ["modality", "source_priority_rank", "reason"],
+        additionalProperties: false,
       },
     },
     required: [

@@ -83,13 +83,14 @@ previous_cycle is last cycle's prescription — PROGRESS from it, never penalize
   - strength[].logged_hit_rate / logged_avg_rpe (null = ignore): hit_rate ≥ ~80 & rpe ≤ ~8 → progress that lift a bit harder; clear struggle (low hit_rate & rpe ≥ ~9 across sessions) → ease THAT ONE lift. Never generalize one lift's struggle into a cycle-wide cut.
   - conditioning.time_domains: rebalance toward under-served buckets, consistent with the conditioning priorities above.
 
-BLOCK-TYPE VOCABULARY (use these 8 exactly)
-  warm-up · mobility · skills · strength · accessory · metcon · active-recovery · cool-down
+BLOCK-TYPE VOCABULARY (use these exactly)
+  warm-up · mobility · skills · strength · accessory · metcon · cardio · active-recovery · cool-down
+cardio = a DEDICATED monostructural aerobic block (a tempo run, row intervals) — NEVER a default. It exists on a day ONLY when the TrainingDesignInput carries a dedicated_cardio authorization (see the rule recap when present); with no authorization, no day contains one, ever — mixed-modal metcons are this sport's default aerobic vehicle.
 
 DAY COMPOSITION
 Every training day includes these 6 block types, in order:
   warm-up → skills → strength → accessory → metcon → cool-down
-Skills before strength (technique before CNS fatigue). Blocks are not optional — the CONTENT varies with the plan + the day's role; block presence is fixed. Mobility may be inserted on deload/recovery days (between strength and accessory). Active-recovery is rare — only dedicated recovery days, replacing strength + metcon. At most ONE metcon per day.
+Skills before strength (technique before CNS fatigue). Blocks are not optional — the CONTENT varies with the plan + the day's role; block presence is fixed. Mobility may be inserted on deload/recovery days (between strength and accessory). A cardio block (ONLY when authorized — see BLOCK-TYPE VOCABULARY) is inserted after the metcon or in place of the skills slot on that day, with its own block_minutes. Active-recovery is rare — only dedicated recovery days, replacing strength + metcon. At most ONE metcon per day.
 
 SKILLS BLOCK — DEVELOP vs MAINTAIN (block presence is fixed; content must not photocopy)
 The skills block exists every day. Its role — declared in block_intents (purpose develop vs maintain/support) — drives the content the fill writes:

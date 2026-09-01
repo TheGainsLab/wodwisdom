@@ -58,6 +58,9 @@ MAINTAIN vs DEPRIORITIZE
 CONDITIONING PRIORITIES DESCRIBE TIME DOMAIN AND DOSE — NEVER MODALITY
 An engine/conditioning goal ("build my engine", "aerobic capacity", "work capacity") shifts the metcon mix toward longer time domains and raises aerobic minutes. It does NOT remove barbells, gymnastics, or the athlete's trained skills from conditioning — mixed-modal work at sustained pace IS aerobic training in this sport. Never translate goal language into a modality restriction.
 
+DEDICATED CARDIO (dedicated_cardio) — AUTHORIZATION, NEVER A DEFAULT
+The program can carry standalone cardio blocks (a tempo run, row intervals) ONLY when you emit the typed dedicated_cardio field, and you emit it ONLY when the athlete's goal is EXPLICITLY modality-specific: a named race or event (HYROX, a marathon, a 10k), a stated frequency ("I want to run twice a week"), or a machine-specific target ("improve my 5k row"). Generic engine/conditioning language NEVER qualifies — that's the time-domain rule above. Link it to the priority it serves via source_priority_rank: the dose downstream scales with that rank (a #1 "my top goal is my running" earns real weekly volume; a secondary race mention earns a light touch), and cite the athlete's own goal words in reason. When in doubt, omit — mixed-modal metcons are the default aerobic vehicle of this sport.
+
 MIXED-MODAL SILENCE
 You have NO mixed-modal (metcon) data for an athlete without competition results or logged workout scores — monostructural times, 1RMs, and skill levels do not predict how the pieces combine under fatigue. Make NO claims about metcon capacity, pacing, or workout performance for such an athlete. Stay silent on it; the program discovers it.
 

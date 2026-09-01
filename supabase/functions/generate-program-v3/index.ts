@@ -61,7 +61,12 @@ import { type BlockLocation } from "../_shared/compute-block-benchmark.ts";
 // Engine core — the extracted generation pipeline. This function now CONSUMES the
 // Engine (payload -> skeleton -> audits -> fill -> audit suite -> recovery)
 // instead of inlining it. See _shared/engine/pipeline.ts.
-import { auditSkeletonMetconMix, formatSkeletonViolationsForRetry } from "../_shared/v3-skeleton-audits.ts";
+import {
+  auditCardioPlan,
+  auditSkeletonMetconMix,
+  formatSkeletonViolationsForRetry,
+  stripCardioBlocks,
+} from "../_shared/v3-skeleton-audits.ts";
 import {
   generateSkeletonWithAudits,
   callSkeletonWriter,
@@ -289,6 +294,30 @@ async function stageCoachState(
     }
   }
 
+  // Part D entitlement fact: an active Engine entitlement (All Access grants
+  // it too) disables dedicated cardio blocks entirely — Engine IS the
+  // dedicated conditioning product. Fail CLOSED on a read error: no cardio is
+  // always safe; unwanted cardio for an Engine athlete is the failure mode.
+  let cardioAllowed = true;
+  try {
+    const { data: engineEnt, error: entErr } = await supa
+      .from("user_entitlements")
+      .select("feature")
+      .eq("user_id", job.user_id)
+      .eq("feature", "engine")
+      .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
+      .limit(1);
+    if (entErr) {
+      console.warn("[generate-program-v3] entitlement read failed (cardio disabled defensively):", entErr);
+      cardioAllowed = false;
+    } else {
+      cardioAllowed = (engineEnt ?? []).length === 0;
+    }
+  } catch (e) {
+    console.warn("[generate-program-v3] entitlement read failed (cardio disabled defensively):", e);
+    cardioAllowed = false;
+  }
+
   const trainingDesignInput = buildTrainingDesignInput(coachState, {
     days_per_week: payload.training_context.days_per_week,
     // Session-budget observe phase (2026-08-31): thread the athlete's stated
@@ -300,6 +329,7 @@ async function stageCoachState(
     vocabulary: payload.vocabulary,
     lifts: payload.lifts,
     previous_cycle: payload.previous_cycle,
+    cardio_allowed: cardioAllowed,
   });
 
   return {
@@ -368,6 +398,37 @@ async function stageSkeleton(
       violations: mix.violations,
       retried: mixRetried,
     }).catch((e) => console.warn("[generate-program-v3] skeleton_mix log failed (non-fatal):", e));
+  }
+
+  // Part D — dedicated cardio. Two layers, per doctrine:
+  //   1. ENTITLEMENT (code, hard): Engine-entitled athletes never receive a
+  //      cardio block — strip any emission deterministically.
+  //   2. LIMITS + AUTHORIZATION (log-only): observed, never blocked.
+  const cardioLines: string[] = [];
+  if (tdi.cardio_allowed === false) {
+    const strippedCardio = stripCardioBlocks(skeleton);
+    if (strippedCardio.length) {
+      cardioLines.push(
+        `entitlement strip: cardio removed from ${strippedCardio.join(", ")} (athlete holds an Engine entitlement)`,
+      );
+    }
+  } else {
+    cardioLines.push(...auditCardioPlan(
+      skeleton,
+      tdi.dedicated_cardio,
+      tdi.session_length_minutes ?? null,
+      tdi.days_per_week,
+    ));
+  }
+  if (cardioLines.length) {
+    for (const l of cardioLines) console.warn(`[generate-program-v3] cardio-plan ${l}`);
+    await logGenerationAudit(supa, {
+      user_id: job.user_id,
+      program_id: rs.continuation.programId ?? null,
+      month_number: rs.continuation.monthNumber,
+      stage: "cardio_plan",
+      warnings: cardioLines,
+    }).catch((e) => console.warn("[generate-program-v3] cardio_plan log failed (non-fatal):", e));
   }
 
   // Session-budget OBSERVE log (2026-08-31): when the athlete stated a budget,
