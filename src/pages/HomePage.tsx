@@ -77,7 +77,7 @@ export default function HomePage({ session }: { session: Session }) {
       return { title: 'Run your evaluation', body: 'Your profile is set up. Run your AI evaluation to unlock program generation.', cta: 'Go to Profile', to: '/profile' };
     }
     if (hasProgramming && !hasProgram) {
-      return { title: 'Generate your program', body: 'Your evaluation is complete — head to your profile to generate your first program.', cta: 'Go to Profile', to: '/profile' };
+      return { title: "Alright, here's the fun part.", body: "What are you training for? A competition? A PR? Just feeling fitter? Tell the coach your goal and schedule, and it'll combine them with everything your evaluation found to build a program that actually fits you.", cta: 'Go to Profile', to: '/profile' };
     }
     if (hasProgram) {
       return { title: "Today's training", body: 'Pick up your program — view your calendar, start a session, and log your results.', cta: 'Open My Programs', to: '/programs' };

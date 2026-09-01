@@ -322,8 +322,8 @@ export default function ProgramsListPage({ session }: { session: Session }) {
                   </>
                 ) : (
                   <>
-                    <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Generate your program</p>
-                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 16 }}>Your profile and evaluation are ready.</p>
+                    <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>Alright, here's the fun part.</p>
+                    <p style={{ color: 'var(--text-dim)', fontSize: 14, marginBottom: 16 }}>What are you training for? A competition? A PR? Just feeling fitter? Tell the coach your goal and schedule, and it'll combine them with everything your evaluation found to build a program that actually fits you.</p>
                     <button className="auth-btn" onClick={() => navigate('/profile')}>Go to Profile →</button>
                   </>
                 )}

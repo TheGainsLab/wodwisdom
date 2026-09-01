@@ -41,7 +41,10 @@ export async function buildStratifiedMetconExamples(
   opts: { openaiApiKey?: string } = {},
 ): Promise<string> {
   const key = opts.openaiApiKey ?? Deno.env.get("OPENAI_API_KEY");
-  if (!key) return "";
+  if (!key) {
+    console.warn("[metcon-examples] OPENAI_API_KEY missing — composer runs with NO examples");
+    return "";
+  }
   try {
     const results = await Promise.all(
       FROZEN_METCON_EXAMPLE_QUERIES.map((q) => searchChunks(supa, q, SCOPE, key, PER_QUERY, 0.2)),
@@ -59,7 +62,13 @@ export async function buildStratifiedMetconExamples(
         }
       }
     }
-    if (ordered.length === 0) return "";
+    if (ordered.length === 0) {
+      console.warn("[metcon-examples] retrieval returned ZERO chunks — composer runs with NO examples");
+      return "";
+    }
+    // Positive confirmation — the anchoring block is load-bearing by design,
+    // and every failure path is soft, so its presence must be visible in logs.
+    console.log(`[metcon-examples] retrieved ${ordered.length} example chunks (mainsite, ${FROZEN_METCON_EXAMPLE_QUERIES.length} strata)`);
     const lines = ordered.map((c) => `— ${c.title ?? "workout"}:\n${c.content.trim()}`);
     return (
       "EXAMPLE WORKOUTS (reference breadth — real pieces spanning formats. Use them as " +

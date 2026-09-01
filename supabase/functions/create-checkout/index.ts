@@ -84,10 +84,13 @@ serve(async (req) => {
       "subscription_data[metadata][plan]": plan,
     };
 
-    // Promo codes are only offered on monthly plans; quarterly is already discounted.
-    if (!isQuarterly) {
-      params["allow_promotion_codes"] = "true";
-    }
+    // Promo codes on ALL intervals (2026-09 reversal of the monthly-only
+    // gate): a one-time code on quarterly is the strongest hook we have —
+    // big felt discount, longest billing commitment, full price from the
+    // second invoice. Note Stripe cannot restrict a coupon by interval
+    // (applies_to is product-level), so any FOREVER coupon minted from here
+    // on is implicitly quarterly-stackable — price new codes accordingly.
+    params["allow_promotion_codes"] = "true";
 
     // If authenticated, pre-fill email and attach user ID
     if (userEmail) {

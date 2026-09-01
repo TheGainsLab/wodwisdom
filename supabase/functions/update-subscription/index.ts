@@ -57,6 +57,12 @@ serve(async (req) => {
     const subscriptionItemId = subscription.items?.data?.[0]?.id;
     if (!subscriptionItemId) throw new Error("No subscription item found");
 
+    // Same plan + same interval is a no-op, not a switch (interval-switch
+    // flow, 2026-09) — never re-anchor the billing cycle for zero change.
+    if (subscription.items?.data?.[0]?.price?.id === newPriceId) {
+      throw new Error("You're already on this plan and billing interval.");
+    }
+
     // Update the subscription: swap price, prorate, reset billing cycle
     const updateParams = new URLSearchParams({
       "items[0][id]": subscriptionItemId,

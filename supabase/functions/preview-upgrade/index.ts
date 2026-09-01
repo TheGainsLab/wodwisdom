@@ -72,6 +72,11 @@ serve(async (req) => {
 
     // Get current plan name from the subscription's price
     const currentPriceId = subscription.items?.data?.[0]?.price?.id;
+    // Same plan + same interval is a no-op, not a switch — reject before
+    // Stripe previews a zero-change "upgrade" (interval-switch flow, 2026-09).
+    if (currentPriceId && currentPriceId === newPriceId) {
+      throw new Error("You're already on this plan and billing interval.");
+    }
     let currentPlanName = "Current Plan";
     if (currentPriceId) {
       // Try to match the price ID to a known plan

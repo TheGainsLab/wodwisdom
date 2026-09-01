@@ -222,6 +222,20 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
     ? PLANS.filter(p => isUpgrade(p.key))
     : PLANS;
 
+  // The subscriber's CURRENT plan (exact feature-set match — an All Access
+  // user "alreadyHas" every plan, so subset checks can't identify theirs).
+  // Used for the monthly→quarterly interval switch: same preview/confirm/
+  // update-subscription flow as an upgrade, just to the same plan's quarterly
+  // price. The server rejects a same-price no-op, so a user already on
+  // quarterly gets a clear message instead of a zero-change proration.
+  const currentPlanKey: PlanKey | null = hasSubscription
+    ? ((Object.keys(PLAN_FEATURES) as PlanKey[]).find(k =>
+      PLAN_FEATURES[k].length === userFeatures.length &&
+      PLAN_FEATURES[k].every(f => userFeatures.includes(f))
+    ) ?? null)
+    : null;
+  const currentPlan = currentPlanKey ? PLANS.find(p => p.key === currentPlanKey) ?? null : null;
+
   // Determine next steps based on newly gained features
   const nextSteps = upgradedPlan
     ? FEATURE_NEXT_STEPS.filter(s => newFeatures(upgradedPlan).includes(s.feature))
@@ -412,6 +426,40 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
                   </button>
                 </div>
 
+                {/* Current plan — interval switch. Quarterly is cheaper, so the
+                    only switch offered is monthly→quarterly: with the toggle on
+                    Quarterly the card arms; on Monthly it's informational. */}
+                {currentPlan && (
+                  <div
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      background: 'var(--surface)', border: interval === 'quarterly' ? '1px solid var(--accent)' : '1px solid var(--border)',
+                      borderRadius: 12, padding: '14px 16px', marginBottom: 12,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 15, fontWeight: 700 }}>{currentPlan.name}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', marginLeft: 8 }}>Your plan</span>
+                      <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-dim)' }}>
+                        {interval === 'quarterly'
+                          ? `Switch to quarterly billing — ${currentPlan.quarterly} every 3 months. You'll see the exact prorated amount before confirming.`
+                          : 'Tip: flip the toggle to Quarterly to save on this plan.'}
+                      </p>
+                    </div>
+                    {interval === 'quarterly' && (
+                      <button
+                        type="button"
+                        className="auth-btn"
+                        disabled={!!loading || previewLoading}
+                        style={{ width: 'auto', padding: '8px 16px', flexShrink: 0, marginTop: 0 }}
+                        onClick={() => { if (!loading && !previewLoading && currentPlanKey) selectPlan(currentPlanKey); }}
+                      >
+                        {previewLoading && selectedPlan === currentPlanKey ? 'Loading...' : 'Switch to Quarterly'}
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {visiblePlans.map(plan => {
                   const owned = alreadyHas(plan.key);
                   const isPreviewing = previewLoading && selectedPlan === plan.key;
@@ -487,7 +535,7 @@ export default function CheckoutPage({ session }: CheckoutPageProps) {
                   );
                 })}
 
-                {hasSubscription && visiblePlans.length === 0 && (
+                {hasSubscription && visiblePlans.length === 0 && !currentPlan && (
                   <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)', textAlign: 'center' }}>
                     <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>You have All Access!</p>
                     <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 16 }}>You already have access to every feature.</p>

@@ -2230,8 +2230,34 @@ export default function AthletePage({ session }: { session: Session }) {
                   // surface2 styling made an ARMED button look dormant — ready
                   // now reads as the primary action it is.
                   const ready = canGenerate && !tierBlocked && !generateLoading;
+                  const goalSnippet = goal.trim()
+                    ? (goal.trim().length > 64 ? goal.trim().slice(0, 64) + '…' : goal.trim())
+                    : null;
+                  const chip: React.CSSProperties = {
+                    background: 'var(--surface2)', borderRadius: 999, padding: '3px 10px',
+                    fontSize: 11.5, color: 'var(--text-dim)', whiteSpace: 'nowrap',
+                    overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%',
+                  };
                   return (
-                    <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px' }}>
+                        <p style={{ fontWeight: 700, fontSize: 15, margin: 0, marginBottom: 6 }}>
+                          Alright, here's the fun part.
+                        </p>
+                        <p style={{ color: 'var(--text-dim)', fontSize: 13.5, lineHeight: 1.5, margin: 0 }}>
+                          What are you training for? A competition? A PR? Just feeling fitter?
+                          Whatever it is, tell us. Then give us your schedule: how many days, how
+                          much time. We'll combine it with everything your evaluation found and
+                          build a program that actually fits who you are and what you're after.
+                        </p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                          <span style={chip}>
+                            {goalSnippet ? <>Goal: {goalSnippet}</> : <>Goal: not set — add it in Training Setup ↑</>}
+                          </span>
+                          <span style={chip}>Days: {daysPerWeek || '—'}/week</span>
+                          <span style={chip}>Session: {sessionLengthMinutes ? `${sessionLengthMinutes} min` : '60 min — default'}</span>
+                        </div>
+                      </div>
                       <button
                         type="button"
                         className="auth-btn"
@@ -2269,7 +2295,7 @@ export default function AthletePage({ session }: { session: Session }) {
                           Complete Step 3 to Generate.
                         </span>
                       )}
-                    </>
+                    </div>
                   );
                 })()}
 
