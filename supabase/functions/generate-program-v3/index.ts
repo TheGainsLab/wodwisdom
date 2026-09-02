@@ -35,6 +35,7 @@ import {
 } from "../_shared/metcon-composer.ts";
 import {
   auditMetconVariety,
+  dropIllegalComposedPieces,
   formatMetconVarietyViolationsForRetry,
   isBarbellMetconMovement,
   repairComposerEmission,
@@ -579,22 +580,24 @@ async function stageMetcons(
     repairs = [...repairs, ...retry.repairs];
     audit = auditMetconVariety(output, auditOpts);
     if (!audit.passed) {
-      const legality = audit.violations.filter((v) =>
-        v.includes("do-not-program") || v.includes("allowed vocabulary") || v.includes("requires"),
-      );
-      if (legality.length > 0) {
-        await logGenerationAudit(supa, {
-          user_id: job.user_id,
-          program_id: rs.continuation.programId ?? null,
-          month_number: rs.continuation.monthNumber,
-          stage: "metcons",
-          violations: audit.violations,
-          retried,
-          meta: { hard_fail: true, first_pass_violations: firstPassViolations, repairs },
-        });
-        throw new Error(`Metcon composer emitted illegal movements after retry: ${legality.join(" | ")}`);
+      // 2026-09-01 founder ruling — NOTHING content-shaped fails a job. A
+      // piece still illegal after the retry (banned / unknown / no-equipment
+      // movement) is DROPPED: its slot is rebuilt by the fill's own metcon
+      // fallback, the athlete gets a complete month, and the log names the
+      // movement. The old throw here killed three paid runs over "Ring Row".
+      const droppedPieces = dropIllegalComposedPieces(output, {
+        vocabulary: tdi.vocabulary,
+        doNotProgram: tdi.do_not_program,
+        equipment: tdi.equipment,
+      });
+      if (droppedPieces.length) {
+        console.warn(`[generate-program-v3] illegal composed pieces dropped (fill will rebuild their slots): ${droppedPieces.join(" | ")}`);
+        repairs = [...repairs, ...droppedPieces];
+        audit = auditMetconVariety(output, auditOpts);
       }
-      console.warn(`[generate-program-v3] metcon variety violations persist (accepting): ${audit.violations.join(" | ")}`);
+      if (!audit.passed) {
+        console.warn(`[generate-program-v3] metcon variety violations persist (accepting): ${audit.violations.join(" | ")}`);
+      }
     }
   }
   if (audit.warnings.length) {

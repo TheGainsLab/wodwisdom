@@ -11,6 +11,7 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import type { ComposedMetcon, MetconSlot } from "./metcon-composer.ts";
 import {
   auditMetconVariety,
+  dropIllegalComposedPieces,
   isBarbellMetconMovement,
   movementSignature,
   repairComposerEmission,
@@ -294,6 +295,49 @@ Deno.test("no-throw guarantee: repair → strip → audit runs the full gauntlet
 Deno.test("strip: tolerates pieces with missing movements (post-repair this can't occur; standalone it must not crash)", () => {
   const weird = { metcons: [{ week_num: 1, day_num: 1 } as unknown as ComposedMetcon] };
   assertEquals(stripStructuralRestRows(weird), 0);
+});
+
+// ── Drop-instead-of-throw (2026-09-01 founder ruling): content never kills ──
+
+Deno.test("dropIllegalComposedPieces: banned, unknown, and no-equipment pieces drop; legal pieces survive", () => {
+  const m = goodMonth();
+  const before = m.length;
+  const output = { metcons: m };
+  const dropped = dropIllegalComposedPieces(output, {
+    vocabulary: ["Row", "Wall Ball", "Burpee", "Run", "Kettlebell Swing", "Bike", "Sit Up",
+      "Thruster", "Pull Up", "Deadlift", "Bar Facing Burpee", "Box Jump Over", "Dumbbell Snatch",
+      "Wall Walk", "Burpee Box Jump Over", "Goblet Squat", "Push Up", "Walking Lunge",
+      "Toes To Bar", "Shuttle Run", "Dumbbell Thruster", "Double Under"],
+    doNotProgram: ["Toes To Bar"], // piece 10 (KB Swing + T2B) → banned drop
+    equipment: { rower: true, assault_bike: true },
+  });
+  assert(dropped.some((d) => d.includes("do-not-program")));
+  assertEquals(output.metcons.length, before - 1);
+  // The surviving month audits WITHOUT legality violations.
+  const audit = auditMetconVariety(output, {
+    vocabulary: ["Row", "Wall Ball", "Burpee", "Run", "Kettlebell Swing", "Bike", "Sit Up",
+      "Thruster", "Pull Up", "Deadlift", "Bar Facing Burpee", "Box Jump Over", "Dumbbell Snatch",
+      "Wall Walk", "Burpee Box Jump Over", "Goblet Squat", "Push Up", "Walking Lunge",
+      "Toes To Bar", "Shuttle Run", "Dumbbell Thruster", "Double Under"],
+    doNotProgram: ["Toes To Bar"],
+  });
+  assertEquals(audit.violations.filter((v) => v.includes("do-not-program")), []);
+});
+
+Deno.test("dropIllegalComposedPieces: unknown-movement piece drops with add-to-library hint (the Ring Row case)", () => {
+  const m = goodMonth();
+  m[0].movements = [{ movement: "Ring Row", prescription: "10" }, { movement: "Burpee", prescription: "5" }];
+  const output = { metcons: m };
+  const dropped = dropIllegalComposedPieces(output, { vocabulary: ["Burpee", "Row"] , doNotProgram: [], equipment: {} });
+  assert(dropped.some((d) => d.includes('"Ring Row"') && d.includes("movements table")));
+});
+
+Deno.test("dropIllegalComposedPieces: clean month drops nothing", () => {
+  const m = goodMonth();
+  const output = { metcons: m };
+  const dropped = dropIllegalComposedPieces(output, { doNotProgram: [], equipment: { rower: true, assault_bike: true } });
+  assertEquals(dropped, []);
+  assertEquals(output.metcons.length, 12);
 });
 
 // ── Athlete-match rules (2026-08-31) ──
