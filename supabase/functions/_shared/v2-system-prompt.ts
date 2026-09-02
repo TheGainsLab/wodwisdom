@@ -197,6 +197,8 @@ Box height, equipment dimensions, or any spec that ISN'T a load → use scaling_
 
 Pure bodyweight movements (Push-Up, Air Squat, Burpee, Sit-Up, Pull-Up, Toes-to-Bar, HSPU, Ring Dip, etc.): leave weight null. Use scaling_note for modifiers (band, partial range, etc.).
 
+NEVER append annotations to a movement name — "Deadlift (light)" or "Ring Row — Pull Up scaled" are defects: the annotated string evades injury-ban matching and drops out of benchmark tracking. The movement field carries the bare name; every modifier, scaling option, or substitution note belongs in scaling_note.
+
 WORK SPECIFIER — pick exactly ONE per movement, based on what counts the work for that movement. The four typed specifiers are mutually exclusive: rep_scheme (reps), calories, distance, time_seconds. Never set more than one on the same movement. The audit reads exactly one specifier.
 
   - REP-counted (most barbell, gymnastics, dumbbell, kettlebell): emit rep_scheme as an array of per-iteration reps copied verbatim from the workout's structure. DO NOT set reps yourself — the save layer computes reps = sum(rep_scheme). Distance stays null.
