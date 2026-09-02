@@ -222,7 +222,7 @@ export async function callWeekFill(
       ]
       : []),
     hasComposed
-      ? "- Each day's metcon is PRE-COMPOSED (see COMPOSED METCONS): emit it EXACTLY — same movements, same scheme, same format, same duration. Your job on metcons is exact loads from the athlete's 1RMs, calories/distances from their pacing, and the typed per-movement fields. NEVER redesign, swap, add, or drop a composed movement."
+      ? "- Metcons for days listed in COMPOSED METCONS are PRE-COMPOSED: emit each EXACTLY — same movements, same scheme, same format, same duration. Your job on those is exact loads from the athlete's 1RMs, calories/distances from their pacing, and the typed per-movement fields. NEVER redesign, swap, add, or drop a composed movement. If a metcon day is NOT in the list (its piece was removed), compose that day's metcon YOURSELF from the skeleton's metcon_focus and the athlete's allowed movements — distinct from the composed pieces, expected time inside the focus window."
       : "- The metcon's EXPECTED completion time must land inside the skeleton's stated metcon_focus window; a time cap may sit above it as a ceiling, never below.",
     priorWeeks.length > 0
       ? `- PROGRESS from the prior weeks below per the month_plan's arc (add load/volume, advance schemes) — do NOT copy them verbatim.`
