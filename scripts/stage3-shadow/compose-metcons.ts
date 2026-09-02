@@ -37,6 +37,7 @@ import {
   repairComposerEmission,
   stripStructuralRestRows,
 } from "../../supabase/functions/_shared/metcon-variety-audits.ts";
+import { trimComposedMovementAnnotations } from "../../supabase/functions/_shared/movement-name-repair.ts";
 import { buildStratifiedMetconExamples } from "../../supabase/functions/_shared/metcon-examples.ts";
 import type { SkeletonOutput } from "../../supabase/functions/_shared/v3-output-schema.ts";
 
@@ -128,6 +129,7 @@ const repaired1 = repairComposerEmission(await callMetconComposer(inputs, { mode
 if (repaired1.repairs.length) console.log(`  emission repaired: ${repaired1.repairs.join(" | ")}`);
 let output = repaired1.output;
 stripStructuralRestRows(output);
+trimComposedMovementAnnotations(output.metcons, inputs.vocabulary);
 let audit = auditMetconVariety(output, auditOpts);
 let retried = false;
 if (!audit.passed) {
@@ -140,6 +142,7 @@ if (!audit.passed) {
   if (repaired2.repairs.length) console.log(`  emission repaired: ${repaired2.repairs.join(" | ")}`);
   output = repaired2.output;
   stripStructuralRestRows(output);
+  trimComposedMovementAnnotations(output.metcons, inputs.vocabulary);
   audit = auditMetconVariety(output, auditOpts);
 }
 console.log(

@@ -40,6 +40,10 @@ import {
   repairComposerEmission,
   stripStructuralRestRows,
 } from "../_shared/metcon-variety-audits.ts";
+import {
+  trimComposedMovementAnnotations,
+  trimWriterMovementAnnotations,
+} from "../_shared/movement-name-repair.ts";
 import { buildStratifiedMetconExamples } from "../_shared/metcon-examples.ts";
 import { formatAuditFailuresForLog, logGenerationAudit } from "../_shared/generation-audit-log.ts";
 import { MODELS } from "../_shared/model-profiles.ts";
@@ -553,7 +557,13 @@ async function stageMetcons(
     if (repairs.length) console.warn(`[generate-program-v3] composer emission repaired: ${repairs.join(" | ")}`);
     const strippedRest = stripStructuralRestRows(output);
     if (strippedRest > 0) console.log(`[generate-program-v3] stripped ${strippedRest} structural Rest row(s) from composed metcons`);
-    return { output, repairs };
+    // Annotation-in-name repair (the Ashley failure, 2026-09-01): "Ring Row
+    // (Pull Up scaled)" is Ring Row wearing a label — trim to the legal name,
+    // keep the label in the stimulus note. Runs before the audit so a label
+    // never reaches the legality hard-fail.
+    const nameRepairs = trimComposedMovementAnnotations(output.metcons, tdi.vocabulary);
+    if (nameRepairs.length) console.warn(`[generate-program-v3] movement names repaired: ${nameRepairs.join(" | ")}`);
+    return { output, repairs: [...repairs, ...nameRepairs] };
   };
 
   let { output, repairs } = await composeRepaired();
@@ -613,8 +623,8 @@ async function stageMetcons(
 }
 
 async function stageFillWeek(
-  _supa: SupabaseClient,
-  _job: ProgramJobRow,
+  supa: SupabaseClient,
+  job: ProgramJobRow,
   rs: ResumeState,
   weekNum: number,
 ): Promise<StageOutcome> {
@@ -623,6 +633,29 @@ async function stageFillWeek(
   const priorWeeks = rs.weeks ?? [];
   const weekMetcons = (rs.composedMetcons ?? []).filter((m) => m.week_num === weekNum);
   const wk = await callWeekFill(payload, skeleton, weekNum, priorWeeks, "", PACK, weekMetcons);
+  // Annotation-in-name repair, fill side (all block types): annotated names
+  // evade the exact-match do_not_program ban ("Deadlift (light)" vs banned
+  // "Deadlift") and drop out of benchmark/tracking matching. Trim to the
+  // legal name, keep the label in scaling_note, log. Runs BEFORE the audits
+  // so the ban check sees canonical names.
+  try {
+    const nameRepairs = trimWriterMovementAnnotations(
+      { weeks: [wk] } as Parameters<typeof trimWriterMovementAnnotations>[0],
+      payload.vocabulary,
+    );
+    if (nameRepairs.length) {
+      for (const r of nameRepairs) console.warn(`[generate-program-v3] fill movement name repaired: ${r}`);
+      await logGenerationAudit(supa, {
+        user_id: job.user_id,
+        program_id: rs.continuation.programId ?? null,
+        month_number: rs.continuation.monthNumber,
+        stage: "soft_audit",
+        warnings: nameRepairs.map((r) => `movement_name_trim: ${r}`),
+      });
+    }
+  } catch (e) {
+    console.warn("[generate-program-v3] fill name repair failed (non-fatal):", e);
+  }
   // Persist each composed piece's stimulus into its metcon block's notes
   // (deterministic — never trust transcription for it). The note is the
   // workout's PURPOSE; it reaches storage, the athlete's UI, and the AI Coach

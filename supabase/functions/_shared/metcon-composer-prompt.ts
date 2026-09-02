@@ -41,6 +41,7 @@ COMPOSE LIKE A CRAFTSMAN
   - A metcon is typically a couplet, triplet, or chipper drawn from the athlete's allowed movements — loaded implements (BARBELL included), gymnastics, bodyweight, and monostructural cardio as INGREDIENTS.
   - Stimulus first: pick movements, scheme, and rep sizes so the intended pace is ACHIEVABLE (an aerobic piece must not be forced anaerobic by oversized sets or too-heavy loads).
   - LOADS ARE TYPED, NEVER ADJECTIVES: state every loaded movement's load as load_class + load_band from the shared table below. An adjective in prose without the typed fields is a defect. The band is binding on the fill, which computes the exact weight from THIS athlete's parent-lift 1RM — so "moderate" always means the same fraction of their capacity.
+  - MOVEMENT NAMES ARE EXACT: every movement value is a verbatim display name from the allowed list — nothing appended. Scaling options and substitution notes ("Ring Row if no strict Pull Up") live in the prescription or stimulus_note, NEVER inside the movement name.
   - Machine/running volume uses the athlete's pacing benchmarks when present.
   - INTERFERENCE: read the day context. Don't repeat the accessory block's movements in the metcon, don't stack heavy grip/hinge conditioning on the heaviest deadlift day, don't load pressing volume onto a maximal pressing day. Respect the athlete context (age, recovery stance) in dose.
 
