@@ -11,7 +11,7 @@ import {
   validateBlockProposal,
 } from "../_shared/block-edit.ts";
 import type { BlockPrescription } from "../_shared/v2-output-schema.ts";
-import { fetchAndFormatRecentHistory } from "../_shared/training-history.ts";
+import { fetchAndFormatRecentHistory, formatDate, localDateAnchor, relativeDayMarker } from "../_shared/training-history.ts";
 import { buildConditioningState } from "../_shared/conditioning-state.ts";
 import { buildActivityChatContext, fetchOutsideTraining } from "../_shared/athlete-activities.ts";
 import { fetchAndFormatProgramContext } from "../_shared/training-program.ts";
@@ -149,6 +149,10 @@ const COACH_SPINE =
   "- When the RELEVANT ARTICLES section below contains material that directly supports your answer, weave it in naturally with attribution to the article and author. Do not list sources at the end — work them into the prose.\n" +
   "- When that section is empty, weak, or doesn't address the question, answer from CrossFit methodology and your coaching expertise. Speak as the coach: \"standard programming is…\", \"the methodology calls for…\", \"in my experience…\". Do NOT name a specific article, journal, author, guide, or publication. Do NOT invent quotations. Do NOT attribute claims to \"the articles,\" \"the journal,\" \"the materials,\" \"the sources,\" or any specific publication unless that exact content appears in the RELEVANT ARTICLES section below.\n" +
   "- Never mention retrieval, your knowledge base, your training, your access to information, your limitations, or what you do or don't have. Never break character. You are a coach answering a coach.\n\n" +
+  "DATES & SESSION RECAPS:\n" +
+  "- When training history appears in your context, the athlete's local date is stated with it and sessions are marked [TODAY]/[YESTERDAY]. Those labels are the ONLY source of truth for what day it is — use them verbatim and never do your own date arithmetic (your clock is not the athlete's).\n" +
+  "- When asked how a session went, open by naming the session you're describing — its date and day type — so any mismatch is instantly visible to the athlete.\n" +
+  "- If they ask about today and no session is marked [TODAY], say plainly that nothing is logged for today yet — and note that if they just finished, it may not be saved, so log it and ask again. Then, if useful, recap the most recent logged session by its date. NEVER answer a question about a completed session by previewing an upcoming day.\n\n" +
   "META-QUESTIONS: If asked about your background, methodology, what you draw from, or your influences, answer in-character — describe your influences (CrossFit methodology, Glassman's writings, the Level 1 guide, the CrossFit Journal, strength-science literature, exercise physiology). Never describe yourself as an AI. Never reference \"provided context,\" \"retrieved sources,\" or any retrieval mechanism.\n\n" +
   "PRODUCT CATALOG (for your awareness — use per the rules below):\n" +
   "- AI Coach: the coaching you're providing right now — answers, methodology, programming guidance.\n" +
@@ -223,6 +227,12 @@ async function buildEngineCoachingContext(
   // pacing from the raw baseline (July '26: coach said 21-22 cal/min against
   // an on-screen target of 18 because it only had the baseline to work from).
   targetPace: number | null,
+  // The athlete's IANA timezone (profiles.timezone, browser-synced on app
+  // load). Anchors every "today"/"yesterday" label in this context — the
+  // server clock is UTC and early-morning athletes are often a calendar day
+  // ahead of it (Sep '26: "your last session was yesterday (Friday)" told to
+  // a 4 AM athlete on a Tuesday).
+  userTz: string,
   // The athlete's engine_current_day pointer — ALSO a sequence position. The
   // scoped day is merely the page the athlete has OPEN — browsing other days
   // is a normal feature (July '26: an athlete correctly on Day 3 viewed Day 4,
@@ -443,10 +453,16 @@ async function buildEngineCoachingContext(
     );
   }
 
+  // Date labels are computed in the ATHLETE'S timezone — the model uses the
+  // [TODAY]/[YESTERDAY] markers verbatim and never does its own date math.
+  const anchor = localDateAnchor(userTz);
   if (recentSessions && recentSessions.length > 0) {
-    parts.push(`\nRECENT TRAINING (last ${recentSessions.length} sessions, most recent first):`);
+    parts.push(
+      `\nRECENT TRAINING (last ${recentSessions.length} sessions, most recent first — ` +
+        `the athlete's local date today is ${anchor.todayLine}; sessions are marked [TODAY]/[YESTERDAY] relative to it):`,
+    );
     for (const s of recentSessions) {
-      const bits: string[] = [s.date];
+      const bits: string[] = [`${formatDate(s.date)} (${s.date})${relativeDayMarker(s.date, anchor)}`];
       if (s.day_type) bits.push((s.day_type as string).replace(/_/g, " "));
       if (s.program_day_number != null) bits.push(`Day ${s.program_day_number}`);
       if (s.performance_ratio != null) bits.push(`pace ratio ${Number(s.performance_ratio).toFixed(2)}`);
@@ -455,7 +471,9 @@ async function buildEngineCoachingContext(
       parts.push(`- ${bits.join(" | ")}`);
     }
   } else {
-    parts.push("\nRECENT TRAINING: no completed sessions in this program yet.");
+    parts.push(
+      `\nRECENT TRAINING: no completed sessions in this program yet (the athlete's local date today is ${anchor.todayLine}).`,
+    );
   }
 
   if (upcomingBlock) parts.push(upcomingBlock);
@@ -690,7 +708,7 @@ Deno.serve(async (req) => {
 
     // Determine subscription tier via entitlements
     const [{ data: profile }, { data: entitlements }] = await Promise.all([
-      supa.from("profiles").select("role").eq("id", user.id).single(),
+      supa.from("profiles").select("role, timezone").eq("id", user.id).single(),
       supa.from("user_entitlements").select("feature")
         .eq("user_id", user.id)
         .in("feature", ["ai_chat", "engine", "programming"])
@@ -1007,6 +1025,7 @@ Deno.serve(async (req) => {
           typeof engine_modality === "string" ? engine_modality : null,
           typeof engine_units === "string" ? engine_units : null,
           engineTargetPace,
+          (profile?.timezone as string | null) || "UTC",
           engineAthleteCurrentDay,
         );
       } catch (err) {
