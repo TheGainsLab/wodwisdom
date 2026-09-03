@@ -66,17 +66,20 @@ function buildAthleteContext(
   conditioning: Record<string, string | number> | null | undefined,
   bodyweight: number | null | undefined,
   units: string | null | undefined,
-  gender: string | null | undefined
+  gender: string | null | undefined,
+  age: number | null | undefined,
 ): string {
   const hasLifts = lifts && Object.keys(lifts).length > 0;
   const hasSkills = skills && Object.keys(skills).length > 0;
   const hasConditioning = conditioning && Object.keys(conditioning).length > 0 && Object.values(conditioning).some((v) => v !== "" && v != null);
   const hasBodyweight = bodyweight != null && bodyweight > 0;
-  if (!hasLifts && !hasSkills && !hasConditioning && !hasBodyweight && !gender) return "";
+  const hasAge = age != null && age > 0;
+  if (!hasLifts && !hasSkills && !hasConditioning && !hasBodyweight && !gender && !hasAge) return "";
 
   const parts: string[] = ["\n\nATHLETE PROFILE:"];
   const u = units === "kg" ? "kg" : "lbs";
 
+  if (hasAge) parts.push(`Age: ${age}`);
   if (gender) parts.push(`Gender: ${gender}`);
 
   if (hasBodyweight) {
@@ -154,6 +157,11 @@ const COACH_SPINE =
   "- When asked how a session went, open by naming the session you're describing — its date and day type — so any mismatch is instantly visible to the athlete.\n" +
   "- If they ask about today and no session is marked [TODAY], say plainly that nothing is logged for today yet — and note that if they just finished, it may not be saved, so log it and ask again. Then, if useful, recap the most recent logged session by its date. NEVER answer a question about a completed session by previewing an upcoming day.\n\n" +
   "META-QUESTIONS: If asked about your background, methodology, what you draw from, or your influences, answer in-character — describe your influences (CrossFit methodology, Glassman's writings, the Level 1 guide, the CrossFit Journal, strength-science literature, exercise physiology). Never describe yourself as an AI. Never reference \"provided context,\" \"retrieved sources,\" or any retrieval mechanism.\n\n" +
+  "COACHING JUDGMENT GUARDRAILS:\n" +
+  "- Hold your position: never reverse a recommendation just because the athlete pushes back. Change course only when they give you NEW information (a number, a symptom, a constraint you didn't have) — and when you do, name exactly what changed your mind. Two confident opposite answers in a row destroys trust faster than either answer alone.\n" +
+  "- Standards and benchmarks: never state specific competitive standards, qualifying scores, or division cutoffs as fact unless they appear in your context. When asked, give clearly-labeled rough estimates ('as a ballpark — verify against published results') — never fabricated precision.\n" +
+  "- Heart rate: when the athlete's age is in their profile, ALWAYS interpret HR relative to it (age-expected max is roughly 220 minus age as a coarse anchor). Never call a heart rate 'modest', 'low', or 'room in the tank' without accounting for age — 148 is a very different number at 25 than at 55.\n" +
+  "- Garbled or ambiguous input: when a detail your answer depends on is garbled or unclear, ask a one-line clarifying question instead of guessing. Restate small numbers you rely on (rest lengths, round counts) from the session context — don't approximate them from memory.\n\n" +
   "PRODUCT CATALOG (for your awareness — use per the rules below):\n" +
   "- AI Coach: the coaching you're providing right now — answers, methodology, programming guidance.\n" +
   "- Year of the Engine: a structured conditioning program with adaptive pace targets that calibrate to the athlete's recent performance.\n" +
@@ -762,7 +770,7 @@ Deno.serve(async (req) => {
     // Fetch athlete profile for prompt personalization (including Engine state)
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
-      .select("lifts, skills, conditioning, bodyweight, units, gender, engine_program_version, engine_current_day, engine_months_unlocked, engine_goal, competition_athlete_id")
+      .select("lifts, skills, conditioning, bodyweight, units, gender, age, engine_program_version, engine_current_day, engine_months_unlocked, engine_goal, competition_athlete_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -1379,7 +1387,7 @@ Deno.serve(async (req) => {
           // tokens of insurance: when the router misroutes a real personal
           // question as meta, the answer still knows who the athlete is.
           // True meta questions just ignore it.
-          buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units, athleteProfile?.gender) +
+          buildAthleteContext(athleteProfile?.lifts, athleteProfile?.skills, athleteProfile?.conditioning, athleteProfile?.bodyweight, athleteProfile?.units, athleteProfile?.gender, athleteProfile?.age) +
           // Engine program context — the full day-scoped dossier when the
           // request scopes to a day, else the user-level athlete card for
           // Engine-tier users (exactly one of these is ever non-empty).
