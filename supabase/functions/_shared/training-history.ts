@@ -67,12 +67,50 @@ function formatMovementName(canonical: string): string {
   return canonical.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatDate(dateStr: string): string {
+export function formatDate(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");
   const day = DAY_NAMES[d.getDay()];
   const month = d.toLocaleString("en-US", { month: "short" });
   const date = d.getDate();
   return `${day} ${month} ${date}`;
+}
+
+/**
+ * The athlete's local calendar anchor. Chat context labels every session date
+ * relative to THIS, because the server clock is UTC and an early-morning
+ * athlete is often a different calendar day than the server (Sep '26: the
+ * coach told a 4 AM athlete his last session was "yesterday (Friday)" on a
+ * Tuesday). An unknown/invalid timezone falls back to UTC rather than
+ * throwing.
+ */
+export interface LocalDateAnchor {
+  /** YYYY-MM-DD in the athlete's timezone. */
+  todayIso: string;
+  yesterdayIso: string;
+  /** e.g. "Wednesday, Sep 3, 2026" — for the context's anchor line. */
+  todayLine: string;
+}
+
+export function localDateAnchor(tz: string): LocalDateAnchor {
+  const iso = (d: Date, zone: string) => d.toLocaleDateString("en-CA", { timeZone: zone });
+  const line = (d: Date, zone: string) =>
+    d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric", timeZone: zone });
+  const now = new Date();
+  const dayBack = new Date(now.getTime() - 86400000);
+  try {
+    return { todayIso: iso(now, tz), yesterdayIso: iso(dayBack, tz), todayLine: line(now, tz) };
+  } catch {
+    return { todayIso: iso(now, "UTC"), yesterdayIso: iso(dayBack, "UTC"), todayLine: line(now, "UTC") };
+  }
+}
+
+/** " [TODAY]" / " [YESTERDAY]" marker for a YYYY-MM-DD session date, else "". */
+export function relativeDayMarker(dateStr: string | null | undefined, anchor: LocalDateAnchor): string {
+  if (!dateStr) return "";
+  const day = dateStr.slice(0, 10);
+  if (day === anchor.todayIso) return " [TODAY]";
+  if (day === anchor.yesterdayIso) return " [YESTERDAY]";
+  return "";
 }
 
 function getMetconTypeLabel(text: string): string {
@@ -418,6 +456,7 @@ export async function fetchAndFormatRecentHistory(
     .eq("id", userId)
     .maybeSingle();
   const userTz: string = profileRow?.timezone || "UTC";
+  const anchor = localDateAnchor(userTz);
   const cutoffStr = new Date(Date.now() - days * 86400000)
     .toLocaleDateString('en-CA', { timeZone: userTz });
 
@@ -520,11 +559,17 @@ export async function fetchAndFormatRecentHistory(
     }
   }
 
-  // Merge and sort by date descending
+  // Merge and sort by date descending. Each line carries a [TODAY]/[YESTERDAY]
+  // marker computed in the ATHLETE'S timezone — the model must never do its
+  // own date arithmetic (see localDateAnchor).
   const allLines = [...workoutLines, ...engineLines]
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, maxLines)
-    .map((l) => l.line);
+    .map((l) => l.line + relativeDayMarker(l.date, anchor));
 
-  return "RECENT TRAINING (last 14 days):\n" + allLines.join("\n");
+  return (
+    `RECENT TRAINING (last 14 days — the athlete's local date today is ${anchor.todayLine}; ` +
+    `sessions are marked [TODAY]/[YESTERDAY] relative to it):\n` +
+    allLines.join("\n")
+  );
 }

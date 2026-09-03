@@ -495,6 +495,27 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [enginePool, setEnginePool] = useState<EnginePoolDay[]>([]);
   const [selProgramId, setSelProgramId] = useState<string | null>(null);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  // ── RPE correction on a logged Engine session (Sep '26, Dennis: a mistyped
+  //    time-trial RPE could only be fixed by emailing support, and the stale
+  //    value kept poisoning coach advice). RPE is display/coach-context only —
+  //    it feeds no pacing or progression — so it's the one session field the
+  //    athlete can correct in place. Performance data stays immutable. ──
+  const [rpeEditId, setRpeEditId] = useState<string | null>(null);
+  const [rpeDraft, setRpeDraft] = useState<number>(7);
+  const [rpeSaving, setRpeSaving] = useState(false);
+  const saveRpe = async (id: string) => {
+    setRpeSaving(true);
+    const { error } = await supabase
+      .from('engine_workout_sessions')
+      .update({ perceived_exertion: rpeDraft })
+      .eq('id', id)
+      .eq('user_id', session.user.id);
+    setRpeSaving(false);
+    if (!error) {
+      setEngineSessions(prev => prev.map(s => (s.id === id ? { ...s, perceived_exertion: rpeDraft } : s)));
+      setRpeEditId(null);
+    }
+  };
   // Which scheduled program entries have their Level-3 block preview expanded.
   const [previewOpen, setPreviewOpen] = useState<Set<string>>(new Set());
   const togglePreview = (id: string) => setPreviewOpen(prev => {
@@ -1647,7 +1668,6 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                       }
                       if (e.average_heart_rate != null) stats.push({ label: 'Avg HR', value: `${e.average_heart_rate} bpm` });
                       if (e.peak_heart_rate != null) stats.push({ label: 'Peak HR', value: `${e.peak_heart_rate} bpm` });
-                      if (e.perceived_exertion != null) stats.push({ label: 'RPE', value: String(e.perceived_exertion) });
                       return (
                         <div key={e.id} className="wc-day-detail-block">
                           <div className="wc-day-detail-block-header">
@@ -1660,7 +1680,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                               <span className="wc-day-detail-score">{(e.performance_ratio * 100).toFixed(0)}%</span>
                             )}
                           </div>
-                          {stats.length > 0 ? (
+                          {stats.length > 0 || e.perceived_exertion != null || rpeEditId === e.id ? (
                             <div className="wc-engine-stats">
                               {stats.map(s => (
                                 <div key={s.label} className="wc-engine-stat">
@@ -1668,6 +1688,43 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                   <span className="wc-engine-stat-value">{s.value}</span>
                                 </div>
                               ))}
+                              {/* RPE is athlete-correctable (it drives no pacing). */}
+                              <div className="wc-engine-stat">
+                                <span className="wc-engine-stat-label">RPE</span>
+                                {rpeEditId === e.id ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                    <select
+                                      value={rpeDraft}
+                                      onChange={ev => setRpeDraft(Number(ev.target.value))}
+                                      disabled={rpeSaving}
+                                      style={{ fontSize: 13, padding: '2px 4px', background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 6 }}
+                                    >
+                                      {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
+                                        <option key={n} value={n}>{n}</option>
+                                      ))}
+                                    </select>
+                                    <button type="button" className="wc-day-ghost-btn" onClick={() => saveRpe(e.id)} disabled={rpeSaving}>
+                                      {rpeSaving ? 'Saving…' : 'Save'}
+                                    </button>
+                                    <button type="button" className="wc-day-ghost-btn" onClick={() => setRpeEditId(null)} disabled={rpeSaving}>
+                                      Cancel
+                                    </button>
+                                  </span>
+                                ) : (
+                                  <span className="wc-engine-stat-value">
+                                    {e.perceived_exertion != null ? e.perceived_exertion : '—'}
+                                    <button
+                                      type="button"
+                                      className="wc-day-ghost-btn"
+                                      style={{ marginLeft: 8 }}
+                                      onClick={() => { setRpeDraft(e.perceived_exertion ?? 7); setRpeEditId(e.id); }}
+                                      aria-label="Edit RPE"
+                                    >
+                                      edit
+                                    </button>
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           ) : (
                             <div className="wc-day-detail-text">Completed — no metrics recorded.</div>
