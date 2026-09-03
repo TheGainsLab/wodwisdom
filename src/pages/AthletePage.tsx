@@ -780,6 +780,46 @@ export default function AthletePage({ session }: { session: Session }) {
     }
   };
 
+  // Polls a generation job to completion and lands the athlete on the program.
+  // Shared by the click path and the load-time reattach below: owns the
+  // error/loading lifecycle so both entry points behave identically.
+  const pollGenerationJob = async (jobId: string) => {
+    try {
+      // Backoff: 3s, 4s, 5s, ... capped at 8s. Budget must exceed the real
+      // end-to-end job time: a 4-day athlete runs ~13 min wall-clock, a heavy
+      // 6-day athlete longer. 150 attempts × ~8s ≈ 20 min, comfortably clear.
+      let delay = 3000;
+      const maxDelay = 8000;
+      const maxAttempts = 150; // ~20 min worth of polling
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise((r) => setTimeout(r, delay));
+        const { data: status, error: statusErr } = await supabase.functions.invoke('program-job-status', {
+          body: { job_id: jobId },
+        });
+        if (statusErr) throw new Error(statusErr.message || 'Failed to check job status');
+        if (status?.error && status?.status !== 'failed') throw new Error(status.error);
+
+        if (status?.status === 'complete') {
+          if (status.program_id) {
+            navigate(`/programs/${status.program_id}`);
+            return;
+          }
+          throw new Error('Program completed but no ID returned');
+        }
+        if (status?.status === 'failed') {
+          throw new Error(status.error || 'Program generation failed');
+        }
+        // Still pending/processing — back off slightly
+        delay = Math.min(delay + 1000, maxDelay);
+      }
+      throw new Error('Program generation timed out');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate program');
+    } finally {
+      setGenerateLoading(false);
+    }
+  };
+
   const loadProfile = useCallback(() => {
     setLoading(true);
     setLoadError(false);
@@ -809,8 +849,27 @@ export default function AthletePage({ session }: { session: Session }) {
         .eq('user_id', session.user.id)
         .eq('source', 'generated')
         .limit(1),
-    ]).then(([profileRes, evalRes, trainingEvalRes, programsRes]) => {
+      // Generation already in flight? (30-min heartbeat window matches the
+      // server-side concurrency guard — a crashed job goes quiet and stops
+      // holding the button.)
+      supabase
+        .from('program_jobs')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('status', 'processing')
+        .gte('updated_at', new Date(Date.now() - 30 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]).then(([profileRes, evalRes, trainingEvalRes, programsRes, jobRes]) => {
       setHasGeneratedProgram(!!(programsRes.data && programsRes.data.length > 0));
+      // Reattach to an in-flight generation (mid-run refresh / return visit):
+      // the button loads already in its Generating state and the page lands on
+      // the program when the job completes — a second click can't happen.
+      if (!(programsRes.data && programsRes.data.length > 0) && jobRes.data?.id) {
+        setGenerateLoading(true);
+        void pollGenerationJob(jobRes.data.id);
+      }
       setResumePending(!!profileRes.data?.programming_resume_pending_at);
       if (!profileRes.data) {
         setIsNewUser(true);
@@ -1024,45 +1083,33 @@ export default function AthletePage({ session }: { session: Session }) {
       const { data, error } = await supabase.functions.invoke('generate-program-v3', {
         body: {},
       });
-      if (error) throw new Error(error.message || 'Failed to generate program');
-      if (data?.error) throw new Error(data.message || data.error || 'Failed to generate program');
-      const jobId = data?.job_id;
+      let jobId = data?.job_id;
+      if (error) {
+        // Non-2xx responses hide their JSON body behind error.context. A 409
+        // GENERATION_IN_PROGRESS means a run is already in flight (double-tap,
+        // or a page refresh mid-run) — reattach to that job's polling instead
+        // of erroring, so the user just sees their generation continue.
+        let body: { error?: string; message?: string; job_id?: string } | null = null;
+        try {
+          body = await (error as unknown as { context?: Response }).context?.json() ?? null;
+        } catch {
+          body = null;
+        }
+        if (body?.error === 'GENERATION_IN_PROGRESS' && body.job_id) {
+          jobId = body.job_id;
+        } else {
+          throw new Error(body?.message || error.message || 'Failed to generate program');
+        }
+      } else if (data?.error) {
+        throw new Error(data.message || data.error || 'Failed to generate program');
+      }
       if (!jobId) throw new Error('No job ID returned');
 
-      // Poll for completion with backoff: 3s, 4s, 5s, 6s, ... capped at 8s.
-      // Budget must exceed the real end-to-end job time: a 4-day athlete runs
-      // ~13 min wall-clock (skeleton + 4 week-fills + benchmark + surgical
-      // passes + save, each its own edge invocation), and a heavy 6-day athlete
-      // longer. 150 attempts × ~8s ≈ 20 min, comfortably clear, so the UI no
-      // longer reports a false timeout while the job is still completing.
-      let delay = 3000;
-      const maxDelay = 8000;
-      const maxAttempts = 150; // ~20 min worth of polling
-      for (let i = 0; i < maxAttempts; i++) {
-        await new Promise((r) => setTimeout(r, delay));
-        const { data: status, error: statusErr } = await supabase.functions.invoke('program-job-status', {
-          body: { job_id: jobId },
-        });
-        if (statusErr) throw new Error(statusErr.message || 'Failed to check job status');
-        if (status?.error && status?.status !== 'failed') throw new Error(status.error);
-
-        if (status?.status === 'complete') {
-          if (status.program_id) {
-            navigate(`/programs/${status.program_id}`);
-            return;
-          }
-          throw new Error('Program completed but no ID returned');
-        }
-        if (status?.status === 'failed') {
-          throw new Error(status.error || 'Program generation failed');
-        }
-        // Still pending/processing — back off slightly
-        delay = Math.min(delay + 1000, maxDelay);
-      }
-      throw new Error('Program generation timed out');
+      // Shared poller owns the rest of the lifecycle (progress → navigate,
+      // error surfacing, clearing the loading state).
+      await pollGenerationJob(jobId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate program');
-    } finally {
       setGenerateLoading(false);
     }
   };

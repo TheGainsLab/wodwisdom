@@ -1171,6 +1171,36 @@ Deno.serve(async (req) => {
       monthNumber = isServiceCall ? (reqMonthNumber ?? 1) : 1;
     }
 
+    // ── Concurrency guard (Sep '26): a user fired three generations in 20
+    // minutes — the duplicate died on a 529 (a false-alarm failure email) and
+    // the third saved a SECOND program. One active job per user, kickoff-wide
+    // (user AND service callers; the resume path above is untouched).
+    // "Active" = processing with a recent heartbeat — stage transitions bump
+    // updated_at, so a crashed job goes quiet and stops blocking after the
+    // window even if the reaper hasn't cleaned it up yet.
+    const ACTIVE_JOB_WINDOW_MS = 30 * 60 * 1000;
+    const { data: activeJob } = await supa
+      .from("program_jobs")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("status", "processing")
+      .gte("updated_at", new Date(Date.now() - ACTIVE_JOB_WINDOW_MS).toISOString())
+      .limit(1)
+      .maybeSingle();
+    if (activeJob) {
+      // job_id rides along so the client can reattach its progress polling to
+      // the run already in flight instead of surfacing an error.
+      return new Response(
+        JSON.stringify({
+          error: "GENERATION_IN_PROGRESS",
+          message:
+            "A program generation is already running for this account — it usually takes a few minutes. Hang tight; there's no need to start another.",
+          job_id: activeJob.id,
+        }),
+        { status: 409, headers: { ...cors, "Content-Type": "application/json" } },
+      );
+    }
+
     // Create the job already at stage 1, with continuation seeded into
     // resume_state (payload_building needs monthNumber). status='processing' so
     // the first claim succeeds; locked_at null so it's immediately claimable.
