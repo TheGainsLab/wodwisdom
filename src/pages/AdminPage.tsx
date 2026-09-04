@@ -836,14 +836,12 @@ export default function AdminPage({ session }: { session: Session }) {
                                 flexShrink: 0,
                                 display: 'inline-block',
                               }} />
-                              {/* Contact recency, spelled out for non-subscribers —
-                                  they're the outreach worklist; subscribers keep
-                                  just the dot. */}
-                              {!u.is_paid_subscriber && (
-                                <span style={{ fontSize: 10, fontWeight: 600, color, whiteSpace: 'nowrap' }}>
-                                  {count === 0 ? 'no contact' : `${daysSince}d`}
-                                </span>
-                              )}
+                              {/* Contact recency, spelled out for everyone —
+                                  non-subscribers are the sales worklist,
+                                  subscribers the retention one. */}
+                              <span style={{ fontSize: 10, fontWeight: 600, color, whiteSpace: 'nowrap' }}>
+                                {count === 0 ? 'no contact' : `${daysSince}d`}
+                              </span>
                             </span>
                           );
                         })()}
