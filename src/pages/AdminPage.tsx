@@ -94,6 +94,34 @@ function FeatureBadge({ feature }: { feature: string }) {
   );
 }
 
+// Pipeline stages, in funnel order. Keys mirror admin_user_list_v2's
+// pipeline_stage exactly — the RPC computes the stage live (no cron, no
+// stored status), the UI only labels and filters it.
+const PIPELINE_STAGES: Array<{ key: string; label: string; color: string }> = [
+  { key: 'signed_up', label: 'Signed up', color: '#8a8878' },
+  { key: 'profile_started', label: 'Profile', color: '#6ea8fe' },
+  { key: 'evaluated', label: 'Evaluated', color: '#f0a050' },
+  { key: 'emailed', label: 'Emailed', color: '#b07ce8' },
+  { key: 'checkout_started', label: 'Checkout', color: '#f1c40f' },
+  { key: 'subscriber', label: 'Subscriber', color: '#2ec486' },
+  { key: 'leaving', label: 'Leaving', color: '#e67e22' },
+  { key: 'churned', label: 'Churned', color: '#e74c3c' },
+];
+
+function StageBadge({ stage }: { stage: string | null }) {
+  const spec = PIPELINE_STAGES.find(s => s.key === stage);
+  if (!spec) return null;
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5,
+      color: spec.color, background: spec.color + '20',
+      padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0,
+    }}>
+      {spec.label}
+    </span>
+  );
+}
+
 // ── Main Component ──
 
 export default function AdminPage({ session }: { session: Session }) {
@@ -131,6 +159,7 @@ export default function AdminPage({ session }: { session: Session }) {
   const [userSort, setUserSort] = useState<UserSort>('last_active');
   const [subscriberFilter, setSubscriberFilter] = useState<SubscriberFilter>('all');
   const [competitionFilter, setCompetitionFilter] = useState<CompetitionFilter>('all');
+  const [stageFilter, setStageFilter] = useState<string>('all');
   const [dupNamesOnly, setDupNamesOnly] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -276,6 +305,7 @@ export default function AdminPage({ session }: { session: Session }) {
   const activeViewFilter = getViewFilter(viewFilter);
   const filteredUsers = users.filter(u => {
     if (activeViewFilter && !activeViewFilter.test(u)) return false;
+    if (stageFilter !== 'all' && u.pipeline_stage !== stageFilter) return false;
     if (subscriberFilter === 'subscribers' && !u.is_paid_subscriber) return false;
     if (subscriberFilter === 'non_subscribers' && u.is_paid_subscriber) return false;
     if (competitionFilter === 'linked' && !u.competition_linked) return false;
@@ -648,6 +678,26 @@ export default function AdminPage({ session }: { session: Session }) {
                   </select>
                 </div>
 
+                {/* Pipeline stage filter — one stage per user, computed live
+                    by the RPC. Counts are across ALL users so the chips read
+                    as a funnel snapshot regardless of other filters. */}
+                <div className="source-toggle" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
+                  {[{ key: 'all', label: 'All', color: '' }, ...PIPELINE_STAGES].map(s => {
+                    const count = s.key === 'all'
+                      ? users.length
+                      : users.filter(u => u.pipeline_stage === s.key).length;
+                    return (
+                      <button
+                        key={s.key}
+                        className={'source-btn ' + (stageFilter === s.key ? 'active' : '')}
+                        onClick={() => setStageFilter(s.key)}
+                      >
+                        {s.label} <span style={{ opacity: 0.6 }}>{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
                 {/* Subscriber filter */}
                 <div className="source-toggle" style={{ marginBottom: 12 }}>
                   {([
@@ -751,6 +801,7 @@ export default function AdminPage({ session }: { session: Session }) {
                           <div style={{ fontSize: 14, fontWeight: 600 }}>{u.full_name || 'No name'}</div>
                           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{u.email}</div>
                         </div>
+                        <StageBadge stage={u.pipeline_stage} />
                         {(() => {
                           // Email outreach indicator. Red = never, Yellow = stale (>14d), Green = recent (<=14d).
                           const count = Number(u.email_count ?? 0);
