@@ -86,17 +86,36 @@ function renderFreeLimit(firstName: string | null, unsubUrl: string | null): str
 
 const EVAL_FOLLOWUP_SUBJECT = "Your evaluation, and what to do with it";
 
+/**
+ * Shared bottom half of both eval follow-up variants (founder copy, Sep '26).
+ * One committed frame — your info + your goals → the program — instead of the
+ * old three-symmetric-doors pitch; each product name deep-links to its
+ * pre-selected checkout (/checkout?plan=... auto-opens the purchase flow for
+ * the signed-in account these recipients all have); the button stays neutral
+ * for the undecided.
+ */
+function evalFollowupWaysForward(): string {
+  return (
+    `<p>An assessment you don't act on is just interesting reading. The real value comes when we combine what we know about you with what you want to accomplish.</p>` +
+    `<p>There are a few ways forward:</p>` +
+    `<p><strong>${emailLink("/checkout?plan=programming", "AI Programming", "eval_followup")}</strong> builds your full program around your evaluation and your goals — strength, skills, accessories and MetCons, plus personalized warmups, cooldowns and mobility. AI Coach is there throughout to guide your training.</p>` +
+    `<p><strong>${emailLink("/checkout?plan=engine", "Year of the Engine", "eval_followup")}</strong> is for athletes who want to focus on conditioning. Choose from 8 different programs based on your goals and schedule, then the AI personalizes the path within that program based on your strengths and weaknesses. Your targets are calibrated to you and recalibrated as you improve.</p>` +
+    `<p><strong>${emailLink("/checkout?plan=all_access", "All Access", "eval_followup")}</strong> combines both — complete programming plus Year of the Engine — our most comprehensive personalized training, at around the same price as most group programs.</p>` +
+    `<p>The evaluation tells us where you are. You tell us where you want to go. We build the training between the two.</p>` +
+    // Deliberately NOT a button: the product links above are the primary
+    // CTAs (straight into pre-selected checkout), and a button here would
+    // out-click them. This is the fallback for the undecided — quiet, and
+    // it funnels back to a page whose whole job is CTAs.
+    `<p style="font-size:13px;color:#5a584f">Still deciding? ${emailLink("/features", "Learn more about each program", "eval_followup")}.</p>` +
+    `<p>-Matt</p>`
+  );
+}
+
 function renderEvalFollowup(firstName: string | null, unsubUrl: string | null): string {
   return emailWrap(
     `<p>${hi(firstName)}</p>` +
     `<p>A few days ago our AI took an honest look at your fitness — your lifting, your skills, and your engine. ${emailLink("/profile", "It's still there in your account", "eval_followup")} whenever you want to re-read it.</p>` +
-    `<p>Here's the question that matters: what happens with it now? An assessment you don't act on is just interesting reading. The whole reason we built the evaluation is that it feeds directly into training:</p>` +
-    `<p><strong>If your engine was the flag</strong> — ${emailLink("/features/engine", "Year of the Engine", "eval_followup")} turns that into 8 conditioning programs with targets calibrated to <em>your</em> baseline, recalibrated as you improve.</p>` +
-    `<p><strong>If lifting or skills need the work</strong> — ${emailLink("/features/programs", "AI Programming", "eval_followup")} builds your whole program around exactly those gaps, and rebuilds it monthly based on what you log.</p>` +
-    `<p><strong>If the honest answer is "more than one thing"</strong> — ${emailLink("/features", "All Access", "eval_followup")} is both programs under one subscription: your conditioning and your strength and skills, trained at the same time. At $49.99/mo it's the best value on the board — everything for less than two plans.</p>` +
-    `<p>Each plan is $29.99/mo on its own, and every plan includes the unlimited AI Coach and full nutrition tracking. Whichever fits, it starts from the evaluation you already did. The work of knowing where you stand is done. The next step is training on it.</p>` +
-    emailButton("/features", "Pick your plan", "eval_followup") +
-    `<p>-Matt</p>`,
+    evalFollowupWaysForward(),
     { unsubUrl },
   );
 }
@@ -120,13 +139,7 @@ function renderEvalFollowupAware(
     `<p>A few days ago our AI took an honest look at your fitness — your lifting, your skills, and your engine. Here's the one-line verdict it reached:</p>` +
     `<p style="border-left:3px solid #ccc;padding-left:12px;color:#5a584f"><strong>${escapeHtml(headline)}</strong></p>` +
     priorityBlock +
-    `<p>An assessment you don't act on is just interesting reading. The whole reason we built the evaluation is that it feeds directly into training:</p>` +
-    `<p><strong>If your engine was the flag</strong> — ${emailLink("/features/engine", "Year of the Engine", "eval_followup")} turns that into 8 conditioning programs with targets calibrated to <em>your</em> baseline, recalibrated as you improve.</p>` +
-    `<p><strong>If lifting or skills need the work</strong> — ${emailLink("/features/programs", "AI Programming", "eval_followup")} builds your whole program around exactly those gaps — including the priority above — and rebuilds it monthly based on what you log.</p>` +
-    `<p><strong>If the honest answer is "more than one thing"</strong> — ${emailLink("/features", "All Access", "eval_followup")} is both programs under one subscription, at $49.99/mo the best value on the board.</p>` +
-    `<p>The work of knowing where you stand is done. The next step is training on it.</p>` +
-    emailButton("/features", "Pick your plan", "eval_followup") +
-    `<p>-Matt</p>`,
+    evalFollowupWaysForward(),
     { unsubUrl },
   );
 }
