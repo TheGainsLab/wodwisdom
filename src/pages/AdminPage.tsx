@@ -7,10 +7,13 @@ import Nav from '../components/Nav';
 type Tab = 'overview' | 'engagement' | 'users';
 type SubscriberFilter = 'all' | 'subscribers' | 'non_subscribers';
 type CompetitionFilter = 'all' | 'linked' | 'not_linked';
-type UserSort = 'last_active' | 'signup_date' | 'question_count' | 'engine_sessions_count' | 'workouts_logged' | 'nutrition_days_logged' | 'total_tokens';
+type UserSort = 'last_active' | 'signup_date' | 'question_count' | 'engine_sessions_count' | 'workouts_logged' | 'nutrition_days_logged' | 'total_tokens' | 'needs_contact';
 
-const USER_SORTS: { key: UserSort; label: string; kind: 'date' | 'number' }[] = [
+const USER_SORTS: { key: UserSort; label: string; kind: 'date' | 'number' | 'contact' }[] = [
   { key: 'last_active', label: 'Last active', kind: 'date' },
+  // Outreach worklist order: never-contacted first, then coldest contact first
+  // (last_email_at ascending). Covers every send — automated and composer.
+  { key: 'needs_contact', label: 'Longest since contact', kind: 'contact' },
   { key: 'signup_date', label: 'Newest signup', kind: 'date' },
   { key: 'question_count', label: 'Questions', kind: 'number' },
   { key: 'engine_sessions_count', label: 'Engine sessions', kind: 'number' },
@@ -323,6 +326,14 @@ export default function AdminPage({ session }: { session: Session }) {
     // Descending; the RPC's default order is last_active DESC, so re-sorting
     // by it here is a no-op unless another sort was chosen and reverted.
     const spec = USER_SORTS.find(s => s.key === userSort)!;
+    if (spec.kind === 'contact') {
+      // Ascending by last contact, never-contacted at the very top — the
+      // opposite polarity of every other sort, because this one is a to-do
+      // list: the most neglected user is the most urgent row.
+      const av = a.last_email_at ? new Date(a.last_email_at).getTime() : -1;
+      const bv = b.last_email_at ? new Date(b.last_email_at).getTime() : -1;
+      return av - bv;
+    }
     if (spec.kind === 'date') {
       const av = a[userSort] ? new Date(a[userSort]).getTime() : 0;
       const bv = b[userSort] ? new Date(b[userSort]).getTime() : 0;
@@ -816,18 +827,24 @@ export default function AdminPage({ session }: { session: Session }) {
                             ? 'Never emailed'
                             : `${count} email${count !== 1 ? 's' : ''} · last ${lastAt!.toLocaleDateString()} (${daysSince}d ago)`;
                           return (
-                            <span
-                              title={tooltip}
-                              aria-label={tooltip}
-                              style={{
+                            <span title={tooltip} aria-label={tooltip} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                              <span style={{
                                 width: 8,
                                 height: 8,
                                 borderRadius: '50%',
                                 background: color,
                                 flexShrink: 0,
                                 display: 'inline-block',
-                              }}
-                            />
+                              }} />
+                              {/* Contact recency, spelled out for non-subscribers —
+                                  they're the outreach worklist; subscribers keep
+                                  just the dot. */}
+                              {!u.is_paid_subscriber && (
+                                <span style={{ fontSize: 10, fontWeight: 600, color, whiteSpace: 'nowrap' }}>
+                                  {count === 0 ? 'no contact' : `${daysSince}d`}
+                                </span>
+                              )}
+                            </span>
                           );
                         })()}
                         {dupCountFor(u) >= 2 && (
