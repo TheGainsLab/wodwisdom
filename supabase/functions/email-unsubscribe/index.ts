@@ -13,42 +13,51 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { verifyUnsubscribeToken } from "../_shared/checkout-emails.ts";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function page(title: string, body: string, status = 200): Response {
+// CORS: since Sep '26 emails mint links on the SITE's /unsubscribe page
+// (deliverability: every email link matches the sending domain), which
+// relays here via a browser fetch. Direct GET from old email links still
+// renders the HTML page as before.
+function page(title: string, body: string, status = 200, cors: Record<string, string> = {}): Response {
   return new Response(
     `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>` +
     `<body style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:480px;margin:80px auto;padding:0 24px;color:#1a1a1a;text-align:center">` +
     `<h2>${title}</h2><p style="color:#5a584f;line-height:1.6">${body}</p></body></html>`,
-    { status, headers: { "Content-Type": "text/html; charset=utf-8" } },
+    { status, headers: { ...cors, "Content-Type": "text/html; charset=utf-8" } },
   );
 }
 
 Deno.serve(async (req) => {
+  const cors = getCorsHeaders(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const url = new URL(req.url);
   const userId = url.searchParams.get("u") ?? "";
   const token = url.searchParams.get("t") ?? "";
 
   if (!UUID_RE.test(userId) || !token) {
-    return page("Invalid link", "This unsubscribe link is incomplete. Reply to any of our emails and we'll take you off the list by hand.", 400);
+    return page("Invalid link", "This unsubscribe link is incomplete. Reply to any of our emails and we'll take you off the list by hand.", 400, cors);
   }
   if (!(await verifyUnsubscribeToken(userId, token))) {
-    return page("Invalid link", "This unsubscribe link didn't check out. Reply to any of our emails and we'll take you off the list by hand.", 403);
+    return page("Invalid link", "This unsubscribe link didn't check out. Reply to any of our emails and we'll take you off the list by hand.", 403, cors);
   }
 
   const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   const { error } = await supa.rpc("set_email_opt_out", { p_user_id: userId });
   if (error) {
     console.error("[email-unsubscribe] opt-out failed:", error);
-    return page("Something went wrong", "We couldn't process that just now. Reply to any of our emails and we'll take you off the list by hand.", 500);
+    return page("Something went wrong", "We couldn't process that just now. Reply to any of our emails and we'll take you off the list by hand.", 500, cors);
   }
 
   return page(
     "You're unsubscribed",
     "You won't receive automated emails from The Gains Lab anymore. Account and billing emails (receipts, password resets) still arrive as needed.",
+    200,
+    cors,
   );
 });

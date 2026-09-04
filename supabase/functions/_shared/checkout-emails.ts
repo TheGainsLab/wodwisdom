@@ -90,14 +90,16 @@ async function hmacHex(value: string): Promise<string | null> {
   return [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** Per-recipient unsubscribe URL, or null when no user / no secret. */
+/** Per-recipient unsubscribe URL, or null when no user / no secret.
+ *  Minted on the SITE (the /unsubscribe page relays to the edge function)
+ *  so every link in an email matches the sending domain — mismatched link
+ *  domains are a spam-filter signal (Resend deliverability report, Sep '26).
+ *  Previously-sent supabase.co links keep working; the function serves both. */
 export async function unsubscribeUrl(userId: string | null): Promise<string | null> {
   if (!userId) return null;
   const token = await hmacHex(userId);
   if (!token) return null;
-  const base = Deno.env.get("SUPABASE_URL");
-  if (!base) return null;
-  return `${base}/functions/v1/email-unsubscribe?u=${userId}&t=${token}`;
+  return `${SITE}/unsubscribe?u=${userId}&t=${token}`;
 }
 
 /** Verify an unsubscribe token minted by unsubscribeUrl. */
@@ -130,13 +132,19 @@ export const emailButton = (path: string, label: string, campaign = "email") =>
  */
 export function emailWrap(inner: string, opts: { unsubUrl?: string | null; maxWidth?: number } = {}): string {
   const width = opts.maxWidth ?? 560;
+  // The opt-out is a sentence in the founder's voice, not a bare
+  // "unsubscribe" — CAN-SPAM requires a clear, working opt-out mechanism,
+  // not the corporate word for it, and these emails are personal in tone
+  // (founder ruling, Sep '26: the footer shouldn't make them read like a
+  // generic marketing blast).
   const unsub = opts.unsubUrl
-    ? ` · <a href="${opts.unsubUrl}" style="color:#9a9890">unsubscribe</a>`
+    ? `<p style="color:#9a9890;font-size:12px;margin-top:24px">You're getting this because you created an account at The Gains Lab. If you'd rather I didn't email you, <a href="${opts.unsubUrl}" style="color:#9a9890">tell me here</a> and I'll stop.</p>`
     : "";
   return (
     `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:${width}px;margin:0 auto;padding:24px;color:#1a1a1a;font-size:15px;line-height:1.6">` +
     inner +
-    `<p style="color:#9a9890;font-size:12px;margin-top:28px">${SENDER_NAME} · <a href="${SITE}" style="color:#9a9890">${SITE.replace("https://", "")}</a>${unsub}<br>${escapeHtml(POSTAL_ADDRESS)}</p>` +
+    unsub +
+    `<p style="color:#9a9890;font-size:12px;margin-top:${opts.unsubUrl ? 8 : 28}px">${SENDER_NAME} · <a href="${SITE}" style="color:#9a9890">${SITE.replace("https://", "")}</a><br>${escapeHtml(POSTAL_ADDRESS)}</p>` +
     `</div>`
   );
 }

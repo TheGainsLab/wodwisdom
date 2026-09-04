@@ -96,6 +96,7 @@ const AILogProgramPage = lazy(() => import('./pages/AILogProgramPage'));
 // Public Q&A library (both trees — visitors and members)
 const QALibraryPage = lazy(() => import('./pages/QALibraryPage'));
 const StayPage = lazy(() => import('./pages/StayPage'));
+const UnsubscribePage = lazy(() => import('./pages/UnsubscribePage'));
 const QAEntryPage = lazy(() => import('./pages/QAEntryPage'));
 
 // Feature landing pages
@@ -183,6 +184,7 @@ export default function App() {
             <Route path="/qa" element={<QALibraryPage />} />
             <Route path="/qa/:slug" element={<QAEntryPage />} />
             <Route path="/stay" element={<StayPage />} />
+            <Route path="/unsubscribe" element={<UnsubscribePage />} />
             <Route path="/features" element={<FeaturesHubPage />} />
             <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
             <Route path="/features/programs" element={<ProgramsFeaturePage />} />
@@ -236,6 +238,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/qa" element={<QALibraryPage signedIn />} />
             <Route path="/qa/:slug" element={<QAEntryPage signedIn />} />
             <Route path="/stay" element={<StayPage />} />
+            <Route path="/unsubscribe" element={<UnsubscribePage />} />
             <Route path="/chat" element={<ChatPage session={session} />} />
             <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />
             <Route path="/workout/start" element={<StartWorkoutPage session={session} />} />
