@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import GainsLogo from './GainsLogo';
 import { useEntitlements } from '../hooks/useEntitlements';
-import { ATHLETEDATA_PUBLIC_TIER, MYPROGRESS_PUBLIC_TIER } from '../lib/featureFlags';
+import { ATHLETEDATA_PUBLIC_TIER } from '../lib/featureFlags';
 
 interface NavProps { isOpen: boolean; onClose: () => void; }
 
@@ -22,7 +22,7 @@ export default function Nav({ isOpen, onClose }: NavProps) {
 
   const isChatActive = location.pathname === '/chat' || location.pathname === '/history' || location.pathname === '/bookmarks';
   const isEngineActive = location.pathname.startsWith('/engine');
-  const isTrainingActive = location.pathname.startsWith('/programs') || location.pathname === '/training-log' || location.pathname === '/progress' || location.pathname.startsWith('/ailog') || location.pathname === '/workout-review' || location.pathname.startsWith('/workout');
+  const isTrainingActive = location.pathname.startsWith('/programs') || location.pathname === '/training-log' || location.pathname.startsWith('/ailog') || location.pathname === '/workout-review' || location.pathname.startsWith('/workout');
   const isNutritionActive = location.pathname.startsWith('/nutrition');
   const [chatExpanded, setChatExpanded] = useState(isChatActive);
   const [engineExpanded, setEngineExpanded] = useState(isEngineActive);
@@ -120,14 +120,12 @@ export default function Nav({ isOpen, onClose }: NavProps) {
                     <button className={"nav-link sub " + (location.pathname.startsWith("/programs") ? "active" : "")} onClick={() => goTo("/programs")}>
                       <span className="nav-sub-dot" />My Programs
                     </button>
-                    <button className={"nav-link sub " + (location.pathname === "/training-log" ? "active" : "")} onClick={() => goTo("/training-log")}>
+                    <button className={"nav-link sub " + (location.pathname === "/training-log" && !location.search.includes("view=analytics") ? "active" : "")} onClick={() => goTo("/training-log")}>
                       <span className="nav-sub-dot" />My Calendar
                     </button>
-                    {(isAdmin || MYPROGRESS_PUBLIC_TIER) && (
-                      <button className={"nav-link sub " + (location.pathname === "/progress" ? "active" : "")} onClick={() => goTo("/progress")}>
-                        <span className="nav-sub-dot" />My Progress
-                      </button>
-                    )}
+                    <button className={"nav-link sub " + (location.pathname === "/training-log" && location.search.includes("view=analytics") ? "active" : "")} onClick={() => goTo("/training-log?view=analytics")}>
+                      <span className="nav-sub-dot" />Analytics
+                    </button>
                     {(hasProgramming || hasEngine || isAdmin) && (
                       <button className={"nav-link sub " + (location.pathname === "/log-activity" ? "active" : "")} onClick={() => goTo("/log-activity")}>
                         <span className="nav-sub-dot" />Log Activity

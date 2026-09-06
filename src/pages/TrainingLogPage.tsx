@@ -12,6 +12,7 @@ import { listActivities, deleteActivity, activityImageUrl, type AthleteActivity 
 import { scheduleProgramDay, scheduleEngineDay, unschedule } from '../lib/trainingSchedule';
 import { localDateString } from '../lib/localDate';
 import { formatMovementName } from '../lib/movementName';
+import { AdherenceRowCard, type AdherenceRow as ProgressAdherenceRow } from '../components/progress/ProgressCards';
 
 interface WorkoutLog {
   id: string;
@@ -535,7 +536,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [view, setView] = useState<'calendar' | 'analytics'>(
     searchParams.get('view') === 'analytics' ? 'analytics' : 'calendar',
   );
-  const [tab, setTab] = useState<'strength' | 'skills' | 'accessory' | 'cardio' | 'metcons' | 'history'>('strength');
+  // Overview lands first (Sep '26, My Progress fold-in): "how is it going
+  // overall" — counts, adherence, monthly reports — before the deep-dive tabs.
+  const [tab, setTab] = useState<'overview' | 'strength' | 'skills' | 'accessory' | 'cardio' | 'metcons' | 'history'>('overview');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // Engine-only users only have the Calendar section; never leave them stranded
@@ -558,6 +561,38 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
   const [allEntries, setAllEntries] = useState<(WorkoutLogEntry & { workout_date: string })[]>([]);
   const [blockTypeMap, setBlockTypeMap] = useState<Map<string, string>>(new Map());
+
+  // ── Overview tab data (My Progress fold-in, Sep '26) ──
+  // Adherence via the self-scoped my_adherence RPC; monthly reports are the
+  // athlete's own evaluations (full history — re-reads over time ARE the
+  // progress story, founder ruling). Loaded once when the Analytics section
+  // is open.
+  const [overviewAdherence, setOverviewAdherence] = useState<ProgressAdherenceRow[]>([]);
+  const [overviewEvals, setOverviewEvals] = useState<{ id: string; month_number: number | null; created_at: string; analysis: string | null }[]>([]);
+  const [overviewCounts, setOverviewCounts] = useState<{ total: number; last30: number } | null>(null);
+  const [openEvalId, setOpenEvalId] = useState<string | null>(null);
+  useEffect(() => {
+    if (view !== 'analytics' || overviewCounts != null) return;
+    (async () => {
+      const cutoff30 = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      const [adh, ev, totalLogs, recentLogs] = await Promise.all([
+        supabase.rpc('my_adherence'),
+        supabase
+          .from('profile_evaluations')
+          .select('id, month_number, created_at, analysis')
+          .eq('user_id', session.user.id)
+          .eq('visible', true)
+          .eq('status', 'complete')
+          .order('created_at', { ascending: false })
+          .limit(36),
+        supabase.from('workout_logs').select('id', { count: 'exact', head: true }).eq('user_id', session.user.id),
+        supabase.from('workout_logs').select('id', { count: 'exact', head: true }).eq('user_id', session.user.id).gte('workout_date', cutoff30),
+      ]);
+      setOverviewAdherence((adh.data as ProgressAdherenceRow[]) ?? []);
+      setOverviewEvals((ev.data as typeof overviewEvals) ?? []);
+      setOverviewCounts({ total: totalLogs.count ?? 0, last30: recentLogs.count ?? 0 });
+    })();
+  }, [view, overviewCounts, session.user.id]);
 
   // ── Edit state ──
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
@@ -1534,7 +1569,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                 Analytics sub-tabs still live within the Analytics section. */}
             {hasProgramming && view === 'analytics' && (
               <div className="tl-tabs">
-                {([['strength', 'Strength'], ['skills', 'Skills'], ['accessory', 'Accessory'], ['cardio', 'Cardio'], ['metcons', 'Metcons'], ['history', 'History']] as const).map(([id, label]) => (
+                {([['overview', 'Overview'], ['strength', 'Strength'], ['skills', 'Skills'], ['accessory', 'Accessory'], ['cardio', 'Cardio'], ['metcons', 'Metcons'], ['history', 'History']] as const).map(([id, label]) => (
                   <button
                     key={id}
                     className={`tl-tab${tab === id ? ' active' : ''}`}
@@ -1996,6 +2031,60 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   </div>
                 )}
 
+              </div>
+            ) : tab === 'overview' ? (
+              /* ── Overview Tab (My Progress fold-in) — how it's going overall:
+                    counts, program adherence, monthly reports. The deep-dive
+                    tabs answer "show me exactly". ── */
+              <div>
+                {overviewCounts && (
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
+                    {[
+                      { label: 'Workouts logged', value: overviewCounts.total },
+                      { label: 'Last 30 days', value: overviewCounts.last30 },
+                    ].map(s => (
+                      <div key={s.label} style={{ flex: 1, minWidth: 120, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px' }}>
+                        <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--text-muted)', marginBottom: 6 }}>{s.label}</div>
+                        <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {overviewAdherence.length > 0 && (
+                  <>
+                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--accent)', marginTop: 24, marginBottom: 12 }}>Program adherence</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {overviewAdherence.map(r => <AdherenceRowCard key={r.id} row={r} />)}
+                    </div>
+                  </>
+                )}
+                {overviewEvals.length > 0 && (
+                  <>
+                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--accent)', marginTop: 24, marginBottom: 12 }}>Monthly reports</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+                      {overviewEvals.map(e => (
+                        <div key={e.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                          <button
+                            onClick={() => setOpenEvalId(openEvalId === e.id ? null : e.id)}
+                            style={{ width: '100%', background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: "'Outfit', sans-serif", fontSize: 13 }}
+                          >
+                            <span style={{ fontWeight: 500 }}>
+                              {e.month_number != null ? `Month ${e.month_number} evaluation` : 'Evaluation'}
+                            </span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                              {new Date(e.created_at).toLocaleDateString()}
+                            </span>
+                          </button>
+                          {openEvalId === e.id && e.analysis && (
+                            <div style={{ padding: '0 16px 14px', fontSize: 13, lineHeight: 1.6, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>
+                              {e.analysis}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             ) : tab === 'strength' ? (
               /* ── Strength Tab ── */
