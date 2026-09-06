@@ -73,7 +73,18 @@ export default function MyProgressPage({ session }: { session: Session }) {
       setAdherence((adh.data as AdherenceRow[]) ?? []);
       setLifts((lp.data as LiftProgress[]) ?? []);
       setSkills((sv.data as SkillVolume[]) ?? []);
-      setEvals((ev.data as EvalRow[]) ?? []);
+      // One report per month: re-runs and resets (and admin testing) produce
+      // multiple evals for the same month_number — keep the newest of each.
+      // Rows arrive newest-first, so the first row seen per month wins.
+      const latestPerMonth: EvalRow[] = [];
+      const seenMonths = new Set<string>();
+      for (const row of (ev.data as EvalRow[]) ?? []) {
+        const key = String(row.month_number ?? 'none');
+        if (seenMonths.has(key)) continue;
+        seenMonths.add(key);
+        latestPerMonth.push(row);
+      }
+      setEvals(latestPerMonth);
       setLogCounts({ total: totalLogs.count ?? 0, last30: recentLogs.count ?? 0 });
       setLoading(false);
     })();
