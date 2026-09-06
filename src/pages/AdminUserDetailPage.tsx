@@ -681,6 +681,107 @@ interface SkillVolume {
   points: SkillPoint[];
 }
 
+/**
+ * Competition history panel (Sep '26): the same Tier 4 read the evaluator and
+ * AI Coach get, rendered on the admin user page — no more visiting the
+ * competition service to see a linked user's data. Self-loading:
+ * admin_user_competition_link (tiny admin RPC) resolves the linked athlete
+ * id, then verify-competition-athlete returns the bundle (admins may fetch
+ * any athlete). Renders nothing for unlinked users; failure-soft otherwise.
+ */
+function CompetitionSection({ userId }: { userId: string }) {
+  const [state, setState] = useState<'loading' | 'unlinked' | 'error' | 'ready'>('loading');
+  const [label, setLabel] = useState<string | null>(null);
+  const [bundle, setBundle] = useState<any>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: link, error } = await supabase.rpc('admin_user_competition_link', { target_user_id: userId });
+        if (error) { setState('error'); return; }
+        const row = Array.isArray(link) ? link[0] : link;
+        if (!row?.competition_athlete_id) { setState('unlinked'); return; }
+        setLabel(row.competition_athlete_label ?? null);
+        const { data, error: vErr } = await supabase.functions.invoke('verify-competition-athlete', {
+          body: { competition_athlete_id: row.competition_athlete_id, include: ['signature'] },
+        });
+        if (vErr || !data?.bundle) { setState('error'); return; }
+        setBundle(data.bundle);
+        setState('ready');
+      } catch {
+        setState('error');
+      }
+    })();
+  }, [userId]);
+
+  if (state === 'unlinked') return null;
+
+  const tierLabel: Record<string, string> = {
+    open_only: 'Open', qualifier: 'Quarterfinals', regionals: 'Semifinals/Regionals', games_athlete: 'Games',
+  };
+  const summary = bundle?.competition_summary;
+  const affinities = (bundle?.movement_affinity ?? [])
+    .filter((a: any) => a.avg_percentile != null)
+    .sort((a: any, b: any) => (b.exposures ?? 0) - (a.exposures ?? 0))
+    .slice(0, 8);
+  const gaps = (bundle?.fitness_signature?.closable_gaps ?? []).slice(0, 3);
+
+  return (
+    <>
+      <SectionHeader>Competition History</SectionHeader>
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+        {state === 'loading' && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Loading competition data…</div>}
+        {state === 'error' && (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+            Linked{label ? ` to ${label}` : ''}, but the competition service didn't answer just now.
+          </div>
+        )}
+        {state === 'ready' && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+              <span style={{ fontSize: 15, fontWeight: 700 }}>{bundle?.identity?.name ?? label ?? 'Linked athlete'}</span>
+              {summary && (
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {tierLabel[summary.overall_competitive_tier] ?? summary.overall_competitive_tier}
+                  {' · '}{summary.seasons_competed} season{summary.seasons_competed === 1 ? '' : 's'}
+                  {summary.latest_percentile != null && <> · latest {Math.round(summary.latest_percentile)}th pct</>}
+                  {summary.trend?.direction && <> · {summary.trend.direction}</>}
+                </span>
+              )}
+              {bundle?.identity?.profile_url && (
+                <a href={bundle.identity.profile_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--accent)', marginLeft: 'auto' }}>
+                  Games profile →
+                </a>
+              )}
+            </div>
+            {affinities.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: gaps.length > 0 ? 12 : 0 }}>
+                {affinities.map((a: any) => (
+                  <span key={a.category} title={`${a.exposures} exposures${a.trend?.direction ? ` · ${a.trend.direction}` : ''}`}
+                    style={{ fontSize: 11, background: 'var(--surface2, rgba(255,255,255,0.04))', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', whiteSpace: 'nowrap' }}>
+                    {a.category.replace(/_/g, ' ')} <strong>{Math.round(a.avg_percentile)}</strong>
+                  </span>
+                ))}
+              </div>
+            )}
+            {gaps.length > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text)' }}>Closable gaps: </span>
+                {gaps.map((g: any, i: number) => (
+                  <span key={`${g.dimension}-${g.bucket}`}>
+                    {i > 0 && ' · '}
+                    {String(g.bucket).replace(/_/g, ' ')} {Math.round(g.cohort_percentile)}th ({Math.round(g.gap_vs_overall_pp)}pp below overall)
+                  </span>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
 export default function AdminUserDetailPage({ session: _session }: { session: Session }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -780,6 +881,9 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                     </div>
                   </>
                 )}
+
+                {/* Competition history — the Tier 4 read for linked users */}
+                <CompetitionSection userId={id!} />
 
                 {/* Recent Activity — preview of the unified timeline */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 32, marginBottom: 12 }}>
