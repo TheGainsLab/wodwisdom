@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import MetconsTab from '../components/MetconsTab';
 import WorkoutCalendar from '../components/WorkoutCalendar';
+import { Sparkline } from '../components/progress/ProgressCards';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { loadUserProgress, getWorkoutsForProgram, getProgramMapping } from '../lib/engineService';
 import { listActivities, deleteActivity, activityImageUrl, type AthleteActivity } from '../lib/activitiesService';
@@ -1177,7 +1178,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       entries: Row[];
       trainingDays: number;
       totalSets: number;
-      cycleBest: { weight: number; unit: string; lbs: number } | null;
+      cycleBest: { weight: number; unit: string; lbs: number; reps: number | null; date: string } | null;
       totalTonnageLbs: number;
       // One bar per training day for the within-card chart: top set that day.
       perSessionTopSet: Array<{ date: string; weight: number; unit: string; lbs: number }>;
@@ -1212,7 +1213,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       const days = new Set<string>();
       let totalSets = 0;
       let bestLbs = 0;
-      let best: { weight: number; unit: string; lbs: number } | null = null;
+      let best: { weight: number; unit: string; lbs: number; reps: number | null; date: string } | null = null;
       let tonnage = 0;
       const perDay = new Map<string, { weight: number; unit: string; lbs: number }>();
 
@@ -1229,7 +1230,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         if (e.weight == null || e.weight <= 0) continue;
         totalSets++;
         const lbs = toLbs(e.weight, e.weight_unit);
-        if (lbs > bestLbs) { bestLbs = lbs; best = { weight: e.weight, unit: e.weight_unit, lbs }; }
+        if (lbs > bestLbs) { bestLbs = lbs; best = { weight: e.weight, unit: e.weight_unit, lbs, reps: e.reps ?? null, date: e.workout_date }; }
         if (lbs > runMax) { runMax = lbs; prIds.add(e.id); }
         if (e.reps != null && e.reps > 0) tonnage += lbs * e.reps;
         const existing = perDay.get(e.workout_date);
@@ -2214,6 +2215,19 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         ? b.workout_date.localeCompare(a.workout_date)
                         : (b.sort_order ?? 0) - (a.sort_order ?? 0)
                     );
+                    // Collapsed-card extras: last-trained recency, cycle best as
+                    // % of the profile 1RM (lbs is the comparison currency), and
+                    // a top-set trend sparkline (skipped for Other Strength —
+                    // mixed movements don't share an axis).
+                    const lastTrained = sessionsDesc.length > 0 ? sessionsDesc[0].workout_date : null;
+                    const fmtShort = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const oneRMLbs = oneRM != null ? toLbs(oneRM, profileUnits) : 0;
+                    const pctOfOneRM = data.cycleBest && oneRMLbs > 0
+                      ? Math.round((data.cycleBest.lbs / oneRMLbs) * 100)
+                      : null;
+                    const trendValues = cfg.key !== 'other' && data.perSessionTopSet.length >= 2
+                      ? data.perSessionTopSet.map(s => s.lbs)
+                      : null;
                     return (
                       <div key={cfg.key} className="tl-movement-card" style={{ padding: 0 }}>
                         <button
@@ -2226,13 +2240,24 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                             <span style={{ fontWeight: 600, fontSize: 15 }}>{cfg.displayName}</span>
-                            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>({data.trainingDays})</span>
-                            <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: 11 }}>{expanded ? '▲' : '▼'}</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{data.trainingDays} day{data.trainingDays !== 1 ? 's' : ''}</span>
+                            {trendValues && (
+                              <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                                <Sparkline values={trendValues} width={72} height={22} />
+                              </span>
+                            )}
+                            <span style={{ marginLeft: trendValues ? 0 : 'auto', color: 'var(--text-muted)', fontSize: 11 }}>{expanded ? '▲' : '▼'}</span>
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                             {data.totalSets} set{data.totalSets !== 1 ? 's' : ''}
                             {oneRM != null && <> · {oneRMLabel} {oneRM}{profileUnits}</>}
-                            {data.cycleBest && <> · Cycle best {data.cycleBest.weight}{data.cycleBest.unit}</>}
+                            {data.cycleBest && (
+                              <> · Cycle best {data.cycleBest.weight}{data.cycleBest.unit}
+                                {data.cycleBest.reps != null && <> x{data.cycleBest.reps}</>}
+                                {pctOfOneRM != null && <> ({pctOfOneRM}% of 1RM)</>}
+                              </>
+                            )}
+                            {lastTrained && <> · Last {fmtShort(lastTrained)}</>}
                           </div>
                         </button>
                         {expanded && (
