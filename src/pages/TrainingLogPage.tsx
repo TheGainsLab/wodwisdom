@@ -282,6 +282,11 @@ const LB_PER_KG = 2.20462;
 const toLbs = (weight: number, unit: string): number =>
   unit === 'kg' ? weight * LB_PER_KG : weight;
 
+// Render a YYYY-MM-DD workout date. Anchored at local noon — new Date('YYYY-MM-DD')
+// parses as UTC midnight, which renders a day early anywhere west of Greenwich.
+const fmtShortDate = (d: string) =>
+  new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
 /** Skill families for the Skills tab cards.
  *  - `metric` drives the in-card chart and the collapsed "best" stat:
  *    'reps' = max reps_completed in a set; 'seconds' = longest hold;
@@ -1319,7 +1324,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   // applies only to weighted PRs; bestLbs = 0 ⇒ no TOP SET badge. ──
   const accessoryByMovement = useMemo(() => {
     type Row = WorkoutLogEntry & { workout_date: string; isPR?: boolean };
-    const map = new Map<string, { entries: Row[]; best: number; bestUnit: string; bestLbs: number }>();
+    const map = new Map<string, { entries: Row[]; best: number; bestUnit: string; bestLbs: number; bestReps: number | null }>();
     for (const e of allEntries) {
       if (!e.block_id || blockTypeMap.get(e.block_id) !== 'accessory') continue;
       const lbs = e.weight != null && e.weight > 0
@@ -1332,6 +1337,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           existing.bestLbs = lbs;
           existing.best = e.weight ?? 0;
           existing.bestUnit = e.weight_unit ?? '';
+          existing.bestReps = e.reps_completed ?? e.reps ?? null;
         }
       } else {
         map.set(e.movement, {
@@ -1339,6 +1345,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           best: e.weight ?? 0,
           bestUnit: e.weight_unit ?? '',
           bestLbs: lbs,
+          bestReps: e.reps_completed ?? e.reps ?? null,
         });
       }
     }
@@ -1353,7 +1360,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       for (const e of chrono) {
         if (e.weight == null || e.weight <= 0) continue;
         const lbs = e.weight_unit === 'kg' ? e.weight * 2.20462 : e.weight;
-        if (lbs > runMax) { runMax = lbs; prIds.add(e.id); }
+        // A PR must beat something: the first weighted entry sets the baseline
+        // without a badge, otherwise sparse movements are wall-to-wall "PR".
+        if (lbs > runMax) { if (runMax > 0) prIds.add(e.id); runMax = lbs; }
       }
       data.entries = data.entries.map(e => ({ ...e, isPR: prIds.has(e.id) }));
     }
@@ -1465,6 +1474,8 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       entries: Row[];
       trainingDays: number;
       totalSets: number;
+      totalReps: number;
+      totalHoldSeconds: number;
       bestReps: number;
       bestHoldSeconds: number;
       perSessionBest: Array<{ date: string; value: number }>;
@@ -1479,6 +1490,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     for (const cfg of SKILL_FAMILIES) {
       map.set(cfg.key, {
         config: cfg, entries: [], trainingDays: 0, totalSets: 0,
+        totalReps: 0, totalHoldSeconds: 0,
         bestReps: 0, bestHoldSeconds: 0, perSessionBest: [],
       });
     }
@@ -1492,13 +1504,22 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
     for (const data of map.values()) {
       const days = new Set<string>();
+      let totalSets = 0;
+      let totalReps = 0;
+      let totalHold = 0;
       let bestReps = 0;
       let bestHold = 0;
       const perDay = new Map<string, number>();
       for (const e of data.entries) {
         days.add(e.workout_date);
+        // One row can carry several sets ("3s x9" = 3 sets of 9), so a raw
+        // entry count undercounts — sets and volume multiply through.
+        const sets = e.sets != null && e.sets > 0 ? e.sets : 1;
         const reps = e.reps_completed ?? 0;
         const hold = e.hold_seconds ?? 0;
+        totalSets += sets;
+        totalReps += sets * reps;
+        totalHold += sets * hold;
         if (reps > bestReps) bestReps = reps;
         if (hold > bestHold) bestHold = hold;
         const sessionVal = data.config.metric === 'seconds' ? hold : reps;
@@ -1508,7 +1529,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         }
       }
       data.trainingDays = days.size;
-      data.totalSets = data.entries.length;
+      data.totalSets = totalSets;
+      data.totalReps = totalReps;
+      data.totalHoldSeconds = totalHold;
       data.bestReps = bestReps;
       data.bestHoldSeconds = bestHold;
       data.perSessionBest = [...perDay.entries()]
@@ -1537,7 +1560,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   // ── Helpers ──
 
   const formatDate = (d: string) => {
-    const date = new Date(d);
+    const date = new Date(d + 'T12:00:00');
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   };
 
@@ -2220,7 +2243,6 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                     // a top-set trend sparkline (skipped for Other Strength —
                     // mixed movements don't share an axis).
                     const lastTrained = sessionsDesc.length > 0 ? sessionsDesc[0].workout_date : null;
-                    const fmtShort = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                     const oneRMLbs = oneRM != null ? toLbs(oneRM, profileUnits) : 0;
                     const pctOfOneRM = data.cycleBest && oneRMLbs > 0
                       ? Math.round((data.cycleBest.lbs / oneRMLbs) * 100)
@@ -2257,7 +2279,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                 {pctOfOneRM != null && <> ({pctOfOneRM}% of 1RM)</>}
                               </>
                             )}
-                            {lastTrained && <> · Last {fmtShort(lastTrained)}</>}
+                            {lastTrained && <> · Last {fmtShortDate(lastTrained)}</>}
                           </div>
                         </button>
                         {expanded && (
@@ -2308,7 +2330,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                   </div>
                                 ) : (
                                   <div key={i} className="tl-set-row">
-                                    <span className="tl-set-date">{new Date(e.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                    <span className="tl-set-date">{fmtShortDate(e.workout_date)}</span>
                                     <span style={{ fontSize: 12, color: 'var(--text-dim)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatMovementName(e.movement)}</span>
                                     <span className="tl-set-value">
                                       {e.weight != null ? `${e.weight}${e.weight_unit}` : '—'}
@@ -2412,6 +2434,14 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         ? b.workout_date.localeCompare(a.workout_date)
                         : (b.sort_order ?? 0) - (a.sort_order ?? 0)
                     );
+                    const lastTrained = sessionsDesc.length > 0 ? sessionsDesc[0].workout_date : null;
+                    const volumeLabel =
+                      cfg.metric === 'reps' && data.totalReps > 0 ? `${data.totalReps} reps`
+                      : cfg.metric === 'seconds' && data.totalHoldSeconds > 0 ? `${data.totalHoldSeconds}s total`
+                      : null;
+                    const trendValues = cfg.metric !== 'none' && data.perSessionBest.length >= 2
+                      ? data.perSessionBest.map(s => s.value)
+                      : null;
                     return (
                       <div key={cfg.key} className="tl-movement-card" style={{ padding: 0 }}>
                         <button
@@ -2424,12 +2454,19 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                             <span style={{ fontWeight: 600, fontSize: 15 }}>{cfg.displayName}</span>
-                            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>({data.trainingDays})</span>
-                            <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: 11 }}>{expanded ? '▲' : '▼'}</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{data.trainingDays} day{data.trainingDays !== 1 ? 's' : ''}</span>
+                            {trendValues && (
+                              <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                                <Sparkline values={trendValues} width={72} height={22} />
+                              </span>
+                            )}
+                            <span style={{ marginLeft: trendValues ? 0 : 'auto', color: 'var(--text-muted)', fontSize: 11 }}>{expanded ? '▲' : '▼'}</span>
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                             {data.totalSets} set{data.totalSets !== 1 ? 's' : ''}
+                            {volumeLabel && <> · {volumeLabel}</>}
                             {bestLabel && <> · {bestLabel}</>}
+                            {lastTrained && <> · Last {fmtShortDate(lastTrained)}</>}
                           </div>
                         </button>
                         {expanded && (
@@ -2512,7 +2549,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                   </div>
                                 ) : (
                                   <div key={i} className="tl-set-row">
-                                    <span className="tl-set-date">{new Date(e.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                    <span className="tl-set-date">{fmtShortDate(e.workout_date)}</span>
                                     <span style={{ fontSize: 12, color: 'var(--text-dim)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatMovementName(e.movement)}</span>
                                     <span className="tl-set-value">
                                       {e.sets != null || e.reps_completed != null || e.hold_seconds != null ? (
@@ -2586,19 +2623,22 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   return movements.map(([movement, data]) => {
                     const sorted = [...data.entries].sort((a, b) =>
                       accessorySort === 'weight'
-                        ? (b.weight ?? 0) - (a.weight ?? 0)
+                        ? toLbs(b.weight ?? 0, b.weight_unit ?? '') - toLbs(a.weight ?? 0, a.weight_unit ?? '')
                         : b.workout_date.localeCompare(a.workout_date)
                     );
                     const recent = sorted.slice(0, 8);
+                    // Rows can carry multiple sets ("3 sets 155lbs x8"), so sum
+                    // them — an entry count reads as "1 set" under a 3-set row.
+                    const totalSets = data.entries.reduce((s, e) => s + (e.sets != null && e.sets > 0 ? e.sets : 1), 0);
                     return (
                       <div key={movement} className="tl-movement-card">
                         <div className="tl-movement-header">
                           <span className="tl-movement-name">{formatMovementName(movement)}</span>
                           {data.bestLbs > 0 && (
-                            <span className="tl-pr-badge">TOP SET: {data.best}{data.bestUnit}</span>
+                            <span className="tl-pr-badge">TOP SET: {data.best}{data.bestUnit}{data.bestReps != null ? ` x${data.bestReps}` : ''}</span>
                           )}
                         </div>
-                        <div className="tl-session-count">{data.entries.length} set{data.entries.length !== 1 ? 's' : ''} logged</div>
+                        <div className="tl-session-count">{totalSets} set{totalSets !== 1 ? 's' : ''} logged</div>
                         <div style={{ marginTop: 8 }}>
                           {recent.map((e, i) => (
                             editingEntryId === e.id ? (
@@ -2614,7 +2654,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                               </div>
                             ) : (
                             <div key={i} className="tl-set-row">
-                              <span className="tl-set-date">{new Date(e.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                              <span className="tl-set-date">{fmtShortDate(e.workout_date)}</span>
                               <span className="tl-set-value">
                                 {e.sets != null && `${e.sets} sets`}
                                 {e.weight != null && e.weight > 0 && ` ${e.weight}${e.weight_unit}`}
