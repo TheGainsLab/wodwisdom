@@ -6,13 +6,14 @@ import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import MetconsTab from '../components/MetconsTab';
 import WorkoutCalendar from '../components/WorkoutCalendar';
+import { Sparkline } from '../components/progress/ProgressCards';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { loadUserProgress, getWorkoutsForProgram, getProgramMapping } from '../lib/engineService';
 import { listActivities, deleteActivity, activityImageUrl, type AthleteActivity } from '../lib/activitiesService';
 import { scheduleProgramDay, scheduleEngineDay, unschedule } from '../lib/trainingSchedule';
 import { localDateString } from '../lib/localDate';
 import { formatMovementName } from '../lib/movementName';
-import { AdherenceRowCard, type AdherenceRow as ProgressAdherenceRow } from '../components/progress/ProgressCards';
+
 
 interface WorkoutLog {
   id: string;
@@ -280,6 +281,11 @@ const STRENGTH_CYCLE_DAYS = 90;
 const LB_PER_KG = 2.20462;
 const toLbs = (weight: number, unit: string): number =>
   unit === 'kg' ? weight * LB_PER_KG : weight;
+
+// Render a YYYY-MM-DD workout date. Anchored at local noon — new Date('YYYY-MM-DD')
+// parses as UTC midnight, which renders a day early anywhere west of Greenwich.
+const fmtShortDate = (d: string) =>
+  new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 /** Skill families for the Skills tab cards.
  *  - `metric` drives the in-card chart and the collapsed "best" stat:
@@ -562,21 +568,27 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [allEntries, setAllEntries] = useState<(WorkoutLogEntry & { workout_date: string })[]>([]);
   const [blockTypeMap, setBlockTypeMap] = useState<Map<string, string>>(new Map());
 
-  // ── Overview tab data (My Progress fold-in, Sep '26) ──
-  // Adherence via the self-scoped my_adherence RPC; monthly reports are the
-  // athlete's own evaluations (full history — re-reads over time ARE the
-  // progress story, founder ruling). Loaded once when the Analytics section
-  // is open.
-  const [overviewAdherence, setOverviewAdherence] = useState<ProgressAdherenceRow[]>([]);
+  // ── Overview tab data (count-based redesign, Sep '26) ──
+  // Positive counts only, no denominators, no prescription math (founder
+  // ruling: "adherence" framing scolds; counts credit). my_training_counts
+  // returns days trained (distinct dates with a completed log — sidesteps
+  // finish-button/partial-day semantics) plus per-program logged blocks by
+  // type. Monthly reports are the athlete's own evaluations (full history —
+  // re-reads over time ARE the progress story). Loaded once when the
+  // Analytics section is open.
+  interface OverviewProgram {
+    id: string; name: string | null; created_at: string; days_trained: number;
+    strength_blocks: number; metcon_blocks: number; skills_blocks: number; accessory_blocks: number;
+  }
+  const [overviewPrograms, setOverviewPrograms] = useState<OverviewProgram[]>([]);
   const [overviewEvals, setOverviewEvals] = useState<{ id: string; month_number: number | null; created_at: string; analysis: string | null }[]>([]);
   const [overviewCounts, setOverviewCounts] = useState<{ total: number; last30: number } | null>(null);
   const [openEvalId, setOpenEvalId] = useState<string | null>(null);
   useEffect(() => {
     if (view !== 'analytics' || overviewCounts != null) return;
     (async () => {
-      const cutoff30 = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-      const [adh, ev, totalLogs, recentLogs] = await Promise.all([
-        supabase.rpc('my_adherence'),
+      const [counts, ev] = await Promise.all([
+        supabase.rpc('my_training_counts'),
         supabase
           .from('profile_evaluations')
           .select('id, month_number, created_at, analysis')
@@ -585,12 +597,11 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           .eq('status', 'complete')
           .order('created_at', { ascending: false })
           .limit(36),
-        supabase.from('workout_logs').select('id', { count: 'exact', head: true }).eq('user_id', session.user.id),
-        supabase.from('workout_logs').select('id', { count: 'exact', head: true }).eq('user_id', session.user.id).gte('workout_date', cutoff30),
       ]);
-      setOverviewAdherence((adh.data as ProgressAdherenceRow[]) ?? []);
+      const c = counts.data as { days_trained_total?: number; days_trained_30d?: number; programs?: OverviewProgram[] } | null;
+      setOverviewPrograms(c?.programs ?? []);
       setOverviewEvals((ev.data as typeof overviewEvals) ?? []);
-      setOverviewCounts({ total: totalLogs.count ?? 0, last30: recentLogs.count ?? 0 });
+      setOverviewCounts({ total: c?.days_trained_total ?? 0, last30: c?.days_trained_30d ?? 0 });
     })();
   }, [view, overviewCounts, session.user.id]);
 
@@ -1172,7 +1183,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       entries: Row[];
       trainingDays: number;
       totalSets: number;
-      cycleBest: { weight: number; unit: string; lbs: number } | null;
+      cycleBest: { weight: number; unit: string; lbs: number; reps: number | null; date: string } | null;
       totalTonnageLbs: number;
       // One bar per training day for the within-card chart: top set that day.
       perSessionTopSet: Array<{ date: string; weight: number; unit: string; lbs: number }>;
@@ -1207,7 +1218,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       const days = new Set<string>();
       let totalSets = 0;
       let bestLbs = 0;
-      let best: { weight: number; unit: string; lbs: number } | null = null;
+      let best: { weight: number; unit: string; lbs: number; reps: number | null; date: string } | null = null;
       let tonnage = 0;
       const perDay = new Map<string, { weight: number; unit: string; lbs: number }>();
 
@@ -1224,7 +1235,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         if (e.weight == null || e.weight <= 0) continue;
         totalSets++;
         const lbs = toLbs(e.weight, e.weight_unit);
-        if (lbs > bestLbs) { bestLbs = lbs; best = { weight: e.weight, unit: e.weight_unit, lbs }; }
+        if (lbs > bestLbs) { bestLbs = lbs; best = { weight: e.weight, unit: e.weight_unit, lbs, reps: e.reps ?? null, date: e.workout_date }; }
         if (lbs > runMax) { runMax = lbs; prIds.add(e.id); }
         if (e.reps != null && e.reps > 0) tonnage += lbs * e.reps;
         const existing = perDay.get(e.workout_date);
@@ -1313,7 +1324,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   // applies only to weighted PRs; bestLbs = 0 ⇒ no TOP SET badge. ──
   const accessoryByMovement = useMemo(() => {
     type Row = WorkoutLogEntry & { workout_date: string; isPR?: boolean };
-    const map = new Map<string, { entries: Row[]; best: number; bestUnit: string; bestLbs: number }>();
+    const map = new Map<string, { entries: Row[]; best: number; bestUnit: string; bestLbs: number; bestReps: number | null }>();
     for (const e of allEntries) {
       if (!e.block_id || blockTypeMap.get(e.block_id) !== 'accessory') continue;
       const lbs = e.weight != null && e.weight > 0
@@ -1326,6 +1337,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           existing.bestLbs = lbs;
           existing.best = e.weight ?? 0;
           existing.bestUnit = e.weight_unit ?? '';
+          existing.bestReps = e.reps_completed ?? e.reps ?? null;
         }
       } else {
         map.set(e.movement, {
@@ -1333,6 +1345,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           best: e.weight ?? 0,
           bestUnit: e.weight_unit ?? '',
           bestLbs: lbs,
+          bestReps: e.reps_completed ?? e.reps ?? null,
         });
       }
     }
@@ -1347,7 +1360,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       for (const e of chrono) {
         if (e.weight == null || e.weight <= 0) continue;
         const lbs = e.weight_unit === 'kg' ? e.weight * 2.20462 : e.weight;
-        if (lbs > runMax) { runMax = lbs; prIds.add(e.id); }
+        // A PR must beat something: the first weighted entry sets the baseline
+        // without a badge, otherwise sparse movements are wall-to-wall "PR".
+        if (lbs > runMax) { if (runMax > 0) prIds.add(e.id); runMax = lbs; }
       }
       data.entries = data.entries.map(e => ({ ...e, isPR: prIds.has(e.id) }));
     }
@@ -1377,6 +1392,13 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     }
     return map;
   }, [logs, blocksByLog]);
+
+  // The Cardio tab only renders for users with completed cardio blocks —
+  // everyone else would read it as their Engine sessions and find it empty.
+  // If the view somehow lands there without data, fall back to Overview.
+  useEffect(() => {
+    if (tab === 'cardio' && !loading && cardioByModality.size === 0) setTab('overview');
+  }, [tab, loading, cardioByModality]);
 
   // ── Sessions insights ──
   // Last-7-days descriptive rollup: workout count + per-block-type breakdown.
@@ -1459,6 +1481,8 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       entries: Row[];
       trainingDays: number;
       totalSets: number;
+      totalReps: number;
+      totalHoldSeconds: number;
       bestReps: number;
       bestHoldSeconds: number;
       perSessionBest: Array<{ date: string; value: number }>;
@@ -1473,6 +1497,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     for (const cfg of SKILL_FAMILIES) {
       map.set(cfg.key, {
         config: cfg, entries: [], trainingDays: 0, totalSets: 0,
+        totalReps: 0, totalHoldSeconds: 0,
         bestReps: 0, bestHoldSeconds: 0, perSessionBest: [],
       });
     }
@@ -1486,13 +1511,22 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
     for (const data of map.values()) {
       const days = new Set<string>();
+      let totalSets = 0;
+      let totalReps = 0;
+      let totalHold = 0;
       let bestReps = 0;
       let bestHold = 0;
       const perDay = new Map<string, number>();
       for (const e of data.entries) {
         days.add(e.workout_date);
+        // One row can carry several sets ("3s x9" = 3 sets of 9), so a raw
+        // entry count undercounts — sets and volume multiply through.
+        const sets = e.sets != null && e.sets > 0 ? e.sets : 1;
         const reps = e.reps_completed ?? 0;
         const hold = e.hold_seconds ?? 0;
+        totalSets += sets;
+        totalReps += sets * reps;
+        totalHold += sets * hold;
         if (reps > bestReps) bestReps = reps;
         if (hold > bestHold) bestHold = hold;
         const sessionVal = data.config.metric === 'seconds' ? hold : reps;
@@ -1502,7 +1536,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         }
       }
       data.trainingDays = days.size;
-      data.totalSets = data.entries.length;
+      data.totalSets = totalSets;
+      data.totalReps = totalReps;
+      data.totalHoldSeconds = totalHold;
       data.bestReps = bestReps;
       data.bestHoldSeconds = bestHold;
       data.perSessionBest = [...perDay.entries()]
@@ -1531,7 +1567,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   // ── Helpers ──
 
   const formatDate = (d: string) => {
-    const date = new Date(d);
+    const date = new Date(d + 'T12:00:00');
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   };
 
@@ -1569,7 +1605,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                 Analytics sub-tabs still live within the Analytics section. */}
             {hasProgramming && view === 'analytics' && (
               <div className="tl-tabs">
-                {([['overview', 'Overview'], ['strength', 'Strength'], ['skills', 'Skills'], ['accessory', 'Accessory'], ['cardio', 'Cardio'], ['metcons', 'Metcons'], ['history', 'History']] as const).map(([id, label]) => (
+                {([['overview', 'Overview'], ['strength', 'Strength'], ['skills', 'Skills'], ['accessory', 'Accessory'], ['cardio', 'Cardio'], ['metcons', 'Metcons'], ['history', 'History']] as const)
+                  .filter(([id]) => id !== 'cardio' || cardioByModality.size > 0)
+                  .map(([id, label]) => (
                   <button
                     key={id}
                     className={`tl-tab${tab === id ? ' active' : ''}`}
@@ -2034,13 +2072,13 @@ export default function TrainingLogPage({ session }: { session: Session }) {
               </div>
             ) : tab === 'overview' ? (
               /* ── Overview Tab (My Progress fold-in) — how it's going overall:
-                    counts, program adherence, monthly reports. The deep-dive
+                    counts, program progress, monthly reports. The deep-dive
                     tabs answer "show me exactly". ── */
               <div>
                 {overviewCounts && (
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
                     {[
-                      { label: 'Workouts logged', value: overviewCounts.total },
+                      { label: 'Days trained', value: overviewCounts.total },
                       { label: 'Last 30 days', value: overviewCounts.last30 },
                     ].map(s => (
                       <div key={s.label} style={{ flex: 1, minWidth: 120, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px' }}>
@@ -2050,11 +2088,46 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                     ))}
                   </div>
                 )}
-                {overviewAdherence.length > 0 && (
+                {overviewPrograms.length > 0 && (
                   <>
-                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--accent)', marginTop: 24, marginBottom: 12 }}>Program adherence</h3>
+                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--accent)', marginTop: 24, marginBottom: 12 }}>Program progress</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {overviewAdherence.map(r => <AdherenceRowCard key={r.id} row={r} />)}
+                      {overviewPrograms.map(p => {
+                        // Positive counts only — typed work banked, no
+                        // denominators, nothing to fall short of.
+                        const typeCounts: Array<[string, number]> = [
+                          ['Strength', p.strength_blocks],
+                          ['MetCons', p.metcon_blocks],
+                          ['Skills', p.skills_blocks],
+                          ['Accessory', p.accessory_blocks],
+                        ];
+                        const nonzero = typeCounts.filter(([, n]) => n > 0);
+                        return (
+                          <div key={p.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                              <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name || 'Untitled program'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(p.created_at).toLocaleDateString()}</div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 88 }}>
+                                <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--text-muted)' }}>Days trained</div>
+                                <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>{p.days_trained}</div>
+                              </div>
+                              {nonzero.map(([label, n]) => (
+                                <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 72 }}>
+                                  <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--text-muted)' }}>{label}</div>
+                                  <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>{n}</div>
+                                </div>
+                              ))}
+                              {nonzero.length === 0 && (
+                                <div style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'center' }}>
+                                  Log a training day and your work shows up here.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -2174,6 +2247,18 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         ? b.workout_date.localeCompare(a.workout_date)
                         : (b.sort_order ?? 0) - (a.sort_order ?? 0)
                     );
+                    // Collapsed-card extras: last-trained recency, cycle best as
+                    // % of the profile 1RM (lbs is the comparison currency), and
+                    // a top-set trend sparkline (skipped for Other Strength —
+                    // mixed movements don't share an axis).
+                    const lastTrained = sessionsDesc.length > 0 ? sessionsDesc[0].workout_date : null;
+                    const oneRMLbs = oneRM != null ? toLbs(oneRM, profileUnits) : 0;
+                    const pctOfOneRM = data.cycleBest && oneRMLbs > 0
+                      ? Math.round((data.cycleBest.lbs / oneRMLbs) * 100)
+                      : null;
+                    const trendValues = cfg.key !== 'other' && data.perSessionTopSet.length >= 2
+                      ? data.perSessionTopSet.map(s => s.lbs)
+                      : null;
                     return (
                       <div key={cfg.key} className="tl-movement-card" style={{ padding: 0 }}>
                         <button
@@ -2186,13 +2271,24 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                             <span style={{ fontWeight: 600, fontSize: 15 }}>{cfg.displayName}</span>
-                            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>({data.trainingDays})</span>
-                            <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: 11 }}>{expanded ? '▲' : '▼'}</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{data.trainingDays} day{data.trainingDays !== 1 ? 's' : ''}</span>
+                            {trendValues && (
+                              <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                                <Sparkline values={trendValues} width={72} height={22} />
+                              </span>
+                            )}
+                            <span style={{ marginLeft: trendValues ? 0 : 'auto', color: 'var(--text-muted)', fontSize: 11 }}>{expanded ? '▲' : '▼'}</span>
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                             {data.totalSets} set{data.totalSets !== 1 ? 's' : ''}
                             {oneRM != null && <> · {oneRMLabel} {oneRM}{profileUnits}</>}
-                            {data.cycleBest && <> · Cycle best {data.cycleBest.weight}{data.cycleBest.unit}</>}
+                            {data.cycleBest && (
+                              <> · Cycle best {data.cycleBest.weight}{data.cycleBest.unit}
+                                {data.cycleBest.reps != null && <> x{data.cycleBest.reps}</>}
+                                {pctOfOneRM != null && <> ({pctOfOneRM}% of 1RM)</>}
+                              </>
+                            )}
+                            {lastTrained && <> · Last {fmtShortDate(lastTrained)}</>}
                           </div>
                         </button>
                         {expanded && (
@@ -2243,7 +2339,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                   </div>
                                 ) : (
                                   <div key={i} className="tl-set-row">
-                                    <span className="tl-set-date">{new Date(e.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                    <span className="tl-set-date">{fmtShortDate(e.workout_date)}</span>
                                     <span style={{ fontSize: 12, color: 'var(--text-dim)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatMovementName(e.movement)}</span>
                                     <span className="tl-set-value">
                                       {e.weight != null ? `${e.weight}${e.weight_unit}` : '—'}
@@ -2347,6 +2443,14 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         ? b.workout_date.localeCompare(a.workout_date)
                         : (b.sort_order ?? 0) - (a.sort_order ?? 0)
                     );
+                    const lastTrained = sessionsDesc.length > 0 ? sessionsDesc[0].workout_date : null;
+                    const volumeLabel =
+                      cfg.metric === 'reps' && data.totalReps > 0 ? `${data.totalReps} reps`
+                      : cfg.metric === 'seconds' && data.totalHoldSeconds > 0 ? `${data.totalHoldSeconds}s total`
+                      : null;
+                    const trendValues = cfg.metric !== 'none' && data.perSessionBest.length >= 2
+                      ? data.perSessionBest.map(s => s.value)
+                      : null;
                     return (
                       <div key={cfg.key} className="tl-movement-card" style={{ padding: 0 }}>
                         <button
@@ -2359,12 +2463,19 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                             <span style={{ fontWeight: 600, fontSize: 15 }}>{cfg.displayName}</span>
-                            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>({data.trainingDays})</span>
-                            <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: 11 }}>{expanded ? '▲' : '▼'}</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{data.trainingDays} day{data.trainingDays !== 1 ? 's' : ''}</span>
+                            {trendValues && (
+                              <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                                <Sparkline values={trendValues} width={72} height={22} />
+                              </span>
+                            )}
+                            <span style={{ marginLeft: trendValues ? 0 : 'auto', color: 'var(--text-muted)', fontSize: 11 }}>{expanded ? '▲' : '▼'}</span>
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                             {data.totalSets} set{data.totalSets !== 1 ? 's' : ''}
+                            {volumeLabel && <> · {volumeLabel}</>}
                             {bestLabel && <> · {bestLabel}</>}
+                            {lastTrained && <> · Last {fmtShortDate(lastTrained)}</>}
                           </div>
                         </button>
                         {expanded && (
@@ -2447,7 +2558,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                   </div>
                                 ) : (
                                   <div key={i} className="tl-set-row">
-                                    <span className="tl-set-date">{new Date(e.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                    <span className="tl-set-date">{fmtShortDate(e.workout_date)}</span>
                                     <span style={{ fontSize: 12, color: 'var(--text-dim)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatMovementName(e.movement)}</span>
                                     <span className="tl-set-value">
                                       {e.sets != null || e.reps_completed != null || e.hold_seconds != null ? (
@@ -2521,19 +2632,22 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   return movements.map(([movement, data]) => {
                     const sorted = [...data.entries].sort((a, b) =>
                       accessorySort === 'weight'
-                        ? (b.weight ?? 0) - (a.weight ?? 0)
+                        ? toLbs(b.weight ?? 0, b.weight_unit ?? '') - toLbs(a.weight ?? 0, a.weight_unit ?? '')
                         : b.workout_date.localeCompare(a.workout_date)
                     );
                     const recent = sorted.slice(0, 8);
+                    // Rows can carry multiple sets ("3 sets 155lbs x8"), so sum
+                    // them — an entry count reads as "1 set" under a 3-set row.
+                    const totalSets = data.entries.reduce((s, e) => s + (e.sets != null && e.sets > 0 ? e.sets : 1), 0);
                     return (
                       <div key={movement} className="tl-movement-card">
                         <div className="tl-movement-header">
                           <span className="tl-movement-name">{formatMovementName(movement)}</span>
                           {data.bestLbs > 0 && (
-                            <span className="tl-pr-badge">TOP SET: {data.best}{data.bestUnit}</span>
+                            <span className="tl-pr-badge">TOP SET: {data.best}{data.bestUnit}{data.bestReps != null ? ` x${data.bestReps}` : ''}</span>
                           )}
                         </div>
-                        <div className="tl-session-count">{data.entries.length} set{data.entries.length !== 1 ? 's' : ''} logged</div>
+                        <div className="tl-session-count">{totalSets} set{totalSets !== 1 ? 's' : ''} logged</div>
                         <div style={{ marginTop: 8 }}>
                           {recent.map((e, i) => (
                             editingEntryId === e.id ? (
@@ -2549,7 +2663,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                               </div>
                             ) : (
                             <div key={i} className="tl-set-row">
-                              <span className="tl-set-date">{new Date(e.workout_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                              <span className="tl-set-date">{fmtShortDate(e.workout_date)}</span>
                               <span className="tl-set-value">
                                 {e.sets != null && `${e.sets} sets`}
                                 {e.weight != null && e.weight > 0 && ` ${e.weight}${e.weight_unit}`}
@@ -2596,12 +2710,13 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   }
                   const sorted = [...cardioByModality.entries()].sort((a, b) => b[1].bestWatts - a[1].bestWatts);
                   return sorted.map(([modality, data]) => {
+                    const modalityLabel = modality === 'unknown' ? 'Cardio' : formatMovementName(modality);
                     const blocks = [...data.blocks].sort((a, b) => b.workout_date.localeCompare(a.workout_date));
                     const recent = blocks.slice(0, 8);
                     return (
                       <div key={modality} className="tl-movement-card">
                         <div className="tl-movement-header">
-                          <span className="tl-movement-name">{formatMovementName(modality)}</span>
+                          <span className="tl-movement-name">{modalityLabel}</span>
                           {data.bestWatts > 0 && (
                             <span className="tl-pr-badge">BEST: {Math.round(data.bestWatts)} W</span>
                           )}
