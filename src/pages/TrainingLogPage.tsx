@@ -12,7 +12,7 @@ import { listActivities, deleteActivity, activityImageUrl, type AthleteActivity 
 import { scheduleProgramDay, scheduleEngineDay, unschedule } from '../lib/trainingSchedule';
 import { localDateString } from '../lib/localDate';
 import { formatMovementName } from '../lib/movementName';
-import { AdherenceRowCard, type AdherenceRow as ProgressAdherenceRow } from '../components/progress/ProgressCards';
+
 
 interface WorkoutLog {
   id: string;
@@ -562,21 +562,27 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [allEntries, setAllEntries] = useState<(WorkoutLogEntry & { workout_date: string })[]>([]);
   const [blockTypeMap, setBlockTypeMap] = useState<Map<string, string>>(new Map());
 
-  // ── Overview tab data (My Progress fold-in, Sep '26) ──
-  // Adherence via the self-scoped my_adherence RPC; monthly reports are the
-  // athlete's own evaluations (full history — re-reads over time ARE the
-  // progress story, founder ruling). Loaded once when the Analytics section
-  // is open.
-  const [overviewAdherence, setOverviewAdherence] = useState<ProgressAdherenceRow[]>([]);
+  // ── Overview tab data (count-based redesign, Sep '26) ──
+  // Positive counts only, no denominators, no prescription math (founder
+  // ruling: "adherence" framing scolds; counts credit). my_training_counts
+  // returns days trained (distinct dates with a completed log — sidesteps
+  // finish-button/partial-day semantics) plus per-program logged blocks by
+  // type. Monthly reports are the athlete's own evaluations (full history —
+  // re-reads over time ARE the progress story). Loaded once when the
+  // Analytics section is open.
+  interface OverviewProgram {
+    id: string; name: string | null; created_at: string; days_trained: number;
+    strength_blocks: number; metcon_blocks: number; skills_blocks: number; accessory_blocks: number;
+  }
+  const [overviewPrograms, setOverviewPrograms] = useState<OverviewProgram[]>([]);
   const [overviewEvals, setOverviewEvals] = useState<{ id: string; month_number: number | null; created_at: string; analysis: string | null }[]>([]);
   const [overviewCounts, setOverviewCounts] = useState<{ total: number; last30: number } | null>(null);
   const [openEvalId, setOpenEvalId] = useState<string | null>(null);
   useEffect(() => {
     if (view !== 'analytics' || overviewCounts != null) return;
     (async () => {
-      const cutoff30 = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-      const [adh, ev, totalLogs, recentLogs] = await Promise.all([
-        supabase.rpc('my_adherence'),
+      const [counts, ev] = await Promise.all([
+        supabase.rpc('my_training_counts'),
         supabase
           .from('profile_evaluations')
           .select('id, month_number, created_at, analysis')
@@ -585,12 +591,11 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           .eq('status', 'complete')
           .order('created_at', { ascending: false })
           .limit(36),
-        supabase.from('workout_logs').select('id', { count: 'exact', head: true }).eq('user_id', session.user.id),
-        supabase.from('workout_logs').select('id', { count: 'exact', head: true }).eq('user_id', session.user.id).gte('workout_date', cutoff30),
       ]);
-      setOverviewAdherence((adh.data as ProgressAdherenceRow[]) ?? []);
+      const c = counts.data as { days_trained_total?: number; days_trained_30d?: number; programs?: OverviewProgram[] } | null;
+      setOverviewPrograms(c?.programs ?? []);
       setOverviewEvals((ev.data as typeof overviewEvals) ?? []);
-      setOverviewCounts({ total: totalLogs.count ?? 0, last30: recentLogs.count ?? 0 });
+      setOverviewCounts({ total: c?.days_trained_total ?? 0, last30: c?.days_trained_30d ?? 0 });
     })();
   }, [view, overviewCounts, session.user.id]);
 
@@ -2034,13 +2039,13 @@ export default function TrainingLogPage({ session }: { session: Session }) {
               </div>
             ) : tab === 'overview' ? (
               /* ── Overview Tab (My Progress fold-in) — how it's going overall:
-                    counts, program adherence, monthly reports. The deep-dive
+                    counts, program progress, monthly reports. The deep-dive
                     tabs answer "show me exactly". ── */
               <div>
                 {overviewCounts && (
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
                     {[
-                      { label: 'Workouts logged', value: overviewCounts.total },
+                      { label: 'Days trained', value: overviewCounts.total },
                       { label: 'Last 30 days', value: overviewCounts.last30 },
                     ].map(s => (
                       <div key={s.label} style={{ flex: 1, minWidth: 120, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px' }}>
@@ -2050,11 +2055,46 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                     ))}
                   </div>
                 )}
-                {overviewAdherence.length > 0 && (
+                {overviewPrograms.length > 0 && (
                   <>
-                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--accent)', marginTop: 24, marginBottom: 12 }}>Program adherence</h3>
+                    <h3 style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--accent)', marginTop: 24, marginBottom: 12 }}>Program progress</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {overviewAdherence.map(r => <AdherenceRowCard key={r.id} row={r} />)}
+                      {overviewPrograms.map(p => {
+                        // Positive counts only — typed work banked, no
+                        // denominators, nothing to fall short of.
+                        const typeCounts: Array<[string, number]> = [
+                          ['Strength', p.strength_blocks],
+                          ['MetCons', p.metcon_blocks],
+                          ['Skills', p.skills_blocks],
+                          ['Accessory', p.accessory_blocks],
+                        ];
+                        const nonzero = typeCounts.filter(([, n]) => n > 0);
+                        return (
+                          <div key={p.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                              <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name || 'Untitled program'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(p.created_at).toLocaleDateString()}</div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 88 }}>
+                                <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--text-muted)' }}>Days trained</div>
+                                <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>{p.days_trained}</div>
+                              </div>
+                              {nonzero.map(([label, n]) => (
+                                <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 72 }}>
+                                  <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--text-muted)' }}>{label}</div>
+                                  <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>{n}</div>
+                                </div>
+                              ))}
+                              {nonzero.length === 0 && (
+                                <div style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'center' }}>
+                                  Log a training day and your work shows up here.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </>
                 )}
