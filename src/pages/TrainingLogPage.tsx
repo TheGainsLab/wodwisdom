@@ -1393,6 +1393,13 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     return map;
   }, [logs, blocksByLog]);
 
+  // The Cardio tab only renders for users with completed cardio blocks —
+  // everyone else would read it as their Engine sessions and find it empty.
+  // If the view somehow lands there without data, fall back to Overview.
+  useEffect(() => {
+    if (tab === 'cardio' && !loading && cardioByModality.size === 0) setTab('overview');
+  }, [tab, loading, cardioByModality]);
+
   // ── Sessions insights ──
   // Last-7-days descriptive rollup: workout count + per-block-type breakdown.
   // Reports only what was logged; never flags absence (the AI Programmer
@@ -1598,7 +1605,9 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                 Analytics sub-tabs still live within the Analytics section. */}
             {hasProgramming && view === 'analytics' && (
               <div className="tl-tabs">
-                {([['overview', 'Overview'], ['strength', 'Strength'], ['skills', 'Skills'], ['accessory', 'Accessory'], ['cardio', 'Cardio'], ['metcons', 'Metcons'], ['history', 'History']] as const).map(([id, label]) => (
+                {([['overview', 'Overview'], ['strength', 'Strength'], ['skills', 'Skills'], ['accessory', 'Accessory'], ['cardio', 'Cardio'], ['metcons', 'Metcons'], ['history', 'History']] as const)
+                  .filter(([id]) => id !== 'cardio' || cardioByModality.size > 0)
+                  .map(([id, label]) => (
                   <button
                     key={id}
                     className={`tl-tab${tab === id ? ' active' : ''}`}
@@ -2701,12 +2710,13 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   }
                   const sorted = [...cardioByModality.entries()].sort((a, b) => b[1].bestWatts - a[1].bestWatts);
                   return sorted.map(([modality, data]) => {
+                    const modalityLabel = modality === 'unknown' ? 'Cardio' : formatMovementName(modality);
                     const blocks = [...data.blocks].sort((a, b) => b.workout_date.localeCompare(a.workout_date));
                     const recent = blocks.slice(0, 8);
                     return (
                       <div key={modality} className="tl-movement-card">
                         <div className="tl-movement-header">
-                          <span className="tl-movement-name">{formatMovementName(modality)}</span>
+                          <span className="tl-movement-name">{modalityLabel}</span>
                           {data.bestWatts > 0 && (
                             <span className="tl-pr-badge">BEST: {Math.round(data.bestWatts)} W</span>
                           )}
