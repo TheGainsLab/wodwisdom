@@ -97,7 +97,7 @@ function MetconBlockCard() {
         <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#34d399', background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.4)', borderRadius: 6, padding: '3px 8px' }}>Metcon</span>
         <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Short power triplet</span>
         <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>cap 7 min</span>
-        <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6 }}>{ctrl('Edit', false)}{ctrl('AI Edit', true)}{ctrl('Coach', true)}</span>
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6 }}>{ctrl('Edit', false)}{ctrl('Coach', true)}</span>
       </div>
       <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>5 Rds For Time: 9-6-3</div>
       {movements.map((m, i) => (
@@ -224,7 +224,7 @@ export default function ProgramsFeaturePage() {
               <h3 style={{ textAlign: 'center' }}>Inside a Training Day</h3>
               <p>Every day breaks down into blocks — warm-up to cooldown — each with loads, targets, and coaching cues.</p>
               <img src="/images/Training-Day-Image.png" alt="A full training day — warm-up, skills, strength, accessory, metcon, and cool-down" className="feature-img" style={{ maxWidth: 560 }} />
-              <p style={{ marginTop: 24 }}>Need to adjust? Edit makes changes manually. Or use AI Edit — just tell the coach what you need: &ldquo;I want to go a little heavier&rdquo; or &ldquo;My rower broke — substitute something else?&rdquo; The coach rebuilds that piece of the session around your request.</p>
+              <p style={{ marginTop: 24 }}>Need to adjust? Edit makes changes manually. Or just tell the coach what you need: &ldquo;I want to go a little heavier&rdquo; or &ldquo;My rower broke — substitute something else?&rdquo; The coach proposes the revised block and you tap Apply — that piece of the session is rebuilt around your request.</p>
             </div>
           </div>
         </div>
