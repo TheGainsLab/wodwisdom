@@ -1326,6 +1326,32 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
   const isLogged = !!logging && !editing && logging.isSaved(block.sort_order);
   const [coachOpen, setCoachOpen] = useState(false);
   const toggleCoach = () => { const n = !coachOpen; setCoachOpen(n); if (n) onEnsureCoaching?.(); };
+  // Logged blocks render collapsed — done work gets out of the way so the
+  // next open block leads the page. Tap re-opens (and re-collapses via the
+  // chevron) for reviewing or amending the log.
+  const [logExpanded, setLogExpanded] = useState(false);
+
+  if (isLogged && !logExpanded) {
+    return (
+      <div className="workout-block" data-block={block.block_type}>
+        <button
+          type="button"
+          onClick={() => setLogExpanded(true)}
+          aria-expanded={false}
+          aria-label={`Show logged ${displayLabel} block`}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: 'var(--text)' }}
+        >
+          <span className="workout-block-label" data-block={block.block_type} style={{ marginBottom: 0 }}>{displayLabel}</span>
+          {block.block_label && <span style={{ ...labelStyle, opacity: 0.6 }}>{block.block_label}</span>}
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--text-dim)' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+            Logged
+            <span style={{ fontSize: 10 }}>▼</span>
+          </span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="workout-block" data-block={block.block_type}>
@@ -1367,6 +1393,17 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
               </button>
             )}
           </span>
+        )}
+        {isLogged && (
+          <button
+            type="button"
+            className="block-edit-toggle"
+            onClick={() => setLogExpanded(false)}
+            aria-label="Collapse logged block"
+            style={canEdit ? undefined : { marginLeft: 'auto' }}
+          >
+            ▲
+          </button>
         )}
       </div>
       {editing && onUpdateBlock ? (

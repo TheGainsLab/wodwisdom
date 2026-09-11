@@ -547,7 +547,7 @@ body.landing-body{overflow:auto;height:auto}
 .agenda-row--completed.agenda-row--active{opacity:1;border-color:var(--text-dim)}
 .program-day-completed .program-day-header{background:color-mix(in srgb,var(--accent) 4%,transparent)}
 .program-day-completed .program-day-blocks{opacity:.7}
-.workout-blocks{display:flex;flex-direction:column;gap:10px}
+.workout-blocks{display:flex;flex-direction:column;gap:20px}
 .workout-block{background:var(--surface2);border:1px solid #ffffff;border-radius:8px;padding:10px 12px;overflow:hidden}
 .workout-block-label{display:inline-block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);margin-bottom:4px;padding:4px 10px;border-radius:6px;background:var(--surface3)}
 .workout-block-label[data-block="warm-up"]{color:#f59e0b;background:rgba(245,158,11,.15)}
