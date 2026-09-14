@@ -532,6 +532,7 @@ function TierCard({
   cardRef,
   locked = false,
   lockMessage,
+  lockPitch,
   onUpgrade,
   children,
 }: {
@@ -549,6 +550,9 @@ function TierCard({
   locked?: boolean;
   /** Replaces the "Unlocks: ..." line when locked. E.g., "Requires AI Programming subscription". */
   lockMessage?: string;
+  /** Optional sales pitch rendered above the lock message in the locked body —
+   *  describes what the tier does, never invites actions locked users can't take. */
+  lockPitch?: React.ReactNode;
   /** Click handler for the upgrade CTA shown when locked. */
   onUpgrade?: () => void;
   children: React.ReactNode;
@@ -621,6 +625,7 @@ function TierCard({
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {locked ? (
             <div style={{ padding: 12, background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              {lockPitch}
               <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 10 }}>
                 {lockMessage || 'This tier requires a subscription.'}
               </div>
@@ -1907,8 +1912,34 @@ export default function AthletePage({ session }: { session: Session }) {
                   defaultExpanded={false}
                   locked={!isAdmin && !hasFeature('programming')}
                   lockMessage="Requires AI Programming or All Access subscription"
+                  lockPitch={
+                    <div style={{ marginBottom: 12 }}>
+                      <p style={{ fontWeight: 700, fontSize: 15, margin: 0, marginBottom: 6, color: 'var(--text)' }}>
+                        The fun part comes with AI Programming.
+                      </p>
+                      <p style={{ color: 'var(--text-dim)', fontSize: 13.5, lineHeight: 1.5, margin: 0 }}>
+                        Tell us what you&apos;re training for — a competition, a PR, just feeling
+                        fitter — and your schedule: how many days, how much time. We combine it
+                        with everything your evaluation found and build a program that actually
+                        fits who you are and what you&apos;re after.
+                      </p>
+                    </div>
+                  }
                   onUpgrade={() => navigate('/features/programs')}
                 >
+                  {/* The fun-part pitch lives here now (its standalone box below is
+                      gone): goals are only ever actionable inside Tier 3. */}
+                  <div style={{ padding: '2px 2px 0' }}>
+                    <p style={{ fontWeight: 700, fontSize: 15, margin: 0, marginBottom: 6 }}>
+                      Alright, here&apos;s the fun part.
+                    </p>
+                    <p style={{ color: 'var(--text-dim)', fontSize: 13.5, lineHeight: 1.5, margin: 0 }}>
+                      What are you training for? A competition? A PR? Just feeling fitter?
+                      Whatever it is, tell us. Then give us your schedule: how many days, how
+                      much time. We&apos;ll combine it with everything your evaluation found and
+                      build a program that actually fits who you are and what you&apos;re after.
+                    </p>
+                  </div>
                   {/* Card 1 — YOUR SCHEDULE (session length dropped Aug '26 — no
                       longer required for T3; stored values still feed the writer) */}
                   <div className="settings-card" style={T3_CARD}>
@@ -2261,50 +2292,21 @@ export default function AthletePage({ session }: { session: Session }) {
                   );
                 })()}
 
-                {/* Generate Program — first-time generation only. Hidden once a
-                    program exists; admins no longer get a regenerate button here
-                    (use the v3 admin section below for testing). handleGenerateProgram
-                    + generateLoading state are kept intact in case the v1 path
-                    needs to be exposed again. */}
-                {!hasGeneratedProgram && (() => {
-                  const canGenerate = isAdmin || hasFeature('programming');
-                  const isFreeUser = !hasFeature('ai_chat') && !hasFeature('engine') && !hasFeature('programming') && !hasFeature('nutrition') && !isAdmin;
-                  const upgradeRoute = isFreeUser ? '/checkout' : '/settings';
-                  const tierBlocked = canGenerate && !tierStatus.canRunPrograms;
-                  const disabled = (canGenerate && generateLoading) || tierBlocked;
+                {/* Generate Program — first-time generation only, entitled users
+                    only. Hidden once a program exists. Non-entitled users see
+                    nothing here: the locked Tier 3 card above carries the pitch
+                    and the upgrade route (2026-09-14 ruling — goals are mentioned
+                    outside Tier 3 but only ever actionable inside it). */}
+                {!hasGeneratedProgram && (isAdmin || hasFeature('programming')) && (() => {
+                  const tierBlocked = !tierStatus.canRunPrograms;
+                  const disabled = generateLoading || tierBlocked;
                   const genTitle = tierBlocked ? 'Complete Step 3 to Generate.' : undefined;
                   // Ready = entitled, tier-complete, not generating. The old
                   // surface2 styling made an ARMED button look dormant — ready
                   // now reads as the primary action it is.
-                  const ready = canGenerate && !tierBlocked && !generateLoading;
-                  const goalSnippet = goal.trim()
-                    ? (goal.trim().length > 64 ? goal.trim().slice(0, 64) + '…' : goal.trim())
-                    : null;
-                  const chip: React.CSSProperties = {
-                    background: 'var(--surface2)', borderRadius: 999, padding: '3px 10px',
-                    fontSize: 11.5, color: 'var(--text-dim)', whiteSpace: 'nowrap',
-                    overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%',
-                  };
+                  const ready = !tierBlocked && !generateLoading;
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <div style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px' }}>
-                        <p style={{ fontWeight: 700, fontSize: 15, margin: 0, marginBottom: 6 }}>
-                          Alright, here's the fun part.
-                        </p>
-                        <p style={{ color: 'var(--text-dim)', fontSize: 13.5, lineHeight: 1.5, margin: 0 }}>
-                          What are you training for? A competition? A PR? Just feeling fitter?
-                          Whatever it is, tell us. Then give us your schedule: how many days, how
-                          much time. We'll combine it with everything your evaluation found and
-                          build a program that actually fits who you are and what you're after.
-                        </p>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-                          <span style={chip}>
-                            {goalSnippet ? <>Goal: {goalSnippet}</> : <>Goal: not set — add it in Training Setup ↑</>}
-                          </span>
-                          <span style={chip}>Days: {daysPerWeek || '—'}/week</span>
-                          <span style={chip}>Session: {sessionLengthMinutes ? `${sessionLengthMinutes} min` : '60 min — default'}</span>
-                        </div>
-                      </div>
                       <button
                         type="button"
                         className="auth-btn"
@@ -2316,26 +2318,21 @@ export default function AthletePage({ session }: { session: Session }) {
                           opacity: tierBlocked ? 0.55 : undefined,
                           cursor: tierBlocked ? 'not-allowed' : undefined,
                         }}
-                        onClick={canGenerate ? (tierBlocked ? undefined : handleGenerateProgram) : () => navigate(upgradeRoute)}
+                        onClick={tierBlocked ? undefined : handleGenerateProgram}
                         disabled={disabled}
                         title={genTitle}
                       >
-                        {canGenerate ? (
-                          generateLoading ? 'Generating...' : ready ? 'Generate Program →' : 'Generate Program'
-                        ) : (
-                          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                            Generate Program
-                          </span>
-                        )}
+                        {generateLoading ? 'Generating...' : ready ? 'Generate Program →' : 'Generate Program'}
                       </button>
                       {(ready || generateLoading) && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
                           Generation takes a few minutes — your full month, warm-ups to cool-downs.
                         </span>
                       )}
-                      {!canGenerate && (
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Requires AI Programming or All Access subscription</span>
+                      {ready && !goal.trim() && (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
+                          No goal set — add one in Training Context above and the program builds toward it.
+                        </span>
                       )}
                       {tierBlocked && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
