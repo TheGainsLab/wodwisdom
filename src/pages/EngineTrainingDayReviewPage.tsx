@@ -10,7 +10,6 @@ import {
   loadWorkoutForDay,
   getWorkoutSessionByDay,
   isPersonalBestSession,
-  type EngineWorkout,
   type EngineWorkoutSession,
 } from '../lib/engineService';
 import { buildEngineShareCardData } from '../lib/shareCard';
@@ -213,7 +212,6 @@ export default function EngineTrainingDayReviewPage({ session: _session }: { ses
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [programVersion, setProgramVersion] = useState<string | null>(null);
-  const [workout, setWorkout] = useState<EngineWorkout | null>(null);
   const [dayTypeName, setDayTypeName] = useState<string>('');
   const [completedSession, setCompletedSession] = useState<EngineWorkoutSession | null>(null);
   const [completedIsPR, setCompletedIsPR] = useState(false);
@@ -240,7 +238,6 @@ export default function EngineTrainingDayReviewPage({ session: _session }: { ses
         }
 
         const w = await loadWorkoutForDay(entry.engine_workout_day_number);
-        setWorkout(w);
 
         if (w?.day_type) {
           const { data: dt } = await supabase
