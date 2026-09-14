@@ -330,14 +330,6 @@ export default function EngineTrainingDayReviewPage({ session: _session }: { ses
                   )}
                 </div>
 
-                {workout?.block_count ? (
-                  <div className="settings-card" style={{ marginTop: 12 }}>
-                    <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                      {workout.block_count === 1 ? 'Single-block session' : `${workout.block_count}-block session`}
-                    </div>
-                  </div>
-                ) : null}
-
                 <CoachChat engineProgramDay={programDay} autoQuestion={autoQuestion} modality={selectedModality} units={selectedUnits} targetPace={targetPace} />
               </>
             )}
