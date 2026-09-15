@@ -36,7 +36,7 @@ import { ChevronLeft, ChevronDown, Play, Pause, Square, Check, RotateCcw, AlertT
 
 // ── Types & Constants ────────────────────────────────────────────────
 
-type Stage = 'loading' | 'equipment' | 'preview' | 'ready' | 'countdown' | 'active' | 'logging' | 'complete';
+type Stage = 'loading' | 'equipment' | 'preview' | 'ready' | 'countdown' | 'active' | 'finished' | 'logging' | 'complete';
 
 interface BlockParams {
   rounds?: number | number[] | string;
@@ -693,11 +693,12 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
     }
     if (idx >= segs.length) {
       // Workout ran to completion (possibly while the screen was off).
+      // Land on the completion interstitial, not the log form — the athlete
+      // just came off a max effort; the form arrives when they ask for it.
       finishedRef.current = true;
       setTotalElapsed(acc);
       setTimeLeft(0);
-      track('log_started', { kind: 'engine' });
-      setStage('logging');
+      setStage('finished');
       return;
     }
     if (idx !== segIndexRef.current) {
@@ -1700,6 +1701,33 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
 
   // ── Render: Ready (waiting for user to start countdown) ──
 
+  // Completion interstitial between the final segment and the log form —
+  // a breath and the total time before the app asks for anything. Also the
+  // natural future home for PR flags and the share card.
+  function renderFinished() {
+    return (
+      <div className="engine-page" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, minHeight: '60vh', textAlign: 'center' }}>
+        <span
+          className={'engine-badge ' + dayTypeBadge(workout?.day_type ?? '')}
+          style={{ fontSize: 14, padding: '6px 16px' }}
+        >
+          {(workout?.day_type ?? '').replace(/_/g, ' ')}
+        </span>
+        <div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>Session complete</div>
+          <div style={{ fontSize: 14, color: 'var(--text-dim)', marginTop: 4 }}>Day {dayNumber}</div>
+        </div>
+        <div className="engine-timer" style={{ color: 'var(--text)' }}>{formatTime(totalElapsed)}</div>
+        <button
+          className="engine-btn engine-btn-primary"
+          onClick={() => { track('log_started', { kind: 'engine' }); setStage('logging'); }}
+        >
+          Log your result →
+        </button>
+      </div>
+    );
+  }
+
   function renderReady() {
     return (
       <div className="engine-page" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 32, minHeight: '60vh' }}>
@@ -2313,6 +2341,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         {hasAccess && !monthLocked && stage === 'ready' && renderReady()}
         {hasAccess && !monthLocked && stage === 'countdown' && renderCountdown()}
         {hasAccess && !monthLocked && stage === 'active' && renderActive()}
+        {hasAccess && !monthLocked && stage === 'finished' && renderFinished()}
         {hasAccess && !monthLocked && stage === 'logging' && renderLogging()}
         {hasAccess && !monthLocked && stage === 'complete' && renderComplete()}
       </div>

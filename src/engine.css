@@ -170,7 +170,7 @@
 /* Workout Breakdown — collapsible segment preview */
 .engine-breakdown-toggle{background:none;border:none;padding:10px 0;cursor:pointer;display:flex;align-items:center;gap:6px;color:var(--text-dim);font-size:13px;font-weight:600;font-family:inherit;width:100%}
 .engine-breakdown-toggle:hover{color:var(--text)}
-.engine-breakdown{display:flex;flex-direction:column;gap:12px;margin-top:4px}
+.engine-breakdown{display:flex;flex-direction:column;gap:12px;margin-top:4px;padding-bottom:12px}
 .engine-breakdown-block-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2);border-radius:6px;border-left:3px solid var(--accent)}
 .engine-breakdown-block-header span:first-child{font-size:13px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px}
 .engine-breakdown-segments{display:flex;flex-direction:column;gap:2px}
