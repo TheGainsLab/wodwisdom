@@ -718,7 +718,7 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
             {baselines.filter(b => b.modality === selModality).map(bl => (
               <div key={bl.id} className="engine-card" style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
-                  Current Baseline
+                  Time Trial Baseline
                 </div>
                 <div className="engine-stat-value" style={{ fontSize: 28 }}>{bl.total_output}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{bl.units ?? 'cal'} in 10 min</div>
