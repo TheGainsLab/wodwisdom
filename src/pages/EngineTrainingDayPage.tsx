@@ -25,6 +25,7 @@ import {
   type EngineTimeTrial,
   type EnginePerformanceMetrics,
   calculateWorkDurationMinutes,
+  calculateWorkDurationSeconds,
 } from '../lib/engineService';
 import { buildEngineShareCardData } from '../lib/shareCard';
 import ShareCardModal from '../components/competitionHistory/ShareCardModal';
@@ -2117,7 +2118,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
             {/* Duration summary — pace is per WORK minute (the workout's defined
                 work time), not the elapsed clock, so it matches the saved pace. */}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-dim)' }}>
-              <span>Duration: {formatTime(totalElapsed)}</span>
+              <span>Work time: {formatTime((workout ? calculateWorkDurationSeconds(workout) : 0) || totalElapsed)}</span>
               {logOutput && (
                 <span>
                   {isRateUnit(selectedUnit)
@@ -2185,9 +2186,9 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
               )}
               <div className="engine-stat" style={{ textAlign: 'center' }}>
                 <div className="engine-stat-value" style={{ fontSize: 22 }}>
-                  {formatTime(totalElapsed)}
+                  {formatTime((workout ? calculateWorkDurationSeconds(workout) : 0) || totalElapsed)}
                 </div>
-                <div className="engine-stat-label">Duration</div>
+                <div className="engine-stat-label">Work time</div>
               </div>
             </div>
 
