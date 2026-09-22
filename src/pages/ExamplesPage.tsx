@@ -110,7 +110,9 @@ export default function ExamplesPage({ signedIn = false }: { signedIn?: boolean 
           <p className="qa-cta-text">
             {signedIn
               ? 'Your own evaluation lives in your profile — and every session you log sharpens the picture.'
-              : 'The evaluation is where yours starts. It’s free, takes a few minutes, and it’s yours to keep.'}
+              : tab === 'evaluations'
+                ? 'This is what yours looks like. Free, about five minutes, and yours to keep — whether or not you train with us.'
+                : 'The evaluation is where yours starts. It’s free, takes a few minutes, and it’s yours to keep.'}
           </p>
           <Link
             to={signedIn ? '/profile' : '/auth?signup=1&next=/profile'}
