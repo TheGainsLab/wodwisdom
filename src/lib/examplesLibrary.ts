@@ -156,6 +156,14 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
     caption:
       'Every day breaks down into blocks — warm-up to cool-down — each with loads, targets, and coaching cues computed from the athlete’s own numbers.',
   },
+  {
+    tab: 'programming',
+    image: '/images/power-duration-curve.png',
+    alt: 'Metcon power analytics — average output and the power-duration curve across time domains',
+    title: 'Your metcons, as data',
+    caption:
+      'Every logged metcon feeds this: your average output and your power-duration curve across short, medium, and long time domains — the fitness picture the next month of programming is built from.',
+  },
 
   // ── Engine ───────────────────────────────────────────────────────
   {
@@ -189,13 +197,5 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
     title: 'Training distribution',
     caption:
       'Sessions by day type across the program — the distribution behind “conditioning, not cardio.”',
-  },
-  {
-    tab: 'engine',
-    image: '/images/power-duration-curve.png',
-    alt: 'Power-duration curve across time domains',
-    title: 'The shape of your engine',
-    caption:
-      'Power across short, medium, and long time domains — your power-duration curve, built from every session you log.',
   },
 ];
