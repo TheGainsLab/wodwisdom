@@ -26,6 +26,62 @@ export interface ExampleEntry {
   caption: string;
 }
 
+/**
+ * A walkthrough is an ordered sequence of screens telling one story — e.g.
+ * a training day start to finish. Rendered as the tab's featured item,
+ * above the gallery entries.
+ */
+export interface ExampleWalkthroughStep {
+  image: string;
+  alt: string;
+  title: string;
+  caption: string;
+}
+
+export interface ExampleWalkthrough {
+  title: string;
+  intro: string;
+  steps: ExampleWalkthroughStep[];
+}
+
+export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthrough>> = {
+  engine: {
+    title: 'A training day, start to finish',
+    intro:
+      'Captured from a live athlete’s account — Day 8 of their program, a Max Aerobic Power session. This is what opening a day and doing the work actually looks like.',
+    steps: [
+      {
+        image: '/images/engine-day-overview.webp',
+        alt: 'Engine Day 8 — Max Aerobic Power day page with spectrum strip, session structure, and AI tools',
+        title: 'Open the day',
+        caption:
+          'The day tells you what it trains — the spectrum strip places Max Aerobic Power on the slow-to-fast continuum — and exactly what it asks: 8 rounds, 1:30 on, 1:30 off. Warm-up, pacing, and the AI Coach are one tap away.',
+      },
+      {
+        image: '/images/engine-day-details.webp',
+        alt: 'Workout details — every round with a personal calorie target, cal/min rate, and RPM',
+        title: 'Every round has your number',
+        caption:
+          'Open the details and every interval carries a target computed from this athlete’s own time-trial baseline: ~24 cal per 90-second round, with the rate and RPM to hit it. Nothing generic — these are their numbers.',
+      },
+      {
+        image: '/images/engine-day-pacing.webp',
+        alt: 'AI Coach pacing answer citing the athlete’s previous session, RPE, and heart rate',
+        title: 'Ask how to attack it',
+        caption:
+          'Tap “Pace this” and the coach plans the session against the athlete’s actual history — their previous Max Aerobic Power session came in at 106% of target at RPE 8, and the pacing advice starts from that.',
+      },
+      {
+        image: '/images/engine-day-equipment.webp',
+        alt: 'Equipment selection — modality picker with a per-machine time-trial baseline',
+        title: 'Pick your engine',
+        caption:
+          'Choose the machine on the way in. Each modality carries its own time-trial baseline — today’s targets come from this athlete’s Echo Bike test. Switch machines and the targets follow.',
+      },
+    ],
+  },
+};
+
 export const EXAMPLE_ENTRIES: ExampleEntry[] = [
   // ── Evaluations ──────────────────────────────────────────────────
   {
