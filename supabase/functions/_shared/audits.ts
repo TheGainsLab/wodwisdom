@@ -485,7 +485,12 @@ export function auditMaxEffort(output: WriterOutput): AuditResult {
         if (b.block_type !== "metcon") {
           violations.push(`${where}: max_effort is only valid in metcon blocks — prescribe concrete volume here.`);
         }
-        if (AMRAP_SCHEME_RE.test(scheme)) {
+        // Forbid max_effort in PLAIN AMRAPs (rounds unbounded, per-round reps
+        // fixed). An interval scheme that merely says "AMRAP each interval"
+        // ("3 rounds: 4:00 on / 1:00 off, AMRAP each interval — ... then max
+        // G2OH in remaining time") is the licensed shape: the on/off window
+        // bounds it, so the keyword alone must not trip this rule.
+        if (AMRAP_SCHEME_RE.test(scheme) && !BOUNDED_WINDOW_RE.test(scheme)) {
           violations.push(`${where}: max_effort inside an AMRAP. AMRAP movements carry fixed per-round reps (rep_scheme) — the ROUNDS are what's unbounded. Remove max_effort and emit rep_scheme.`);
         }
         if (flagged.length > 1) {
