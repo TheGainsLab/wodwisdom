@@ -41,6 +41,7 @@ function compactMovement(m: any): string {
   let s = String(m.movement ?? "").trim();
   const arr: number[] | null = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
   if (m.max_effort === true) s += " max effort";
+  else if (Array.isArray(m.cal_scheme) && m.cal_scheme.length > 1) s += ` ${m.cal_scheme.join("-")}cal`;
   else if (m.calories != null && m.calories > 0) s += m.sets != null && m.sets > 1 ? ` ${m.sets}×${m.calories}cal` : ` ${m.calories}cal`;
   else if (arr && arr.length > 1 && !arr.every((n: number) => n === arr[0])) s += ` ${arr.join("-")}`;
   else if (m.sets != null && m.reps != null) s += ` ${m.sets}×${m.reps}`;

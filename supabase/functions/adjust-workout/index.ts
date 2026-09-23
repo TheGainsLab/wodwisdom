@@ -217,7 +217,7 @@ RULES (honor every one):
 - All weights in the athlete's units. Plate math: lbs → nearest 5, kg → nearest 2.5. Prescribed barbell weight ≤ the relevant 1RM unless the scheme is an explicit max attempt.
 - At most ONE monostructural cardio modality (Row / Bike / Ski-erg / Run / Swim) per metcon. Barbell movements within a metcon share ONE load.
 - Movements use display-name strings from the vocabulary list in the user message.
-- Pick exactly ONE work specifier per movement: rep-counted → emit rep_scheme as the per-iteration breakdown ([21,15,9] chipper, [15,15,15] for 3 RFT, [100] single-pass, [10] one AMRAP round); do NOT also set reps. distance-counted → distance + distance_unit with the PER-ROUND distance (unit is ONLY "ft" or "m" — never yards; convert 60 yd → 180 ft, in the prose too), and sets = the rounds count in a multi-round block ("3 RFT: Row 250m" → distance 250, sets 3). calorie-counted (Cal Row / Cal Bike / Cal Ski-erg) → the \`calories\` field with the PER-ROUND calories, same convention ("4 rounds: 15 cal Bike" → calories 15, sets 4); NEVER the summed total across rounds, and NEVER encode calories as reps/rep_scheme.
+- Pick exactly ONE work specifier per movement: rep-counted → emit rep_scheme as the per-iteration breakdown ([21,15,9] chipper, [15,15,15] for 3 RFT, [100] single-pass, [10] one AMRAP round); do NOT also set reps. distance-counted → distance + distance_unit with the PER-ROUND distance (unit is ONLY "ft" or "m" — never yards; convert 60 yd → 180 ft, in the prose too), and sets = the rounds count in a multi-round block ("3 RFT: Row 250m" → distance 250, sets 3). calorie-counted (Cal Row / Cal Bike / Cal Ski-erg) → the \`calories\` field with the PER-ROUND calories, same convention ("4 rounds: 15 cal Bike" → calories 15, sets 4); NEVER the summed total across rounds, and NEVER encode calories as reps/rep_scheme. When per-round calories/distance VARY with the scheme, use cal_scheme / distance_scheme ("21-15-9 cal bike" → cal_scheme [21,15,9], calories and sets null — code derives the total).
 - Do NOT change how a movement measures work from how it currently stands: if the movement uses distance, keep distance; if calories, keep calories; if reps, keep reps. Never silently convert a "Row 500m" into reps or calories — preserve the measure UNLESS the athlete explicitly asks to change it.
 - A rotating-station EMOM's minute count must be a multiple of its station count (3 stations → EMOM 12 or 15, never 14) — every station gets the same number of rounds.
 - Every movement must populate at least one of {sets, reps, rep_scheme, calories, weight, time_seconds, distance} > 0 — OR carry max_effort: true. max_effort means "as many reps/cals as possible in the remaining window" (a finisher inside a bounded clock): set NO volume fields with it, never invent a number. Metcon blocks with a bounded clock only, LAST movement only, at most one per block, never in AMRAPs (AMRAP movements keep fixed per-round reps via rep_scheme).
@@ -246,6 +246,8 @@ function rowToMovement(m: any): MovementPrescription {
   if (m.target_pct_1rm != null) mv.target_pct_1rm = m.target_pct_1rm;
   if (m.cardio_modality != null) mv.cardio_modality = m.cardio_modality;
   if (m.calories != null) mv.calories = m.calories;
+  if (Array.isArray(m.cal_scheme)) mv.cal_scheme = m.cal_scheme;
+  if (Array.isArray(m.distance_scheme)) mv.distance_scheme = m.distance_scheme;
   if (m.max_effort === true) mv.max_effort = true;
   return mv;
 }
@@ -301,7 +303,7 @@ async function handleBlockPropose(
 
   const { data: movementRows } = await supa
     .from("program_movements_v2")
-    .select("movement, sets, reps, rep_scheme, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, cardio_modality, calories, max_effort, sort_order")
+    .select("movement, sets, reps, rep_scheme, weight, weight_unit, rpe, time_seconds, distance, distance_scheme, distance_unit, scaling_note, target_pct_1rm, cardio_modality, calories, cal_scheme, max_effort, sort_order")
     .eq("block_id", block_id)
     .order("sort_order");
 

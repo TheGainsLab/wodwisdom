@@ -96,10 +96,18 @@ function toWorkCalcMovement(
 
   const out: WorkCalcMovement = { movement_name: name };
 
+  // Pre-save, a varying-scheme movement carries cal_scheme/distance_scheme
+  // with the scalar left null (save derives total = sum). Sum here so the
+  // benchmark path sees the same totals it would read post-save.
+  const sumScheme = (a: number[] | undefined | null) =>
+    Array.isArray(a) ? a.filter((n) => typeof n === "number" && n > 0).reduce((x, y) => x + y, 0) : 0;
+  const calTotal = typeof m.calories === "number" && m.calories > 0 ? m.calories : sumScheme(m.cal_scheme);
+  const distTotal = typeof m.distance === "number" && m.distance > 0 ? m.distance : sumScheme(m.distance_scheme);
+
   // 1. Calorie-counted (Cal Row, Cal Bike, Cal Ski) — typed field wins.
-  if (typeof m.calories === "number" && m.calories > 0) {
-    out.calories = m.calories;
-  } else if (typeof m.distance === "number" && m.distance > 0 && m.distance_unit) {
+  if (calTotal > 0) {
+    out.calories = calTotal;
+  } else if (distTotal > 0 && m.distance_unit) {
     // 2. Distance-counted (rowing meters, running meters/miles).
     const unit = m.distance_unit.toLowerCase();
     const mapped: WorkCalcMovement["distance_unit"] | null =
@@ -109,7 +117,7 @@ function toWorkCalcMovement(
         : unit === "km" || unit === "kilometer" || unit === "kilometers" ? "kilometers"
         : null;
     if (mapped === null) return null;
-    out.distance_value = m.distance;
+    out.distance_value = distTotal;
     out.distance_unit = mapped;
   } else if (typeof m.reps === "number" && m.reps > 0) {
     // 3a. Rep-counted with reps already populated (legacy / programmatic-

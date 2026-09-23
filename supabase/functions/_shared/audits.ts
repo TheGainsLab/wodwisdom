@@ -377,8 +377,11 @@ function movementHasAnyPrescription(m: MovementPrescription): boolean {
     (Array.isArray(m.rep_scheme)
       && m.rep_scheme.length > 0
       && m.rep_scheme.some((n) => typeof n === "number" && n > 0)) ||
-    // calories is the typed specifier for Cal Row / Cal Bike / Cal Ski.
+    // calories is the typed specifier for Cal Row / Cal Bike / Cal Ski;
+    // cal_scheme/distance_scheme are the varying-round mirrors of rep_scheme.
     (m.calories != null && m.calories > 0) ||
+    (Array.isArray(m.cal_scheme) && m.cal_scheme.some((n) => typeof n === "number" && n > 0)) ||
+    (Array.isArray(m.distance_scheme) && m.distance_scheme.some((n) => typeof n === "number" && n > 0)) ||
     (m.weight != null && m.weight > 0) ||
     (m.time_seconds != null && m.time_seconds > 0) ||
     (m.distance != null && m.distance > 0)
@@ -437,10 +440,13 @@ export function auditRequiredFields(output: WriterOutput): AuditResult {
             );
           }
           // A distance without a unit renders as a naked number ("3×60") —
-          // the writer must commit to ft or m (never yards).
-          if (m.distance != null && m.distance > 0 && (m.distance_unit !== "ft" && m.distance_unit !== "m")) {
+          // the writer must commit to ft or m (never yards). Applies to the
+          // scalar and to a varying distance_scheme alike.
+          const hasDistanceWork = (m.distance != null && m.distance > 0) ||
+            (Array.isArray(m.distance_scheme) && m.distance_scheme.some((n) => typeof n === "number" && n > 0));
+          if (hasDistanceWork && (m.distance_unit !== "ft" && m.distance_unit !== "m")) {
             violations.push(
-              `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type}) movement[${j}] "${m.movement}": distance ${m.distance} has no valid distance_unit — set "ft" or "m" (convert yards to feet).`,
+              `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type}) movement[${j}] "${m.movement}": distance work has no valid distance_unit — set "ft" or "m" (convert yards to feet).`,
             );
           }
         }
@@ -506,7 +512,9 @@ export function auditMaxEffort(output: WriterOutput): AuditResult {
         for (const { m, j } of flagged) {
           const hasVolume = (m.reps != null && m.reps > 0) || (m.calories != null && m.calories > 0) ||
             (m.time_seconds != null && m.time_seconds > 0) || (m.distance != null && m.distance > 0) ||
-            (Array.isArray(m.rep_scheme) && m.rep_scheme.length > 0);
+            (Array.isArray(m.rep_scheme) && m.rep_scheme.length > 0) ||
+            (Array.isArray(m.cal_scheme) && m.cal_scheme.length > 0) ||
+            (Array.isArray(m.distance_scheme) && m.distance_scheme.length > 0);
           if (hasVolume) {
             violations.push(`${where} movement[${j}] "${m.movement}": max_effort combined with volume fields. max_effort means the quantity is unknown until logged — remove reps/rep_scheme/calories/time_seconds/distance (weight/RPE are fine).`);
           }

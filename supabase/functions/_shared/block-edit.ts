@@ -85,6 +85,8 @@ function rowToMovement(m: any): MovementPrescription {
   if (m.target_pct_1rm != null) mv.target_pct_1rm = m.target_pct_1rm;
   if (m.cardio_modality != null) mv.cardio_modality = m.cardio_modality;
   if (m.calories != null) mv.calories = m.calories;
+  if (Array.isArray(m.cal_scheme)) mv.cal_scheme = m.cal_scheme;
+  if (Array.isArray(m.distance_scheme)) mv.distance_scheme = m.distance_scheme;
   if (m.max_effort === true) mv.max_effort = true;
   return mv;
 }
@@ -112,7 +114,7 @@ export async function loadOwnedBlock(
 
   const { data: movementRows } = await supa
     .from("program_movements_v2")
-    .select("movement, sets, reps, rep_scheme, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, cardio_modality, calories, max_effort, sort_order")
+    .select("movement, sets, reps, rep_scheme, weight, weight_unit, rpe, time_seconds, distance, distance_scheme, distance_unit, scaling_note, target_pct_1rm, cardio_modality, calories, cal_scheme, max_effort, sort_order")
     .eq("block_id", blockId)
     .order("sort_order");
 
@@ -227,9 +229,10 @@ function hasVolumeSpecifier(m: MovementPrescription): boolean {
   // max_effort IS the volume specifier: "as many as possible in the window".
   if (m.max_effort === true) return true;
   const positive = (v: unknown) => typeof v === "number" && v > 0;
+  const scheme = (a: unknown) => Array.isArray(a) && a.some((n) => typeof n === "number" && n > 0);
   return positive(m.sets) || positive(m.reps) || positive(m.calories) ||
     positive(m.weight) || positive(m.time_seconds) || positive(m.distance) ||
-    (Array.isArray(m.rep_scheme) && m.rep_scheme.some((n) => typeof n === "number" && n > 0));
+    scheme(m.rep_scheme) || scheme(m.cal_scheme) || scheme(m.distance_scheme);
 }
 
 /** Validate a proposed block against the athlete's hard constraints. Returns
@@ -285,6 +288,20 @@ export function reconcileReps(
   return { reps: cleaned.reduce((a, b) => a + b, 0), rep_scheme: cleaned };
 }
 
+/** cal_scheme/distance_scheme mirror of reconcileReps: total = sum(scheme). */
+function reconcileScheme(
+  total: number | null | undefined,
+  scheme: number[] | null | undefined,
+  maxItem: number,
+): { total: number | null; scheme: number[] | null } {
+  if (!Array.isArray(scheme) || scheme.length === 0) {
+    return { total: total ?? null, scheme: null };
+  }
+  const cleaned = scheme.filter((n) => Number.isFinite(n) && n > 0 && n <= maxItem);
+  if (cleaned.length === 0) return { total: total ?? null, scheme: null };
+  return { total: cleaned.reduce((a, b) => a + b, 0), scheme: cleaned };
+}
+
 export async function applyBlockProposal(
   supa: SupabaseClient,
   blockId: string,
@@ -308,6 +325,8 @@ export async function applyBlockProposal(
 
   const inserts = (proposal.movements ?? []).map((m, i) => {
     const { reps, rep_scheme } = reconcileReps(m.reps, m.rep_scheme);
+    const cal = reconcileScheme(m.calories, m.cal_scheme, 500);
+    const dist = reconcileScheme(m.distance, m.distance_scheme, 50000);
     return {
       block_id: blockId,
       movement: m.movement,
@@ -318,9 +337,11 @@ export async function applyBlockProposal(
       weight_unit: m.weight_unit ?? null,
       rpe: m.rpe ?? null,
       time_seconds: m.time_seconds ?? null,
-      distance: m.distance ?? null,
+      distance: dist.total,
+      distance_scheme: dist.scheme,
       distance_unit: m.distance_unit ?? null,
-      calories: m.calories ?? null,
+      calories: cal.total,
+      cal_scheme: cal.scheme,
       max_effort: m.max_effort === true ? true : null,
       cardio_modality: m.cardio_modality ?? null,
       scaling_note: m.scaling_note ?? null,

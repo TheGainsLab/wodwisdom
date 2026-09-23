@@ -15,7 +15,7 @@ import type { DayLogController, SaveBlockPayload } from '../components/blockLog'
 // real V3DayView (colored cards + per-block Edit / Coach ▾ + Session
 // intent + Sources) with this page's own data + handlers. Logging lands on these
 // cards next. Engine days are separate (their own timer route).
-const MOVEMENT_SELECT = 'id, block_id, movement, sets, reps, rep_scheme, calories, max_effort, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order';
+const MOVEMENT_SELECT = 'id, block_id, movement, sets, reps, rep_scheme, calories, cal_scheme, max_effort, weight, weight_unit, rpe, time_seconds, distance, distance_scheme, distance_unit, scaling_note, target_pct_1rm, sort_order';
 
 export default function DayPage(_props: { session: Session }) {
   const { workoutId } = useParams<{ workoutId: string }>();
