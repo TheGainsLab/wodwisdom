@@ -206,6 +206,9 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [editingProgramName, setEditingProgramName] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  // Weeks render collapsed by default — opening a month shows Week 1..4
+  // headers, not every day. Keyed by the global week number.
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set());
   const [generatingNextMonth, setGeneratingNextMonth] = useState(false);
 
 
@@ -378,6 +381,13 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   useEffect(() => {
     if (!dayParam || !allWorkouts.some(w => w.id === dayParam)) return;
     setExpandedDays(prev => new Set(prev).add(dayParam));
+    // The day's week must be open for the scroll target to exist.
+    const target = allWorkouts.find(w => w.id === dayParam);
+    if (target) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const globalWeek = (((target as any).month_number || 1) - 1) * 4 + (target.week_num || 1);
+      setExpandedWeeks(prev => new Set(prev).add(globalWeek));
+    }
     const t = setTimeout(() => {
       document.getElementById(`day-${dayParam}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 250);
@@ -732,10 +742,35 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                               Month {month}
                             </div>
                           )}
-                          {weeks.map((week, wi) => (
+                          {weeks.map((week, wi) => {
+                            const weekOpen = expandedWeeks.has(week.weekNum);
+                            const doneCount = week.days.filter((d) => {
+                              const dIp = inProgressWorkouts.get(d.id);
+                              return completedWorkoutIds.has(d.id) || (!!dIp && dIp.totalBlocks > 0 && dIp.savedCount >= dIp.totalBlocks);
+                            }).length;
+                            return (
                       <div key={wi} className="program-week-group">
-                        <div className="program-week-label">Week {week.weekNum}</div>
-                        {week.days.map((w) => {
+                        <button
+                          type="button"
+                          className="program-week-label"
+                          aria-expanded={weekOpen}
+                          onClick={() => setExpandedWeeks(prev => {
+                            const next = new Set(prev);
+                            if (next.has(week.weekNum)) next.delete(week.weekNum); else next.add(week.weekNum);
+                            return next;
+                          })}
+                          style={{
+                            width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+                            cursor: 'pointer', font: 'inherit', textAlign: 'left', border: 'none',
+                            ...(weekOpen ? { borderBottom: '1px solid var(--border)' } : {}),
+                          }}
+                        >
+                          <span>Week {week.weekNum}</span>
+                          <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 600 }}>
+                            {doneCount}/{week.days.length} logged {weekOpen ? '▲' : '▼'}
+                          </span>
+                        </button>
+                        {weekOpen && week.days.map((w) => {
                           const rawIp = inProgressWorkouts.get(w.id);
                           // Treat an in-progress log whose savedCount has reached
                           // totalBlocks as completed in the UI, even if the server
@@ -936,7 +971,8 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                           );
                         })}
                       </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       );
                     });
