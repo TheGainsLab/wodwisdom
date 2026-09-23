@@ -39,11 +39,14 @@ export interface ProgramMovementV2 {
   reps: number | null;
   rep_scheme: number[] | null;
   calories: number | null;
+  cal_scheme: number[] | null;
+  max_effort: boolean | null;
   weight: number | null;
   weight_unit: string | null;
   rpe: number | null;
   time_seconds: number | null;
   distance: number | null;
+  distance_scheme: number[] | null;
   distance_unit: string | null;
   scaling_note: string | null;
   target_pct_1rm: number | null;
@@ -80,6 +83,9 @@ export interface BlockProposalMovement {
   target_pct_1rm?: number | null;
   cardio_modality?: string | null;
   calories?: number | null;
+  cal_scheme?: number[] | null;
+  distance_scheme?: number[] | null;
+  max_effort?: boolean | null;
 }
 export interface BlockProposal {
   block_type: string;
@@ -267,7 +273,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
 
   // v3 add a task to a block. Block structure stays locked; only the movement
   // list grows. New row gets a placeholder name the user overwrites.
-  const MOVEMENT_SELECT = 'id, block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order';
+  const MOVEMENT_SELECT = 'id, block_id, movement, sets, reps, rep_scheme, calories, cal_scheme, max_effort, weight, weight_unit, rpe, time_seconds, distance, distance_scheme, distance_unit, scaling_note, target_pct_1rm, sort_order';
   const addMovementToBlock = useCallback(async (blockId: string) => {
     let maxSort = -1;
     for (const blocks of v3BlocksByWorkout.values()) {
@@ -478,7 +484,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
         blockIds,
         (batch) => supabase
           .from('program_movements_v2')
-          .select('id, block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order')
+          .select('id, block_id, movement, sets, reps, rep_scheme, calories, cal_scheme, max_effort, weight, weight_unit, rpe, time_seconds, distance, distance_scheme, distance_unit, scaling_note, target_pct_1rm, sort_order')
           .in('block_id', batch)
           .order('sort_order'),
       ),
@@ -998,6 +1004,12 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
  * sets×reps / total-reps form.
  */
 function formatRepPrescription(m: ProgramMovementV2): string | null {
+  // "As many as possible in the remaining window" — the block's clock does
+  // the capping; no number exists until the athlete logs one.
+  if (m.max_effort === true) return 'Max effort';
+  // Varying per-round calories ("21-15-9 cal") — the rep_scheme mirror.
+  const calLabel = schemeLabel(m.cal_scheme);
+  if (calLabel != null) return `${calLabel} cal`;
   // Calorie-counted (Cal Row / Cal Bike / Cal Ski) takes precedence — when
   // calories is populated the movement is monostructural cardio measured in
   // calories, not reps. Calories are per-round; sets carries the rounds
@@ -1020,8 +1032,20 @@ function formatRepPrescription(m: ProgramMovementV2): string | null {
   return null;
 }
 
-/** Distance display: per-round distance with sets carrying the rounds ("3×250m"). */
-function formatDistance(m: { sets?: number | null; distance?: number | null; distance_unit?: string | null }): string {
+/** Varying scheme → "21-15-9"; uniform → "3×250"; null when unusable. */
+function schemeLabel(scheme: number[] | null | undefined): string | null {
+  if (!Array.isArray(scheme) || scheme.length === 0) return null;
+  const valid = scheme.filter((n) => typeof n === 'number' && n > 0);
+  if (valid.length === 0) return null;
+  if (valid.length === 1) return String(valid[0]);
+  return valid.every((n) => n === valid[0]) ? `${valid.length}×${valid[0]}` : valid.join('-');
+}
+
+/** Distance display: per-round distance with sets carrying the rounds
+ *  ("3×250m"), or a varying distance_scheme as "500-400-300m". */
+function formatDistance(m: { sets?: number | null; distance?: number | null; distance_scheme?: number[] | null; distance_unit?: string | null }): string {
+  const scheme = schemeLabel(m.distance_scheme);
+  if (scheme != null) return `${scheme}${m.distance_unit ?? ''}`;
   const rounds = m.sets != null && m.sets > 1 ? `${m.sets}×` : '';
   return `${rounds}${m.distance}${m.distance_unit ?? ''}`;
 }
@@ -1033,7 +1057,7 @@ export function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
     // Distance-based movements (row/run/bike/etc.) use distance as the work
     // spec; reps is meaningless there. Writer sometimes emits both — prefer
     // distance and drop reps to avoid "Row 250 reps · 250m".
-    const hasDistance = m.distance != null;
+    const hasDistance = m.distance != null || (Array.isArray(m.distance_scheme) && m.distance_scheme.length > 0);
     if (!hasDistance) {
       const repStr = formatRepPrescription(m);
       if (repStr) parts.push(repStr);
@@ -1468,11 +1492,11 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
 /** Render a movement (live row or proposal) as a single readable line. */
 export function movementToLine(m: BlockProposalMovement): string {
   const parts: string[] = [];
-  const hasDistance = m.distance != null;
+  const hasDistance = m.distance != null || (Array.isArray(m.distance_scheme) && m.distance_scheme.length > 0);
   if (!hasDistance) {
     const r = formatRepPrescription({
-      calories: m.calories ?? null, rep_scheme: m.rep_scheme ?? null,
-      sets: m.sets ?? null, reps: m.reps ?? null,
+      calories: m.calories ?? null, cal_scheme: m.cal_scheme ?? null, rep_scheme: m.rep_scheme ?? null,
+      sets: m.sets ?? null, reps: m.reps ?? null, max_effort: m.max_effort ?? null,
     } as ProgramMovementV2);
     if (r) parts.push(r);
   }
@@ -1493,7 +1517,7 @@ function V3MovementRow({ movement }: { movement: ProgramMovementV2 }) {
   // Distance-based movements (row/run/bike/etc.) use distance as the work
   // spec; reps is meaningless there. Writer sometimes emits both — prefer
   // distance and drop reps to avoid "Row 250 reps · 250m".
-  const hasDistance = movement.distance != null;
+  const hasDistance = movement.distance != null || (Array.isArray(movement.distance_scheme) && movement.distance_scheme.length > 0);
   if (!hasDistance) {
     const repStr = formatRepPrescription(movement);
     if (repStr) parts.push(repStr);

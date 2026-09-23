@@ -58,6 +58,21 @@ function reconcileReps(
   return { reps: sum, rep_scheme: cleaned };
 }
 
+/** cal_scheme/distance_scheme mirror of reconcileReps: scheme present →
+ *  total = sum(scheme), deterministic, no LLM arithmetic. */
+function reconcileScheme(
+  total: number | null | undefined,
+  scheme: number[] | null | undefined,
+  maxItem: number,
+): { total: number | null; scheme: number[] | null } {
+  if (!Array.isArray(scheme) || scheme.length === 0) {
+    return { total: total ?? null, scheme: null };
+  }
+  const cleaned = scheme.filter((n) => Number.isFinite(n) && n > 0 && n <= maxItem);
+  if (cleaned.length === 0) return { total: total ?? null, scheme: null };
+  return { total: cleaned.reduce((a, b) => a + b, 0), scheme: cleaned };
+}
+
 /**
  * Build a per-block intent object from the skeleton day's metadata.
  * Each block type carries the slice of skeleton reasoning that shaped it.
@@ -278,6 +293,8 @@ export async function saveProgramV3(
           for (let m = 0; m < b.movements.length; m++) {
             const mv = b.movements[m];
             const { reps, rep_scheme } = reconcileReps(mv.reps, mv.rep_scheme);
+            const cal = reconcileScheme(mv.calories, mv.cal_scheme, 500);
+            const dist = reconcileScheme(mv.distance, mv.distance_scheme, 50000);
             movementInserts.push({
               block_id: blockId,
               movement: mv.movement,
@@ -288,9 +305,12 @@ export async function saveProgramV3(
               weight_unit: mv.weight_unit ?? null,
               rpe: mv.rpe ?? null,
               time_seconds: mv.time_seconds ?? null,
-              distance: mv.distance ?? null,
+              distance: dist.total,
+              distance_scheme: dist.scheme,
               distance_unit: mv.distance_unit ?? null,
-              calories: mv.calories ?? null,
+              calories: cal.total,
+              cal_scheme: cal.scheme,
+              max_effort: mv.max_effort === true ? true : null,
               cardio_modality: mv.cardio_modality ?? null,
               scaling_note: mv.scaling_note ?? null,
               target_pct_1rm: mv.target_pct_1rm ?? null,

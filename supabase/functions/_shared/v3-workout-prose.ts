@@ -30,20 +30,38 @@ interface MovementRow {
   reps: number | null;
   rep_scheme: number[] | null;
   calories: number | null;
+  cal_scheme?: number[] | null;
+  max_effort?: boolean | null;
   weight: number | null;
   weight_unit: string | null;
   rpe: number | null;
   time_seconds: number | null;
   distance: number | null;
+  distance_scheme?: number[] | null;
   distance_unit: string | null;
   scaling_note: string | null;
   sort_order: number;
 }
 
+/** Varying scheme → "21-15-9"; uniform → "3×250"; null when unusable. */
+function schemeLabel(scheme: number[] | null | undefined): string | null {
+  if (!Array.isArray(scheme) || scheme.length === 0) return null;
+  const valid = scheme.filter((n) => typeof n === "number" && n > 0);
+  if (valid.length === 0) return null;
+  if (valid.length === 1) return String(valid[0]);
+  return valid.every((n) => n === valid[0]) ? `${valid.length}×${valid[0]}` : valid.join("-");
+}
+
 function formatMovement(m: MovementRow): string {
   const parts: string[] = [];
   const arr: number[] | null = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
-  if (m.calories != null && m.calories > 0) {
+  const calLabel = schemeLabel(m.cal_scheme);
+  if (m.max_effort === true) {
+    // "As many as possible in the remaining window" — the clock caps it.
+    parts.push("max effort in remaining time");
+  } else if (calLabel != null) {
+    parts.push(`${calLabel} cal`);
+  } else if (m.calories != null && m.calories > 0) {
     // Per-round calories; sets carries the rounds ("4×15 cal").
     parts.push(m.sets != null && m.sets > 1 ? `${m.sets}×${m.calories} cal` : `${m.calories} cal`);
   } else if (arr && arr.length > 1 && !arr.every((n) => n === arr[0])) {
@@ -60,7 +78,9 @@ function formatMovement(m: MovementRow): string {
   if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? "lbs"}`);
   if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
   if (m.time_seconds != null) parts.push(`${m.time_seconds}s`);
-  if (m.distance != null) parts.push(`${m.sets != null && m.sets > 1 && m.calories == null && m.reps == null && m.rep_scheme == null ? `${m.sets}×` : ""}${m.distance}${m.distance_unit ?? ""}`);
+  const distLabel = schemeLabel(m.distance_scheme);
+  if (distLabel != null) parts.push(`${distLabel}${m.distance_unit ?? ""}`);
+  else if (m.distance != null) parts.push(`${m.sets != null && m.sets > 1 && m.calories == null && m.reps == null && m.rep_scheme == null ? `${m.sets}×` : ""}${m.distance}${m.distance_unit ?? ""}`);
   const scheme = parts.length > 0 ? ` — ${parts.join(" · ")}` : "";
   const scaling = m.scaling_note ? ` (${m.scaling_note})` : "";
   return `${m.movement}${scheme}${scaling}`;

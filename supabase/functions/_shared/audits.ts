@@ -366,6 +366,9 @@ export function auditPlateMath(output: WriterOutput): AuditResult {
 
 function movementHasAnyPrescription(m: MovementPrescription): boolean {
   return (
+    // max_effort IS a prescription: "as many as possible in the window".
+    // Placement legality is auditMaxEffort's job, not this rule's.
+    m.max_effort === true ||
     (m.sets != null && m.sets > 0) ||
     (m.reps != null && m.reps > 0) ||
     // rep_scheme is the canonical rep specifier — writer prompt tells the
@@ -374,8 +377,11 @@ function movementHasAnyPrescription(m: MovementPrescription): boolean {
     (Array.isArray(m.rep_scheme)
       && m.rep_scheme.length > 0
       && m.rep_scheme.some((n) => typeof n === "number" && n > 0)) ||
-    // calories is the typed specifier for Cal Row / Cal Bike / Cal Ski.
+    // calories is the typed specifier for Cal Row / Cal Bike / Cal Ski;
+    // cal_scheme/distance_scheme are the varying-round mirrors of rep_scheme.
     (m.calories != null && m.calories > 0) ||
+    (Array.isArray(m.cal_scheme) && m.cal_scheme.some((n) => typeof n === "number" && n > 0)) ||
+    (Array.isArray(m.distance_scheme) && m.distance_scheme.some((n) => typeof n === "number" && n > 0)) ||
     (m.weight != null && m.weight > 0) ||
     (m.time_seconds != null && m.time_seconds > 0) ||
     (m.distance != null && m.distance > 0)
@@ -433,11 +439,90 @@ export function auditRequiredFields(output: WriterOutput): AuditResult {
               `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type}) movement[${j}] "${m.movement}": has none of {sets, reps, weight, time_seconds, distance} populated.`,
             );
           }
+          // A distance without a unit renders as a naked number ("3×60") —
+          // the writer must commit to ft or m (never yards). Applies to the
+          // scalar and to a varying distance_scheme alike.
+          const hasDistanceWork = (m.distance != null && m.distance > 0) ||
+            (Array.isArray(m.distance_scheme) && m.distance_scheme.some((n) => typeof n === "number" && n > 0));
+          if (hasDistanceWork && (m.distance_unit !== "ft" && m.distance_unit !== "m")) {
+            violations.push(
+              `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type}) movement[${j}] "${m.movement}": distance work has no valid distance_unit — set "ft" or "m" (convert yards to feet).`,
+            );
+          }
         }
       }
     }
   }
   return { rule: "required_fields", passed: violations.length === 0, violations };
+}
+
+// ============================================================
+// Rule — max_effort placement
+// ============================================================
+
+const AMRAP_SCHEME_RE = /\bamrap\b|as many rounds/i;
+const BOUNDED_WINDOW_RE = /\bemom\b|e\d+mom|\d\s*(?:min|:\d{2}|s|sec\w*)?\s*on\s*[/,]?\s*\d[^a-z]*off|every\s+\d+\s*min/i;
+
+/**
+ * max_effort means "as many reps/cals as possible in the remaining window" —
+ * it only makes sense where a clock does the capping, at the end of a round's
+ * work. Deterministic guards (the writer prompt asks; this enforces):
+ *   1. metcon blocks only
+ *   2. never in AMRAPs — AMRAP movements carry fixed per-round reps
+ *   3. only the block's LAST movement
+ *   4. at most one per block
+ *   5. block must have a bounded clock (interval "on/off", EMOM, or time cap)
+ *   6. the flagged movement carries NO volume fields (never invent a number)
+ */
+export function auditMaxEffort(output: WriterOutput): AuditResult {
+  const violations: string[] = [];
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        const movements = safeMovements(b);
+        const flagged = movements
+          .map((m, j) => ({ m, j }))
+          .filter(({ m }) => m.max_effort === true);
+        if (flagged.length === 0) continue;
+        const where = `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type})`;
+        const scheme = (b.block_scheme ?? "").trim();
+        if (b.block_type !== "metcon") {
+          violations.push(`${where}: max_effort is only valid in metcon blocks — prescribe concrete volume here.`);
+        }
+        // Forbid max_effort in PLAIN AMRAPs (rounds unbounded, per-round reps
+        // fixed). An interval scheme that merely says "AMRAP each interval"
+        // ("3 rounds: 4:00 on / 1:00 off, AMRAP each interval — ... then max
+        // G2OH in remaining time") is the licensed shape: the on/off window
+        // bounds it, so the keyword alone must not trip this rule.
+        if (AMRAP_SCHEME_RE.test(scheme) && !BOUNDED_WINDOW_RE.test(scheme)) {
+          violations.push(`${where}: max_effort inside an AMRAP. AMRAP movements carry fixed per-round reps (rep_scheme) — the ROUNDS are what's unbounded. Remove max_effort and emit rep_scheme.`);
+        }
+        if (flagged.length > 1) {
+          violations.push(`${where}: ${flagged.length} max_effort movements. At most ONE per block — give the others concrete volume.`);
+        }
+        if (flagged.some(({ j }) => j !== movements.length - 1)) {
+          violations.push(`${where}: max_effort on a non-final movement. Only the block's LAST movement may be max_effort ("...then max reps in the remaining time").`);
+        }
+        const bounded = (b.time_cap_seconds != null && b.time_cap_seconds > 0) || BOUNDED_WINDOW_RE.test(scheme);
+        if (!bounded) {
+          violations.push(`${where}: max_effort without a bounded clock. The block needs an interval structure ("X on / Y off"), an EMOM, or a time cap — otherwise "max" has no window to fill.`);
+        }
+        for (const { m, j } of flagged) {
+          const hasVolume = (m.reps != null && m.reps > 0) || (m.calories != null && m.calories > 0) ||
+            (m.time_seconds != null && m.time_seconds > 0) || (m.distance != null && m.distance > 0) ||
+            (Array.isArray(m.rep_scheme) && m.rep_scheme.length > 0) ||
+            (Array.isArray(m.cal_scheme) && m.cal_scheme.length > 0) ||
+            (Array.isArray(m.distance_scheme) && m.distance_scheme.length > 0);
+          if (hasVolume) {
+            violations.push(`${where} movement[${j}] "${m.movement}": max_effort combined with volume fields. max_effort means the quantity is unknown until logged — remove reps/rep_scheme/calories/time_seconds/distance (weight/RPE are fine).`);
+          }
+        }
+      }
+    }
+  }
+  return { rule: "max_effort_placement", passed: violations.length === 0, violations };
 }
 
 // ============================================================
@@ -878,6 +963,7 @@ export const ALL_AUDITS = [
   (ctx: AuditContext): AuditResult => auditMetconMonostructural(ctx.output),
   (ctx: AuditContext): AuditResult => auditMetconBarbellLoads(ctx.output),
   (ctx: AuditContext): AuditResult => auditRequiredFields(ctx.output),
+  (ctx: AuditContext): AuditResult => auditMaxEffort(ctx.output),
   (ctx: AuditContext): AuditResult => auditWorkupTopSet(ctx.output),
   (ctx: AuditContext): AuditResult => auditMetconDuration(ctx.output, ctx.skeleton),
   (ctx: AuditContext): AuditResult => auditDayCount(ctx.output, ctx.daysPerWeek),
@@ -908,6 +994,7 @@ export const AUDIT_KIND: Record<string, AuditKind> = {
   metcon_barbell_one_load: "block-local",
   metcon_duration_matches_focus: "block-local",
   required_fields: "block-local",
+  max_effort_placement: "block-local",
   workup_top_set: "block-local",
   do_not_program: "block-local",
   // Structural — whole-program issues; only writer-retry can fix

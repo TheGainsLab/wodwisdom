@@ -13,15 +13,32 @@ export interface DisplayMovement {
   weight_unit?: string | null;
   time_seconds?: number | null;
   distance?: number | null;
+  distance_scheme?: number[] | null;
   distance_unit?: string | null;
   calories?: number | null;
+  cal_scheme?: number[] | null;
+  max_effort?: boolean | null;
   scaling_note?: string | null;
+}
+
+/** Varying scheme → "21-15-9"; uniform → "3×250"; null when unusable. */
+function schemeLabel(scheme: number[] | null | undefined): string | null {
+  if (!Array.isArray(scheme) || scheme.length === 0) return null;
+  const valid = scheme.filter((n) => typeof n === 'number' && n > 0);
+  if (valid.length === 0) return null;
+  if (valid.length === 1) return String(valid[0]);
+  return valid.every((n) => n === valid[0]) ? `${valid.length}×${valid[0]}` : valid.join('-');
 }
 
 /** The rep/volume portion: "4×15 cal" | "21-15-9 reps" | "5×5" | "3×10" | "8 reps".
  *  Calories are per-round with sets carrying the rounds; legacy rows without
  *  sets render the bare number. */
 export function formatRepPrescription(m: DisplayMovement): string | null {
+  // "As many as possible in the remaining window" — no number until logged.
+  if (m.max_effort === true) return 'Max effort';
+  // Varying per-round calories ("21-15-9 cal") — the rep_scheme mirror.
+  const calScheme = schemeLabel(m.cal_scheme);
+  if (calScheme != null) return `${calScheme} cal`;
   if (m.calories != null && m.calories > 0) {
     return m.sets != null && m.sets > 1 ? `${m.sets}×${m.calories} cal` : `${m.calories} cal`;
   }
@@ -47,15 +64,21 @@ function formatDuration(totalSeconds: number): string {
 /** Full one-line prescription: "Movement — 5×5 · 225lbs · RPE 8". */
 export function formatMovementLine(m: DisplayMovement): string {
   const parts: string[] = [];
-  const hasDistance = m.distance != null;
+  const hasDistance = m.distance != null || (Array.isArray(m.distance_scheme) && m.distance_scheme.length > 0);
   if (!hasDistance) {
     const repStr = formatRepPrescription(m);
     if (repStr) parts.push(repStr);
   }
   if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? 'lbs'}`);
   if (m.time_seconds != null) parts.push(formatDuration(m.time_seconds));
-  // Distance is per-round; sets carries the rounds ("3×250m").
-  if (hasDistance) parts.push(`${m.sets != null && m.sets > 1 ? `${m.sets}×` : ''}${m.distance}${m.distance_unit ?? ''}`);
+  // Distance is per-round; sets carries the rounds ("3×250m"), or a varying
+  // distance_scheme renders as "500-400-300m".
+  if (hasDistance) {
+    const distScheme = schemeLabel(m.distance_scheme);
+    parts.push(distScheme != null
+      ? `${distScheme}${m.distance_unit ?? ''}`
+      : `${m.sets != null && m.sets > 1 ? `${m.sets}×` : ''}${m.distance}${m.distance_unit ?? ''}`);
+  }
   const scheme = parts.length > 0 ? ` — ${parts.join(' · ')}` : '';
   return `${m.movement}${scheme}`;
 }

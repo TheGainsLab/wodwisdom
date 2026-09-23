@@ -87,6 +87,28 @@ export interface MovementPrescription {
    * `reps = sum(rep_scheme)` at save time — the LLM never does arithmetic.
    */
   rep_scheme?: number[];
+  /**
+   * Per-round calories when the rounds VARY — the rep_scheme mirror for
+   * calorie-counted movements. "21-15-9 cal bike" → [21, 15, 9]. Code
+   * derives calories = sum(cal_scheme) at save time. Uniform rounds use
+   * calories (per-round) + sets instead.
+   */
+  cal_scheme?: number[];
+  /**
+   * Per-round distance when the rounds VARY — "row 500-400-300m" →
+   * [500, 400, 300] (requires distance_unit). Code derives
+   * distance = sum(distance_scheme) at save time. Uniform rounds use
+   * distance (per-round) + sets instead.
+   */
+  distance_scheme?: number[];
+  /**
+   * "As many reps/cals as possible in the remaining window" — the movement's
+   * own quantity is unbounded; the block's clock does the capping. When true,
+   * no volume specifier is set (never invent a number). Metcon blocks with a
+   * bounded clock only, last movement only, at most one per block (enforced
+   * by auditMaxEffort).
+   */
+  max_effort?: boolean;
   weight?: number;
   weight_unit?: "lbs" | "kg";
   rpe?: number;
@@ -211,6 +233,21 @@ function buildMovementSchema(units: "lbs" | "kg") {
         maxItems: 20,
         description: "Per-iteration reps breakdown. Required for every rep-counted movement. Chipper '21-15-9' → [21,15,9]. 3 RFT 15 reps/round → [15,15,15]. Single-pass '100 burpees' → [100]. AMRAP 10 reps/round → [10] (one structural unit). Just copy the numbers from block_scheme — DO NOT do arithmetic.",
       },
+      cal_scheme: {
+        type: "array",
+        items: { type: "integer", minimum: 1, maximum: 500 },
+        minItems: 2,
+        maxItems: 20,
+        description: "Per-round calories when rounds VARY — the rep_scheme mirror for calorie-counted movements. '21-15-9 cal bike' → [21,15,9]. Leave calories and sets null (code derives the total). Uniform rounds use calories + sets instead, never this.",
+      },
+      distance_scheme: {
+        type: "array",
+        items: { type: "integer", minimum: 1, maximum: 50000 },
+        minItems: 2,
+        maxItems: 20,
+        description: "Per-round distance when rounds VARY — 'row 500-400-300m' → [500,400,300], with distance_unit set. Leave distance and sets null (code derives the total). Uniform rounds use distance + sets instead, never this.",
+      },
+      max_effort: { type: "boolean", description: "TRUE only for 'as many reps/cals as possible in the remaining window' (a finisher inside a bounded clock). Set NO volume fields with it — never invent a number. Metcon blocks only, LAST movement only, at most one per block, never in AMRAPs (AMRAP movements have fixed per-round reps via rep_scheme)." },
       weight: { type: "number", minimum: 0 },
       weight_unit: { type: "string", enum: [units] },
       rpe: { type: "integer", minimum: 1, maximum: 10 },
