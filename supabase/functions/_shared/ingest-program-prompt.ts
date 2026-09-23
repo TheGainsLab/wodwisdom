@@ -48,7 +48,7 @@ For every block, extract its movements:
 - target_pct_1rm: a percentage of 1RM if prescribed ("@80%" → 80; for a range "@70-75%" use the low end).
 - time_seconds: a duration prescription ("row 5 min" → 300).
 - distance + distance_unit: distance work — "500m" → distance 500, distance_unit "m". "ft" or "m".
-- calories: calorie-based cardio — "30 cal row" → calories 30.
+- calories: calorie-based cardio, PER-ROUND like reps — "4 rounds: 15 cal row" → calories 15 (sets 4); single-pass "30 cal row" → calories 30.
 - cardio_modality: for a monostructural movement, the machine (see list below).
 - rpe: a prescribed RPE if given.
 - scaling_note: any scaling cue.

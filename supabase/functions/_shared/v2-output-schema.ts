@@ -202,7 +202,7 @@ function buildMovementSchema(units: "lbs" | "kg") {
     type: "object",
     properties: {
       movement: { type: "string", description: "Display name from the vocabulary list provided in the user message." },
-      sets: { type: "integer", minimum: 1, maximum: 30 },
+      sets: { type: "integer", minimum: 1, maximum: 30, description: "Strength/accessory: the sets count. Calorie/distance movement in a multi-round metcon: the ROUNDS count (per-round scalar × sets = total work)." },
       reps: { type: "integer", minimum: 1, maximum: 500, description: "DO NOT compute manually. Code derives this from sum(rep_scheme) at save time." },
       rep_scheme: {
         type: "array",
@@ -215,9 +215,9 @@ function buildMovementSchema(units: "lbs" | "kg") {
       weight_unit: { type: "string", enum: [units] },
       rpe: { type: "integer", minimum: 1, maximum: 10 },
       time_seconds: { type: "integer", minimum: 1, maximum: 7200 },
-      distance: { type: "number", minimum: 0 },
+      distance: { type: "number", minimum: 0, description: "PER-ROUND distance for distance-counted movements ('3 RFT: Row 250m' → 250, with sets: 3). Single-pass → the full distance, sets omitted." },
       distance_unit: { type: "string", enum: ["ft", "m"] },
-      calories: { type: "number", minimum: 0, description: "For calorie-based cardio (e.g. '30 cal row', '20 cal bike'). Use THIS field — never reps/rep_scheme — for Cal Row / Cal Bike / Cal Ski-erg. Total calories across the prescription (e.g. 4 rounds of 10 cal → 40)." },
+      calories: { type: "number", minimum: 0, description: "For calorie-based cardio (e.g. '15 cal bike'). Use THIS field — never reps/rep_scheme — for Cal Row / Cal Bike / Cal Ski-erg. PER-ROUND calories, like distance ('4 rounds of 15 cal' → calories: 15, sets: 4) — NEVER the summed total across rounds." },
       cardio_modality: { type: "string", description: "Machine for a monostructural movement (e.g. an erg inside a metcon)." },
       scaling_note: { type: "string", maxLength: 240, description: "EMPTY by default — leave null. NO coaching cues, notes, or guidance (all of that lives in the Coach panel). Populate ONLY with a bare hard-prescription spec that has no other field — box height ('24-inch box'), band, or deficit — spec text only, no coaching words. Most movements have none." },
       target_pct_1rm: {
@@ -431,7 +431,7 @@ export function buildIngestProgramTool() {
       time_seconds: { type: "integer", minimum: 1, maximum: 14400 },
       distance: { type: "number", minimum: 0 },
       distance_unit: { type: "string", enum: ["ft", "m"] },
-      calories: { type: "number", minimum: 0, description: "For calorie-based cardio (e.g. '30 cal row')." },
+      calories: { type: "number", minimum: 0, description: "For calorie-based cardio (e.g. '30 cal row'). Per-round in multi-round blocks (sets carries the rounds count)." },
       cardio_modality: { type: "string", description: "Machine for a monostructural movement; from the modality list in the user message." },
       scaling_note: { type: "string", maxLength: 240, description: "EMPTY by default — leave null. NO coaching cues, notes, or guidance (all of that lives in the Coach panel). Populate ONLY with a bare hard-prescription spec that has no other field — box height ('24-inch box'), band, or deficit — spec text only, no coaching words. Most movements have none." },
     },

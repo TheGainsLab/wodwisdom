@@ -1000,8 +1000,11 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
 function formatRepPrescription(m: ProgramMovementV2): string | null {
   // Calorie-counted (Cal Row / Cal Bike / Cal Ski) takes precedence — when
   // calories is populated the movement is monostructural cardio measured in
-  // calories, not reps.
-  if (m.calories != null && m.calories > 0) return `${m.calories} cal`;
+  // calories, not reps. Calories are per-round; sets carries the rounds
+  // ("4×15 cal"). Legacy rows without sets render the bare number.
+  if (m.calories != null && m.calories > 0) {
+    return m.sets != null && m.sets > 1 ? `${m.sets}×${m.calories} cal` : `${m.calories} cal`;
+  }
   const arr = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
   if (arr && arr.length > 1) {
     const allEqual = arr.every((n) => n === arr[0]);
@@ -1013,8 +1016,14 @@ function formatRepPrescription(m: ProgramMovementV2): string | null {
   }
   if (m.sets != null && m.reps != null) return `${m.sets}×${m.reps}`;
   if (m.sets != null) return `${m.sets} ${m.sets === 1 ? 'set' : 'sets'}`;
-  if (m.reps != null) return `${m.reps} reps`;
+  if (m.reps != null) return `${m.reps} ${m.reps === 1 ? 'rep' : 'reps'}`;
   return null;
+}
+
+/** Distance display: per-round distance with sets carrying the rounds ("3×250m"). */
+function formatDistance(m: { sets?: number | null; distance?: number | null; distance_unit?: string | null }): string {
+  const rounds = m.sets != null && m.sets > 1 ? `${m.sets}×` : '';
+  return `${rounds}${m.distance}${m.distance_unit ?? ''}`;
 }
 
 export function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
@@ -1032,7 +1041,7 @@ export function v3BlocksToProse(blocks: ProgramBlockV2[]): string {
     if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? 'lbs'}`);
     if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
     if (m.time_seconds != null) parts.push(formatDuration(m.time_seconds));
-    if (hasDistance) parts.push(`${m.distance}${m.distance_unit ?? ''}`);
+    if (hasDistance) parts.push(formatDistance(m));
     const scheme = parts.length > 0 ? ` — ${parts.join(' · ')}` : '';
     const scaling = m.scaling_note ? ` (${m.scaling_note})` : '';
     return `${m.movement}${scheme}${scaling}`;
@@ -1473,7 +1482,7 @@ export function movementToLine(m: BlockProposalMovement): string {
   }
   if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
   if (m.time_seconds != null) parts.push(formatDuration(m.time_seconds));
-  if (hasDistance) parts.push(`${m.distance}${m.distance_unit ?? ''}`);
+  if (hasDistance) parts.push(formatDistance(m));
   const presc = parts.join(' · ');
   const scaling = m.scaling_note ? ` — ${m.scaling_note}` : '';
   return `${m.movement}${presc ? `  ${presc}` : ''}${scaling}`;
@@ -1495,7 +1504,7 @@ function V3MovementRow({ movement }: { movement: ProgramMovementV2 }) {
   }
   if (movement.rpe != null) parts.push(`RPE ${movement.rpe}`);
   if (movement.time_seconds != null) parts.push(formatDuration(movement.time_seconds));
-  if (hasDistance) parts.push(`${movement.distance}${movement.distance_unit ?? ''}`);
+  if (hasDistance) parts.push(formatDistance(movement));
   const prescription = parts.join(' · ');
 
   return (

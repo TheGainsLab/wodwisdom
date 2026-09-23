@@ -18,9 +18,13 @@ export interface DisplayMovement {
   scaling_note?: string | null;
 }
 
-/** The rep/volume portion: "45 cal" | "21-15-9 reps" | "5×5" | "3×10" | "8 reps". */
+/** The rep/volume portion: "4×15 cal" | "21-15-9 reps" | "5×5" | "3×10" | "8 reps".
+ *  Calories are per-round with sets carrying the rounds; legacy rows without
+ *  sets render the bare number. */
 export function formatRepPrescription(m: DisplayMovement): string | null {
-  if (m.calories != null && m.calories > 0) return `${m.calories} cal`;
+  if (m.calories != null && m.calories > 0) {
+    return m.sets != null && m.sets > 1 ? `${m.sets}×${m.calories} cal` : `${m.calories} cal`;
+  }
   const arr = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
   if (arr && arr.length > 1) {
     const allEqual = arr.every((n) => n === arr[0]);
@@ -29,8 +33,8 @@ export function formatRepPrescription(m: DisplayMovement): string | null {
     return `${arr.length}×${arr[0]}`;
   }
   if (m.sets != null && m.reps != null) return `${m.sets}×${m.reps}`;
-  if (m.sets != null) return `${m.sets} sets`;
-  if (m.reps != null) return `${m.reps} reps`;
+  if (m.sets != null) return `${m.sets} ${m.sets === 1 ? 'set' : 'sets'}`;
+  if (m.reps != null) return `${m.reps} ${m.reps === 1 ? 'rep' : 'reps'}`;
   return null;
 }
 
@@ -50,7 +54,8 @@ export function formatMovementLine(m: DisplayMovement): string {
   }
   if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? 'lbs'}`);
   if (m.time_seconds != null) parts.push(formatDuration(m.time_seconds));
-  if (hasDistance) parts.push(`${m.distance}${m.distance_unit ?? ''}`);
+  // Distance is per-round; sets carries the rounds ("3×250m").
+  if (hasDistance) parts.push(`${m.sets != null && m.sets > 1 ? `${m.sets}×` : ''}${m.distance}${m.distance_unit ?? ''}`);
   const scheme = parts.length > 0 ? ` — ${parts.join(' · ')}` : '';
   return `${m.movement}${scheme}`;
 }
