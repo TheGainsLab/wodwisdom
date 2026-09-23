@@ -526,6 +526,110 @@ export function auditMaxEffort(output: WriterOutput): AuditResult {
 }
 
 // ============================================================
+// Rule — prose consistency (scheme text vs typed fields)
+// ============================================================
+
+// "@195", "@195 lbs", "@ 155/105" — an absolute load narrated into prose.
+// Clock references ("@2:00") are fine, hence the lookahead excluding :.
+const PROSE_ABSOLUTE_LOAD_RE = /@\s*\d+(?:\.\d+)?(?![\d.]*\s*:)/;
+// "60 yd", "60-yd", "5-10-15 yd", "yards"
+const PROSE_YARDS_RE = /\b\d+(?:\s*-\s*\d+)*\s*-?\s*(?:yd|yds|yard|yards)\b/i;
+// Per-movement quantities that belong to the rows (the one-copy rule):
+// "35 lb DBs" (loads without @), "82%", "4x3", "15 cal", "10 reps", "800m"/"30-ft".
+const PROSE_ROW_QUANTITY_RES: Array<{ re: RegExp; what: string }> = [
+  { re: /\b\d+(?:\.\d+)?\s*(?:lbs?|kg|#)\b/i, what: "a load" },
+  { re: /\d+(?:\.\d+)?\s*%/, what: "a percentage" },
+  { re: /\b\d+\s*[x×]\s*\d+\b/i, what: "a sets×reps count" },
+  { re: /\b\d+\s*cal(?:s|ories)?\b/i, what: "a calorie count" },
+  { re: /\b\d+\s*reps?\b/i, what: "a rep count" },
+  { re: /\b\d+(?:\.\d+)?\s*-?\s*(?:ft|feet|meters?|km|miles?|m|mi)\b/i, what: "a distance" },
+];
+// "21-15-9" (two or more hyphens) — the rounds pattern that must equal the
+// movements' varying schemes. "60-90 sec" (one hyphen) doesn't match.
+const PROSE_ROUNDS_PATTERN_RE = /\b\d+(?:-\d+){2,}\b/;
+
+/** Block types whose scheme may not carry per-movement quantities. Cardio
+ *  schemes legitimately carry pace prose ("2:00/500m splits"), so they get
+ *  only the load/yards checks. */
+const ONE_COPY_BLOCK_TYPES = new Set(["strength", "accessory", "metcon", "skills"]);
+
+/**
+ * THE ONE-COPY RULE, enforced. block_scheme narrates structure (format,
+ * clock, rest, station mapping by movement name); the movement rows carry
+ * every quantity. A number written into prose is authored independently of
+ * the typed row, so it WILL drift (observed: "@195 lbs" prose beside a
+ * 220 lb row; "60-yd" prose beside a 180ft row). Deterministic violations →
+ * surgical rewrites the prose. The rounds pattern ("21-15-9") is the one
+ * number the scheme may carry, and it must exactly equal the movements'
+ * varying rep/cal/distance schemes.
+ */
+export function auditProseConsistency(output: WriterOutput): AuditResult {
+  const violations: string[] = [];
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        const where = `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type})`;
+        const scheme = b.block_scheme ?? "";
+        if (PROSE_ABSOLUTE_LOAD_RE.test(scheme)) {
+          violations.push(
+            `${where}: block_scheme states an absolute load ("${scheme.match(PROSE_ABSOLUTE_LOAD_RE)?.[0]}…"). The movement rows carry the computed weights — remove the number from the prose.`,
+          );
+        }
+        if (PROSE_YARDS_RE.test(scheme)) {
+          violations.push(
+            `${where}: block_scheme uses yards ("${scheme.match(PROSE_YARDS_RE)?.[0]}"). Distance prose uses ft or m, matching the typed fields — convert (60 yd → 180 ft).`,
+          );
+        }
+        if (ONE_COPY_BLOCK_TYPES.has(b.block_type)) {
+          // Strip the rounds pattern first so "21-15-9 for time" isn't
+          // misread by the quantity regexes.
+          const schemeSansPattern = scheme.replace(PROSE_ROUNDS_PATTERN_RE, "");
+          for (const { re, what } of PROSE_ROW_QUANTITY_RES) {
+            const hit = schemeSansPattern.match(re);
+            if (hit) {
+              violations.push(
+                `${where}: block_scheme states ${what} ("${hit[0]}") — the one-copy rule: quantities live ONLY on the movement rows. Keep the scheme to format + clock + rest + station assignments by movement name (e.g. "AMRAP 13", "EMOM 10 — odd: Handstand Walk, even: Wall Walks", "Work sets across. 2 min rest between sets.").`,
+              );
+              break; // one message per block is enough for surgical
+            }
+          }
+          // Rounds pattern ↔ varying schemes cross-check.
+          const patternHit = scheme.match(PROSE_ROUNDS_PATTERN_RE);
+          if (patternHit) {
+            const pattern = patternHit[0].split("-").map((n) => parseInt(n, 10));
+            const movements = safeMovements(b);
+            for (let j = 0; j < movements.length; j++) {
+              const m = movements[j];
+              for (const arr of [m.rep_scheme, m.cal_scheme, m.distance_scheme]) {
+                if (!Array.isArray(arr) || arr.length < 2) continue;
+                if (arr.every((n) => n === arr[0])) continue; // uniform — not scheme-shaped
+                if (arr.length !== pattern.length || arr.some((n, k) => n !== pattern[k])) {
+                  violations.push(
+                    `${where} movement[${j}] "${m.movement}": scheme pattern "${patternHit[0]}" does not match the movement's varying scheme [${arr.join(",")}] — they must be identical.`,
+                  );
+                }
+              }
+            }
+          }
+        }
+        const movements = safeMovements(b);
+        for (let j = 0; j < movements.length; j++) {
+          const note = movements[j].scaling_note ?? "";
+          if (note && PROSE_YARDS_RE.test(note)) {
+            violations.push(
+              `${where} movement[${j}] "${movements[j].movement}": scaling_note uses yards ("${note.match(PROSE_YARDS_RE)?.[0]}") — express the spec in ft or m.`,
+            );
+          }
+        }
+      }
+    }
+  }
+  return { rule: "prose_consistency", passed: violations.length === 0, violations };
+}
+
+// ============================================================
 // Rule — no contraindicated movements (injury safety)
 // ============================================================
 
@@ -964,6 +1068,7 @@ export const ALL_AUDITS = [
   (ctx: AuditContext): AuditResult => auditMetconBarbellLoads(ctx.output),
   (ctx: AuditContext): AuditResult => auditRequiredFields(ctx.output),
   (ctx: AuditContext): AuditResult => auditMaxEffort(ctx.output),
+  (ctx: AuditContext): AuditResult => auditProseConsistency(ctx.output),
   (ctx: AuditContext): AuditResult => auditWorkupTopSet(ctx.output),
   (ctx: AuditContext): AuditResult => auditMetconDuration(ctx.output, ctx.skeleton),
   (ctx: AuditContext): AuditResult => auditDayCount(ctx.output, ctx.daysPerWeek),
@@ -995,6 +1100,7 @@ export const AUDIT_KIND: Record<string, AuditKind> = {
   metcon_duration_matches_focus: "block-local",
   required_fields: "block-local",
   max_effort_placement: "block-local",
+  prose_consistency: "block-local",
   workup_top_set: "block-local",
   do_not_program: "block-local",
   // Structural — whole-program issues; only writer-retry can fix

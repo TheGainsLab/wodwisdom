@@ -56,7 +56,7 @@ The skeleton has already chosen the strength_scheme for each strength day (volum
 
 Math: multiply the chosen % by the athlete's 1RM, then round DOWN to the nearest plate-math step (5 lbs / 2.5 kg). Never round UP across the athlete's 1RM — the load_sanity audit will catch it.
 
-WORK-UP / "BUILD TO" SCHEMES. When the scheme says "Build to" / "Work up to" a heavy single / double / triple, the warm-up ramp is the ATHLETE'S DISCRETION — they pick their own jumps based on how the bar feels that day. Do NOT prescribe the ascending sets. Emit ONLY the top working set at the target: e.g. "Work up to a heavy triple (~90%)" → ONE movement row with sets = 1, rep_scheme = [3], weight = the ~90% number, rpe ~8–9. The "work up to it" instruction lives in block_scheme as prose (block_scheme is shown to the athlete), never as invented fixed-weight sets. NEVER stamp the top weight across multiple sets (e.g. 5×3 at the top triple) — that reads as 15 reps at 90% and contradicts the build-up instruction.
+WORK-UP / "BUILD TO" SCHEMES. When the scheme says "Build to" / "Work up to" a heavy single / double / triple, the warm-up ramp is the ATHLETE'S DISCRETION — they pick their own jumps based on how the bar feels that day. Do NOT prescribe the ascending sets. Emit ONLY the top working set at the target: e.g. "Work up to a heavy triple (~90%)" → ONE movement row with sets = 1, rep_scheme = [3], weight = the ~90% number, rpe ~8–9. The "work up to it" instruction lives in block_scheme as prose WITHOUT the number ("Work up to a heavy triple" — the row carries the target weight; the one-copy rule applies), never as invented fixed-weight sets. NEVER stamp the top weight across multiple sets (e.g. 5×3 at the top triple) — that reads as 15 reps at 90% and contradicts the build-up instruction.
 
 If the scheme prescribes a back-off AFTER the work-up — "work up to a heavy single, THEN 3×1 @85%" — that is TWO prescriptions, so emit TWO movement rows: (1) the work-up target (sets = 1, rep_scheme = [1], weight = the heavy-single target), and (2) the fixed back-off as its own honest row (sets = 3, rep_scheme = [1], weight = the 85% number). Only the back-off is fixed; the work-up stays the athlete's call.
 
@@ -155,20 +155,23 @@ NOTES — WHERE TEXT GOES. Two text fields, two distinct audiences:
 
 BLOCK_SCHEME — STRUCTURE ONLY. block_scheme answers ONE question: "how is the work organized?" Nothing else. It is the readable workout structure, and that is ALL it is.
 
-You are given the skeleton's scheme + focus for this block — build block_scheme by expanding THAT into a clean readable line: spell out the format/scheme, the complex pairing or per-round breakdown, loads, and rest. Add the structure; add NOTHING else.
+THE ONE-COPY RULE. Every quantity that lives on a movement row — reps, sets×reps, calories, distances, loads, percentages — appears ONLY on the row, NEVER in block_scheme. The rows render directly under the header on every surface, so a header number is clutter at best and a contradiction at worst: a prose number is authored separately from the typed row and WILL drift. block_scheme carries ONLY the facts no row can hold: format + clock, the rounds pattern, rest, station/minute assignments by movement NAME, and variant notes.
 
-INCLUDE (structure only): the scheme/format ("5x5 @75%", "AMRAP 12", "EMOM 10"), round or minute assignments (EMOM "odd: X / even: Y"), complex pairing spelled out ("5 sets of [1 Clean + 1 Front Squat + 1 Jerk] @72%"), the per-round breakdown for metcons ("3 RFT: Row 200m / 10 Box Jump-Over / 12 DB Snatch"), and rest between sets ("2 min rest").
+INCLUDE (structure only): the format + clock ("AMRAP 13", "EMOM 10", "3 rounds: 4:00 on / 1:00 off", "5 RFT (12-min cap)", "21-15-9 for time" — a rounds pattern like 21-15-9 is the format's NAME and must exactly equal the movements' rep_scheme/cal_scheme arrays), station or minute assignments by movement NAME with no quantities ("odd minutes: Handstand Walk (freestanding); even minutes: Wall Walks"), rest ("2 min rest between sets", "Rest remainder of each minute"), straight-set framing for accessory ("Straight sets."), work-set framing for strength ("Work sets across."), and work-up narrative WITHOUT numbers ("Work up to a heavy triple" — the row carries the target weight and reps).
 
-NEVER include — every one of these is the Coach panel's job, NOT block_scheme:
+NEVER include — the first three because the rows own them, the rest because they are the Coach panel's job:
+  • ANY per-movement quantity: "4x3 @82% Strict Press" → header is "Work sets across. 2 min rest between sets." (the row says 4×3 · the computed weight · 82%) / "15 cal Row / 10 Toes-to-Bar" → header is "AMRAP 13" (the rows say 15 cal and 10 reps) / "30-ft Handstand Walk" → name only (the row says 5×30ft).
+  • ABSOLUTE loads or percentages ("@195 lbs", "@155", "2×35 lb DBs", "@82%"): weights and % live in the typed weight / target_pct_1rm fields — a prose copy WILL contradict the computed value.
+  • yards, anywhere ("60-yd shuttle"): distance prose uses ft or m, matching the typed fields — same rule as distance_unit.
   • effort / feel / intent words: "light technical work", "easy deload volume", "build position", "no grind", "no strain", "conversational pace", "this is technical work not max effort"
   • execution cues / tempo: "consistent depth and bar path", "feel the positions", "controlled touch-and-go or reset each rep", "controlled eccentric"
   • target times / pacing: "Target 11–14 min", "aim for ~90s/round"
-  • redundant scheme clarifications: "all 5 sets across at the same load" (5x5 already means that)
+  • redundant scheme clarifications: "all 5 sets across at the same load"
   • the internal Track A/B label or week/deload tags
-If you find yourself writing a phrase that tells the athlete HOW WELL or HOW HARD to do it, stop — that sentence belongs in Coach, not here.
+If you find yourself writing a phrase that tells the athlete HOW WELL or HOW HARD to do it, stop — that sentence belongs in Coach, not here. If you find yourself writing a NUMBER that a movement row already carries, stop — delete it; the row is the single source.
 
-KEEP (real examples): "5 sets of [1 Clean + 1 Front Squat + 1 Jerk] @ 72% of C&J 1RM. 2 min rest between sets." / "EMOM 12 — odd: 15ft Handstand Walk, even: 3 Wall Walks. Rest remainder of each minute." / "For time: 50 cal Row / 21 Clean & Jerk @155 / 15 Bar Muscle-Ups / 21 Clean & Jerk @155 / 15 HSPU."
-CUT the tails (real leaks): "…Consistent depth and bar path each set" / "…feel the floor, no grind" / "…Build position — technical work, not max effort" / "…Target 11–14 min" / "…all 5 sets across at the same load".
+KEEP (real examples): "Work sets across. 2 min rest between sets." / "5 sets of [1 Clean + 1 Front Squat + 1 Jerk]. 2 min rest between sets." / "EMOM 12 — odd: Handstand Walk, even: Wall Walks. Rest remainder of each minute." / "AMRAP 13" / "21-15-9 for time (7-min cap)" / "Straight sets. Rest 60–90 sec between sets."
+CUT the tails (real leaks): "…@82% Strict Press" / "…15 cal Row / 10 Toes-to-Bar / 10 Deadlift @195 lbs" / "…30-ft Handstand Walk" / "…Consistent depth and bar path each set" / "…Target 11–14 min".
 
 BLOCK_LABEL — ONLY FOR WARM-UP AND COOL-DOWN. A block has EITHER a block_scheme OR a block_label, NEVER both:
   • warm-up / cool-down blocks have NO block_scheme (the athlete just does the listed movements), so give them a short block_label as their header — e.g. "Lower-Body Activation + Shoulder Prep", "Hip & Hamstring Flush".
