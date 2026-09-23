@@ -40,7 +40,7 @@ function compressWorkoutText(text: string | null): string {
 function compactMovement(m: any): string {
   let s = String(m.movement ?? "").trim();
   const arr: number[] | null = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
-  if (m.calories != null && m.calories > 0) s += ` ${m.calories}cal`;
+  if (m.calories != null && m.calories > 0) s += m.sets != null && m.sets > 1 ? ` ${m.sets}×${m.calories}cal` : ` ${m.calories}cal`;
   else if (arr && arr.length > 1 && !arr.every((n: number) => n === arr[0])) s += ` ${arr.join("-")}`;
   else if (m.sets != null && m.reps != null) s += ` ${m.sets}×${m.reps}`;
   else if (m.reps != null) s += ` ${m.reps}`;

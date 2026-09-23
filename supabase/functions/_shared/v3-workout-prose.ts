@@ -44,7 +44,8 @@ function formatMovement(m: MovementRow): string {
   const parts: string[] = [];
   const arr: number[] | null = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
   if (m.calories != null && m.calories > 0) {
-    parts.push(`${m.calories} cal`);
+    // Per-round calories; sets carries the rounds ("4×15 cal").
+    parts.push(m.sets != null && m.sets > 1 ? `${m.sets}×${m.calories} cal` : `${m.calories} cal`);
   } else if (arr && arr.length > 1 && !arr.every((n) => n === arr[0])) {
     parts.push(`${arr.join("-")} reps`);
   } else if (arr && arr.length > 1) {
@@ -59,7 +60,7 @@ function formatMovement(m: MovementRow): string {
   if (m.weight != null) parts.push(`${m.weight}${m.weight_unit ?? "lbs"}`);
   if (m.rpe != null) parts.push(`RPE ${m.rpe}`);
   if (m.time_seconds != null) parts.push(`${m.time_seconds}s`);
-  if (m.distance != null) parts.push(`${m.distance}${m.distance_unit ?? ""}`);
+  if (m.distance != null) parts.push(`${m.sets != null && m.sets > 1 && m.calories == null && m.reps == null && m.rep_scheme == null ? `${m.sets}×` : ""}${m.distance}${m.distance_unit ?? ""}`);
   const scheme = parts.length > 0 ? ` — ${parts.join(" · ")}` : "";
   const scaling = m.scaling_note ? ` (${m.scaling_note})` : "";
   return `${m.movement}${scheme}${scaling}`;

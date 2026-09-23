@@ -218,11 +218,13 @@ WORK SPECIFIER — pick exactly ONE per movement, based on what counts the work 
 
     If a single iteration covers all the work for that movement (AMRAP / EMOM / single-pass / one set), rep_scheme has ONE entry. Code uses the rounds count from block_scheme as a separate multiplier when needed.
 
-  - DISTANCE-counted (Row, Run, Swim, Ski-erg distance): set distance + distance_unit. Reps stays null, rep_scheme stays omitted — a 250m row is not "250 reps." For a "3 RFT: Row 250m, 12 Deadlift, 6 Bar MU" workout, the row movement gets distance: 250, distance_unit: 'm', reps: null. The deadlift gets rep_scheme: [12, 12, 12] and the bar muscle-up gets rep_scheme: [6, 6, 6].
+  - DISTANCE-counted (Row, Run, Swim, Ski-erg distance): set distance + distance_unit with the PER-ROUND distance. Reps stays null, rep_scheme stays omitted — a 250m row is not "250 reps." For a "3 RFT: Row 250m, 12 Deadlift, 6 Bar MU" workout, the row movement gets distance: 250, distance_unit: 'm', sets: 3 (sets = the rounds count, so the prescription carries its round structure), reps: null. The deadlift gets rep_scheme: [12, 12, 12] and the bar muscle-up gets rep_scheme: [6, 6, 6]. Single-pass distance ("Run 1 mile") → distance only, sets omitted.
 
-  - CALORIE-counted (Bike, Ski-erg calories, Cal Row): emit the typed calories field with the total calorie count (e.g. calories: 50 for "50-cal Row"). Leave reps and rep_scheme null. Leave distance null. Do NOT put calorie counts in reps or rep_scheme, and do NOT use scaling_note to signal "Calories" — calories is its own field and downstream reads it directly.
+  - CALORIE-counted (Bike, Ski-erg calories, Cal Row): emit the typed calories field with the PER-ROUND calorie count — exactly like distance. "4 rounds: 15 cal Bike" → calories: 15, sets: 4 (sets = the rounds count). Single-pass "50-cal Row" → calories: 50, sets omitted. NEVER emit the summed total across rounds (downstream multiplies by rounds; a summed total double-counts). Leave reps and rep_scheme null. Leave distance null. Do NOT put calorie counts in reps or rep_scheme, and do NOT use scaling_note to signal "Calories" — calories is its own field and downstream reads it directly.
 
   - TIME-counted (a max-effort hold for X seconds, a tabata-style work interval): set time_seconds. Reps, rep_scheme, and distance stay null.
+
+  - Movements whose rep is itself a distance (Shuttle Run, farmer/sandbag carries, sled push/drag, walking lunge for distance) MUST state the length: either distance + distance_unit when the work is measured as one continuous distance, or rep_scheme for the rep count PLUS the per-rep length in scaling_note ("25-ft shuttles", "50-ft carry"). A bare "4 shuttle runs" prescribes nothing.
 
 These categories are mutually exclusive at the movement level. A single workout can mix categories across its movements (a metcon can pair a row with deadlifts), but each movement uses exactly one.
 
