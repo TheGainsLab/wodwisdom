@@ -39,6 +39,7 @@ export interface ProgramMovementV2 {
   reps: number | null;
   rep_scheme: number[] | null;
   calories: number | null;
+  max_effort: boolean | null;
   weight: number | null;
   weight_unit: string | null;
   rpe: number | null;
@@ -80,6 +81,7 @@ export interface BlockProposalMovement {
   target_pct_1rm?: number | null;
   cardio_modality?: string | null;
   calories?: number | null;
+  max_effort?: boolean | null;
 }
 export interface BlockProposal {
   block_type: string;
@@ -267,7 +269,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
 
   // v3 add a task to a block. Block structure stays locked; only the movement
   // list grows. New row gets a placeholder name the user overwrites.
-  const MOVEMENT_SELECT = 'id, block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order';
+  const MOVEMENT_SELECT = 'id, block_id, movement, sets, reps, rep_scheme, calories, max_effort, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order';
   const addMovementToBlock = useCallback(async (blockId: string) => {
     let maxSort = -1;
     for (const blocks of v3BlocksByWorkout.values()) {
@@ -478,7 +480,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
         blockIds,
         (batch) => supabase
           .from('program_movements_v2')
-          .select('id, block_id, movement, sets, reps, rep_scheme, calories, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order')
+          .select('id, block_id, movement, sets, reps, rep_scheme, calories, max_effort, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, sort_order')
           .in('block_id', batch)
           .order('sort_order'),
       ),
@@ -998,6 +1000,9 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
  * sets×reps / total-reps form.
  */
 function formatRepPrescription(m: ProgramMovementV2): string | null {
+  // "As many as possible in the remaining window" — the block's clock does
+  // the capping; no number exists until the athlete logs one.
+  if (m.max_effort === true) return 'Max effort';
   // Calorie-counted (Cal Row / Cal Bike / Cal Ski) takes precedence — when
   // calories is populated the movement is monostructural cardio measured in
   // calories, not reps. Calories are per-round; sets carries the rounds
@@ -1472,7 +1477,7 @@ export function movementToLine(m: BlockProposalMovement): string {
   if (!hasDistance) {
     const r = formatRepPrescription({
       calories: m.calories ?? null, rep_scheme: m.rep_scheme ?? null,
-      sets: m.sets ?? null, reps: m.reps ?? null,
+      sets: m.sets ?? null, reps: m.reps ?? null, max_effort: m.max_effort ?? null,
     } as ProgramMovementV2);
     if (r) parts.push(r);
   }

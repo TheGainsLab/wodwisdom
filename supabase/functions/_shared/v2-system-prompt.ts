@@ -224,6 +224,8 @@ WORK SPECIFIER — pick exactly ONE per movement, based on what counts the work 
 
   - TIME-counted (a max-effort hold for X seconds, a tabata-style work interval): set time_seconds. Reps, rep_scheme, and distance stay null.
 
+  - MAX-EFFORT (as many reps/cals as possible in the remaining window — "max Burpees in remaining time", a max-cal finisher): set max_effort: true and NOTHING else — no reps, no rep_scheme, no calories, no time_seconds. NEVER invent a number or estimate the remaining time; the block's clock does the capping. Strict limits: metcon blocks with a bounded clock only (intervals "X on / Y off", EMOM, or a time cap), the block's LAST movement only, at most one per block. NOT for AMRAPs — in an AMRAP the ROUNDS are unbounded but each movement's per-round reps are fixed: "AMRAP 12: 10 burpees" → rep_scheme [10], never max_effort.
+
   - Movements whose rep is itself a distance (Shuttle Run, farmer/sandbag carries, sled push/drag, walking lunge for distance) MUST state the length: either distance + distance_unit when the work is measured as one continuous distance, or rep_scheme for the rep count PLUS the per-rep length in scaling_note ("25-ft shuttles", "50-ft carry"). A bare "4 shuttle runs" prescribes nothing.
 
 These categories are mutually exclusive at the movement level. A single workout can mix categories across its movements (a metcon can pair a row with deadlifts), but each movement uses exactly one.

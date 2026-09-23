@@ -30,6 +30,7 @@ interface MovementRow {
   reps: number | null;
   rep_scheme: number[] | null;
   calories: number | null;
+  max_effort?: boolean | null;
   weight: number | null;
   weight_unit: string | null;
   rpe: number | null;
@@ -43,7 +44,10 @@ interface MovementRow {
 function formatMovement(m: MovementRow): string {
   const parts: string[] = [];
   const arr: number[] | null = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
-  if (m.calories != null && m.calories > 0) {
+  if (m.max_effort === true) {
+    // "As many as possible in the remaining window" — the clock caps it.
+    parts.push("max effort in remaining time");
+  } else if (m.calories != null && m.calories > 0) {
     // Per-round calories; sets carries the rounds ("4×15 cal").
     parts.push(m.sets != null && m.sets > 1 ? `${m.sets}×${m.calories} cal` : `${m.calories} cal`);
   } else if (arr && arr.length > 1 && !arr.every((n) => n === arr[0])) {

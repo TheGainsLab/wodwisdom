@@ -85,6 +85,7 @@ function rowToMovement(m: any): MovementPrescription {
   if (m.target_pct_1rm != null) mv.target_pct_1rm = m.target_pct_1rm;
   if (m.cardio_modality != null) mv.cardio_modality = m.cardio_modality;
   if (m.calories != null) mv.calories = m.calories;
+  if (m.max_effort === true) mv.max_effort = true;
   return mv;
 }
 
@@ -111,7 +112,7 @@ export async function loadOwnedBlock(
 
   const { data: movementRows } = await supa
     .from("program_movements_v2")
-    .select("movement, sets, reps, rep_scheme, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, cardio_modality, calories, sort_order")
+    .select("movement, sets, reps, rep_scheme, weight, weight_unit, rpe, time_seconds, distance, distance_unit, scaling_note, target_pct_1rm, cardio_modality, calories, max_effort, sort_order")
     .eq("block_id", blockId)
     .order("sort_order");
 
@@ -223,6 +224,8 @@ export function buildProposeBlockEditTool(units: "lbs" | "kg", dayBlocks: DayBlo
 // ---------------------------------------------------------------------------
 
 function hasVolumeSpecifier(m: MovementPrescription): boolean {
+  // max_effort IS the volume specifier: "as many as possible in the window".
+  if (m.max_effort === true) return true;
   const positive = (v: unknown) => typeof v === "number" && v > 0;
   return positive(m.sets) || positive(m.reps) || positive(m.calories) ||
     positive(m.weight) || positive(m.time_seconds) || positive(m.distance) ||
@@ -258,7 +261,7 @@ export function validateBlockProposal(
       problems.push(`"${name}" is not in the movement vocabulary — use an exact display name from the vocabulary list.`);
     }
     if (!hasVolumeSpecifier(m)) {
-      problems.push(`"${name}" has no work specified — populate at least one of sets/reps/rep_scheme/calories/weight/time_seconds/distance.`);
+      problems.push(`"${name}" has no work specified — populate at least one of sets/reps/rep_scheme/calories/weight/time_seconds/distance, or mark it max_effort.`);
     }
   }
   return problems;
@@ -318,6 +321,7 @@ export async function applyBlockProposal(
       distance: m.distance ?? null,
       distance_unit: m.distance_unit ?? null,
       calories: m.calories ?? null,
+      max_effort: m.max_effort === true ? true : null,
       cardio_modality: m.cardio_modality ?? null,
       scaling_note: m.scaling_note ?? null,
       target_pct_1rm: m.target_pct_1rm ?? null,

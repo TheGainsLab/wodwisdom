@@ -291,6 +291,7 @@ export async function saveProgramV3(
               distance: mv.distance ?? null,
               distance_unit: mv.distance_unit ?? null,
               calories: mv.calories ?? null,
+              max_effort: mv.max_effort === true ? true : null,
               cardio_modality: mv.cardio_modality ?? null,
               scaling_note: mv.scaling_note ?? null,
               target_pct_1rm: mv.target_pct_1rm ?? null,

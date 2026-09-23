@@ -15,6 +15,7 @@ export interface DisplayMovement {
   distance?: number | null;
   distance_unit?: string | null;
   calories?: number | null;
+  max_effort?: boolean | null;
   scaling_note?: string | null;
 }
 
@@ -22,6 +23,8 @@ export interface DisplayMovement {
  *  Calories are per-round with sets carrying the rounds; legacy rows without
  *  sets render the bare number. */
 export function formatRepPrescription(m: DisplayMovement): string | null {
+  // "As many as possible in the remaining window" — no number until logged.
+  if (m.max_effort === true) return 'Max effort';
   if (m.calories != null && m.calories > 0) {
     return m.sets != null && m.sets > 1 ? `${m.sets}×${m.calories} cal` : `${m.calories} cal`;
   }
