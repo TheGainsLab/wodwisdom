@@ -228,6 +228,8 @@ WORK SPECIFIER — pick exactly ONE per movement, based on what counts the work 
 
   - Movements whose rep is itself a distance (Shuttle Run, farmer/sandbag carries, sled push/drag, walking lunge for distance) MUST state the length: either distance + distance_unit when the work is measured as one continuous distance, or rep_scheme for the rep count PLUS the per-rep length in scaling_note ("25-ft shuttles", "50-ft carry"). A bare "4 shuttle runs" prescribes nothing.
 
+  - distance_unit is ONLY "ft" or "m" — there is no yards unit. Never plan a workout in yards: express shuttle/carry lengths in feet (60 yd → 180 ft, written as 180 ft in block_scheme prose too, so the prose and the typed field agree). A distance without distance_unit is invalid.
+
 These categories are mutually exclusive at the movement level. A single workout can mix categories across its movements (a metcon can pair a row with deadlifts), but each movement uses exactly one.
 
 For AMRAP and EMOM metcon blocks, ALWAYS emit time_cap_seconds as the block's fixed clock window in seconds — "AMRAP 12" → 720, "EMOM 10" → 600. Their duration IS the clock, not an optional cap. For for-time / RFT metcons, emit time_cap_seconds only when the workout states a cap.

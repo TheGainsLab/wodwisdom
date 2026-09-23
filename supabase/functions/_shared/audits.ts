@@ -436,6 +436,13 @@ export function auditRequiredFields(output: WriterOutput): AuditResult {
               `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type}) movement[${j}] "${m.movement}": has none of {sets, reps, weight, time_seconds, distance} populated.`,
             );
           }
+          // A distance without a unit renders as a naked number ("3×60") —
+          // the writer must commit to ft or m (never yards).
+          if (m.distance != null && m.distance > 0 && (m.distance_unit !== "ft" && m.distance_unit !== "m")) {
+            violations.push(
+              `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type}) movement[${j}] "${m.movement}": distance ${m.distance} has no valid distance_unit — set "ft" or "m" (convert yards to feet).`,
+            );
+          }
         }
       }
     }
