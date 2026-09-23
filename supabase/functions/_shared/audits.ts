@@ -526,6 +526,59 @@ export function auditMaxEffort(output: WriterOutput): AuditResult {
 }
 
 // ============================================================
+// Rule — prose consistency (scheme text vs typed fields)
+// ============================================================
+
+// "@195", "@195 lbs", "@ 155/105" — an absolute load narrated into prose.
+// Percentages ("@75%") and clock references ("@2:00") are fine, hence the
+// lookahead excluding % and :.
+const PROSE_ABSOLUTE_LOAD_RE = /@\s*\d+(?:\.\d+)?(?![\d.]*\s*[%:])/;
+// "60 yd", "60-yd", "5-10-15 yd", "yards"
+const PROSE_YARDS_RE = /\b\d+(?:\s*-\s*\d+)*\s*-?\s*(?:yd|yds|yard|yards)\b/i;
+
+/**
+ * block_scheme (and scaling notes) narrate structure; the movement rows carry
+ * the computed prescription. A pound-number written into prose is authored
+ * independently of the band math, so it WILL drift from the typed weight
+ * (observed: "@195 lbs" prose beside a 220 lb row). Yards in prose split
+ * units from the typed ft/m fields the same way. Both are deterministic
+ * violations → surgical rewrites the prose.
+ */
+export function auditProseConsistency(output: WriterOutput): AuditResult {
+  const violations: string[] = [];
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        const where = `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type})`;
+        const scheme = b.block_scheme ?? "";
+        if (PROSE_ABSOLUTE_LOAD_RE.test(scheme)) {
+          violations.push(
+            `${where}: block_scheme states an absolute load ("${scheme.match(PROSE_ABSOLUTE_LOAD_RE)?.[0]}…"). The movement rows carry the computed weights — remove the pound-number from the prose (percentages like "@75%" are fine).`,
+          );
+        }
+        if (PROSE_YARDS_RE.test(scheme)) {
+          violations.push(
+            `${where}: block_scheme uses yards ("${scheme.match(PROSE_YARDS_RE)?.[0]}"). Distance prose uses ft or m, matching the typed fields — convert (60 yd → 180 ft).`,
+          );
+        }
+        const movements = safeMovements(b);
+        for (let j = 0; j < movements.length; j++) {
+          const note = movements[j].scaling_note ?? "";
+          if (note && PROSE_YARDS_RE.test(note)) {
+            violations.push(
+              `${where} movement[${j}] "${movements[j].movement}": scaling_note uses yards ("${note.match(PROSE_YARDS_RE)?.[0]}") — express the spec in ft or m.`,
+            );
+          }
+        }
+      }
+    }
+  }
+  return { rule: "prose_consistency", passed: violations.length === 0, violations };
+}
+
+// ============================================================
 // Rule — no contraindicated movements (injury safety)
 // ============================================================
 
@@ -964,6 +1017,7 @@ export const ALL_AUDITS = [
   (ctx: AuditContext): AuditResult => auditMetconBarbellLoads(ctx.output),
   (ctx: AuditContext): AuditResult => auditRequiredFields(ctx.output),
   (ctx: AuditContext): AuditResult => auditMaxEffort(ctx.output),
+  (ctx: AuditContext): AuditResult => auditProseConsistency(ctx.output),
   (ctx: AuditContext): AuditResult => auditWorkupTopSet(ctx.output),
   (ctx: AuditContext): AuditResult => auditMetconDuration(ctx.output, ctx.skeleton),
   (ctx: AuditContext): AuditResult => auditDayCount(ctx.output, ctx.daysPerWeek),
@@ -995,6 +1049,7 @@ export const AUDIT_KIND: Record<string, AuditKind> = {
   metcon_duration_matches_focus: "block-local",
   required_fields: "block-local",
   max_effort_placement: "block-local",
+  prose_consistency: "block-local",
   workup_top_set: "block-local",
   do_not_program: "block-local",
   // Structural — whole-program issues; only writer-retry can fix
