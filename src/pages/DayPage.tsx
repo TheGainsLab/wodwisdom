@@ -23,7 +23,7 @@ export default function DayPage(_props: { session: Session }) {
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [blocks, setBlocks] = useState<ProgramBlockV2[]>([]);
-  const [meta, setMeta] = useState<{ week_num: number; day_num: number; program_id: string; program_name: string } | null>(null);
+  const [meta, setMeta] = useState<{ week_num: number; day_num: number; month_number?: number | null; program_id: string; program_name: string } | null>(null);
   // Bumped when the AI Coach applies a block edit — re-runs the day fetch.
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -35,7 +35,7 @@ export default function DayPage(_props: { session: Session }) {
       const [{ data: wkRow }, { data: blockRows }] = await Promise.all([
         supabase
           .from('program_workouts')
-          .select('week_num, day_num, program_id, programs:programs!inner(name)')
+          .select('week_num, day_num, month_number, program_id, programs:programs!inner(name, generated_months)')
           .eq('id', workoutId)
           .maybeSingle(),
         supabase
@@ -46,8 +46,14 @@ export default function DayPage(_props: { session: Session }) {
       ]);
       if (!active) return;
       if (wkRow) {
-        const d = wkRow as unknown as { week_num: number; day_num: number; program_id: string; programs?: { name?: string } };
-        setMeta({ week_num: d.week_num, day_num: d.day_num, program_id: d.program_id, program_name: d.programs?.name ?? 'Program' });
+        const d = wkRow as unknown as { week_num: number; day_num: number; month_number?: number; program_id: string; programs?: { name?: string; generated_months?: number } };
+        setMeta({
+          week_num: d.week_num, day_num: d.day_num, program_id: d.program_id,
+          program_name: d.programs?.name ?? 'Program',
+          // Month shown only when the program actually spans months — a
+          // single-month program's "Mo 1" would be noise.
+          month_number: (d.programs?.generated_months ?? 1) > 1 ? (d.month_number || 1) : null,
+        });
       }
       const blks = ((blockRows as (ProgramBlockV2 & { program_workout_id: string })[] | null) ?? []).map(b => ({ ...b, movements: [] as ProgramMovementV2[] }));
       if (blks.length) {
@@ -172,7 +178,9 @@ export default function DayPage(_props: { session: Session }) {
 
   if (!workoutId) { navigate('/training-log', { replace: true }); return null; }
 
-  const title = meta ? `${meta.program_name} · Wk ${meta.week_num} Day ${meta.day_num}` : 'Training Day';
+  const title = meta
+    ? `${meta.program_name} · ${meta.month_number ? `Mo ${meta.month_number} ` : ''}Wk ${meta.week_num} Day ${meta.day_num}`
+    : 'Training Day';
 
   return (
     <div className="app-layout">
