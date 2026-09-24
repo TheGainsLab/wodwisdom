@@ -460,8 +460,6 @@ export function auditRequiredFields(output: WriterOutput): AuditResult {
 // Rule — max_effort placement
 // ============================================================
 
-const AMRAP_SCHEME_RE = /\bamrap\b|as many rounds/i;
-const BOUNDED_WINDOW_RE = /\bemom\b|e\d+mom|\d\s*(?:min|:\d{2}|s|sec\w*)?\s*on\s*[/,]?\s*\d[^a-z]*off|every\s+\d+\s*min/i;
 
 /**
  * max_effort means "as many reps/cals as possible in the remaining window" —
@@ -487,16 +485,15 @@ export function auditMaxEffort(output: WriterOutput): AuditResult {
           .filter(({ m }) => m.max_effort === true);
         if (flagged.length === 0) continue;
         const where = `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type})`;
-        const scheme = (b.block_scheme ?? "").trim();
         if (b.block_type !== "metcon") {
           violations.push(`${where}: max_effort is only valid in metcon blocks — prescribe concrete volume here.`);
         }
         // Forbid max_effort in PLAIN AMRAPs (rounds unbounded, per-round reps
-        // fixed). An interval scheme that merely says "AMRAP each interval"
-        // ("3 rounds: 4:00 on / 1:00 off, AMRAP each interval — ... then max
-        // G2OH in remaining time") is the licensed shape: the on/off window
-        // bounds it, so the keyword alone must not trip this rule.
-        if (AMRAP_SCHEME_RE.test(scheme) && !BOUNDED_WINDOW_RE.test(scheme)) {
+        // fixed). An intervals format with amrap_each_interval is the
+        // licensed shape — the on/off window bounds it. Typed check on
+        // scheme_format, no prose parsing.
+        const fmt = b.scheme_format?.format;
+        if (fmt === "amrap") {
           violations.push(`${where}: max_effort inside an AMRAP. AMRAP movements carry fixed per-round reps (rep_scheme) — the ROUNDS are what's unbounded. Remove max_effort and emit rep_scheme.`);
         }
         if (flagged.length > 1) {
@@ -505,7 +502,7 @@ export function auditMaxEffort(output: WriterOutput): AuditResult {
         if (flagged.some(({ j }) => j !== movements.length - 1)) {
           violations.push(`${where}: max_effort on a non-final movement. Only the block's LAST movement may be max_effort ("...then max reps in the remaining time").`);
         }
-        const bounded = (b.time_cap_seconds != null && b.time_cap_seconds > 0) || BOUNDED_WINDOW_RE.test(scheme);
+        const bounded = (b.time_cap_seconds != null && b.time_cap_seconds > 0) || fmt === "intervals" || fmt === "emom";
         if (!bounded) {
           violations.push(`${where}: max_effort without a bounded clock. The block needs an interval structure ("X on / Y off"), an EMOM, or a time cap — otherwise "max" has no window to fill.`);
         }
@@ -526,107 +523,94 @@ export function auditMaxEffort(output: WriterOutput): AuditResult {
 }
 
 // ============================================================
-// Rule — prose consistency (scheme text vs typed fields)
+// Rule — scheme_format validity (typed; replaces the prose-regex layer)
 // ============================================================
 
-// "@195", "@195 lbs", "@ 155/105" — an absolute load narrated into prose.
-// Clock references ("@2:00") are fine, hence the lookahead excluding :.
-const PROSE_ABSOLUTE_LOAD_RE = /@\s*\d+(?:\.\d+)?(?![\d.]*\s*:)/;
-// "60 yd", "60-yd", "5-10-15 yd", "yards"
-const PROSE_YARDS_RE = /\b\d+(?:\s*-\s*\d+)*\s*-?\s*(?:yd|yds|yard|yards)\b/i;
-// Per-movement quantities that belong to the rows (the one-copy rule):
-// "35 lb DBs" (loads without @), "82%", "4x3", "15 cal", "10 reps", "800m"/"30-ft".
-const PROSE_ROW_QUANTITY_RES: Array<{ re: RegExp; what: string }> = [
-  { re: /\b\d+(?:\.\d+)?\s*(?:lbs?|kg|#)\b/i, what: "a load" },
-  { re: /\d+(?:\.\d+)?\s*%/, what: "a percentage" },
-  { re: /\b\d+\s*[x×]\s*\d+\b/i, what: "a sets×reps count" },
-  { re: /\b\d+\s*cal(?:s|ories)?\b/i, what: "a calorie count" },
-  { re: /\b\d+\s*reps?\b/i, what: "a rep count" },
-  { re: /\b\d+(?:\.\d+)?\s*-?\s*(?:ft|feet|meters?|km|miles?|m|mi)\b/i, what: "a distance" },
-];
-// "21-15-9" (two or more hyphens) — the rounds pattern that must equal the
-// movements' varying schemes. "60-90 sec" (one hyphen) doesn't match.
-const PROSE_ROUNDS_PATTERN_RE = /\b\d+(?:-\d+){2,}\b/;
+const SCHEME_REQUIRED_BLOCK_TYPES = new Set([
+  "strength",
+  "accessory",
+  "metcon",
+  "skills",
+  "cardio",
+]);
 
-/** Block types whose scheme may not carry per-movement quantities. Cardio
- *  schemes legitimately carry pace prose ("2:00/500m splits"), so they get
- *  only the load/yards checks. */
-const ONE_COPY_BLOCK_TYPES = new Set(["strength", "accessory", "metcon", "skills"]);
+/** Per-block scheme_format problems — shared by the generation audit and
+ *  the chat-proposal validator so both paths enforce one contract. All
+ *  checks are typed comparisons; no prose parsing (project law). */
+export function blockSchemeFormatProblems(b: BlockPrescription): string[] {
+  const problems: string[] = [];
+  const sf = b.scheme_format;
+  if (!SCHEME_REQUIRED_BLOCK_TYPES.has(b.block_type)) return problems;
+  if (!sf || !sf.format) {
+    problems.push(`(${b.block_type}): scheme_format is missing — every prescription block declares its typed format (amrap/emom/rft/for_time/intervals/steady/work_sets/work_up/complex/straight_sets/rounds_ntf).`);
+    return problems;
+  }
+  const need = (cond: boolean, msg: string) => { if (!cond) problems.push(`(${b.block_type}, ${sf.format}): ${msg}`); };
+  switch (sf.format) {
+    case "amrap":
+      need(sf.minutes != null && sf.minutes > 0, "minutes is required.");
+      break;
+    case "emom": {
+      need(sf.minutes != null && sf.minutes > 0, "minutes is required.");
+      if (Array.isArray(sf.stations) && sf.stations.length > 0) {
+        const slots = sf.stations.length;
+        if (sf.minutes != null && sf.minutes % slots !== 0) {
+          problems.push(`(${b.block_type}, emom): ${sf.minutes} minutes is not a multiple of ${slots} stations — every station gets the same number of rounds (use ${Math.floor(sf.minutes / slots) * slots} or ${Math.ceil(sf.minutes / slots) * slots}).`);
+        }
+        const movementCount = (b.movements ?? []).length;
+        for (const slot of sf.stations) {
+          for (const idx of slot) {
+            if (!Number.isInteger(idx) || idx < 0 || idx >= movementCount) {
+              problems.push(`(${b.block_type}, emom): station index ${idx} does not point at a movement row (0..${movementCount - 1}).`);
+            }
+          }
+        }
+      }
+      break;
+    }
+    case "rft":
+    case "rounds_ntf":
+      need(sf.rounds != null && sf.rounds > 0, "rounds is required.");
+      break;
+    case "intervals":
+      need(sf.rounds != null && sf.rounds > 0, "rounds is required.");
+      need(sf.work_seconds != null && sf.work_seconds > 0, "work_seconds is required.");
+      need(sf.rest_seconds != null && sf.rest_seconds > 0, "rest_seconds is required.");
+      break;
+    case "for_time": {
+      const pattern = sf.rounds_pattern;
+      if (Array.isArray(pattern) && pattern.length > 1) {
+        for (const m of b.movements ?? []) {
+          for (const arr of [m.rep_scheme, m.cal_scheme, m.distance_scheme]) {
+            if (!Array.isArray(arr) || arr.length < 2) continue;
+            if (arr.every((n) => n === arr[0])) continue; // uniform — not pattern-shaped
+            if (arr.length !== pattern.length || arr.some((n, k) => n !== pattern[k])) {
+              problems.push(`(metcon, for_time): rounds_pattern [${pattern.join(",")}] does not match "${m.movement}" scheme [${arr.join(",")}] — they must be identical.`);
+            }
+          }
+        }
+      }
+      break;
+    }
+    default:
+      break; // steady / work_sets / work_up / complex / straight_sets: no required numerics
+  }
+  return problems;
+}
 
-/**
- * THE ONE-COPY RULE, enforced. block_scheme narrates structure (format,
- * clock, rest, station mapping by movement name); the movement rows carry
- * every quantity. A number written into prose is authored independently of
- * the typed row, so it WILL drift (observed: "@195 lbs" prose beside a
- * 220 lb row; "60-yd" prose beside a 180ft row). Deterministic violations →
- * surgical rewrites the prose. The rounds pattern ("21-15-9") is the one
- * number the scheme may carry, and it must exactly equal the movements'
- * varying rep/cal/distance schemes.
- */
-export function auditProseConsistency(output: WriterOutput): AuditResult {
+export function auditSchemeFormat(output: WriterOutput): AuditResult {
   const violations: string[] = [];
   for (const week of safeWeeks(output)) {
     for (const day of safeDays(week)) {
       const blocks = safeBlocks(day);
       for (let i = 0; i < blocks.length; i++) {
-        const b = blocks[i];
-        const where = `Week ${week.week_num} Day ${day.day_num} block[${i}] (${b.block_type})`;
-        const scheme = b.block_scheme ?? "";
-        if (PROSE_ABSOLUTE_LOAD_RE.test(scheme)) {
-          violations.push(
-            `${where}: block_scheme states an absolute load ("${scheme.match(PROSE_ABSOLUTE_LOAD_RE)?.[0]}…"). The movement rows carry the computed weights — remove the number from the prose.`,
-          );
-        }
-        if (PROSE_YARDS_RE.test(scheme)) {
-          violations.push(
-            `${where}: block_scheme uses yards ("${scheme.match(PROSE_YARDS_RE)?.[0]}"). Distance prose uses ft or m, matching the typed fields — convert (60 yd → 180 ft).`,
-          );
-        }
-        if (ONE_COPY_BLOCK_TYPES.has(b.block_type)) {
-          // Strip the rounds pattern first so "21-15-9 for time" isn't
-          // misread by the quantity regexes.
-          const schemeSansPattern = scheme.replace(PROSE_ROUNDS_PATTERN_RE, "");
-          for (const { re, what } of PROSE_ROW_QUANTITY_RES) {
-            const hit = schemeSansPattern.match(re);
-            if (hit) {
-              violations.push(
-                `${where}: block_scheme states ${what} ("${hit[0]}") — the one-copy rule: quantities live ONLY on the movement rows. Keep the scheme to format + clock + rest + station assignments by movement name (e.g. "AMRAP 13", "EMOM 10 — odd: Handstand Walk, even: Wall Walks", "Work sets across. 2 min rest between sets.").`,
-              );
-              break; // one message per block is enough for surgical
-            }
-          }
-          // Rounds pattern ↔ varying schemes cross-check.
-          const patternHit = scheme.match(PROSE_ROUNDS_PATTERN_RE);
-          if (patternHit) {
-            const pattern = patternHit[0].split("-").map((n) => parseInt(n, 10));
-            const movements = safeMovements(b);
-            for (let j = 0; j < movements.length; j++) {
-              const m = movements[j];
-              for (const arr of [m.rep_scheme, m.cal_scheme, m.distance_scheme]) {
-                if (!Array.isArray(arr) || arr.length < 2) continue;
-                if (arr.every((n) => n === arr[0])) continue; // uniform — not scheme-shaped
-                if (arr.length !== pattern.length || arr.some((n, k) => n !== pattern[k])) {
-                  violations.push(
-                    `${where} movement[${j}] "${m.movement}": scheme pattern "${patternHit[0]}" does not match the movement's varying scheme [${arr.join(",")}] — they must be identical.`,
-                  );
-                }
-              }
-            }
-          }
-        }
-        const movements = safeMovements(b);
-        for (let j = 0; j < movements.length; j++) {
-          const note = movements[j].scaling_note ?? "";
-          if (note && PROSE_YARDS_RE.test(note)) {
-            violations.push(
-              `${where} movement[${j}] "${movements[j].movement}": scaling_note uses yards ("${note.match(PROSE_YARDS_RE)?.[0]}") — express the spec in ft or m.`,
-            );
-          }
+        for (const p of blockSchemeFormatProblems(blocks[i])) {
+          violations.push(`Week ${week.week_num} Day ${day.day_num} block[${i}] ${p}`);
         }
       }
     }
   }
-  return { rule: "prose_consistency", passed: violations.length === 0, violations };
+  return { rule: "scheme_format_valid", passed: violations.length === 0, violations };
 }
 
 // ============================================================
@@ -1068,7 +1052,7 @@ export const ALL_AUDITS = [
   (ctx: AuditContext): AuditResult => auditMetconBarbellLoads(ctx.output),
   (ctx: AuditContext): AuditResult => auditRequiredFields(ctx.output),
   (ctx: AuditContext): AuditResult => auditMaxEffort(ctx.output),
-  (ctx: AuditContext): AuditResult => auditProseConsistency(ctx.output),
+  (ctx: AuditContext): AuditResult => auditSchemeFormat(ctx.output),
   (ctx: AuditContext): AuditResult => auditWorkupTopSet(ctx.output),
   (ctx: AuditContext): AuditResult => auditMetconDuration(ctx.output, ctx.skeleton),
   (ctx: AuditContext): AuditResult => auditDayCount(ctx.output, ctx.daysPerWeek),
@@ -1100,7 +1084,7 @@ export const AUDIT_KIND: Record<string, AuditKind> = {
   metcon_duration_matches_focus: "block-local",
   required_fields: "block-local",
   max_effort_placement: "block-local",
-  prose_consistency: "block-local",
+  scheme_format_valid: "block-local",
   workup_top_set: "block-local",
   do_not_program: "block-local",
   // Structural — whole-program issues; only writer-retry can fix

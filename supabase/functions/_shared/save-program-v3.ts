@@ -12,6 +12,7 @@
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { WriterOutput } from "./v2-output-schema.ts";
+import { composeBlockScheme } from "./compose-block-scheme.ts";
 import type { SkeletonOutput } from "./v3-output-schema.ts";
 
 interface InsertedWorkout {
@@ -254,11 +255,16 @@ export async function saveProgramV3(
         const skDay = skelDayByKey.get(`${week.week_num}-${day.day_num}`);
         for (let bIdx = 0; bIdx < day.blocks.length; bIdx++) {
           const b = day.blocks[bIdx];
+          // The header renders from the typed format + rows (one-copy rule);
+          // fall back to model text only for paths without scheme_format
+          // (program ingest transcribes imported text).
+          const renderedScheme = composeBlockScheme(b.scheme_format, b.movements ?? [], b.time_cap_seconds);
           blockInserts.push({
             program_workout_id: w.id,
             block_type: b.block_type,
             block_label: b.block_label ?? null,
-            block_scheme: b.block_scheme ?? null,
+            block_scheme: renderedScheme ?? b.block_scheme ?? null,
+            scheme_format: b.scheme_format ?? null,
             time_cap_seconds: b.time_cap_seconds ?? null,
             block_notes: b.block_notes ?? null,
             cardio_modality: b.cardio_modality ?? null,

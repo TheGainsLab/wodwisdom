@@ -34,6 +34,8 @@ import {
 } from "./build-writer-payload.ts";
 import { buildRecentLoadLine, fetchOutsideTraining } from "./athlete-activities.ts";
 import { computeBlockBenchmark } from "./compute-block-benchmark.ts";
+import { composeBlockScheme } from "./compose-block-scheme.ts";
+import { blockSchemeFormatProblems } from "./audits.ts";
 import { normalizeGender } from "./metcon-workcalc.ts";
 
 // ---------------------------------------------------------------------------
@@ -100,7 +102,7 @@ export async function loadOwnedBlock(
 ): Promise<{ original: BlockPrescription; programWorkoutId: string } | null> {
   const { data: block } = await supa
     .from("program_blocks_v2")
-    .select("id, program_workout_id, block_type, block_label, block_scheme, time_cap_seconds, block_notes, cardio_modality")
+    .select("id, program_workout_id, block_type, block_label, block_scheme, scheme_format, time_cap_seconds, block_notes, cardio_modality")
     .eq("id", blockId)
     .maybeSingle();
   if (!block) return null;
@@ -122,6 +124,7 @@ export async function loadOwnedBlock(
     block_type: block.block_type,
     ...(block.block_label != null ? { block_label: block.block_label } : {}),
     ...(block.block_scheme != null ? { block_scheme: block.block_scheme } : {}),
+    ...(block.scheme_format != null ? { scheme_format: block.scheme_format } : {}),
     ...(block.time_cap_seconds != null ? { time_cap_seconds: block.time_cap_seconds } : {}),
     ...(block.block_notes != null ? { block_notes: block.block_notes } : {}),
     ...(block.cardio_modality != null ? { cardio_modality: block.cardio_modality } : {}),
@@ -243,6 +246,7 @@ export function validateBlockProposal(
   opts: { doNotProgram: string[]; vocabulary: string[] },
 ): string[] {
   const problems: string[] = [];
+  problems.push(...blockSchemeFormatProblems(proposal));
   const movements = proposal.movements ?? [];
   if (movements.length === 0) {
     problems.push("The proposed block has no movements.");
@@ -310,7 +314,8 @@ export async function applyBlockProposal(
   const { error: bErr } = await supa.from("program_blocks_v2").update({
     block_type: proposal.block_type,
     block_label: proposal.block_label ?? null,
-    block_scheme: proposal.block_scheme ?? null,
+    block_scheme: composeBlockScheme(proposal.scheme_format, proposal.movements ?? [], proposal.time_cap_seconds) ?? proposal.block_scheme ?? null,
+    scheme_format: proposal.scheme_format ?? null,
     time_cap_seconds: proposal.time_cap_seconds ?? null,
     block_notes: proposal.block_notes ?? null,
     cardio_modality: proposal.cardio_modality ?? null,

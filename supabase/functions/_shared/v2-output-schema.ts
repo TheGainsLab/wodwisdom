@@ -133,21 +133,70 @@ export interface MovementPrescription {
   calories?: number;
 }
 
+/** The typed workout-format vocabulary. Free-text schemes are retired for
+ *  generated blocks: the model fills these fields and code renders the
+ *  header (compose-block-scheme.ts), so the header and the movement rows
+ *  cannot disagree — the one-copy rule as a type, not a rule. */
+export const SCHEME_FORMATS = [
+  "amrap", // as many rounds as possible in `minutes`
+  "emom", // every minute on the minute for `minutes`; optional `stations`
+  "rft", // `rounds` rounds for time
+  "for_time", // single pass for time; `rounds_pattern` for 21-15-9-style
+  "intervals", // `rounds` × (`work_seconds` on / `rest_seconds` off)
+  "steady", // steady-state cardio; optional pace_note
+  "work_sets", // strength fixed work sets across
+  "work_up", // build to a heavy top set (row carries target)
+  "complex", // N sets of a bracketed barbell complex
+  "straight_sets", // accessory straight sets
+  "rounds_ntf", // `rounds` quality rounds, not for time
+] as const;
+export type SchemeFormatName = typeof SCHEME_FORMATS[number];
+
+export interface SchemeFormat {
+  format: SchemeFormatName;
+  /** Total clock minutes — amrap and emom. */
+  minutes?: number;
+  /** Rounds — rft, intervals, rounds_ntf. */
+  rounds?: number;
+  /** Interval work window, seconds. */
+  work_seconds?: number;
+  /** Interval rest window / rest between sets, seconds. */
+  rest_seconds?: number;
+  /** Top of a rest range ("60–90 sec") — rest_seconds is the bottom. */
+  rest_seconds_max?: number;
+  /** for_time ladder pattern ([21,15,9]); MUST equal the movements'
+   *  varying rep_scheme/cal_scheme arrays (audited). */
+  rounds_pattern?: number[];
+  /** emom minute-slot assignments as movement INDEXES: [[0],[1],[2]] =
+   *  min 1 → movements[0], min 2 → movements[1], min 3 → movements[2],
+   *  rotating. Two slots render odd/even. */
+  stations?: number[][];
+  /** intervals: each work window is AMRAP-style ("AMRAP each interval"). */
+  amrap_each_interval?: boolean;
+  /** emom: append "Rest remainder of each minute." */
+  rest_remainder?: boolean;
+  /** steady/intervals cardio only: a short pace cue ("conversational pace"). */
+  pace_note?: string;
+}
+
 /**
- * A block within a day. block_scheme + time_cap let the writer
- * describe metcon shape ("21-15-9 for time", "AMRAP 12") without
- * mangling per-movement reps.
+ * A block within a day. scheme_format + time_cap let the writer
+ * describe metcon shape without mangling per-movement reps; code
+ * renders the human header from them.
  */
 export interface BlockPrescription {
   block_type: BlockType;
   /** Optional human label ("Primary Strength", "Conditioning"). */
   block_label?: string;
   /**
-   * Optional scheme description — primarily for metcons + strength
-   * complexes ("21-15-9 for time", "AMRAP 12", "5x5 @75%", "EMOM 10",
-   * "Every 90s × 8"). Plain text; the writer phrases it naturally.
+   * Rendered scheme header ("21-15-9 for time (7-min cap)"). MACHINE-WRITTEN
+   * for generated blocks (composeBlockScheme at save/apply); the model emits
+   * scheme_format instead. Still model-written on the ingest path, where
+   * imported text is transcribed.
    */
   block_scheme?: string;
+  /** Typed workout format — the single source the header renders from. */
+  scheme_format?: SchemeFormat;
   /**
    * The block's clock window in seconds — a stated time cap OR a fixed
    * duration. Always set for AMRAP ("AMRAP 12" → 720) and EMOM
@@ -282,13 +331,35 @@ function blockTimeCapMax(sessionLengthMinutes: number | null): number {
   return Math.max(60, cap);
 }
 
+function buildSchemeFormatSchema() {
+  return {
+    type: "object",
+    description: "The block's workout format as TYPED fields — code renders the human header from these plus the movement rows, so never restate movement quantities anywhere. REQUIRED for strength/accessory/metcon/skills/cardio blocks. Per-format fields: amrap → minutes. emom → minutes (+ stations as movement-INDEX slots, [[0],[1],[2]] = min 1/2/3 rotating — minutes MUST be a multiple of the slot count; + rest_remainder). rft → rounds. for_time → rounds_pattern for 21-15-9-style ladders (must exactly equal the movements' varying rep_scheme/cal_scheme). intervals → rounds + work_seconds + rest_seconds (+ amrap_each_interval). steady → optional pace_note. work_sets → rest_seconds. work_up → nothing (the top-set row carries the target). complex → rest_seconds. straight_sets → rest_seconds (+ rest_seconds_max for a 60–90s range). rounds_ntf → rounds.",
+    properties: {
+      format: { type: "string", enum: SCHEME_FORMATS },
+      minutes: { type: "integer", minimum: 1, maximum: 120 },
+      rounds: { type: "integer", minimum: 1, maximum: 50 },
+      work_seconds: { type: "integer", minimum: 10, maximum: 3600 },
+      rest_seconds: { type: "integer", minimum: 5, maximum: 1200 },
+      rest_seconds_max: { type: "integer", minimum: 10, maximum: 1200 },
+      rounds_pattern: { type: "array", items: { type: "integer", minimum: 1, maximum: 200 }, minItems: 2, maxItems: 10 },
+      stations: { type: "array", items: { type: "array", items: { type: "integer", minimum: 0, maximum: 19 }, minItems: 1, maxItems: 4 }, minItems: 2, maxItems: 6 },
+      amrap_each_interval: { type: "boolean" },
+      rest_remainder: { type: "boolean" },
+      pace_note: { type: "string", maxLength: 80, description: "Cardio only — a short pace cue ('conversational pace'). NEVER numbers a movement row carries." },
+    },
+    required: ["format"],
+    additionalProperties: false,
+  };
+}
+
 function buildBlockSchema(units: "lbs" | "kg", sessionLengthMinutes: number | null) {
   return {
     type: "object",
     properties: {
       block_type: { type: "string", enum: BLOCK_TYPES },
       block_label: { type: "string", maxLength: 100 },
-      block_scheme: { type: "string", maxLength: 200 },
+      scheme_format: buildSchemeFormatSchema(),
       time_cap_seconds: { type: "integer", minimum: 60, maximum: blockTimeCapMax(sessionLengthMinutes) },
       block_notes: { type: "string", maxLength: 500 },
       movements: {

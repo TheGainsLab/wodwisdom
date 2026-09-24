@@ -220,7 +220,7 @@ RULES (honor every one):
 - Pick exactly ONE work specifier per movement: rep-counted → emit rep_scheme as the per-iteration breakdown ([21,15,9] chipper, [15,15,15] for 3 RFT, [100] single-pass, [10] one AMRAP round); do NOT also set reps. distance-counted → distance + distance_unit with the PER-ROUND distance (unit is ONLY "ft" or "m" — never yards; convert 60 yd → 180 ft, in the prose too), and sets = the rounds count in a multi-round block ("3 RFT: Row 250m" → distance 250, sets 3). calorie-counted (Cal Row / Cal Bike / Cal Ski-erg) → the \`calories\` field with the PER-ROUND calories, same convention ("4 rounds: 15 cal Bike" → calories 15, sets 4); NEVER the summed total across rounds, and NEVER encode calories as reps/rep_scheme. When per-round calories/distance VARY with the scheme, use cal_scheme / distance_scheme ("21-15-9 cal bike" → cal_scheme [21,15,9], calories and sets null — code derives the total).
 - Do NOT change how a movement measures work from how it currently stands: if the movement uses distance, keep distance; if calories, keep calories; if reps, keep reps. Never silently convert a "Row 500m" into reps or calories — preserve the measure UNLESS the athlete explicitly asks to change it.
 - A rotating-station EMOM's minute count must be a multiple of its station count (3 stations → EMOM 12 or 15, never 14) — every station gets the same number of rounds.
-- ONE-COPY RULE: block_scheme carries NO per-movement quantities — no loads, percentages, calories, reps, or distances ("AMRAP 13", not "AMRAP 13 — 15 cal Row / 10 Deadlift @195 lbs"); the movement rows own every number. block_scheme keeps only format + clock + rounds pattern + rest + station assignments by movement NAME. Distance prose uses ft or m, never yards.
+- scheme_format is REQUIRED and TYPED — you do not write a header sentence; code renders the athlete-facing header from scheme_format + the movement rows. Pick the format and fill only its fields: amrap→minutes; emom→minutes (+ stations as movement-index slots, minutes a multiple of the slot count; rest_remainder); rft→rounds; for_time→rounds_pattern for 21-15-9 ladders (must equal the varying movement schemes exactly); intervals→rounds+work_seconds+rest_seconds (+amrap_each_interval); steady→pace_note; work_sets/straight_sets/complex→rest_seconds (+rest_seconds_max); work_up→nothing (the top-set row carries the target); rounds_ntf→rounds. Never emit block_scheme text. Distance prose (scaling_note specs) uses ft or m, never yards.
 - Every movement must populate at least one of {sets, reps, rep_scheme, calories, weight, time_seconds, distance} > 0 — OR carry max_effort: true. max_effort means "as many reps/cals as possible in the remaining window" (a finisher inside a bounded clock): set NO volume fields with it, never invent a number. Metcon blocks with a bounded clock only, LAST movement only, at most one per block, never in AMRAPs (AMRAP movements keep fixed per-round reps via rep_scheme).
 
 Emit ONLY the revised block via the emit_block tool. No prose outside the tool call.`;
@@ -286,7 +286,7 @@ async function handleBlockPropose(
 
   const { data: block, error: bErr } = await supa
     .from("program_blocks_v2")
-    .select("id, program_workout_id, block_type, block_label, block_scheme, time_cap_seconds, block_notes, cardio_modality")
+    .select("id, program_workout_id, block_type, block_label, block_scheme, scheme_format, time_cap_seconds, block_notes, cardio_modality")
     .eq("id", block_id)
     .single();
   if (bErr || !block) return json({ error: "Block not found" }, cors, 404);
@@ -312,6 +312,7 @@ async function handleBlockPropose(
     block_type: block.block_type,
     ...(block.block_label != null ? { block_label: block.block_label } : {}),
     ...(block.block_scheme != null ? { block_scheme: block.block_scheme } : {}),
+    ...(block.scheme_format != null ? { scheme_format: block.scheme_format } : {}),
     ...(block.time_cap_seconds != null ? { time_cap_seconds: block.time_cap_seconds } : {}),
     ...(block.block_notes != null ? { block_notes: block.block_notes } : {}),
     ...(block.cardio_modality != null ? { cardio_modality: block.cardio_modality } : {}),

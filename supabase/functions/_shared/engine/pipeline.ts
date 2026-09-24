@@ -20,6 +20,7 @@ import type { TrainingDesignInput } from "../training-design-input.ts";
 import type { SkeletonOutput } from "../v3-output-schema.ts";
 import type { WriterOutput, WeekPrescription } from "../v2-output-schema.ts";
 import type { SkeletonAuditResult } from "../v3-skeleton-audits.ts";
+import { renderBlockSchemeInPlace } from "../compose-block-scheme.ts";
 import type { runAudits } from "../audit-runner.ts";
 import type { BlockLocation } from "../compute-block-benchmark.ts";
 import type { Gender } from "../compute-benchmarks.ts";
@@ -435,6 +436,9 @@ export async function applySurgicalFixes(
       payload, skeleton, g.week, g.day, g.blockIdx, block, g.violations,
     );
     if (!corrected) { failed++; continue; }
+    // Corrected blocks carry scheme_format; render the header before splicing
+    // so re-audit and save see the final string.
+    renderBlockSchemeInPlace(corrected);
 
     if (pack.recovery.spliceBlock(output, g.week, g.day, g.blockIdx, corrected)) {
       rewritten++;
