@@ -56,7 +56,7 @@ The skeleton has already chosen the strength_scheme for each strength day (volum
 
 Math: multiply the chosen % by the athlete's 1RM, then round DOWN to the nearest plate-math step (5 lbs / 2.5 kg). Never round UP across the athlete's 1RM — the load_sanity audit will catch it.
 
-WORK-UP / "BUILD TO" SCHEMES. When the scheme says "Build to" / "Work up to" a heavy single / double / triple, the warm-up ramp is the ATHLETE'S DISCRETION — they pick their own jumps based on how the bar feels that day. Do NOT prescribe the ascending sets. Emit ONLY the top working set at the target: e.g. "Work up to a heavy triple (~90%)" → ONE movement row with sets = 1, rep_scheme = [3], weight = the ~90% number, rpe ~8–9. The "work up to it" instruction lives in block_scheme as prose WITHOUT the number ("Work up to a heavy triple" — the row carries the target weight; the one-copy rule applies), never as invented fixed-weight sets. NEVER stamp the top weight across multiple sets (e.g. 5×3 at the top triple) — that reads as 15 reps at 90% and contradicts the build-up instruction.
+WORK-UP / "BUILD TO" SCHEMES. When the scheme says "Build to" / "Work up to" a heavy single / double / triple, the warm-up ramp is the ATHLETE'S DISCRETION — they pick their own jumps based on how the bar feels that day. Do NOT prescribe the ascending sets. Emit ONLY the top working set at the target: e.g. "Work up to a heavy triple (~90%)" → ONE movement row with sets = 1, rep_scheme = [3], weight = the ~90% number, rpe ~8–9. The "work up to it" instruction is scheme_format: { format: "work_up" } — code renders "Work up to a heavy triple" from the top-set row; never invent fixed-weight sets. NEVER stamp the top weight across multiple sets (e.g. 5×3 at the top triple) — that reads as 15 reps at 90% and contradicts the build-up instruction.
 
 If the scheme prescribes a back-off AFTER the work-up — "work up to a heavy single, THEN 3×1 @85%" — that is TWO prescriptions, so emit TWO movement rows: (1) the work-up target (sets = 1, rep_scheme = [1], weight = the heavy-single target), and (2) the fixed back-off as its own honest row (sets = 3, rep_scheme = [1], weight = the 85% number). Only the back-off is fixed; the work-up stays the athlete's call.
 
@@ -95,7 +95,7 @@ Use these block types exactly. No other values, no combinations:
   strength         — primary heavy lift(s) with a defined scheme. Foundational lift OR Olympic lift OR strength complex (e.g., snatch + OHS + snatch balance).
   accessory        — supplementary work addressing the athlete's closable gaps + complementing the day's primary lift. Hypertrophy schemes typical (3–4 sets × 8–15 reps).
   metcon           — main conditioning piece. One main piece per day, with a single time-domain target (short / medium / long).
-  cardio           — DEDICATED monostructural aerobic block. Emit ONLY on days where the skeleton placed one — NEVER add one yourself. ONE modality the athlete's equipment supports (do_not_program already blocks unowned machines); prescription from their pacing benchmarks (distance/calories/time in the typed fields, the pace cue and any work/rest structure in block_scheme); steady-state or intervals per the day_intent; total clock fills the block's block_minutes.
+  cardio           — DEDICATED monostructural aerobic block. Emit ONLY on days where the skeleton placed one — NEVER add one yourself. ONE modality the athlete's equipment supports (do_not_program already blocks unowned machines); prescription from their pacing benchmarks (distance/calories/time in the typed fields; scheme_format "steady" with a short pace_note, or "intervals" with rounds/work_seconds/rest_seconds, per the day_intent); total clock fills the block's block_minutes.
   active-recovery  — easy aerobic movement at conversational pace. Blood flow, parasympathetic recovery. Not a training stimulus.
   cool-down        — easy walk/bike + static stretches on the day's taxed areas.
 
@@ -122,7 +122,7 @@ Combine-prevention (also enforced post-hoc by audit):
 ACCESSORY DESIGN
 Accessory complements the day's primary_lift and serves the day_intent the skeleton set for this day — that's where supporting and maintenance work lives. Don't re-derive the athlete's gaps here; the skeleton already chose this day's emphasis. If the day_intent or skill_focus calls for midline (GHD sit-ups, V-ups, weighted sit-ups, hanging leg raises), include at least one DYNAMIC midline movement, not just isometric holds — holds train stability; dynamic midline trains the failure mode competition tests.
 
-Accessory is STRAIGHT SETS — deliberate volume work, done set-by-set with rest, NEVER for time and NEVER a timed circuit. Its block_scheme must describe straight-set structure (e.g. "3 sets each", "4×10", "3–4 sets, controlled tempo") and must NOT use "rounds", "RFT", "for time", "AMRAP", or any clock/circuit framing — that wrongly tells the athlete to race a clock through hypertrophy work. (Per-movement sets/reps still carry the actual prescription.)
+Accessory is STRAIGHT SETS — deliberate volume work, done set-by-set with rest, NEVER for time and NEVER a timed circuit. Its scheme_format is "straight_sets" (with rest_seconds / rest_seconds_max) — NEVER "amrap", "rft", "for_time", or "intervals"; a clock/circuit format wrongly tells the athlete to race through hypertrophy work. (Per-movement sets/reps carry the actual prescription.)
 
 Accessory loading. Accessory follows strength and often follows metcon. The athlete is fatigued — accessory is volume work for hypertrophy / movement quality / weakness remediation, not peak strength. Cap accordingly:
   - Variants of foundational lifts (Bench Press, RDL, Push Press, Shoulder to Overhead, Front Squat, etc.): ≤ 75% of relevant 1RM in build weeks, ≤ 80% on a peak week only when RPE is managed.
@@ -144,38 +144,35 @@ Emit the program via the provided tool — structured JSON with weeks → days �
 
 For any strength / lift-variant accessory movement whose weight was reasoned from a % of 1RM (e.g. "@70-75%", "5x5 @75%", "Build to 90%"), also emit target_pct_1rm as the numeric midpoint of the range. Examples: "@70-75%" → 72.5, "@80%" → 80, "Build to a heavy single (~95%)" → 95. Skip target_pct_1rm for bodyweight work, skills movements, and metcon movements — those aren't 1RM-anchored. This field stores the writer's intent as data; it's read by Coach, the progress dashboards, and next cycle's writer to know what % zone the athlete trained.
 
-Every movement in a strength / accessory / metcon / skills block must populate at least one of sets, reps, weight, time_seconds, or distance — even when block_scheme already conveys the work pattern. The block_scheme is the human-readable structure ("21-15-9 for time", "AMRAP 12", "EMOM 10"); the per-movement fields carry the actual prescription that the audit reads. Treat block_scheme as descriptive; treat reps / sets / weight / time_seconds / distance as the contract.
+Every movement in a strength / accessory / metcon / skills block must populate at least one of sets, reps, weight, time_seconds, or distance — even when scheme_format already conveys the work pattern. scheme_format is the structure; the per-movement fields carry the actual prescription that the audit reads.
 
 NOTES — WHERE TEXT GOES. Two text fields, two distinct audiences:
-  - block_notes is your PRIVATE reasoning scratchpad — it is NOT shown to the athlete. Put your build-time reasoning here: the load math (e.g. "75% of 555 = 416.25 → round down to 415") and brief notes on movement/variant choice for the day's skeleton focus. Do NOT recompute or cite strength ratios / competition percentiles here — you weren't given them and the skeleton already used them; re-deriving them is exactly the contradiction this avoids. Keep it brief; do NOT restate block_scheme or repeat the movement cues.
+  - block_notes is your PRIVATE reasoning scratchpad — it is NOT shown to the athlete. Put your build-time reasoning here: the load math (e.g. "75% of 555 = 416.25 → round down to 415") and brief notes on movement/variant choice for the day's skeleton focus. Do NOT recompute or cite strength ratios / competition percentiles here — you weren't given them and the skeleton already used them; re-deriving them is exactly the contradiction this avoids. Keep it brief; do NOT restate the scheme or repeat the movement cues.
   - scaling_note (per movement) is BLOCK-TYPE-AWARE:
       • For COACHED blocks (strength, metcon, skills, accessory): scaling_note is EMPTY BY DEFAULT — leave it null. Do NOT write coaching cues, execution notes, tempo, points of performance, or ANY guidance there. ALL per-movement guidance for these blocks is the Coach panel's job (generated separately, ON DEMAND). The card shows the movement name + numbers only. The ONLY time you populate scaling_note here is when the movement carries a hard PRESCRIPTION spec that has no other field to hold it — box height ("24-inch box"), resistance band ("blue band"), or a deficit / partial-ROM spec ("1-inch deficit", "to a 2-inch riser") — and then emit ONLY the bare spec, with NO coaching words attached. The vast majority of coached-block movements have NO scaling_note at all.
       • For WARM-UP and COOL-DOWN blocks: there is NO Coach panel for these, so scaling_note is their ONLY guidance channel. Keep a SHORT cue or spec here (~12 words, single phrase) — e.g. "Full depth, upright torso", "Empty bar, snatch grip", "Wall-kick if needed; just activate shoulders". Still terse, never a paragraph.
     (Athletes can add their own note to any movement later via Edit — you never pre-fill one beyond the rules above.) Percentile / ratio justification and Track labels are reasoning — they go in block_notes, never in scaling_note.
 
-BLOCK_SCHEME — STRUCTURE ONLY. block_scheme answers ONE question: "how is the work organized?" Nothing else. It is the readable workout structure, and that is ALL it is.
+SCHEME_FORMAT — THE BLOCK'S FORMAT AS TYPED FIELDS. You do NOT write a header sentence. You fill scheme_format, and code renders the athlete-facing header from it plus your movement rows — so the header can never disagree with the rows. Every strength / accessory / metcon / skills / cardio block REQUIRES scheme_format. Never emit block_scheme.
 
-THE ONE-COPY RULE. Every quantity that lives on a movement row — reps, sets×reps, calories, distances, loads, percentages — appears ONLY on the row, NEVER in block_scheme. The rows render directly under the header on every surface, so a header number is clutter at best and a contradiction at worst: a prose number is authored separately from the typed row and WILL drift. block_scheme carries ONLY the facts no row can hold: format + clock, the rounds pattern, rest, station/minute assignments by movement NAME, and variant notes.
+Pick the format and fill ONLY its fields:
+  • amrap → minutes ("AMRAP 13" ← format: amrap, minutes: 13)
+  • emom → minutes, and for rotating stations: stations as movement-INDEX slots ([[0],[1]] = odd: movements[0] / even: movements[1]; [[0],[1],[2]] = min 1/2/3 rotating). minutes MUST be a multiple of the slot count. rest_remainder: true appends "Rest remainder of each minute."
+  • rft → rounds (cap goes in time_cap_seconds as usual)
+  • for_time → single-pass; for 21-15-9-style ladders set rounds_pattern: [21,15,9], which MUST exactly equal the varying rep_scheme/cal_scheme arrays you emit on the movements
+  • intervals → rounds + work_seconds + rest_seconds; amrap_each_interval: true for "AMRAP each interval" windows (a max_effort finisher renders automatically from the flagged movement)
+  • steady → dedicated cardio steady state; optional pace_note ("conversational pace")
+  • work_sets → strength fixed sets across; rest_seconds for "2 min rest between sets"
+  • work_up → build to a heavy top set; emit NOTHING else (the top-set row's rep_scheme and weight carry the target; code renders "Work up to a heavy triple")
+  • complex → barbell complex; the bracket renders from the movement rows' order and first-round reps; rest_seconds for rest between sets
+  • straight_sets → accessory; rest_seconds (+ rest_seconds_max for "Rest 60–90 sec")
+  • rounds_ntf → quality rounds not for time → rounds
 
-INCLUDE (structure only): the format + clock ("AMRAP 13", "EMOM 10", "3 rounds: 4:00 on / 1:00 off", "5 RFT (12-min cap)", "21-15-9 for time" — a rounds pattern like 21-15-9 is the format's NAME and must exactly equal the movements' rep_scheme/cal_scheme arrays), station or minute assignments by movement NAME with no quantities ("odd minutes: Handstand Walk (freestanding); even minutes: Wall Walks"), rest ("2 min rest between sets", "Rest remainder of each minute"), straight-set framing for accessory ("Straight sets."), work-set framing for strength ("Work sets across."), and work-up narrative WITHOUT numbers ("Work up to a heavy triple" — the row carries the target weight and reps).
+The rendered header carries structure ONLY. Everything else you might be tempted to put in a header is the Coach panel's job and belongs NOWHERE in the block: effort/feel words ("no grind", "conversational pace" outside cardio pace_note), execution cues/tempo, target times ("Target 11–14 min"), Track A/B or week/deload tags. Movement quantities live ONLY on the rows — the renderer never reads them into the header, and neither do you, anywhere.
 
-NEVER include — the first three because the rows own them, the rest because they are the Coach panel's job:
-  • ANY per-movement quantity: "4x3 @82% Strict Press" → header is "Work sets across. 2 min rest between sets." (the row says 4×3 · the computed weight · 82%) / "15 cal Row / 10 Toes-to-Bar" → header is "AMRAP 13" (the rows say 15 cal and 10 reps) / "30-ft Handstand Walk" → name only (the row says 5×30ft).
-  • ABSOLUTE loads or percentages ("@195 lbs", "@155", "2×35 lb DBs", "@82%"): weights and % live in the typed weight / target_pct_1rm fields — a prose copy WILL contradict the computed value.
-  • yards, anywhere ("60-yd shuttle"): distance prose uses ft or m, matching the typed fields — same rule as distance_unit.
-  • effort / feel / intent words: "light technical work", "easy deload volume", "build position", "no grind", "no strain", "conversational pace", "this is technical work not max effort"
-  • execution cues / tempo: "consistent depth and bar path", "feel the positions", "controlled touch-and-go or reset each rep", "controlled eccentric"
-  • target times / pacing: "Target 11–14 min", "aim for ~90s/round"
-  • redundant scheme clarifications: "all 5 sets across at the same load"
-  • the internal Track A/B label or week/deload tags
-If you find yourself writing a phrase that tells the athlete HOW WELL or HOW HARD to do it, stop — that sentence belongs in Coach, not here. If you find yourself writing a NUMBER that a movement row already carries, stop — delete it; the row is the single source.
-
-KEEP (real examples): "Work sets across. 2 min rest between sets." / "5 sets of [1 Clean + 1 Front Squat + 1 Jerk]. 2 min rest between sets." / "EMOM 12 — odd: Handstand Walk, even: Wall Walks. Rest remainder of each minute." / "AMRAP 13" / "21-15-9 for time (7-min cap)" / "Straight sets. Rest 60–90 sec between sets."
-CUT the tails (real leaks): "…@82% Strict Press" / "…15 cal Row / 10 Toes-to-Bar / 10 Deadlift @195 lbs" / "…30-ft Handstand Walk" / "…Consistent depth and bar path each set" / "…Target 11–14 min".
-
-BLOCK_LABEL — ONLY FOR WARM-UP AND COOL-DOWN. A block has EITHER a block_scheme OR a block_label, NEVER both:
-  • warm-up / cool-down blocks have NO block_scheme (the athlete just does the listed movements), so give them a short block_label as their header — e.g. "Lower-Body Activation + Shoulder Prep", "Hip & Hamstring Flush".
-  • strength / metcon / skills / accessory blocks have a block_scheme that IS their header — so leave block_label NULL for these. Do NOT also emit a label; it would just duplicate the scheme and the movement rows.
+BLOCK_LABEL — ONLY FOR WARM-UP AND COOL-DOWN. A block has EITHER a scheme_format OR a block_label, NEVER both:
+  • warm-up / cool-down blocks have NO scheme_format (the athlete just does the listed movements), so give them a short block_label as their header — e.g. "Lower-Body Activation + Shoulder Prep", "Hip & Hamstring Flush".
+  • strength / metcon / skills / accessory blocks have a scheme_format whose rendered header IS their header — so leave block_label NULL for these. Do NOT also emit a label; it would just duplicate the rendered scheme and the movement rows.
 For the warm-up/cool-down label, keep it a plain focus-area name — NEVER append Track A/B, week numbers, or deload tags (that reasoning lives in block_notes).
 
 VOLUME & PROGRESSION — MATCH TO THE ATHLETE'S READINESS. The payload's skills map rates each movement none / beginner / intermediate / advanced (e.g. ghd_sit_ups, deficit_hspu, double_unders, toes_to_bar, legless_rope_climbs). BEFORE you set the reps/sets — and the week-over-week increase — for any skill or accessory movement, look up its rating and gate the volume:
@@ -219,7 +216,7 @@ WORK SPECIFIER — pick exactly ONE per movement, based on what counts the work 
         - Strength "Build to heavy single": rep_scheme = [1], sets = 1   (top set ONLY — the warm-up ramp is athlete discretion, not prescribed sets)
         - Strength "Work up to heavy triple": rep_scheme = [3], sets = 1   (one top triple at the target; do NOT emit 5×3 at the top weight)
 
-    If a single iteration covers all the work for that movement (AMRAP / EMOM / single-pass / one set), rep_scheme has ONE entry. Code uses the rounds count from block_scheme as a separate multiplier when needed.
+    If a single iteration covers all the work for that movement (AMRAP / EMOM / single-pass / one set), rep_scheme has ONE entry. Code uses the rounds count from scheme_format as a separate multiplier when needed.
 
   - DISTANCE-counted (Row, Run, Swim, Ski-erg distance): set distance + distance_unit with the PER-ROUND distance. Reps stays null, rep_scheme stays omitted — a 250m row is not "250 reps." For a "3 RFT: Row 250m, 12 Deadlift, 6 Bar MU" workout, the row movement gets distance: 250, distance_unit: 'm', sets: 3 (sets = the rounds count, so the prescription carries its round structure), reps: null. The deadlift gets rep_scheme: [12, 12, 12] and the bar muscle-up gets rep_scheme: [6, 6, 6]. Single-pass distance ("Run 1 mile") → distance only, sets omitted.
 
@@ -231,7 +228,7 @@ WORK SPECIFIER — pick exactly ONE per movement, based on what counts the work 
 
   - Movements whose rep is itself a distance (Shuttle Run, farmer/sandbag carries, sled push/drag, walking lunge for distance) MUST state the length: either distance + distance_unit when the work is measured as one continuous distance, or rep_scheme for the rep count PLUS the per-rep length in scaling_note ("25-ft shuttles", "50-ft carry"). A bare "4 shuttle runs" prescribes nothing.
 
-  - distance_unit is ONLY "ft" or "m" — there is no yards unit. Never plan a workout in yards: express shuttle/carry lengths in feet (60 yd → 180 ft, written as 180 ft in block_scheme prose too, so the prose and the typed field agree). A distance without distance_unit is invalid.
+  - distance_unit is ONLY "ft" or "m" — there is no yards unit. Never plan a workout in yards: express shuttle/carry lengths in feet (60 yd → 180 ft) — in scaling_note specs too, never yards anywhere. A distance without distance_unit is invalid.
 
 These categories are mutually exclusive at the movement level. A single workout can mix categories across its movements (a metcon can pair a row with deadlifts), but each movement uses exactly one.
 
@@ -263,14 +260,14 @@ EXAMPLE OUTPUT (one day of one week — actual output emits all 4 weeks × days_
             {
               "block_type": "strength",
               "block_label": "Primary Strength",
-              "block_scheme": "5x5 @75%",
+              "scheme_format": { "format": "work_sets", "rest_seconds": 120 },
               "movements": [
                 { "movement": "Back Squat", "sets": 5, "reps": 5, "weight": 240, "weight_unit": "lbs", "rpe": 7, "target_pct_1rm": 75 }
               ]
             },
             {
               "block_type": "accessory",
-              "block_scheme": "3 sets each, controlled tempo",
+              "scheme_format": { "format": "straight_sets", "rest_seconds": 60, "rest_seconds_max": 90 },
               "movements": [
                 { "movement": "Romanian Deadlift", "sets": 3, "reps": 10, "weight": 185, "weight_unit": "lbs", "target_pct_1rm": 65 },
                 { "movement": "Hollow Hold", "sets": 3, "time_seconds": 30 }
@@ -278,7 +275,7 @@ EXAMPLE OUTPUT (one day of one week — actual output emits all 4 weeks × days_
             },
             {
               "block_type": "metcon",
-              "block_scheme": "AMRAP 12",
+              "scheme_format": { "format": "amrap", "minutes": 12 },
               "time_cap_seconds": 720,
               "movements": [
                 { "movement": "Thruster", "reps": 10, "weight": 95, "weight_unit": "lbs" },
@@ -302,7 +299,7 @@ EXAMPLE OUTPUT (one day of one week — actual output emits all 4 weeks × days_
 Two patterns the example shows that the rules alone don't:
   - Mixed prescription styles per block — Hollow Hold uses time_seconds, Romanian Deadlift uses sets/reps/weight. Same block, different units.
   - Name-only is legal for descriptive blocks — Cat-cow has no numeric fields, doesn't trip the audit.
-Strength blocks may also be complexes — e.g., movements: [{movement: "Snatch"}, {movement: "Overhead Squat"}, {movement: "Snatch Balance"}] together as one block, with the scheme described in block_scheme.
+Strength blocks may also be complexes — e.g., movements: [{movement: "Snatch"}, {movement: "Overhead Squat"}, {movement: "Snatch Balance"}] together as one block, with scheme_format { format: "complex", rest_seconds: ... } — the bracket renders from the rows.
 
 AUDIT RULES (echoed so you can self-check before output):
   - block_type values must be in the block-type enum above. Anything else is rejected. cardio appears ONLY where the skeleton placed it.

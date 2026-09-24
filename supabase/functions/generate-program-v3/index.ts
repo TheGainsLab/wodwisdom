@@ -83,6 +83,7 @@ import {
   recomputeBenchmarks,
   STALL_HALT_PASSES,
 } from "../_shared/engine/pipeline.ts";
+import { renderWeekSchemesInPlace } from "../_shared/compose-block-scheme.ts";
 import { getDomainPack } from "../_shared/domain-packs/registry.ts";
 import {
   runStageWithLease,
@@ -636,6 +637,9 @@ async function stageFillWeek(
   const priorWeeks = rs.weeks ?? [];
   const weekMetcons = (rs.composedMetcons ?? []).filter((m) => m.week_num === weekNum);
   const wk = await callWeekFill(payload, skeleton, weekNum, priorWeeks, "", PACK, weekMetcons);
+  // Render every header from scheme_format + rows BEFORE audits/benchmarks —
+  // downstream stages read block_scheme text and must see the final strings.
+  renderWeekSchemesInPlace(wk);
   // Annotation-in-name repair, fill side (all block types): annotated names
   // evade the exact-match do_not_program ban ("Deadlift (light)" vs banned
   // "Deadlift") and drop out of benchmark/tracking matching. Trim to the
