@@ -101,6 +101,41 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
       },
     ],
   },
+  programming: {
+    title: 'A real training day, block by block',
+    intro:
+      'Pulled straight from a generated program — Week 1, Day 1 of a pressing-focused cycle, exactly as the athlete sees it. Warm-up to cool-down, every number computed from their evaluation. Then look closer: the program explains its own reasoning, and every block carries its own coach.',
+    steps: [
+      {
+        image: '/images/programming-day-full.webp',
+        alt: 'A complete training day — warm-up, skills, strength, accessory, metcon, and cool-down blocks',
+        title: 'The whole day',
+        caption:
+          'Six blocks with a shape: prime the shoulders, practice skills while the nervous system is fresh, then the day’s main lift — 5×5 bench at 75% of this athlete’s tested max — supporting accessory work, a 13-minute conditioning piece, and a flush to finish. Every load and rep count is theirs, not a template’s.',
+      },
+      {
+        image: '/images/programming-intent.webp',
+        alt: 'Today’s Training Intent — the program explaining why the day is built this way',
+        title: 'Why today looks like this',
+        caption:
+          'Tap “Today’s Training Intent” and the program shows its work: which evaluation priority each block serves, why the skills come before the pressing load, and why the metcon deliberately stays out of the way of the squat cycle’s recovery budget. Nothing here is random — and it tells you so.',
+      },
+      {
+        image: '/images/programming-skills-coach.webp',
+        alt: 'Skills block with AI Coach game plan and per-movement cues for butterfly pull-ups and legless rope climbs',
+        title: 'Every block carries a coach',
+        caption:
+          'Tap Coach on any block and you get a game plan for the piece plus cues for each movement — what to do, what not to do — reasoned from this athlete’s skill ratings: their legless rope climb is the beginner-rated limiter here, so “one clean ascent beats any grind.”',
+      },
+      {
+        image: '/images/programming-metcon.webp',
+        alt: 'Metcon block — AMRAP 13 with an AI game plan predicting rounds and naming the limiter',
+        title: 'The metcon, with a game plan',
+        caption:
+          'The conditioning piece comes with a prediction and a strategy: expect 4–5 rounds, the limiter is grip and lat fatigue stacking from earlier in the session — so row at 70%, keep the toes-to-bar relaxed. That’s a coach who watched your whole day, not just this workout.',
+      },
+    ],
+  },
   engine: {
     title: 'A training day, start to finish',
     intro:
@@ -148,14 +183,8 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
     caption:
       'One week from a real generated program. Every session has a purpose — and the emphasis follows the weaknesses the evaluation found.',
   },
-  {
-    tab: 'programming',
-    image: '/images/Training-Day-Image.png',
-    alt: 'A full training day — warm-up, skills, strength, metcon, and cool-down',
-    title: 'Inside a training day',
-    caption:
-      'Every day breaks down into blocks — warm-up to cool-down — each with loads, targets, and coaching cues computed from the athlete’s own numbers.',
-  },
+  // "Inside a training day" gallery entry retired — the walkthrough's first
+  // step IS a full day, captured newer and cleaner.
   {
     tab: 'programming',
     image: '/images/power-duration-curve.png',
