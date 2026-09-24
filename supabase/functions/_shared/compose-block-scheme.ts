@@ -36,7 +36,10 @@ function capSuffix(timeCapSeconds: number | null | undefined, format: string): s
 function restSuffix(sf: SchemeFormat): string {
   if (sf.rest_seconds == null || sf.rest_seconds <= 0) return "";
   if (sf.rest_seconds_max != null && sf.rest_seconds_max > sf.rest_seconds) {
-    return ` Rest ${sf.rest_seconds}–${sf.rest_seconds_max} sec between sets.`;
+    const lo = sf.rest_seconds, hi = sf.rest_seconds_max;
+    return lo % 60 === 0 && hi % 60 === 0
+      ? ` Rest ${lo / 60}–${hi / 60} min between sets.`
+      : ` Rest ${lo}–${hi} sec between sets.`;
   }
   const r = sf.rest_seconds;
   const pretty = r % 60 === 0 ? `${r / 60} min` : `${r} sec`;
@@ -108,7 +111,8 @@ export function composeBlockScheme(
       return sf.pace_note ? `Steady state — ${sf.pace_note}` : "Steady state";
 
     case "work_sets":
-      return `Work sets across.${restSuffix(sf)}`.trim();
+      // Plain English over "sets across" gym jargon.
+      return `Same weight across all sets.${restSuffix(sf)}`.trim();
 
     case "work_up": {
       // The top set is the first movement row's rep target.
@@ -127,7 +131,9 @@ export function composeBlockScheme(
     }
 
     case "straight_sets":
-      return `Straight sets.${restSuffix(sf)}`.trim();
+      // The rows carry the sets×reps; the header's only job is the rest and
+      // the not-a-circuit intent. "Straight sets" was jargon — say it plainly.
+      return (restSuffix(sf).trim() || "Rest as needed between sets.") + " Not for time.";
 
     case "rounds_ntf":
       return `${sf.rounds ?? "?"} rounds, not for time.`;

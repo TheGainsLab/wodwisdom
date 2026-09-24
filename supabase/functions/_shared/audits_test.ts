@@ -19,6 +19,8 @@ import {
   auditLoadSanity,
   auditVocabularyCompliance,
   auditWorkupTopSet,
+  auditMetconDrills,
+  blockSchemeFormatProblems,
 } from "./audits.ts";
 import type {
   BlockPrescription,
@@ -701,3 +703,96 @@ Deno.test("runAudits: well-formed baseline output passes structural pre-check, r
   assert(!result.failures.some((f) => f.rule === "structural_integrity"));
 });
 
+
+// ============================================================
+// Rule — positional/core drills don't belong in metcon blocks
+// ============================================================
+
+Deno.test("auditMetconDrills: Plank in a metcon → fails", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks.push(
+    block("metcon", [
+      mv("Double Under", { reps: 55 }),
+      mv("GHD Sit Up", { reps: 8 }),
+      mv("Plank", { reps: 6 }),
+    ], { scheme_format: { format: "emom", minutes: 14, stations: [[0], [1]] } }),
+  );
+  const result = auditMetconDrills(out);
+  assert(!result.passed);
+  assert(result.violations.some((v) => v.includes('"Plank"')));
+});
+
+Deno.test("auditMetconDrills: Hollow Rock in a metcon → fails", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks.push(
+    block("metcon", [mv("Run", { distance: 400 }), mv("Hollow Rock", { reps: 15 })], {
+      scheme_format: { format: "intervals", rounds: 3, work_seconds: 300, rest_seconds: 60 },
+    }),
+  );
+  assert(!auditMetconDrills(out).passed);
+});
+
+Deno.test("auditMetconDrills: rep-counted competition core work passes", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks.push(
+    block("metcon", [
+      mv("Toes-to-Bar", { reps: 10 }),
+      mv("GHD Sit Up", { reps: 12 }),
+      mv("V Up", { reps: 15 }),
+      mv("Knees-to-Elbow", { reps: 10 }),
+    ], { scheme_format: { format: "amrap", minutes: 12 } }),
+  );
+  assert(auditMetconDrills(out).passed);
+});
+
+Deno.test("auditMetconDrills: hang/handstand dynamic movements don't false-positive", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks.push(
+    block("metcon", [
+      mv("Hang Power Clean", { reps: 8, weight: 135 }),
+      mv("Handstand Push Up", { reps: 6 }),
+      mv("Wall Ball", { reps: 20 }),
+      mv("Wall Walk", { reps: 3 }),
+    ], { scheme_format: { format: "rft", rounds: 4 } }),
+  );
+  assert(auditMetconDrills(out).passed);
+});
+
+Deno.test("auditMetconDrills: holds outside metcons are untouched", () => {
+  const out = baselineOutput();
+  out.weeks[0].days[0].blocks.push(
+    block("accessory", [mv("Plank", { reps: undefined, sets: 3, time_seconds: 40 })], {
+      scheme_format: { format: "straight_sets", rest_seconds: 60 },
+    }),
+    block("skills", [mv("Handstand Hold", { reps: undefined, sets: 4, time_seconds: 30 })], {
+      scheme_format: { format: "rounds_ntf", rounds: 4 },
+    }),
+  );
+  assert(auditMetconDrills(out).passed);
+});
+
+// ============================================================
+// scheme_format — EMOM station coverage
+// ============================================================
+
+Deno.test("blockSchemeFormatProblems: EMOM movement in no station → violation", () => {
+  const b = block("metcon", [mv("Double Under"), mv("GHD Sit Up"), mv("Plank")], {
+    scheme_format: { format: "emom", minutes: 14, stations: [[0], [1]] },
+  });
+  const problems = blockSchemeFormatProblems(b);
+  assert(problems.some((p) => p.includes('"Plank"') && p.includes("not assigned to any station")));
+});
+
+Deno.test("blockSchemeFormatProblems: packed slot covers the third movement → no violation", () => {
+  const b = block("metcon", [mv("Double Under"), mv("GHD Sit Up"), mv("Shoulder Taps")], {
+    scheme_format: { format: "emom", minutes: 14, stations: [[0], [1, 2]] },
+  });
+  assertEquals(blockSchemeFormatProblems(b), []);
+});
+
+Deno.test("blockSchemeFormatProblems: stationless EMOM has no coverage requirement", () => {
+  const b = block("metcon", [mv("Cal Ski-erg", { reps: undefined, calories: 12 })], {
+    scheme_format: { format: "emom", minutes: 10 },
+  });
+  assertEquals(blockSchemeFormatProblems(b), []);
+});

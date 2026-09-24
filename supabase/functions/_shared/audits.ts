@@ -254,6 +254,57 @@ export function auditMetconMonostructural(output: WriterOutput): AuditResult {
 }
 
 // ============================================================
+// Rule — positional/core drills don't belong in metcon blocks
+// ============================================================
+//
+// Coaching doctrine (2026-09-24, month-5 review): planks, hollow rocks,
+// dead bugs and their kin exist to build midline stiffness — they are
+// accessory/skills tools, not movements to race under fatigue. Two
+// month-5 metcons carried them ("Plank, 6 reps" and "Hollow Rock"
+// mid-interval). Rep-counted competition core work (T2B, GHD Sit-Ups,
+// Sit-Ups, V-Ups, Knees-to-Elbow) stays fine in metcons — none of it
+// matches these keywords. Metcon blocks ONLY; every other block type
+// programs these movements freely.
+
+const METCON_BANNED_DRILL_KEYWORDS = [
+  "plank", // Plank, Side Plank, RKC Plank, Plank Shoulder Taps — none are raced
+  "hollow", // Hollow Hold + Hollow Rock (doctrine bans the rock too)
+  "dead bug", "dead-bug",
+  "bird dog", "bird-dog",
+  "wall sit", "wall-sit",
+  "dead hang", // NOT bare "hang" — Hang Power Clean etc. must not match
+  "arch rock", "superman",
+  " hold", // word-ending: Handstand Hold, L-Sit Hold, Ring Support Hold, Chin-Over-Bar Hold
+];
+
+function isMetconBannedDrill(movement: string): boolean {
+  // Pad so " hold" matches "X Hold" at the end of the name too.
+  const n = ` ${movement.toLowerCase()} `;
+  return METCON_BANNED_DRILL_KEYWORDS.some((k) => n.includes(k));
+}
+
+export function auditMetconDrills(output: WriterOutput): AuditResult {
+  const violations: string[] = [];
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const blocks = safeBlocks(day);
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        if (b.block_type !== "metcon") continue;
+        for (const m of safeMovements(b)) {
+          if (isMetconBannedDrill(m.movement)) {
+            violations.push(
+              `Week ${week.week_num} Day ${day.day_num} block[${i}] (metcon): "${m.movement}" is a positional/core drill — drills build midline stiffness and don't belong in metcons. Replace it with a rep-counted movement that serves the same stimulus (T2B, GHD Sit-Ups, Sit-Ups, V-Ups), or drop it and let the round breathe.`,
+            );
+          }
+        }
+      }
+    }
+  }
+  return { rule: "metcon_no_drills", passed: violations.length === 0, violations };
+}
+
+// ============================================================
 // Rule — barbell movements in a metcon share a single load
 // ============================================================
 //
@@ -558,11 +609,23 @@ export function blockSchemeFormatProblems(b: BlockPrescription): string[] {
           problems.push(`(${b.block_type}, emom): ${sf.minutes} minutes is not a multiple of ${slots} stations — every station gets the same number of rounds (use ${Math.floor(sf.minutes / slots) * slots} or ${Math.ceil(sf.minutes / slots) * slots}).`);
         }
         const movementCount = (b.movements ?? []).length;
+        const referenced = new Set<number>();
         for (const slot of sf.stations) {
           for (const idx of slot) {
             if (!Number.isInteger(idx) || idx < 0 || idx >= movementCount) {
               problems.push(`(${b.block_type}, emom): station index ${idx} does not point at a movement row (0..${movementCount - 1}).`);
+            } else {
+              referenced.add(idx);
             }
+          }
+        }
+        // Coverage — the mirror of the in-range check. A movement in the
+        // block but in no station is work the header cannot place: the
+        // athlete can't tell which minute it belongs to.
+        for (let mi = 0; mi < movementCount; mi++) {
+          if (!referenced.has(mi)) {
+            const name = b.movements?.[mi]?.movement ?? `movement ${mi}`;
+            problems.push(`(${b.block_type}, emom): movement[${mi}] "${name}" is not assigned to any station — every movement must appear in the station map (pack it into a slot, add a station with a divisible minute count, or remove it).`);
           }
         }
       }
@@ -1049,6 +1112,7 @@ export const ALL_AUDITS = [
   // retained as a callable but no longer wired.
   (ctx: AuditContext): AuditResult => auditMetconOnePiece(ctx.output),
   (ctx: AuditContext): AuditResult => auditMetconMonostructural(ctx.output),
+  (ctx: AuditContext): AuditResult => auditMetconDrills(ctx.output),
   (ctx: AuditContext): AuditResult => auditMetconBarbellLoads(ctx.output),
   (ctx: AuditContext): AuditResult => auditRequiredFields(ctx.output),
   (ctx: AuditContext): AuditResult => auditMaxEffort(ctx.output),
@@ -1080,6 +1144,7 @@ export const AUDIT_KIND: Record<string, AuditKind> = {
   // Block-local — single block (or two) needs rewriting via surgical LLM call
   metcon_one_piece: "block-local",
   metcon_one_monostructural: "block-local",
+  metcon_no_drills: "block-local",
   metcon_barbell_one_load: "block-local",
   metcon_duration_matches_focus: "block-local",
   required_fields: "block-local",

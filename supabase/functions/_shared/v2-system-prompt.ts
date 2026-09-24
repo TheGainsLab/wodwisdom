@@ -118,6 +118,7 @@ Combine-prevention (also enforced post-hoc by audit):
   - At most ONE monostructural cardio modality per metcon block. Pick ONE of Row / Bike / Ski-erg / Run / Swim — never two in the same workout, even in a deload week. (Shuttle Run is a rep-counted floor movement, not a Run modality — it pairs freely with a machine.) Athletes have one machine in front of them; mid-workout machine swaps are awkward and not standard programming. If you want multiple modalities, give them separate days, or use one as a warm-up / cool-down.
   - Monostructural cardio (Row / Bike / Ski-erg / Run) volume goes in the TYPED field, never reps: use \`calories\` for a calorie prescription ("20 cal bike" → calories 20; "4 rounds × 10 cal" → calories 10, sets 4 — PER-ROUND, per the CALORIE-counted rule below, never the summed total) OR \`distance\` + \`distance_unit\` for a distance prescription ("2000m row" → distance 2000, distance_unit "m"). reps / rep_scheme are for rep-counted movements ONLY — never put cardio calories/distance there. Pick exactly one specifier per movement; leave the others null.
   - Barbell movements within a single metcon block must share ONE load. Two different barbell exercises at two different weights (e.g., Deadlift @225 + Push Press @135) forces mid-workout plate swaps — bad metcon design. Either pick ONE barbell movement for the metcon, OR use a complex where all barbell movements share the same load (DT-style: Deadlift + Hang Power Clean + Push Jerk all at 155). Same load = same bar setup = a real workout.
+  - NO positional/core drills in metcons: planks (any variant), hollow rocks/holds, dead bugs, bird dogs, wall sits, dead hangs, arch rocks/supermans, and static holds of any kind build midline stiffness — they are accessory/skills tools, never movements to race under fatigue. Rep-counted competition core work IS fine in metcons: Toes-to-Bar, GHD Sit-Ups, Sit-Ups, V-Ups, Knees-to-Elbow. And name the movement you actually mean — never program one movement under another's name with the truth in scaling_note ("Plank" with a note describing shoulder taps).
 
 ACCESSORY DESIGN
 Accessory complements the day's primary_lift and serves the day_intent the skeleton set for this day — that's where supporting and maintenance work lives. Don't re-derive the athlete's gaps here; the skeleton already chose this day's emphasis. If the day_intent or skill_focus calls for midline (GHD sit-ups, V-ups, weighted sit-ups, hanging leg raises), include at least one DYNAMIC midline movement, not just isometric holds — holds train stability; dynamic midline trains the failure mode competition tests.
@@ -157,7 +158,7 @@ SCHEME_FORMAT — THE BLOCK'S FORMAT AS TYPED FIELDS. You do NOT write a header 
 
 Pick the format and fill ONLY its fields:
   • amrap → minutes ("AMRAP 13" ← format: amrap, minutes: 13)
-  • emom → minutes, and for rotating stations: stations as movement-INDEX slots ([[0],[1]] = odd: movements[0] / even: movements[1]; [[0],[1],[2]] = min 1/2/3 rotating). minutes MUST be a multiple of the slot count. rest_remainder: true appends "Rest remainder of each minute."
+  • emom → minutes, and for rotating stations: stations as movement-INDEX slots ([[0],[1]] = odd: movements[0] / even: movements[1]; [[0],[1],[2]] = min 1/2/3 rotating). minutes MUST be a multiple of the slot count. EVERY movement row must appear in a station — a slot can hold two movements done back to back ([[0],[1,2]] = even: movements[1] + movements[2]); a movement in no station is work the header cannot place. If a movement doesn't fit the rotation, it doesn't belong in the block. rest_remainder: true appends "Rest remainder of each minute."
   • rft → rounds (cap goes in time_cap_seconds as usual)
   • for_time → single-pass; for 21-15-9-style ladders set rounds_pattern: [21,15,9], which MUST exactly equal the varying rep_scheme/cal_scheme arrays you emit on the movements
   • intervals → rounds + work_seconds + rest_seconds; amrap_each_interval: true for "AMRAP each interval" windows (a max_effort finisher renders automatically from the flagged movement)
@@ -180,6 +181,10 @@ VOLUME & PROGRESSION — MATCH TO THE ATHLETE'S READINESS. The payload's skills 
   - intermediate → moderate volume and progression.
   - advanced → full volume and progression is fine.
 A LOW rating means PRIORITIZE the movement — program it more often, emphasize quality reps — it does NOT mean assign it the most volume. The "develop the weakness" intent is right; the volume and rate of increase must still match what under-trained tissue can tolerate. This governs both the reps/sets you emit AND how fast they climb week to week.
+
+ALTERNATING / UNILATERAL MOVEMENTS (pistols, single-arm DB work, lunges, step-ups): sets × reps must split evenly per side — even reps per set ("4×6, 3 each side"), or odd reps per set with an EVEN set count (4×5 alternating = 10 per arm across the block). NEVER odd sets × odd reps (5×3 alternating = 15 total — cannot split). If the count is per-leg rather than alternating, say "each leg" in the note, not "alternating."
+
+HANDSTAND WALK: in metcons, ALWAYS distance (ft/m) — it must be scoreable and judgeable. In skills blocks, prefer distance once the athlete's handstand-walk rating is intermediate or better; time-boxed practice (e.g. 20s attempts inside an EMOM minute) is fine for developing athletes, and pairs naturally with a timed wall-hold fallback.
 
 FIELD-USE BY MOVEMENT TYPE — when to use weight vs scaling_note
 
