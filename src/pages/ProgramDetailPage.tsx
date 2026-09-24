@@ -209,6 +209,8 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   // Weeks render collapsed by default — opening a month shows Week 1..4
   // headers, not every day. Keyed by the global week number.
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set());
+  // Generation poll handle — one poller at a time, cleared on unmount.
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [generatingNextMonth, setGeneratingNextMonth] = useState(false);
 
 
@@ -374,6 +376,27 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
     if (!id) return;
     loadProgram();
   }, [id, session.user.id]);
+
+  // Reattach to an in-flight generation (mid-run refresh, or an invoke that
+  // timed out after the server created the job): the button loads in its
+  // true state and polling resumes. Clears the poller on unmount.
+  useEffect(() => {
+    if (!program?.id) return;
+    let cancelled = false;
+    (async () => {
+      if (generatingNextMonth) return;
+      const inFlight = await findInFlightJob();
+      if (inFlight && !cancelled) {
+        setGeneratingNextMonth(true);
+        pollJob(inFlight);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [program?.id]);
 
   // Deep-link from the calendar's "View in program": ?day=<workoutId> expands
   // that day and scrolls to it, so the user lands ON the day they tapped.
@@ -579,6 +602,42 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const completedCount = workouts.filter(w => completedWorkoutIds.has(w.id)).length;
   const isGenerated = program?.source === 'generated' || program?.name?.startsWith('Month ');
 
+  /** Poll one generation job to completion, keeping the button truthful. */
+  const pollJob = (jobId: string) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      const { data: jobData } = await supabase.functions.invoke('program-job-status', {
+        body: { job_id: jobId },
+      });
+      if (jobData?.status === 'complete') {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setGeneratingNextMonth(false);
+        // Reload program to show new workouts
+        loadProgram();
+      } else if (jobData?.status === 'failed') {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setGeneratingNextMonth(false);
+        alert('Failed to generate next month: ' + (jobData?.error || 'Unknown error'));
+      }
+    }, 5000);
+  };
+
+  /** The server's view of "generating": a fresh pending/processing job.
+   *  The 30-min heartbeat window matches the server-side concurrency guard —
+   *  a crashed job goes quiet and stops holding the button. */
+  const findInFlightJob = async (): Promise<string | null> => {
+    const { data } = await supabase
+      .from('program_jobs')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .in('status', ['pending', 'processing'])
+      .gte('updated_at', new Date(Date.now() - 30 * 60 * 1000).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data?.id ?? null;
+  };
+
   const handleGenerateNextMonth = async () => {
     if (!program || generatingNextMonth) return;
     setGeneratingNextMonth(true);
@@ -587,26 +646,19 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
         body: { program_id: program.id },
       });
       if (error) throw error;
-      // Poll for completion
-      const pollInterval = setInterval(async () => {
-        const { data: jobData } = await supabase.functions.invoke('program-job-status', {
-          body: { job_id: data.job_id },
-        });
-        if (jobData?.status === 'complete') {
-          clearInterval(pollInterval);
-          setGeneratingNextMonth(false);
-          // Reload program to show new workouts
-          loadProgram();
-        } else if (jobData?.status === 'failed') {
-          clearInterval(pollInterval);
-          setGeneratingNextMonth(false);
-          alert('Failed to generate next month: ' + (jobData?.error || 'Unknown error'));
-        }
-      }, 5000);
+      pollJob(data.job_id);
     } catch (err) {
-      console.error('Generate next month failed:', err);
-      setGeneratingNextMonth(false);
-      alert('Failed to start generation');
+      // The invoke can time out AFTER the server created the job (the
+      // orchestrator runs review/eval before responding). Don't declare
+      // failure until the server confirms nothing is running.
+      console.error('Generate next month invoke failed:', err);
+      const inFlight = await findInFlightJob();
+      if (inFlight) {
+        pollJob(inFlight);
+      } else {
+        setGeneratingNextMonth(false);
+        alert('Failed to start generation');
+      }
     }
   };
 
@@ -622,24 +674,18 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.message || data.error);
-      const pollInterval = setInterval(async () => {
-        const { data: jobData } = await supabase.functions.invoke('program-job-status', {
-          body: { job_id: data.job_id },
-        });
-        if (jobData?.status === 'complete') {
-          clearInterval(pollInterval);
-          setGeneratingNextMonth(false);
-          loadProgram();
-        } else if (jobData?.status === 'failed') {
-          clearInterval(pollInterval);
-          setGeneratingNextMonth(false);
-          alert('v3 next month failed: ' + (jobData?.error || 'Unknown error'));
-        }
-      }, 5000);
+      pollJob(data.job_id);
     } catch (err: any) {
+      // Same reattach logic as the production button: a timed-out invoke may
+      // have created the job anyway.
       console.error('Generate next month (v3) failed:', err);
-      setGeneratingNextMonth(false);
-      alert('Failed to start v3 generation: ' + (err?.message || 'unknown'));
+      const inFlight = await findInFlightJob();
+      if (inFlight) {
+        pollJob(inFlight);
+      } else {
+        setGeneratingNextMonth(false);
+        alert('Failed to start v3 generation: ' + (err?.message || 'unknown'));
+      }
     }
   };
 
