@@ -36,7 +36,10 @@ function capSuffix(timeCapSeconds: number | null | undefined, format: string): s
 function restSuffix(sf: SchemeFormat): string {
   if (sf.rest_seconds == null || sf.rest_seconds <= 0) return "";
   if (sf.rest_seconds_max != null && sf.rest_seconds_max > sf.rest_seconds) {
-    return ` Rest ${sf.rest_seconds}–${sf.rest_seconds_max} sec between sets.`;
+    const lo = sf.rest_seconds, hi = sf.rest_seconds_max;
+    return lo % 60 === 0 && hi % 60 === 0
+      ? ` Rest ${lo / 60}–${hi / 60} min between sets.`
+      : ` Rest ${lo}–${hi} sec between sets.`;
   }
   const r = sf.rest_seconds;
   const pretty = r % 60 === 0 ? `${r / 60} min` : `${r} sec`;
