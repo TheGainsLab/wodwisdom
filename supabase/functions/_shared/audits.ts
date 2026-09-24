@@ -558,11 +558,23 @@ export function blockSchemeFormatProblems(b: BlockPrescription): string[] {
           problems.push(`(${b.block_type}, emom): ${sf.minutes} minutes is not a multiple of ${slots} stations — every station gets the same number of rounds (use ${Math.floor(sf.minutes / slots) * slots} or ${Math.ceil(sf.minutes / slots) * slots}).`);
         }
         const movementCount = (b.movements ?? []).length;
+        const referenced = new Set<number>();
         for (const slot of sf.stations) {
           for (const idx of slot) {
             if (!Number.isInteger(idx) || idx < 0 || idx >= movementCount) {
               problems.push(`(${b.block_type}, emom): station index ${idx} does not point at a movement row (0..${movementCount - 1}).`);
+            } else {
+              referenced.add(idx);
             }
+          }
+        }
+        // Coverage — the mirror of the in-range check. A movement in the
+        // block but in no station is work the header cannot place: the
+        // athlete can't tell which minute it belongs to.
+        for (let mi = 0; mi < movementCount; mi++) {
+          if (!referenced.has(mi)) {
+            const name = b.movements?.[mi]?.movement ?? `movement ${mi}`;
+            problems.push(`(${b.block_type}, emom): movement[${mi}] "${name}" is not assigned to any station — every movement must appear in the station map (pack it into a slot, add a station with a divisible minute count, or remove it).`);
           }
         }
       }

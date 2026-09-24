@@ -157,7 +157,7 @@ SCHEME_FORMAT — THE BLOCK'S FORMAT AS TYPED FIELDS. You do NOT write a header 
 
 Pick the format and fill ONLY its fields:
   • amrap → minutes ("AMRAP 13" ← format: amrap, minutes: 13)
-  • emom → minutes, and for rotating stations: stations as movement-INDEX slots ([[0],[1]] = odd: movements[0] / even: movements[1]; [[0],[1],[2]] = min 1/2/3 rotating). minutes MUST be a multiple of the slot count. rest_remainder: true appends "Rest remainder of each minute."
+  • emom → minutes, and for rotating stations: stations as movement-INDEX slots ([[0],[1]] = odd: movements[0] / even: movements[1]; [[0],[1],[2]] = min 1/2/3 rotating). minutes MUST be a multiple of the slot count. EVERY movement row must appear in a station — a slot can hold two movements done back to back ([[0],[1,2]] = even: movements[1] + movements[2]); a movement in no station is work the header cannot place. If a movement doesn't fit the rotation, it doesn't belong in the block. rest_remainder: true appends "Rest remainder of each minute."
   • rft → rounds (cap goes in time_cap_seconds as usual)
   • for_time → single-pass; for 21-15-9-style ladders set rounds_pattern: [21,15,9], which MUST exactly equal the varying rep_scheme/cal_scheme arrays you emit on the movements
   • intervals → rounds + work_seconds + rest_seconds; amrap_each_interval: true for "AMRAP each interval" windows (a max_effort finisher renders automatically from the flagged movement)
