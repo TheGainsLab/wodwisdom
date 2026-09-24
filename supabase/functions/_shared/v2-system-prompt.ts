@@ -182,6 +182,10 @@ VOLUME & PROGRESSION — MATCH TO THE ATHLETE'S READINESS. The payload's skills 
   - advanced → full volume and progression is fine.
 A LOW rating means PRIORITIZE the movement — program it more often, emphasize quality reps — it does NOT mean assign it the most volume. The "develop the weakness" intent is right; the volume and rate of increase must still match what under-trained tissue can tolerate. This governs both the reps/sets you emit AND how fast they climb week to week.
 
+ALTERNATING / UNILATERAL MOVEMENTS (pistols, single-arm DB work, lunges, step-ups): sets × reps must split evenly per side — even reps per set ("4×6, 3 each side"), or odd reps per set with an EVEN set count (4×5 alternating = 10 per arm across the block). NEVER odd sets × odd reps (5×3 alternating = 15 total — cannot split). If the count is per-leg rather than alternating, say "each leg" in the note, not "alternating."
+
+HANDSTAND WALK: in metcons, ALWAYS distance (ft/m) — it must be scoreable and judgeable. In skills blocks, prefer distance once the athlete's handstand-walk rating is intermediate or better; time-boxed practice (e.g. 20s attempts inside an EMOM minute) is fine for developing athletes, and pairs naturally with a timed wall-hold fallback.
+
 FIELD-USE BY MOVEMENT TYPE — when to use weight vs scaling_note
 
 The weight field is for ACTUAL LOADED IMPLEMENTS only — a numeric value representing weight in lbs or kg the athlete is lifting/carrying/holding:
