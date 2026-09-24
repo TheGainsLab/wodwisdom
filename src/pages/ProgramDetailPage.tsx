@@ -207,8 +207,10 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   const [editingProgramName, setEditingProgramName] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
   // Weeks render collapsed by default — opening a month shows Week 1..4
-  // headers, not every day. Keyed by the global week number.
+  // headers, not every day. Keyed by the global week number. Months collapse
+  // the same way one level up (multi-month programs open as Month 1 | 2 | …).
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set());
+  const [expandedMonths, setExpandedMonths] = useState<Set<number>>(new Set());
   // Generation poll handle — one poller at a time, cleared on unmount.
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [generatingNextMonth, setGeneratingNextMonth] = useState(false);
@@ -404,11 +406,13 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   useEffect(() => {
     if (!dayParam || !allWorkouts.some(w => w.id === dayParam)) return;
     setExpandedDays(prev => new Set(prev).add(dayParam));
-    // The day's week must be open for the scroll target to exist.
+    // The day's month AND week must be open for the scroll target to exist.
     const target = allWorkouts.find(w => w.id === dayParam);
     if (target) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const globalWeek = (((target as any).month_number || 1) - 1) * 4 + (target.week_num || 1);
+      const targetMonth = ((target as any).month_number || 1) as number;
+      const globalWeek = (targetMonth - 1) * 4 + (target.week_num || 1);
+      setExpandedMonths(prev => new Set(prev).add(targetMonth));
       setExpandedWeeks(prev => new Set(prev).add(globalWeek));
     }
     const t = setTimeout(() => {
@@ -781,14 +785,39 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                         weeks.push({ weekNum: (month - 1) * 4 + wn, days: weekMap.get(wn)!.sort((a, b) => a.day_num - b.day_num) });
                       });
 
+                      // Months collapse like weeks: a multi-month program opens
+                      // as Month 1 | Month 2 | … headers; a single-month
+                      // program has no month layer to collapse.
+                      const monthOpen = !hasMultipleMonths || expandedMonths.has(month);
+                      const monthDone = monthWorkouts.filter((d) => {
+                        const dIp = inProgressWorkouts.get(d.id);
+                        return completedWorkoutIds.has(d.id) || (!!dIp && dIp.totalBlocks > 0 && dIp.savedCount >= dIp.totalBlocks);
+                      }).length;
                       return (
                         <div key={month}>
                           {hasMultipleMonths && (
-                            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)', margin: '24px 0 12px', paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
-                              Month {month}
-                            </div>
+                            <button
+                              type="button"
+                              aria-expanded={monthOpen}
+                              onClick={() => setExpandedMonths(prev => {
+                                const next = new Set(prev);
+                                if (next.has(month)) next.delete(month); else next.add(month);
+                                return next;
+                              })}
+                              style={{
+                                width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+                                background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer',
+                                fontFamily: 'inherit', fontSize: 16, fontWeight: 700, color: 'var(--accent)',
+                                margin: '24px 0 12px', padding: '0 0 8px', textAlign: 'left',
+                              }}
+                            >
+                              <span>Month {month}</span>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)' }}>
+                                {monthDone}/{monthWorkouts.length} logged {monthOpen ? '▲' : '▼'}
+                              </span>
+                            </button>
                           )}
-                          {weeks.map((week, wi) => {
+                          {monthOpen && weeks.map((week, wi) => {
                             const weekOpen = expandedWeeks.has(week.weekNum);
                             const doneCount = week.days.filter((d) => {
                               const dIp = inProgressWorkouts.get(d.id);
