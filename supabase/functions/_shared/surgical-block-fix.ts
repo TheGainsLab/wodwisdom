@@ -46,6 +46,7 @@ RULES (honor every one):
 - Plate math: lbs → nearest 5, kg → nearest 2.5.
 - Prescribed barbell weight ≤ relevant 1RM unless the scheme/notes say "1RM attempt" / "max attempt" / "new 1RM".
 - At most one monostructural cardio modality (Row / Bike / Ski-erg / Run / Swim) per metcon. NEVER mix two even in a deload metcon.
+- NO positional/core drills in metcons: planks, hollow rocks/holds, dead bugs, bird dogs, wall sits, dead hangs, arch rocks, static holds of any kind. They are accessory/skills tools. Rep-counted core work (T2B, GHD Sit-Ups, Sit-Ups, V-Ups) is fine. Name the movement you mean — never program one movement under another's name with the truth in scaling_note.
 - Barbell movements within a metcon share ONE load (DT-style complex OK; mixed loads NOT OK).
 - Every movement in strength / accessory / metcon / skills must populate at least one of {sets, reps, rep_scheme, calories, weight, time_seconds, distance} > 0 — OR carry max_effort: true ("as many as possible in the remaining window": metcon blocks with a bounded clock only, LAST movement only, one per block, never in plain AMRAPs, and NO volume fields alongside it). rep_scheme, cal_scheme, distance_scheme, and calories are valid specifiers — do NOT strip them.
 - Movements use display-name strings from the vocabulary list in the user message.
