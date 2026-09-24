@@ -108,7 +108,8 @@ export function composeBlockScheme(
       return sf.pace_note ? `Steady state — ${sf.pace_note}` : "Steady state";
 
     case "work_sets":
-      return `Work sets across.${restSuffix(sf)}`.trim();
+      // Plain English over "sets across" gym jargon.
+      return `Same weight across all sets.${restSuffix(sf)}`.trim();
 
     case "work_up": {
       // The top set is the first movement row's rep target.
@@ -127,7 +128,9 @@ export function composeBlockScheme(
     }
 
     case "straight_sets":
-      return `Straight sets.${restSuffix(sf)}`.trim();
+      // The rows carry the sets×reps; the header's only job is the rest and
+      // the not-a-circuit intent. "Straight sets" was jargon — say it plainly.
+      return (restSuffix(sf).trim() || "Rest as needed between sets.") + " Not for time.";
 
     case "rounds_ntf":
       return `${sf.rounds ?? "?"} rounds, not for time.`;
