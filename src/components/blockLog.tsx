@@ -293,11 +293,11 @@ function RpeStepper({ value, onChange }: { value: number | null; onChange: (v: n
 // ── "Notes for the coach" — brief fault observables as tappable chips ──
 // Tapped = "this happened." Solid accent when on. Instruction lives behind
 // the Coach button, never on a chip.
-function CoachNoteChips({ faults, checked, onToggle }: { faults: string[]; checked: string[]; onToggle: (f: string) => void }) {
+function CoachNoteChips({ faults, checked, onToggle, showLabel = true }: { faults: string[]; checked: string[]; onToggle: (f: string) => void; showLabel?: boolean }) {
   if (faults.length === 0) return null;
   return (
     <div style={{ marginTop: 8 }}>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 6 }}>Notes for the coach</div>
+      {showLabel && <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 6 }}>Notes for the coach</div>}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {faults.map(f => {
           const on = checked.includes(f);
@@ -725,9 +725,21 @@ function MetconLog({ block, controller, coaching, onSaved }: {
       <div style={{ marginTop: 10 }}>
         <RpeStepper value={rpe} onChange={setRpe} />
       </div>
-      {block.movements.map((m) => (
-        <CoachNoteChips key={m.id} faults={faultsForMovement(coaching, m.movement)} checked={checked[m.id] ?? []} onToggle={(f) => toggleChip(m.id, f)} />
-      ))}
+      {block.movements.some((m) => faultsForMovement(coaching, m.movement).length > 0) && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>Notes for the coach</div>
+          {block.movements.map((m) => {
+            const mFaults = faultsForMovement(coaching, m.movement);
+            if (!mFaults.length) return null;
+            return (
+              <div key={m.id} style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(m.movement)}</div>
+                <CoachNoteChips faults={mFaults} checked={checked[m.id] ?? []} onToggle={(f) => toggleChip(m.id, f)} showLabel={false} />
+              </div>
+            );
+          })}
+        </div>
+      )}
       <SaveFooter saving={saving} canSave={anythingAsserted} onSave={save} notes={notes} onNotes={setNotes} />
     </div>
   );
