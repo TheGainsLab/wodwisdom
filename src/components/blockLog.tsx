@@ -3,33 +3,39 @@
 // DayLogController (in-progress log id, saved-state, save via save-workout-block);
 // each world reads the prescription off the block and collects actuals.
 //
-// Rx-first redesign (2026-09): logging is a claim, so the UI collects explicit
-// claims instead of prefilled form data.
-//  - The panel opens as CONFIRMATION: each task (movement, or the whole piece
-//    for metcons; all movements for strength — a complex is one bar cycle)
-//    shows its prescription read-only with an Rx / Edit choice. Rx asserts
-//    "did exactly this"; Edit opens that task's rows for what changed.
-//    Save stays disabled until every task is answered — an untouched form
-//    can never write data.
-//  - No Skip button (2026-09 polish): a user who skips a block is not a user
-//    who wants to tap more buttons, and doctrine already guarantees an
-//    unlogged block sends NO signal (the previous-cycle summary removed
-//    completion_pct/skip_pct precisely so non-loggers are never punished).
-//    The 'block_skipped' badge/history handling stays for legacy rows.
-//  - Faults are self-report chips under "Anything break down?" — orthogonal
-//    to Rx: you can hit every number and still grind.
-//  - Effort is ONE question per block, a +/- stepper saved on
-//    workout_log_blocks.rpe. Untouched → null, never an echoed prescription.
-//  - The collapsed card shows status after save: ✓ Rx · RPE 8 / ✓ Modified ·
-//    RPE 7 / Skipped — the day becomes a scannable summary of the session.
-//  - blocks.rx finally carries signal: true = every task Rx'd via the
-//    as-written path (it was parked always-false since the Rx checkbox was
-//    removed as a tautology).
+// Rows-as-logger (2026-09, designed live against the mock with the founder):
+//  - Tap "Log block" and THE PLAN ROWS BECOME THE LOG ROWS: BlockLog renders
+//    the same movement rows the card shows (same formatter — prescriptionText
+//    — so plan and log can never disagree), each with its own Rx / Modify
+//    pair, per-exercise RPE stepper, and "Notes for the coach" fault chips.
+//    Nothing is repeated; the card's own rows hide while the logger is open
+//    (V3BlockCard listens via onOpenChange).
+//  - EVERYTHING IS OPTIONAL. Save writes exactly what was asserted. A movement
+//    never touched simply isn't logged — the same meaning silence has
+//    everywhere else in the system (absence of logging is NEVER a penalty).
+//  - Logging is INCREMENTAL: save one movement mid-session, come back, log the
+//    next. Re-save replaces the block record (save-workout-block deletes by
+//    log_id + sort_order before insert), so the panel rehydrates saved claims
+//    from the controller's snapshot — without that, a later partial save
+//    would silently erase the earlier one.
+//  - Rx = "did exactly this": the prescription saves as the actuals. Modify
+//    opens that movement's per-set editor in place (prefilled; ✕ skips a
+//    set). The editor's open state is separate from the claim, so a saved
+//    Modified movement sits collapsed until deliberately reopened.
+//  - Fault chips are the athlete's notes FOR the coach — brief past-tense
+//    observables sourced from the review's common_faults; instruction lives
+//    behind the Coach button. Saved onto faults_observed per movement.
+//  - Per-exercise RPE lands on that movement's entry rows (entries.rpe);
+//    the block row's rpe stores the max — the limiter is the block's story.
+//  - The saved card shows a red ✓ on each logged movement's plan row (parent
+//    renders those); the footer button reads "Log block" while movements
+//    remain, "Edit log" once all are logged.
 import { useMemo, useState } from 'react';
 import type { ProgramBlockV2, ProgramMovementV2 } from '../pages/ProgramDetailPage';
 import type { ReviewBlock } from '../components/reviewCoaching';
 import { scoreMetcon, deriveTimeDomain, type BenchmarkResult } from '../lib/metconScoring';
 import { formatMovementName } from '../lib/movementName';
+import { prescriptionText } from '../lib/formatMovement';
 
 // ── Save payload (the `block` body of save-workout-block) ──
 export interface LogEntry {
@@ -64,7 +70,7 @@ export interface SaveBlockPayload {
   entries: LogEntry[];
   capped: boolean;
   capped_reps: number | null;
-  /** Block-level effort (1-10) — the one RPE signal per block. */
+  /** Block-level effort — max across the logged movements' RPEs. */
   rpe?: number | null;
   cardio_avg_watts?: number | null;
   cardio_work_seconds?: number | null;
@@ -78,11 +84,43 @@ export interface SaveBlockPayload {
   time_domain?: string | null;
 }
 
-/** Collapsed-card status for a saved block — what the badge renders from. */
-export interface SavedBlockMeta {
+// ── Saved-state snapshot: what the controller knows about a saved block ──
+// Enough to (a) rehydrate the panel's claims on reopen and (b) let the parent
+// card draw ✓ on logged plan rows. Built from the save payload client-side,
+// and from a DB read on page load.
+export interface SavedEntrySnapshot {
+  movement: string;
+  set_number: number | null;
+  reps: number | null;
+  hold_seconds: number | null;
+  distance: number | null;
+  weight: number | null;
+  rpe: number | null;
+  calories: number | null;
+  faults_observed: string[] | null;
+  completed: boolean | null;
+  skip_reason: string | null;
+}
+export interface SavedBlockSnapshot {
   rx: boolean;
   rpe: number | null;
-  skipped: boolean;
+  notes: string | null;
+  score: string | null;
+  capped: boolean;
+  entries: SavedEntrySnapshot[];
+}
+
+/** Movement names carrying at least one saved entry — the parent card's ✓s. */
+export function loggedMovementNames(snap: SavedBlockSnapshot | null | undefined): Set<string> {
+  const names = new Set<string>();
+  for (const e of snap?.entries ?? []) names.add(e.movement);
+  return names;
+}
+/** Every movement in the block has entries → the log is complete. */
+export function blockFullyLogged(block: ProgramBlockV2, snap: SavedBlockSnapshot | null | undefined): boolean {
+  if (!snap) return false;
+  const names = loggedMovementNames(snap);
+  return block.movements.length > 0 && block.movements.every((m) => names.has(m.movement));
 }
 
 export interface DayLogController {
@@ -92,8 +130,8 @@ export interface DayLogController {
   saving: number | null;
   saveBlock: (block: SaveBlockPayload) => Promise<{ auto_completed?: boolean } | null>;
   reopen: (sortOrder: number) => void;
-  /** Status of a saved block for the collapsed badge; null/absent → plain "Logged". */
-  savedMeta?: (sortOrder: number) => SavedBlockMeta | null;
+  /** Saved-state snapshot for rehydration + the parent's row checkmarks. */
+  savedSnapshot?: (sortOrder: number) => SavedBlockSnapshot | null;
 }
 
 // ── helpers ──
@@ -198,26 +236,68 @@ function faultsForMovement(coaching: ReviewBlock | null | undefined, movementNam
   }
   return [];
 }
-function blockFaults(coaching: ReviewBlock | null | undefined, movements: ProgramMovementV2[]): string[] {
-  const all = new Set<string>();
-  for (const m of movements) for (const f of faultsForMovement(coaching, m.movement)) all.add(f);
-  return [...all];
-}
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '8px 10px', fontSize: 14, textAlign: 'center',
   background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
   color: 'var(--text)', fontFamily: "'Outfit', sans-serif",
 };
-const wrapStyle: React.CSSProperties = { marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)' };
 
-// ── Fault chips: self-reports, not coaching cues ──
-// Tapped = "yes, this happened." Saved onto faults_observed. Orthogonal to
-// Rx — hitting every number ugly is still worth reporting.
-function FaultChips({ faults, checked, onToggle }: { faults: string[]; checked: string[]; onToggle: (f: string) => void }) {
+// ── Rx / Modify choice, one per task ──
+// The chosen one fills solid accent with white text; its partner dims. At
+// rest both wear the white outline so they read as pressable.
+type Claim = 'rx' | 'mod' | null;
+function RxModifyChoice({ claim, onRx, onModify }: { claim: Claim; onRx: () => void; onModify: () => void }) {
+  const btn = (self: 'rx' | 'mod'): React.CSSProperties => {
+    const active = claim === self;
+    const other = claim != null && !active;
+    return {
+      padding: '6px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+      fontFamily: "'Outfit', sans-serif", borderRadius: 8, transition: 'all .12s',
+      background: active ? 'var(--accent)' : 'transparent',
+      border: `1px solid ${active ? 'var(--accent)' : other ? 'var(--border)' : '#ffffff'}`,
+      color: active ? '#ffffff' : other ? 'var(--text-muted)' : 'var(--text)',
+    };
+  };
+  return (
+    <span style={{ display: 'inline-flex', gap: 8, flexShrink: 0 }}>
+      <button type="button" style={btn('rx')} onClick={onRx}>Rx</button>
+      <button type="button" style={btn('mod')} onClick={onModify}>Modify</button>
+    </span>
+  );
+}
+
+// ── Per-exercise RPE stepper — optional, starts unset, first tap lands on 5 ──
+function RpeStepper({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
+  const bump = (d: number) => {
+    if (value == null) { onChange(5); return; }
+    onChange(Math.min(10, Math.max(1, value + d)));
+  };
+  const stepBtn: React.CSSProperties = {
+    width: 34, height: 34, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)',
+    color: 'var(--text)', fontSize: 17, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit', sans-serif",
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  };
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ fontSize: 12, color: 'var(--text)', flex: 1 }}>RPE</span>
+      <button type="button" style={stepBtn} onClick={() => bump(-1)} aria-label="Lower RPE">−</button>
+      <span style={{ width: 26, textAlign: 'center', fontSize: 15, fontWeight: 700, color: value != null ? 'var(--text)' : 'var(--text-muted)' }}>
+        {value ?? '—'}
+      </span>
+      <button type="button" style={stepBtn} onClick={() => bump(1)} aria-label="Raise RPE">+</button>
+    </div>
+  );
+}
+
+// ── "Notes for the coach" — brief fault observables as tappable chips ──
+// Tapped = "this happened." Solid accent when on. Instruction lives behind
+// the Coach button, never on a chip.
+function CoachNoteChips({ faults, checked, onToggle }: { faults: string[]; checked: string[]; onToggle: (f: string) => void }) {
   if (faults.length === 0) return null;
   return (
-    <div style={{ marginTop: 6 }}>
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 6 }}>Notes for the coach</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {faults.map(f => {
           const on = checked.includes(f);
@@ -227,11 +307,11 @@ function FaultChips({ faults, checked, onToggle }: { faults: string[]; checked: 
               type="button"
               onClick={() => onToggle(f)}
               style={{
-                padding: '5px 10px', fontSize: 12, lineHeight: 1.35, borderRadius: 14, cursor: 'pointer',
-                textAlign: 'left', fontFamily: "'Outfit', sans-serif",
-                background: on ? 'rgba(231, 76, 60, 0.15)' : 'var(--surface)',
-                border: `1px solid ${on ? 'var(--danger, #e74c3c)' : 'var(--border)'}`,
-                color: on ? 'var(--danger, #e74c3c)' : 'var(--text-dim)',
+                padding: '5px 11px', fontSize: 12, lineHeight: 1.35, borderRadius: 14, cursor: 'pointer',
+                textAlign: 'left', fontFamily: "'Outfit', sans-serif", transition: 'all .12s',
+                background: on ? 'var(--accent)' : 'transparent',
+                border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+                color: on ? '#ffffff' : 'var(--text-dim)',
               }}
             >
               {f}
@@ -243,142 +323,36 @@ function FaultChips({ faults, checked, onToggle }: { faults: string[]; checked: 
   );
 }
 
-// ── Rx / Modify choice, one per task ──
-// Styled like the Log block button (white text, white outline) so the two
-// controls the panel is gated on read as pressable, not disabled; the chosen
-// one flips to the accent. "Modify" — not "Edit" — because the card's own
-// Edit button changes the PRESCRIPTION; this one records that YOU deviated.
-type TaskMode = 'rx' | 'edit' | null;
-function RxModifyChoice({ mode, onRx, onModify }: { mode: TaskMode; onRx: () => void; onModify: () => void }) {
-  const btn = (active: boolean): React.CSSProperties => ({
-    padding: '6px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-    fontFamily: "'Outfit', sans-serif", borderRadius: 8,
-    background: active ? 'var(--accent-dim, rgba(255,77,77,0.12))' : 'transparent',
-    border: `1px solid ${active ? 'var(--accent)' : '#ffffff'}`,
-    color: active ? 'var(--accent)' : 'var(--text)',
-  });
-  return (
-    <span style={{ display: 'inline-flex', gap: 8, flexShrink: 0 }}>
-      <button type="button" style={btn(mode === 'rx')} onClick={onRx}>
-        {mode === 'rx' ? '✓ Rx' : 'Rx'}
-      </button>
-      <button type="button" style={btn(mode === 'edit')} onClick={onModify}>
-        {mode === 'edit' ? '✓ Modify' : 'Modify'}
-      </button>
-    </span>
-  );
-}
-
-/** Compact one-line prescription summary — the card above already lists the
- *  work, so the confirmation view names it in one breath ("3×10 @ 50 lbs")
- *  instead of repeating every set as a row. Rows appear only under Modify. */
-function prescriptionSummary(m: ProgramMovementV2, showWeight: boolean, units: string): string {
-  const { count, prefill, unitLabel } = plannedSets(m);
-  const vals = prefill.filter((v): v is number => v != null);
-  let core: string;
-  if (vals.length === 0) {
-    core = `${count} set${count === 1 ? '' : 's'}`;
-  } else if (vals.length === count && vals.every(v => v === vals[0])) {
-    core = unitLabel === 'reps' ? `${count}×${vals[0]}` : `${count}×${vals[0]}${unitLabel === 'sec' ? 's' : unitLabel}`;
-  } else {
-    core = vals.join('-');
-  }
-  if (showWeight && m.weight != null) core += ` @ ${m.weight} ${m.weight_unit || units}`;
-  return core;
-}
-
-/** Fault chips folded behind a "Common faults" disclosure — exception-path
- *  input shouldn't occupy half the panel at rest. */
-function FaultsDisclosure({ children, count }: { children: React.ReactNode; count: number }) {
-  const [openFaults, setOpenFaults] = useState(false);
-  return (
-    <div style={{ marginTop: 8 }}>
-      <button
-        type="button"
-        onClick={() => setOpenFaults(o => !o)}
-        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, color: count > 0 ? 'var(--danger, #e74c3c)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, fontFamily: "'Outfit', sans-serif", display: 'inline-flex', alignItems: 'center', gap: 5 }}
-      >
-        Common faults{count > 0 ? ` (${count})` : ''}
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: openFaults ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9" /></svg>
-      </button>
-      {openFaults && children}
-    </div>
-  );
-}
-
-// ── RPE stepper: the one effort question per block ──
-// Starts unset ("—") and saves null when untouched — effort is asserted, never
-// prefilled (per-set RPE was prescription-prefilled noise; this is the fix's
-// block-level descendant). First tap lands mid-scale at 5.
-function RpeStepper({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
-  const bump = (d: number) => {
-    if (value == null) { onChange(5); return; }
-    onChange(Math.min(10, Math.max(1, value + d)));
-  };
-  const stepBtn: React.CSSProperties = {
-    width: 36, height: 36, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)',
-    color: 'var(--text)', fontSize: 18, fontWeight: 700, cursor: 'pointer', fontFamily: "'Outfit', sans-serif",
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-  };
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
-      <span style={{ fontSize: 12, color: 'var(--text-dim)', flex: 1 }}>How hard was this block? (RPE 1–10)</span>
-      <button type="button" style={stepBtn} onClick={() => bump(-1)} aria-label="Lower RPE">−</button>
-      <span style={{ width: 28, textAlign: 'center', fontSize: 16, fontWeight: 700, color: value != null ? 'var(--text)' : 'var(--text-muted)' }}>
-        {value ?? '—'}
-      </span>
-      <button type="button" style={stepBtn} onClick={() => bump(1)} aria-label="Raise RPE">+</button>
-    </div>
-  );
-}
-
-/** Notes + RPE + Save — the block-level tail of every panel. Save is gated by
- *  the panel (every task answered) so an untouched form can't write data. */
-function SaveFooter({ saving, canSave, onSave, rpe, onRpe, notes, onNotes }: {
-  saving: boolean; canSave: boolean;
-  onSave: () => void; rpe: number | null; onRpe: (v: number | null) => void;
+/** Additional notes + Save. Save lights up once anything is asserted. */
+function SaveFooter({ saving, canSave, onSave, notes, onNotes }: {
+  saving: boolean; canSave: boolean; onSave: () => void;
   notes: string; onNotes: (v: string) => void;
 }) {
   return (
     <>
-      <RpeStepper value={rpe} onChange={onRpe} />
       <input
-        style={{ ...inputStyle, textAlign: 'left', marginTop: 10 }}
-        placeholder="Notes (optional)"
+        style={{ ...inputStyle, textAlign: 'left', marginTop: 12 }}
+        placeholder="Additional notes (optional)"
         maxLength={1000}
         value={notes}
         onChange={e => onNotes(e.target.value)}
       />
-      <button type="button" className="auth-btn" style={{ width: '100%', marginTop: 8, opacity: canSave ? 1 : 0.5 }} onClick={onSave} disabled={saving || !canSave}>
+      <button type="button" className="auth-btn" style={{ width: '100%', marginTop: 10, opacity: canSave ? 1 : 0.45 }} onClick={onSave} disabled={saving || !canSave}>
         {saving ? 'Saving…' : 'Save block'}
       </button>
     </>
   );
 }
-const useChecked = () => {
-  const [checked, setChecked] = useState<Record<string, string[]>>({});
-  const toggle = (key: string, fault: string) => setChecked(prev => {
-    const cur = prev[key] ?? [];
-    return { ...prev, [key]: cur.includes(fault) ? cur.filter(f => f !== fault) : [...cur, fault] };
-  });
-  return { checked, toggle };
-};
 
-// ── Editable rows for a movement (the Edit path) ──
-// A row is a set, prefilled from the prescription; ✕ marks a set skipped
-// (saved completed:false — "planned 5, did 4" stays legible downstream).
+// ── Editable per-set rows (the Modify path) ──
 type RowState = { weight: string; value: string; skipped: boolean };
 function EditableRows({ m, rows, showWeight, units, onRow }: {
   m: ProgramMovementV2; rows: RowState[]; showWeight: boolean; units: string;
   onRow: (i: number, patch: Partial<RowState>) => void;
 }) {
   const { count, unitLabel } = plannedSets(m);
-  const iconBtn: React.CSSProperties = {
-    background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-    color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', flexShrink: 0,
-  };
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 0 2px' }}>
       {Array.from({ length: count }, (_, i) => {
         const r = rows[i] ?? { weight: '', value: '', skipped: false };
         if (r.skipped) {
@@ -398,7 +372,8 @@ function EditableRows({ m, rows, showWeight, units, onRow }: {
             {showWeight && <input style={{ ...inputStyle, flex: 1 }} inputMode="decimal" placeholder={units} value={r.weight} onChange={e => onRow(i, { weight: e.target.value })} />}
             <input style={{ ...inputStyle, flex: 1 }} inputMode="decimal" placeholder={unitLabel} value={r.value} onChange={e => onRow(i, { value: e.target.value })} />
             <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{unitLabel}</span>
-            <button type="button" style={iconBtn} title="Skip this set" onClick={() => onRow(i, { skipped: true })}>
+            <button type="button" title="Skip this set" onClick={() => onRow(i, { skipped: true })}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text-muted)', display: 'inline-flex', flexShrink: 0 }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
             </button>
           </div>
@@ -408,80 +383,134 @@ function EditableRows({ m, rows, showWeight, units, onRow }: {
   );
 }
 
-// ── Strength / skills / accessory: Rx-first per task ──
-// A TASK is one movement for skills/accessory; ALL movements for strength
-// (a complex is one bar cycle — you can't Rx the clean but edit the front
-// squat of the same complex). Each task shows its prescription read-only
-// with an Rx/Edit choice; faults sit per task (skills/accessory) or on the
-// block (strength); RPE + notes + Save close the block.
-function PerTaskLog({ block, controller, coaching, label, type, showWeight, faultsPerMovement }: {
+// ── Task state + hydration ──
+// A TASK is one movement (skills/accessory) or the whole movement group
+// (strength — a complex is one bar cycle, claimed together).
+interface TaskState {
+  claim: Claim;
+  /** Editor open right now — separate from the claim, so a saved Modified
+   *  task sits collapsed until deliberately reopened. */
+  expanded: boolean;
+  rpe: number | null;
+}
+function hydrateFromSnapshot(
+  tasks: ProgramMovementV2[][],
+  snap: SavedBlockSnapshot | null,
+  showWeight: boolean,
+): { states: Record<string, TaskState>; rows: Record<string, RowState[]>; checked: Record<string, string[]> } {
+  const states: Record<string, TaskState> = {};
+  const rows: Record<string, RowState[]> = {};
+  const checked: Record<string, string[]> = {};
+  const byMovement = new Map<string, SavedEntrySnapshot[]>();
+  for (const e of snap?.entries ?? []) {
+    const list = byMovement.get(e.movement) ?? [];
+    list.push(e);
+    byMovement.set(e.movement, list);
+  }
+  for (const t of tasks) {
+    const key = t.map((m) => m.id).join('+');
+    let claimed = false;
+    let anyDeviation = false;
+    let taskRpe: number | null = null;
+    for (const m of t) {
+      const { kind, count, prefill } = plannedSets(m);
+      const saved = (byMovement.get(m.movement) ?? []).sort((a, b) => (a.set_number ?? 0) - (b.set_number ?? 0));
+      const fresh = Array.from({ length: count }, (_, i) => ({
+        weight: m.weight != null ? String(m.weight) : '',
+        value: prefill[i] != null ? String(prefill[i]) : '',
+        skipped: false,
+      }));
+      if (saved.length > 0) {
+        claimed = true;
+        const faults = new Set<string>();
+        saved.forEach((e) => (e.faults_observed ?? []).forEach((f) => faults.add(f)));
+        if (faults.size > 0) checked[m.id] = [...faults];
+        for (let i = 0; i < count; i++) {
+          const e = saved[i];
+          if (!e) continue;
+          if (e.rpe != null && taskRpe == null) taskRpe = e.rpe;
+          if (e.completed === false) { fresh[i].skipped = true; anyDeviation = true; continue; }
+          const actual = kind === 'reps' ? e.reps : kind === 'seconds' ? e.hold_seconds : e.distance;
+          if (actual != null) fresh[i].value = String(actual);
+          if (showWeight && e.weight != null) fresh[i].weight = String(e.weight);
+          const matchesPlan = actual != null && prefill[i] != null && actual === prefill[i] &&
+            (!showWeight || e.weight == null || m.weight == null || e.weight === m.weight);
+          if (!matchesPlan) anyDeviation = true;
+        }
+      }
+      rows[m.id] = fresh;
+    }
+    states[key] = {
+      claim: claimed ? (anyDeviation ? 'mod' : 'rx') : null,
+      expanded: false,
+      rpe: taskRpe,
+    };
+  }
+  return { states, rows, checked };
+}
+
+// ── Strength / skills / accessory: the rows ARE the logger ──
+function RowLogger({ block, controller, coaching, label, type, showWeight, onSaved }: {
   block: ProgramBlockV2;
   controller: DayLogController;
   coaching: ReviewBlock | null;
   label: string;
   type: string;
   showWeight: boolean;
-  faultsPerMovement: boolean;
+  onSaved: () => void;
 }) {
   const saving = controller.saving === block.sort_order;
-  // strength → one task with every movement; others → one task per movement.
   const tasks: ProgramMovementV2[][] = useMemo(
-    () => (type === 'strength' ? [block.movements] : block.movements.map(m => [m])),
+    () => (type === 'strength' ? [block.movements] : block.movements.map((m) => [m])),
     [block, type],
   );
-  const taskKey = (t: ProgramMovementV2[]) => t.map(m => m.id).join('+');
+  const taskKey = (t: ProgramMovementV2[]) => t.map((m) => m.id).join('+');
+  const snap = controller.savedSnapshot?.(block.sort_order) ?? null;
+  const hydrated = useMemo(() => hydrateFromSnapshot(tasks, snap, showWeight), [tasks, snap, showWeight]);
 
-  const initialRows = useMemo(() => {
-    const rows: Record<string, RowState[]> = {};
-    for (const m of block.movements) {
-      const { count, prefill } = plannedSets(m);
-      rows[m.id] = Array.from({ length: count }, (_, i) => ({
-        weight: m.weight != null ? String(m.weight) : '',
-        value: prefill[i] != null ? String(prefill[i]) : '',
-        skipped: false,
-      }));
-    }
-    return rows;
-  }, [block]);
-  const [rows, setRows] = useState(initialRows);
-  const [modes, setModes] = useState<Record<string, TaskMode>>({});
-  const [rpe, setRpe] = useState<number | null>(null);
-  const [notes, setNotes] = useState('');
-  const { checked, toggle } = useChecked();
-  const sharedFaults = faultsPerMovement ? [] : blockFaults(coaching, block.movements);
+  const [states, setStates] = useState(hydrated.states);
+  const [rows, setRows] = useState(hydrated.rows);
+  const [checked, setChecked] = useState(hydrated.checked);
+  const [notes, setNotes] = useState(snap?.notes ?? '');
 
+  const setTask = (k: string, patch: Partial<TaskState>) =>
+    setStates((p) => ({ ...p, [k]: { ...p[k], ...patch } }));
   const setRow = (mId: string, i: number, patch: Partial<RowState>) =>
-    setRows(prev => ({ ...prev, [mId]: prev[mId].map((r, k) => (k === i ? { ...r, ...patch } : r)) }));
+    setRows((p) => ({ ...p, [mId]: p[mId].map((r, j) => (j === i ? { ...r, ...patch } : r)) }));
+  const toggleChip = (mId: string, f: string) =>
+    setChecked((p) => {
+      const cur = p[mId] ?? [];
+      return { ...p, [mId]: cur.includes(f) ? cur.filter((x) => x !== f) : [...cur, f] };
+    });
 
-  const allAnswered = tasks.every(t => modes[taskKey(t)] != null);
+  const anythingAsserted = tasks.some((t) => {
+    const st = states[taskKey(t)];
+    return st?.claim != null || st?.rpe != null;
+  }) || Object.values(checked).some((c) => c.length > 0) || notes.trim() !== '';
 
   const save = () => {
-    const blockFaultsChecked = checked['block'] ?? [];
     const entries: LogEntry[] = [];
-    for (const t of tasks) {
-      const mode = modes[taskKey(t)];
+    const claimedTasks = tasks.filter((t) => states[taskKey(t)]?.claim != null);
+    for (const t of claimedTasks) {
+      const st = states[taskKey(t)];
       for (const m of t) {
         const { kind, count, prefill } = plannedSets(m);
-        const movementFaults = faultsPerMovement ? (checked[m.id] ?? []) : blockFaultsChecked;
+        const movementFaults = checked[m.id] ?? [];
         for (let i = 0; i < count; i++) {
           const prescribed = {
             prescribed_weight: m.weight ?? null,
             prescribed_reps: kind === 'reps' ? (prefill[i] ?? null) : null,
           };
           const r = rows[m.id]?.[i] ?? { weight: '', value: '', skipped: false };
-          if (mode === 'edit' && r.skipped) {
-            // Recorded, not omitted: null actuals keep it out of e1RM/volume/
-            // hit-rate math; completed:false makes the skip itself the signal.
+          if (st.claim === 'mod' && r.skipped) {
             entries.push(emptyEntry(m.movement, {
               sets: 1, set_number: i + 1, completed: false, skip_reason: 'skipped',
-              weight_unit: m.weight_unit || controller.userUnits, ...prescribed,
+              weight_unit: m.weight_unit || controller.userUnits, rpe: st.rpe, ...prescribed,
             }));
             continue;
           }
-          // Rx → the prescription IS the actual (that's the claim being made).
-          // Edit → whatever the inputs hold.
-          const weightStr = mode === 'rx' ? (m.weight != null ? String(m.weight) : '') : r.weight;
-          const valueStr = mode === 'rx' ? (prefill[i] != null ? String(prefill[i]) : '') : r.value;
+          const weightStr = st.claim === 'rx' ? (m.weight != null ? String(m.weight) : '') : r.weight;
+          const valueStr = st.claim === 'rx' ? (prefill[i] != null ? String(prefill[i]) : '') : r.value;
           const v = kind === 'distance' ? numOrNull(valueStr) : intOrNull(valueStr);
           entries.push(emptyEntry(m.movement, {
             sets: 1,
@@ -492,140 +521,130 @@ function PerTaskLog({ block, controller, coaching, label, type, showWeight, faul
             distance_unit: kind === 'distance' ? (m.distance_unit ?? null) : null,
             weight: showWeight ? numOrNull(weightStr) : null,
             weight_unit: m.weight_unit || controller.userUnits,
+            rpe: st.rpe,
             faults_observed: movementFaults.length ? movementFaults : null,
             ...prescribed,
           }));
         }
       }
     }
+    const rpes = claimedTasks.map((t) => states[taskKey(t)].rpe).filter((v): v is number => v != null);
     controller.saveBlock({
       label: block.block_label || label, type, text: blockText(block), score: null,
-      rx: tasks.every(t => modes[taskKey(t)] === 'rx'),
+      rx: claimedTasks.length > 0 && claimedTasks.every((t) => states[taskKey(t)].claim === 'rx'),
       notes: notes.trim() || null,
-      sort_order: block.sort_order, entries, capped: false, capped_reps: null, rpe,
-    });
+      sort_order: block.sort_order, entries, capped: false, capped_reps: null,
+      rpe: rpes.length ? Math.max(...rpes) : null,
+    }).then((res) => { if (res) onSaved(); });
   };
 
-  // Faults for the whole panel fold behind ONE disclosure (per-movement
-  // chips grouped inside it) — exception-path input, closed at rest.
-  const taskFaults = (t: ProgramMovementV2[]) =>
-    t.flatMap((m) => faultsForMovement(coaching, m.movement));
-  const anyFaults = faultsPerMovement
-    ? tasks.some(t => taskFaults(t).length > 0)
-    : sharedFaults.length > 0;
-  const checkedCount = Object.values(checked).reduce((n, arr) => n + arr.length, 0);
-
   return (
-    <div className="block-log" style={wrapStyle}>
-      {tasks.map((t) => {
+    <div className="block-log">
+      {tasks.map((t, ti) => {
         const k = taskKey(t);
-        const mode = modes[k] ?? null;
+        const st = states[k] ?? { claim: null, expanded: false, rpe: null };
         const choice = (
           <RxModifyChoice
-            mode={mode}
-            onRx={() => setModes(p => ({ ...p, [k]: 'rx' }))}
-            onModify={() => setModes(p => ({ ...p, [k]: 'edit' }))}
+            claim={st.claim}
+            onRx={() => setTask(k, { claim: st.claim === 'rx' ? null : 'rx', expanded: false })}
+            onModify={() => st.claim === 'mod'
+              ? setTask(k, { expanded: !st.expanded })
+              : setTask(k, { claim: 'mod', expanded: true })}
           />
         );
-        // Single-movement task: one line — "Name · 3×10 @ 50 lbs   [Rx][Modify]".
-        // Multi-movement (strength complex): a summary line per movement, one
-        // choice for the group. Modify expands rows in place; Rx collapses back.
         return (
-          <div key={k} style={{ marginBottom: 12 }}>
-            {t.length === 1 ? (
-              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 13, minWidth: 0 }}>
-                  <span style={{ fontWeight: 600 }}>{formatMovementName(t[0].movement)}</span>
-                  <span style={{ color: 'var(--text-dim)' }}> · {prescriptionSummary(t[0], showWeight, controller.userUnits)}</span>
-                </span>
-                {choice}
-              </div>
-            ) : (
-              <>
+          <div key={k} style={{ padding: '10px 0', borderBottom: ti < tasks.length - 1 ? '1px dashed var(--border)' : 'none' }}>
+            {/* Name over grey prescription; buttons own the right side. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ flex: 1, minWidth: 0 }}>
                 {t.map((m) => (
-                  <div key={m.id} style={{ fontSize: 13, marginBottom: 2 }}>
-                    <span style={{ fontWeight: 600 }}>{formatMovementName(m.movement)}</span>
-                    <span style={{ color: 'var(--text-dim)' }}> · {prescriptionSummary(m, showWeight, controller.userUnits)}</span>
-                  </div>
+                  <span key={m.id} style={{ display: 'block' }}>
+                    <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{formatMovementName(m.movement)}</span>
+                    <span style={{ display: 'block', fontSize: 12, color: 'var(--text-dim)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                      {prescriptionText(m)}
+                    </span>
+                  </span>
                 ))}
-                <div style={{ marginTop: 6 }}>{choice}</div>
-              </>
-            )}
-            {mode === 'edit' && t.map((m) => (
-              <div key={m.id} style={{ marginTop: 8 }}>
-                {t.length > 1 && <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--text-dim)' }}>{formatMovementName(m.movement)}</div>}
+              </span>
+              {choice}
+            </div>
+            {st.claim === 'mod' && st.expanded && t.map((m) => (
+              <div key={m.id}>
+                {t.length > 1 && <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', marginTop: 6 }}>{formatMovementName(m.movement)}</div>}
                 <EditableRows m={m} rows={rows[m.id] ?? []} showWeight={showWeight} units={controller.userUnits} onRow={(i, p) => setRow(m.id, i, p)} />
               </div>
+            ))}
+            <div style={{ marginTop: 8 }}>
+              <RpeStepper value={st.rpe} onChange={(v) => setTask(k, { rpe: v })} />
+            </div>
+            {t.map((m) => (
+              <CoachNoteChips key={m.id} faults={faultsForMovement(coaching, m.movement)} checked={checked[m.id] ?? []} onToggle={(f) => toggleChip(m.id, f)} />
             ))}
           </div>
         );
       })}
-      {anyFaults && (
-        <FaultsDisclosure count={checkedCount}>
-          {faultsPerMovement
-            ? tasks.map(t => t.map((m) => {
-                const f = faultsForMovement(coaching, m.movement);
-                if (!f.length) return null;
-                return (
-                  <div key={m.id} style={{ marginTop: 6 }}>
-                    {tasks.length > 1 && <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4 }}>{formatMovementName(m.movement)}</div>}
-                    <FaultChips faults={f} checked={checked[m.id] ?? []} onToggle={(x) => toggle(m.id, x)} />
-                  </div>
-                );
-              }))
-            : <FaultChips faults={sharedFaults} checked={checked['block'] ?? []} onToggle={(f) => toggle('block', f)} />}
-        </FaultsDisclosure>
-      )}
-      <SaveFooter
-        saving={saving}
-        canSave={allAnswered}
-        onSave={save} rpe={rpe} onRpe={setRpe} notes={notes} onNotes={setNotes}
-      />
+      <SaveFooter saving={saving} canSave={anythingAsserted} onSave={save} notes={notes} onNotes={setNotes} />
     </div>
   );
 }
 
-// ── Metcon: one entity — score + Rx/Edit for the piece + faults + RPE ──
-// No Rx *checkbox* ambiguity anymore: Rx is the athlete's explicit claim
-// ("did the piece as written"); Edit opens per-movement actuals for what
-// changed (scaled the cleans, subbed a movement's volume). The score is the
-// result either way.
-function MetconLog({ block, controller, coaching }: { block: ProgramBlockV2; controller: DayLogController; coaching: ReviewBlock | null }) {
+// ── Metcon: one piece — score + one Rx/Modify + per-movement chips + RPE ──
+function MetconLog({ block, controller, coaching, onSaved }: {
+  block: ProgramBlockV2; controller: DayLogController; coaching: ReviewBlock | null; onSaved: () => void;
+}) {
   const saving = controller.saving === block.sort_order;
-  const [score, setScore] = useState('');
-  const [capped, setCapped] = useState(false);
+  const snap = controller.savedSnapshot?.(block.sort_order) ?? null;
+  const [score, setScore] = useState(snap?.score ?? '');
+  const [capped, setCapped] = useState(snap?.capped ?? false);
   const [cappedReps, setCappedReps] = useState('');
-  const [notes, setNotes] = useState('');
-  const [rpe, setRpe] = useState<number | null>(null);
-  const [mode, setMode] = useState<TaskMode>(null);
-  const { checked, toggle } = useChecked();
-  // Per-movement actuals for the Edit path: one row per movement, prefilled.
+  const [notes, setNotes] = useState(snap?.notes ?? '');
+  const [rpe, setRpe] = useState<number | null>(snap?.rpe ?? null);
+  const [claim, setClaim] = useState<Claim>(snap ? (snap.rx ? 'rx' : snap.entries.length ? 'mod' : null) : null);
+  const [checked, setChecked] = useState<Record<string, string[]>>(() => {
+    const c: Record<string, string[]> = {};
+    for (const m of block.movements) {
+      const faults = new Set<string>();
+      (snap?.entries ?? []).filter((e) => e.movement === m.movement)
+        .forEach((e) => (e.faults_observed ?? []).forEach((f) => faults.add(f)));
+      if (faults.size > 0) c[m.id] = [...faults];
+    }
+    return c;
+  });
+  const toggleChip = (mId: string, f: string) =>
+    setChecked((p) => {
+      const cur = p[mId] ?? [];
+      return { ...p, [mId]: cur.includes(f) ? cur.filter((x) => x !== f) : [...cur, f] };
+    });
+  // Per-movement actuals for the Modify path, hydrated from saved entries.
   const initialActuals = useMemo(() => {
     const a: Record<string, { weight: string; value: string }> = {};
     for (const m of block.movements) {
       const isCal = m.calories != null && m.calories > 0;
+      const saved = (snap?.entries ?? []).find((e) => e.movement === m.movement);
       a[m.id] = {
-        weight: m.weight != null ? String(m.weight) : '',
-        value: isCal ? String(m.calories) : m.reps != null ? String(m.reps) : m.distance != null ? String(m.distance) : '',
+        weight: saved?.weight != null ? String(saved.weight) : m.weight != null ? String(m.weight) : '',
+        value: saved != null
+          ? String((isCal ? saved.calories : saved.reps ?? saved.distance) ?? '')
+          : isCal ? String(m.calories) : m.reps != null ? String(m.reps) : m.distance != null ? String(m.distance) : '',
       };
     }
     return a;
-  }, [block]);
+  }, [block, snap]);
   const [actuals, setActuals] = useState(initialActuals);
-  // "Hit the cap" only applies to for-time work; AMRAP/EMOM score IS rounds+reps.
   const isForTime = inferMetconType(block) === 'for_time';
   const roundSize = metconRoundSize(block);
   const capTotal = capped ? parseCapProgress(cappedReps, roundSize) : null;
+  const anythingAsserted = claim != null || score.trim() !== '' || capped || rpe != null ||
+    Object.values(checked).some((c) => c.length > 0) || notes.trim() !== '';
   const save = () => {
     const entries: LogEntry[] = block.movements.map((m) => {
       const isCal = m.calories != null && m.calories > 0;
       const f = checked[m.id] ?? [];
       const a = actuals[m.id] ?? { weight: '', value: '' };
-      const useEdited = mode === 'edit';
+      const useEdited = claim === 'mod';
       const editedVal = numOrNull(a.value);
       return emptyEntry(m.movement, {
-        // Calories are calories — never reps with a phantom unit.
-        reps: isCal ? null : (useEdited ? (Number.isInteger(editedVal) ? editedVal : intOrNull(a.value)) : (m.reps ?? null)),
+        reps: isCal ? null : (useEdited ? intOrNull(a.value) : (m.reps ?? null)),
         calories: isCal ? (useEdited ? editedVal : (m.calories ?? null)) : null,
         weight: useEdited ? numOrNull(a.weight) : (m.weight ?? null),
         weight_unit: m.weight_unit || controller.userUnits,
@@ -639,12 +658,10 @@ function MetconLog({ block, controller, coaching }: { block: ProgramBlockV2; con
     const wType = inferMetconType(block);
     const text = [block.block_scheme, block.block_label].filter(Boolean).join('\n');
     const scoring = !capped && score.trim() && benchmark ? scoreMetcon(score.trim(), wType, benchmark) : null;
-    // Capped: the athlete's time IS the cap — save it as the score so a capped
-    // workout is distinguishable from an unlogged one. capped:true marks it.
     const cappedScore = block.time_cap_seconds != null ? formatClock(block.time_cap_seconds) : null;
     controller.saveBlock({
       label: block.block_label || 'Metcon', type: 'metcon', text: blockText(block),
-      score: capped ? cappedScore : (score.trim() || null), rx: mode === 'rx', notes: notes.trim() || null,
+      score: capped ? cappedScore : (score.trim() || null), rx: claim === 'rx', notes: notes.trim() || null,
       sort_order: block.sort_order, entries, capped, capped_reps: capped ? capTotal : null,
       rpe,
       block_scheme: block.block_scheme, time_cap_seconds: block.time_cap_seconds,
@@ -652,16 +669,14 @@ function MetconLog({ block, controller, coaching }: { block: ProgramBlockV2; con
       median_benchmark: benchmark && benchmark.medianScore !== '--' ? benchmark.medianScore : null,
       excellent_benchmark: benchmark && benchmark.excellentScore !== '--' ? benchmark.excellentScore : null,
       time_domain: deriveTimeDomain(wType, text, benchmark?.medianScore ?? null),
-    });
+    }).then((res) => { if (res) onSaved(); });
   };
   return (
-    <div className="block-log" style={wrapStyle}>
-      {!capped && (
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{isForTime ? 'Result (time)' : 'Result (rounds + reps)'}</div>
-          <input style={{ ...inputStyle, textAlign: 'left' }} placeholder={isForTime ? 'e.g. 12:34' : 'e.g. 5+18'} value={score} onChange={e => setScore(e.target.value)} />
-        </div>
-      )}
+    <div className="block-log">
+      <div style={{ margin: '10px 0 8px' }}>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{isForTime ? 'Result (time)' : 'Result (rounds + reps)'}</div>
+        {!capped && <input style={{ ...inputStyle, textAlign: 'left' }} placeholder={isForTime ? 'e.g. 12:34' : 'e.g. 5+18'} value={score} onChange={e => setScore(e.target.value)} />}
+      </div>
       {isForTime && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', marginBottom: 8 }}>
           <label style={{ fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={capped} onChange={e => setCapped(e.target.checked)} /> Hit the cap</label>
@@ -680,8 +695,8 @@ function MetconLog({ block, controller, coaching }: { block: ProgramBlockV2; con
           )}
         </div>
       )}
-      {mode === 'edit' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 4 }}>
+      {claim === 'mod' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
           {block.movements.map((m) => {
             const isCal = m.calories != null && m.calories > 0;
             const a = actuals[m.id] ?? { weight: '', value: '' };
@@ -702,143 +717,111 @@ function MetconLog({ block, controller, coaching }: { block: ProgramBlockV2; con
           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Per-round numbers — record what you actually did.</div>
         </div>
       )}
-      <div style={{ marginTop: 4 }}>
-        <RxModifyChoice mode={mode} onRx={() => setMode('rx')} onModify={() => setMode('edit')} />
-      </div>
-      {block.movements.some((m) => faultsForMovement(coaching, m.movement).length > 0) && (
-        <FaultsDisclosure count={Object.values(checked).reduce((n, arr) => n + arr.length, 0)}>
-          {block.movements.map((m) => {
-            const mFaults = faultsForMovement(coaching, m.movement);
-            if (!mFaults.length) return null;
-            return (
-              <div key={m.id} style={{ marginTop: 6 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4 }}>{formatMovementName(m.movement)}</div>
-                <FaultChips faults={mFaults} checked={checked[m.id] ?? []} onToggle={(f) => toggle(m.id, f)} />
-              </div>
-            );
-          })}
-        </FaultsDisclosure>
-      )}
-      <SaveFooter
-        saving={saving}
-        canSave={mode != null}
-        onSave={save} rpe={rpe} onRpe={setRpe} notes={notes} onNotes={setNotes}
+      <RxModifyChoice
+        claim={claim}
+        onRx={() => setClaim(claim === 'rx' ? null : 'rx')}
+        onModify={() => setClaim(claim === 'mod' ? null : 'mod')}
       />
+      <div style={{ marginTop: 10 }}>
+        <RpeStepper value={rpe} onChange={setRpe} />
+      </div>
+      {block.movements.map((m) => (
+        <CoachNoteChips key={m.id} faults={faultsForMovement(coaching, m.movement)} checked={checked[m.id] ?? []} onToggle={(f) => toggleChip(m.id, f)} />
+      ))}
+      <SaveFooter saving={saving} canSave={anythingAsserted} onSave={save} notes={notes} onNotes={setNotes} />
     </div>
   );
 }
 
 // ── Cardio: machine avg watts + work time (power) ──
-// The actuals are inherently manual (no prescription can prefill your output),
-// so cardio keeps its two fields; Rx/Edit would have nothing to claim beyond
-// them. Gate: at least one field entered.
-function CardioLog({ block, controller }: { block: ProgramBlockV2; controller: DayLogController }) {
+function CardioLog({ block, controller, onSaved }: { block: ProgramBlockV2; controller: DayLogController; onSaved: () => void }) {
   const saving = controller.saving === block.sort_order;
+  const snap = controller.savedSnapshot?.(block.sort_order) ?? null;
   const [watts, setWatts] = useState('');
   const [time, setTime] = useState('');
-  const [rpe, setRpe] = useState<number | null>(null);
-  const [notes, setNotes] = useState('');
+  const [rpe, setRpe] = useState<number | null>(snap?.rpe ?? null);
+  const [notes, setNotes] = useState(snap?.notes ?? '');
   const save = () => {
-    const entries: LogEntry[] = block.movements.map((m) => emptyEntry(m.movement, { distance: m.distance ?? null, distance_unit: m.distance_unit ?? null }));
+    const entries: LogEntry[] = block.movements.map((m) => emptyEntry(m.movement, { distance: m.distance ?? null, distance_unit: m.distance_unit ?? null, rpe }));
     controller.saveBlock({
       label: block.block_label || 'Cardio', type: 'cardio', text: blockText(block), score: null, rx: false, notes: notes.trim() || null,
       sort_order: block.sort_order, entries, capped: false, capped_reps: null, rpe,
       cardio_avg_watts: numOrNull(watts), cardio_work_seconds: parseClock(time), cardio_modality: null,
-    });
+    }).then((res) => { if (res) onSaved(); });
   };
-  const canSave = watts.trim() !== '' || time.trim() !== '';
+  const canSave = watts.trim() !== '' || time.trim() !== '' || rpe != null || notes.trim() !== '';
   return (
-    <div className="block-log" style={wrapStyle}>
+    <div className="block-log" style={{ marginTop: 10 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Avg watts</div><input style={inputStyle} inputMode="decimal" placeholder="watts" value={watts} onChange={e => setWatts(e.target.value)} /></div>
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Work time</div><input style={inputStyle} placeholder="mm:ss" value={time} onChange={e => setTime(e.target.value)} /></div>
       </div>
-      <SaveFooter
-        saving={saving}
-        canSave={canSave}
-        onSave={save} rpe={rpe} onRpe={setRpe} notes={notes} onNotes={setNotes}
-      />
+      <div style={{ marginTop: 8 }}>
+        <RpeStepper value={rpe} onChange={setRpe} />
+      </div>
+      <SaveFooter saving={saving} canSave={canSave} onSave={save} notes={notes} onNotes={setNotes} />
     </div>
   );
 }
 
-// ── Saved badge: the collapsed card becomes a status line ──
-function SavedBadge({ meta, onEdit }: { meta: SavedBlockMeta | null; onEdit: () => void }) {
-  const label = meta?.skipped
-    ? 'Skipped'
-    : `${meta?.rx ? 'Rx' : meta ? 'Modified' : 'Logged'}${meta?.rpe != null ? ` · RPE ${meta.rpe}` : ''}`;
-  const skipped = meta?.skipped === true;
-  return (
-    <div className="block-log" style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-      <span style={{ fontSize: 13, fontWeight: 700, color: skipped ? 'var(--text-muted)' : 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-        {!skipped && (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-        )}
-        {label}
-      </span>
-      <button type="button" className="block-ai-edit-toggle" onClick={onEdit}>Edit</button>
-    </div>
-  );
-}
-
-// ── Dispatcher ──
-function renderWorld(block: ProgramBlockV2, controller: DayLogController, coaching: ReviewBlock | null) {
-  switch (block.block_type) {
-    case 'strength':
-      return <PerTaskLog block={block} controller={controller} coaching={coaching} label="Strength" type="strength" showWeight faultsPerMovement={false} />;
-    case 'metcon':
-      return <MetconLog block={block} controller={controller} coaching={coaching} />;
-    case 'skills':
-      return <PerTaskLog block={block} controller={controller} coaching={coaching} label="Skills" type="skills" showWeight={false} faultsPerMovement />;
-    case 'accessory':
-      return <PerTaskLog block={block} controller={controller} coaching={coaching} label="Accessory" type="accessory" showWeight faultsPerMovement />;
-    case 'cardio':
-      return <CardioLog block={block} controller={controller} />;
-    default: return null;
-  }
-}
 const LOGGABLE_TYPES = ['strength', 'metcon', 'skills', 'accessory', 'cardio'];
+/** Strength/skills/accessory replace the card's movement list while open —
+ *  their rows ARE the logger. Metcon and cardio panels are fields below the
+ *  rows (score, watts), so the plan rows stay visible for context. */
+const ROW_LOGGER_TYPES = ['strength', 'skills', 'accessory'];
 
-export default function BlockLog({ block, controller, coaching, onEnsureCoaching }: {
+export default function BlockLog({ block, controller, coaching, onEnsureCoaching, onOpenChange }: {
   block: ProgramBlockV2;
   controller: DayLogController;
   coaching?: ReviewBlock | null;
   onEnsureCoaching?: () => void;
+  /** Fires when the logger opens/closes so the parent card can hide its own
+   *  movement rows while the logger's live rows are showing. */
+  onOpenChange?: (open: boolean) => void;
 }) {
-  // Collapsed by default — the day reads as a workout; you open the block you're
-  // doing, log it, and it collapses to a status line. Each block opens independently.
-  const [open, setOpen] = useState(false);
+  const [open, setOpenRaw] = useState(false);
+  const setOpen = (o: boolean) => { setOpenRaw(o); onOpenChange?.(o && ROW_LOGGER_TYPES.includes(block.block_type)); };
   if (!LOGGABLE_TYPES.includes(block.block_type)) return null;
 
-  if (controller.isSaved(block.sort_order)) {
-    return <SavedBadge meta={controller.savedMeta?.(block.sort_order) ?? null} onEdit={() => { controller.reopen(block.sort_order); setOpen(true); }} />;
-  }
+  const saved = controller.isSaved(block.sort_order);
+  const snap = controller.savedSnapshot?.(block.sort_order) ?? null;
+  const complete = saved && blockFullyLogged(block, snap);
 
   if (!open) {
     return (
-      <div style={{ textAlign: 'center', marginTop: 10 }}>
+      <div style={{ marginTop: 12 }}>
         <button
           type="button"
           onClick={() => { setOpen(true); onEnsureCoaching?.(); }}
-          style={{ padding: '7px 14px', background: 'transparent', border: '1px solid #ffffff', borderRadius: 8, color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: "'Outfit', sans-serif" }}
+          style={{ padding: '7px 16px', background: 'transparent', border: '1px solid var(--accent)', borderRadius: 8, color: 'var(--text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Outfit', sans-serif" }}
         >
-          Log block
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+          {complete ? 'Edit log' : 'Log block'}
         </button>
       </div>
     );
   }
+  const onSaved = () => setOpen(false);
   return (
     <div>
       <button
         type="button"
         onClick={() => setOpen(false)}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, cursor: 'pointer', marginTop: 10, padding: '4px 0', fontFamily: "'Outfit', sans-serif" }}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--accent)', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, cursor: 'pointer', marginTop: 10, padding: '4px 0', fontFamily: "'Outfit', sans-serif" }}
       >
         Log
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
       </button>
-      {renderWorld(block, controller, coaching ?? null)}
+      {block.block_type === 'metcon'
+        ? <MetconLog block={block} controller={controller} coaching={coaching ?? null} onSaved={onSaved} />
+        : block.block_type === 'cardio'
+          ? <CardioLog block={block} controller={controller} onSaved={onSaved} />
+          : <RowLogger
+              block={block} controller={controller} coaching={coaching ?? null}
+              label={block.block_type === 'strength' ? 'Strength' : block.block_type === 'skills' ? 'Skills' : 'Accessory'}
+              type={block.block_type}
+              showWeight={block.block_type !== 'skills'}
+              onSaved={onSaved}
+            />}
     </div>
   );
 }

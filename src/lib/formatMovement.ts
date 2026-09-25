@@ -82,3 +82,12 @@ export function formatMovementLine(m: DisplayMovement): string {
   const scheme = parts.length > 0 ? ` — ${parts.join(' · ')}` : '';
   return `${m.movement}${scheme}`;
 }
+
+/** The prescription alone, no movement name — the log panel's grey line
+ *  ("3×10 · 50lbs"). Same parts formatMovementLine builds, same precedence,
+ *  so the plan row and the log row can never disagree. */
+export function prescriptionText(m: DisplayMovement): string {
+  const line = formatMovementLine(m);
+  const sep = line.indexOf(' \u2014 ');
+  return sep === -1 ? '' : line.slice(sep + 3);
+}

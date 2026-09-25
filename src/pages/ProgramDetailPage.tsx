@@ -9,7 +9,7 @@ import Nav from '../components/Nav';
 import WorkoutBlocksDisplay, { BlockContent } from '../components/WorkoutBlocksDisplay';
 import { BlockCoachingBody, coachingForBlockType, formatReviewMarkdown, CHEVRON_DOWN, type ReviewBlock } from '../components/reviewCoaching';
 import { useWorkoutReview } from '../lib/useWorkoutReview';
-import BlockLog, { type DayLogController } from '../components/blockLog';
+import BlockLog, { type DayLogController, loggedMovementNames, blockFullyLogged } from '../components/blockLog';
 import { formatMovementName } from '../lib/movementName';
 
 interface ProgramBlock {
@@ -1467,7 +1467,13 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
   const showCoach = !!canCoach && COACHABLE_BLOCK_TYPES.includes(block.block_type);
   // Logged blocks dim to read as "done". The Log/Edit footer stays full-bright
   // (rendered outside the dimmed wrapper). Editing un-dims so fields are clear.
-  const isLogged = !!logging && !editing && logging.isSaved(block.sort_order);
+  const savedSnap = logging?.savedSnapshot?.(block.sort_order) ?? null;
+  const loggedNames = loggedMovementNames(savedSnap);
+  const fullyLogged = !!logging && logging.isSaved(block.sort_order) && blockFullyLogged(block, savedSnap);
+  const isLogged = fullyLogged && !editing;
+  // Rows-as-logger: while the log panel is open (strength/skills/accessory),
+  // BlockLog renders the movement rows itself — hide the card's own copy.
+  const [logOpen, setLogOpen] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
   const toggleCoach = () => { const n = !coachOpen; setCoachOpen(n); if (n) onEnsureCoaching?.(); };
   // Logged blocks render collapsed — done work gets out of the way so the
@@ -1568,10 +1574,10 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
           ratio justification) — kept in the DB for admin/eval, not shown to the
           athlete. Execution cues live in each movement's scaling_note. */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {block.movements.map((m) => (
+        {!(logOpen && !editing) && block.movements.map((m) => (
           editing
             ? <V3MovementEditRow key={m.id} movement={m} onUpdate={onUpdateMovement!} onRemove={onRemoveMovement} />
-            : <V3MovementRow key={m.id} movement={m} />
+            : <V3MovementRow key={m.id} movement={m} logged={loggedNames.has(m.movement)} />
         ))}
         {editing && onAddMovement && (
           <button type="button" className="movement-add-btn" onClick={() => onAddMovement(block.id)}>
@@ -1581,7 +1587,7 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
       </div>
       </div>
 
-      {logging && !editing && <BlockLog block={block} controller={logging} coaching={coaching ?? null} onEnsureCoaching={onEnsureCoaching} />}
+      {logging && !editing && <BlockLog block={block} controller={logging} coaching={coaching ?? null} onEnsureCoaching={onEnsureCoaching} onOpenChange={setLogOpen} />}
 
       {showCoach && coachOpen && (
         <div className="block-coach-body" style={{ marginTop: 10 }}>
@@ -1623,7 +1629,7 @@ export function movementToLine(m: BlockProposalMovement): string {
   return `${m.movement}${presc ? `  ${presc}` : ''}${scaling}`;
 }
 
-function V3MovementRow({ movement }: { movement: ProgramMovementV2 }) {
+function V3MovementRow({ movement, logged }: { movement: ProgramMovementV2; logged?: boolean }) {
   const parts: string[] = [];
   // Distance-based movements (row/run/bike/etc.) use distance as the work
   // spec; reps is meaningless there. Writer sometimes emits both — prefer
@@ -1653,6 +1659,7 @@ function V3MovementRow({ movement }: { movement: ProgramMovementV2 }) {
     }}>
       <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', flex: '0 0 auto' }}>
         {formatMovementName(movement.movement)}
+        {logged && <span style={{ color: 'var(--accent)', fontWeight: 700, marginLeft: 6 }}>✓</span>}
       </span>
       {prescription && (
         <span style={{
