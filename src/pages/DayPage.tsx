@@ -9,7 +9,7 @@ import {
   V3DayView, v3BlocksToProse,
   type ProgramBlockV2, type ProgramMovementV2,
 } from './ProgramDetailPage';
-import type { DayLogController, SaveBlockPayload } from '../components/blockLog';
+import type { DayLogController, SaveBlockPayload, SavedBlockSnapshot, SavedEntrySnapshot } from '../components/blockLog';
 
 // DayPage — the single surface for an AI-programming training day. Renders the
 // real V3DayView (colored cards + per-block Edit / Coach ▾ + Session
@@ -80,6 +80,7 @@ export default function DayPage(_props: { session: Session }) {
   const [userUnits, setUserUnits] = useState<'lbs' | 'kg'>('lbs');
   const [logId, setLogId] = useState<string | null>(null);
   const [savedSorts, setSavedSorts] = useState<Set<number>>(new Set());
+  const [snapshots, setSnapshots] = useState<Record<number, SavedBlockSnapshot>>({});
   const [savingSort, setSavingSort] = useState<number | null>(null);
 
   // Resume any in-progress log for this workout + the user's unit preference.
@@ -95,8 +96,35 @@ export default function DayPage(_props: { session: Session }) {
       if (prof?.units === 'kg') setUserUnits('kg');
       if (ipLog?.id) {
         setLogId(ipLog.id);
-        const { data: savedBlocks } = await supabase.from('workout_log_blocks').select('sort_order').eq('log_id', ipLog.id);
-        if (active && savedBlocks) setSavedSorts(new Set((savedBlocks as { sort_order: number }[]).map(b => b.sort_order)));
+        // Full snapshots so the log panel can REHYDRATE saved claims after a
+        // reload — re-save replaces the whole block record, so reopening
+        // without the earlier assertions would silently erase them.
+        const [{ data: savedBlocks }, { data: savedEntries }] = await Promise.all([
+          supabase.from('workout_log_blocks').select('id, sort_order, rx, rpe, notes, score, capped').eq('log_id', ipLog.id),
+          supabase.from('workout_log_entries')
+            .select('block_id, movement, set_number, reps, hold_seconds, distance, weight, rpe, calories, faults_observed, completed, skip_reason')
+            .eq('log_id', ipLog.id),
+        ]);
+        if (active && savedBlocks) {
+          const rows = savedBlocks as { id: string; sort_order: number; rx: boolean | null; rpe: number | null; notes: string | null; score: string | null; capped: boolean | null }[];
+          const entryRows = ((savedEntries as (SavedEntrySnapshot & { block_id: string | null })[] | null) ?? []);
+          const byBlockId = new Map<string, SavedEntrySnapshot[]>();
+          for (const e of entryRows) {
+            if (!e.block_id) continue;
+            const list = byBlockId.get(e.block_id) ?? [];
+            list.push(e);
+            byBlockId.set(e.block_id, list);
+          }
+          setSavedSorts(new Set(rows.map(b => b.sort_order)));
+          setSnapshots(Object.fromEntries(rows.map(b => [
+            b.sort_order,
+            {
+              rx: b.rx === true, rpe: b.rpe ?? null, notes: b.notes ?? null,
+              score: b.score ?? null, capped: b.capped === true,
+              entries: byBlockId.get(b.id) ?? [],
+            } satisfies SavedBlockSnapshot,
+          ])));
+        }
       }
     })();
     return () => { active = false; };
@@ -111,6 +139,24 @@ export default function DayPage(_props: { session: Session }) {
       if (error || data?.error) return null;
       if (data?.log_id && !logId) setLogId(data.log_id);
       setSavedSorts(prev => new Set(prev).add(block.sort_order));
+      // Snapshot from the payload itself — what was just written is what a
+      // reopened panel must rehydrate from.
+      setSnapshots(prev => ({
+        ...prev,
+        [block.sort_order]: {
+          rx: block.rx,
+          rpe: block.rpe ?? null,
+          notes: block.notes ?? null,
+          score: block.score ?? null,
+          capped: block.capped,
+          entries: block.entries.map(e => ({
+            movement: e.movement, set_number: e.set_number, reps: e.reps,
+            hold_seconds: e.hold_seconds, distance: e.distance, weight: e.weight,
+            rpe: e.rpe, calories: e.calories, faults_observed: e.faults_observed,
+            completed: e.completed, skip_reason: e.skip_reason,
+          })),
+        },
+      }));
       return { auto_completed: data?.auto_completed };
     } finally {
       setSavingSort(null);
@@ -123,7 +169,8 @@ export default function DayPage(_props: { session: Session }) {
     saving: savingSort,
     saveBlock,
     reopen: (s) => setSavedSorts(prev => { const n = new Set(prev); n.delete(s); return n; }),
-  }), [workoutDate, userUnits, savedSorts, savingSort, saveBlock]);
+    savedSnapshot: (s) => snapshots[s] ?? null,
+  }), [workoutDate, userUnits, savedSorts, snapshots, savingSort, saveBlock]);
 
   // ── Edit handlers (operate on this page's flat blocks state) ──
   const updateMovementField = async (movementId: string, patch: Partial<ProgramMovementV2>) => {

@@ -92,7 +92,7 @@ Rules:
 - Do NOT include a "prescription" field — it is injected separately.
 - Provide cues_and_faults for EVERY movement in the metcon.
 - Cues: 2-3 actionable points of performance per movement. Personalize using athlete profile (e.g. specific loads from their 1RMs, scaling based on their skill level).
-- Common faults: 1-2 most common errors at the prescribed intensity/volume.
+- Common faults: 1-2 most common errors at the prescribed intensity/volume. Phrase each fault as a BRIEF past-tense observable the athlete can tap to self-report in the log (≤6 words, e.g. "Lost leg drive late sets", "Bar drifted toward face") — what happened, NEVER the correction (corrections belong in cues), never full range of motion, never a sensible scaling.
 - time_domain must include pacing strategy and what will limit this specific athlete; do NOT restate the movements, reps, or scheme (already on the card).
 - Ground advice in the provided reference material when available.
 - Use recent training to account for fatigue or similar recent volume.
@@ -114,7 +114,7 @@ Rules:
 - Do NOT include a "prescription" field — it is injected separately.
 - Provide cues_and_faults for EVERY lift in the strength block.
 - Cues: 2-3 actionable points of performance per lift. Personalize using athlete profile — calculate specific working weights from their 1RMs (e.g. "75% of 300lb back squat = 225lb").
-- Common faults: 1-2 most common errors at the prescribed intensity.
+- Common faults: 1-2 most common errors at the prescribed intensity. Phrase each fault as a BRIEF past-tense observable the athlete can tap to self-report in the log (≤6 words, e.g. "Lost leg drive late sets", "Bar drifted toward face") — what happened, NEVER the correction (corrections belong in cues), never full range of motion, never a sensible scaling.
 - time_domain focuses on RPE progression and the strategic judgment call; do NOT restate rest/sets/reps/% (already on the card).
 - Ground advice in the provided reference material when available (periodization, load management, biomechanics).
 - Use recent training to account for fatigue or similar recent volume.
@@ -136,7 +136,7 @@ Rules:
 - Do NOT include a "prescription" field — it is injected separately.
 - Provide cues_and_faults for EVERY movement in the skills block.
 - Cues: 2-3 actionable points of performance per movement. Personalize using athlete profile — if the athlete can't do the movement as written, provide a progression path and scaling option.
-- Common faults: 1-2 most common errors for that movement.
+- Common faults: 1-2 most common errors for that movement. Phrase each fault as a BRIEF past-tense observable the athlete can tap to self-report in the log (≤6 words, e.g. "Lost leg drive late sets", "Bar drifted toward face") — what happened, NEVER the correction (corrections belong in cues), never full range of motion, never a sensible scaling.
 - time_domain gives the session priority/focus and a duration estimate; do NOT restate the format/structure (already on the card).
 - Ground advice in the provided reference material when available (progressions, skill transfer, quality metrics).
 - Use recent training to account for recent practice or fatigue.
@@ -169,7 +169,7 @@ Rules:
 - Provide cues_and_faults for EVERY movement in the accessory block.
 - Accessory work targets supporting strength, hypertrophy, and structural balance — emphasize controlled tempo, full range of motion, and quality over load.
 - Cues: 2-3 actionable points of performance per movement (positioning, tempo, mind-muscle, what "good" looks like at the prescribed load).
-- Common faults: 1-2 most common errors — typically using momentum, partial range of motion, losing midline/posture, or chasing load over control.
+- Common faults: 1-2 most common errors — typically using momentum, partial range of motion, losing midline/posture, or chasing load over control. Phrase each fault as a BRIEF past-tense observable the athlete can tap to self-report in the log (≤6 words, e.g. "Lost leg drive late sets", "Bar drifted toward face") — what happened, NEVER the correction (corrections belong in cues), never full range of motion, never a sensible scaling.
 - time_domain gives the quality focus and a duration estimate; do NOT restate sets/reps/rest (already on the card).
 - Ground advice in the provided reference material when available.
 - Be concise and practical. Athlete-focused voice.`;
