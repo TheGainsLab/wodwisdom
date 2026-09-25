@@ -12,41 +12,36 @@ import {
   validateBlockProposal,
 } from "./block-edit.ts";
 
-const VOCAB = ["Back Squat", "Strict Press", "Dumbbell Bench Press", "Row", "Wall Ball"];
-
 function proposal(movements: BlockPrescription["movements"]): BlockPrescription {
   return { block_type: "strength", block_scheme: "4x5", movements };
 }
 
 Deno.test("a legal proposal passes", () => {
   const p = proposal([{ movement: "Dumbbell Bench Press", sets: 4, reps: 8, weight: 50 }]);
-  assertEquals(validateBlockProposal(p, { doNotProgram: [], vocabulary: VOCAB }), []);
+  assertEquals(validateBlockProposal(p, { doNotProgram: [] }), []);
 });
 
 Deno.test("do-not-program is absolute — even by exact name", () => {
   const p = proposal([{ movement: "Back Squat", sets: 4, reps: 5, weight: 225 }]);
-  const problems = validateBlockProposal(p, { doNotProgram: ["Back Squat"], vocabulary: VOCAB });
+  const problems = validateBlockProposal(p, { doNotProgram: ["Back Squat"] });
   assert(problems.some((s) => s.includes("do-not-program")));
 });
 
-Deno.test("out-of-vocabulary movements are rejected; empty vocabulary skips the check", () => {
-  const p = proposal([{ movement: "Invented Machine Slam", sets: 3, reps: 10 }]);
-  const problems = validateBlockProposal(p, { doNotProgram: [], vocabulary: VOCAB });
-  assert(problems.some((s) => s.includes("vocabulary")));
-  // Soft-fail posture: if the vocabulary fetch came back empty, don't reject everything.
-  assertEquals(validateBlockProposal(p, { doNotProgram: [], vocabulary: [] }), []);
+Deno.test("movement naming is free — off-catalog names pass (2026-09: Echo Bike / KB Row)", () => {
+  const p = proposal([{ movement: "Kettlebell Row", sets: 3, reps: 10, weight: 40 }]);
+  assertEquals(validateBlockProposal(p, { doNotProgram: [] }), []);
 });
 
 Deno.test("movements need a name and at least one volume specifier", () => {
   const noWork = proposal([{ movement: "Strict Press" }]);
-  assert(validateBlockProposal(noWork, { doNotProgram: [], vocabulary: VOCAB })
+  assert(validateBlockProposal(noWork, { doNotProgram: [] })
     .some((s) => s.includes("no work specified")));
   const empty = proposal([]);
-  assert(validateBlockProposal(empty, { doNotProgram: [], vocabulary: VOCAB })
+  assert(validateBlockProposal(empty, { doNotProgram: [] })
     .some((s) => s.includes("no movements")));
   // rep_scheme alone is a valid specifier (the writer's preferred shape).
   const schemeOnly = proposal([{ movement: "Wall Ball", rep_scheme: [21, 15, 9] }]);
-  assertEquals(validateBlockProposal(schemeOnly, { doNotProgram: [], vocabulary: VOCAB }), []);
+  assertEquals(validateBlockProposal(schemeOnly, { doNotProgram: [] }), []);
 });
 
 Deno.test("reconcileReps matches the client: reps = sum of cleaned scheme", () => {

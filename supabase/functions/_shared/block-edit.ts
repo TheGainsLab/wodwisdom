@@ -11,7 +11,10 @@
  *     writer uses, so an edited block is indistinguishable from a generated
  *     one — logging, review, history, and next-cycle reads all keep working.
  *   - Validation is server-side and BEFORE the athlete sees anything: the
- *     do_not_program list is absolute, movements come from the vocabulary.
+ *     do_not_program list is absolute; movement naming is FREE (the same
+ *     2026-05 decision the generator made — a curated catalog can't contain
+ *     every movement an athlete's garage can, and two users were blocked in
+ *     Sept '26 asking for Echo Bike / KB Row swaps).
  *     An illegal proposal bounces back to the model, never to the athlete.
  *   - Apply is server-side (apply-block-edit fn): write rows, mark the
  *     ai_edit_log row accepted, and for metcons null-then-recompute the
@@ -28,7 +31,6 @@ import {
 } from "./v2-output-schema.ts";
 import {
   computeMergedAvoidance,
-  fetchVocabulary,
   type AvoidanceConfirmed,
   type InjuryConstraints,
 } from "./build-writer-payload.ts";
@@ -153,7 +155,6 @@ export interface BlockEditContext {
   gender: string | null;
   doNotProgram: string[];
   injuryNotes: string;
-  vocabulary: string[];
   /** Compact object rendered into the coach's prompt. */
   promptContext: Record<string, unknown>;
 }
@@ -162,12 +163,11 @@ export async function buildBlockEditContext(
   supa: SupabaseClient,
   userId: string,
 ): Promise<BlockEditContext> {
-  const [{ data: profile }, vocabulary, recentLoad] = await Promise.all([
+  const [{ data: profile }, recentLoad] = await Promise.all([
     supa.from("athlete_profiles")
       .select("lifts, equipment, units, gender, injuries_constraints, injuries_structured, injuries_constraints_hash, injuries_avoidance_confirmed")
       .eq("user_id", userId)
       .maybeSingle(),
-    fetchVocabulary(supa),
     fetchOutsideTraining(supa, userId).then(buildRecentLoadLine).catch(() => null),
   ]);
   const prof = (profile ?? {}) as EditProfileRow;
@@ -183,7 +183,6 @@ export async function buildBlockEditContext(
     gender: prof.gender ?? null,
     doNotProgram,
     injuryNotes,
-    vocabulary,
     promptContext: {
       units,
       lifts: prof.lifts ?? {},
@@ -240,10 +239,18 @@ function hasVolumeSpecifier(m: MovementPrescription): boolean {
 
 /** Validate a proposed block against the athlete's hard constraints. Returns
  *  problem strings (empty = legal). Safety is one of the three forever-hard
- *  classes: a banned movement NEVER reaches the athlete, even by request. */
+ *  classes: a banned movement NEVER reaches the athlete, even by request.
+ *
+ *  Movement NAMING is free — no vocabulary gate. The generator dropped hard
+ *  vocabulary enforcement in 2026-05 (it banned the legitimate accessory
+ *  catalog); this validator was written later and re-included it, which
+ *  blocked real athlete requests ("Echo Bike", "Kettlebell Row") against a
+ *  list neither the athlete nor the proposing model can see. Downstream is
+ *  built for free names: analytics key on names the writer already
+ *  free-emits, and the power calculator is confident-or-skip. */
 export function validateBlockProposal(
   proposal: BlockPrescription,
-  opts: { doNotProgram: string[]; vocabulary: string[] },
+  opts: { doNotProgram: string[] },
 ): string[] {
   const problems: string[] = [];
   problems.push(...blockSchemeFormatProblems(proposal));
@@ -253,19 +260,14 @@ export function validateBlockProposal(
     return problems;
   }
   const banned = new Set(opts.doNotProgram.map((s) => s.toLowerCase().trim()));
-  const vocab = new Set(opts.vocabulary.map((s) => s.toLowerCase().trim()));
   for (const m of movements) {
     const name = (m.movement ?? "").trim();
     if (!name) {
       problems.push("A movement is missing its name.");
       continue;
     }
-    const key = name.toLowerCase();
-    if (banned.has(key)) {
+    if (banned.has(name.toLowerCase())) {
       problems.push(`"${name}" is on this athlete's do-not-program list — substitute a safe alternative that preserves the stimulus.`);
-    }
-    if (vocab.size > 0 && !vocab.has(key)) {
-      problems.push(`"${name}" is not in the movement vocabulary — use an exact display name from the vocabulary list.`);
     }
     if (!hasVolumeSpecifier(m)) {
       problems.push(`"${name}" has no work specified — populate at least one of sets/reps/rep_scheme/calories/weight/time_seconds/distance, or mark it max_effort.`);
