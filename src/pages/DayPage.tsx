@@ -9,7 +9,7 @@ import {
   V3DayView, v3BlocksToProse,
   type ProgramBlockV2, type ProgramMovementV2,
 } from './ProgramDetailPage';
-import type { DayLogController, SaveBlockPayload } from '../components/blockLog';
+import type { DayLogController, SaveBlockPayload, SavedBlockMeta } from '../components/blockLog';
 
 // DayPage — the single surface for an AI-programming training day. Renders the
 // real V3DayView (colored cards + per-block Edit / Coach ▾ + Session
@@ -80,6 +80,7 @@ export default function DayPage(_props: { session: Session }) {
   const [userUnits, setUserUnits] = useState<'lbs' | 'kg'>('lbs');
   const [logId, setLogId] = useState<string | null>(null);
   const [savedSorts, setSavedSorts] = useState<Set<number>>(new Set());
+  const [savedMeta, setSavedMeta] = useState<Record<number, SavedBlockMeta>>({});
   const [savingSort, setSavingSort] = useState<number | null>(null);
 
   // Resume any in-progress log for this workout + the user's unit preference.
@@ -95,8 +96,22 @@ export default function DayPage(_props: { session: Session }) {
       if (prof?.units === 'kg') setUserUnits('kg');
       if (ipLog?.id) {
         setLogId(ipLog.id);
-        const { data: savedBlocks } = await supabase.from('workout_log_blocks').select('sort_order').eq('log_id', ipLog.id);
-        if (active && savedBlocks) setSavedSorts(new Set((savedBlocks as { sort_order: number }[]).map(b => b.sort_order)));
+        // Blocks + skip markers so the collapsed badges are truthful after a
+        // reload: rx/rpe from the block row; skipped from any entry carrying
+        // skip_reason 'block_skipped' (no schema column needed).
+        const [{ data: savedBlocks }, { data: skipEntries }] = await Promise.all([
+          supabase.from('workout_log_blocks').select('id, sort_order, rx, rpe').eq('log_id', ipLog.id),
+          supabase.from('workout_log_entries').select('block_id').eq('log_id', ipLog.id).eq('skip_reason', 'block_skipped'),
+        ]);
+        if (active && savedBlocks) {
+          const skippedBlockIds = new Set(((skipEntries as { block_id: string | null }[] | null) ?? []).map(e => e.block_id));
+          const rows = savedBlocks as { id: string; sort_order: number; rx: boolean | null; rpe: number | null }[];
+          setSavedSorts(new Set(rows.map(b => b.sort_order)));
+          setSavedMeta(Object.fromEntries(rows.map(b => [
+            b.sort_order,
+            { rx: b.rx === true, rpe: b.rpe ?? null, skipped: skippedBlockIds.has(b.id) },
+          ])));
+        }
       }
     })();
     return () => { active = false; };
@@ -111,6 +126,14 @@ export default function DayPage(_props: { session: Session }) {
       if (error || data?.error) return null;
       if (data?.log_id && !logId) setLogId(data.log_id);
       setSavedSorts(prev => new Set(prev).add(block.sort_order));
+      setSavedMeta(prev => ({
+        ...prev,
+        [block.sort_order]: {
+          rx: block.rx,
+          rpe: block.rpe ?? null,
+          skipped: block.entries.length > 0 && block.entries.every(e => e.skip_reason === 'block_skipped'),
+        },
+      }));
       return { auto_completed: data?.auto_completed };
     } finally {
       setSavingSort(null);
@@ -123,7 +146,8 @@ export default function DayPage(_props: { session: Session }) {
     saving: savingSort,
     saveBlock,
     reopen: (s) => setSavedSorts(prev => { const n = new Set(prev); n.delete(s); return n; }),
-  }), [workoutDate, userUnits, savedSorts, savingSort, saveBlock]);
+    savedMeta: (s) => savedMeta[s] ?? null,
+  }), [workoutDate, userUnits, savedSorts, savedMeta, savingSort, saveBlock]);
 
   // ── Edit handlers (operate on this page's flat blocks state) ──
   const updateMovementField = async (movementId: string, patch: Partial<ProgramMovementV2>) => {

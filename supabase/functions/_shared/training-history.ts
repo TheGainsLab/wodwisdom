@@ -59,6 +59,8 @@ export interface WorkoutLogEntryRow {
   faults_observed: string[] | null;
   /** false = the athlete explicitly skipped this set. */
   completed: boolean | null;
+  /** 'skipped' = one set; 'block_skipped' = the athlete skipped the whole block. */
+  skip_reason: string | null;
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -128,6 +130,18 @@ function formatBlock(
   blockEntries: WorkoutLogEntryRow[]
 ): string {
   const sorted = blockEntries.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+  // Whole-block skip (Rx-first logger): every entry carries
+  // skip_reason 'block_skipped'. One clean fact beats a stack of empty
+  // entries — the writer/Coach read "the athlete chose not to do this."
+  if (
+    sorted.length > 0 &&
+    sorted.every((e) => e.skip_reason === "block_skipped")
+  ) {
+    const label = block.block_type.charAt(0).toUpperCase() + block.block_type.slice(1);
+    const what = block.block_text ? ` (${block.block_text.slice(0, 60).replace(/\n/g, " ")})` : "";
+    return `${label}: SKIPPED by athlete${what}`;
+  }
 
   if (block.block_type === "strength") {
     // Group per-set entries by movement for compact summaries
@@ -505,7 +519,7 @@ export async function fetchAndFormatRecentHistory(
         .in("log_id", logIds),
       supa
         .from("workout_log_entries")
-        .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, calories, quality, variation, faults_observed, completed")
+        .select("log_id, movement, sets, reps, weight, weight_unit, rpe, scaling_note, sort_order, block_id, block_label, set_number, reps_completed, hold_seconds, distance, distance_unit, calories, quality, variation, faults_observed, completed, skip_reason")
         .in("log_id", logIds),
     ]);
 
