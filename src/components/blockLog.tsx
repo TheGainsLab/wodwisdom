@@ -11,9 +11,11 @@
 //    "did exactly this"; Edit opens that task's rows for what changed.
 //    Save stays disabled until every task is answered — an untouched form
 //    can never write data.
-//  - Skip lives next to Log block on the collapsed card. A skipped block is
-//    RECORDED (entries completed:false, skip_reason 'block_skipped'), so the
-//    AI can tell "skipped the metcon" from "never logged."
+//  - No Skip button (2026-09 polish): a user who skips a block is not a user
+//    who wants to tap more buttons, and doctrine already guarantees an
+//    unlogged block sends NO signal (the previous-cycle summary removed
+//    completion_pct/skip_pct precisely so non-loggers are never punished).
+//    The 'block_skipped' badge/history handling stays for legacy rows.
 //  - Faults are self-report chips under "Anything break down?" — orthogonal
 //    to Rx: you can hit every number and still grind.
 //  - Effort is ONE question per block, a +/- stepper saved on
@@ -215,8 +217,7 @@ const wrapStyle: React.CSSProperties = { marginTop: 10, paddingTop: 10, borderTo
 function FaultChips({ faults, checked, onToggle }: { faults: string[]; checked: string[]; onToggle: (f: string) => void }) {
   if (faults.length === 0) return null;
   return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 6 }}>Anything break down?</div>
+    <div style={{ marginTop: 6 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {faults.map(f => {
           const on = checked.includes(f);
@@ -242,22 +243,65 @@ function FaultChips({ faults, checked, onToggle }: { faults: string[]; checked: 
   );
 }
 
-// ── Rx / Edit segmented choice, one per task ──
+// ── Rx / Modify choice, one per task ──
+// Styled like the Log block button (white text, white outline) so the two
+// controls the panel is gated on read as pressable, not disabled; the chosen
+// one flips to the accent. "Modify" — not "Edit" — because the card's own
+// Edit button changes the PRESCRIPTION; this one records that YOU deviated.
 type TaskMode = 'rx' | 'edit' | null;
-function RxEditChoice({ mode, onRx, onEdit }: { mode: TaskMode; onRx: () => void; onEdit: () => void }) {
+function RxModifyChoice({ mode, onRx, onModify }: { mode: TaskMode; onRx: () => void; onModify: () => void }) {
   const btn = (active: boolean): React.CSSProperties => ({
-    flex: 1, padding: '7px 0', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+    padding: '6px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
     fontFamily: "'Outfit', sans-serif", borderRadius: 8,
     background: active ? 'var(--accent-dim, rgba(255,77,77,0.12))' : 'transparent',
-    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-    color: active ? 'var(--accent)' : 'var(--text-dim)',
+    border: `1px solid ${active ? 'var(--accent)' : '#ffffff'}`,
+    color: active ? 'var(--accent)' : 'var(--text)',
   });
   return (
-    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+    <span style={{ display: 'inline-flex', gap: 8, flexShrink: 0 }}>
       <button type="button" style={btn(mode === 'rx')} onClick={onRx}>
         {mode === 'rx' ? '✓ Rx' : 'Rx'}
       </button>
-      <button type="button" style={btn(mode === 'edit')} onClick={onEdit}>Edit</button>
+      <button type="button" style={btn(mode === 'edit')} onClick={onModify}>
+        {mode === 'edit' ? '✓ Modify' : 'Modify'}
+      </button>
+    </span>
+  );
+}
+
+/** Compact one-line prescription summary — the card above already lists the
+ *  work, so the confirmation view names it in one breath ("3×10 @ 50 lbs")
+ *  instead of repeating every set as a row. Rows appear only under Modify. */
+function prescriptionSummary(m: ProgramMovementV2, showWeight: boolean, units: string): string {
+  const { count, prefill, unitLabel } = plannedSets(m);
+  const vals = prefill.filter((v): v is number => v != null);
+  let core: string;
+  if (vals.length === 0) {
+    core = `${count} set${count === 1 ? '' : 's'}`;
+  } else if (vals.length === count && vals.every(v => v === vals[0])) {
+    core = unitLabel === 'reps' ? `${count}×${vals[0]}` : `${count}×${vals[0]}${unitLabel === 'sec' ? 's' : unitLabel}`;
+  } else {
+    core = vals.join('-');
+  }
+  if (showWeight && m.weight != null) core += ` @ ${m.weight} ${m.weight_unit || units}`;
+  return core;
+}
+
+/** Fault chips folded behind a "Common faults" disclosure — exception-path
+ *  input shouldn't occupy half the panel at rest. */
+function FaultsDisclosure({ children, count }: { children: React.ReactNode; count: number }) {
+  const [openFaults, setOpenFaults] = useState(false);
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button
+        type="button"
+        onClick={() => setOpenFaults(o => !o)}
+        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, color: count > 0 ? 'var(--danger, #e74c3c)' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, fontFamily: "'Outfit', sans-serif", display: 'inline-flex', alignItems: 'center', gap: 5 }}
+      >
+        Common faults{count > 0 ? ` (${count})` : ''}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: openFaults ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9" /></svg>
+      </button>
+      {openFaults && children}
     </div>
   );
 }
@@ -290,8 +334,8 @@ function RpeStepper({ value, onChange }: { value: number | null; onChange: (v: n
 
 /** Notes + RPE + Save — the block-level tail of every panel. Save is gated by
  *  the panel (every task answered) so an untouched form can't write data. */
-function SaveFooter({ saving, canSave, gateHint, onSave, rpe, onRpe, notes, onNotes }: {
-  saving: boolean; canSave: boolean; gateHint: string;
+function SaveFooter({ saving, canSave, onSave, rpe, onRpe, notes, onNotes }: {
+  saving: boolean; canSave: boolean;
   onSave: () => void; rpe: number | null; onRpe: (v: number | null) => void;
   notes: string; onNotes: (v: string) => void;
 }) {
@@ -305,9 +349,6 @@ function SaveFooter({ saving, canSave, gateHint, onSave, rpe, onRpe, notes, onNo
         value={notes}
         onChange={e => onNotes(e.target.value)}
       />
-      {!canSave && (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, textAlign: 'center' }}>{gateHint}</div>
-      )}
       <button type="button" className="auth-btn" style={{ width: '100%', marginTop: 8, opacity: canSave ? 1 : 0.5 }} onClick={onSave} disabled={saving || !canSave}>
         {saving ? 'Saving…' : 'Save block'}
       </button>
@@ -322,24 +363,6 @@ const useChecked = () => {
   });
   return { checked, toggle };
 };
-
-// ── Read-only prescription rows for a movement (the confirmation view) ──
-function ReadOnlyRows({ m, showWeight, units }: { m: ProgramMovementV2; showWeight: boolean; units: string }) {
-  const { count, prefill, unitLabel } = plannedSets(m);
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {Array.from({ length: count }, (_, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 24 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 600, width: 24, flexShrink: 0 }}>S{i + 1}</span>
-          <span style={{ fontSize: 13, color: 'var(--text)' }}>
-            {showWeight && m.weight != null ? `${m.weight} ${m.weight_unit || units} × ` : ''}
-            {prefill[i] != null ? `${prefill[i]} ${unitLabel}` : `— ${unitLabel}`}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 // ── Editable rows for a movement (the Edit path) ──
 // A row is a set, prefilled from the prescription; ✕ marks a set skipped
@@ -483,37 +506,79 @@ function PerTaskLog({ block, controller, coaching, label, type, showWeight, faul
     });
   };
 
+  // Faults for the whole panel fold behind ONE disclosure (per-movement
+  // chips grouped inside it) — exception-path input, closed at rest.
+  const taskFaults = (t: ProgramMovementV2[]) =>
+    t.flatMap((m) => faultsForMovement(coaching, m.movement));
+  const anyFaults = faultsPerMovement
+    ? tasks.some(t => taskFaults(t).length > 0)
+    : sharedFaults.length > 0;
+  const checkedCount = Object.values(checked).reduce((n, arr) => n + arr.length, 0);
+
   return (
     <div className="block-log" style={wrapStyle}>
       {tasks.map((t) => {
         const k = taskKey(t);
         const mode = modes[k] ?? null;
+        const choice = (
+          <RxModifyChoice
+            mode={mode}
+            onRx={() => setModes(p => ({ ...p, [k]: 'rx' }))}
+            onModify={() => setModes(p => ({ ...p, [k]: 'edit' }))}
+          />
+        );
+        // Single-movement task: one line — "Name · 3×10 @ 50 lbs   [Rx][Modify]".
+        // Multi-movement (strength complex): a summary line per movement, one
+        // choice for the group. Modify expands rows in place; Rx collapses back.
         return (
-          <div key={k} style={{ marginBottom: 14 }}>
-            {t.map((m) => (
-              <div key={m.id} style={{ marginBottom: 6 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{formatMovementName(m.movement)}</div>
-                {mode === 'edit'
-                  ? <EditableRows m={m} rows={rows[m.id] ?? []} showWeight={showWeight} units={controller.userUnits} onRow={(i, p) => setRow(m.id, i, p)} />
-                  : <ReadOnlyRows m={m} showWeight={showWeight} units={controller.userUnits} />}
+          <div key={k} style={{ marginBottom: 12 }}>
+            {t.length === 1 ? (
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 13, minWidth: 0 }}>
+                  <span style={{ fontWeight: 600 }}>{formatMovementName(t[0].movement)}</span>
+                  <span style={{ color: 'var(--text-dim)' }}> · {prescriptionSummary(t[0], showWeight, controller.userUnits)}</span>
+                </span>
+                {choice}
               </div>
-            ))}
-            <RxEditChoice
-              mode={mode}
-              onRx={() => setModes(p => ({ ...p, [k]: 'rx' }))}
-              onEdit={() => setModes(p => ({ ...p, [k]: 'edit' }))}
-            />
-            {faultsPerMovement && t.map((m) => (
-              <FaultChips key={m.id} faults={faultsForMovement(coaching, m.movement)} checked={checked[m.id] ?? []} onToggle={(f) => toggle(m.id, f)} />
+            ) : (
+              <>
+                {t.map((m) => (
+                  <div key={m.id} style={{ fontSize: 13, marginBottom: 2 }}>
+                    <span style={{ fontWeight: 600 }}>{formatMovementName(m.movement)}</span>
+                    <span style={{ color: 'var(--text-dim)' }}> · {prescriptionSummary(m, showWeight, controller.userUnits)}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: 6 }}>{choice}</div>
+              </>
+            )}
+            {mode === 'edit' && t.map((m) => (
+              <div key={m.id} style={{ marginTop: 8 }}>
+                {t.length > 1 && <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--text-dim)' }}>{formatMovementName(m.movement)}</div>}
+                <EditableRows m={m} rows={rows[m.id] ?? []} showWeight={showWeight} units={controller.userUnits} onRow={(i, p) => setRow(m.id, i, p)} />
+              </div>
             ))}
           </div>
         );
       })}
-      {!faultsPerMovement && <FaultChips faults={sharedFaults} checked={checked['block'] ?? []} onToggle={(f) => toggle('block', f)} />}
+      {anyFaults && (
+        <FaultsDisclosure count={checkedCount}>
+          {faultsPerMovement
+            ? tasks.map(t => t.map((m) => {
+                const f = faultsForMovement(coaching, m.movement);
+                if (!f.length) return null;
+                return (
+                  <div key={m.id} style={{ marginTop: 6 }}>
+                    {tasks.length > 1 && <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4 }}>{formatMovementName(m.movement)}</div>}
+                    <FaultChips faults={f} checked={checked[m.id] ?? []} onToggle={(x) => toggle(m.id, x)} />
+                  </div>
+                );
+              }))
+            : <FaultChips faults={sharedFaults} checked={checked['block'] ?? []} onToggle={(f) => toggle('block', f)} />}
+        </FaultsDisclosure>
+      )}
       <SaveFooter
         saving={saving}
         canSave={allAnswered}
-        gateHint={tasks.length > 1 ? 'Mark each movement Rx or Edit to save' : 'Mark the work Rx or Edit to save'}
         onSave={save} rpe={rpe} onRpe={setRpe} notes={notes} onNotes={setNotes}
       />
     </div>
@@ -637,21 +702,26 @@ function MetconLog({ block, controller, coaching }: { block: ProgramBlockV2; con
           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Per-round numbers — record what you actually did.</div>
         </div>
       )}
-      <RxEditChoice mode={mode} onRx={() => setMode('rx')} onEdit={() => setMode('edit')} />
-      {block.movements.map((m) => {
-        const mFaults = faultsForMovement(coaching, m.movement);
-        if (!mFaults.length) return null;
-        return (
-          <div key={m.id} style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{formatMovementName(m.movement)}</div>
-            <FaultChips faults={mFaults} checked={checked[m.id] ?? []} onToggle={(f) => toggle(m.id, f)} />
-          </div>
-        );
-      })}
+      <div style={{ marginTop: 4 }}>
+        <RxModifyChoice mode={mode} onRx={() => setMode('rx')} onModify={() => setMode('edit')} />
+      </div>
+      {block.movements.some((m) => faultsForMovement(coaching, m.movement).length > 0) && (
+        <FaultsDisclosure count={Object.values(checked).reduce((n, arr) => n + arr.length, 0)}>
+          {block.movements.map((m) => {
+            const mFaults = faultsForMovement(coaching, m.movement);
+            if (!mFaults.length) return null;
+            return (
+              <div key={m.id} style={{ marginTop: 6 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4 }}>{formatMovementName(m.movement)}</div>
+                <FaultChips faults={mFaults} checked={checked[m.id] ?? []} onToggle={(f) => toggle(m.id, f)} />
+              </div>
+            );
+          })}
+        </FaultsDisclosure>
+      )}
       <SaveFooter
         saving={saving}
         canSave={mode != null}
-        gateHint="Mark the piece Rx or Edit to save"
         onSave={save} rpe={rpe} onRpe={setRpe} notes={notes} onNotes={setNotes}
       />
     </div>
@@ -686,7 +756,6 @@ function CardioLog({ block, controller }: { block: ProgramBlockV2; controller: D
       <SaveFooter
         saving={saving}
         canSave={canSave}
-        gateHint="Enter watts or work time to save"
         onSave={save} rpe={rpe} onRpe={setRpe} notes={notes} onNotes={setNotes}
       />
     </div>
@@ -729,7 +798,6 @@ function renderWorld(block: ProgramBlockV2, controller: DayLogController, coachi
   }
 }
 const LOGGABLE_TYPES = ['strength', 'metcon', 'skills', 'accessory', 'cardio'];
-const TYPE_LABEL: Record<string, string> = { strength: 'Strength', metcon: 'Metcon', skills: 'Skills', accessory: 'Accessory', cardio: 'Cardio' };
 
 export default function BlockLog({ block, controller, coaching, onEnsureCoaching }: {
   block: ProgramBlockV2;
@@ -740,42 +808,15 @@ export default function BlockLog({ block, controller, coaching, onEnsureCoaching
   // Collapsed by default — the day reads as a workout; you open the block you're
   // doing, log it, and it collapses to a status line. Each block opens independently.
   const [open, setOpen] = useState(false);
-  const [confirmSkip, setConfirmSkip] = useState(false);
   if (!LOGGABLE_TYPES.includes(block.block_type)) return null;
-  const saving = controller.saving === block.sort_order;
 
   if (controller.isSaved(block.sort_order)) {
     return <SavedBadge meta={controller.savedMeta?.(block.sort_order) ?? null} onEdit={() => { controller.reopen(block.sort_order); setOpen(true); }} />;
   }
 
-  // "Didn't do this block" — recorded, not silent. Every movement's entry
-  // saves completed:false with skip_reason 'block_skipped'; no RPE, no score.
-  const skipBlock = () => {
-    const entries: LogEntry[] = block.movements.map((m) => emptyEntry(m.movement, {
-      completed: false, skip_reason: 'block_skipped',
-      weight_unit: m.weight_unit || controller.userUnits,
-      prescribed_weight: m.weight ?? null, prescribed_reps: m.reps ?? null,
-    }));
-    controller.saveBlock({
-      label: block.block_label || TYPE_LABEL[block.block_type] || 'Block', type: block.block_type,
-      text: blockText(block), score: null, rx: false, notes: null,
-      sort_order: block.sort_order, entries, capped: false, capped_reps: null, rpe: null,
-    });
-    setConfirmSkip(false);
-  };
-
   if (!open) {
-    if (confirmSkip) {
-      return (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Skip this block? It's recorded — the program adapts.</span>
-          <button type="button" className="block-ai-edit-toggle" onClick={skipBlock} disabled={saving}>{saving ? 'Saving…' : 'Skip block'}</button>
-          <button type="button" className="block-ai-edit-toggle" onClick={() => setConfirmSkip(false)}>Cancel</button>
-        </div>
-      );
-    }
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10 }}>
+      <div style={{ textAlign: 'center', marginTop: 10 }}>
         <button
           type="button"
           onClick={() => { setOpen(true); onEnsureCoaching?.(); }}
@@ -783,13 +824,6 @@ export default function BlockLog({ block, controller, coaching, onEnsureCoaching
         >
           Log block
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
-        </button>
-        <button
-          type="button"
-          onClick={() => setConfirmSkip(true)}
-          style={{ padding: '7px 12px', background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Outfit', sans-serif" }}
-        >
-          Skip
         </button>
       </div>
     );
