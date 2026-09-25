@@ -1580,7 +1580,6 @@ Deno.serve(async (req) => {
               }
               const problems = validateBlockProposal(input.block, {
                 doNotProgram: editContext.doNotProgram,
-                vocabulary: editContext.vocabulary,
               });
               if (problems.length > 0) {
                 invalidBounces++;
