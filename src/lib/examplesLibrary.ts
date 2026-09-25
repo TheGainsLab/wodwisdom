@@ -121,6 +121,13 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
           'Tap “Today’s Training Intent” and the program shows its work: which evaluation priority each block serves, why the skills come before the pressing load, and why the metcon deliberately stays out of the way of the squat cycle’s recovery budget. Nothing here is random — and it tells you so.',
       },
       {
+        image: '/images/programming-strength.webp',
+        alt: 'Strength block — Bench Press 5×5 at 195 lbs, 75% of tested max, RPE 7',
+        title: 'Your numbers, not a template’s',
+        caption:
+          'One line carries the whole point: 5×5 at 195 — 75% of this athlete’s tested max — at a prescribed effort. Change your max, and every number downstream changes with it.',
+      },
+      {
         image: '/images/programming-skills-coach.webp',
         alt: 'Skills block with AI Coach game plan and per-movement cues for butterfly pull-ups and legless rope climbs',
         title: 'Every block carries a coach',
@@ -133,6 +140,27 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         title: 'The metcon, with a game plan',
         caption:
           'The conditioning piece comes with a prediction and a strategy: expect 4–5 rounds, the limiter is grip and lat fatigue stacking from earlier in the session — so row at 70%, keep the toes-to-bar relaxed. That’s a coach who watched your whole day, not just this workout.',
+      },
+      {
+        image: '/images/programming-accessory.webp',
+        alt: 'Accessory block — dumbbell rows and banded tricep extensions with rest guidance',
+        title: 'The supporting work',
+        caption:
+          'Accessory volume chosen to support the day’s pressing — done for quality, with the rest spelled out. Every block type has a job.',
+      },
+      {
+        image: '/images/programming-coach-change.webp',
+        alt: 'AI Coach conversation — athlete’s rower broke, coach proposes swapping to Echo Bike with Apply and Keep buttons',
+        title: 'Broken rower? Tell the coach.',
+        caption:
+          'This is a real conversation: the athlete’s rower died, so they told the coach. It reasoned through the swap — same calorie target, same stimulus — showed exactly what would change, and one tap on Apply rewrote the program. It even warned the bike would feel harder. That’s the difference between a program you follow and a program that works with you.',
+      },
+      {
+        image: '/images/programming-months.webp',
+        alt: 'Program overview — months and weeks of an ongoing personalized program',
+        title: 'And it keeps going',
+        caption:
+          'Not a PDF you buy once — an ongoing program. Every month is generated from the last: what you logged, what got easier, what you told the coach. Month after month.',
       },
     ],
   },
