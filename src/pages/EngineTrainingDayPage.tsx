@@ -1189,7 +1189,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 <>
                   <hr className="engine-divider" />
                   <div className="engine-stat" style={{ textAlign: 'center' }}>
-                  <div className="engine-stat-label">Time Trial Baseline ({selectedMod?.label})</div>
+                  <div className="engine-stat-label" style={{ color: 'var(--text)' }}>Time Trial Baseline ({selectedMod?.label})</div>
                   <div className="engine-stat-value" style={{ fontSize: 22 }}>
                     {baseline.total_output} {baseline.units ?? 'cal'}
                   </div>
