@@ -861,6 +861,23 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
     setStage('ready');
   };
 
+  // "Log without the timer" — the athlete who reads "10 rounds · 1:30 on/off"
+  // and runs it off the bike's own clock. Same initialization as
+  // handleStartWorkout (segments + one score slot per work interval, so the
+  // logging form's interval grid and planned work/rest math are identical),
+  // but the destination is the Log Results form directly. Before this, the
+  // workaround was Start Workout → immediately Skip to End.
+  const handleLogWithoutTimer = () => {
+    if (!workout) return;
+    const segs = generateSegments(workout);
+    setSegments(segs);
+    segmentsRef.current = segs;
+    setIntervalScores(segs.filter(s => s.type === 'work').map(() => ''));
+    setIntervalsOpen(false);
+    setTotalIsAuto(false);
+    setStage('logging');
+  };
+
   const handleBeginCountdown = () => {
     setCountdownVal(3);
     setStage('countdown');
@@ -1656,6 +1673,13 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                     style={{ width: '100%' }}
                   >
                     <Play size={18} /> Start Workout
+                  </button>
+                  <button
+                    className="engine-btn engine-btn-secondary"
+                    onClick={handleLogWithoutTimer}
+                    style={{ width: '100%', marginTop: 10 }}
+                  >
+                    Log without the timer
                   </button>
 
                   <hr className="engine-divider" style={{ marginTop: 20 }} />
