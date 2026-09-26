@@ -1901,7 +1901,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           </div>
 
           {currentGoal != null ? (
-            <div style={{ fontSize: 16, fontWeight: 600, color: timerColor, marginTop: 8 }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)', marginTop: 8 }}>
               Goal: ~{currentGoal % 1 === 0 ? currentGoal : currentGoal.toFixed(1)} {selectedUnit}
             </div>
           ) : seg?.intensity ? (
@@ -1925,13 +1925,13 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         {/* Info row */}
         <div className="engine-grid">
           <div className="engine-stat" style={{ textAlign: 'center' }}>
-            <div className="engine-stat-value" style={{ fontSize: 20 }}>
+            <div className="engine-stat-value" style={{ fontSize: 22, color: '#ffffff' }}>
               {seg ? `${seg.blockIndex + 1}/${workout?.block_count ?? 1}` : '—'}
             </div>
             <div className="engine-stat-label">Block</div>
           </div>
           <div className="engine-stat" style={{ textAlign: 'center' }}>
-            <div className="engine-stat-value" style={{ fontSize: 20 }}>
+            <div className="engine-stat-value" style={{ fontSize: 22, color: '#ffffff' }}>
               {workSegsInBlock.length > 1 ? `${currentRoundInBlock}/${workSegsInBlock.length}` : '—'}
             </div>
             <div className="engine-stat-label">Round</div>
