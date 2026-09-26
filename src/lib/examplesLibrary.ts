@@ -76,14 +76,14 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'Evaluation strengths section',
         title: 'What not to waste time on',
         caption:
-          'It knows what’s already working — and says so with numbers. “We keep it trained, not targeted” is how your programming time doesn’t get wasted.',
+          'It knows what’s already working — and says so with numbers. A 19:55 5k and a 6:44 2k row get kept sharp with regular touches, “but it doesn’t need to be pushed while strength is the focus.” That’s how your training time doesn’t get wasted.',
       },
       {
         image: '/images/eval-weaknesses.png',
         alt: 'Evaluation weaknesses and priorities, ranked',
         title: 'Ranked, with the why',
         caption:
-          'Not a list — a diagnosis. It works out that the push press is covering for untrained shoulders, and that the jerk is what caps the clean & jerk. That’s reasoning, not a template.',
+          'Not a list — a diagnosis. It notices the jerk (265) barely clears the push press (255), and concludes it’s technique, not strength, capping the clean & jerk — so the fix is cheap. That’s reasoning, not a template.',
       },
       {
         image: '/images/eval-analysis.png',
