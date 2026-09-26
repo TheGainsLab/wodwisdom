@@ -861,6 +861,23 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
     setStage('ready');
   };
 
+  // "Log without the timer" — the athlete who reads "10 rounds · 1:30 on/off"
+  // and runs it off the bike's own clock. Same initialization as
+  // handleStartWorkout (segments + one score slot per work interval, so the
+  // logging form's interval grid and planned work/rest math are identical),
+  // but the destination is the Log Results form directly. Before this, the
+  // workaround was Start Workout → immediately Skip to End.
+  const handleLogWithoutTimer = () => {
+    if (!workout) return;
+    const segs = generateSegments(workout);
+    setSegments(segs);
+    segmentsRef.current = segs;
+    setIntervalScores(segs.filter(s => s.type === 'work').map(() => ''));
+    setIntervalsOpen(false);
+    setTotalIsAuto(false);
+    setStage('logging');
+  };
+
   const handleBeginCountdown = () => {
     setCountdownVal(3);
     setStage('countdown');
@@ -1172,7 +1189,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                 <>
                   <hr className="engine-divider" />
                   <div className="engine-stat" style={{ textAlign: 'center' }}>
-                  <div className="engine-stat-label">Time Trial Baseline ({selectedMod?.label})</div>
+                  <div className="engine-stat-label" style={{ color: 'var(--text)' }}>Time Trial Baseline ({selectedMod?.label})</div>
                   <div className="engine-stat-value" style={{ fontSize: 22 }}>
                     {baseline.total_output} {baseline.units ?? 'cal'}
                   </div>
@@ -1657,6 +1674,13 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
                   >
                     <Play size={18} /> Start Workout
                   </button>
+                  <button
+                    className="engine-btn engine-btn-secondary"
+                    onClick={handleLogWithoutTimer}
+                    style={{ width: '100%', marginTop: 10 }}
+                  >
+                    Log without the timer
+                  </button>
 
                   <hr className="engine-divider" style={{ marginTop: 20 }} />
                   <div style={{
@@ -1877,7 +1901,7 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
           </div>
 
           {currentGoal != null ? (
-            <div style={{ fontSize: 16, fontWeight: 600, color: timerColor, marginTop: 8 }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)', marginTop: 8 }}>
               Goal: ~{currentGoal % 1 === 0 ? currentGoal : currentGoal.toFixed(1)} {selectedUnit}
             </div>
           ) : seg?.intensity ? (
@@ -1901,13 +1925,13 @@ export default function EngineTrainingDayPage({ session }: { session: Session })
         {/* Info row */}
         <div className="engine-grid">
           <div className="engine-stat" style={{ textAlign: 'center' }}>
-            <div className="engine-stat-value" style={{ fontSize: 20 }}>
+            <div className="engine-stat-value" style={{ fontSize: 22, color: '#ffffff' }}>
               {seg ? `${seg.blockIndex + 1}/${workout?.block_count ?? 1}` : '—'}
             </div>
             <div className="engine-stat-label">Block</div>
           </div>
           <div className="engine-stat" style={{ textAlign: 'center' }}>
-            <div className="engine-stat-value" style={{ fontSize: 20 }}>
+            <div className="engine-stat-value" style={{ fontSize: 22, color: '#ffffff' }}>
               {workSegsInBlock.length > 1 ? `${currentRoundInBlock}/${workSegsInBlock.length}` : '—'}
             </div>
             <div className="engine-stat-label">Round</div>
