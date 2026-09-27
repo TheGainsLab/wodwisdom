@@ -254,14 +254,6 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
   },
   {
     tab: 'engine',
-    image: '/images/HR-analytics.png',
-    alt: 'Average heart rate by day type',
-    title: 'Heart rate by day type',
-    caption:
-      'Endurance days live low, anaerobic days spike. Proof the program trains the whole spectrum — not one band in the middle.',
-  },
-  {
-    tab: 'engine',
     image: '/images/sessions.png',
     alt: 'Sessions by day type',
     title: 'Training distribution',
