@@ -184,6 +184,13 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
           'Open the details and every interval carries a target computed from this athlete’s own time-trial baseline: ~24 cal per 90-second round, with the rate and RPM to hit it. Nothing generic — these are their numbers.',
       },
       {
+        image: '/images/engine-day-timer.webp',
+        alt: 'Built-in work timer — 2:36 elapsed with the calorie goal, block, and round on screen',
+        title: 'Run it on the built-in timer — or don’t',
+        caption:
+          'Start the session and the timer runs the whole thing: your goal on screen (~50.4 cal here), which block and round you’re in, work and rest called automatically. Prefer the rower’s own monitor? Skip the timer entirely and log your numbers straight off the machine.',
+      },
+      {
         image: '/images/engine-day-pacing.webp',
         alt: 'AI Coach pacing answer citing the athlete’s previous session, RPE, and heart rate',
         title: 'Ask how to attack it',
@@ -191,11 +198,25 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
           'Tap “Pace this” and the coach plans the session against the athlete’s actual history — their previous Max Aerobic Power session came in at 106% of target at RPE 8, and the pacing advice starts from that.',
       },
       {
+        image: '/images/engine-day-history.webp',
+        alt: 'Workout history — two Max Aerobic Power sessions a week apart, output rising from 16.3 to 18.4 cal/min',
+        title: 'The history that makes it smart',
+        caption:
+          'Every session lands in your history — and the system reads it. Same workout, one week apart: 16.3 cal/min, then 18.4. That improvement is why the next session’s targets are higher. Progress isn’t a feeling here; it’s a number the program acts on.',
+      },
+      {
         image: '/images/engine-day-equipment.webp',
         alt: 'Equipment selection — modality picker with a per-machine time-trial baseline',
         title: 'Pick your engine',
         caption:
           'Choose the machine on the way in. Each modality carries its own time-trial baseline — today’s targets come from this athlete’s Echo Bike test. Switch machines and the targets follow.',
+      },
+      {
+        image: '/images/engine-analytics-overview.webp',
+        alt: 'Analytics overview — 9 sessions at 109% average performance, sessions split evenly across day types, energy system ratios, and peak vs average pace',
+        title: 'Where it all adds up',
+        caption:
+          'Nine sessions in, this athlete is averaging 109% of their targets at RPE 7.6 — working slightly above prescription without redlining. Look at the day-type split: two sessions each across anaerobic, endurance, interval, and max aerobic power. The whole spectrum, trained evenly — that’s conditioning, not cardio.',
       },
     ],
   },
@@ -225,34 +246,10 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
   // ── Engine ───────────────────────────────────────────────────────
   {
     tab: 'engine',
-    image: '/images/work-rest-ratio.png',
-    alt: 'Work-to-rest ratio analytics',
-    title: 'Work : rest, session by session',
+    image: '/images/engine-analytics-comparison.webp',
+    alt: 'Average pace comparison across day types — anaerobic 45.5, max aerobic power 17.3, endurance 11.5 cal/min',
+    title: 'Compare yourself across stimuli',
     caption:
-      'The work-to-rest breakdown across a training block — how much time this athlete spent working versus recovering, and how that shifts by day type.',
-  },
-  {
-    tab: 'engine',
-    image: '/images/comparison.png',
-    alt: 'Output comparison across training structures',
-    title: 'Output across day types',
-    caption:
-      'The same athlete produces very different output depending on what the day is asking for. That’s by design — each structure targets its own adaptation.',
-  },
-  {
-    tab: 'engine',
-    image: '/images/HR-analytics.png',
-    alt: 'Average heart rate by day type',
-    title: 'Heart rate by day type',
-    caption:
-      'Endurance days live low, anaerobic days spike. Proof the program trains the whole spectrum — not one band in the middle.',
-  },
-  {
-    tab: 'engine',
-    image: '/images/sessions.png',
-    alt: 'Sessions by day type',
-    title: 'Training distribution',
-    caption:
-      'Sessions by day type across the program — the distribution behind “conditioning, not cardio.”',
+      'Pick the day types and compare: this athlete holds 45.5 cal/min on anaerobic days, 17.3 at max aerobic power, 11.5 on endurance. A 4× spread on the same machine — proof each day type is asking for something genuinely different, and you can watch each one move.',
   },
 ];
