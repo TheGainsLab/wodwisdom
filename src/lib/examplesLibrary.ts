@@ -191,6 +191,13 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
           'Tap “Pace this” and the coach plans the session against the athlete’s actual history — their previous Max Aerobic Power session came in at 106% of target at RPE 8, and the pacing advice starts from that.',
       },
       {
+        image: '/images/engine-day-history.webp',
+        alt: 'Workout history — two Max Aerobic Power sessions a week apart, output rising from 16.3 to 18.4 cal/min',
+        title: 'The history that makes it smart',
+        caption:
+          'Every session lands in your history — and the system reads it. Same workout, one week apart: 16.3 cal/min, then 18.4. That improvement is why the next session’s targets are higher. Progress isn’t a feeling here; it’s a number the program acts on.',
+      },
+      {
         image: '/images/engine-day-equipment.webp',
         alt: 'Equipment selection — modality picker with a per-machine time-trial baseline',
         title: 'Pick your engine',
