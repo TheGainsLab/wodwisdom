@@ -48,14 +48,14 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
   evaluations: {
     title: 'A real evaluation, start to finish',
     intro:
-      'Generated from about five minutes of self-reported input — the same intake you’d do. Read it top to bottom and notice what it’s doing: establishing the facts, weighing them, and reasoning its way to a prescription. This is the foundation a program is built from.',
+      'Generated from about five minutes of self-reported input — the same intake you’d do. Read it top to bottom and notice what it’s doing: establishing the facts, weighing them, reasoning its way to a prescription. This is the foundation a program is built from.',
     steps: [
       {
         image: '/images/eval-intake-profile.png',
         alt: 'Athlete profile intake — basics and athletic data steps',
         title: 'What we ask',
         caption:
-          'Two steps: the basics, then your athletic data — lifts, skills, and conditioning. Scientific precision not required; a general idea is fine.',
+          'We start with the basics — age, height, weight, and gender. Then we ask about your lifts, skills, and conditioning. It’s the same information you’d expect to give a coach. You don’t need exact numbers for everything. If you only know roughly where you stand, that’s enough to get started — and completing Step 1 already unlocks tailored answers from the AI Coach.',
       },
       {
         image: '/images/eval-intake-benchmarks.png',
@@ -67,37 +67,37 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
       {
         image: '/images/eval-summary.png',
         alt: 'Evaluation opening verdict',
-        title: 'The verdict',
+        title: 'The coach’s read',
         caption:
-          'It opens with a coach’s read, not a score: the clearest gap in an otherwise well-rounded profile, named in one sentence.',
+          'This is how the evaluation opens: not with a score, but with a read. The single clearest opportunity in an otherwise well-rounded profile, named in one sentence — before a single detail is unpacked. It’s not scoring inputs. It’s making a coaching call from the evidence.',
       },
       {
         image: '/images/eval-strengths.png',
         alt: 'Evaluation strengths section',
         title: 'What not to waste time on',
         caption:
-          'It knows what’s already working — and says so with numbers. A 19:55 5k and a 6:44 2k row get kept sharp with regular touches, “but it doesn’t need to be pushed while strength is the focus.” That’s how your training time doesn’t get wasted.',
+          'A good evaluation doesn’t just hunt for weaknesses — it recognizes what’s already working and decides how much attention it still needs. A 19:55 5k and a 6:44 2k row get kept sharp with regular touches, “but it doesn’t need to be pushed while strength is the focus.” Strong skills and a balanced hinge stay in the rotation too — no special emphasis needed. That’s coaching judgment: maintain the strengths, spend your time where the gains are. That’s how training time doesn’t get wasted.',
       },
       {
         image: '/images/eval-weaknesses.png',
         alt: 'Evaluation weaknesses and priorities, ranked',
         title: 'Ranked, with the why',
         caption:
-          'Not a list — a diagnosis. It notices the jerk (265) barely clears the push press (255), and concludes it’s technique, not strength, capping the clean & jerk — so the fix is cheap. That’s reasoning, not a template.',
+          'Not a list — a diagnosis. It notices the jerk (265) barely clears the push press (255), and concludes it’s technique, not strength, capping the clean & jerk — so the fix is cheap. It also separates major priorities from low-cost accessory work, so everything doesn’t get treated as equally important. That’s reasoning, not a template.',
       },
       {
         image: '/images/eval-analysis.png',
         alt: 'Evaluation analysis — the full reasoning across strengths, weaknesses, and conditioning',
         title: 'The reasoning — hedges included',
         caption:
-          'It weighs everything together, and it’s honest about its limits: these lifts are self-reported, so its confidence is capped until real sessions get logged. As training data comes in, the calls sharpen.',
+          'This is where the evaluation goes deeper. It weighs the athlete as a whole — strengths, weaknesses, age, goals, training frequency, recovery, and its own confidence in the data — then decides what to push, what to maintain, what to touch lightly, and what not to prioritize yet. It’s also honest about its limits. Self-reported lifts start with lower confidence — as you log real training, the calls sharpen. This is the reasoning behind the program: not just what to train, but why, how much, and what comes first.',
       },
       {
         image: '/images/eval-recommendations.png',
         alt: 'Evaluation recommendations — four prioritized prescriptions',
         title: 'The prescription',
         caption:
-          'Four specific, prioritized recommendations. Tell it your goal and your schedule, and your program is built from exactly this reasoning.',
+          'The evaluation finishes by turning the reasoning into a short list of clear training priorities. What should lead the cycle. What should support it. What needs technique work. What can stay in the background. If you move forward with AI Programming, these recommendations become inputs to the program generator — alongside your goals, schedule, equipment, and preferences. The evaluation doesn’t just tell you what’s wrong. It tells the system what to do next.',
       },
     ],
   },
