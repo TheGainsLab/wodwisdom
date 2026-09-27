@@ -211,6 +211,13 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         caption:
           'Choose the machine on the way in. Each modality carries its own time-trial baseline — today’s targets come from this athlete’s Echo Bike test. Switch machines and the targets follow.',
       },
+      {
+        image: '/images/engine-analytics-overview.webp',
+        alt: 'Analytics overview — 9 sessions at 109% average performance, sessions split evenly across day types, energy system ratios, and peak vs average pace',
+        title: 'Where it all adds up',
+        caption:
+          'Nine sessions in, this athlete is averaging 109% of their targets at RPE 7.6 — working slightly above prescription without redlining. Look at the day-type split: two sessions each across anaerobic, endurance, interval, and max aerobic power. The whole spectrum, trained evenly — that’s conditioning, not cardio.',
+      },
     ],
   },
 };
