@@ -184,6 +184,13 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
           'Open the details and every interval carries a target computed from this athlete’s own time-trial baseline: ~24 cal per 90-second round, with the rate and RPM to hit it. Nothing generic — these are their numbers.',
       },
       {
+        image: '/images/engine-day-timer.webp',
+        alt: 'Built-in work timer — 2:36 elapsed with the calorie goal, block, and round on screen',
+        title: 'Run it on the built-in timer — or don’t',
+        caption:
+          'Start the session and the timer runs the whole thing: your goal on screen (~50.4 cal here), which block and round you’re in, work and rest called automatically. Prefer the rower’s own monitor? Skip the timer entirely and log your numbers straight off the machine.',
+      },
+      {
         image: '/images/engine-day-pacing.webp',
         alt: 'AI Coach pacing answer citing the athlete’s previous session, RPE, and heart rate',
         title: 'Ask how to attack it',
