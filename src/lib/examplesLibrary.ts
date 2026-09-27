@@ -252,12 +252,4 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
     caption:
       'Pick the day types and compare: this athlete holds 45.5 cal/min on anaerobic days, 17.3 at max aerobic power, 11.5 on endurance. A 4× spread on the same machine — proof each day type is asking for something genuinely different, and you can watch each one move.',
   },
-  {
-    tab: 'engine',
-    image: '/images/sessions.png',
-    alt: 'Sessions by day type',
-    title: 'Training distribution',
-    caption:
-      'Sessions by day type across the program — the distribution behind “conditioning, not cardio.”',
-  },
 ];
