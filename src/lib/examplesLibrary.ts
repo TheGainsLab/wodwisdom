@@ -254,11 +254,11 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
   },
   {
     tab: 'engine',
-    image: '/images/comparison.png',
-    alt: 'Output comparison across training structures',
-    title: 'Output across day types',
+    image: '/images/engine-analytics-comparison.webp',
+    alt: 'Average pace comparison across day types — anaerobic 45.5, max aerobic power 17.3, endurance 11.5 cal/min',
+    title: 'Compare yourself across stimuli',
     caption:
-      'The same athlete produces very different output depending on what the day is asking for. That’s by design — each structure targets its own adaptation.',
+      'Pick the day types and compare: this athlete holds 45.5 cal/min on anaerobic days, 17.3 at max aerobic power, 11.5 on endurance. A 4× spread on the same machine — proof each day type is asking for something genuinely different, and you can watch each one move.',
   },
   {
     tab: 'engine',
