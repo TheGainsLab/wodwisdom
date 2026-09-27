@@ -246,14 +246,6 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
   // ── Engine ───────────────────────────────────────────────────────
   {
     tab: 'engine',
-    image: '/images/work-rest-ratio.png',
-    alt: 'Work-to-rest ratio analytics',
-    title: 'Work : rest, session by session',
-    caption:
-      'The work-to-rest breakdown across a training block — how much time this athlete spent working versus recovering, and how that shifts by day type.',
-  },
-  {
-    tab: 'engine',
     image: '/images/engine-analytics-comparison.webp',
     alt: 'Average pace comparison across day types — anaerobic 45.5, max aerobic power 17.3, endurance 11.5 cal/min',
     title: 'Compare yourself across stimuli',
