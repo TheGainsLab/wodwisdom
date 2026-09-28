@@ -15,6 +15,46 @@ function isExamplesTab(v: string | null): v is ExamplesTab {
   return v !== null && v in EXAMPLES_TABS;
 }
 
+// Each tab's ask, placed once — right where its walkthrough story lands.
+const CTA_PROMPTS: Record<ExamplesTab, string> = {
+  evaluations:
+    'You just read the whole thing. Yours takes about five minutes — free, no credit card, and yours to keep.',
+  programming:
+    'Everything above was generated for one athlete. Yours starts from the same free evaluation — no credit card, yours to keep.',
+  engine:
+    'That’s one athlete’s data. See where you stand first — the evaluation is free, takes about five minutes, and it’s yours to keep.',
+};
+
+const CTA_SECONDARY: Record<ExamplesTab, { to: string; label: string }> = {
+  evaluations: { to: '/features/programs', label: 'Explore AI Programming →' },
+  programming: { to: '/features/programs', label: 'Explore AI Programming →' },
+  engine: { to: '/features/engine', label: 'Explore AI Year of the Engine →' },
+};
+
+function TabCta({ tab, signedIn }: { tab: ExamplesTab; signedIn: boolean }) {
+  const secondary = CTA_SECONDARY[tab];
+  return (
+    <div className="qa-cta-card" style={{ margin: '0 0 56px' }}>
+      <p className="qa-cta-text">
+        {signedIn
+          ? 'Your own evaluation lives in your profile — and every session you log sharpens the picture.'
+          : CTA_PROMPTS[tab]}
+      </p>
+      <Link
+        to={signedIn ? '/profile' : '/auth?signup=1&next=/profile'}
+        className="feature-cta qa-cta-btn"
+      >
+        {signedIn ? 'Open your profile' : 'Get Your Free Evaluation'}
+      </Link>
+      <div style={{ marginTop: 16 }}>
+        <Link to={secondary.to} style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
+          {secondary.label}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Public proof page (/examples): real evaluations, program excerpts, and
  * Engine analytics behind the product pages' "see real…" links. One page,
@@ -93,6 +133,7 @@ export default function ExamplesPage({ signedIn = false }: { signedIn?: boolean 
               ))}
             </section>
           )}
+          <TabCta tab={tab} signedIn={signedIn} />
           {entries.map((e) => (
             <figure key={e.image} style={{ margin: '0 0 48px' }}>
               <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 6px', color: 'var(--text)' }}>
@@ -104,6 +145,16 @@ export default function ExamplesPage({ signedIn = false }: { signedIn?: boolean 
               <img src={e.image} alt={e.alt} loading="lazy" className="feature-img" />
             </figure>
           ))}
+          {/* Slim repeat for readers who scrolled past the card; the
+              evaluations tab has no gallery, so it already ends on the card. */}
+          {!signedIn && entries.length > 0 && (
+            <p style={{ textAlign: 'center', fontSize: 15, color: 'var(--text-dim)', margin: '8px 0 0' }}>
+              Ready to see yours?{' '}
+              <Link to="/auth?signup=1&next=/profile" style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>
+                Get your free evaluation &rarr;
+              </Link>
+            </p>
+          )}
         </div>
 
       </div>
