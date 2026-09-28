@@ -2,146 +2,33 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
+import '../../landing.css';
 
 const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
 const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
 
-// Real-HTML per-movement cues (✓) and faults (✗) — replaces task-guidance-image.png.
-function TaskGuidanceCard() {
-  const movements: { name: string; cues: string[]; faults: string[] }[] = [
-    {
-      name: 'Burpee',
-      cues: [
-        "Stay low and fast — don't fully stand and pause between reps. Jump your feet in and explode up in one fluid motion to keep cycle time tight.",
-        "Control your breathing during burpees: exhale hard on the push-up, inhale on the jump. With 9 reps per round at your bodyweight, uncontrolled breathing will blow up your heart rate before the thrusters.",
-        "Jump and clap with purpose but don't over-extend — get your feet moving toward the bar the moment you land. The burpee is a transition INTO the thruster, not a resting movement.",
-      ],
-      faults: [
-        "Slowing to a walk between burpees in rounds 3–5 as HR spikes — commit to a steady rhythmic pace rather than sprinting 3 and dying on the last 6.",
-        "Sloppy push-up position (sagging hips or worm-style) under fatigue — keep a rigid plank on every rep. A no-rep costs more time than a clean slow rep.",
-      ],
-    },
-    {
-      name: 'Thruster',
-      cues: [
-        "115 lbs is light for you — go unbroken all 5 rounds, no exceptions. Drive out of the bottom of the squat explosively and use that hip drive to punch the bar overhead so your arms aren't pressing it up.",
-        "Rack position must be tight: elbows up, bar on shoulders, before each squat. After 9 burpees your upper back will want to round — fight it. Keep chest tall and elbows punching forward on the descent.",
-        "Lock out hard at the top and immediately descend into the next rep — don't pause or reset overhead. With only 6 reps per round, the goal is 6 smooth fast reps and bar down in under 20 seconds.",
-      ],
-      faults: [
-        "Forward lean in the squat causing the bar to drift out — you had this fault flagged on June 9. Cue: keep the torso vertical, drive knees out, and think 'elbows up' throughout the squat portion.",
-        "Breaking the thruster into a front squat + press under fatigue — if you catch yourself pressing separately, lower the weight next time. This round, commit to the drive-through: hips and arms finish together.",
-      ],
-    },
-    {
-      name: 'Bar Muscle Up',
-      cues: [
-        "With only 3 reps per round, go unbroken every single set. Your butterfly pull-up is advanced — use that kip aggressively to generate the hip-to-bar height you need, then punch down hard in the transition.",
-        "After thrusters, your grip and lats are pre-fatigued. Chalk up before round 1 and re-chalk if needed. Approach the bar with full intent — don't hang and wait. Kip immediately on contact.",
-        "In rounds 4–5 when lat fatigue sets in, focus on the false grip or a strong re-grip on top of the bar in the dip. The dip and press-out phase is where intermediate bar MU athletes lose their reps — stay patient through the turnover and press tall.",
-      ],
-      faults: [
-        "Missing the transition (chest not clearing the bar) due to insufficient hip drive after thrusters — if your kip feels flat, take one extra swing to reload rather than muscling a half-rep that costs energy and risks a no-rep.",
-        "Rushing the set-up after thrusters and jumping on the bar before the hips are ready — 2-second pause, hands set, then go. Wasted reps here end your sub-7 finish.",
-      ],
-    },
+const bodyP: React.CSSProperties = { color: 'var(--text-dim)', fontSize: 15.5, lineHeight: 1.6, maxWidth: '62ch', margin: '0 0 14px' };
+const bold: React.CSSProperties = { color: 'var(--text)', fontWeight: 700 };
+
+// The logged-Fran context card — data-shaped HTML, matching the mock.
+function FranCard() {
+  const rows = [
+    ['Fran', '3:42'],
+    ['Percentile', '82nd'],
+    ['Avg power', '297 W · 3.4 W/kg'],
+    ['Time domain', 'Sprint · unbroken thrusters'],
   ];
   return (
-    <div style={{ maxWidth: 560, margin: '24px auto 0', background: 'var(--surface)', border: '1px solid #ffffff', borderRadius: 16, padding: '22px 24px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 22 }}>
-      {movements.map((m, mi) => (
-        <div key={mi} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{m.name}</div>
-          {m.cues.map((c, i) => (
-            <div key={`c${i}`} style={{ display: 'flex', gap: 10, fontSize: 15, lineHeight: 1.55, color: 'var(--text-dim)' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 3 }}><polyline points="20 6 9 17 4 12" /></svg>
-              <span>{c}</span>
-            </div>
-          ))}
-          {m.faults.map((f, i) => (
-            <div key={`f${i}`} style={{ display: 'flex', gap: 10, fontSize: 15, lineHeight: 1.55, color: 'var(--text-dim)' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 3 }}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              <span>{f}</span>
-            </div>
-          ))}
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px 24px', maxWidth: 430 }}>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9.5, letterSpacing: '1.1px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>
+        Logged result
+      </div>
+      {rows.map(([k, v], i) => (
+        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13.5, padding: '7px 0', borderBottom: i === rows.length - 1 ? 'none' : '1px solid var(--border)' }}>
+          <span style={{ color: 'var(--text-dim)' }}>{k}</span>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: 'var(--text)' }}>{v}</span>
         </div>
       ))}
-    </div>
-  );
-}
-
-// Real-HTML "Today's Training Intent" card (replaces Training-Intent-image.png).
-function TrainingIntentCard() {
-  return (
-    <div style={{ maxWidth: 560, margin: '24px auto 0', background: 'var(--surface)', border: '1px solid #ffffff', borderRadius: 16, padding: '22px 24px', textAlign: 'left' }}>
-      <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 14 }}>Today's Training Intent</div>
-      <p style={{ fontSize: 15, lineHeight: 1.65, color: 'var(--text-dim)', margin: 0 }}>
-        This session is built around front squat development as the structural anchor: the squat-focused warm-up (squat therapy, Cossack squats, goblet squats) primes hip mobility and positional awareness, while the skills EMOM is placed first — before the strength block — to leverage a fresh CNS for the motor learning demands of handstand walk (spatial orientation, balance, wrist loading) and ring muscle-up maintenance (timing, transition quality), both of which degrade rapidly under fatigue. The front squat block at 80% (285 lbs × 4×5, RPE 8) then drives maximal force production through the posterior chain and anterior core, with the Bulgarian split squats and single-arm rows reinforcing unilateral leg strength and posterior chain balance that directly support squat integrity; the V-ups sustain midline stiffness that ties directly to both the squats and the handstand work. The metcon closes the session as a short anaerobic power finisher — the 9-6-3 thruster/burpee/bar muscle-up triplet at 115 lbs targets the phosphocreatine and fast glycolytic systems and intentionally challenges thruster mechanics under accumulated fatigue, making it a functional test of the movement quality built earlier in the session, particularly relevant given the forward-lean thruster fault flagged in recent training.
-      </p>
-    </div>
-  );
-}
-
-// Real-HTML metcon block + game plan (replaces strategy-image.png).
-function MetconBlockCard() {
-  const movements = [
-    { name: 'Burpee', scheme: '5×9' },
-    { name: 'Thruster', scheme: '5×6 · 115 lbs' },
-    { name: 'Bar Muscle Up', scheme: '5×3' },
-  ];
-  const ctrl = (label: string, accent: boolean) => (
-    <span style={{ fontSize: 12, fontWeight: 600, color: accent ? 'var(--accent)' : 'var(--text-dim)', border: `1px solid ${accent ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 6, padding: '4px 9px', display: 'inline-flex', alignItems: 'center' }}>{label}</span>
-  );
-  return (
-    <div style={{ maxWidth: 560, margin: '24px auto 0', background: 'var(--surface)', border: '1px solid #ffffff', borderRadius: 16, padding: '20px 22px', textAlign: 'left' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#34d399', background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.4)', borderRadius: 6, padding: '3px 8px' }}>Metcon</span>
-        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Short power triplet</span>
-        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>cap 7 min</span>
-        <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6 }}>{ctrl('Edit', false)}{ctrl('Coach', true)}</span>
-      </div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>5 Rds For Time: 9-6-3</div>
-      {movements.map((m, i) => (
-        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, padding: '10px 0', borderTop: i === 0 ? 'none' : '1px dashed var(--border)', fontSize: 15 }}>
-          <span style={{ color: 'var(--text)' }}>{m.name}</span>
-          <span style={{ color: 'var(--text-dim)', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap' }}>{m.scheme}</span>
-        </div>
-      ))}
-      <div style={{ textAlign: 'center', margin: '14px 0 4px' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', border: '1px solid #ffffff', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
-          Log block
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
-        </span>
-      </div>
-      <div style={{ border: '1px solid var(--border)', borderRadius: 12, background: 'var(--bg)', padding: '16px 18px', marginTop: 12 }}>
-        <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>Game Plan</div>
-        <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--text-dim)', margin: 0 }}>
-          Target 5:30–6:30, hard cap at 7:00. At 115 lbs (~32% of your 355 front squat), the thrusters are light enough to go unbroken every round — the bar should never come down. Primary limiter will be the bar muscle-ups in later rounds (3–4 and 5) as lat and grip fatigue accumulate from the burpees and thruster overhead lockout. Burpees will spike heart rate fast given your bodyweight (225 lbs) — that's the engine tax that bleeds into the muscle-ups. Pacing strategy: treat rounds 1–2 as controlled-aggressive, minimize rest at transitions, and push rounds 3–5 knowing the reps drop. No settling in — this is a sprint from the jump. The biggest time leaks will be standing around before getting on the bar for muscle-ups. Keep transition time under 5 seconds every time.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// Real-HTML "Weaknesses & Priorities" eval excerpt (replaces weak-eval.png),
-// styled to match this page's screenshots (1px white border, 16px radius).
-function WeaknessesCard() {
-  const items = [
-    'GHD sit-ups are a major liability at beginner level, evidenced by your 17th-percentile competition performance — this movement appears frequently in higher-level competition.',
-    'Deficit HSPU and legless rope climbs remain at beginner level, creating vulnerability to advanced gymnastics progressions that separate qualifier from regional-level athletes.',
-    'Strong lift numbers, but technical Olympic lifting weakness — your snatch at 1.09× BW and C&J at 1.40× BW are both below the 0.60 and 0.75 ratios relative to your back squat strength.',
-    'Long-duration aerobic capacity is your biggest competitive gap — ranking only 68.68th percentile in monostructural-long events, with your 20:11 5K run being particularly limiting.',
-  ];
-  return (
-    <div style={{ maxWidth: 560, margin: '24px auto 0', background: 'var(--surface)', border: '1px solid #ffffff', borderRadius: 16, padding: '22px 24px', textAlign: 'left' }}>
-      <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 16 }}>Weaknesses &amp; Priorities</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {items.map((t, i) => (
-          <div key={i} style={{ display: 'flex', gap: 10 }}>
-            <span style={{ flex: '0 0 auto', fontSize: 16, fontWeight: 700, lineHeight: 1.6, color: 'var(--accent)' }}>{i + 1}.</span>
-            <span style={{ fontSize: 16, lineHeight: 1.6, color: 'var(--text-dim)' }}>{t}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -189,104 +76,129 @@ export default function ProgramsFeaturePage() {
       {/* Hero */}
       <section className="feature-hero">
         <h1 className="feature-hero-title">AI Programming</h1>
-        <p className="feature-hero-sub" style={{ fontSize: 'clamp(20px,3vw,26px)', fontWeight: 700, color: 'var(--text)' }}>
-          The Program That Follows You.
+        <p className="feature-hero-sub" style={{ fontSize: 'clamp(17px,2.6vw,22px)', fontWeight: 700, color: 'var(--accent)' }}>
+          We build your entire training around you.
+        </p>
+        <p className="feature-hero-body" style={{ marginBottom: 12 }}>
+          Complete your evaluation — just a few minutes — tell us your goals and schedule, and the AI builds your individualized program, a full month at a time, warm-ups to cool-downs.
+        </p>
+        <p className="feature-hero-body" style={{ marginBottom: 12 }}>
+          Then AI Coach stays with you. Need to change a workout? Ask. Need cues, pacing, strategy, or training advice? Ask. It knows your program, your history, and your numbers, so the guidance is specific to you.
         </p>
         <p className="feature-hero-body">
-          Built from your evaluation — strength, skills, conditioning, and competition history — then aimed at the adaptations that move your fitness the most. You train on what's holding you back, so you get fitter faster.
+          And when the month ends, the next one is built from what you actually did.
         </p>
       </section>
 
-      {/* Step 1 — Evaluation */}
-      <section className="feature-section">
+      {/* Why AI — quiet band */}
+      <section className="feature-section" style={{ borderTop: '1px solid var(--border)', padding: '46px 0' }}>
         <div className="feature-container">
-          <div className="feature-row reverse">
-            <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Your evaluation drives everything.</h3>
-              <p>
-                It pinpoints where you rank, what's holding you back, and what to fix first.
-              </p>
-              <WeaknessesCard />
-              <p style={{ marginTop: 28 }}>
-                Those gaps become your program. Your coach takes your profile and goals and turns them into work on your calendar — Olympic lifts, gymnastics, aerobic engine. Nothing gets ignored.
-              </p>
-              <img src="/images/Program-week.png" alt="A week of programming targeting your weaknesses" className="feature-img" style={{ maxWidth: 560 }} />
-            </div>
+          <div className="lp-kicker" style={{ textAlign: 'center' }}>Why AI Works for Programming</div>
+          <div style={{ maxWidth: '62ch', margin: '0 auto' }}>
+            <p style={bodyP}>A truly individualized program depends on a huge amount of information — your strength, skills, conditioning, goals, schedule, history, results, feedback, and progress.</p>
+            <p style={bodyP}>AI is exceptionally well suited to that. And this isn't a rules engine or a decision tree — it reasons across your history and results, so what you get is shaped by what you've actually done.</p>
+            <p style={bodyP}>It's grounded in our training methodology and draws on the same information a skilled coach would consider — so its decisions reflect sound coaching principles rather than generic fitness ideas.</p>
+            <p style={{ ...bodyP, ...bold, marginBottom: 0 }}>That&rsquo;s what makes this more than generated workouts. It&rsquo;s programming built from the full picture of you.</p>
           </div>
         </div>
       </section>
 
-      {/* Step 2 — Inside a Training Day */}
-      <section className="feature-section">
-        <div className="feature-container">
-          <div className="feature-row">
-            <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Inside a Training Day</h3>
-              <p>Every day breaks down into blocks — warm-up to cooldown — each with loads, targets, and coaching cues.</p>
-              <img src="/images/Training-Day-Image.png" alt="A full training day — warm-up, skills, strength, accessory, metcon, and cool-down" className="feature-img" style={{ maxWidth: 560 }} />
-              <p style={{ marginTop: 24 }}>Need to adjust? Edit makes changes manually. Or just tell the coach what you need: &ldquo;I want to go a little heavier&rdquo; or &ldquo;My rower broke — substitute something else?&rdquo; The coach proposes the revised block and you tap Apply — that piece of the session is rebuilt around your request.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Coach, Every Block */}
+      {/* Level 1 — Built around you */}
       <section className="feature-section" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="feature-container">
-          <div className="feature-row">
-            <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Coach, Every Block</h3>
-              <p>Tap any block and the coach explains the why — not just what to do, but what adaptation you're chasing and how it fits your bigger picture.</p>
-              <TrainingIntentCard />
-              <p style={{ marginTop: 24 }}>Every session opens with intent. You know what you're training, why it matters, and how it connects to your goals — before your warm-up starts.</p>
-              <p style={{ marginTop: 24 }}>Need a game plan? Tap the Metcon and the coach gives you pacing, target times, and where the leaks usually happen.</p>
-              <MetconBlockCard />
-              <p style={{ marginTop: 24 }}>Tap any movement and get specific cues — tied to your history and your faults. Not generic advice. Your coach knows your numbers, your weaknesses, and what you're working on.</p>
-              <TaskGuidanceCard />
-              <p style={{ marginTop: 24 }}>And when you have a question, the coach answers with everything in view — your profile, your history, today's workout, your strengths and weaknesses. The answer is specific to you.</p>
-              <img src="/images/AI-Coach-Image.png" alt="The AI coach answering a question in the context of your training day" className="feature-img" style={{ maxWidth: 560 }} />
-            </div>
-          </div>
+          <div className="lp-kicker">Personalization · Level 1</div>
+          <h2 className="lp-h2">Your evaluation and your goals drive everything.</h2>
+          <p style={bodyP}>It starts with a full evaluation of your lifts, skills, and conditioning — measured against 15 million competition event scores.</p>
+          <p style={bodyP}>Then you tell us what you're after, how you like to train, and how many days you want to train each week.</p>
+          <p style={{ ...bodyP, ...bold }}>The evaluation tells us where you are. You tell us where you want to go. Your program is the shortest distance between the two.</p>
+          <p style={bodyP}>The evaluation is free, takes just a few minutes, and is yours to keep — whether or not you train with us.</p>
+          <Link className="lp-link" to="/examples?tab=evaluations" style={{ fontSize: 13.5 }}>Read a full evaluation &rarr;</Link>
         </div>
       </section>
 
-      {/* Step 5 — Ongoing */}
-      <section className="feature-section">
+      {/* The Output — inside a training day */}
+      <section className="feature-section" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="feature-container">
-          <div className="feature-row reverse">
-            <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>It never stops adapting.</h3>
-              <p>
-                Log your results and the program adapts. Flag weaknesses and it adjusts. Demonstrate proficiency and the challenges increase.
-              </p>
-              <p>
-                Every month, your coach re-evaluates your performance, updates your evaluation, and writes your next month of training. Your evaluation history tells the story of your progress.
-              </p>
-            </div>
-          </div>
+          <div className="lp-kicker">The Output</div>
+          <h2 className="lp-h2">Inside a training day.</h2>
+          <p style={{ ...bodyP, marginTop: 16 }}>Every day breaks down into blocks — warm-up to cool-down — each with loads, targets, and coaching cues computed from your numbers. Skills, Strength, Technical Work, Accessories, MetCons. Weights in your units, percentages from your actual maxes, metcons scaled to your capacity.</p>
+          <p style={bodyP}>Volume and intensity are balanced to produce adaptation, not burnout.</p>
+          <p style={{ ...bodyP, ...bold }}>Not a template with your name on it. Training built from your numbers, your priorities, and your goals.</p>
+          <Link className="lp-link" to="/examples?tab=programming" style={{ fontSize: 13.5, display: 'inline-block', marginTop: 10 }}>See a full training day &rarr;</Link>
         </div>
       </section>
 
-      {/* Compare */}
-      <section className="feature-section">
+      {/* Level 2 — Coach on every block */}
+      <section className="feature-section" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="feature-container">
-          <div className="feature-row reverse">
-            <div className="feature-text">
-              <h3>AI Programming — {interval === 'monthly' ? '$29.99/mo' : '$74.99/qtr'}</h3>
-              <p>
-                Includes your AI Coach, full analytics, and competition rankings.
-              </p>
-              <div style={{ display: 'flex', maxWidth: 280, margin: '16px 0 0', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-                <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'monthly' ? 'var(--accent)' : 'transparent', color: interval === 'monthly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('monthly')}>Monthly</button>
-                <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'quarterly' ? 'var(--accent)' : 'transparent', color: interval === 'quarterly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('quarterly')}>Quarterly</button>
-              </div>
-              <div style={{ display: 'flex', marginTop: 16 }}>
-                <button className="feature-cta" onClick={buyProgramming} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
-              </div>
-              <p style={{ marginTop: 16, fontStyle: 'italic' }}>
-                The program that follows you.
-              </p>
+          <div className="lp-kicker">Personalization · Level 2</div>
+          <h2 className="lp-h2">Coach, every block.</h2>
+          <p style={{ ...bodyP, marginTop: 16 }}>Every block has a built-in AI Coach. Tap the button in any block and get guidance for what you're about to do — before you even have to ask — informed by your profile, evaluation, training history, and today's session.</p>
+          <img
+            src="/images/programming-coach-change.webp"
+            alt="AI Coach conversation — the athlete's rower broke, the coach proposes an Echo Bike swap with Apply and Keep buttons"
+            loading="lazy"
+            className="feature-img"
+            style={{ maxWidth: 420, margin: '10px 0 24px' }}
+          />
+          <p style={bodyP}>Need to change something? Tell the coach: &ldquo;My rower's broken — can we change the MetCon and keep the stimulus?&rdquo; or &ldquo;I'm traveling this week — can we adjust to hotel workouts with dumbbells and a jump rope?&rdquo;</p>
+          <p style={bodyP}>The coach proposes the revised block. You review it and tap Apply.</p>
+          <p style={{ ...bodyP, ...bold, marginBottom: 0 }}>Your program updates — and stays your program.</p>
+        </div>
+      </section>
+
+      {/* Context — data comes to life */}
+      <section className="feature-section" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="feature-container">
+          <div className="lp-kicker">Context</div>
+          <h2 className="lp-h2">Most apps save a score. We use it.</h2>
+          <p style={bodyP}>A result usually sits in a log — a number from a session that's already over.</p>
+          <p style={bodyP}>This is different. The Gains Lab captures what the result means — percentile, power, time domain, movement demands — and puts that information back into the system.</p>
+          <div style={{ margin: '20px 0 24px' }}>
+            <FranCard />
+          </div>
+          <p style={bodyP}>It can recalibrate targets, influence future sessions, and help decide what comes next.</p>
+          <p style={{ ...bodyP, ...bold, marginBottom: 0 }}>It doesn't just know you finished Fran in 3:42. It knows what that says about your fitness — and remembers it when making the next decision.</p>
+        </div>
+      </section>
+
+      {/* Level 3 — It never stops adapting */}
+      <section className="feature-section" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="feature-container">
+          <div className="lp-kicker">Personalization · Level 3</div>
+          <h2 className="lp-h2">It never stops adapting.</h2>
+          <p style={bodyP}>When you complete a month, the next one generates automatically from what you log — scores, feedback, RPEs, and any outside training. Weaknesses you've improved rotate out of focus; the next priority rotates in.</p>
+          <p style={{ ...bodyP, ...bold }}>Month one is built from your evaluation. Every month after is built from evidence.</p>
+          <Link className="lp-link" to="/examples?tab=programming">See real programs and evaluations &rarr;</Link>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section className="feature-section" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="feature-container">
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 28, textAlign: 'center', maxWidth: 430, margin: '0 auto' }}>
+            <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>AI Programming</h2>
+            <div style={{ fontSize: 32, fontWeight: 800, margin: '6px 0 2px' }}>{interval === 'monthly' ? '$29.99' : '$74.99'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{interval === 'monthly' ? 'per month' : 'per quarter'}</div>
+            <div style={{ display: 'flex', maxWidth: 240, margin: '0 auto 16px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+              {(['monthly', 'quarterly'] as const).map(iv => (
+                <button
+                  key={iv}
+                  type="button"
+                  style={{ flex: 1, padding: '8px 0', border: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', background: interval === iv ? 'var(--accent)' : 'transparent', color: interval === iv ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
+                  onClick={() => setInterval(iv)}
+                >
+                  {iv === 'monthly' ? 'Monthly' : 'Quarterly'}
+                </button>
+              ))}
             </div>
+            <p style={{ color: 'var(--text-dim)', fontSize: 14, margin: '0 0 18px' }}>Includes AI Coach, Nutrition tracking, and training analytics.</p>
+            <button className="feature-cta" onClick={buyProgramming} disabled={checkoutLoading}>
+              {checkoutLoading ? 'Redirecting…' : 'Start AI Programming'}
+            </button>
+          </div>
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13.5, marginTop: 22 }}>
+            Not ready? <Link to="/auth?signup=1&next=/profile" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>Run your free evaluation</Link> — no credit card, yours to keep.
           </div>
         </div>
       </section>
