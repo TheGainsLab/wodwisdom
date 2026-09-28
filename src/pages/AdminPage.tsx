@@ -869,6 +869,14 @@ export default function AdminPage({ session }: { session: Session }) {
                             🔗 {u.competition_athlete_label || 'Linked'}
                           </span>
                         )}
+                        {u.past_user && (
+                          <span
+                            title="Past customer — matched a Resend audience from the previous platforms"
+                            style={{ fontSize: 10, fontWeight: 600, color: '#b389f0', background: '#b389f020', padding: '2px 8px', borderRadius: 4, whiteSpace: 'nowrap' }}
+                          >
+                            past user
+                          </span>
+                        )}
                         {u.role === 'admin' && (
                           <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: 'var(--accent)', background: 'var(--accent-glow)', padding: '2px 8px', borderRadius: 4 }}>Admin</span>
                         )}
