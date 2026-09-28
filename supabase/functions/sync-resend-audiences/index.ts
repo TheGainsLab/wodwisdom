@@ -13,7 +13,10 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+// The audiences API needs a full-access key; the shared RESEND_API_KEY is
+// send-restricted. Prefer a dedicated RESEND_AUDIENCES_KEY so the sending
+// functions can keep the least-privilege key.
+const RESEND_API_KEY = Deno.env.get("RESEND_AUDIENCES_KEY") || Deno.env.get("RESEND_API_KEY");
 
 interface ResendAudience {
   id: string;
@@ -63,7 +66,7 @@ Deno.serve(async (req) => {
 
   try {
     if (!RESEND_API_KEY) {
-      return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), { status: 500, headers: jsonHeaders });
+      return new Response(JSON.stringify({ error: "RESEND_AUDIENCES_KEY / RESEND_API_KEY not configured" }), { status: 500, headers: jsonHeaders });
     }
 
     // Admin gate — same pattern as admin-send-email.
