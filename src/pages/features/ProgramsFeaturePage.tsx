@@ -12,11 +12,12 @@ const bold: React.CSSProperties = { color: 'var(--text)', fontWeight: 700 };
 
 // The logged-Fran context card — data-shaped HTML, matching the mock.
 function FranCard() {
+  // Real numbers from a logged Fran (Sat, May 16 · Metcon · Rx).
   const rows = [
-    ['Fran', '3:42'],
-    ['Percentile', '82nd'],
-    ['Avg power', '297 W · 3.4 W/kg'],
-    ['Time domain', 'Sprint · unbroken thrusters'],
+    ['Fran', '3:32'],
+    ['Percentile', '99th'],
+    ['Power', '3.88 W/kg'],
+    ['Time domain', 'short'],
   ];
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px 24px', maxWidth: 430 }}>
@@ -158,7 +159,7 @@ export default function ProgramsFeaturePage() {
             <FranCard />
           </div>
           <p style={bodyP}>It can recalibrate targets, influence future sessions, and help decide what comes next.</p>
-          <p style={{ ...bodyP, ...bold, marginBottom: 0 }}>It doesn't just know you finished Fran in 3:42. It knows what that says about your fitness — and remembers it when making the next decision.</p>
+          <p style={{ ...bodyP, ...bold, marginBottom: 0 }}>It doesn't just know you finished Fran in 3:32. It knows what that says about your fitness — and remembers it when making the next decision.</p>
         </div>
       </section>
 
