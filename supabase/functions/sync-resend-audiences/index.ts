@@ -31,15 +31,29 @@ interface ResendContact {
   unsubscribed: boolean;
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Resend allows 10 requests/second. Pace every call and retry 429s with
+// backoff (honoring retry-after when present) so a large audience list
+// syncs in one run instead of dying mid-pagination.
 async function resendGet(path: string): Promise<any> {
-  const resp = await fetch(`https://api.resend.com${path}`, {
-    headers: { Authorization: `Bearer ${RESEND_API_KEY}` },
-  });
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`Resend ${path} -> ${resp.status}: ${text.slice(0, 300)}`);
+  for (let attempt = 0; ; attempt++) {
+    await sleep(150);
+    const resp = await fetch(`https://api.resend.com${path}`, {
+      headers: { Authorization: `Bearer ${RESEND_API_KEY}` },
+    });
+    if (resp.status === 429 && attempt < 5) {
+      const retryAfter = Number(resp.headers.get("retry-after")) || 0;
+      await resp.body?.cancel();
+      await sleep(Math.max(retryAfter * 1000, 1000 * (attempt + 1)));
+      continue;
+    }
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      throw new Error(`Resend ${path} -> ${resp.status}: ${text.slice(0, 300)}`);
+    }
+    return resp.json();
   }
-  return resp.json();
 }
 
 /** All contacts of one audience. Follows `after` cursors when the API
