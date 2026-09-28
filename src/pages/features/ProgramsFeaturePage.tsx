@@ -93,7 +93,7 @@ export default function ProgramsFeaturePage() {
       {/* Why AI — quiet band */}
       <section className="feature-section" style={{ borderTop: '1px solid var(--border)', padding: '46px 0' }}>
         <div className="feature-container">
-          <div className="lp-kicker" style={{ textAlign: 'center' }}>Why AI Works for Programming</div>
+          <div className="lp-kicker lp-kicker-solo">Why AI Works for Programming</div>
           <div style={{ maxWidth: '62ch', margin: '0 auto' }}>
             <p style={bodyP}>A truly individualized program depends on a huge amount of information — your strength, skills, conditioning, goals, schedule, history, results, feedback, and progress.</p>
             <p style={bodyP}>AI is exceptionally well suited to that. And this isn't a rules engine or a decision tree — it reasons across your history and results, so what you get is shaped by what you've actually done.</p>

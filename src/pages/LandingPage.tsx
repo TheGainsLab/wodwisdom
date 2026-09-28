@@ -101,7 +101,7 @@ export default function LandingPage() {
       {/* ===== Why AI — quiet band ===== */}
       <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)', padding: '56px 0' }}>
         <div className="landing-container">
-          <div className="lp-kicker" style={{ textAlign: 'center', fontSize: 20, letterSpacing: '2.4px', marginBottom: 18 }}>Why AI</div>
+          <div className="lp-kicker lp-kicker-solo">Why AI</div>
           {/* Paragraphs read left-aligned on a centered 62ch block; only the
               kicker and the bold thesis line stay centered. */}
           <div style={{ maxWidth: '62ch', margin: '0 auto' }}>
@@ -229,7 +229,7 @@ export default function LandingPage() {
       {/* ===== FAQ ===== */}
       <section id="faq" className="landing-faq">
         <div className="landing-container">
-          <div className="lp-kicker">Frequently Asked Questions</div>
+          <div className="lp-kicker lp-kicker-solo">FAQ</div>
           <div className="landing-faq-list" style={{ margin: '20px auto 0' }}>
             {FAQ_ITEMS.map((item, i) => (
               <div

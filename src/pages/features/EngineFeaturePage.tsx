@@ -288,7 +288,9 @@ export default function EngineFeaturePage() {
       {/* Coach strip */}
       <section className="feature-section" style={{ borderTop: '1px solid var(--border)', padding: '44px 0' }}>
         <div className="feature-container">
-          <div className="lp-kicker">AI Coach · Always Available</div>
+          {/* Header-less section: enlarged like the other solo kickers, but
+              left-aligned to match this strip (per the mock review). */}
+          <div className="lp-kicker" style={{ fontSize: 20, letterSpacing: '2.4px', marginBottom: 16 }}>AI Coach · Always Available</div>
           <p style={bodyP}>When you have questions — pacing, strategy, or what today&rsquo;s session is for — <span style={bold}>AI Coach is built into every training day.</span></p>
           <p style={bodyP}>It knows your numbers, your history, and the work in front of you, so the answer is specific to you and the session you&rsquo;re doing.</p>
           <p style={bodyP}>Included with every plan.</p>
