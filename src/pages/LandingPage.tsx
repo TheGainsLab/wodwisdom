@@ -121,13 +121,13 @@ export default function LandingPage() {
         <div className="landing-container">
           <div className="lp-kicker">Two Ways to Train</div>
           <h2 className="lp-h2">Pick your path.</h2>
-          <p style={{ ...bodyP, fontSize: 15.5, color: 'var(--text-muted)', maxWidth: '60ch', marginBottom: 12 }}>
+          <p style={{ ...bodyP, fontSize: 16, color: 'var(--text-muted)', maxWidth: '60ch', marginBottom: 12 }}>
             This isn't a workout library with a chatbot. It's an AI-powered training platform that personalizes the work, learns from your results, and coaches you every day.
           </p>
-          <p style={{ ...bodyP, fontSize: 15.5, color: 'var(--text-muted)', maxWidth: '60ch', marginBottom: 12 }}>
+          <p style={{ ...bodyP, fontSize: 16, color: 'var(--text-muted)', maxWidth: '60ch', marginBottom: 12 }}>
             Every plan includes AI Coach — think of it like having a coach by your side. It knows your training history, helps you plan the day, answers workout-specific questions, and can make small adjustments when something needs to change.
           </p>
-          <p style={{ ...bodyP, fontSize: 15.5, color: 'var(--text)', fontWeight: 700, maxWidth: '60ch', marginBottom: 34 }}>
+          <p style={{ ...bodyP, fontSize: 16, color: 'var(--text)', fontWeight: 700, maxWidth: '60ch', marginBottom: 34 }}>
             Two products. One intelligent system built around you.
           </p>
           <div className="lp-paths">
@@ -161,7 +161,7 @@ export default function LandingPage() {
           <div className="lp-proof">
             <div>
               <h2 className="lp-h2">It starts by learning who you are.</h2>
-              <p style={{ ...bodyP, fontSize: 15.5 }}>
+              <p style={{ ...bodyP, fontSize: 16 }}>
                 The Gains Lab maps your abilities, history, goals, strengths, and weaknesses — and shows where you stand against 15 million competition event scores. It also identifies your biggest opportunities. This evaluation becomes the foundation of your personalized training.
               </p>
               <p style={{ color: 'var(--text)', fontWeight: 700, fontSize: 16, margin: '18px 0 22px' }}>

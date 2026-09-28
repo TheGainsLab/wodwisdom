@@ -7,7 +7,7 @@ import '../../landing.css';
 const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
 const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
 
-const bodyP: React.CSSProperties = { color: 'var(--text-dim)', fontSize: 15.5, lineHeight: 1.6, maxWidth: '62ch', margin: '0 0 14px' };
+const bodyP: React.CSSProperties = { color: 'var(--text-dim)', fontSize: 16, lineHeight: 1.6, maxWidth: '62ch', margin: '0 0 14px' };
 const bold: React.CSSProperties = { color: 'var(--text)', fontWeight: 700 };
 
 // The logged-Fran context card — data-shaped HTML, matching the mock.
