@@ -61,7 +61,19 @@ export default function AdminOpsPage({ session }: { session: Session }) {
     setSyncMsg('');
     try {
       const { data, error: err } = await supabase.functions.invoke('sync-resend-audiences', { body: {} });
-      if (err) setSyncMsg(`Sync failed: ${err.message}`);
+      if (err) {
+        // FunctionsHttpError carries the response; surface the function's
+        // real error message instead of the SDK's generic one.
+        let detail = err.message;
+        const ctx = (err as { context?: Response }).context;
+        if (ctx && typeof ctx.json === 'function') {
+          try {
+            const body = await ctx.json();
+            if (body?.error) detail = body.error;
+          } catch { /* keep the generic message */ }
+        }
+        setSyncMsg(`Sync failed: ${detail}`);
+      }
       else if (data?.error) setSyncMsg(`Sync failed: ${data.error}`);
       else setSyncMsg(`Synced ${data.total_contacts} contacts from ${data.audiences?.length ?? 0} audiences.`);
       await loadLegacyStats();
