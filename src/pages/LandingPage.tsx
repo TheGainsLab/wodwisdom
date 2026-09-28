@@ -204,7 +204,7 @@ export default function LandingPage() {
           <div className="lp-plans">
             {[
               { plan: 'programming' as const, name: 'AI Programming', monthly: '$29.99', quarterly: '$74.99', blurb: 'Individualized training built around your evaluation, goals, and progress.', cta: 'Choose Programming', feat: false, badge: '' },
-              { plan: 'all_access' as const, name: 'All Access', monthly: '$49.99', quarterly: '$119.99', blurb: 'AI Programming + AI Year of the Engine. Save $120/year vs. buying both.', cta: 'Get All Access', feat: true, badge: 'Most Complete' },
+              { plan: 'all_access' as const, name: 'All Access', monthly: '$49.99', quarterly: '$119.99', blurb: 'AI Programming + AI Year of the Engine.', cta: 'Get All Access', feat: true, badge: 'Best Value' },
               { plan: 'engine' as const, name: 'AI Year of the Engine', monthly: '$29.99', quarterly: '$74.99', blurb: 'Our conditioning system, personalized to your fitness and goals.', cta: 'Choose Engine', feat: false, badge: '' },
             ].map(p => (
               <div key={p.plan} className={'lp-plan' + (p.feat ? ' lp-plan-feat' : '')}>
