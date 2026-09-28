@@ -246,6 +246,14 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
   // ── Engine ───────────────────────────────────────────────────────
   {
     tab: 'engine',
+    image: '/images/engine-analytics-targets.webp',
+    alt: 'Targets vs Actual analytics — Sep 17 target 15.3 vs actual 16.3, then Sep 24 target 16.3 vs actual 18.4',
+    title: 'Watch the system learn',
+    caption:
+      'Two Max Aerobic Power sessions, one week apart. Sep 17: target 15.3, actual 16.3. Look at Sep 24 — the target is 16.3. The athlete’s own result became the next demand, and they beat that too. This is the loop: you produce, the program raises the bar.',
+  },
+  {
+    tab: 'engine',
     image: '/images/engine-analytics-comparison.webp',
     alt: 'Average pace comparison across day types — anaerobic 45.5, max aerobic power 17.3, endurance 11.5 cal/min',
     title: 'Compare yourself across stimuli',
