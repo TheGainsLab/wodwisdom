@@ -294,3 +294,6 @@ verify_jwt = false
 
 [functions.save-offer]
 verify_jwt = false
+
+[functions.sync-resend-audiences]
+verify_jwt = false
