@@ -112,7 +112,7 @@ export default function ProgramsFeaturePage() {
           <p style={bodyP}>Then you tell us what you're after, how you like to train, and how many days you want to train each week.</p>
           <p style={{ ...bodyP, ...bold }}>The evaluation tells us where you are. You tell us where you want to go. Your program is the shortest distance between the two.</p>
           <p style={bodyP}>The evaluation is free, takes just a few minutes, and is yours to keep — whether or not you train with us.</p>
-          <Link className="lp-link" to="/examples?tab=evaluations" style={{ fontSize: 13.5 }}>Read a full evaluation &rarr;</Link>
+          <Link className="lp-link" to="/examples?tab=evaluations">Read a full evaluation &rarr;</Link>
         </div>
       </section>
 
@@ -124,7 +124,7 @@ export default function ProgramsFeaturePage() {
           <p style={{ ...bodyP, marginTop: 16 }}>Every day breaks down into blocks — warm-up to cool-down — each with loads, targets, and coaching cues computed from your numbers. Skills, Strength, Technical Work, Accessories, MetCons. Weights in your units, percentages from your actual maxes, metcons scaled to your capacity.</p>
           <p style={bodyP}>Volume and intensity are balanced to produce adaptation, not burnout.</p>
           <p style={{ ...bodyP, ...bold }}>Not a template with your name on it. Training built from your numbers, your priorities, and your goals.</p>
-          <Link className="lp-link" to="/examples?tab=programming" style={{ fontSize: 13.5, display: 'inline-block', marginTop: 10 }}>See a full training day &rarr;</Link>
+          <Link className="lp-link" to="/examples?tab=programming" style={{ display: 'inline-block', marginTop: 10 }}>See a full training day &rarr;</Link>
         </div>
       </section>
 
@@ -179,7 +179,7 @@ export default function ProgramsFeaturePage() {
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 28, textAlign: 'center', maxWidth: 430, margin: '0 auto' }}>
             <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>AI Programming</h2>
             <div style={{ fontSize: 32, fontWeight: 800, margin: '6px 0 2px' }}>{interval === 'monthly' ? '$29.99' : '$74.99'}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{interval === 'monthly' ? 'per month' : 'per quarter'}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>{interval === 'monthly' ? 'per month' : 'per quarter'}</div>
             <div style={{ display: 'flex', maxWidth: 240, margin: '0 auto 16px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
               {(['monthly', 'quarterly'] as const).map(iv => (
                 <button
@@ -192,12 +192,12 @@ export default function ProgramsFeaturePage() {
                 </button>
               ))}
             </div>
-            <p style={{ color: 'var(--text-dim)', fontSize: 14, margin: '0 0 18px' }}>Includes AI Coach, Nutrition tracking, and training analytics.</p>
+            <p style={{ color: 'var(--text-dim)', fontSize: 15, margin: '0 0 18px' }}>Includes AI Coach, Nutrition tracking, and training analytics.</p>
             <button className="feature-cta" onClick={buyProgramming} disabled={checkoutLoading}>
               {checkoutLoading ? 'Redirecting…' : 'Start AI Programming'}
             </button>
           </div>
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13.5, marginTop: 22 }}>
+          <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 14.5, marginTop: 22 }}>
             Not ready? <Link to="/auth?signup=1&next=/profile" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>Run your free evaluation</Link> — no credit card, yours to keep.
           </div>
         </div>

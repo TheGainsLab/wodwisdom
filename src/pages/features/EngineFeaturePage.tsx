@@ -66,7 +66,7 @@ function SpectrumPoster() {
           <div className="eng-zone-label">Metcon Zone</div>
         </div>
       </div>
-      <div style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--text)', marginTop: 14 }}>
+      <div style={{ textAlign: 'center', fontSize: 13.5, color: 'var(--text)', marginTop: 14 }}>
         Each bar shows the range of fibers a structure trains.
       </div>
     </div>
@@ -158,7 +158,7 @@ function ProgramsLibrary() {
                 </div>
                 {expanded && (
                   <div style={{ animation: 'fadeUp .2s ease' }}>
-                    <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>
+                    <p style={{ fontSize: 14.5, color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>
                       {prog.description}
                     </p>
                   </div>
@@ -312,7 +312,7 @@ export default function EngineFeaturePage() {
           <p style={bodyP}>Rower, bike erg, echo bike, ski erg, treadmill — or the open road. AI Year of the Engine runs on whatever you've got: pick your equipment when you start a session, and if you'd rather run than ride, run.</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '16px 0 4px' }}>
             {['C2 Row', 'Bike Erg', 'Echo / Assault', 'Ski Erg', 'Treadmill', 'Outdoor Run', 'Road', 'Track', 'Trail'].map(m => (
-              <span key={m} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 999, padding: '6px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{m}</span>
+              <span key={m} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 999, padding: '6px 14px', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{m}</span>
             ))}
           </div>
           <p style={{ ...bodyP, marginTop: 14, marginBottom: 0 }}>Your pacing is calibrated per machine, from your own time trials. Do a time trial on the rower and your rowing targets are yours. A running time trial unlocks running targets. <span style={bold}>Switch equipment whenever you want — the program follows you there.</span></p>
@@ -338,7 +338,7 @@ export default function EngineFeaturePage() {
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 28, textAlign: 'center', maxWidth: 430, margin: '0 auto' }}>
             <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>AI Year of the Engine</h2>
             <div style={{ fontSize: 32, fontWeight: 800, margin: '6px 0 2px' }}>{interval === 'monthly' ? '$29.99' : '$74.99'}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{interval === 'monthly' ? 'per month' : 'per quarter'}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>{interval === 'monthly' ? 'per month' : 'per quarter'}</div>
             <div style={{ display: 'flex', maxWidth: 240, margin: '0 auto 16px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
               {(['monthly', 'quarterly'] as const).map(iv => (
                 <button
@@ -351,12 +351,12 @@ export default function EngineFeaturePage() {
                 </button>
               ))}
             </div>
-            <p style={{ color: 'var(--text-dim)', fontSize: 14, margin: '0 0 18px' }}>Includes AI Coach, Nutrition tracking, and training analytics.</p>
+            <p style={{ color: 'var(--text-dim)', fontSize: 15, margin: '0 0 18px' }}>Includes AI Coach, Nutrition tracking, and training analytics.</p>
             <button className="feature-cta" onClick={buyEngine} disabled={checkoutLoading}>
               {checkoutLoading ? 'Redirecting…' : 'Start AI Year of the Engine'}
             </button>
           </div>
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13.5, marginTop: 22 }}>
+          <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 14.5, marginTop: 22 }}>
             Not ready? <Link to="/auth?signup=1&next=/profile" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>Run your free evaluation</Link> — no credit card, yours to keep.
           </div>
         </div>

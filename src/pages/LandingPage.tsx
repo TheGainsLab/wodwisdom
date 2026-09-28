@@ -148,7 +148,7 @@ export default function LandingPage() {
           </div>
           <div className="lp-band">
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>Want both? Get All Access.</div>
-            <span style={{ color: 'var(--text-dim)', fontSize: 14.5 }}>AI Programming + AI Year of the Engine for $49.99/month — save $120 a year vs. buying them separately.</span>
+            <span style={{ color: 'var(--text-dim)', fontSize: 15 }}>AI Programming + AI Year of the Engine for $49.99/month — save $120 a year vs. buying them separately.</span>
             <a className="lp-link" href="#pricing" style={{ marginTop: 4 }}>Get All Access &rarr;</a>
           </div>
         </div>
@@ -170,12 +170,12 @@ export default function LandingPage() {
               <Link to="/auth?signup=1&next=/profile" className="landing-cta">Get Your Free Evaluation</Link>
             </div>
             <div className="lp-evalcard">
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
                 From a real athlete's evaluation
               </div>
               <p><b>Technique, not strength, is capping the clean &amp; jerk.</b> The jerk (265) barely clears the push press (255) — a gap that points at overhead mechanics, not missing horsepower. So the fix is cheap.</p>
               <p><b>What stays on maintenance:</b> a 19:55 5k and a 6:44 2k row get kept sharp with regular touches, &ldquo;but it doesn&rsquo;t need to be pushed while strength is the focus.&rdquo;</p>
-              <Link className="lp-link" to="/examples" style={{ fontSize: 13.5 }}>See real evaluations, programs, and Engine analytics &rarr;</Link>
+              <Link className="lp-link" to="/examples">See real evaluations, programs, and Engine analytics &rarr;</Link>
             </div>
           </div>
         </div>
@@ -208,15 +208,15 @@ export default function LandingPage() {
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 10, minHeight: 14 }}>{p.badge}</div>
                 <h3 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 6px' }}>{p.name}</h3>
                 <div style={{ fontSize: 30, fontWeight: 800, margin: '8px 0 2px' }}>{pricingInterval === 'monthly' ? p.monthly : p.quarterly}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>{pricingInterval === 'monthly' ? 'per month' : 'per quarter'}</div>
-                <p style={{ color: 'var(--text-dim)', fontSize: 14, margin: '0 0 20px' }}>{p.blurb}</p>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>{pricingInterval === 'monthly' ? 'per month' : 'per quarter'}</div>
+                <p style={{ color: 'var(--text-dim)', fontSize: 15, margin: '0 0 20px' }}>{p.blurb}</p>
                 <button className="landing-cta" style={{ marginTop: 'auto' }} onClick={() => buy(p.plan)} disabled={checkoutLoading !== null}>
                   {checkoutLoading === p.plan ? 'Redirecting…' : p.cta}
                 </button>
               </div>
             ))}
           </div>
-          <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13.5, marginTop: 18 }}>
+          <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 15, marginTop: 18 }}>
             Every plan includes AI Coach, Nutrition tracking, and training analytics.
           </p>
           <div style={{ textAlign: 'center', marginTop: 30, color: 'var(--text-dim)', fontSize: 15 }}>

@@ -14,7 +14,7 @@
 .landing-signin-btn:hover{border-color:var(--accent);color:var(--accent)}
 
 /* ===== Shared CTA Button ===== */
-.landing-cta{display:inline-block;background:var(--accent);color:white;border:none;border-radius:10px;padding:16px 36px;font-family:'Outfit',sans-serif;font-size:16px;font-weight:600;cursor:pointer;transition:background .2s,transform .1s}
+.landing-cta{display:inline-block;background:var(--accent);color:white;border:none;border-radius:10px;padding:16px 36px;font-family:'Outfit',sans-serif;font-size:16px;font-weight:600;cursor:pointer;transition:background .2s,transform .1s;text-decoration:none}
 .landing-cta:hover{background:var(--accent-hover)}
 .landing-cta:active{transform:scale(.98)}
 
@@ -133,12 +133,12 @@
 .lp-path{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:30px 30px 26px;display:flex;flex-direction:column}
 .lp-path h3{font-size:23px;font-weight:800;margin:0 0 10px}
 .lp-path p{color:var(--text-dim);font-size:15px;line-height:1.6;margin:0 0 22px}
-.lp-link{color:var(--accent);text-decoration:none;font-weight:700;font-size:14.5px}
+.lp-link{color:var(--accent);text-decoration:none;font-weight:700;font-size:15px}
 .lp-path .lp-link{margin-top:auto}
 .lp-band{margin-top:20px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:22px 24px;display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center}
 .lp-proof{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center}
 .lp-evalcard{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:12px;padding:22px 24px}
-.lp-evalcard p{font-size:14px;color:var(--text-dim);margin:0 0 12px;line-height:1.6}
+.lp-evalcard p{font-size:15px;color:var(--text-dim);margin:0 0 12px;line-height:1.6}
 .lp-evalcard p b{color:var(--text)}
 .lp-plans{display:grid;grid-template-columns:1fr 1.12fr 1fr;gap:18px;align-items:stretch}
 .lp-plan{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:26px 24px;display:flex;flex-direction:column;text-align:center}

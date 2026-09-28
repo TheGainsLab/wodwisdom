@@ -47,7 +47,7 @@ function TabCta({ tab, signedIn }: { tab: ExamplesTab; signedIn: boolean }) {
         {signedIn ? 'Open your profile' : 'Get Your Free Evaluation'}
       </Link>
       <div style={{ marginTop: 16 }}>
-        <Link to={secondary.to} style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
+        <Link to={secondary.to} style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>
           {secondary.label}
         </Link>
       </div>
