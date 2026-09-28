@@ -173,8 +173,11 @@ export default function LandingPage() {
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
                 From a real athlete's evaluation
               </div>
-              <p><b>Technique, not strength, is capping the clean &amp; jerk.</b> The jerk (265) barely clears the push press (255) — a gap that points at overhead mechanics, not missing horsepower. So the fix is cheap.</p>
-              <p><b>What stays on maintenance:</b> a 19:55 5k and a 6:44 2k row get kept sharp with regular touches, &ldquo;but it doesn&rsquo;t need to be pushed while strength is the focus.&rdquo;</p>
+              {/* Verbatim from the evaluation on /examples (weaknesses #3,
+                  strengths #1) — trims marked with ellipses. Keep it that way:
+                  the tag above claims a real excerpt. */}
+              <p>&ldquo;Your jerk (265) is barely above your push press (255) — that says <b>the jerk technique, not overhead strength, is what&rsquo;s capping your clean &amp; jerk</b>&hellip; Technique work here is cheap on recovery and high-return.&rdquo;</p>
+              <p>&ldquo;A 19:55 5k run, a 6:44 2k row, and a 17:57 5k row at 225 lbs is <b>a real engine</b>&hellip; We keep this sharp with regular touches, but it doesn&rsquo;t need to be pushed while strength is the focus.&rdquo;</p>
               <Link className="lp-link" to="/examples">See real evaluations, programs, and Engine analytics &rarr;</Link>
             </div>
           </div>
