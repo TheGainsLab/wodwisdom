@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
+import FeatureFooter from '../../components/FeatureFooter';
 import '../../features.css';
 
 export default function NutritionFeaturePage() {
@@ -114,7 +115,7 @@ export default function NutritionFeaturePage() {
         </p>
       </section>
 
-      <footer className="feature-footer"><GainsLogo /></footer>
+      <FeatureFooter />
     </div>
   );
 }

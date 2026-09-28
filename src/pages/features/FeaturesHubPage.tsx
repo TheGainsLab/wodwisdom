@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
+import FeatureFooter from '../../components/FeatureFooter';
 import '../../features.css';
 
 // July '26 repositioning: two hero PRODUCTS (Engine, Programs); the AI Coach
@@ -149,7 +150,7 @@ export default function FeaturesHubPage() {
         <button className="feature-cta" onClick={() => navigate('/auth?signup=1')}>Try it Free</button>
       </section>
 
-      <footer className="feature-footer"><GainsLogo /></footer>
+      <FeatureFooter links={[{ to: '/examples', label: 'Real Examples' }]} />
     </div>
   );
 }

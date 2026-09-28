@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
+import FeatureFooter from '../../components/FeatureFooter';
 import '../../features.css';
 import '../../landing.css';
 
@@ -362,7 +363,7 @@ export default function EngineFeaturePage() {
         </div>
       </section>
 
-      <footer className="feature-footer"><GainsLogo /></footer>
+      <FeatureFooter links={[{ to: '/examples?tab=engine', label: 'Real Examples' }, { to: '/features/programs', label: 'AI Programming' }]} />
     </div>
   );
 }

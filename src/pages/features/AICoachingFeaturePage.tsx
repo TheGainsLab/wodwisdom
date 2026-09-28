@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
+import FeatureFooter from '../../components/FeatureFooter';
 import '../../features.css';
 
 function ChatExample({ question, children, scienceMode }: { question: string; children: React.ReactNode; scienceMode?: boolean }) {
@@ -163,7 +164,7 @@ export default function AICoachingFeaturePage() {
         </p>
       </section>
 
-      <footer className="feature-footer"><GainsLogo /></footer>
+      <FeatureFooter links={[{ to: '/examples', label: 'Real Examples' }]} />
     </div>
   );
 }
