@@ -125,7 +125,8 @@ export default function LandingPage() {
             This isn't a workout library with a chatbot. It's an AI-powered training platform that personalizes the work, learns from your results, and coaches you every day.
           </p>
           <p style={{ ...bodyP, fontSize: 16, color: 'var(--text-muted)', maxWidth: '60ch', marginBottom: 12 }}>
-            Every plan includes AI Coach — think of it like having a coach by your side. It knows your training history, helps you plan the day, answers workout-specific questions, and can make small adjustments when something needs to change.
+            Every plan includes AI Coach — think of it like having a coach by your side. It knows your training history, helps you plan the day, answers workout-specific questions, and can make small adjustments when something needs to change.{' '}
+            <Link to="/qa" className="lp-link" style={{ fontSize: 15 }}>See the coach answer real questions &rarr;</Link>
           </p>
           <p style={{ ...bodyP, fontSize: 16, color: 'var(--text)', fontWeight: 700, maxWidth: '60ch', marginBottom: 34 }}>
             Two products. One intelligent system built around you.
