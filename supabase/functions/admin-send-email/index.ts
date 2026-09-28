@@ -80,7 +80,7 @@ interface InboundAttachment {
   content_base64: string;
 }
 
-function renderCustom(subject: string, body: string, name: string, attachments: InboundAttachment[]): RenderedTemplate {
+function renderCustom(subject: string, body: string, name: string, attachments: InboundAttachment[], evalHtml = ""): RenderedTemplate {
   // Body comes from the admin composer as plain-text-with-extras. Four
   // kinds of formatting are supported:
   //   1. Blank-line-separated paragraphs -> <p> blocks
@@ -159,13 +159,72 @@ function renderCustom(subject: string, body: string, name: string, attachments: 
   // length.
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0; color: #1a1a1a; line-height: 1.6;">
-      ${withImages.map((p) => `<p>${p}</p>`).join("\n      ")}
+      ${withImages.map((p) => `<p>${p}</p>`).join("\n      ")}${evalHtml}
     </div>
   `.trim();
   return {
     subject: subject.trim() || "A note from The Gains Lab",
     html,
   };
+}
+
+interface StructuredEvaluation {
+  headline_takeaway?: string;
+  detailed_analysis?: string;
+  strengths?: string[];
+  weaknesses_and_priorities?: string[];
+  recommendations?: string[];
+}
+
+/** The recipient's evaluation, rendered inline below the personal note —
+ *  the founder's "attach the eval" flow, as email text rather than a PDF.
+ *  Prefers the typed structured_evaluation; older rows fall back to a
+ *  minimal render of the markdown `analysis` prose. */
+function renderEvaluationHtml(
+  structured: StructuredEvaluation | null,
+  analysis: string | null,
+  createdAt: string,
+): string {
+  const esc = (t: string) => applyEmphasis(escapeHtml(t));
+  const dateStr = new Date(createdAt).toLocaleDateString("en-US", {
+    month: "long", day: "numeric", year: "numeric",
+  });
+  const parts: string[] = [];
+  parts.push('<hr style="border: none; border-top: 1px solid #e5e5e5; margin: 28px 0;" />');
+  parts.push(`<p style="font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #888; margin-bottom: 16px;">Your Evaluation &middot; ${escapeHtml(dateStr)}</p>`);
+
+  const section = (title: string, items: string[] | undefined) => {
+    if (!items || items.length === 0) return;
+    parts.push(`<p style="margin: 20px 0 8px;"><strong>${title}</strong></p>`);
+    parts.push(`<ul style="padding-left: 20px; margin: 0;">${items.map((i) => `<li style="margin-bottom: 8px;">${esc(i)}</li>`).join("")}</ul>`);
+  };
+
+  if (structured?.headline_takeaway) {
+    parts.push(`<p><strong>${esc(structured.headline_takeaway)}</strong></p>`);
+    for (const para of (structured.detailed_analysis ?? "").split(/\n\s*\n/)) {
+      if (para.trim()) parts.push(`<p>${esc(para.trim()).replace(/\n/g, "<br/>")}</p>`);
+    }
+    section("Strengths", structured.strengths);
+    section("Priorities", structured.weaknesses_and_priorities);
+    section("Recommendations", structured.recommendations);
+  } else if (analysis) {
+    // Markdown fallback: paragraphs, "### " headings, "- " bullet groups.
+    for (const block of analysis.split(/\n\s*\n/)) {
+      const t = block.trim();
+      if (!t) continue;
+      if (t.startsWith("### ")) {
+        parts.push(`<p style="margin: 20px 0 8px;"><strong>${esc(t.slice(4))}</strong></p>`);
+      } else if (t.split("\n").every((l) => l.trim().startsWith("- "))) {
+        const items = t.split("\n").map((l) => l.trim().slice(2));
+        parts.push(`<ul style="padding-left: 20px; margin: 0;">${items.map((i) => `<li style="margin-bottom: 8px;">${esc(i)}</li>`).join("")}</ul>`);
+      } else {
+        parts.push(`<p>${esc(t).replace(/\n/g, "<br/>")}</p>`);
+      }
+    }
+  } else {
+    return "";
+  }
+  return "\n      " + parts.join("\n      ");
 }
 
 Deno.serve(async (req) => {
@@ -212,7 +271,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { user_id, template_key, subject, body: customBody, campaign_key, attachments: rawAttachments } = body || {};
+    const { user_id, template_key, subject, body: customBody, campaign_key, attachments: rawAttachments, include_evaluation } = body || {};
     if (!user_id || !template_key) {
       return new Response(
         JSON.stringify({ error: "user_id and template_key are required" }),
@@ -288,7 +347,30 @@ Deno.serve(async (req) => {
           { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
         );
       }
-      rendered = renderCustom(customSubject, customText, recipientName, attachments);
+      let evalHtml = "";
+      if (include_evaluation === true) {
+        const { data: evalRow } = await supa
+          .from("profile_evaluations")
+          .select("structured_evaluation, analysis, created_at")
+          .eq("user_id", user_id)
+          .eq("status", "complete")
+          .eq("visible", true)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!evalRow) {
+          return new Response(
+            JSON.stringify({ error: "This user has no completed evaluation to include" }),
+            { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
+          );
+        }
+        evalHtml = renderEvaluationHtml(
+          evalRow.structured_evaluation as StructuredEvaluation | null,
+          evalRow.analysis,
+          evalRow.created_at,
+        );
+      }
+      rendered = renderCustom(customSubject, customText, recipientName, attachments, evalHtml);
     } else {
       return new Response(
         JSON.stringify({ error: `Unknown template_key: ${template_key}` }),
