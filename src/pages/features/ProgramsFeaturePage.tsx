@@ -7,7 +7,7 @@ import '../../landing.css';
 const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
 const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
 
-const bodyP: React.CSSProperties = { color: 'var(--text-dim)', fontSize: 15.5, lineHeight: 1.6, maxWidth: '62ch', margin: '0 0 14px' };
+const bodyP: React.CSSProperties = { color: 'var(--text-dim)', fontSize: 16, lineHeight: 1.6, maxWidth: '62ch', margin: '0 0 14px' };
 const bold: React.CSSProperties = { color: 'var(--text)', fontWeight: 700 };
 
 // The logged-Fran context card — data-shaped HTML, matching the mock.
@@ -93,7 +93,7 @@ export default function ProgramsFeaturePage() {
       {/* Why AI — quiet band */}
       <section className="feature-section" style={{ borderTop: '1px solid var(--border)', padding: '46px 0' }}>
         <div className="feature-container">
-          <div className="lp-kicker" style={{ textAlign: 'center' }}>Why AI Works for Programming</div>
+          <div className="lp-kicker lp-kicker-solo">Why AI Works for Programming</div>
           <div style={{ maxWidth: '62ch', margin: '0 auto' }}>
             <p style={bodyP}>A truly individualized program depends on a huge amount of information — your strength, skills, conditioning, goals, schedule, history, results, feedback, and progress.</p>
             <p style={bodyP}>AI is exceptionally well suited to that. And this isn't a rules engine or a decision tree — it reasons across your history and results, so what you get is shaped by what you've actually done.</p>
@@ -112,7 +112,7 @@ export default function ProgramsFeaturePage() {
           <p style={bodyP}>Then you tell us what you're after, how you like to train, and how many days you want to train each week.</p>
           <p style={{ ...bodyP, ...bold }}>The evaluation tells us where you are. You tell us where you want to go. Your program is the shortest distance between the two.</p>
           <p style={bodyP}>The evaluation is free, takes just a few minutes, and is yours to keep — whether or not you train with us.</p>
-          <Link className="lp-link" to="/examples?tab=evaluations" style={{ fontSize: 13.5 }}>Read a full evaluation &rarr;</Link>
+          <Link className="lp-link" to="/examples?tab=evaluations">Read a full evaluation &rarr;</Link>
         </div>
       </section>
 
@@ -124,7 +124,7 @@ export default function ProgramsFeaturePage() {
           <p style={{ ...bodyP, marginTop: 16 }}>Every day breaks down into blocks — warm-up to cool-down — each with loads, targets, and coaching cues computed from your numbers. Skills, Strength, Technical Work, Accessories, MetCons. Weights in your units, percentages from your actual maxes, metcons scaled to your capacity.</p>
           <p style={bodyP}>Volume and intensity are balanced to produce adaptation, not burnout.</p>
           <p style={{ ...bodyP, ...bold }}>Not a template with your name on it. Training built from your numbers, your priorities, and your goals.</p>
-          <Link className="lp-link" to="/examples?tab=programming" style={{ fontSize: 13.5, display: 'inline-block', marginTop: 10 }}>See a full training day &rarr;</Link>
+          <Link className="lp-link" to="/examples?tab=programming" style={{ display: 'inline-block', marginTop: 10 }}>See a full training day &rarr;</Link>
         </div>
       </section>
 
@@ -179,7 +179,7 @@ export default function ProgramsFeaturePage() {
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 28, textAlign: 'center', maxWidth: 430, margin: '0 auto' }}>
             <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>AI Programming</h2>
             <div style={{ fontSize: 32, fontWeight: 800, margin: '6px 0 2px' }}>{interval === 'monthly' ? '$29.99' : '$74.99'}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{interval === 'monthly' ? 'per month' : 'per quarter'}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>{interval === 'monthly' ? 'per month' : 'per quarter'}</div>
             <div style={{ display: 'flex', maxWidth: 240, margin: '0 auto 16px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
               {(['monthly', 'quarterly'] as const).map(iv => (
                 <button
@@ -192,12 +192,12 @@ export default function ProgramsFeaturePage() {
                 </button>
               ))}
             </div>
-            <p style={{ color: 'var(--text-dim)', fontSize: 14, margin: '0 0 18px' }}>Includes AI Coach, Nutrition tracking, and training analytics.</p>
+            <p style={{ color: 'var(--text-dim)', fontSize: 15, margin: '0 0 18px' }}>Includes AI Coach, Nutrition tracking, and training analytics.</p>
             <button className="feature-cta" onClick={buyProgramming} disabled={checkoutLoading}>
               {checkoutLoading ? 'Redirecting…' : 'Start AI Programming'}
             </button>
           </div>
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13.5, marginTop: 22 }}>
+          <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 14.5, marginTop: 22 }}>
             Not ready? <Link to="/auth?signup=1&next=/profile" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>Run your free evaluation</Link> — no credit card, yours to keep.
           </div>
         </div>

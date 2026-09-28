@@ -101,7 +101,7 @@ export default function LandingPage() {
       {/* ===== Why AI — quiet band ===== */}
       <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)', padding: '56px 0' }}>
         <div className="landing-container">
-          <div className="lp-kicker" style={{ textAlign: 'center', fontSize: 20, letterSpacing: '2.4px', marginBottom: 18 }}>Why AI</div>
+          <div className="lp-kicker lp-kicker-solo">Why AI</div>
           {/* Paragraphs read left-aligned on a centered 62ch block; only the
               kicker and the bold thesis line stay centered. */}
           <div style={{ maxWidth: '62ch', margin: '0 auto' }}>
@@ -121,13 +121,13 @@ export default function LandingPage() {
         <div className="landing-container">
           <div className="lp-kicker">Two Ways to Train</div>
           <h2 className="lp-h2">Pick your path.</h2>
-          <p style={{ ...bodyP, fontSize: 15.5, color: 'var(--text-muted)', maxWidth: '60ch', marginBottom: 12 }}>
+          <p style={{ ...bodyP, fontSize: 16, color: 'var(--text-muted)', maxWidth: '60ch', marginBottom: 12 }}>
             This isn't a workout library with a chatbot. It's an AI-powered training platform that personalizes the work, learns from your results, and coaches you every day.
           </p>
-          <p style={{ ...bodyP, fontSize: 15.5, color: 'var(--text-muted)', maxWidth: '60ch', marginBottom: 12 }}>
+          <p style={{ ...bodyP, fontSize: 16, color: 'var(--text-muted)', maxWidth: '60ch', marginBottom: 12 }}>
             Every plan includes AI Coach — think of it like having a coach by your side. It knows your training history, helps you plan the day, answers workout-specific questions, and can make small adjustments when something needs to change.
           </p>
-          <p style={{ ...bodyP, fontSize: 15.5, color: 'var(--text)', fontWeight: 700, maxWidth: '60ch', marginBottom: 34 }}>
+          <p style={{ ...bodyP, fontSize: 16, color: 'var(--text)', fontWeight: 700, maxWidth: '60ch', marginBottom: 34 }}>
             Two products. One intelligent system built around you.
           </p>
           <div className="lp-paths">
@@ -148,7 +148,7 @@ export default function LandingPage() {
           </div>
           <div className="lp-band">
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>Want both? Get All Access.</div>
-            <span style={{ color: 'var(--text-dim)', fontSize: 14.5 }}>AI Programming + AI Year of the Engine for $49.99/month — save $120 a year vs. buying them separately.</span>
+            <span style={{ color: 'var(--text-dim)', fontSize: 15 }}>AI Programming + AI Year of the Engine for $49.99/month — save $120 a year vs. buying them separately.</span>
             <a className="lp-link" href="#pricing" style={{ marginTop: 4 }}>Get All Access &rarr;</a>
           </div>
         </div>
@@ -161,7 +161,7 @@ export default function LandingPage() {
           <div className="lp-proof">
             <div>
               <h2 className="lp-h2">It starts by learning who you are.</h2>
-              <p style={{ ...bodyP, fontSize: 15.5 }}>
+              <p style={{ ...bodyP, fontSize: 16 }}>
                 The Gains Lab maps your abilities, history, goals, strengths, and weaknesses — and shows where you stand against 15 million competition event scores. It also identifies your biggest opportunities. This evaluation becomes the foundation of your personalized training.
               </p>
               <p style={{ color: 'var(--text)', fontWeight: 700, fontSize: 16, margin: '18px 0 22px' }}>
@@ -170,12 +170,12 @@ export default function LandingPage() {
               <Link to="/auth?signup=1&next=/profile" className="landing-cta">Get Your Free Evaluation</Link>
             </div>
             <div className="lp-evalcard">
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
                 From a real athlete's evaluation
               </div>
               <p><b>Technique, not strength, is capping the clean &amp; jerk.</b> The jerk (265) barely clears the push press (255) — a gap that points at overhead mechanics, not missing horsepower. So the fix is cheap.</p>
               <p><b>What stays on maintenance:</b> a 19:55 5k and a 6:44 2k row get kept sharp with regular touches, &ldquo;but it doesn&rsquo;t need to be pushed while strength is the focus.&rdquo;</p>
-              <Link className="lp-link" to="/examples" style={{ fontSize: 13.5 }}>See real evaluations, programs, and Engine analytics &rarr;</Link>
+              <Link className="lp-link" to="/examples">See real evaluations, programs, and Engine analytics &rarr;</Link>
             </div>
           </div>
         </div>
@@ -208,15 +208,15 @@ export default function LandingPage() {
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 10, minHeight: 14 }}>{p.badge}</div>
                 <h3 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 6px' }}>{p.name}</h3>
                 <div style={{ fontSize: 30, fontWeight: 800, margin: '8px 0 2px' }}>{pricingInterval === 'monthly' ? p.monthly : p.quarterly}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>{pricingInterval === 'monthly' ? 'per month' : 'per quarter'}</div>
-                <p style={{ color: 'var(--text-dim)', fontSize: 14, margin: '0 0 20px' }}>{p.blurb}</p>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>{pricingInterval === 'monthly' ? 'per month' : 'per quarter'}</div>
+                <p style={{ color: 'var(--text-dim)', fontSize: 15, margin: '0 0 20px' }}>{p.blurb}</p>
                 <button className="landing-cta" style={{ marginTop: 'auto' }} onClick={() => buy(p.plan)} disabled={checkoutLoading !== null}>
                   {checkoutLoading === p.plan ? 'Redirecting…' : p.cta}
                 </button>
               </div>
             ))}
           </div>
-          <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13.5, marginTop: 18 }}>
+          <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 15, marginTop: 18 }}>
             Every plan includes AI Coach, Nutrition tracking, and training analytics.
           </p>
           <div style={{ textAlign: 'center', marginTop: 30, color: 'var(--text-dim)', fontSize: 15 }}>
@@ -229,7 +229,7 @@ export default function LandingPage() {
       {/* ===== FAQ ===== */}
       <section id="faq" className="landing-faq">
         <div className="landing-container">
-          <div className="lp-kicker">Frequently Asked Questions</div>
+          <div className="lp-kicker lp-kicker-solo">FAQ</div>
           <div className="landing-faq-list" style={{ margin: '20px auto 0' }}>
             {FAQ_ITEMS.map((item, i) => (
               <div
