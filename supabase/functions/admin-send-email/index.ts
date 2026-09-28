@@ -224,6 +224,17 @@ function renderEvaluationHtml(
   } else {
     return "";
   }
+
+  // The natural moment for the ask: they just re-read their own evaluation.
+  // Even-handed by design — recipients came in interested in different
+  // products, so both paths get equal weight and All Access rides quietly
+  // underneath.
+  const BTN = "display: inline-block; background: #ff3a3a; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;";
+  parts.push('<hr style="border: none; border-top: 1px solid #e5e5e5; margin: 28px 0;" />');
+  parts.push('<p>This evaluation is the foundation \u2014 where you take it is up to you.</p>');
+  parts.push(`<p style="text-align: center; margin: 24px 0 0;"><a href="${SITE_URL}/checkout?plan=programming" style="${BTN}">Start AI Programming \u2192</a></p>`);
+  parts.push(`<p style="text-align: center; margin: 12px 0 8px;"><a href="${SITE_URL}/checkout?plan=engine" style="${BTN}">Start AI Year of the Engine \u2192</a></p>`);
+  parts.push(`<p style="text-align: center; font-size: 13px; margin: 0;"><a href="${SITE_URL}/checkout?plan=all_access" style="color: #ff3a3a;">Want both? Get All Access \u2192</a></p>`);
   return "\n      " + parts.join("\n      ");
 }
 
