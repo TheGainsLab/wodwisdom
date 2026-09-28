@@ -227,7 +227,7 @@ function statusColor(status: string): string {
   }
 }
 
-function EmailSection({ userId, userEmail, userName }: { userId: string; userEmail: string; userName: string }) {
+function EmailSection({ userId, userEmail, userName, hasEvaluation }: { userId: string; userEmail: string; userName: string; hasEvaluation: boolean }) {
   // ?outreach=1 (the /admin/outreach worklist links here with it) pre-checks
   // the outreach tag so working the list marks each user handled on send.
   const [searchParams] = useSearchParams();
@@ -236,6 +236,7 @@ function EmailSection({ userId, userEmail, userName }: { userId: string; userEma
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [images, setImages] = useState<ComposerImage[]>([]);
+  const [includeEval, setIncludeEval] = useState(false);
   const [confirmArmed, setConfirmArmed] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -428,7 +429,7 @@ function EmailSection({ userId, userEmail, userName }: { userId: string; userEma
       // automated eval-reminder sweep (its candidates RPC excludes the tag).
       const campaign_key = outreach ? 'eval_outreach' : undefined;
       const payload = templateKey === 'custom'
-        ? { user_id: userId, template_key: 'custom', subject, body, attachments, campaign_key }
+        ? { user_id: userId, template_key: 'custom', subject, body, attachments, campaign_key, include_evaluation: includeEval }
         : { user_id: userId, template_key: 'welcome_back', campaign_key };
       const { data, error: invokeErr } = await supabase.functions.invoke('admin-send-email', { body: payload });
       if (invokeErr) throw new Error(invokeErr.message || 'Send failed');
@@ -438,6 +439,7 @@ function EmailSection({ userId, userEmail, userName }: { userId: string; userEma
       images.forEach((img) => URL.revokeObjectURL(img.preview_url));
       setImages([]);
       imgCounterRef.current = 0;
+      setIncludeEval(false);
       setConfirmArmed(false);
       await loadHistory();
     } catch (e) {
@@ -481,6 +483,23 @@ function EmailSection({ userId, userEmail, userName }: { userId: string; userEma
             eval reminder will permanently skip them. Leave unchecked for support replies and one-off notes.
           </span>
         </label>
+
+        {templateKey === 'custom' && (
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: 'var(--text-dim)', cursor: hasEvaluation ? 'pointer' : 'default', lineHeight: 1.5, opacity: hasEvaluation ? 1 : 0.55 }}>
+            <input
+              type="checkbox"
+              checked={includeEval}
+              disabled={!hasEvaluation}
+              onChange={(e) => { setIncludeEval(e.target.checked); setConfirmArmed(false); }}
+              style={{ marginTop: 3, accentColor: 'var(--accent)' }}
+            />
+            <span>
+              <strong style={{ color: 'var(--text)' }}>Include their evaluation</strong> — appends the latest completed
+              evaluation below your note, rendered as email text (verdict, strengths, priorities, recommendations).
+              {!hasEvaluation && ' This user has no completed evaluation.'}
+            </span>
+          </label>
+        )}
 
         {templateKey === 'custom' ? (
           <>
@@ -962,6 +981,7 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                     userId={id}
                     userEmail={profile.email}
                     userName={profile.full_name || profile.email}
+                    hasEvaluation={(data?.evaluations?.length ?? 0) > 0}
                   />
                 )}
 
