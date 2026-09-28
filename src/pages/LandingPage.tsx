@@ -148,7 +148,7 @@ export default function LandingPage() {
           </div>
           <div className="lp-band">
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>Want both? Get All Access.</div>
-            <span style={{ color: 'var(--text-dim)', fontSize: 15 }}>AI Programming + AI Year of the Engine for $49.99/month — save $120 a year vs. buying them separately.</span>
+            <span style={{ color: 'var(--text-dim)', fontSize: 15 }}>AI Programming + AI Year of the Engine for $49.99/month.</span>
             <a className="lp-link" href="#pricing" style={{ marginTop: 4 }}>Get All Access &rarr;</a>
           </div>
         </div>
