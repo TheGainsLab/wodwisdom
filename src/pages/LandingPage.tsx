@@ -125,7 +125,8 @@ export default function LandingPage() {
             This isn't a workout library with a chatbot. It's an AI-powered training platform that personalizes the work, learns from your results, and coaches you every day.
           </p>
           <p style={{ ...bodyP, fontSize: 16, color: 'var(--text-muted)', maxWidth: '60ch', marginBottom: 12 }}>
-            Every plan includes AI Coach — think of it like having a coach by your side. It knows your training history, helps you plan the day, answers workout-specific questions, and can make small adjustments when something needs to change.
+            Every plan includes AI Coach — think of it like having a coach by your side. It knows your training history, helps you plan the day, answers workout-specific questions, and can make small adjustments when something needs to change.{' '}
+            <Link to="/qa" className="lp-link" style={{ fontSize: 15 }}>See the coach answer real questions &rarr;</Link>
           </p>
           <p style={{ ...bodyP, fontSize: 16, color: 'var(--text)', fontWeight: 700, maxWidth: '60ch', marginBottom: 34 }}>
             Two products. One intelligent system built around you.
@@ -148,7 +149,7 @@ export default function LandingPage() {
           </div>
           <div className="lp-band">
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>Want both? Get All Access.</div>
-            <span style={{ color: 'var(--text-dim)', fontSize: 15 }}>AI Programming + AI Year of the Engine for $49.99/month — save $120 a year vs. buying them separately.</span>
+            <span style={{ color: 'var(--text-dim)', fontSize: 15 }}>AI Programming + AI Year of the Engine for $49.99/month.</span>
             <a className="lp-link" href="#pricing" style={{ marginTop: 4 }}>Get All Access &rarr;</a>
           </div>
         </div>
@@ -173,8 +174,11 @@ export default function LandingPage() {
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
                 From a real athlete's evaluation
               </div>
-              <p><b>Technique, not strength, is capping the clean &amp; jerk.</b> The jerk (265) barely clears the push press (255) — a gap that points at overhead mechanics, not missing horsepower. So the fix is cheap.</p>
-              <p><b>What stays on maintenance:</b> a 19:55 5k and a 6:44 2k row get kept sharp with regular touches, &ldquo;but it doesn&rsquo;t need to be pushed while strength is the focus.&rdquo;</p>
+              {/* Verbatim from the evaluation on /examples (weaknesses #3,
+                  strengths #1) — trims marked with ellipses. Keep it that way:
+                  the tag above claims a real excerpt. */}
+              <p>&ldquo;Your jerk (265) is barely above your push press (255) — that says <b>the jerk technique, not overhead strength, is what&rsquo;s capping your clean &amp; jerk</b>&hellip; Technique work here is cheap on recovery and high-return.&rdquo;</p>
+              <p>&ldquo;A 19:55 5k run, a 6:44 2k row, and a 17:57 5k row at 225 lbs is <b>a real engine</b>&hellip; We keep this sharp with regular touches, but it doesn&rsquo;t need to be pushed while strength is the focus.&rdquo;</p>
               <Link className="lp-link" to="/examples">See real evaluations, programs, and Engine analytics &rarr;</Link>
             </div>
           </div>
@@ -201,7 +205,7 @@ export default function LandingPage() {
           <div className="lp-plans">
             {[
               { plan: 'programming' as const, name: 'AI Programming', monthly: '$29.99', quarterly: '$74.99', blurb: 'Individualized training built around your evaluation, goals, and progress.', cta: 'Choose Programming', feat: false, badge: '' },
-              { plan: 'all_access' as const, name: 'All Access', monthly: '$49.99', quarterly: '$119.99', blurb: 'AI Programming + AI Year of the Engine. Save $120/year vs. buying both.', cta: 'Get All Access', feat: true, badge: 'Most Complete' },
+              { plan: 'all_access' as const, name: 'All Access', monthly: '$49.99', quarterly: '$119.99', blurb: 'AI Programming + AI Year of the Engine.', cta: 'Get All Access', feat: true, badge: 'Best Value' },
               { plan: 'engine' as const, name: 'AI Year of the Engine', monthly: '$29.99', quarterly: '$74.99', blurb: 'Our conditioning system, personalized to your fitness and goals.', cta: 'Choose Engine', feat: false, badge: '' },
             ].map(p => (
               <div key={p.plan} className={'lp-plan' + (p.feat ? ' lp-plan-feat' : '')}>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
+import FeatureFooter from '../../components/FeatureFooter';
 import '../../features.css';
 import '../../landing.css';
 
@@ -43,7 +44,7 @@ function SpectrumPoster() {
   const fade = 'linear-gradient(90deg,#000 0%,rgba(0,0,0,0.3) 100%)';
   return (
     <div className="eng-poster">
-      <div className="eng-axis"><span>Slow-Twitch</span><span>Fast-Twitch</span></div>
+      <div className="eng-axis"><span>Slow</span><span>Fast</span></div>
       <div className="eng-rows">
         <div>
           {rows.map(s => {
@@ -310,11 +311,13 @@ export default function EngineFeaturePage() {
           <div className="lp-kicker">Your Equipment</div>
           <h2 className="lp-h2">Any engine. Your engine.</h2>
           <p style={bodyP}>Rower, bike erg, echo bike, ski erg, treadmill — or the open road. AI Year of the Engine runs on whatever you've got: pick your equipment when you start a session, and if you'd rather run than ride, run.</p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '16px 0 4px' }}>
-            {['C2 Row', 'Bike Erg', 'Echo / Assault', 'Ski Erg', 'Treadmill', 'Outdoor Run', 'Road', 'Track', 'Trail'].map(m => (
-              <span key={m} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 999, padding: '6px 14px', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{m}</span>
-            ))}
-          </div>
+          <img
+            src="/images/engine-day-equipment.webp"
+            alt="Equipment selection — modality and unit pickers with a per-machine time-trial baseline"
+            loading="lazy"
+            className="feature-img"
+            style={{ maxWidth: 420, margin: '16px 0 4px' }}
+          />
           <p style={{ ...bodyP, marginTop: 14, marginBottom: 0 }}>Your pacing is calibrated per machine, from your own time trials. Do a time trial on the rower and your rowing targets are yours. A running time trial unlocks running targets. <span style={bold}>Switch equipment whenever you want — the program follows you there.</span></p>
         </div>
       </section>
@@ -362,7 +365,7 @@ export default function EngineFeaturePage() {
         </div>
       </section>
 
-      <footer className="feature-footer"><GainsLogo /></footer>
+      <FeatureFooter links={[{ to: '/examples?tab=engine', label: 'Real Examples' }, { to: '/features/programs', label: 'AI Programming' }]} />
     </div>
   );
 }
