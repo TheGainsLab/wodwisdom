@@ -2,30 +2,97 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import '../../features.css';
+import '../../landing.css';
 
 const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
 const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
 
+const bodyP: React.CSSProperties = { color: 'var(--text-dim)', fontSize: 15.5, lineHeight: 1.6, maxWidth: '62ch', margin: '0 0 14px' };
+const bold: React.CSSProperties = { color: 'var(--text)', fontWeight: 700 };
+
+// The 22 training structures and the span of the slow→fast fiber spectrum
+// each one trains (0 = pure slow-twitch endurance, 100 = all-out power).
+// Gradient entries emphasize their slow end and fade toward the fast end.
+const SPECTRUM: { key: string; lo: number; hi: number; gradient?: boolean }[] = [
+  { key: 'Endurance', lo: 8, hi: 16 },
+  { key: 'Threshold', lo: 42, hi: 50 },
+  { key: 'Anaerobic', lo: 86, hi: 96 },
+  { key: 'Time Trial', lo: 56, hi: 66 },
+  { key: 'Devour', lo: 42, hi: 56 },
+  { key: 'Descending Devour', lo: 44, hi: 56 },
+  { key: 'Ascending Devour', lo: 46, hi: 64 },
+  { key: 'Towers', lo: 18, hi: 62 },
+  { key: 'Max Aerobic Power', lo: 50, hi: 64 },
+  { key: 'Hybrid Aerobic', lo: 52, hi: 64 },
+  { key: 'Rocket Races A', lo: 56, hi: 68 },
+  { key: 'Rocket Races B', lo: 56, hi: 68 },
+  { key: 'Interval', lo: 40, hi: 80 },
+  { key: 'Ascending', lo: 56, hi: 86 },
+  { key: 'Atomic', lo: 70, hi: 88 },
+  { key: 'Hybrid Anaerobic', lo: 70, hi: 84 },
+  { key: 'Flux', lo: 10, hi: 45, gradient: true },
+  { key: 'Flux Stages', lo: 10, hi: 52, gradient: true },
+  { key: 'Polarized', lo: 8, hi: 92, gradient: true },
+  { key: 'Infinity', lo: 46, hi: 82, gradient: true },
+  { key: 'Afterburner', lo: 40, hi: 92, gradient: true },
+  { key: 'Synthesis', lo: 12, hi: 96, gradient: true },
+];
+
+function SpectrumPoster() {
+  const rows = [...SPECTRUM].sort((a, b) => (a.lo + a.hi) / 2 - (b.lo + b.hi) / 2);
+  const fade = 'linear-gradient(90deg,#000 0%,rgba(0,0,0,0.3) 100%)';
+  return (
+    <div className="eng-poster">
+      <div className="eng-axis"><span>Slow-Twitch</span><span>Fast-Twitch</span></div>
+      <div className="eng-rows">
+        <div>
+          {rows.map(s => {
+            const left = Math.max(0, Math.min(100, s.lo));
+            const width = Math.max(3, Math.min(100 - left, s.hi - s.lo));
+            const lit: React.CSSProperties = { clipPath: `inset(0 ${100 - (left + width)}% 0 ${left}%)` };
+            if (s.gradient) { lit.maskImage = fade; lit.WebkitMaskImage = fade; }
+            return (
+              <div key={s.key} className="eng-prow">
+                <div className="eng-nm">{s.key}</div>
+                <div className="eng-track"><div className="base" /><div className="lit" style={lit} /></div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="eng-zones">
+          <div className="eng-zone-fill" />
+          <div className="eng-zone-line" style={{ left: '50%' }} />
+          <div className="eng-zone-line" style={{ left: '75%' }} />
+          <div className="eng-zone-label">Metcon Zone</div>
+        </div>
+      </div>
+      <div style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--text)', marginTop: 14 }}>
+        Each bar shows the range of fibers a structure trains.
+      </div>
+    </div>
+  );
+}
+
 const ENGINE_PROGRAMS = [
   {
-    name: 'Year of the Engine - Classic',
+    name: 'AI Year of the Engine - Classic',
     freq: '5x/week',
-    description: 'The original conditioning super-cycle. 720 days, 5 sessions per week, 36 months — 12 three-month cycles, each adding another layer to your capacity across all 20 training frameworks. Builds exceptional work capacity for any task.',
+    description: 'The original conditioning super-cycle. 720 days, 5 sessions per week, 36 months — 12 three-month cycles, each adding another layer to your capacity across all 22 training structures. Builds exceptional work capacity for any task.',
   },
   {
-    name: 'Year of the Engine - Classic (3-Day)',
+    name: 'AI Year of the Engine - Classic (3-Day)',
     freq: '3x/week',
-    description: 'The original super-cycle, three days a week. Every phase, every framework, every adaptation — built for athletes who are training for more than one thing at once. Exceptional capacity without the five-day commitment.',
+    description: 'The original super-cycle, three days a week. Every phase, every structure, every adaptation — built for athletes who are training for more than one thing at once. Exceptional capacity without the five-day commitment.',
   },
   {
     name: 'Engine Mini Cycle',
     freq: '5x/week',
-    description: 'The original super-cycle in four-week micro-cycles. All 20 frameworks in a year, then harder variations as you progress. Your ML data and personalized calibration carry over — and if you\u2019ve been through YoE before, this is a more intense progression through familiar territory.',
+    description: 'The original super-cycle in four-week micro-cycles. All 22 structures in a year, then harder variations as you progress. Your ML data and personalized calibration carry over — and if you’ve been through YoE before, this is a more intense progression through familiar territory.',
   },
   {
     name: 'Engine Mini Cycle (3-Day)',
     freq: '3x/week',
-    description: 'Train the three day version of super-cycle in four-week micro-cycles. All 20 frameworks in a year, then harder variations as you progress. Your ML data and personalized calibration carry over — and if you\u2019ve been through YoE before, this is a more intense progression through familiar territory.',
+    description: 'Train the three day version of super-cycle in four-week micro-cycles. All 22 structures in a year, then harder variations as you progress. Your ML data and personalized calibration carry over — and if you’ve been through YoE before, this is a more intense progression through familiar territory.',
   },
   {
     name: 'VO3 (3-Day)',
@@ -40,12 +107,12 @@ const ENGINE_PROGRAMS = [
   {
     name: 'Hyrox Race Prep (3-Day)',
     freq: '3x/week',
-    description: 'Twelve months of race-specific conditioning, three days a week. Built around the demands of Hyrox — sustained output, pace transitions, and the ability to keep moving when it gets uncomfortable. Frameworks targeting every layer of race fitness: power, synthesis, and the capacity to finish strong. For athletes who race Hyrox or want to.',
+    description: 'Twelve months of race-specific conditioning, three days a week. Built around the demands of Hyrox — sustained output, pace transitions, and the ability to keep moving when it gets uncomfortable. Structures targeting every layer of race fitness: power, synthesis, and the capacity to finish strong. For athletes who race Hyrox or want to.',
   },
   {
     name: 'Hyrox Race Prep (5-Day)',
     freq: '5x/week',
-    description: 'The full race prep block, five days a week. Same Hyrox-specific frameworks as the 3-day — sustained output, pace transitions, race-finish capacity — with two additional sessions that build the aerobic foundation underneath. For dedicated competitors who want to arrive at the start line with nothing left to prove in training.',
+    description: 'The full race prep block, five days a week. Same Hyrox-specific structures as the 3-day — sustained output, pace transitions, race-finish capacity — with two additional sessions that build the aerobic foundation underneath. For dedicated competitors who want to arrive at the start line with nothing left to prove in training.',
   },
 ];
 
@@ -53,13 +120,14 @@ function ProgramsLibrary() {
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
   return (
-    <section className="feature-section">
+    <section className="feature-section" style={{ borderTop: '1px solid var(--border)' }}>
       <div className="feature-container">
-        <h2 className="feature-section-title" style={{ textAlign: 'center', marginBottom: 8 }}>8 programs. One subscription.</h2>
-        <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 15, marginBottom: 32, maxWidth: 540, margin: '0 auto 32px' }}>
-          Each program arranges the 20 frameworks toward a different goal. Pick the one that fits — and switch anytime. Your performance data carries over, so your coach never starts from scratch.
+        <div className="lp-kicker">Programs</div>
+        <h2 className="lp-h2">8 programs. One subscription.</h2>
+        <p style={{ ...bodyP, marginBottom: 24 }}>
+          Each program arranges the 22 structures toward a different goal. Pick the one that fits — and switch anytime. Your performance data carries over, so your coach never starts from scratch.
         </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 600, margin: '0 auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 600 }}>
           {ENGINE_PROGRAMS.map((prog, i) => {
             const expanded = expandedIdx === i;
             return (
@@ -146,132 +214,149 @@ export default function EngineFeaturePage() {
 
       {/* Hero */}
       <section className="feature-hero">
-        <h1 className="feature-hero-title">Year of the Engine</h1>
-        <p className="feature-hero-sub">The conditioning program that follows you.</p>
-        <p className="feature-hero-body">
+        <h1 className="feature-hero-title">AI Year of the Engine</h1>
+        <p className="feature-hero-sub" style={{ fontSize: 'clamp(17px,2.6vw,22px)', fontWeight: 700, color: 'var(--accent)' }}>
+          The conditioning program that follows you.
+        </p>
+        <p className="feature-hero-body" style={{ marginBottom: 12 }}>
           Your engine isn't one thing. It's aerobic capacity. Anaerobic power. Efficiency. Repeatability.
         </p>
         <p className="feature-hero-body">
-          Year of the Engine runs 20 distinct training frameworks, each targeting a specific adaptation — and your coach calibrates every interval to you.
+          AI Year of the Engine runs 22 distinct training structures, each targeting a specific adaptation. Every training day is calibrated to you, and built to run alongside whatever else you train.
         </p>
       </section>
 
-      {/* Know the number */}
-      <section className="feature-section">
+      {/* Spectrum */}
+      <section className="feature-section" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="feature-container">
-          <div className="feature-row">
-            <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Know the number. Hit the number.</h3>
-              <p>
-                Day 24. Max Aerobic Power. Goal: 68.4 calories.
-              </p>
-              <p>
-                Once the clock starts, the app becomes your pacer. Goals, countdowns, and round
-                context stay front and center through fatigue — so you execute the plan and get the stimulus you need.
-              </p>
-              <img src="/images/pacing-coach.png" alt="Pacing Coach — real-time interval targets and progress tracking" className="feature-img" />
-            </div>
-          </div>
+          <div className="lp-kicker">Conditioning, Not Cardio</div>
+          <h2 className="lp-h2" style={{ marginBottom: 20 }}>Train the entire spectrum of muscle fibers.</h2>
+          <SpectrumPoster />
+          <p style={{ ...bodyP, marginTop: 16, marginBottom: 0 }}>
+            AI Year of the Engine trains the full spectrum — from aerobic base to all-out sprint. <span style={bold}>Most programs concentrate in the Metcon Zone, which can leave important adaptations undertrained.</span>
+          </p>
         </div>
       </section>
 
-      {/* AI adjusts */}
-      <section className="feature-section">
+      {/* Level 1 — pacing */}
+      <section className="feature-section" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="feature-container">
-          <div className="feature-row reverse">
-            <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>The AI watches. The program adjusts.</h3>
-              <p>
-                Target: 14. Actual: 17. The AI recalibrates, and your next session will be harder.
-              </p>
-              <p>
-                The program follows your performance, not a schedule.
-              </p>
-              <img src="/images/target-vs-actual.png" alt="Target vs Actual output comparison" className="feature-img" />
-            </div>
-
-          </div>
+          <div className="lp-kicker">Personalization · Level 1</div>
+          <h2 className="lp-h2">Know the number. Hit the number.</h2>
+          <img
+            src="/images/engine-day-timer.webp"
+            alt="The built-in work timer mid-session — elapsed time, a personal calorie goal, and block and round position"
+            loading="lazy"
+            className="feature-img"
+            style={{ maxWidth: 420, margin: '16px 0 20px' }}
+          />
+          <p style={bodyP}>Open any training day and your target is waiting for you, calculated from your time trials and your recent performance.</p>
+          <p style={{ ...bodyP, ...bold }}>Every session — even every interval — has a target built for you, so you know exactly what to aim for to get the intended stimulus.</p>
+          <Link className="lp-link" to="/examples?tab=engine">See a real athlete's training day &rarr;</Link>
         </div>
       </section>
 
-      {/* Engine fingerprint */}
-      <section className="feature-section">
+      {/* Level 2 — the AI learns */}
+      <section className="feature-section" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="feature-container">
-          <div className="feature-row">
-            <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Your engine has a fingerprint.</h3>
-              <p>
-                See how your engine produces power — and how it recovers. Bring the data to your coach, or ask the AI Coach directly: it's included for every Engine athlete.
-              </p>
-              <img src="/images/work-rest-ratio.png" alt="Work to rest ratio analytics" className="feature-img" />
-            </div>
-
-          </div>
+          <div className="lp-kicker">Personalization · Level 2</div>
+          <h2 className="lp-h2">The AI learns. The program adjusts.</h2>
+          <img
+            src="/images/engine-analytics-targets.webp"
+            alt="Targets vs Actual analytics — Sep 17 target 15.3 vs actual 16.3, then Sep 24 target 16.3 vs actual 18.4"
+            loading="lazy"
+            className="feature-img"
+            style={{ maxWidth: 420, margin: '16px 0 20px' }}
+          />
+          <p style={bodyP}>Look closely: Sep 17&rsquo;s actual became Sep 24&rsquo;s target. Beat the number, and the next one rises to meet you.</p>
+          <p style={bodyP}>The AI learns from what you actually did and updates the targets ahead. And every month, a time trial re-baselines the whole system — every target recalibrated to your current fitness, not the athlete you were when you started.</p>
+          <p style={{ ...bodyP, ...bold, marginBottom: 0 }}>The program follows your performance, not just the calendar.</p>
         </div>
       </section>
 
-      {/* Workout taxonomy */}
-      <section className="feature-section">
+      {/* Level 3 — sequencing */}
+      <section className="feature-section" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="feature-container">
-          <div className="feature-row reverse">
-            <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Track output across energy systems</h3>
-              <p>
-                See exactly how your performance varies across energy systems — and watch each one improve independently.
-              </p>
-              <img src="/images/comparison.png" alt="Output comparison across training types" className="feature-img" />
-            </div>
-
-          </div>
+          <div className="lp-kicker">Personalization · Level 3</div>
+          <h2 className="lp-h2">Your results shape what comes next.</h2>
+          <p style={bodyP}>After your first ten sessions, the AI compares your results against your goals and adjusts the training ahead — changing the sequence and emphasis to give you the stimulus you need next.</p>
+          <p style={bodyP}>It can also account for training you log outside the Engine, so your upcoming work reflects the full picture.</p>
+          <p style={{ ...bodyP, ...bold, marginBottom: 0 }}>Same track. Sequenced around you.</p>
         </div>
       </section>
 
-      {/* Heart rate analytics */}
-      <section className="feature-section">
+      {/* Coach strip */}
+      <section className="feature-section" style={{ borderTop: '1px solid var(--border)', padding: '44px 0' }}>
         <div className="feature-container">
-          <div className="feature-row">
-            <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>Heart rate doesn't lie.</h3>
-              <p>
-                HR analytics — avg, peak, efficiency, load — so you know what a session cost you.
-              </p>
-            </div>
-            <img src="/images/HR-analytics.png" alt="HR Analytics — average heart rate by day type" className="feature-img" />
-          </div>
+          <div className="lp-kicker">AI Coach · Always Available</div>
+          <p style={bodyP}>When you have questions — pacing, strategy, or what today&rsquo;s session is for — <span style={bold}>AI Coach is built into every training day.</span></p>
+          <p style={bodyP}>It knows your numbers, your history, and the work in front of you, so the answer is specific to you and the session you&rsquo;re doing.</p>
+          <p style={bodyP}>Included with every plan.</p>
+          <img
+            src="/images/engine-day-pacing.webp"
+            alt="AI Coach pacing answer citing the athlete's previous session, RPE, and heart rate"
+            loading="lazy"
+            className="feature-img"
+            style={{ maxWidth: 420, marginTop: 10 }}
+          />
         </div>
       </section>
 
-      {/* Framework balance */}
-      <section className="feature-section">
+      {/* Modality */}
+      <section className="feature-section" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="feature-container">
-          <div className="feature-row">
-            <div className="feature-text">
-              <h3 style={{ textAlign: 'center' }}>See what the AI sees</h3>
-              <p>
-                Track your training distribution across energy systems — the same data the AI uses to update your program.
-              </p>
-              <img src="/images/sessions.png" alt="Sessions by day type analytics" className="feature-img" />
-            </div>
-
+          <div className="lp-kicker">Your Equipment</div>
+          <h2 className="lp-h2">Any engine. Your engine.</h2>
+          <p style={bodyP}>Rower, bike erg, echo bike, ski erg, treadmill — or the open road. AI Year of the Engine runs on whatever you've got: pick your equipment when you start a session, and if you'd rather run than ride, run.</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '16px 0 4px' }}>
+            {['C2 Row', 'Bike Erg', 'Echo / Assault', 'Ski Erg', 'Treadmill', 'Outdoor Run', 'Road', 'Track', 'Trail'].map(m => (
+              <span key={m} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 999, padding: '6px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{m}</span>
+            ))}
           </div>
+          <p style={{ ...bodyP, marginTop: 14, marginBottom: 0 }}>Your pacing is calibrated per machine, from your own time trials. Do a time trial on the rower and your rowing targets are yours. A running time trial unlocks running targets. <span style={bold}>Switch equipment whenever you want — the program follows you there.</span></p>
+        </div>
+      </section>
+
+      {/* Analytics teaser */}
+      <section className="feature-section" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="feature-container">
+          <div className="lp-kicker">Analytics</div>
+          <h2 className="lp-h2">The AI sees everything. So do you.</h2>
+          <p style={bodyP}>Every session feeds your analytics — power fingerprint, energy-system breakdown, heart rate, training distribution. The same data the AI uses to update your program, open for your inspection.</p>
+          <Link className="lp-link" to="/examples?tab=engine">See real Engine analytics &rarr;</Link>
         </div>
       </section>
 
       {/* Programs library */}
       <ProgramsLibrary />
 
-      {/* Footer CTA */}
-      <section className="feature-footer-cta">
-        <h2>Year of the Engine — {interval === 'monthly' ? '$29.99/mo' : '$74.99/qtr'}</h2>
-        <p className="feature-footer-details">
-          AI Coach included. Machine learning calibration. Pacing coach. Full conditioning analytics.
-        </p>
-        <div style={{ display: 'flex', maxWidth: 280, margin: '0 auto 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-          <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'monthly' ? 'var(--accent)' : 'transparent', color: interval === 'monthly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('monthly')}>Monthly</button>
-          <button type="button" style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', background: interval === 'quarterly' ? 'var(--accent)' : 'transparent', color: interval === 'quarterly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }} onClick={() => setInterval('quarterly')}>Quarterly</button>
-        </div>
-        <div className="feature-footer-actions">
-          <button className="feature-cta" onClick={buyEngine} disabled={checkoutLoading}>{checkoutLoading ? 'Redirecting...' : 'Get Started'}</button>
+      {/* Pricing */}
+      <section className="feature-section" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="feature-container">
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 28, textAlign: 'center', maxWidth: 430, margin: '0 auto' }}>
+            <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>AI Year of the Engine</h2>
+            <div style={{ fontSize: 32, fontWeight: 800, margin: '6px 0 2px' }}>{interval === 'monthly' ? '$29.99' : '$74.99'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{interval === 'monthly' ? 'per month' : 'per quarter'}</div>
+            <div style={{ display: 'flex', maxWidth: 240, margin: '0 auto 16px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+              {(['monthly', 'quarterly'] as const).map(iv => (
+                <button
+                  key={iv}
+                  type="button"
+                  style={{ flex: 1, padding: '8px 0', border: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer', background: interval === iv ? 'var(--accent)' : 'transparent', color: interval === iv ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
+                  onClick={() => setInterval(iv)}
+                >
+                  {iv === 'monthly' ? 'Monthly' : 'Quarterly'}
+                </button>
+              ))}
+            </div>
+            <p style={{ color: 'var(--text-dim)', fontSize: 14, margin: '0 0 18px' }}>Includes AI Coach, Nutrition tracking, and training analytics.</p>
+            <button className="feature-cta" onClick={buyEngine} disabled={checkoutLoading}>
+              {checkoutLoading ? 'Redirecting…' : 'Start AI Year of the Engine'}
+            </button>
+          </div>
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13.5, marginTop: 22 }}>
+            Not ready? <Link to="/auth?signup=1&next=/profile" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>Run your free evaluation</Link> — no credit card, yours to keep.
+          </div>
         </div>
       </section>
 

@@ -3,188 +3,43 @@ import { useNavigate, Link } from 'react-router-dom';
 import GainsLogo from '../components/GainsLogo';
 import '../landing.css';
 
-/** Inline styled plan name — bold + accent color, used throughout FAQs */
-const PN: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <strong style={{ color: 'var(--accent)' }}>{children}</strong>
-);
+const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
+const CHECKOUT_ENDPOINT = SUPABASE_BASE + '/functions/v1/create-checkout';
 
-/** Dashed image-placeholder box. Swap each for a real <img> once art is ready. */
-// One shared image frame so every landing-page screenshot looks uniform on
-// mobile: full-width, natural aspect ratio, rounded, subtle border + shadow,
-// lazy-loaded. Pass `src` once the art exists; until then it renders the
-// dashed placeholder box (sized by `ratio`) with the same corner radius.
-// Matches the site-wide uploaded-screenshot treatment (.feature-img):
-// a crisp 1px white border + 16px radius, so landing images read the same as
-// the feature pages. Shadow kept for a touch of depth.
-const IMG_FRAME: React.CSSProperties = {
-  width: '100%',
-  display: 'block',
-  borderRadius: 16,
-  border: '1px solid #ffffff',
-  background: 'var(--bg)',
-  boxShadow: '0 8px 30px rgba(0,0,0,.25)',
-};
-const Placeholder: React.FC<{ label: string; src?: string; alt?: string; ratio?: string }> = ({ label, src, alt, ratio = '16 / 10' }) => {
-  if (src) {
-    return <img src={src} alt={alt ?? ''} loading="lazy" style={IMG_FRAME} />;
-  }
-  return (
-    <div style={{
-      width: '100%',
-      aspectRatio: ratio,
-      border: '2px dashed var(--border)',
-      borderRadius: 14,
-      background: 'var(--surface)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      color: 'var(--text-dim)',
-      fontSize: 14,
-      textAlign: 'center',
-      padding: 24,
-      boxSizing: 'border-box',
-    }}>
-      {label}
-    </div>
-  );
-};
-
-/** Small uppercase accent label that sits above a section headline. */
-// Real-HTML coach chat (replaces a screenshot) — crisp, responsive, readable.
-function CoachChat() {
-  return (
-    <div style={{ ...IMG_FRAME, background: 'var(--surface)', padding: '20px 20px 24px', maxWidth: 720, margin: '0 auto' }}>
-      <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 18 }}>AI Coach</div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <div style={{ background: 'var(--accent)', color: '#fff', padding: '12px 16px', borderRadius: '16px 16px 4px 16px', maxWidth: '88%', fontSize: 16, fontWeight: 600, lineHeight: 1.5 }}>
-          I'm a strong rower — how should that influence my pacing?
-        </div>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-        <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)', padding: '16px 18px', borderRadius: '16px 16px 16px 4px', maxWidth: '92%', fontSize: 16, lineHeight: 1.65 }}>
-          <p style={{ margin: '0 0 12px' }}>Your numbers confirm it: a 2:59 1k and 6:20 2k make rowing one of your strengths. The trap is letting that strength cost you somewhere else.</p>
-          <p style={{ margin: 0 }}>On today's couplet, don't attack the row just because the calories feel easy. A hard 16 calories can spike your heart rate and load your legs before the thrusters. At your strength level, 95 lbs should never be the limiter — so pace the row to keep it that way.</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Real-HTML "With GAINS" read on Fran (replaces a screenshot).
-function FranReadCard() {
-  const metric = (label: string, value: string) => (
-    <div>
-      <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--text-muted)', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--text)', fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
-    </div>
-  );
-  const divider = <div style={{ height: 1, background: 'var(--border)', margin: '16px 0' }} />;
-  return (
-    <div style={{ ...IMG_FRAME, background: 'var(--surface)', padding: '20px 22px' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 18 }}>
-        <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Tue, Jun 9</span>
-        <span style={{ fontSize: 15, color: 'var(--text-muted)' }}>Metcon · Rx</span>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 16 }}>
-        {metric('Power', '3.70 W/kg')}
-        {metric('Score', '3:42')}
-        {metric('Time domain', 'medium')}
-        {metric('Percentile', '97th')}
-      </div>
-      {divider}
-      <div style={{ fontSize: 16, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-        <div style={{ fontWeight: 600, color: 'var(--text)' }}>Short sprint couplet</div>
-        <div>Thruster — 21-15-9 reps · 95 lbs</div>
-        <div>Pull-ups — 21-15-9 reps</div>
-      </div>
-      {divider}
-      <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--text-muted)', marginBottom: 6 }}>Faults observed</div>
-      <div style={{ fontSize: 16, lineHeight: 1.55, color: 'var(--text-dim)' }}>
-        <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Thruster:</span> Forward lean in squat causing bar to drift away from body
-      </div>
-      <div style={{ fontSize: 16, fontStyle: 'italic', color: 'var(--text-dim)', marginTop: 14 }}>New Fran PR!</div>
-    </div>
-  );
-}
-
-// Real-HTML training-intent card (replaces a screenshot).
-function TrainingIntentCard() {
-  return (
-    <div style={{ ...IMG_FRAME, background: 'var(--surface)', padding: '20px 22px' }}>
-      <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 16 }}>Week 1 · Day 1</div>
-      <div style={{ border: '1px solid var(--border)', borderRadius: 14, background: 'var(--bg)', padding: '20px 22px' }}>
-        <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 }}>Training Intent</div>
-        <p style={{ fontSize: 18, lineHeight: 1.7, color: 'var(--text-dim)', margin: 0 }}>
-          This session builds pulling strength through heavy deadlifts, develops midline stability with GHD sit-up practice, and finishes with a short power couplet that tests the same hinge pattern under fatigue.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// Real-HTML metcon history (replaces a screenshot) — the logged training that
-// feeds the coach. Three entries chosen for RANGE (short / medium / long), not
-// quantity: the W/kg column across the trio quietly demonstrates the
-// power-duration curve the One Scale section just promised.
-function MetconHistory() {
-  const entries = [
-    { date: 'Tue, Jun 9', score: '3:42', wkg: '3.70', title: 'Short sprint couplet', moves: ['Thruster — 21-15-9 reps · 95 lbs', 'Pull-ups — 21-15-9 reps'] },
-    { date: 'Sun, Jun 7', score: '4+13', wkg: '2.01', title: 'Medium mixed modal', moves: ['Wall Ball — 20 reps · 20 lbs (to 10-foot target)', 'Double Under — 30 reps', 'Clean — 10 reps · 155 lbs'] },
-    { date: 'Fri, May 22', score: '17:45', wkg: '2.73', title: 'Long Steady Pace', moves: ['Row — 2000 m', 'Push Up — 50 reps', 'Air Squat — 100 reps', 'Wall Ball — 150 reps · 20 lbs'] },
-  ];
-  return (
-    <div style={{ ...IMG_FRAME, background: 'var(--surface)', padding: 6 }}>
-      {entries.map((e, i) => (
-        <div key={i} style={{ padding: '14px 16px', borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
-            <div style={{ fontSize: 15, color: 'var(--text)' }}>
-              <span style={{ fontWeight: 700 }}>{e.date}</span>
-              <span style={{ color: 'var(--text-muted)' }}> · Metcon · {e.score}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 4, padding: '1px 6px', marginLeft: 8 }}>Rx</span>
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap' }}>{e.wkg} W/kg</div>
-          </div>
-          <div style={{ fontSize: 15, color: 'var(--text-dim)', marginTop: 6, lineHeight: 1.5 }}>
-            <div style={{ fontWeight: 600, color: 'var(--text)' }}>{e.title}</div>
-            {e.moves.map((m, j) => <div key={j}>{m}</div>)}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const Eyebrow: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 }}>
-    {children}
-  </div>
-);
-
-const sectionHeadline: React.CSSProperties = { fontSize: 'clamp(26px,3.4vw,34px)', fontWeight: 700, letterSpacing: '-.5px', lineHeight: 1.2, marginBottom: 16 };
 const bodyP: React.CSSProperties = { fontSize: 18, lineHeight: 1.7, color: 'var(--text-dim)', marginBottom: 16 };
-const stepBadge: React.CSSProperties = { flex: '0 0 auto', width: 34, height: 34, borderRadius: '50%', border: '2px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 15 };
-const stepTitle: React.CSSProperties = { fontSize: 19, fontWeight: 700, color: 'var(--text)' };
 
 const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   {
-    q: 'How can I try it before paying?',
-    a: <>Create a <a href="/auth?signup=1" style={{ color: 'var(--accent)', fontWeight: 600 }}>free account</a>, then your evaluation, 3 coach questions, and unlimited past-Open workouts — no card required.</>,
+    q: 'How can I try The Gains Lab before paying?',
+    a: <>Create a free account and run your fitness evaluation — a full written assessment of where you are and what to prioritize, measured against 15 million competition event scores. No credit card. It's yours to keep whether you subscribe or not.</>,
   },
   {
-    q: "What's the difference between the plans?",
-    a: <><PN>AI Programming</PN> builds and adapts your full training program; <PN>Year of the Engine</PN> is the conditioning program; <PN>All Access</PN> is both.</>,
+    q: "What's the difference between AI Programming and AI Year of the Engine?",
+    a: 'AI Programming builds your entire training — strength, skills, conditioning — individually, month by month. AI Year of the Engine is our conditioning system: you pick a track, and the AI personalizes every session’s pacing and targets to you. Programming replaces your training; Engine runs alongside it.',
+  },
+  {
+    q: 'What does All Access include?',
+    a: 'Everything: AI Programming, AI Year of the Engine, AI Coach, Nutrition tracking, and training analytics — one plan, $120/year less than buying both.',
+  },
+  {
+    q: 'Does every plan include AI Coach?',
+    a: 'Yes. Every training plan includes unlimited AI Coach questions, grounded in the methodology and your own training history.',
+  },
+  {
+    q: 'Does it work on my phone?',
+    a: 'Yes — The Gains Lab is an installable web app. Open thegainslab.com in your phone’s browser and add it to your home screen. No app store, nothing to download.',
+  },
+  {
+    q: 'What equipment do I need?',
+    a: 'A standard functional-fitness setup: barbell, pulling bar, and a conditioning machine (bike, rower, or ski erg — running works too). Your profile records what you have, and programs are built around it.',
   },
   {
     q: 'Can I cancel anytime?',
-    a: 'Yes. No contracts or commitments — cancel anytime and keep access through the end of your billing period.',
+    a: 'Yes. Cancel in one click from Settings; you keep full access through the end of your billing period, and your training history and PRs are saved if you ever come back.',
   },
   {
-    q: "What's included with every plan?",
-    a: 'Your AI coach, full nutrition tracking, full analytics, and competition rankings.',
-  },
-  {
-    q: 'I have additional questions. How can I contact you?',
-    a: <>You can send us an email anytime to <a href="mailto:coach@thegainslab.com" style={{ color: 'var(--accent)' }}>coach@thegainslab.com</a></>,
+    q: 'I have more questions. How do I reach you?',
+    a: <>Email <a href="mailto:coach@thegainslab.com" style={{ color: 'var(--accent)' }}>coach@thegainslab.com</a> — a real person reads every message.</>,
   },
 ];
 
@@ -192,7 +47,25 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [pricingInterval, setPricingInterval] = useState<'monthly' | 'quarterly'>('monthly');
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const goToAuth = () => navigate('/auth');
+
+  // Signed-out checkout: same anonymous create-checkout flow the feature
+  // pages use (a /checkout route needs a session and redirects away).
+  const buy = async (plan: 'programming' | 'engine' | 'all_access') => {
+    setCheckoutLoading(plan);
+    try {
+      const resp = await fetch(CHECKOUT_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan, interval: pricingInterval }),
+      });
+      const data = await resp.json();
+      if (data.url) { window.location.href = data.url; return; }
+      if (data.error) alert(data.error);
+    } catch { alert('Failed to start checkout'); }
+    finally { setCheckoutLoading(null); }
+  };
 
   useEffect(() => {
     document.body.classList.add('landing-body');
@@ -210,295 +83,145 @@ export default function LandingPage() {
           <nav className="landing-nav">
             <a href="#pricing">Pricing</a>
             <a href="#faq">FAQ</a>
-            <Link to="/qa">Q&amp;A</Link>
+            <Link to="/examples">Examples</Link>
           </nav>
           <button className="landing-signin-btn" onClick={goToAuth}>Sign In</button>
         </div>
       </header>
 
       {/* ===== Hero ===== */}
-      <section className="landing-hero">
+      <section className="landing-hero" style={{ minHeight: 'auto', padding: '84px 24px 64px' }}>
         <GainsLogo className="landing-hero-logo" />
-        <h1 className="landing-hero-title">Stop Doing Someone Else's Workout.</h1>
-        <p className="landing-hero-sub">
-          A coach that learns who you are, finds what's holding you back, and adapts as you improve — measured against 15 million real competition scores.
-        </p>
-        <div className="landing-hero-ctas">
-          <Link to="/auth?signup=1" className="landing-cta">Get Your Free Evaluation</Link>
-          <a href="#how-it-works" className="landing-cta landing-cta-outline">See How It Works &rarr;</a>
-        </div>
-
-        {/* Merged opening (Aug '26 tightening): the hero flows straight from
-            "we learn everything about you" into the eval excerpt and the
-            foundation line. The old "How It Knows You" re-introduction is gone —
-            the visitor is looking at an Evaluation; the next section explains
-            how to GET one, not what it is. */}
-        <div style={{ maxWidth: 640, margin: '48px auto 0', textAlign: 'center' }}>
-          <Eyebrow>Personal from day one</Eyebrow>
-          <p style={{ fontSize: 18, lineHeight: 1.7, color: 'var(--text-dim)', margin: 0 }}>
-            Most programs know nothing about you. GAINS starts by learning everything: your ability, your history, what's holding you back — and exactly what to do about it.
-          </p>
-          <p style={{ fontSize: 18, lineHeight: 1.7, color: 'var(--text-dim)', margin: '12px 0 0' }}>
-            Here's an excerpt from a real athlete's Evaluation:
-          </p>
-        </div>
-
-        {/* Visual: a real athlete's evaluation (excerpt of a multi-page eval). */}
-        <div style={{ width: '100%', maxWidth: 820, margin: '20px auto 0' }}>
-          <Placeholder src="/images/hero-eval.png" alt="A real GAINS athlete evaluation" label="[ Image placeholder — Evaluation screenshot (~820×512) ]" />
-        </div>
-
-        <p style={{ ...bodyP, marginTop: 18, maxWidth: 680 }}>
-          Your full Evaluation is a complete map of your fitness — your strengths, weaknesses, and where you stand against <span style={{ color: 'var(--accent)' }}>15 million</span> real competition scores.
-        </p>
-        <p style={{ ...bodyP, marginTop: 0, maxWidth: 680 }}>
-          If you train with us, it becomes the foundation of your program. If not, it's yours to keep — <span style={{ fontWeight: 600, color: 'var(--text)' }}>free.</span>
+        <h1 className="landing-hero-title" style={{ fontSize: 'clamp(34px,6vw,58px)' }}>Stop Doing Someone Else's Workout.</h1>
+        <p className="landing-hero-sub" style={{ marginBottom: 0 }}>
+          The Gains Lab uses AI that knows your data, goals, history, and feedback to deliver truly individualized training.
         </p>
       </section>
 
-      {/* ===== How It Works — the steps explain how to GET the Evaluation
-             (the hero above already showed what it is) ===== */}
-      <section id="how-it-works" className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
+      {/* ===== Why AI — quiet band ===== */}
+      <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)', padding: '56px 0' }}>
         <div className="landing-container">
-          <Eyebrow>How It Works</Eyebrow>
-
-          {/* Numbered path: build profile → add history → get evaluation (the destination). */}
-          <div style={{ maxWidth: 640, marginTop: 16 }}>
-            {/* ① Build your profile */}
-            <div style={{ display: 'flex', gap: 16 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={stepBadge}>1</div>
-                <div style={{ flex: 1, width: 2, background: 'var(--accent)', minHeight: 16 }} />
-              </div>
-              <div style={{ paddingBottom: 28 }}>
-                <div style={stepTitle}>Tell us about you <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>— in about five minutes.</span></div>
-                <p style={{ ...bodyP, marginTop: 8, marginBottom: 0 }}>Strength, skills, benchmarks, and goals.</p>
-              </div>
-            </div>
-            {/* ② Add your history */}
-            <div style={{ display: 'flex', gap: 16 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={stepBadge}>2</div>
-                <div style={{ flex: 1, width: 2, background: 'var(--accent)', minHeight: 16 }} />
-              </div>
-              <div style={{ paddingBottom: 28 }}>
-                <div style={stepTitle}>Add your competition history <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>— optional, but powerful.</span></div>
-                <p style={{ ...bodyP, marginTop: 8, marginBottom: 0 }}>
-                  Connect your results in seconds and we'll benchmark you against athletes at every level. No history? No problem.
-                </p>
-              </div>
-            </div>
-            {/* ③ Get your evaluation — the destination */}
-            <div style={{ display: 'flex', gap: 16 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{ ...stepBadge, background: 'var(--accent)', borderColor: 'var(--accent)', color: '#fff' }}>3</div>
-              </div>
-              <div>
-                <div style={stepTitle}>Get your Evaluation.</div>
-                <p style={{ ...bodyP, marginTop: 8, marginBottom: 0 }}>
-                  See your strengths, bottlenecks, and where you rank. Delivered instantly.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* The evaluation itself */}
-          <div style={{ maxWidth: 920, margin: '36px auto 0' }}>
-            <Placeholder src="/images/section2-eval.png" alt="A full GAINS AI Evaluation" label="[ Image placeholder — Full evaluation screenshot ]" />
-            <p style={{ textAlign: 'center', fontSize: 18, fontWeight: 700, color: 'var(--text)', lineHeight: 1.5, margin: '20px auto 0' }}>
-              And that's just the beginning.
+          <div className="lp-kicker" style={{ textAlign: 'center', fontSize: 20, letterSpacing: '2.4px', marginBottom: 18 }}>Why AI</div>
+          {/* Paragraphs read left-aligned on a centered 62ch block; only the
+              kicker and the bold thesis line stay centered. */}
+          <div style={{ maxWidth: '62ch', margin: '0 auto' }}>
+            <p style={{ ...bodyP, fontSize: 16.5 }}>Coaches bring inspiration, leadership, empathy, accountability, and real one-to-one connection.</p>
+            <p style={{ ...bodyP, fontSize: 16.5 }}>AI's advantage is information processing. It can compare patterns across enormous datasets and bring the full picture to every programming decision, every time.</p>
+            <p style={{ ...bodyP, fontSize: 16.5 }}>A truly individualized program depends on a lot of information — and that information grows every time you train. So we built The Gains Lab around that idea: give AI the full athlete context — your profile, training history, results, goals, and feedback — the information most group programs never use.</p>
+            <p style={{ ...bodyP, fontSize: 16.5 }}>But data alone isn't enough. We also trained our AI on the methodology, giving it the coaching principles to make better training decisions.</p>
+            <p style={{ ...bodyP, fontSize: 16.5, textAlign: 'center', color: 'var(--text)', fontWeight: 700, marginBottom: 0 }}>
+              Give AI the information and the methodology, and personalization becomes possible at a completely different level.
             </p>
-            <p style={{ ...bodyP, textAlign: 'center', maxWidth: 640, margin: '8px auto 0' }}>
-              Your free account also unlocks our archive of past competition workouts. Test yourself against levels you never reached, or compare yourself to where you were years ago.
-            </p>
-            <div style={{ textAlign: 'center', marginTop: 24 }}>
-              <Link to="/auth?signup=1" className="landing-cta">Get Your Free Evaluation</Link>
-            </div>
           </div>
         </div>
       </section>
 
-      {/* ===== Data comes to life ===== */}
+      {/* ===== Two Ways to Train ===== */}
+      <section id="paths" className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="landing-container">
+          <div className="lp-kicker">Two Ways to Train</div>
+          <h2 className="lp-h2">Pick your path.</h2>
+          <p style={{ ...bodyP, fontSize: 15.5, color: 'var(--text-muted)', maxWidth: '60ch', marginBottom: 12 }}>
+            This isn't a workout library with a chatbot. It's an AI-powered training platform that personalizes the work, learns from your results, and coaches you every day.
+          </p>
+          <p style={{ ...bodyP, fontSize: 15.5, color: 'var(--text-muted)', maxWidth: '60ch', marginBottom: 12 }}>
+            Every plan includes AI Coach — think of it like having a coach by your side. It knows your training history, helps you plan the day, answers workout-specific questions, and can make small adjustments when something needs to change.
+          </p>
+          <p style={{ ...bodyP, fontSize: 15.5, color: 'var(--text)', fontWeight: 700, maxWidth: '60ch', marginBottom: 34 }}>
+            Two products. One intelligent system built around you.
+          </p>
+          <div className="lp-paths">
+            <div className="lp-path">
+              <h3>AI Programming</h3>
+              <p style={{ color: 'var(--text)', fontWeight: 600, marginBottom: 10 }}>Built around you, from day one.</p>
+              <p>A complete program shaped by your evaluation, your goals, and your schedule. Replace what you're doing with something made for you.</p>
+              <p>Daily coaching guides you through the work. Log your results, and the program evolves as your fitness improves.</p>
+              <Link className="lp-link" to="/features/programs">Explore AI Programming &rarr;</Link>
+            </div>
+            <div className="lp-path">
+              <h3>AI Year of the Engine</h3>
+              <p style={{ color: 'var(--text)', fontWeight: 600, marginBottom: 10 }}>Your conditioning, not cardio — personalized and coached every day.</p>
+              <p>Built to run alongside your other training, not replace it. Keep your strength program, your sport, your gym — Engine handles the conditioning.</p>
+              <p>Choose your track, tell us your goals, and AI calibrates every session to you. Log your results and the system adapts, sequencing what comes next to match your fitness and performance.</p>
+              <Link className="lp-link" to="/features/engine">Explore AI Year of the Engine &rarr;</Link>
+            </div>
+          </div>
+          <div className="lp-band">
+            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>Want both? Get All Access.</div>
+            <span style={{ color: 'var(--text-dim)', fontSize: 14.5 }}>AI Programming + AI Year of the Engine for $49.99/month — save $120 a year vs. buying them separately.</span>
+            <a className="lp-link" href="#pricing" style={{ marginTop: 4 }}>Get All Access &rarr;</a>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== Personal From Day One ===== */}
       <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="landing-container">
-          <Eyebrow>Data comes to life</Eyebrow>
-          <h2 style={sectionHeadline}>Most Apps Save a Number. GAINS Saves the Whole Story.</h2>
-          <p style={{ ...bodyP, maxWidth: 680, marginBottom: 36 }}>
-            Most apps log &ldquo;3:42 RX&rdquo; and move on. GAINS captures what that score actually means: power output, percentile, time domain, movement quality — even faults it observed.
-          </p>
-
-          {/* Bare logged result, then the personalized coach read — stacked (mobile-first, single column) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 28, alignItems: 'start', maxWidth: 560 }}>
-            {/* Left — Most Apps: just a logged result, no insight */}
+          <div className="lp-kicker">Personal From Day One</div>
+          <div className="lp-proof">
             <div>
-              <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 15, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 14 }}>
-                Most Apps
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '22px 0' }}>
-                <span style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-dim)' }}>Fran</span>
-                <span style={{ fontSize: 32, fontWeight: 800, color: 'var(--text-dim)' }}>3:42</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 9px' }}>RX</span>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-label="Logged">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              </div>
+              <h2 className="lp-h2">It starts by learning who you are.</h2>
+              <p style={{ ...bodyP, fontSize: 15.5 }}>
+                The Gains Lab maps your abilities, history, goals, strengths, and weaknesses — and shows where you stand against 15 million competition event scores. It also identifies your biggest opportunities. This evaluation becomes the foundation of your personalized training.
+              </p>
+              <p style={{ color: 'var(--text)', fontWeight: 700, fontSize: 16, margin: '18px 0 22px' }}>
+                Even if you decide not to train with us, it's free and yours to keep.
+              </p>
+              <Link to="/auth?signup=1&next=/profile" className="landing-cta">Get Your Free Evaluation</Link>
             </div>
-            {/* Right — With GAINS: the high-info context card */}
-            <div>
-              <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: 15, fontWeight: 700, color: 'var(--accent)', marginBottom: 14 }}>
-                With GAINS
+            <div className="lp-evalcard">
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 12 }}>
+                From a real athlete's evaluation
               </div>
-              <FranReadCard />
+              <p><b>Technique, not strength, is capping the clean &amp; jerk.</b> The jerk (265) barely clears the push press (255) — a gap that points at overhead mechanics, not missing horsepower. So the fix is cheap.</p>
+              <p><b>What stays on maintenance:</b> a 19:55 5k and a 6:44 2k row get kept sharp with regular touches, &ldquo;but it doesn&rsquo;t need to be pushed while strength is the focus.&rdquo;</p>
+              <Link className="lp-link" to="/examples" style={{ fontSize: 13.5 }}>See real evaluations, programs, and Engine analytics &rarr;</Link>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* ===== A Common Language for Fitness ===== */}
-      <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
-        <div className="landing-container" style={{ maxWidth: 760 }}>
-          <Eyebrow>One Scale for Everything</Eyebrow>
-          <h2 style={sectionHeadline}>Fitness Needs a Common Language.</h2>
-          <p style={bodyP}>
-            A rowing workout doesn't look like a lifting workout. A two-minute sprint doesn't look like a twenty-minute chipper. But fitness is work capacity — so GAINS converts every result into power, watts and watts per kilogram, and measures everything on one scale.
-          </p>
-
-          <div style={{ margin: '24px 0' }}>
-            <Placeholder src="/images/power-duration-curve.png" alt="Your power across every metcon, your average output, and your power-duration curve across short, medium, and long time domains" label="[ Image placeholder — Power charts ]" />
-          </div>
-
-          <p style={bodyP}>
-            That unlocks two things:
-          </p>
-          <p style={bodyP}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Progress over time.</span> See what's improving and what's stalling across every time domain — not just workouts you happen to repeat.
-          </p>
-          <p style={{ ...bodyP, marginBottom: 0 }}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Where you rank.</span> See how you stack up against real competition scores — and watch the gap close as you improve.
-          </p>
-        </div>
-      </section>
-
-      {/* ===== Your Coach, Every Training Day ===== */}
-      <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
-        <div className="landing-container" style={{ maxWidth: 760 }}>
-          <Eyebrow>Your Coach, Every Training Day</Eyebrow>
-          <h2 style={sectionHeadline}>Every Workout Has a Purpose.</h2>
-          <p style={bodyP}>The coach doesn't just program your session — it explains it:</p>
-          <ul style={{ margin: '0 0 16px', paddingLeft: 18, fontSize: 18, lineHeight: 1.8, color: 'var(--text-dim)' }}>
-            <li>Why today's workout exists</li>
-            <li>What adaptation you're chasing</li>
-            <li>What success looks like</li>
-            <li>How it fits into your goals</li>
-          </ul>
-          <p style={{ ...bodyP, fontWeight: 600, color: 'var(--text)' }}>Before you move a single rep, you know why.</p>
-          {/* Training-intent card — illustrates the bullets above. */}
-          <div style={{ margin: '8px 0 28px' }}>
-            <TrainingIntentCard />
-          </div>
-          <p style={{ ...bodyP, marginBottom: 0 }}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Ask the Coach:</span> Have a question? Your coach answers with your profile, history, today's workout, strengths, and weaknesses in view — so the answer is specific to you, not generic advice.
-          </p>
-          {/* Coach-chat screen (rowing-pacing example). */}
-          <div style={{ marginTop: 20 }}>
-            <CoachChat />
-          </div>
-        </div>
-      </section>
-
-      {/* ===== It Learns From Every Workout ===== */}
-      <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
-        <div className="landing-container" style={{ maxWidth: 760 }}>
-          <Eyebrow>It Learns From Every Workout</Eyebrow>
-          <h2 style={sectionHeadline}>Most programs stay fixed. Yours adapts.</h2>
-          <p style={bodyP}>
-            Every score, RPE, and quality rating becomes context. Your coach doesn't start each session from scratch — it starts with your training history.
-          </p>
-          <div style={{ maxWidth: 640, margin: '24px auto' }}>
-            <MetconHistory />
-          </div>
-          <p style={bodyP}>
-            This is the raw material your coach uses to understand you — not just a log, but context that shapes what comes next.
-          </p>
-          <p style={bodyP}>
-            Over time, it learns how your reported effort and quality line up with your actual output. The more you train, the sharper its read on you gets.
-          </p>
-          <p style={{ ...bodyP, marginBottom: 0 }}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Never forgets. Gets smarter with every rep.</span>
-          </p>
-        </div>
-      </section>
-
-      {/* ===== Plans ===== */}
-      <section className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
-        <div className="landing-container" style={{ maxWidth: 720 }}>
-          <h2 style={{ ...sectionHeadline, textAlign: 'center' }}>Let's Make Some Gains.</h2>
-          <p style={{ textAlign: 'center', fontSize: 18, fontWeight: 700, color: 'var(--text)', maxWidth: 600, margin: '0 auto 28px' }}>
-            Your evaluation identifies your gaps. Your program fixes them.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, margin: '0 auto 24px', maxWidth: 480 }}>
-            <Link to="/features/programs" className="landing-offering-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
-              <h3>AI Programming &rarr;</h3>
-              <p>Personalized training built around your evaluation, goals, and progress — with coaching guidance every session.</p>
-            </Link>
-            <Link to="/features/engine" className="landing-offering-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
-              <h3>Year of the Engine &rarr;</h3>
-              <p>Conditioning calibrated to your fitness, with every interval paced to you.</p>
-            </Link>
-            <Link to="/auth?signup=1" className="landing-offering-card" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
-              <h3>All Access &rarr;</h3>
-              <p>AI Programming + Year of the Engine. The complete system.</p>
-            </Link>
-          </div>
-          <p style={{ ...bodyP, marginBottom: 8 }}>Every plan includes your AI coach, full analytics, and competition rankings. No add-ons. No hidden fees.</p>
-          <p style={{ ...bodyP, marginBottom: 0 }}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Not ready to commit?</span> Start with your free evaluation. No obligation. No credit card. See exactly where you stand, then decide what you want to do about it.
-          </p>
         </div>
       </section>
 
       {/* ===== Pricing ===== */}
-      <section id="pricing" className="landing-pricing">
+      <section id="pricing" className="landing-explainer" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="landing-container">
-          <div className="landing-pricing-table">
-            <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
+          <div className="lp-kicker">Pricing</div>
+          <h2 className="lp-h2">Let's make some gains.</h2>
+          <p style={{ ...bodyP, fontSize: 15, color: 'var(--text-muted)', marginBottom: 26 }}>Monthly or quarterly. Cancel anytime.</p>
+          <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 20, maxWidth: 320 }}>
+            {(['monthly', 'quarterly'] as const).map(iv => (
               <button
-                style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: pricingInterval === 'monthly' ? 'var(--accent)' : 'transparent', color: pricingInterval === 'monthly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
-                onClick={() => setPricingInterval('monthly')}
+                key={iv}
+                style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: pricingInterval === iv ? 'var(--accent)' : 'transparent', color: pricingInterval === iv ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
+                onClick={() => setPricingInterval(iv)}
               >
-                Monthly
+                {iv === 'monthly' ? 'Monthly' : 'Quarterly'}
               </button>
-              <button
-                style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: pricingInterval === 'quarterly' ? 'var(--accent)' : 'transparent', color: pricingInterval === 'quarterly' ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
-                onClick={() => setPricingInterval('quarterly')}
-              >
-                Quarterly
-              </button>
-            </div>
-            <div className="landing-pricing-header">
-              <span>Service</span>
-              <span>{pricingInterval === 'monthly' ? 'Monthly' : 'Quarterly'}</span>
-            </div>
+            ))}
+          </div>
+          <div className="lp-plans">
             {[
-              { plan: 'programming', name: 'AI Programming', monthly: '$29.99', quarterly: '$74.99' },
-              { plan: 'engine', name: 'Year of the Engine', monthly: '$29.99', quarterly: '$74.99' },
-              { plan: 'all_access', name: 'All Access', monthly: '$49.99', quarterly: '$119.99', note: '(AI Programming and Year of the Engine)' },
+              { plan: 'programming' as const, name: 'AI Programming', monthly: '$29.99', quarterly: '$74.99', blurb: 'Individualized training built around your evaluation, goals, and progress.', cta: 'Choose Programming', feat: false, badge: '' },
+              { plan: 'all_access' as const, name: 'All Access', monthly: '$49.99', quarterly: '$119.99', blurb: 'AI Programming + AI Year of the Engine. Save $120/year vs. buying both.', cta: 'Get All Access', feat: true, badge: 'Most Complete' },
+              { plan: 'engine' as const, name: 'AI Year of the Engine', monthly: '$29.99', quarterly: '$74.99', blurb: 'Our conditioning system, personalized to your fitness and goals.', cta: 'Choose Engine', feat: false, badge: '' },
             ].map(p => (
-              <div
-                key={p.plan}
-                className="landing-pricing-row"
-              >
-                <div>
-                  <span className="landing-pricing-name">{p.name}</span>
-                  {p.note && <div className="landing-pricing-note">{p.note}</div>}
-                </div>
-                <span className="landing-pricing-amount">
-                  {pricingInterval === 'monthly' ? p.monthly : p.quarterly}
-                </span>
+              <div key={p.plan} className={'lp-plan' + (p.feat ? ' lp-plan-feat' : '')}>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 10, minHeight: 14 }}>{p.badge}</div>
+                <h3 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 6px' }}>{p.name}</h3>
+                <div style={{ fontSize: 30, fontWeight: 800, margin: '8px 0 2px' }}>{pricingInterval === 'monthly' ? p.monthly : p.quarterly}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>{pricingInterval === 'monthly' ? 'per month' : 'per quarter'}</div>
+                <p style={{ color: 'var(--text-dim)', fontSize: 14, margin: '0 0 20px' }}>{p.blurb}</p>
+                <button className="landing-cta" style={{ marginTop: 'auto' }} onClick={() => buy(p.plan)} disabled={checkoutLoading !== null}>
+                  {checkoutLoading === p.plan ? 'Redirecting…' : p.cta}
+                </button>
               </div>
             ))}
-
-
+          </div>
+          <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13.5, marginTop: 18 }}>
+            Every plan includes AI Coach, Nutrition tracking, and training analytics.
+          </p>
+          <div style={{ textAlign: 'center', marginTop: 30, color: 'var(--text-dim)', fontSize: 15 }}>
+            Not ready to choose? Create a free account and run your evaluation — no credit card, yours to keep.<br />
+            <Link to="/auth?signup=1&next=/profile" className="landing-cta" style={{ marginTop: 14 }}>Get Your Free Evaluation</Link>
           </div>
         </div>
       </section>
@@ -506,8 +229,8 @@ export default function LandingPage() {
       {/* ===== FAQ ===== */}
       <section id="faq" className="landing-faq">
         <div className="landing-container">
-          <h2 className="landing-section-title">Frequently Asked Questions</h2>
-          <div className="landing-faq-list">
+          <div className="lp-kicker">Frequently Asked Questions</div>
+          <div className="landing-faq-list" style={{ margin: '20px auto 0' }}>
             {FAQ_ITEMS.map((item, i) => (
               <div
                 key={i}
@@ -527,19 +250,22 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ===== Final CTA ===== */}
+      {/* ===== Closing ===== */}
       <section className="landing-footer-cta">
-        <h2>Stop Doing Someone Else's Workout.</h2>
-        <p style={{ fontSize: 17, color: 'var(--text-dim)', maxWidth: 600, margin: '0 auto 28px', lineHeight: 1.6 }}>
-          Meet the coach that learns who you are, measures what matters, and adapts as you improve.
+        <h2 style={{ marginBottom: 12 }}>Stop Doing Someone Else's Workout.</h2>
+        <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', maxWidth: 600, margin: '0 auto 28px', lineHeight: 1.6 }}>
+          AI Programming. AI Year of the Engine. Or both.
         </p>
-        <Link to="/auth?signup=1" className="landing-cta">Get Your Free Evaluation</Link>
+        <Link to="/auth?signup=1&next=/profile" className="landing-cta">Get Your Free Evaluation</Link>
       </section>
 
       <footer className="landing-footer">
         <GainsLogo />
         {/* Visible on mobile too — the header nav is display:none under 640px. */}
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 10, display: 'flex', gap: 18, justifyContent: 'center' }}>
+          <Link to="/examples" style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+            Real Examples
+          </Link>
           <Link to="/qa" style={{ color: 'var(--text-dim)', textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
             Q&amp;A: Ask a Coach
           </Link>
