@@ -48,6 +48,7 @@ const LogActivityPage = lazy(() => import('./pages/LogActivityPage'));
 const WorkoutAnalysisPage = lazy(() => import('./pages/WorkoutAnalysisPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const CheckoutCompletePage = lazy(() => import('./pages/CheckoutCompletePage'));
+const CheckoutRedirectPage = lazy(() => import('./pages/CheckoutRedirectPage'));
 // REMOVED (Decision 11 class sweep): the Engine Class pages (F4/F5 leaderboard/TV/view,
 // JoinEnginePage) are deleted — Engine Class is not a product. REMOVED (Decision 12a,
 // Phase C): ClaimSeatPage + the claim flow — gym members live on their gym's member app
@@ -192,11 +193,12 @@ export default function App() {
             <Route path="/features/engine" element={<EngineFeaturePage />} />
             <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
             <Route path="/checkout/complete" element={<CheckoutCompletePage />} />
-            {/* Signed-out /checkout (email links, bookmarks): the plans page
-                needs a session, so land on the features hub — its checkout
-                works anonymously — instead of silently falling to the landing
-                page (the July '26 recovery-email leak). */}
-            <Route path="/checkout" element={<Navigate to="/features" replace />} />
+            {/* Signed-out /checkout (email links, bookmarks): with a valid
+                ?plan= it goes straight to Stripe via the anonymous
+                create-checkout flow; otherwise it lands on the features hub —
+                never silently on the landing page (the July '26
+                recovery-email leak). */}
+            <Route path="/checkout" element={<CheckoutRedirectPage />} />
             {/* Dead-link stubs for the retired gym flows (Decisions 11 / 12a). */}
             <Route path="/join/engine/:token" element={<RetiredInviteNotice />} />
             <Route path="/claim/:token" element={<RetiredInviteNotice />} />
