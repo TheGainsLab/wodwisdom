@@ -792,6 +792,7 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
   const [liftProgress, setLiftProgress] = useState<LiftProgress[] | null>(null);
   const [skillVolume, setSkillVolume] = useState<SkillVolume[] | null>(null);
   const [recentActivity, setRecentActivity] = useState<TimelineEvent[]>([]);
+  const [pastAudiences, setPastAudiences] = useState<string[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -806,6 +807,9 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
         supabase.rpc('admin_user_skill_volume', { target_user_id: id }),
         supabase.rpc('admin_user_timeline', { target_user_id: id, p_limit: 12 }),
       ]);
+      // Past-platform membership (Resend audience snapshot) — best-effort.
+      supabase.rpc('admin_past_user_audiences', { target_user_id: id })
+        .then(({ data: auds }) => setPastAudiences((auds as string[]) ?? []));
       if (err) { setError(err.message); setLoading(false); return; }
       setData(result);
       setAdherence((adh as AdherenceRow[]) ?? []);
@@ -861,10 +865,16 @@ export default function AdminUserDetailPage({ session: _session }: { session: Se
                     {profile?.role === 'admin' && (
                       <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: 'var(--accent)', background: 'var(--accent-glow)', padding: '2px 8px', borderRadius: 4, marginLeft: 'auto' }}>Admin</span>
                     )}
+                    {pastAudiences.length > 0 && (
+                      <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: '#b389f0', border: '1px solid #b389f0', padding: '2px 8px', borderRadius: 4, marginLeft: profile?.role === 'admin' ? 0 : 'auto' }}>Past User</span>
+                    )}
                   </div>
                   <InfoRow label="Signup Date" value={profile?.signup_date ? new Date(profile.signup_date).toLocaleDateString() : null} />
                   <InfoRow label="Role" value={profile?.role} />
                   <InfoRow label="Stripe Customer" value={profile?.stripe_customer_id || 'None'} />
+                  {pastAudiences.length > 0 && (
+                    <InfoRow label="Past Platforms" value={pastAudiences.join(', ')} />
+                  )}
                 </div>
 
                 {/* Entitlements */}

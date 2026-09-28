@@ -46,6 +46,31 @@ export default function AdminOpsPage({ session }: { session: Session }) {
   const [runs, setRuns] = useState<ReconRun[]>([]);
   const [lastRunAt, setLastRunAt] = useState<Record<string, string>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // Past-user sync (Resend audiences -> legacy_contacts)
+  const [legacyStats, setLegacyStats] = useState<{ contacts: number; audiences: number; matched_users: number; last_synced: string | null } | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
+
+  async function loadLegacyStats() {
+    const { data } = await supabase.rpc('admin_legacy_contacts_stats');
+    if (data) setLegacyStats(data as any);
+  }
+
+  async function runResendSync() {
+    setSyncing(true);
+    setSyncMsg('');
+    try {
+      const { data, error: err } = await supabase.functions.invoke('sync-resend-audiences', { body: {} });
+      if (err) setSyncMsg(`Sync failed: ${err.message}`);
+      else if (data?.error) setSyncMsg(`Sync failed: ${data.error}`);
+      else setSyncMsg(`Synced ${data.total_contacts} contacts from ${data.audiences?.length ?? 0} audiences.`);
+      await loadLegacyStats();
+    } catch (e) {
+      setSyncMsg(`Sync failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   useEffect(() => {
     (async () => {
@@ -73,6 +98,7 @@ export default function AdminOpsPage({ session }: { session: Session }) {
         setLastRunAt(data.last_run_at ?? {});
       }
       setLoading(false);
+      loadLegacyStats();
     })();
   }, [adminCheck, kind]);
 
@@ -136,6 +162,36 @@ export default function AdminOpsPage({ session }: { session: Session }) {
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Past-user sync (Resend audiences) */}
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)' }}>
+                        past-user sync (resend)
+                      </div>
+                      <div style={{ fontSize: 13, marginTop: 4 }}>
+                        {legacyStats
+                          ? <>
+                              <b>{legacyStats.contacts}</b> contacts · <b>{legacyStats.audiences}</b> audiences · <b style={{ color: '#b389f0' }}>{legacyStats.matched_users}</b> matched app users
+                              {legacyStats.last_synced && <span style={{ color: 'var(--text-muted)' }}> · synced {formatDateTime(legacyStats.last_synced)}</span>}
+                              {!legacyStats.last_synced && <span style={{ color: '#ef4444' }}> · never synced</span>}
+                            </>
+                          : 'Loading…'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={runResendSync}
+                      disabled={syncing}
+                      style={{ marginLeft: 'auto', background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 16px', borderRadius: 8, fontFamily: "'Outfit', sans-serif", fontSize: 13, fontWeight: 600, cursor: syncing ? 'default' : 'pointer', opacity: syncing ? 0.6 : 1 }}
+                    >
+                      {syncing ? 'Syncing…' : 'Sync now'}
+                    </button>
+                  </div>
+                  {syncMsg && (
+                    <div style={{ fontSize: 12.5, marginTop: 8, color: syncMsg.startsWith('Sync failed') ? '#ef4444' : '#2ec486' }}>{syncMsg}</div>
+                  )}
                 </div>
 
                 {/* Kind filter */}

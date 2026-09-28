@@ -25,6 +25,7 @@ interface OutreachRow {
   last_email_at: string | null;
   handled: boolean;
   handled_at: string | null;
+  past_user: boolean;
 }
 
 /** Where each athlete actually stalled (admin_outreach_list's stage CASE),
@@ -226,6 +227,7 @@ export default function AdminOutreachPage({ session }: { session: Session }) {
                       ) : (
                         <>
                           {!r.email_confirmed && <Badge color="#e8a33d">unconfirmed</Badge>}
+                          {r.past_user && <Badge color="#b389f0">past user</Badge>}
                           <Badge color={stageOf(r.stage).color}>{stageOf(r.stage).label}</Badge>
                           {r.last_email_at && (
                             <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>last emailed {fmtDate(r.last_email_at)}</span>
