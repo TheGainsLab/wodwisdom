@@ -177,7 +177,7 @@ img.feature-img{width:100%;max-width:360px;margin:24px auto 0;display:block;bord
 .eng-track .base{position:absolute;inset:0;background:var(--grad);opacity:.14}
 .eng-track .lit{position:absolute;inset:0;background:var(--grad)}
 .eng-zones{position:absolute;top:-22px;bottom:-4px;left:calc(var(--labelw) + 10px);right:0;pointer-events:none}
-.eng-zone-label{position:absolute;top:0;left:50%;width:25%;text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--text-dim)}
+.eng-zone-label{position:absolute;top:0;left:50%;width:25%;text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--text-dim);white-space:nowrap}
 .eng-zone-line{position:absolute;top:16px;bottom:0;width:0;border-left:2px dashed rgba(255,255,255,.5)}
 .eng-zone-fill{position:absolute;top:16px;bottom:0;left:50%;width:25%;background:rgba(255,255,255,.05)}
 @media (max-width:700px){.eng-poster{--labelw:108px}.eng-nm{font-size:10.5px}}

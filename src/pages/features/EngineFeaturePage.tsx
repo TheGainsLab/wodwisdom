@@ -44,7 +44,7 @@ function SpectrumPoster() {
   const fade = 'linear-gradient(90deg,#000 0%,rgba(0,0,0,0.3) 100%)';
   return (
     <div className="eng-poster">
-      <div className="eng-axis"><span>Slow-Twitch</span><span>Fast-Twitch</span></div>
+      <div className="eng-axis"><span>Slow</span><span>Fast</span></div>
       <div className="eng-rows">
         <div>
           {rows.map(s => {
