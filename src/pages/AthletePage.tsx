@@ -88,7 +88,7 @@ function t3CounterStyle(len: number, show: boolean): React.CSSProperties {
 /** Shared structured-evaluation renderer (admin v2 panel + user eval history):
  *  green strengths (bulleted), red weaknesses (numbered), synthesizing prose,
  *  numbered recommendations. */
-function StructuredEvalView({ e, onUpgrade }: { e: SafeEvaluation; onUpgrade?: () => void }) {
+function StructuredEvalView({ e, onUpgrade, hasEngine = false }: { e: SafeEvaluation; onUpgrade?: (plan: 'programming' | 'all_access' | 'engine') => void; hasEngine?: boolean }) {
   // Stage D: does the eval have a shelf life (re-reads)?
   useEffect(() => { track('eval_viewed'); }, []);
   return (
@@ -135,36 +135,62 @@ function StructuredEvalView({ e, onUpgrade }: { e: SafeEvaluation; onUpgrade?: (
           </div>
           <div style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.65, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
-              <div style={CTA_KICKER}>Your Program</div>
-              Add your goals and training preferences. Our AI combines them with your evaluation to
-              build your personalized program.
+              <strong style={{ color: 'var(--text)', fontWeight: 700 }}>A program built for you, not a template.</strong>{' '}
+              Combine this evaluation with your goals and preferences, so every training session is
+              aimed at what&rsquo;s holding you back. Not the athlete next to you.
             </div>
             <div>
-              <div style={CTA_KICKER}>Your Coach</div>
-              Your program includes your AI Coach.{' '}
-              <strong style={{ color: 'var(--text)', fontWeight: 700 }}>AI Coach is not a chatbot.</strong>{' '}
-              It is trained on our methodology and has access to your evaluation, goals, program,
-              and training history — so it can answer questions, coach your sessions, and adjust
-              your training in real time. It&rsquo;s like having a high-level coach by your side,
-              every session.
+              <strong style={{ color: 'var(--text)', fontWeight: 700 }}>A coach beside you, every session.</strong>{' '}
+              Not a chatbot. Our AI Coach is trained on our methodology and 25 years of programming
+              history, with your Evaluation, goals, and history in view. It thinks like an
+              experienced coach, so it answers your questions, coaches your lifts, and adjusts your
+              training in real time.
             </div>
             <div>
-              <div style={CTA_KICKER}>Your Gains</div>
-              Log your results and AI reviews what actually happened — then updates your program to
-              keep you on track.
+              <strong style={{ color: 'var(--text)', fontWeight: 700 }}>Training that adapts as you improve.</strong>{' '}
+              Log your results and the program updates. It keeps matching the athlete you are now —
+              not the one you were when you started.
             </div>
           </div>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: '14px 0' }}>
-            Personalized training and coaching. <span style={{ color: 'var(--accent)' }}>Every day.</span>
+            Personalized training and coaching, aimed at what&rsquo;s holding you back.{' '}
+            <span style={{ color: 'var(--accent)' }}>Every day.</span>
           </div>
           <button
             type="button"
             className="auth-btn"
             style={{ padding: '14px 20px', fontSize: 14, width: '100%', fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase' }}
-            onClick={onUpgrade}
+            onClick={() => onUpgrade('programming')}
           >
             Build My Program
           </button>
+          {/* Engine / All Access addendum — hidden for existing Engine
+              subscribers, for whom "Want Engine too?" makes no sense. */}
+          {!hasEngine && (
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)', textAlign: 'center' }}>
+              <div style={{ fontSize: 13.5, color: 'var(--text-dim)', marginBottom: 10 }}>
+                Want Engine too? Get <strong style={{ color: 'var(--text)' }}>All Access</strong> — best value,
+                save 15%. $50/month for both.
+              </div>
+              <button
+                type="button"
+                onClick={() => onUpgrade('all_access')}
+                style={{ background: 'none', border: '1px solid var(--accent)', color: 'var(--accent)', borderRadius: 8, padding: '10px 18px', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Get All Access &rarr;
+              </button>
+              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 10 }}>
+                Just conditioning?{' '}
+                <button
+                  type="button"
+                  onClick={() => onUpgrade('engine')}
+                  style={{ background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                >
+                  $30/month &rarr;
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -2427,7 +2453,8 @@ export default function AthletePage({ session }: { session: Session }) {
                                           {structured ? (
                                             <StructuredEvalView
                                               e={normalizeEvaluation(structured)}
-                                              onUpgrade={!isAdmin && !hasFeature('programming') ? () => navigate('/checkout') : undefined}
+                                              onUpgrade={!isAdmin && !hasFeature('programming') ? (plan) => navigate(`/checkout?plan=${plan}`) : undefined}
+                                              hasEngine={hasFeature('engine')}
                                             />
                                           ) : (
                                             <div className="workout-review-section" style={{ marginTop: 0 }}>
