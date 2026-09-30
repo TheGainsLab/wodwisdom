@@ -199,6 +199,10 @@ export default function App() {
                 never silently on the landing page (the July '26
                 recovery-email leak). */}
             <Route path="/checkout" element={<CheckoutRedirectPage />} />
+            {/* Signed-out /profile (email "re-read your evaluation" links):
+                sign in first, then land on the profile — never fall to the
+                landing page. */}
+            <Route path="/profile" element={<Navigate to="/auth?next=/profile" replace />} />
             {/* Dead-link stubs for the retired gym flows (Decisions 11 / 12a). */}
             <Route path="/join/engine/:token" element={<RetiredInviteNotice />} />
             <Route path="/claim/:token" element={<RetiredInviteNotice />} />
