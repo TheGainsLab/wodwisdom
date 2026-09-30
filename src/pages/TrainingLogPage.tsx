@@ -2978,9 +2978,10 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                           {isSkills && blockEntries.length > 0 && (
                                             <div style={{ paddingLeft: 8, marginTop: 8, fontSize: 13, color: 'var(--text-dim)' }}>
                                               {blockEntries.map((entry, ei) => {
+                                                const effReps = entry.reps_completed ?? entry.reps;
                                                 const parts: string[] = [];
-                                                if (entry.sets != null) parts.push(`${entry.sets} sets`);
-                                                if (entry.reps_completed != null) parts.push(`x${entry.reps_completed}`);
+                                                if (entry.sets != null) parts.push(`${entry.sets} set${entry.sets !== 1 ? 's' : ''}`);
+                                                if (effReps != null) parts.push(`x${effReps}`);
                                                 if (entry.hold_seconds != null) parts.push(`${entry.hold_seconds}s hold`);
                                                 const detail = parts.length > 0 ? parts.join(' ') : 'practiced';
                                                 return (
