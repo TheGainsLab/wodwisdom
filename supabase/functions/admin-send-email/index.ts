@@ -242,6 +242,7 @@ function renderCtaBlock(): string {
   parts.push('<p style="text-align: center; font-size: 14px; margin: 0 0 10px;">Want Engine too? Get <strong>All Access</strong> \u2014 best value, save 15%. $50/month for both.</p>');
   parts.push(`<p style="text-align: center; margin: 0 0 14px;"><a href="${SITE_URL}/checkout?plan=all_access" style="display: inline-block; border: 1px solid #ff3a3a; color: #ff3a3a; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Get All Access \u2192</a></p>`);
   parts.push(`<p style="text-align: center; font-size: 13px; margin: 0;">Just conditioning? <a href="${SITE_URL}/checkout?plan=engine" style="color: #ff3a3a; font-weight: 600;">$30/month \u2192</a></p>`);
+  parts.push(`<p style="text-align: center; font-size: 12.5px; color: #888; margin: 16px 0 0;">Not ready? <a href="${SITE_URL}/examples" style="color: #ff3a3a;">See real evaluations, programs, and Engine analytics \u2192</a></p>`);
   return parts.join("\n      ");
 }
 
