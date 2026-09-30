@@ -236,6 +236,14 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
   // step IS a full day, captured newer and cleaner.
   {
     tab: 'programming',
+    image: '/images/programming-logged-amrap.webp',
+    alt: 'A logged Monday AMRAP — 9+3 Rx at the 45th percentile of the Open field',
+    title: 'An honest number',
+    caption:
+      'Not every day is a PR. A Monday AMRAP, 9+3 Rx — and an honest read: 45th percentile of the Open field for this workout. The system measures, it doesn’t flatter. That honesty is what makes the 99th-percentile days mean something.',
+  },
+  {
+    tab: 'programming',
     image: '/images/power-duration-curve.png',
     alt: 'Metcon power analytics — average output and the power-duration curve across time domains',
     title: 'Your metcons, as data',
