@@ -227,6 +227,49 @@ function statusColor(status: string): string {
   }
 }
 
+// The founder's eval-to-program pitch (drafted 2026-09-30). Loaded into the
+// composer as a starting point: the <insert> slot takes the personal notes
+// about THIS athlete's evaluation; everything else is ready to send. The
+// purchase buttons come from the Add-purchase-buttons toggle, not the body.
+const EVAL_PITCH_DRAFT = {
+  subject: 'Turn This Evaluation Into Your Program',
+  body: `Hey {first_name},
+
+This is Coach Matt. It's really me, not the AI. You completed an Evaluation but haven't started a program yet.
+
+I built The Gains Lab as an alternative to conventional programming.
+
+Every group program has the same limitation: coaches can't continuously keep all their athletes' histories, goals, and results in view. So training and coaching expertise get packaged into a one-size-fits-all program or track. Leaderboards replace analysis. Generic notes replace personal guidance. Distribution gets better. Training does not. I know, because I owned a gym and sold online programs.
+
+But you and I are different athletes. <INSERT: a line or two about THEIR evaluation — what stood out, their clearest opportunity>. It simply doesn't make sense for us to do the same program. Scaling made sense when that was the best tool we had.
+
+[Re-read your evaluation](https://www.thegainslab.com/profile) — everything below is built from it.
+
+But AI changes what's possible.
+
+Our AI delivers personalized training and coaching.
+
+It has seen every article, seminar, and training guide behind our methodology. It has reviewed 25 years of programming history, so it knows how those principles get applied in real training. And it holds 15 million competition event scores — a reference set no individual coach could keep in memory.
+
+That's the knowledge base of an experienced coach, with perfect recall and no blind spots. And it puts all of it to work on you — not as information, but as judgment. The same quality of thinking a great coach brings, aimed entirely at your training.
+
+Strength work aimed at what you need. Conditioning calibrated to your fitness. Skills and accessories chosen for your priorities.
+
+We don't just hand you a program and walk away. The AI Coach trains with you.
+
+Ask questions anytime — your AI Programming includes unlimited questions. Need to make changes? Tell the Coach. Traveling? Need a substitution? It sees your entire profile, Evaluation, and training history, so every answer is built for you.
+
+Log your results as you train, and the program evolves. You always get training for the athlete you are, not the athlete you were when you started.
+
+And you see everything the AI sees — your full training history, right in your analytics, the same data the Coach uses.
+
+Your Evaluation is what makes it personal. AI Programming combines it with your profile, goals, preferences, and schedule into one program. When you sign up, you tell us exactly what your goals are — then we build around them.
+
+Not ready yet? [See real programs from actual athletes](https://www.thegainslab.com/examples?tab=programming) — excerpts from programs in use, not mockups.
+
+— Matt`,
+};
+
 function EmailSection({ userId, userEmail, userName, hasEvaluation }: { userId: string; userEmail: string; userName: string; hasEvaluation: boolean }) {
   // ?outreach=1 (the /admin/outreach worklist links here with it) pre-checks
   // the outreach tag so working the list marks each user handled on send.
@@ -282,6 +325,17 @@ function EmailSection({ userId, userEmail, userName, hasEvaluation }: { userId: 
     } finally {
       setInsertingSaveLink(false);
     }
+  };
+
+  const loadEvalPitchDraft = () => {
+    if ((subject.trim() || body.trim()) && !window.confirm('Replace the current subject and message with the eval pitch draft?')) return;
+    setTemplateKey('custom');
+    setSubject(EVAL_PITCH_DRAFT.subject);
+    setBody(EVAL_PITCH_DRAFT.body);
+    setIncludeEval(false);
+    setIncludeCta(true);
+    setConfirmArmed(false);
+    setError('');
   };
 
   const addImage = async (file: File): Promise<string | null> => {
@@ -471,6 +525,13 @@ function EmailSection({ userId, userEmail, userName, hasEvaluation }: { userId: 
             <option value="custom">Custom message</option>
             <option value="welcome_back">Welcome Back (reactivation)</option>
           </select>
+          <button
+            type="button"
+            onClick={loadEvalPitchDraft}
+            style={{ marginTop: 8, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '7px 14px', fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+          >
+            Load draft: Eval → Program pitch
+          </button>
         </div>
 
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1.5 }}>
