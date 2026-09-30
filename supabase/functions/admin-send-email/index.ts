@@ -226,16 +226,23 @@ function renderEvaluationHtml(
   }
 
   // The natural moment for the ask: they just re-read their own evaluation.
-  // Even-handed by design — recipients came in interested in different
-  // products, so both paths get equal weight and All Access rides quietly
-  // underneath.
-  const BTN = "display: inline-block; background: #ff3a3a; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;";
-  parts.push('<hr style="border: none; border-top: 1px solid #e5e5e5; margin: 28px 0;" />');
-  parts.push('<p>This evaluation is the foundation \u2014 where you take it is up to you.</p>');
-  parts.push(`<p style="text-align: center; margin: 24px 0 0;"><a href="${SITE_URL}/checkout?plan=programming" style="${BTN}">Start AI Programming \u2192</a></p>`);
-  parts.push(`<p style="text-align: center; margin: 12px 0 8px;"><a href="${SITE_URL}/checkout?plan=engine" style="${BTN}">Start AI Year of the Engine \u2192</a></p>`);
-  parts.push(`<p style="text-align: center; font-size: 13px; margin: 0;"><a href="${SITE_URL}/checkout?plan=all_access" style="color: #ff3a3a;">Want both? Get All Access \u2192</a></p>`);
+  parts.push(renderCtaBlock());
   return "\n      " + parts.join("\n      ");
+}
+
+/** The purchase-ask block — mirrors the in-app post-evaluation card
+ *  (founder copy, 2026-09-30): Build My Program primary, the All Access
+ *  value band, and the just-conditioning Engine link. Appended after an
+ *  included evaluation, or on its own via include_cta. */
+function renderCtaBlock(): string {
+  const BTN = "display: inline-block; background: #ff3a3a; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;";
+  const parts: string[] = [];
+  parts.push('<hr style="border: none; border-top: 1px solid #e5e5e5; margin: 28px 0;" />');
+  parts.push(`<p style="text-align: center; margin: 0 0 18px;"><a href="${SITE_URL}/checkout?plan=programming" style="${BTN}">Build My Program</a></p>`);
+  parts.push('<p style="text-align: center; font-size: 14px; margin: 0 0 10px;">Want Engine too? Get <strong>All Access</strong> \u2014 best value, save 15%. $50/month for both.</p>');
+  parts.push(`<p style="text-align: center; margin: 0 0 14px;"><a href="${SITE_URL}/checkout?plan=all_access" style="display: inline-block; border: 1px solid #ff3a3a; color: #ff3a3a; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Get All Access \u2192</a></p>`);
+  parts.push(`<p style="text-align: center; font-size: 13px; margin: 0;">Just conditioning? <a href="${SITE_URL}/checkout?plan=engine" style="color: #ff3a3a; font-weight: 600;">$30/month \u2192</a></p>`);
+  return parts.join("\n      ");
 }
 
 Deno.serve(async (req) => {
@@ -282,7 +289,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { user_id, template_key, subject, body: customBody, campaign_key, attachments: rawAttachments, include_evaluation } = body || {};
+    const { user_id, template_key, subject, body: customBody, campaign_key, attachments: rawAttachments, include_evaluation, include_cta } = body || {};
     if (!user_id || !template_key) {
       return new Response(
         JSON.stringify({ error: "user_id and template_key are required" }),
@@ -380,6 +387,9 @@ Deno.serve(async (req) => {
           evalRow.analysis,
           evalRow.created_at,
         );
+      }
+      if (!evalHtml && include_cta === true) {
+        evalHtml = "\n      " + renderCtaBlock();
       }
       rendered = renderCustom(customSubject, customText, recipientName, attachments, evalHtml);
     } else {

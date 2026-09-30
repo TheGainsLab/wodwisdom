@@ -237,6 +237,7 @@ function EmailSection({ userId, userEmail, userName, hasEvaluation }: { userId: 
   const [body, setBody] = useState('');
   const [images, setImages] = useState<ComposerImage[]>([]);
   const [includeEval, setIncludeEval] = useState(false);
+  const [includeCta, setIncludeCta] = useState(false);
   const [confirmArmed, setConfirmArmed] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -429,7 +430,7 @@ function EmailSection({ userId, userEmail, userName, hasEvaluation }: { userId: 
       // automated eval-reminder sweep (its candidates RPC excludes the tag).
       const campaign_key = outreach ? 'eval_outreach' : undefined;
       const payload = templateKey === 'custom'
-        ? { user_id: userId, template_key: 'custom', subject, body, attachments, campaign_key, include_evaluation: includeEval }
+        ? { user_id: userId, template_key: 'custom', subject, body, attachments, campaign_key, include_evaluation: includeEval, include_cta: includeCta }
         : { user_id: userId, template_key: 'welcome_back', campaign_key };
       const { data, error: invokeErr } = await supabase.functions.invoke('admin-send-email', { body: payload });
       if (invokeErr) throw new Error(invokeErr.message || 'Send failed');
@@ -440,6 +441,7 @@ function EmailSection({ userId, userEmail, userName, hasEvaluation }: { userId: 
       setImages([]);
       imgCounterRef.current = 0;
       setIncludeEval(false);
+      setIncludeCta(false);
       setConfirmArmed(false);
       await loadHistory();
     } catch (e) {
@@ -495,8 +497,24 @@ function EmailSection({ userId, userEmail, userName, hasEvaluation }: { userId: 
             />
             <span>
               <strong style={{ color: 'var(--text)' }}>Include their evaluation</strong> — appends the latest completed
-              evaluation below your note, rendered as email text (verdict, strengths, priorities, recommendations).
+              evaluation below your note, rendered as email text (verdict, strengths, priorities, recommendations),
+              followed by the purchase buttons.
               {!hasEvaluation && ' This user has no completed evaluation.'}
+            </span>
+          </label>
+        )}
+
+        {templateKey === 'custom' && !includeEval && (
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: 'var(--text-dim)', cursor: 'pointer', lineHeight: 1.5 }}>
+            <input
+              type="checkbox"
+              checked={includeCta}
+              onChange={(e) => { setIncludeCta(e.target.checked); setConfirmArmed(false); }}
+              style={{ marginTop: 3, accentColor: 'var(--accent)' }}
+            />
+            <span>
+              <strong style={{ color: 'var(--text)' }}>Add purchase buttons</strong> — ends the email with the
+              Build My Program / All Access / Engine block (same as the in-app post-evaluation card).
             </span>
           </label>
         )}
