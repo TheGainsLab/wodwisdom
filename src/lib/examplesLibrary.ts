@@ -241,6 +241,13 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
           'The same athlete, three energy systems: 45.5 cal/min on anaerobic days, 17.3 at max aerobic power, 11.5 on endurance. A 4× spread on the same machine — proof each day type demands something different, and each one is tracked on its own axis.',
       },
       {
+        image: '/images/analytics-energy-ratio.webp',
+        alt: 'Energy System Paces — Echo Bike bars at 1.00× time trial, 1.10× aerobic, 2.83× glycolytic, with a 2.56× Energy Systems Ratio',
+        title: 'Two engines, one number',
+        caption:
+          'Those day types distill into a single derived metric. Every bar is a multiple of the athlete’s own time-trial pace — the dashed 1.00× baseline. Aerobic sits at 1.10×, glycolytic at 2.83×, and the ratio between them is the headline: a 2.56× glycolytic reserve, the gap between what you can produce in a burst and what you can sustain. The program trains both ends, and this number is how you watch them move.',
+      },
+      {
         image: '/images/analytics-targets-evolution.webp',
         alt: 'Targets vs Actual — three Max Aerobic Power sessions: targets 15.3, 16.3, 16.8 against actuals 16.3, 18.4, 18.7',
         title: 'The data writes the program',
