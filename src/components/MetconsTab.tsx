@@ -206,12 +206,15 @@ function CollapsibleSection({
  *  When onSelect is provided, the whole column is a click target; the selected
  *  bar keeps full color + a ring while the rest dim. */
 function WkgBarChart({
-  items, valueLabel = 'W/kg', onSelect, selectedKey,
+  items, valueLabel = 'W/kg', onSelect, selectedKey, referenceValue,
 }: {
   items: Array<{ key: string; label: string; subLabel?: string; value: number; bucket?: string }>;
   valueLabel?: string;
   onSelect?: (key: string) => void;
   selectedKey?: string | null;
+  /** Athlete's average — drawn as a dashed reference line so every bar
+   *  reads as above/below their own baseline (no axis chrome needed). */
+  referenceValue?: number | null;
 }) {
   if (items.length === 0) {
     return (
@@ -224,8 +227,24 @@ function WkgBarChart({
   const first = items[0];
   const last = items[items.length - 1];
   const clickable = !!onSelect;
+  const ref = referenceValue != null && referenceValue > 0 && maxVal > 0 && referenceValue <= maxVal
+    ? referenceValue : null;
   return (
     <div>
+      {/* Magnitude anchors: your average on the left, the peak on the right. */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 10, color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
+        <span>{ref != null ? `avg ${ref.toFixed(2)} ${valueLabel}` : ''}</span>
+        <span>{maxVal > 0 ? `peak ${maxVal.toFixed(2)} ${valueLabel}` : ''}</span>
+      </div>
+      <div style={{ position: 'relative' }}>
+      {ref != null && (
+        <div style={{
+          position: 'absolute', left: 0, right: 0,
+          bottom: `${(ref / maxVal) * 100}%`,
+          borderTop: '1px dashed rgba(255,255,255,0.45)',
+          pointerEvents: 'none', zIndex: 1,
+        }} />
+      )}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 100 }}>
         {items.map((it, i) => {
           const isSel = selectedKey != null && selectedKey === it.key;
@@ -256,6 +275,7 @@ function WkgBarChart({
             </button>
           );
         })}
+      </div>
       </div>
       <div style={{
         display: 'flex', justifyContent: 'space-between', marginTop: 4,
@@ -610,6 +630,7 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
         <div style={{ height: 10 }} />
         <WkgBarChart
           items={programDurationBars}
+          referenceValue={programStats.avgWkg}
           selectedKey={selected?.source === 'program' ? selected.key : null}
           onSelect={(k) => setSelected(prev => prev?.source === 'program' && prev.key === k ? null : { source: 'program', key: k })}
         />
@@ -661,6 +682,7 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
             </div>
             <WkgBarChart
               items={historicalChart}
+              referenceValue={historicalStats.avgWkg}
               selectedKey={selected?.source === 'historical' ? selected.key : null}
               onSelect={(k) => setSelected(prev => prev?.source === 'historical' && prev.key === k ? null : { source: 'historical', key: k })}
             />
