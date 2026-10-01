@@ -23,12 +23,15 @@ const CTA_PROMPTS: Record<ExamplesTab, string> = {
     'Everything above was generated for one athlete. Yours starts from the same free evaluation — no credit card, yours to keep.',
   engine:
     'That’s one athlete’s data. See where you stand first — the evaluation is free, takes about five minutes, and it’s yours to keep.',
+  analytics:
+    'Every chart above started as one athlete logging one workout. Yours starts with the free evaluation — no credit card, yours to keep.',
 };
 
 const CTA_SECONDARY: Record<ExamplesTab, { to: string; label: string }> = {
   evaluations: { to: '/features/programs', label: 'Explore AI Programming →' },
   programming: { to: '/features/programs', label: 'Explore AI Programming →' },
   engine: { to: '/features/engine', label: 'Explore AI Year of the Engine →' },
+  analytics: { to: '/features/programs', label: 'Explore AI Programming →' },
 };
 
 function TabCta({ tab, signedIn }: { tab: ExamplesTab; signedIn: boolean }) {
