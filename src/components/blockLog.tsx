@@ -188,14 +188,19 @@ export function schemeRoundsFor(block: ProgramBlockV2, idx: number): number | nu
 
 export function plannedSets(m: ProgramMovementV2, schemeRounds?: number | null): { kind: SetKind; count: number; prefill: (number | null)[]; unitLabel: string } {
   const scheme = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
-  if (scheme && scheme.length > 0) {
+  // A ladder needs at least two rungs. A single-element scheme ([3]) is
+  // uniform reps, NOT one set — the display formatter has always treated it
+  // that way (its guard is length > 1), and the mismatch made a "4×3" row
+  // open a one-set editor (founder report, 2026-10-01).
+  if (scheme && scheme.length > 1) {
     return { kind: 'reps', count: scheme.length, prefill: scheme, unitLabel: 'reps' };
   }
   // The movement's own sets win; the block scheme's rounds only fill the
   // gap for rows that state none (the EMOM / quality-rounds shapes).
   const count = m.sets ?? (schemeRounds != null && schemeRounds > 1 ? schemeRounds : 1);
-  if (m.reps != null) {
-    return { kind: 'reps', count, prefill: Array.from({ length: count }, () => m.reps), unitLabel: 'reps' };
+  const uniformReps = m.reps ?? (scheme && scheme.length === 1 ? scheme[0] : null);
+  if (uniformReps != null) {
+    return { kind: 'reps', count, prefill: Array.from({ length: count }, () => uniformReps), unitLabel: 'reps' };
   }
   if (m.time_seconds != null) {
     return { kind: 'seconds', count, prefill: Array.from({ length: count }, () => m.time_seconds), unitLabel: 'sec' };
