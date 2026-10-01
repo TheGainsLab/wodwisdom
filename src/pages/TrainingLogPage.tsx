@@ -1556,15 +1556,33 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   // No top-set-equivalent chart — reps vs seconds across families aren't
   // comparable on a single axis.
   const skillsOverview = useMemo(() => {
-    const volume: Array<{ key: string; displayName: string; sets: number }> = [];
+    // Reps and seconds can't share an axis honestly (4×3 vs 4×12 looked
+    // identical when this charted sets — founder call, 2026-10-01), so the
+    // overview splits: rep families by total reps, hold families by total
+    // time. Families with sets but no recorded quantity fall back to a
+    // sets label so old sparse logs stay visible.
+    const reps: Array<{ key: string; displayName: string; value: number; label: string }> = [];
+    const holds: Array<{ key: string; displayName: string; value: number; label: string }> = [];
     for (const cfg of SKILL_FAMILIES) {
       const data = skillsByFamily.get(cfg.key)!;
-      if (data.totalSets > 0) {
-        volume.push({ key: cfg.key, displayName: cfg.displayName, sets: data.totalSets });
+      if (data.totalSets === 0) continue;
+      if (cfg.metric === 'seconds') {
+        holds.push({
+          key: cfg.key, displayName: cfg.displayName,
+          value: data.totalHoldSeconds,
+          label: data.totalHoldSeconds > 0 ? `${data.totalHoldSeconds}s` : `${data.totalSets} sets`,
+        });
+      } else {
+        reps.push({
+          key: cfg.key, displayName: cfg.displayName,
+          value: data.totalReps,
+          label: data.totalReps > 0 ? String(data.totalReps) : `${data.totalSets} sets`,
+        });
       }
     }
-    volume.sort((a, b) => b.sets - a.sets);
-    return { volume };
+    reps.sort((a, b) => b.value - a.value);
+    holds.sort((a, b) => b.value - a.value);
+    return { reps, holds };
   }, [skillsByFamily]);
 
   // ── Helpers ──
@@ -2386,32 +2404,39 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   onChange={e => setSkillsSearch(e.target.value)}
                 />
 
-                {/* Overview: volume per family. One chart only — reps and seconds
-                    families don't share a top-set axis. */}
+                {/* Overview: reps and holds charted separately — different
+                    units never share an axis. */}
                 {(() => {
-                  const { volume } = skillsOverview;
-                  if (volume.length === 0) return null;
-                  const maxVol = volume.reduce((m, v) => Math.max(m, v.sets), 0);
+                  const { reps, holds } = skillsOverview;
+                  if (reps.length === 0 && holds.length === 0) return null;
                   const section: React.CSSProperties = { marginBottom: 12, padding: 12, background: 'var(--surface2)', borderRadius: 8 };
                   const title: React.CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 };
                   const row: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, fontSize: 12 };
                   const name: React.CSSProperties = { width: 140, color: 'var(--text)', flexShrink: 0 };
                   const track: React.CSSProperties = { flex: 1, height: 8, background: 'var(--surface)', borderRadius: 4, overflow: 'hidden' };
                   const value: React.CSSProperties = { width: 60, textAlign: 'right', color: 'var(--text-dim)', fontFamily: 'JetBrains Mono', flexShrink: 0 };
-                  return (
-                    <div style={{ marginTop: 12, marginBottom: 16 }}>
+                  const chart = (heading: string, items: typeof reps) => {
+                    if (items.length === 0) return null;
+                    const max = items.reduce((m, v) => Math.max(m, v.value), 0);
+                    return (
                       <div style={section}>
-                        <div style={title}>Volume — 90 days (sets)</div>
-                        {volume.map(v => (
+                        <div style={title}>{heading}</div>
+                        {items.map(v => (
                           <div key={v.key} style={row}>
                             <span style={name}>{v.displayName}</span>
                             <div style={track}>
-                              <div style={{ height: '100%', width: `${(v.sets / maxVol) * 100}%`, background: 'var(--accent)' }} />
+                              <div style={{ height: '100%', width: `${max > 0 ? (v.value / max) * 100 : 0}%`, background: 'var(--accent)' }} />
                             </div>
-                            <span style={value}>{v.sets}</span>
+                            <span style={value}>{v.label}</span>
                           </div>
                         ))}
                       </div>
+                    );
+                  };
+                  return (
+                    <div style={{ marginTop: 12, marginBottom: 16 }}>
+                      {chart('Volume — 90 days (reps)', reps)}
+                      {chart('Holds — 90 days (time)', holds)}
                     </div>
                   );
                 })()}
