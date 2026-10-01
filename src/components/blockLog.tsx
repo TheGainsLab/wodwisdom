@@ -158,12 +158,42 @@ export const formatClock = (seconds: number): string =>
  * disagree with the prescription the athlete is looking at.
  */
 type SetKind = 'reps' | 'seconds' | 'distance';
-export function plannedSets(m: ProgramMovementV2): { kind: SetKind; count: number; prefill: (number | null)[]; unitLabel: string } {
+/** Rounds implied by the block's typed scheme for the movement at `idx`,
+ *  used only when the movement row carries no set structure of its own.
+ *  A skills EMOM's "Ring Muscle Up — 3 reps" row is really N rounds of 3
+ *  (minutes across stations); a rounds_ntf block's rows repeat every round.
+ *  Without this, Rx logged one set where the athlete did several
+ *  (founder report, 2026-10-01). Null = scheme implies nothing. */
+export function schemeRoundsFor(block: ProgramBlockV2, idx: number): number | null {
+  const sf = block.scheme_format;
+  if (!sf) return null;
+  if ((sf.format === 'rounds_ntf' || sf.format === 'rft' || sf.format === 'intervals')
+      && sf.rounds != null && sf.rounds > 1) {
+    return sf.rounds;
+  }
+  if (sf.format === 'emom' && sf.minutes != null && sf.minutes > 0) {
+    const stations = sf.stations;
+    if (stations && stations.length > 0) {
+      let n = 0;
+      for (let min = 0; min < sf.minutes; min++) {
+        if ((stations[min % stations.length] ?? []).includes(idx)) n++;
+      }
+      return n > 1 ? n : null;
+    }
+    // No stations: a single-movement EMOM does that movement every minute.
+    if (block.movements.length === 1) return sf.minutes > 1 ? sf.minutes : null;
+  }
+  return null;
+}
+
+export function plannedSets(m: ProgramMovementV2, schemeRounds?: number | null): { kind: SetKind; count: number; prefill: (number | null)[]; unitLabel: string } {
   const scheme = Array.isArray(m.rep_scheme) ? m.rep_scheme : null;
   if (scheme && scheme.length > 0) {
     return { kind: 'reps', count: scheme.length, prefill: scheme, unitLabel: 'reps' };
   }
-  const count = m.sets ?? 1;
+  // The movement's own sets win; the block scheme's rounds only fill the
+  // gap for rows that state none (the EMOM / quality-rounds shapes).
+  const count = m.sets ?? (schemeRounds != null && schemeRounds > 1 ? schemeRounds : 1);
   if (m.reps != null) {
     return { kind: 'reps', count, prefill: Array.from({ length: count }, () => m.reps), unitLabel: 'reps' };
   }
@@ -346,11 +376,11 @@ function SaveFooter({ saving, canSave, onSave, notes, onNotes }: {
 
 // ── Editable per-set rows (the Modify path) ──
 type RowState = { weight: string; value: string; skipped: boolean };
-function EditableRows({ m, rows, showWeight, units, onRow }: {
+function EditableRows({ m, rows, showWeight, units, onRow, schemeRounds }: {
   m: ProgramMovementV2; rows: RowState[]; showWeight: boolean; units: string;
-  onRow: (i: number, patch: Partial<RowState>) => void;
+  onRow: (i: number, patch: Partial<RowState>) => void; schemeRounds?: number | null;
 }) {
-  const { count, unitLabel } = plannedSets(m);
+  const { count, unitLabel } = plannedSets(m, schemeRounds);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 0 2px' }}>
       {Array.from({ length: count }, (_, i) => {
@@ -394,6 +424,7 @@ interface TaskState {
   rpe: number | null;
 }
 function hydrateFromSnapshot(
+  block: ProgramBlockV2,
   tasks: ProgramMovementV2[][],
   snap: SavedBlockSnapshot | null,
   showWeight: boolean,
@@ -413,7 +444,7 @@ function hydrateFromSnapshot(
     let anyDeviation = false;
     let taskRpe: number | null = null;
     for (const m of t) {
-      const { kind, count, prefill } = plannedSets(m);
+      const { kind, count, prefill } = plannedSets(m, schemeRoundsFor(block, block.movements.indexOf(m)));
       const saved = (byMovement.get(m.movement) ?? []).sort((a, b) => (a.set_number ?? 0) - (b.set_number ?? 0));
       const fresh = Array.from({ length: count }, (_, i) => ({
         weight: m.weight != null ? String(m.weight) : '',
@@ -466,7 +497,7 @@ function RowLogger({ block, controller, coaching, label, type, showWeight, onSav
   );
   const taskKey = (t: ProgramMovementV2[]) => t.map((m) => m.id).join('+');
   const snap = controller.savedSnapshot?.(block.sort_order) ?? null;
-  const hydrated = useMemo(() => hydrateFromSnapshot(tasks, snap, showWeight), [tasks, snap, showWeight]);
+  const hydrated = useMemo(() => hydrateFromSnapshot(block, tasks, snap, showWeight), [block, tasks, snap, showWeight]);
 
   const [states, setStates] = useState(hydrated.states);
   const [rows, setRows] = useState(hydrated.rows);
@@ -494,7 +525,7 @@ function RowLogger({ block, controller, coaching, label, type, showWeight, onSav
     for (const t of claimedTasks) {
       const st = states[taskKey(t)];
       for (const m of t) {
-        const { kind, count, prefill } = plannedSets(m);
+        const { kind, count, prefill } = plannedSets(m, schemeRoundsFor(block, block.movements.indexOf(m)));
         const movementFaults = checked[m.id] ?? [];
         for (let i = 0; i < count; i++) {
           const prescribed = {
@@ -571,7 +602,7 @@ function RowLogger({ block, controller, coaching, label, type, showWeight, onSav
             {st.claim === 'mod' && st.expanded && t.map((m) => (
               <div key={m.id}>
                 {t.length > 1 && <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', marginTop: 6 }}>{formatMovementName(m.movement)}</div>}
-                <EditableRows m={m} rows={rows[m.id] ?? []} showWeight={showWeight} units={controller.userUnits} onRow={(i, p) => setRow(m.id, i, p)} />
+                <EditableRows m={m} rows={rows[m.id] ?? []} showWeight={showWeight} units={controller.userUnits} onRow={(i, p) => setRow(m.id, i, p)} schemeRounds={schemeRoundsFor(block, block.movements.indexOf(m))} />
               </div>
             ))}
             <div style={{ marginTop: 8 }}>

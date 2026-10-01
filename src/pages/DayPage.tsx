@@ -40,7 +40,7 @@ export default function DayPage(_props: { session: Session }) {
           .maybeSingle(),
         supabase
           .from('program_blocks_v2')
-          .select('id, program_workout_id, block_type, block_label, block_scheme, time_cap_seconds, block_notes, sort_order, expected_benchmark')
+          .select('id, program_workout_id, block_type, block_label, block_scheme, scheme_format, time_cap_seconds, block_notes, sort_order, expected_benchmark')
           .eq('program_workout_id', workoutId)
           .order('sort_order'),
       ]);
