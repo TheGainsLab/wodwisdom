@@ -278,6 +278,13 @@ function classifyLift(movement: string): string {
 }
 
 const STRENGTH_CYCLE_DAYS = 90;
+// Longitudinal windows for the Strength/Skills stats (founder request,
+// 2026-10-01): cycle stays the default coaching frame; Year/All show the
+// long arc. Cutoffs apply client-side over the loaded logs (currently the
+// latest 200), so "All" is bounded by that fetch.
+type StatsWindow = 'cycle' | 'year' | 'all';
+const WINDOW_DAYS: Record<StatsWindow, number> = { cycle: STRENGTH_CYCLE_DAYS, year: 365, all: 36500 };
+const WINDOW_LABELS: Record<StatsWindow, string> = { cycle: '90 days', year: '1 year', all: 'all time' };
 const LB_PER_KG = 2.20462;
 const toLbs = (weight: number, unit: string): number =>
   unit === 'kg' ? weight * LB_PER_KG : weight;
@@ -367,7 +374,6 @@ function classifySkill(movement: string): string {
   return 'other_skills';
 }
 
-const SKILLS_CYCLE_DAYS = 90;
 
 function getMetconTypeLabel(text: string): string {
   const t = text.toUpperCase();
@@ -561,6 +567,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [bodyweightKg, setBodyweightKg] = useState<number | null>(null);
   const [competitionAthleteId, setCompetitionAthleteId] = useState<string | null>(null);
   const [skillsSearch, setSkillsSearch] = useState('');
+  const [statsWindow, setStatsWindow] = useState<StatsWindow>('cycle');
   const [expandedSkillFamilies, setExpandedSkillFamilies] = useState<Set<string>>(new Set());
   const [accessorySearch, setAccessorySearch] = useState('');
   const [accessorySort, setAccessorySort] = useState<'weight' | 'date'>('date');
@@ -1184,6 +1191,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       trainingDays: number;
       totalSets: number;
       totalReps: number;
+      perSessionE1rm: Array<{ date: string; lbs: number }>;
       cycleBest: { weight: number; unit: string; lbs: number; reps: number | null; date: string } | null;
       totalTonnageLbs: number;
       // One bar per training day for the within-card chart: top set that day.
@@ -1192,7 +1200,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
     const cutoff = new Date();
     cutoff.setHours(0, 0, 0, 0);
-    cutoff.setDate(cutoff.getDate() - STRENGTH_CYCLE_DAYS);
+    cutoff.setDate(cutoff.getDate() - WINDOW_DAYS[statsWindow]);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
 
     const map = new Map<string, LiftGroupData>();
@@ -1201,7 +1209,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         config: cfg,
         entries: [],
         trainingDays: 0,
-        totalSets: 0, totalReps: 0,
+        totalSets: 0, totalReps: 0, perSessionE1rm: [],
         cycleBest: null,
         totalTonnageLbs: 0,
         perSessionTopSet: [],
@@ -1232,6 +1240,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
       let runMax = 0;
       const prIds = new Set<string>();
+      const perDayE1 = new Map<string, number>();
       for (const e of chrono) {
         days.add(e.workout_date);
         if (e.weight == null || e.weight <= 0) continue;
@@ -1240,6 +1249,10 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         if (lbs > bestLbs) { bestLbs = lbs; best = { weight: e.weight, unit: e.weight_unit, lbs, reps: e.reps ?? null, date: e.workout_date }; }
         if (lbs > runMax) { runMax = lbs; prIds.add(e.id); }
         if (e.reps != null && e.reps > 0) { tonnage += lbs * e.reps; totalReps += e.reps; }
+        // Estimated 1RM (Epley), the motion metric: 195x5 is ~227.
+        // Reps capped at 15 — the formula degrades into fiction above that.
+        const e1 = e.reps != null && e.reps > 1 ? lbs * (1 + Math.min(e.reps, 15) / 30) : lbs;
+        if (e1 > (perDayE1.get(e.workout_date) ?? 0)) perDayE1.set(e.workout_date, e1);
         const existing = perDay.get(e.workout_date);
         if (!existing || lbs > existing.lbs) {
           perDay.set(e.workout_date, { weight: e.weight, unit: e.weight_unit, lbs });
@@ -1255,10 +1268,13 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       data.perSessionTopSet = [...perDay.entries()]
         .map(([date, v]) => ({ date, ...v }))
         .sort((a, b) => a.date.localeCompare(b.date));
+      data.perSessionE1rm = [...perDayE1.entries()]
+        .map(([date, lbs]) => ({ date, lbs }))
+        .sort((a, b) => a.date.localeCompare(b.date));
     }
 
     return map;
-  }, [allEntries, blockTypeMap]);
+  }, [allEntries, blockTypeMap, statsWindow]);
 
   // Metcon blocks flattened with their workout_date — fed into the new
   // MetconsTab for stats, charts, heatmap, and history list.
@@ -1493,7 +1509,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
 
     const cutoff = new Date();
     cutoff.setHours(0, 0, 0, 0);
-    cutoff.setDate(cutoff.getDate() - SKILLS_CYCLE_DAYS);
+    cutoff.setDate(cutoff.getDate() - WINDOW_DAYS[statsWindow]);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
 
     const map = new Map<string, SkillFamilyData>();
@@ -1553,7 +1569,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     }
 
     return map;
-  }, [allEntries, blockTypeMap]);
+  }, [allEntries, blockTypeMap, statsWindow]);
 
   // Volume per family (total sets in cycle) for the overview chart at top.
   // No top-set-equivalent chart — reps vs seconds across families aren't
@@ -2194,6 +2210,14 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   onChange={e => setStrengthSearch(e.target.value)}
                 />
 
+                <div className="source-toggle" style={{ margin: '10px 0 0' }}>
+                  {(['cycle', 'year', 'all'] as const).map(w => (
+                    <button key={w} className={'source-btn ' + (statsWindow === w ? 'active' : '')} onClick={() => setStatsWindow(w)}>
+                      {w === 'cycle' ? 'Cycle' : w === 'year' ? 'Year' : 'All'}
+                    </button>
+                  ))}
+                </div>
+
                 {/* Overview: tonnage + top-set bars across all lift groups (90 days). */}
                 {(() => {
                   const { volume, topSet } = strengthOverview;
@@ -2210,7 +2234,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                     <div style={{ marginTop: 12, marginBottom: 16 }}>
                       {volume.length > 0 && (
                         <div style={section}>
-                          <div style={title}>Volume — 90 days (tonnage)</div>
+                          <div style={title}>Volume — {WINDOW_LABELS[statsWindow]} (tonnage)</div>
                           {volume.map(v => (
                             <div key={v.key} style={row}>
                               <span style={name}>{v.displayName}</span>
@@ -2224,7 +2248,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                       )}
                       {topSet.length > 0 && (
                         <div style={section}>
-                          <div style={title}>Top Set — 90 days</div>
+                          <div style={title}>Top Set — {WINDOW_LABELS[statsWindow]}</div>
                           {topSet.map(t => (
                             <div key={t.key} style={row}>
                               <span style={name}>{t.displayName}</span>
@@ -2280,8 +2304,8 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                     const pctOfOneRM = data.cycleBest && oneRMLbs > 0
                       ? Math.round((data.cycleBest.lbs / oneRMLbs) * 100)
                       : null;
-                    const trendValues = cfg.key !== 'other' && data.perSessionTopSet.length >= 2
-                      ? data.perSessionTopSet.map(s => s.lbs)
+                    const trendValues = cfg.key !== 'other' && data.perSessionE1rm.length >= 2
+                      ? data.perSessionE1rm.map(s => s.lbs)
                       : null;
                     return (
                       <div key={cfg.key} className="tl-movement-card" style={{ padding: 0 }}>
@@ -2308,7 +2332,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                             {data.totalReps > 0 && <> · {data.totalReps} reps</>}
                             {oneRM != null && <> · {oneRMLabel} {oneRM}{profileUnits}</>}
                             {data.cycleBest && (
-                              <> · Cycle best {data.cycleBest.weight}{data.cycleBest.unit}
+                              <> · {statsWindow === 'cycle' ? 'Cycle best' : 'Best'} {data.cycleBest.weight}{data.cycleBest.unit}
                                 {data.cycleBest.reps != null && <> x{data.cycleBest.reps}</>}
                                 {pctOfOneRM != null && <> ({pctOfOneRM}% of 1RM)</>}
                               </>
@@ -2319,7 +2343,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                         {expanded && (
                           <div style={{ padding: '0 12px 12px' }}>
                             {/* Per-session top-set chart. Skipped for Other Strength (mixed-axis movements). */}
-                            {cfg.key !== 'other' && data.perSessionTopSet.length > 0 && (() => {
+                            {cfg.key !== 'other' && data.perSessionTopSet.length >= 2 && (() => {
                               const maxLbs = data.perSessionTopSet.reduce((m, s) => Math.max(m, s.lbs), 0);
                               const first = data.perSessionTopSet[0];
                               const last = data.perSessionTopSet[data.perSessionTopSet.length - 1];
@@ -2335,7 +2359,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                         key={i}
                                         title={`${s.date}: ${s.weight}${s.unit}`}
                                         style={{
-                                          flex: 1, minWidth: 4,
+                                          flex: 1, minWidth: 4, maxWidth: 40,
                                           height: `${maxLbs > 0 ? Math.max((s.lbs / maxLbs) * 100, 4) : 4}%`,
                                           background: 'var(--accent)', borderRadius: 2,
                                         }}
@@ -2345,6 +2369,46 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 10, color: 'var(--text-muted)' }}>
                                     <span>{fmtAxis(first.date)}</span>
                                     <span>{fmtAxis(last.date)}</span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
+                            {/* Estimated-1RM trend (Epley from each session's best set) —
+                                the motion metric; needs two sessions to be a trend. */}
+                            {cfg.key !== 'other' && data.perSessionE1rm.length >= 2 && (() => {
+                              const pts = data.perSessionE1rm;
+                              const maxE1 = pts.reduce((m, s) => Math.max(m, s.lbs), 0);
+                              const toDisplay = (lbs: number) => Math.round(profileUnits === 'kg' ? lbs / 2.20462 : lbs);
+                              const fmtAxis = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                              const latest = pts[pts.length - 1];
+                              return (
+                                <div style={{ padding: 10, background: 'var(--surface2)', borderRadius: 6, marginTop: 8 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                      Estimated 1RM per session
+                                    </div>
+                                    <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'JetBrains Mono' }}>
+                                      best {toDisplay(maxE1)}{profileUnits} · latest {toDisplay(latest.lbs)}{profileUnits}
+                                    </div>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 80 }}>
+                                    {pts.map((s, i) => (
+                                      <div
+                                        key={i}
+                                        title={`${s.date}: ~${toDisplay(s.lbs)}${profileUnits}`}
+                                        style={{
+                                          flex: 1, minWidth: 4, maxWidth: 40,
+                                          height: `${maxE1 > 0 ? Math.max((s.lbs / maxE1) * 100, 4) : 4}%`,
+                                          background: s.lbs >= maxE1 ? 'var(--accent)' : 'var(--accent-glow, rgba(255,58,58,.45))',
+                                          borderRadius: 2,
+                                        }}
+                                      />
+                                    ))}
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 10, color: 'var(--text-muted)' }}>
+                                    <span>{fmtAxis(pts[0].date)}</span>
+                                    <span>{fmtAxis(latest.date)}</span>
                                   </div>
                                 </div>
                               );
@@ -2408,6 +2472,14 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   onChange={e => setSkillsSearch(e.target.value)}
                 />
 
+                <div className="source-toggle" style={{ margin: '10px 0 0' }}>
+                  {(['cycle', 'year', 'all'] as const).map(w => (
+                    <button key={w} className={'source-btn ' + (statsWindow === w ? 'active' : '')} onClick={() => setStatsWindow(w)}>
+                      {w === 'cycle' ? 'Cycle' : w === 'year' ? 'Year' : 'All'}
+                    </button>
+                  ))}
+                </div>
+
                 {/* Overview: reps and holds charted separately — different
                     units never share an axis. */}
                 {(() => {
@@ -2439,8 +2511,8 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                   };
                   return (
                     <div style={{ marginTop: 12, marginBottom: 16 }}>
-                      {chart('Volume — 90 days (reps)', reps)}
-                      {chart('Holds — 90 days (time)', holds)}
+                      {chart(`Volume — ${WINDOW_LABELS[statsWindow]} (reps)`, reps)}
+                      {chart(`Holds — ${WINDOW_LABELS[statsWindow]} (time)`, holds)}
                     </div>
                   );
                 })()}
