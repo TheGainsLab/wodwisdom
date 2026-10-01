@@ -263,8 +263,8 @@ export default function EngineFeaturePage() {
           <div className="lp-kicker">Personalization · Level 2</div>
           <h2 className="lp-h2">The AI learns. The program adjusts.</h2>
           <img
-            src="/images/engine-analytics-targets.webp"
-            alt="Targets vs Actual analytics — Sep 17 target 15.3 vs actual 16.3, then Sep 24 target 16.3 vs actual 18.4"
+            src="/images/analytics-targets-evolution.webp"
+            alt="Targets vs Actual — three Max Aerobic Power sessions with the target rising from 15.3 to 16.3 to 16.8 as the athlete beats each one"
             loading="lazy"
             className="feature-img"
             style={{ maxWidth: 420, margin: '16px 0 20px' }}
