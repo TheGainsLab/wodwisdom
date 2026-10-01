@@ -2507,7 +2507,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                             })()}
 
                             {/* Per-session best chart (reps or seconds depending on family). */}
-                            {cfg.metric !== 'none' && data.perSessionBest.length > 0 && (() => {
+                            {cfg.metric !== 'none' && data.perSessionBest.length >= 2 && (() => {
                               const maxVal = data.perSessionBest.reduce((m, s) => Math.max(m, s.value), 0);
                               const unit = cfg.metric === 'seconds' ? 's' : ' reps';
                               const fmtAxis = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -2524,7 +2524,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                         key={i}
                                         title={`${s.date}: ${s.value}${unit}`}
                                         style={{
-                                          flex: 1, minWidth: 4,
+                                          flex: 1, minWidth: 4, maxWidth: 40,
                                           height: `${maxVal > 0 ? Math.max((s.value / maxVal) * 100, 4) : 4}%`,
                                           background: 'var(--accent)', borderRadius: 2,
                                         }}
