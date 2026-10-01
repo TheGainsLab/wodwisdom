@@ -53,12 +53,22 @@ export interface ProgramMovementV2 {
   sort_order: number;
 }
 
+/** Typed workout format (program_blocks_v2.scheme_format) — only the
+ *  fields the frontend consumes. Null on ingested/legacy blocks. */
+export interface SchemeFormatV2 {
+  format: string;
+  minutes?: number | null;
+  rounds?: number | null;
+  stations?: number[][] | null;
+}
+
 export interface ProgramBlockV2 {
   id: string;
   program_workout_id: string;
   block_type: string;
   block_label: string | null;
   block_scheme: string | null;
+  scheme_format?: SchemeFormatV2 | null;
   time_cap_seconds: number | null;
   block_notes: string | null;
   sort_order: number;
@@ -481,7 +491,7 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
         workoutIds,
         (batch) => supabase
           .from('program_blocks_v2')
-          .select('id, program_workout_id, block_type, block_label, block_scheme, time_cap_seconds, block_notes, sort_order, expected_benchmark')
+          .select('id, program_workout_id, block_type, block_label, block_scheme, scheme_format, time_cap_seconds, block_notes, sort_order, expected_benchmark')
           .in('program_workout_id', batch)
           .order('sort_order'),
       ) : Promise.resolve([]),
