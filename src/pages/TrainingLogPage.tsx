@@ -1183,6 +1183,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       entries: Row[];
       trainingDays: number;
       totalSets: number;
+      totalReps: number;
       cycleBest: { weight: number; unit: string; lbs: number; reps: number | null; date: string } | null;
       totalTonnageLbs: number;
       // One bar per training day for the within-card chart: top set that day.
@@ -1200,7 +1201,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         config: cfg,
         entries: [],
         trainingDays: 0,
-        totalSets: 0,
+        totalSets: 0, totalReps: 0,
         cycleBest: null,
         totalTonnageLbs: 0,
         perSessionTopSet: [],
@@ -1217,6 +1218,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
     for (const data of map.values()) {
       const days = new Set<string>();
       let totalSets = 0;
+      let totalReps = 0;
       let bestLbs = 0;
       let best: { weight: number; unit: string; lbs: number; reps: number | null; date: string } | null = null;
       let tonnage = 0;
@@ -1237,7 +1239,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         const lbs = toLbs(e.weight, e.weight_unit);
         if (lbs > bestLbs) { bestLbs = lbs; best = { weight: e.weight, unit: e.weight_unit, lbs, reps: e.reps ?? null, date: e.workout_date }; }
         if (lbs > runMax) { runMax = lbs; prIds.add(e.id); }
-        if (e.reps != null && e.reps > 0) tonnage += lbs * e.reps;
+        if (e.reps != null && e.reps > 0) { tonnage += lbs * e.reps; totalReps += e.reps; }
         const existing = perDay.get(e.workout_date);
         if (!existing || lbs > existing.lbs) {
           perDay.set(e.workout_date, { weight: e.weight, unit: e.weight_unit, lbs });
@@ -1247,6 +1249,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       data.entries = data.entries.map(e => ({ ...e, isPR: prIds.has(e.id) }));
       data.trainingDays = days.size;
       data.totalSets = totalSets;
+      data.totalReps = totalReps;
       data.cycleBest = best;
       data.totalTonnageLbs = tonnage;
       data.perSessionTopSet = [...perDay.entries()]
@@ -2302,6 +2305,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                             {data.totalSets} set{data.totalSets !== 1 ? 's' : ''}
+                            {data.totalReps > 0 && <> · {data.totalReps} reps</>}
                             {oneRM != null && <> · {oneRMLabel} {oneRM}{profileUnits}</>}
                             {data.cycleBest && (
                               <> · Cycle best {data.cycleBest.weight}{data.cycleBest.unit}
