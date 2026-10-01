@@ -285,12 +285,20 @@ export function validateBlockProposal(
 export function reconcileReps(
   reps: number | null | undefined,
   repScheme: number[] | null | undefined,
+  sets?: number | null,
 ): { reps: number | null; rep_scheme: number[] | null } {
   if (!Array.isArray(repScheme) || repScheme.length === 0) {
     return { reps: reps ?? null, rep_scheme: null };
   }
   const cleaned = repScheme.filter((n) => Number.isFinite(n) && n > 0 && n <= 1000);
   if (cleaned.length === 0) return { reps: reps ?? null, rep_scheme: null };
+  // A one-element scheme next to a real set count ([3] with sets=4) is the
+  // degenerate shape that under-logged Rx (2,059 rows found 2026-10-01):
+  // collapse it to plain reps. A lone element WITHOUT sets stays as-is —
+  // metcon convention uses [10] for one AMRAP round, [100] for single-pass.
+  if (cleaned.length === 1 && typeof sets === 'number' && sets > 1) {
+    return { reps: cleaned[0], rep_scheme: null };
+  }
   return { reps: cleaned.reduce((a, b) => a + b, 0), rep_scheme: cleaned };
 }
 
@@ -331,7 +339,7 @@ export async function applyBlockProposal(
   if (dErr) throw new Error(`movement delete failed: ${dErr.message}`);
 
   const inserts = (proposal.movements ?? []).map((m, i) => {
-    const { reps, rep_scheme } = reconcileReps(m.reps, m.rep_scheme);
+    const { reps, rep_scheme } = reconcileReps(m.reps, m.rep_scheme, m.sets);
     const cal = reconcileScheme(m.calories, m.cal_scheme, 500);
     const dist = reconcileScheme(m.distance, m.distance_scheme, 50000);
     return {

@@ -47,6 +47,7 @@ function roundToPlateMath(w: number | null, unit: string | null): number | null 
 function reconcileReps(
   reps: number | null | undefined,
   repScheme: number[] | null | undefined,
+  sets?: number | null,
 ): { reps: number | null; rep_scheme: number[] | null } {
   if (!Array.isArray(repScheme) || repScheme.length === 0) {
     return { reps: reps ?? null, rep_scheme: null };
@@ -54,6 +55,13 @@ function reconcileReps(
   const cleaned = repScheme.filter((n) => Number.isFinite(n) && n > 0 && n <= 1000);
   if (cleaned.length === 0) {
     return { reps: reps ?? null, rep_scheme: null };
+  }
+  // A one-element scheme next to a real set count ([3] with sets=4) is the
+  // degenerate shape that under-logged Rx (2,059 rows found 2026-10-01):
+  // collapse it to plain reps. A lone element WITHOUT sets stays as-is —
+  // metcon convention uses [10] for one AMRAP round, [100] for single-pass.
+  if (cleaned.length === 1 && typeof sets === 'number' && sets > 1) {
+    return { reps: cleaned[0], rep_scheme: null };
   }
   const sum = cleaned.reduce((a, b) => a + b, 0);
   return { reps: sum, rep_scheme: cleaned };
@@ -298,7 +306,7 @@ export async function saveProgramV3(
           if (!blockId) continue;
           for (let m = 0; m < b.movements.length; m++) {
             const mv = b.movements[m];
-            const { reps, rep_scheme } = reconcileReps(mv.reps, mv.rep_scheme);
+            const { reps, rep_scheme } = reconcileReps(mv.reps, mv.rep_scheme, mv.sets);
             const cal = reconcileScheme(mv.calories, mv.cal_scheme, 500);
             const dist = reconcileScheme(mv.distance, mv.distance_scheme, 50000);
             movementInserts.push({

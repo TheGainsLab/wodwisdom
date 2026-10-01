@@ -107,16 +107,23 @@ export interface BlockProposal {
   movements: BlockProposalMovement[];
 }
 
-/** Mirror save-program-v3's reconcileReps: rep_scheme present → reps = sum. */
+/** Mirror save-program-v3's reconcileReps: rep_scheme present → reps = sum.
+ *  A one-element scheme next to sets>1 collapses to plain reps (the shape
+ *  that under-logged Rx); a lone element without sets stays — metcon
+ *  convention uses [10] for one AMRAP round. */
 export function reconcileReps(
   reps: number | null | undefined,
   repScheme: number[] | null | undefined,
+  sets?: number | null,
 ): { reps: number | null; rep_scheme: number[] | null } {
   if (!Array.isArray(repScheme) || repScheme.length === 0) {
     return { reps: reps ?? null, rep_scheme: null };
   }
   const cleaned = repScheme.filter((n) => Number.isFinite(n) && n > 0 && n <= 1000);
   if (cleaned.length === 0) return { reps: reps ?? null, rep_scheme: null };
+  if (cleaned.length === 1 && typeof sets === 'number' && sets > 1) {
+    return { reps: cleaned[0], rep_scheme: null };
+  }
   return { reps: cleaned.reduce((a, b) => a + b, 0), rep_scheme: cleaned };
 }
 
