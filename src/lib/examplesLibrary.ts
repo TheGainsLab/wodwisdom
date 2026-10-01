@@ -156,11 +156,11 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
           'This is a real conversation: the athlete’s rower died, so they told the coach. It reasoned through the swap — same calorie target, same stimulus — showed exactly what would change, and one tap on Apply rewrote the program. It even warned the bike would feel harder. That’s the difference between a program you follow and a program that works with you.',
       },
       {
-        image: '/images/programming-months.webp',
-        alt: 'Program overview — months and weeks of an ongoing personalized program',
-        title: 'And it keeps going',
+        image: '/images/programming-logged-metcon.webp',
+        alt: 'A logged Fran — 3:32 Rx converted to 3.88 W/kg, 99th percentile, short time domain',
+        title: 'Your score becomes intelligence',
         caption:
-          'Not a PDF you buy once — an ongoing program. Every month is generated from the last: what you logged, what got easier, what you told the coach. Month after month.',
+          'This is what logging a workout actually does here. A 3:32 Fran isn’t stored as a diary entry — it’s converted: 3.88 watts per kilogram, 99th percentile, short time domain. That read feeds your analytics, your coach’s answers, and the next month of programming. Most apps save your score. This one uses it.',
       },
     ],
   },
@@ -234,6 +234,14 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
   },
   // "Inside a training day" gallery entry retired — the walkthrough's first
   // step IS a full day, captured newer and cleaner.
+  {
+    tab: 'programming',
+    image: '/images/programming-logged-amrap.webp',
+    alt: 'A logged Monday AMRAP — 9+3 Rx at the 45th percentile of the Open field',
+    title: 'An honest number',
+    caption:
+      'Not every day is a PR. A Monday AMRAP, 9+3 Rx — and an honest read: 45th percentile of the Open field for this workout. The system measures, it doesn’t flatter. That honesty is what makes the 99th-percentile days mean something.',
+  },
   {
     tab: 'programming',
     image: '/images/power-duration-curve.png',

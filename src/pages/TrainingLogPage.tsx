@@ -1521,18 +1521,21 @@ export default function TrainingLogPage({ session }: { session: Session }) {
         days.add(e.workout_date);
         // One row can carry several sets ("3s x9" = 3 sets of 9), so a raw
         // entry count undercounts — sets and volume multiply through.
+        // Reps: the block logger writes per-set `reps` (Rx copies the
+        // prescription); the older flow wrote `reps_completed`. Read both.
         const sets = e.sets != null && e.sets > 0 ? e.sets : 1;
-        const reps = e.reps_completed ?? 0;
+        const reps = e.reps_completed ?? e.reps ?? 0;
         const hold = e.hold_seconds ?? 0;
         totalSets += sets;
         totalReps += sets * reps;
         totalHold += sets * hold;
         if (reps > bestReps) bestReps = reps;
         if (hold > bestHold) bestHold = hold;
-        const sessionVal = data.config.metric === 'seconds' ? hold : reps;
+        // Session TOTAL volume (all sets that day), not best set — for
+        // skills, accumulated quality practice is the trend that matters.
+        const sessionVal = data.config.metric === 'seconds' ? sets * hold : sets * reps;
         if (sessionVal > 0) {
-          const prev = perDay.get(e.workout_date) ?? 0;
-          if (sessionVal > prev) perDay.set(e.workout_date, sessionVal);
+          perDay.set(e.workout_date, (perDay.get(e.workout_date) ?? 0) + sessionVal);
         }
       }
       data.trainingDays = days.size;
@@ -2513,7 +2516,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                               return (
                                 <div style={{ padding: 10, background: 'var(--surface2)', borderRadius: 6 }}>
                                   <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-                                    {cfg.metric === 'seconds' ? 'Longest hold per session' : 'Best set per session'}
+                                    {cfg.metric === 'seconds' ? 'Hold time per session' : 'Reps per session'}
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 80 }}>
                                     {data.perSessionBest.map((s, i) => (
@@ -2561,15 +2564,22 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                     <span className="tl-set-date">{fmtShortDate(e.workout_date)}</span>
                                     <span style={{ fontSize: 12, color: 'var(--text-dim)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatMovementName(e.movement)}</span>
                                     <span className="tl-set-value">
-                                      {e.sets != null || e.reps_completed != null || e.hold_seconds != null ? (
-                                        <>
-                                          {e.sets != null && `${e.sets}s`}
-                                          {e.reps_completed != null && ` x${e.reps_completed}`}
-                                          {e.hold_seconds != null && ` ${e.hold_seconds}s`}
-                                        </>
-                                      ) : (
-                                        <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Practiced</span>
-                                      )}
+                                      {(() => {
+                                        const effReps = e.reps_completed ?? e.reps;
+                                        const nSets = e.sets != null && e.sets > 0 ? e.sets : null;
+                                        if (effReps != null && effReps > 0) {
+                                          return nSets != null && nSets > 1
+                                            ? `${nSets}×${effReps} · ${nSets * effReps} reps`
+                                            : `${effReps} reps`;
+                                        }
+                                        if (e.hold_seconds != null && e.hold_seconds > 0) {
+                                          return nSets != null && nSets > 1
+                                            ? `${nSets}×${e.hold_seconds}s · ${nSets * e.hold_seconds}s total`
+                                            : `${e.hold_seconds}s hold`;
+                                        }
+                                        if (nSets != null) return `${nSets} set${nSets !== 1 ? 's' : ''}`;
+                                        return <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Practiced</span>;
+                                      })()}
                                     </span>
                                     {e.rpe != null && <span className="tl-set-detail">RPE {e.rpe}</span>}
                                     {e.quality && <span className="tl-set-detail">{e.quality}</span>}
@@ -2968,9 +2978,10 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                           {isSkills && blockEntries.length > 0 && (
                                             <div style={{ paddingLeft: 8, marginTop: 8, fontSize: 13, color: 'var(--text-dim)' }}>
                                               {blockEntries.map((entry, ei) => {
+                                                const effReps = entry.reps_completed ?? entry.reps;
                                                 const parts: string[] = [];
-                                                if (entry.sets != null) parts.push(`${entry.sets} sets`);
-                                                if (entry.reps_completed != null) parts.push(`x${entry.reps_completed}`);
+                                                if (entry.sets != null) parts.push(`${entry.sets} set${entry.sets !== 1 ? 's' : ''}`);
+                                                if (effReps != null) parts.push(`x${effReps}`);
                                                 if (entry.hold_seconds != null) parts.push(`${entry.hold_seconds}s hold`);
                                                 const detail = parts.length > 0 ? parts.join(' ') : 'practiced';
                                                 return (
