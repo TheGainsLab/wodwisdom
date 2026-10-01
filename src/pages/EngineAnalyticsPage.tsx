@@ -467,41 +467,73 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
         <hr className="engine-divider" />
 
         {/* Energy System Ratios + Pace Stats */}
-        <h3 className="engine-header">Energy System Ratios</h3>
+        <h3 className="engine-header">Energy System Paces</h3>
         {availableModalities.length > 0 ? (
           <>
             <PillSelector items={availableModalities} selected={selModality} onSelect={setSelModality} label="Select Modality" />
-            {selModality && (summaryRatios.glycolytic !== null || summaryRatios.aerobic !== null || summaryRatios.systems !== null) && (
-              <div className="engine-card">
-                <div className="ea-ratio-bars">
-                  {summaryRatios.glycolytic !== null && (
+            {/* Pace bars share ONE denominator (the time trial) and scale to
+                the tallest bar, with the 1.00× baseline drawn as a reference
+                — proportions finally match the numbers (founder revision,
+                2026-10-02). Systems is a different denominator, so it is NOT
+                a bar: it gets the hero box below. */}
+            {selModality && (summaryRatios.glycolytic !== null || summaryRatios.aerobic !== null) && (() => {
+              const maxRatio = Math.max(summaryRatios.glycolytic ?? 0, summaryRatios.aerobic ?? 0, 1);
+              const h = (v: number) => `${Math.max((v / maxRatio) * 100, 3)}%`;
+              return (
+                <div className="engine-card">
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', marginBottom: 4 }}>
+                    Each bar is a multiple of your time-trial pace.
+                  </div>
+                  <div className="ea-ratio-bars">
                     <div className="ea-ratio-col">
-                      <div className="ea-ratio-value">{summaryRatios.glycolytic.toFixed(2)}</div>
+                      <div className="ea-ratio-value" style={{ color: 'var(--text-dim)' }}>1.00&times;</div>
                       <div className="ea-ratio-bar-bg">
-                        <div className="ea-ratio-bar-fill" style={{ height: `${Math.min(summaryRatios.glycolytic * 100, 100)}%` }} />
+                        <div className="ea-ratio-bar-fill" style={{ height: h(1), background: 'var(--surface)', border: '1px dashed var(--text-muted)', boxSizing: 'border-box' }} />
                       </div>
-                      <div className="ea-ratio-label">Glycolytic</div>
+                      <div className="ea-ratio-label">Time Trial</div>
+                      <div className="ea-ratio-sub">your baseline</div>
                     </div>
-                  )}
-                  {summaryRatios.aerobic !== null && (
-                    <div className="ea-ratio-col">
-                      <div className="ea-ratio-value">{summaryRatios.aerobic.toFixed(2)}</div>
-                      <div className="ea-ratio-bar-bg">
-                        <div className="ea-ratio-bar-fill" style={{ height: `${Math.min(summaryRatios.aerobic * 100, 100)}%` }} />
+                    {summaryRatios.aerobic !== null && (
+                      <div className="ea-ratio-col">
+                        <div className="ea-ratio-value">{summaryRatios.aerobic.toFixed(2)}&times;</div>
+                        <div className="ea-ratio-bar-bg">
+                          <div className="ea-ratio-bar-fill" style={{ height: h(summaryRatios.aerobic) }} />
+                        </div>
+                        <div className="ea-ratio-label">Aerobic</div>
+                        <div className="ea-ratio-sub">max aerobic vs time trial</div>
                       </div>
-                      <div className="ea-ratio-label">Aerobic</div>
-                    </div>
-                  )}
-                  {summaryRatios.systems !== null && (
-                    <div className="ea-ratio-col">
-                      <div className="ea-ratio-value">{summaryRatios.systems.toFixed(2)}</div>
-                      <div className="ea-ratio-bar-bg">
-                        <div className="ea-ratio-bar-fill" style={{ height: `${Math.min(summaryRatios.systems * 100, 100)}%` }} />
+                    )}
+                    {summaryRatios.glycolytic !== null && (
+                      <div className="ea-ratio-col">
+                        <div className="ea-ratio-value">{summaryRatios.glycolytic.toFixed(2)}&times;</div>
+                        <div className="ea-ratio-bar-bg">
+                          <div className="ea-ratio-bar-fill" style={{ height: h(summaryRatios.glycolytic) }} />
+                        </div>
+                        <div className="ea-ratio-label">Glycolytic</div>
+                        <div className="ea-ratio-sub">anaerobic vs time trial</div>
                       </div>
-                      <div className="ea-ratio-label">Systems</div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
+              );
+            })()}
+            {/* The headline number — a concept, not a bar: the gap between
+                the two engines. Immune to time-trial re-baselines by
+                construction (both terms share the denominator). */}
+            {selModality && summaryRatios.systems !== null && (
+              <div className="engine-card" style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--text)' }}>
+                  Energy Systems Ratio
+                </div>
+                <div className="engine-stat-value" style={{ fontSize: 30, margin: '6px 0' }}>
+                  {summaryRatios.systems.toFixed(2)}&times;
+                </div>
+                <p style={{ fontSize: 12.5, lineHeight: 1.6, color: 'var(--text-dim)', maxWidth: '46ch', margin: '0 auto' }}>
+                  Your anaerobic pace against your max aerobic pace — the{' '}
+                  <strong style={{ color: 'var(--text)' }}>glycolytic reserve</strong>: the gap between what you can
+                  produce in a burst and what you can sustain. The program trains both ends, and this number is how
+                  you watch them move relative to each other.
+                </p>
               </div>
             )}
             {selModality && summaryRatios.glycolytic === null && summaryRatios.aerobic === null && summaryRatios.systems === null && (
