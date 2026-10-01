@@ -207,10 +207,10 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
       },
       {
         image: '/images/engine-analytics-overview.webp',
-        alt: 'Analytics overview — 9 sessions at 109% average performance, sessions split evenly across day types, energy system ratios, and peak vs average pace',
+        alt: 'Analytics overview — 12 sessions at 108% average performance, five day types from anaerobic to threshold, and energy system paces with the 2.56× ratio',
         title: 'Where it all adds up',
         caption:
-          'Nine sessions in, this athlete is averaging 109% of their targets at RPE 7.6 — working slightly above prescription without redlining. Look at the day-type split: two sessions each across anaerobic, endurance, interval, and max aerobic power. The whole spectrum, trained evenly — that’s conditioning, not cardio.',
+          'Twelve sessions in, this athlete is averaging 108% of their targets at RPE 7.5 — working slightly above prescription without redlining. Five day types on the board, anaerobic through threshold, and the rollup ends in the energy-system read: pace bars against the time-trial baseline, and the glycolytic reserve. A season of Engine work, in one scroll.',
       },
     ],
   },
