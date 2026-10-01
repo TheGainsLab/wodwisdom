@@ -7,15 +7,16 @@
 // public/images/. Coach answers are NOT here — /qa is their home, and the
 // Examples page links to it as a fourth tab.
 
-export type ExamplesTab = 'evaluations' | 'programming' | 'engine';
+export type ExamplesTab = 'evaluations' | 'programming' | 'engine' | 'analytics';
 
 export const EXAMPLES_TABS: Record<ExamplesTab, string> = {
   evaluations: 'Evaluations',
   programming: 'Programming',
   engine: 'Engine',
+  analytics: 'Analytics',
 };
 
-export const EXAMPLES_TAB_ORDER: ExamplesTab[] = ['evaluations', 'programming', 'engine'];
+export const EXAMPLES_TAB_ORDER: ExamplesTab[] = ['evaluations', 'programming', 'engine', 'analytics'];
 
 export interface ExampleEntry {
   tab: ExamplesTab;
@@ -155,13 +156,6 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         caption:
           'This is a real conversation: the athlete’s rower died, so they told the coach. It reasoned through the swap — same calorie target, same stimulus — showed exactly what would change, and one tap on Apply rewrote the program. It even warned the bike would feel harder. That’s the difference between a program you follow and a program that works with you.',
       },
-      {
-        image: '/images/programming-logged-metcon.webp',
-        alt: 'A logged Fran — 3:32 Rx converted to 3.88 W/kg, 99th percentile, short time domain',
-        title: 'Your score becomes intelligence',
-        caption:
-          'This is what logging a workout actually does here. A 3:32 Fran isn’t stored as a diary entry — it’s converted: 3.88 watts per kilogram, 99th percentile, short time domain. That read feeds your analytics, your coach’s answers, and the next month of programming. Most apps save your score. This one uses it.',
-      },
     ],
   },
   engine: {
@@ -220,6 +214,48 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
       },
     ],
   },
+  analytics: {
+    title: 'One athlete’s training, as data',
+    intro:
+      'Most apps’ analytics describe your past — a reward screen after the work. Ours are the operating system: the numbers you see here are the same inputs the AI uses to write what comes next. Measured in watts, ranked against 15 million competition scores, honest when the day was ordinary, and fed straight back into the program.',
+    steps: [
+      {
+        image: '/images/programming-logged-metcon.webp',
+        alt: 'A logged Fran — 3:32 Rx converted to 3.88 W/kg, 99th percentile, short time domain',
+        title: 'A score becomes a measurement',
+        caption:
+          'It starts the moment you log. A 3:32 Fran isn’t stored as a diary entry — it’s converted into physics: 3.88 watts per kilogram, 99th percentile of the Open field, short time domain. Power is the common language that lets a sprint couplet and a 20-minute grinder sit on the same scale.',
+      },
+      {
+        image: '/images/analytics-power-duration.webp',
+        alt: 'Power vs Duration chart — every logged metcon as a bar from 3:12 to 17:45, one selected showing its full read and the athlete’s note',
+        title: 'Every workout lands on your curve',
+        caption:
+          'Each logged metcon becomes a point on your personal power-duration curve, short efforts to long. Tap any bar for the full read — and notice the athlete’s own note riding with the numbers: “it was hard.” The system keeps what you felt next to what you produced, because the coach reads both.',
+      },
+      {
+        image: '/images/programming-logged-amrap.webp',
+        alt: 'A logged Monday AMRAP — 9+3 Rx at the 45th percentile of the Open field',
+        title: 'Honest when it’s ordinary',
+        caption:
+          'Not every day is a PR, and the system says so: a Monday AMRAP at the 45th percentile. Capped scores and unmodelable workouts get no rank at all rather than a flattering guess. That honesty is what makes the 99th-percentile days mean something.',
+      },
+      {
+        image: '/images/engine-analytics-comparison.webp',
+        alt: 'Average pace comparison across day types — anaerobic 45.5, max aerobic power 17.3, endurance 11.5 cal/min',
+        title: 'Compared across stimuli',
+        caption:
+          'The same athlete, three energy systems: 45.5 cal/min on anaerobic days, 17.3 at max aerobic power, 11.5 on endurance. A 4× spread on the same machine — proof each day type demands something different, and each one is tracked on its own axis.',
+      },
+      {
+        image: '/images/engine-analytics-targets.webp',
+        alt: 'Targets vs Actual analytics — Sep 17 target 15.3 vs actual 16.3, then Sep 24 target 16.3 vs actual 18.4',
+        title: 'The data writes the program',
+        caption:
+          'This is the part no reward screen does. Sep 17: target 15.3, actual 16.3. Look at Sep 24 — the target is 16.3. The athlete’s own result became the next demand, and they beat that too. Your analytics aren’t a mirror; they’re the input. You produce, the program raises the bar.',
+      },
+    ],
+  },
 };
 
 export const EXAMPLE_ENTRIES: ExampleEntry[] = [
@@ -234,38 +270,4 @@ export const EXAMPLE_ENTRIES: ExampleEntry[] = [
   },
   // "Inside a training day" gallery entry retired — the walkthrough's first
   // step IS a full day, captured newer and cleaner.
-  {
-    tab: 'programming',
-    image: '/images/programming-logged-amrap.webp',
-    alt: 'A logged Monday AMRAP — 9+3 Rx at the 45th percentile of the Open field',
-    title: 'An honest number',
-    caption:
-      'Not every day is a PR. A Monday AMRAP, 9+3 Rx — and an honest read: 45th percentile of the Open field for this workout. The system measures, it doesn’t flatter. That honesty is what makes the 99th-percentile days mean something.',
-  },
-  {
-    tab: 'programming',
-    image: '/images/power-duration-curve.png',
-    alt: 'Metcon power analytics — average output and the power-duration curve across time domains',
-    title: 'Your metcons, as data',
-    caption:
-      'Every logged metcon feeds this: your average output and your power-duration curve across short, medium, and long time domains — the fitness picture the next month of programming is built from.',
-  },
-
-  // ── Engine ───────────────────────────────────────────────────────
-  {
-    tab: 'engine',
-    image: '/images/engine-analytics-targets.webp',
-    alt: 'Targets vs Actual analytics — Sep 17 target 15.3 vs actual 16.3, then Sep 24 target 16.3 vs actual 18.4',
-    title: 'Watch the system learn',
-    caption:
-      'Two Max Aerobic Power sessions, one week apart. Sep 17: target 15.3, actual 16.3. Look at Sep 24 — the target is 16.3. The athlete’s own result became the next demand, and they beat that too. This is the loop: you produce, the program raises the bar.',
-  },
-  {
-    tab: 'engine',
-    image: '/images/engine-analytics-comparison.webp',
-    alt: 'Average pace comparison across day types — anaerobic 45.5, max aerobic power 17.3, endurance 11.5 cal/min',
-    title: 'Compare yourself across stimuli',
-    caption:
-      'Pick the day types and compare: this athlete holds 45.5 cal/min on anaerobic days, 17.3 at max aerobic power, 11.5 on endurance. A 4× spread on the same machine — proof each day type is asking for something genuinely different, and you can watch each one move.',
-  },
 ];
