@@ -234,13 +234,6 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
           'Each logged metcon becomes a point on your personal power-duration curve, short efforts to long. Tap any bar for the full read — and notice the athlete’s own note riding with the numbers: “it was hard.” The system keeps what you felt next to what you produced, because the coach reads both.',
       },
       {
-        image: '/images/programming-logged-amrap.webp',
-        alt: 'A logged Monday AMRAP — 9+3 Rx at the 45th percentile of the Open field',
-        title: 'Honest when it’s ordinary',
-        caption:
-          'Not every day is a PR, and the system says so: a Monday AMRAP at the 45th percentile. Capped scores and unmodelable workouts get no rank at all rather than a flattering guess. That honesty is what makes the 99th-percentile days mean something.',
-      },
-      {
         image: '/images/engine-analytics-comparison.webp',
         alt: 'Average pace comparison across day types — anaerobic 45.5, max aerobic power 17.3, endurance 11.5 cal/min',
         title: 'Compared across stimuli',
