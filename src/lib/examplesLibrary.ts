@@ -234,13 +234,6 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
           'Each logged metcon becomes a point on your personal power-duration curve, short efforts to long. Tap any bar for the full read — and notice the athlete’s own note riding with the numbers: “it was hard.” The system keeps what you felt next to what you produced, because the coach reads both.',
       },
       {
-        image: '/images/programming-logged-amrap.webp',
-        alt: 'A logged Monday AMRAP — 9+3 Rx at the 45th percentile of the Open field',
-        title: 'Honest when it’s ordinary',
-        caption:
-          'Not every day is a PR, and the system says so: a Monday AMRAP at the 45th percentile. Capped scores and unmodelable workouts get no rank at all rather than a flattering guess. That honesty is what makes the 99th-percentile days mean something.',
-      },
-      {
         image: '/images/engine-analytics-comparison.webp',
         alt: 'Average pace comparison across day types — anaerobic 45.5, max aerobic power 17.3, endurance 11.5 cal/min',
         title: 'Compared across stimuli',
@@ -248,11 +241,11 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
           'The same athlete, three energy systems: 45.5 cal/min on anaerobic days, 17.3 at max aerobic power, 11.5 on endurance. A 4× spread on the same machine — proof each day type demands something different, and each one is tracked on its own axis.',
       },
       {
-        image: '/images/engine-analytics-targets.webp',
-        alt: 'Targets vs Actual analytics — Sep 17 target 15.3 vs actual 16.3, then Sep 24 target 16.3 vs actual 18.4',
+        image: '/images/analytics-targets-evolution.webp',
+        alt: 'Targets vs Actual — three Max Aerobic Power sessions: targets 15.3, 16.3, 16.8 against actuals 16.3, 18.4, 18.7',
         title: 'The data writes the program',
         caption:
-          'This is the part no reward screen does. Sep 17: target 15.3, actual 16.3. Look at Sep 24 — the target is 16.3. The athlete’s own result became the next demand, and they beat that too. Your analytics aren’t a mirror; they’re the input. You produce, the program raises the bar.',
+          'This is the part no reward screen does. Three Max Aerobic Power sessions: Sep 17 — target 15.3, actual 16.3. Sep 24 — the target is exactly that 16.3; the athlete posts 18.4. Sep 29 — the bar rises again to 16.8, beaten again at 18.7. Raised every time, and notice it didn’t naively chase the 18.4 breakout — the system sets demands it believes you can repeat. Your analytics aren’t a mirror; they’re the input.',
       },
     ],
   },
