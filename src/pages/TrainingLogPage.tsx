@@ -569,6 +569,10 @@ export default function TrainingLogPage({ session }: { session: Session }) {
   const [skillsSearch, setSkillsSearch] = useState('');
   const [statsWindow, setStatsWindow] = useState<StatsWindow>('cycle');
   const [expandedSkillFamilies, setExpandedSkillFamilies] = useState<Set<string>>(new Set());
+  // Skills ledger: per-day session lines expand to their raw set rows; the
+  // list caps at 20 session lines until "Show all" (founder call, 2026-10-02).
+  const [expandedSkillSessions, setExpandedSkillSessions] = useState<Set<string>>(new Set());
+  const [showAllSkillSessions, setShowAllSkillSessions] = useState<Set<string>>(new Set());
   const [accessorySearch, setAccessorySearch] = useState('');
   const [accessorySort, setAccessorySort] = useState<'weight' | 'date'>('date');
 
@@ -2414,9 +2418,21 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                               );
                             })()}
 
-                            {/* Session list (newest first). */}
+                            {/* Session ledger (newest first): one line per day+movement
+                                — "4×4 · 16 reps" — expanding to the raw set rows (with
+                                editing) on tap. Latest 20 lines, then Show all. */}
                             <div style={{ marginTop: 8 }}>
-                              {sessionsDesc.map((e, i) => (
+                              {(() => {
+                                type SessionGroup = { date: string; movement: string; entries: typeof sessionsDesc };
+                                const groups: SessionGroup[] = [];
+                                for (const e of sessionsDesc) {
+                                  const lastG = groups[groups.length - 1];
+                                  if (lastG && lastG.date === e.workout_date && lastG.movement === e.movement) lastG.entries.push(e);
+                                  else groups.push({ date: e.workout_date, movement: e.movement, entries: [e] });
+                                }
+                                const showAll = showAllSkillSessions.has(cfg.key);
+                                const visibleGroups = showAll ? groups : groups.slice(0, 20);
+                                const renderEntryRow = (e: typeof sessionsDesc[number], i: number) => (
                                 editingEntryId === e.id ? (
                                   <div key={i} className="tl-set-row" style={{ flexWrap: 'wrap', gap: 6 }}>
                                     <input type="number" value={editFields.weight} onChange={ev => setEditFields(f => ({ ...f, weight: ev.target.value }))} placeholder="Weight" style={{ width: 70, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
@@ -2444,7 +2460,66 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                     </button>
                                   </div>
                                 )
-                              ))}
+                              );
+                                return (
+                                  <>
+                                    {visibleGroups.map((g) => {
+                                      const gkey = `${cfg.key}|${g.date}|${g.movement}`;
+                                      const gExpanded = expandedSkillSessions.has(gkey) || g.entries.some(e => e.id === editingEntryId);
+                                      const effVals = g.entries.map(e => e.reps_completed ?? e.reps);
+                                      const setCounts = g.entries.map(e => (e.sets != null && e.sets > 0 ? e.sets : 1));
+                                      const totSets = setCounts.reduce((a2, b2) => a2 + b2, 0);
+                                      const totReps = g.entries.reduce((sum, e, i2) => sum + setCounts[i2] * ((e.reps_completed ?? e.reps) ?? 0), 0);
+                                      const totHold = g.entries.reduce((sum, e, i2) => sum + setCounts[i2] * (e.hold_seconds ?? 0), 0);
+                                      const uniformReps = totReps > 0 && effVals.every(v => v != null && v === effVals[0]) ? effVals[0] : null;
+                                      const rpeMax = g.entries.reduce((m, e) => (e.rpe != null && e.rpe > m ? e.rpe : m), 0);
+                                      const faults = [...new Set(g.entries.flatMap(e => e.faults_observed ?? []))];
+                                      const summary = totReps > 0
+                                        ? (totSets === 1 ? `${totReps} reps`
+                                          : uniformReps != null ? `${totSets}×${uniformReps} · ${totReps} reps`
+                                          : `${totSets} sets · ${totReps} reps`)
+                                        : totHold > 0
+                                          ? (totSets === 1 ? `${totHold}s hold` : `${totSets} sets · ${totHold}s total`)
+                                          : `${totSets} set${totSets !== 1 ? 's' : ''}`;
+                                      return (
+                                        <div key={gkey}>
+                                          <div
+                                            className="tl-set-row"
+                                            style={{ cursor: 'pointer' }}
+                                            onClick={() => setExpandedSkillSessions(prev => {
+                                              const next = new Set(prev);
+                                              if (next.has(gkey)) next.delete(gkey); else next.add(gkey);
+                                              return next;
+                                            })}
+                                          >
+                                            <span className="tl-set-date">{fmtShortDate(g.date)}</span>
+                                            <span style={{ fontSize: 12, color: 'var(--text-dim)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatMovementName(g.movement)}</span>
+                                            <span className="tl-set-value">{summary}</span>
+                                            {rpeMax > 0 && <span className="tl-set-detail">RPE {rpeMax}</span>}
+                                            {faults.length > 0 && (
+                                              <span className="tl-set-detail" style={{ color: 'var(--danger, #e74c3c)', fontSize: 11 }}>{faults.join(', ')}</span>
+                                            )}
+                                            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{gExpanded ? '▲' : '▼'}</span>
+                                          </div>
+                                          {gExpanded && (
+                                            <div style={{ paddingLeft: 10, borderLeft: '2px solid var(--border)', marginLeft: 4 }}>
+                                              {g.entries.map((e, i2) => renderEntryRow(e, i2))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                    {groups.length > 20 && !showAll && (
+                                      <button
+                                        onClick={() => setShowAllSkillSessions(prev => new Set(prev).add(cfg.key))}
+                                        style={{ width: '100%', marginTop: 8, padding: '8px 0', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-dim)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                                      >
+                                        Show all ({groups.length} sessions)
+                                      </button>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                         )}
@@ -2539,8 +2614,10 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                     const data = skillsByFamily.get(cfg.key)!;
                     const expanded = expandedSkillFamilies.has(cfg.key);
                     const bestLabel =
-                      cfg.metric === 'reps' && data.bestReps > 0 ? `Best ${data.bestReps} reps`
-                      : cfg.metric === 'seconds' && data.bestHoldSeconds > 0 ? `Longest ${data.bestHoldSeconds}s`
+                      cfg.metric === 'reps' && data.bestReps > 0
+                        ? <>Best set <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{data.bestReps}</span> reps</>
+                      : cfg.metric === 'seconds' && data.bestHoldSeconds > 0
+                        ? <>Longest hold <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{data.bestHoldSeconds}s</span></>
                       : null;
                     const sessionsDesc = [...data.entries].sort((a, b) =>
                       b.workout_date !== a.workout_date
@@ -2640,9 +2717,21 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                               );
                             })()}
 
-                            {/* Session list (newest first). */}
+                            {/* Session ledger (newest first): one line per day+movement
+                                — "4×4 · 16 reps" — expanding to the raw set rows (with
+                                editing) on tap. Latest 20 lines, then Show all. */}
                             <div style={{ marginTop: 8 }}>
-                              {sessionsDesc.map((e, i) => (
+                              {(() => {
+                                type SessionGroup = { date: string; movement: string; entries: typeof sessionsDesc };
+                                const groups: SessionGroup[] = [];
+                                for (const e of sessionsDesc) {
+                                  const lastG = groups[groups.length - 1];
+                                  if (lastG && lastG.date === e.workout_date && lastG.movement === e.movement) lastG.entries.push(e);
+                                  else groups.push({ date: e.workout_date, movement: e.movement, entries: [e] });
+                                }
+                                const showAll = showAllSkillSessions.has(cfg.key);
+                                const visibleGroups = showAll ? groups : groups.slice(0, 20);
+                                const renderEntryRow = (e: typeof sessionsDesc[number], i: number) => (
                                 editingEntryId === e.id ? (
                                   <div key={i} className="tl-set-row" style={{ flexWrap: 'wrap', gap: 6 }}>
                                     <input type="number" value={editFields.sets} onChange={ev => setEditFields(f => ({ ...f, sets: ev.target.value }))} placeholder="Sets" style={{ width: 50, padding: '3px 6px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }} />
@@ -2694,7 +2783,66 @@ export default function TrainingLogPage({ session }: { session: Session }) {
                                     </button>
                                   </div>
                                 )
-                              ))}
+                              );
+                                return (
+                                  <>
+                                    {visibleGroups.map((g) => {
+                                      const gkey = `${cfg.key}|${g.date}|${g.movement}`;
+                                      const gExpanded = expandedSkillSessions.has(gkey) || g.entries.some(e => e.id === editingEntryId);
+                                      const effVals = g.entries.map(e => e.reps_completed ?? e.reps);
+                                      const setCounts = g.entries.map(e => (e.sets != null && e.sets > 0 ? e.sets : 1));
+                                      const totSets = setCounts.reduce((a2, b2) => a2 + b2, 0);
+                                      const totReps = g.entries.reduce((sum, e, i2) => sum + setCounts[i2] * ((e.reps_completed ?? e.reps) ?? 0), 0);
+                                      const totHold = g.entries.reduce((sum, e, i2) => sum + setCounts[i2] * (e.hold_seconds ?? 0), 0);
+                                      const uniformReps = totReps > 0 && effVals.every(v => v != null && v === effVals[0]) ? effVals[0] : null;
+                                      const rpeMax = g.entries.reduce((m, e) => (e.rpe != null && e.rpe > m ? e.rpe : m), 0);
+                                      const faults = [...new Set(g.entries.flatMap(e => e.faults_observed ?? []))];
+                                      const summary = totReps > 0
+                                        ? (totSets === 1 ? `${totReps} reps`
+                                          : uniformReps != null ? `${totSets}×${uniformReps} · ${totReps} reps`
+                                          : `${totSets} sets · ${totReps} reps`)
+                                        : totHold > 0
+                                          ? (totSets === 1 ? `${totHold}s hold` : `${totSets} sets · ${totHold}s total`)
+                                          : `${totSets} set${totSets !== 1 ? 's' : ''}`;
+                                      return (
+                                        <div key={gkey}>
+                                          <div
+                                            className="tl-set-row"
+                                            style={{ cursor: 'pointer' }}
+                                            onClick={() => setExpandedSkillSessions(prev => {
+                                              const next = new Set(prev);
+                                              if (next.has(gkey)) next.delete(gkey); else next.add(gkey);
+                                              return next;
+                                            })}
+                                          >
+                                            <span className="tl-set-date">{fmtShortDate(g.date)}</span>
+                                            <span style={{ fontSize: 12, color: 'var(--text-dim)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatMovementName(g.movement)}</span>
+                                            <span className="tl-set-value">{summary}</span>
+                                            {rpeMax > 0 && <span className="tl-set-detail">RPE {rpeMax}</span>}
+                                            {faults.length > 0 && (
+                                              <span className="tl-set-detail" style={{ color: 'var(--danger, #e74c3c)', fontSize: 11 }}>{faults.join(', ')}</span>
+                                            )}
+                                            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{gExpanded ? '▲' : '▼'}</span>
+                                          </div>
+                                          {gExpanded && (
+                                            <div style={{ paddingLeft: 10, borderLeft: '2px solid var(--border)', marginLeft: 4 }}>
+                                              {g.entries.map((e, i2) => renderEntryRow(e, i2))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                    {groups.length > 20 && !showAll && (
+                                      <button
+                                        onClick={() => setShowAllSkillSessions(prev => new Set(prev).add(cfg.key))}
+                                        style={{ width: '100%', marginTop: 8, padding: '8px 0', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-dim)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                                      >
+                                        Show all ({groups.length} sessions)
+                                      </button>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                         )}
