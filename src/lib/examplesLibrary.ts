@@ -206,7 +206,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
           'Choose the machine on the way in. Each modality carries its own time-trial baseline — today’s targets come from this athlete’s Echo Bike test. Switch machines and the targets follow.',
       },
       {
-        image: '/images/engine-analytics-overview.webp',
+        image: '/images/engine-analytics-overview-v2.webp',
         alt: 'Analytics overview — 12 sessions at 108% average performance, five day types from anaerobic to threshold, and energy system paces with the 2.56× ratio',
         title: 'Where it all adds up',
         caption:
