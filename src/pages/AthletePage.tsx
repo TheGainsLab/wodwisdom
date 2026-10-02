@@ -1958,7 +1958,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       </p>
                     </div>
                   }
-                  onUpgrade={() => navigate('/features/programs')}
+                  onUpgrade={() => navigate('/checkout?plan=programming')}
                 >
                   {/* The fun-part pitch lives here now (its standalone box below is
                       gone): goals are only ever actionable inside Tier 3. */}

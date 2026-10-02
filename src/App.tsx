@@ -305,8 +305,8 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/ailog/:id" element={<AILogProgramPage session={session} />} />
             <Route path="/features" element={<FeaturesHubPage />} />
             <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
-            <Route path="/features/programs" element={<ProgramsFeaturePage />} />
-            <Route path="/features/engine" element={<EngineFeaturePage />} />
+            <Route path="/features/programs" element={<ProgramsFeaturePage signedIn />} />
+            <Route path="/features/engine" element={<EngineFeaturePage signedIn />} />
             <Route path="/features/nutrition" element={<NutritionFeaturePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

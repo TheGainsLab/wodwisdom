@@ -63,7 +63,7 @@ export default function CheckoutRedirectPage() {
             We couldn't start checkout just now. You can try again from the product page — or email{' '}
             <a href="mailto:coach@thegainslab.com" style={{ color: 'var(--accent)' }}>coach@thegainslab.com</a> and a human will sort it out.
           </p>
-          <Link to="/features" className="feature-cta">See plans</Link>
+          <Link to="/pricing" className="feature-cta">See plans</Link>
         </>
       )}
     </div>

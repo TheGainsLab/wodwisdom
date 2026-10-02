@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import GainsLogo from '../../components/GainsLogo';
 import FeatureFooter from '../../components/FeatureFooter';
 import '../../features.css';
@@ -35,11 +35,15 @@ function FranCard() {
   );
 }
 
-export default function ProgramsFeaturePage() {
+export default function ProgramsFeaturePage({ signedIn = false }: { signedIn?: boolean }) {
+  const navigate = useNavigate();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [interval, setInterval] = useState<'monthly' | 'quarterly'>('monthly');
 
   const buyProgramming = async () => {
+    // Signed-in buys must tie to the account: route through /checkout
+    // (auto-triggers Stripe) instead of the anonymous flow below.
+    if (signedIn) { navigate(`/checkout?plan=programming&interval=${interval}`); return; }
     setCheckoutLoading(true);
     try {
       const resp = await fetch(CHECKOUT_ENDPOINT, {
