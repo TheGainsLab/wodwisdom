@@ -18,6 +18,7 @@ export function QAHeader({ signedIn }: { signedIn: boolean }) {
         <nav className="feature-nav">
           <Link to="/qa">Q&amp;A</Link>
           {!signedIn && <Link to="/features">Features</Link>}
+          {!signedIn && <Link to="/pricing">Pricing</Link>}
         </nav>
         {signedIn ? (
           <Link to="/" className="feature-signin-btn">Open App</Link>

@@ -21,6 +21,7 @@ export default function FeatureFooter({ links = [] }: { links?: { to: string; la
       </Link>
       <div style={{ marginTop: 10, display: 'flex', gap: 18, justifyContent: 'center', flexWrap: 'wrap' }}>
         <Link to="/" style={linkStyle}>Home</Link>
+        <Link to="/pricing" style={linkStyle}>Pricing</Link>
         {links.map(l => (
           <Link key={l.to} to={l.to} style={linkStyle}>{l.label}</Link>
         ))}
