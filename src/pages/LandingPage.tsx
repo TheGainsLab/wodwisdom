@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import GainsLogo from '../components/GainsLogo';
+import PricingPlans, { type PricingPlan, type PricingInterval } from '../components/PricingPlans';
 import '../landing.css';
 
 const SUPABASE_BASE = import.meta.env.VITE_SUPABASE_URL || 'https://hsiqzmbfulmfxbvbsdwz.supabase.co';
@@ -46,19 +47,18 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
 export default function LandingPage() {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [pricingInterval, setPricingInterval] = useState<'monthly' | 'quarterly'>('monthly');
-  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState<PricingPlan | null>(null);
   const goToAuth = () => navigate('/auth');
 
   // Signed-out checkout: same anonymous create-checkout flow the feature
   // pages use (a /checkout route needs a session and redirects away).
-  const buy = async (plan: 'programming' | 'engine' | 'all_access') => {
+  const buy = async (plan: PricingPlan, interval: PricingInterval) => {
     setCheckoutLoading(plan);
     try {
       const resp = await fetch(CHECKOUT_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, interval: pricingInterval }),
+        body: JSON.stringify({ plan, interval }),
       });
       const data = await resp.json();
       if (data.url) { window.location.href = data.url; return; }
@@ -191,35 +191,7 @@ export default function LandingPage() {
           <div className="lp-kicker">Pricing</div>
           <h2 className="lp-h2">Let's make some gains.</h2>
           <p style={{ ...bodyP, fontSize: 15, color: 'var(--text-muted)', marginBottom: 26 }}>Monthly or quarterly. Cancel anytime.</p>
-          <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 20, maxWidth: 320 }}>
-            {(['monthly', 'quarterly'] as const).map(iv => (
-              <button
-                key={iv}
-                style={{ flex: 1, padding: '10px 0', border: 'none', fontFamily: "'Outfit', sans-serif", fontSize: 14, fontWeight: 600, cursor: 'pointer', background: pricingInterval === iv ? 'var(--accent)' : 'transparent', color: pricingInterval === iv ? 'white' : 'var(--text-dim)', transition: 'all .15s' }}
-                onClick={() => setPricingInterval(iv)}
-              >
-                {iv === 'monthly' ? 'Monthly' : 'Quarterly'}
-              </button>
-            ))}
-          </div>
-          <div className="lp-plans">
-            {[
-              { plan: 'programming' as const, name: 'AI Programming', monthly: '$29.99', quarterly: '$74.99', blurb: 'Individualized training built around your evaluation, goals, and progress.', cta: 'Choose Programming', feat: false, badge: '' },
-              { plan: 'all_access' as const, name: 'All Access', monthly: '$49.99', quarterly: '$119.99', blurb: 'AI Programming + AI Year of the Engine.', cta: 'Get All Access', feat: true, badge: 'Best Value' },
-              { plan: 'engine' as const, name: 'AI Year of the Engine', monthly: '$29.99', quarterly: '$74.99', blurb: 'Our conditioning system, personalized to your fitness and goals.', cta: 'Choose Engine', feat: false, badge: '' },
-            ].map(p => (
-              <div key={p.plan} className={'lp-plan' + (p.feat ? ' lp-plan-feat' : '')}>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: 10, minHeight: 14 }}>{p.badge}</div>
-                <h3 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 6px' }}>{p.name}</h3>
-                <div style={{ fontSize: 30, fontWeight: 800, margin: '8px 0 2px' }}>{pricingInterval === 'monthly' ? p.monthly : p.quarterly}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>{pricingInterval === 'monthly' ? 'per month' : 'per quarter'}</div>
-                <p style={{ color: 'var(--text-dim)', fontSize: 15, margin: '0 0 20px' }}>{p.blurb}</p>
-                <button className="landing-cta" style={{ marginTop: 'auto' }} onClick={() => buy(p.plan)} disabled={checkoutLoading !== null}>
-                  {checkoutLoading === p.plan ? 'Redirecting…' : p.cta}
-                </button>
-              </div>
-            ))}
-          </div>
+          <PricingPlans onBuy={buy} busyPlan={checkoutLoading} />
           <p style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 15, marginTop: 18 }}>
             Every plan includes AI Coach, Nutrition tracking, and training analytics.
           </p>
