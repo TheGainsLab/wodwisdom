@@ -241,15 +241,17 @@ I built The Gains Lab as an alternative to conventional programming.
 
 Every group program has the same limitation: coaches can't continuously keep all their athletes' histories, goals, and results in view. So training and coaching expertise get packaged into a one-size-fits-all program or track. Leaderboards replace analysis. Generic notes replace personal guidance. Distribution gets better. Training does not. I know, because I owned a gym and sold online programs.
 
-But you and I are different athletes. <INSERT: a line or two about THEIR evaluation — what stood out, their clearest opportunity>. It simply doesn't make sense for us to do the same program. Scaling made sense when that was the best tool we had.
+<INSERT: Matt's profile + the athlete's profile — e.g. "I'm a lifelong lifter who presses well and pays for it on the rower. You're a top-10% masters competitor with a serious engine and a pressing gap.">
+
+It doesn't make sense for a group of athletes with different needs and goals to do the same program.
+
+And now you don't have to. AI changes what's possible.
 
 {eval_headline}
 
-That's from your evaluation. [Re-read it](https://www.thegainslab.com/profile) — everything that follows is built from it.
+[That's from your evaluation →](https://www.thegainslab.com/profile)
 
-But AI changes what's possible.
-
-Our AI delivers personalized training and coaching.
+Our AI uses that evaluation and your training history to deliver personalized training and coaching.
 
 It has seen every article, seminar, and training guide behind our methodology. It has reviewed 25 years of programming history, so it knows how those principles get applied in real training. And it holds 15 million competition event scores — a reference set no individual coach could keep in memory.
 
