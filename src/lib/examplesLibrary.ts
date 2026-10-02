@@ -54,107 +54,107 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
       {
         image: '/images/eval-intake-profile.png',
         alt: 'Athlete profile intake — basics and athletic data steps',
-        title: 'What we ask',
+        title: 'Start with the basics',
         caption:
-          'We start with the basics — age, height, weight, and gender. Then we ask about your lifts, skills, and conditioning. It’s the same information you’d expect to give a coach. You don’t need exact numbers for everything. If you only know roughly where you stand, that’s enough to get started — and completing Step 1 already unlocks tailored answers from the AI Coach.',
+          'We begin with the same information you’d expect to give a coach: age, height, weight, lifts, skills, and a few conditioning benchmarks.\n\nYou don’t need perfect data. If you only know roughly where you stand, that’s enough to get started.\n\nComplete the basics and the system can already begin tailoring its answers to you.',
       },
       {
         image: '/images/eval-intake-benchmarks.png',
         alt: 'Conditioning benchmarks — running and rowing times entered in the profile',
-        title: 'A few honest numbers',
+        title: 'Give us what you know',
         caption:
-          'Enter what you know — a mile time, a 2k row, bike calories. This athlete’s whole intake took about five minutes.',
+          'We ask for the basics of your athletic profile: your lifts, skills, and a few conditioning benchmarks.\n\nEnter as much as you know. You don’t need every number, and you don’t need perfect precision — a reasonable estimate is enough to get started.\n\nThe inputs are simple. What we do with them is different.',
       },
       {
         image: '/images/eval-summary.png',
         alt: 'Evaluation opening verdict',
         title: 'The coach’s read',
         caption:
-          'This is how the evaluation opens: not with a score, but with a read. The single clearest opportunity in an otherwise well-rounded profile, named in one sentence — before a single detail is unpacked. It’s not scoring inputs. It’s making a coaching call from the evidence.',
+          'The Evaluation opens with the big picture.\n\nBefore it gets into the details, it tells you what matters most: where you’re already strong, where the biggest opportunity is, and what should drive the training next.\n\nHere, the athlete’s engine is strong, but raw strength — especially pressing — is the clearest limiter.\n\nIt doesn’t just score the inputs. It interprets them and makes a coaching judgment.',
       },
       {
         image: '/images/eval-strengths.png',
         alt: 'Evaluation strengths section',
         title: 'What not to waste time on',
         caption:
-          'A good evaluation doesn’t just hunt for weaknesses — it recognizes what’s already working and decides how much attention it still needs. A 19:55 5k and a 6:44 2k row get kept sharp with regular touches, “but it doesn’t need to be pushed while strength is the focus.” Strong skills and a balanced hinge stay in the rotation too — no special emphasis needed. That’s coaching judgment: maintain the strengths, spend your time where the gains are. That’s how training time doesn’t get wasted.',
+          'A good evaluation doesn’t just find weaknesses. It recognizes what’s already working — and decides how much attention it still needs.\n\nHere, strong endurance, advanced skills, and a balanced hinge pattern are all identified as strengths. They stay in the program, but they don’t need to drive it.\n\nThe system keeps them sharp with regular touches while more training time goes toward the athlete’s bigger opportunities.\n\nThat’s coaching judgment: maintain what’s already strong, and spend your time where the gains are.',
       },
       {
         image: '/images/eval-weaknesses.png',
         alt: 'Evaluation weaknesses and priorities, ranked',
         title: 'Ranked, with the why',
         caption:
-          'Not a list — a diagnosis. It notices the jerk (265) barely clears the push press (255), and concludes it’s technique, not strength, capping the clean & jerk — so the fix is cheap. It also separates major priorities from low-cost accessory work, so everything doesn’t get treated as equally important. That’s reasoning, not a template.',
+          'The Evaluation doesn’t just list weaknesses. It ranks them, explains why they matter, and decides which ones deserve the most training attention.\n\nHere, pressing strength is the biggest gap. Squat strength comes next. The jerk looks more like a technique problem than a strength problem, while the remaining gymnastics gaps are lower-cost accessory work.\n\nThat distinction matters because the program won’t treat everything equally.\n\nThese priorities become the work — the things the AI programs to improve first.',
       },
       {
         image: '/images/eval-analysis.png',
         alt: 'Evaluation analysis — the full reasoning across strengths, weaknesses, and conditioning',
-        title: 'The reasoning — hedges included',
+        title: 'The reasoning behind the plan',
         caption:
-          'This is where the evaluation goes deeper. It weighs the athlete as a whole — strengths, weaknesses, age, goals, training frequency, recovery, and its own confidence in the data — then decides what to push, what to maintain, what to touch lightly, and what not to prioritize yet. It’s also honest about its limits. Self-reported lifts start with lower confidence — as you log real training, the calls sharpen. This is the reasoning behind the program: not just what to train, but why, how much, and what comes first.',
+          'This is where the Evaluation goes deeper.\n\nThe AI weighs the athlete as a whole — strengths, weaknesses, age, goals, training frequency, recovery, and how confident it is in the underlying data — then decides what to push, what to maintain, what to touch lightly, and what not to prioritize yet.\n\nIt also explains the tradeoffs. Strong conditioning gets maintained instead of pushed. Pressing strength gets the emphasis. Jerk technique is treated as high-return work. Lower-priority skills stay in the background.\n\nAnd when the evidence is uncertain, it says so. Self-reported lifts start with lower confidence; logged training sharpens the picture over time.\n\nThis is the reasoning behind the program — not just what to train, but why, how much, and what comes first.',
       },
       {
         image: '/images/eval-recommendations.png',
         alt: 'Evaluation recommendations — four prioritized prescriptions',
         title: 'The prescription',
         caption:
-          'The evaluation finishes by turning the reasoning into a short list of clear training priorities. What should lead the cycle. What should support it. What needs technique work. What can stay in the background. If you move forward with AI Programming, these recommendations become inputs to the program generator — alongside your goals, schedule, equipment, and preferences. The evaluation doesn’t just tell you what’s wrong. It tells the system what to do next.',
+          'The Evaluation finishes by turning all of that reasoning into a clear training plan.\n\nWhat should lead the cycle. What should support it. What needs technique work. What can stay in the background.\n\nHere, pressing strength becomes the lead priority, lower-body strength gets a structured progression, jerk technique gets regular attention, and lower-priority skill gaps are handled as accessory work.\n\nIf you move forward with AI Programming, these recommendations become the starting point for the program — alongside your goals, schedule, equipment, and preferences.\n\nThe Evaluation doesn’t just tell you what needs work. It tells the AI what to build next.',
       },
     ],
   },
   programming: {
     title: 'A real training day, block by block',
     intro:
-      'Pulled straight from a generated program — Week 1, Day 1 of a pressing-focused cycle, exactly as the athlete sees it. Warm-up to cool-down, every number computed from their evaluation. Every session in the program is built this way — skills, strength, accessory, metcon — with the emphasis aimed at what the evaluation found. Then look closer: the program explains its own reasoning, and every block carries its own coach.',
+      'Pulled straight from a generated program — Week 1, Day 1 of a pressing-focused cycle, exactly as the athlete sees it. Warm-up to cool-down, every number computed from their evaluation. Then look closer: the program explains its own reasoning, and every block carries its own coach.',
     steps: [
       {
         image: '/images/programming-day-full.webp',
         alt: 'A complete training day — warm-up, skills, strength, accessory, metcon, and cool-down blocks',
-        title: 'The whole day',
+        title: 'The whole day is built around you',
         caption:
-          'Six blocks with a shape: prime the shoulders, practice skills while the nervous system is fresh, then the day’s main lift — 5×5 bench at 75% of this athlete’s tested max — supporting accessory work, a 13-minute conditioning piece, and a flush to finish. Every load and rep count is theirs, not a template’s.',
+          'This is a complete training day generated from the athlete’s Evaluation, profile, goals, and priorities.\n\nWarm-up. Skills. Strength. Accessories. Metcon. Cool-down.\n\nEach block is individualized — the movements, loads, reps, percentages, and conditioning are chosen for this athlete, not pulled from a shared template.\n\nAnd the day is built as a whole: skills before fatigue, the main strength priority in the right place, supporting accessory work, conditioning that fits the day, and recovery work to finish.\n\nThis isn’t one workout with personalized numbers. It’s an entire training day built for one athlete.',
       },
       {
         image: '/images/programming-intent.webp',
         alt: 'Today’s Training Intent — the program explaining why the day is built this way',
-        title: 'Why today looks like this',
+        title: 'Know what the day is trying to do',
         caption:
-          'Tap “Today’s Training Intent” and the program shows its work: which evaluation priority each block serves, why the skills come before the pressing load, and why the metcon deliberately stays out of the way of the squat cycle’s recovery budget. Nothing here is random — and it tells you so.',
+          'Every training day comes with its own intent.\n\nBefore you start, AI Coach explains what the session is trying to accomplish, why the blocks are ordered the way they are, which priorities they support, and how the conditioning fits with the rest of the day.\n\nIt’s the same kind of conversation you’d want from a coach when you walk into the gym: here’s what we’re working on today, here’s why, and here’s how to approach it.\n\nYou don’t just get the workout. You understand the plan behind it.',
       },
       {
         image: '/images/programming-strength.webp',
         alt: 'Strength block — Bench Press 5×5 at 195 lbs, 75% of tested max, RPE 7',
-        title: 'Your numbers, not a template’s',
+        title: 'Your numbers, proven methods',
         caption:
-          'One line carries the whole point: 5×5 at 195 — 75% of this athlete’s tested max — at a prescribed effort. Change your max, and every number downstream changes with it.',
+          'The program uses your actual numbers to prescribe the work. Here, 5×5 bench at 195 is 75% of this athlete’s tested max, with a target RPE of 7.\n\nChange the athlete, and the prescription changes.\n\nBut personalization doesn’t mean reinventing strength training. The program still uses proven lifts, loading principles, and progression — it simply applies them to your abilities and priorities.\n\nIndividualized numbers. Familiar methods. Training built for you.',
       },
       {
         image: '/images/programming-skills-coach.webp',
         alt: 'Skills block with AI Coach game plan and per-movement cues for butterfly pull-ups and legless rope climbs',
         title: 'Every block carries a coach',
         caption:
-          'Tap Coach on any block and you get a game plan for the piece plus cues for each movement — what to do, what not to do — reasoned from this athlete’s skill ratings: their legless rope climb is the beginner-rated limiter here, so “one clean ascent beats any grind.”',
+          'Tap Coach on any block and you get guidance for the work in front of you.\n\nFirst, the game plan: what this block is for, what should feel hard, what should stay controlled, and where your attention belongs.\n\nThen, movement-by-movement coaching: cues, common faults, reminders, and what to watch for — all informed by your skill level and training history.\n\nHere, the system knows butterfly pull-ups are a strength and legless rope climbs are the limiter, so the advice changes accordingly: one clean ascent beats any grind.\n\nYou don’t just get the work. You get coached through how to do it well.',
       },
       {
         image: '/images/programming-metcon.webp',
         alt: 'Metcon block — AMRAP 13 with an AI game plan predicting rounds and naming the limiter',
         title: 'The metcon, with a game plan',
         caption:
-          'The conditioning piece comes with a prediction and a strategy: expect 4–5 rounds, the limiter is grip and lat fatigue stacking from earlier in the session — so row at 70%, keep the toes-to-bar relaxed. That’s a coach who watched your whole day, not just this workout.',
+          'Every metcon comes with a strategy built around the athlete.\n\nThe Coach looks at the workout, your profile, your Evaluation, and what you’ve already done that day, then tells you how to approach it — expected rounds, likely limiter, pacing, where to stay controlled, and where to push.\n\nHere, the target is 4–5 rounds, with grip and lat fatigue identified as the main limiter. So the advice is specific: row around 70%, keep the toes-to-bar relaxed, and protect grip for the power cleans.\n\nYou’re not just given a metcon. You’re told how to get the most out of it.',
       },
       {
         image: '/images/programming-accessory.webp',
         alt: 'Accessory block — dumbbell rows and banded tricep extensions with rest guidance',
-        title: 'The supporting work',
+        title: 'The small work is personalized too',
         caption:
-          'Accessory volume chosen to support the day’s pressing — done for quality, with the rest spelled out. Every block type has a job.',
+          'Accessory work is easy to overlook, but it’s where a lot of gaps get addressed.\n\nThe program uses your Evaluation, history, and goals to choose the supporting work that adds the most value — here, rows to balance the day’s pressing and triceps work to support pressing strength.\n\nThe load, reps, and rest are prescribed for quality, not just to fill time.\n\nThe main work drives the day. The accessory work fills the gaps. Both are built around you.',
       },
       {
         image: '/images/programming-coach-change.webp',
         alt: 'AI Coach conversation — athlete’s rower broke, coach proposes swapping to Echo Bike with Apply and Keep buttons',
-        title: 'Broken rower? Tell the coach.',
+        title: 'Change the plan without losing the purpose',
         caption:
-          'This is a real conversation: the athlete’s rower died, so they told the coach. It reasoned through the swap — same calorie target, same stimulus — showed exactly what would change, and one tap on Apply rewrote the program. It even warned the bike would feel harder. That’s the difference between a program you follow and a program that works with you.',
+          'Life changes. Your training can too.\n\nBroken equipment. Travel. Limited time. A movement that needs to be adjusted. Tell AI Coach what changed, and it can modify the session while preserving what the workout was designed to accomplish.\n\nHere, a broken rower becomes an Echo Bike swap. The rest of the metcon stays intact, the stimulus is preserved, and the Coach even explains how the substitution may change the feel of the workout.\n\nReview the change. Tap Apply. Keep training.\n\nThis isn’t a static program you have to work around. It’s a program that can work around you.',
       },
     ],
   },
@@ -168,91 +168,91 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'Engine Day 8 — Max Aerobic Power day page with spectrum strip, session structure, and AI tools',
         title: 'Open the day',
         caption:
-          'The day tells you what it trains — the spectrum strip places Max Aerobic Power on the slow-to-fast continuum — and exactly what it asks: 8 rounds, 1:30 on, 1:30 off. Warm-up, pacing, and the AI Coach are one tap away.',
+          'Every Engine session starts by telling you what you’re training and how the day is structured.\n\nThe spectrum shows where the session sits between endurance and power. Here, the work is 8 rounds of 1:30 on / 1:30 off, with 12 total minutes of work.\n\nFrom there, everything you need is one tap away: workout details, your history and past targets, pacing guidance, warm-up, and AI Coach.\n\nYou know the purpose of the session before you start — and you have the tools to execute it well.',
       },
       {
         image: '/images/engine-day-details.webp',
         alt: 'Workout details — every round with a personal calorie target, cal/min rate, and RPM',
-        title: 'Every round has your number',
+        title: 'Every interval is personalized',
         caption:
-          'Open the details and every interval carries a target computed from this athlete’s own time-trial baseline: ~24 cal per 90-second round, with the rate and RPM to hit it. Nothing generic — these are their numbers.',
+          'Open the workout details and every round has a target built from your own performance.\n\nHere, each 90-second interval is set at about 24 calories, with the pace and RPM shown alongside it so you know exactly what to hold.\n\nThat same idea carries across the program — calories, meters, pace, RPM, or split time, depending on the machine.\n\nYou’re not guessing at intensity. Every interval is calibrated to give you the stimulus you need.',
       },
       {
         image: '/images/engine-day-timer.webp',
         alt: 'Built-in work timer — 2:36 elapsed with the calorie goal, block, and round on screen',
-        title: 'Run it on the built-in timer — or don’t',
+        title: 'Your target stays in front of you',
         caption:
-          'Start the session and the timer runs the whole thing: your goal on screen (~50.4 cal here), which block and round you’re in, work and rest called automatically. Prefer the rower’s own monitor? Skip the timer entirely and log your numbers straight off the machine.',
+          'Start the session and your goal stays on screen while the clock runs.\n\nYou can see the target for the interval, the round you’re in, and the work/rest structure in real time — so you always know whether you’re on pace for the intended stimulus.\n\nPrefer the machine’s own monitor? That’s fine too. The timer is optional.\n\nThe point is simple: you know the number before you start, and you can pace against it while you train.',
       },
       {
         image: '/images/engine-day-pacing.webp',
         alt: 'AI Coach pacing answer citing the athlete’s previous session, RPE, and heart rate',
-        title: 'Ask how to attack it',
+        title: 'Ask how to attack the session',
         caption:
-          'Tap “Pace this” and the coach plans the session against the athlete’s actual history — their previous Max Aerobic Power session came in at 106% of target at RPE 8, and the pacing advice starts from that.',
+          'Tap Pace this and AI Coach builds the plan around you.\n\nIt sees your profile, Evaluation, training history, previous sessions, targets, RPE, and the workout in front of you. Then it turns that context into specific pacing guidance for this session — how hard to start, what to hold, where fatigue is likely to show up, and how to approach each interval.\n\nHere, the Coach knows the athlete’s previous Max Aerobic Power session came in at 106% of target at RPE 8, so the advice starts from what this athlete has actually done — not from generic pacing rules.\n\nThe question may be simple. The answer is built from your data.',
       },
       {
         image: '/images/engine-day-history.webp',
         alt: 'Workout history — two Max Aerobic Power sessions a week apart, output rising from 16.3 to 18.4 cal/min',
-        title: 'The history that makes it smart',
+        title: 'Your history stays with you',
         caption:
-          'Every session lands in your history — and the system reads it. Same workout, one week apart: 16.3 cal/min, then 18.4. That improvement is why the next session’s targets are higher. Progress isn’t a feeling here; it’s a number the program acts on.',
+          'Every session is stored, so you can see exactly how your performance is changing over time.\n\nHere, the same Max Aerobic Power work moves from 16.3 cal/min to 18.4 one week later — with RPE recorded alongside it.\n\nThat history gives you a clearer picture of your progress, and it gives the AI better information for what comes next.\n\nYou can see how far you’ve come. The system uses that history to decide where to push next.',
       },
       {
         image: '/images/engine-day-equipment.webp',
         alt: 'Equipment selection — modality picker with a per-machine time-trial baseline',
-        title: 'Pick your engine',
+        title: 'Train on the machine you want',
         caption:
-          'Choose the machine on the way in. Each modality carries its own time-trial baseline — today’s targets come from this athlete’s Echo Bike test. Switch machines and the targets follow.',
+          'Row. Bike. Ski. Run. Treadmill. Mix them up.\n\nThe Gains Lab keeps a separate performance baseline for each modality, so your targets stay personalized to the machine you’re actually using.\n\nHere, today’s Echo Bike target comes from this athlete’s own Echo Bike time trial. Switch to the rower or treadmill and the system uses that modality’s data instead.\n\nYou don’t have to fit your training to the platform. The platform adapts to how you train.',
       },
       {
         image: '/images/engine-analytics-overview-v2.webp',
         alt: 'Analytics overview — 12 sessions at 108% average performance, five day types from anaerobic to threshold, and energy system paces with the 2.56× ratio',
-        title: 'Where it all adds up',
+        title: 'Your whole engine, in one place',
         caption:
-          'Twelve sessions in, this athlete is averaging 108% of their targets at RPE 7.5 — working slightly above prescription without redlining. Five day types on the board, anaerobic through threshold, and the rollup ends in the energy-system read: pace bars against the time-trial baseline, and the glycolytic reserve. A season of Engine work, in one scroll.',
+          'This is the rollup.\n\nSessions completed. Average performance against target. RPE. Equipment used. Training split across day types. Time-trial baselines. Aerobic and anaerobic pace. Glycolytic reserve.\n\nInstead of a list of workouts, you get a living picture of how your conditioning is developing.\n\nYou can see what you’ve trained, how you’re responding, where you’re improving, and what still needs work — and the AI sees the same picture when it decides what comes next.',
       },
     ],
   },
   analytics: {
     title: 'One athlete’s training, as data',
     intro:
-      'Most apps’ analytics describe your past — a reward screen after the work. Ours are the operating system: the numbers you see here are the same inputs the AI uses to write what comes next. Measured in watts, ranked against 15 million competition scores, honest when the day was ordinary, and fed straight back into the program.',
+      'Most apps’ analytics describe your past — a reward screen after the work. Ours are the operating system: the numbers you see here are the same inputs the AI uses to write what comes next. Measured in watts, ranked against 15 million competition scores, and fed straight back into the program.',
     steps: [
       {
         image: '/images/programming-logged-metcon.webp',
         alt: 'A logged Fran — 3:32 Rx converted to 3.88 W/kg, 99th percentile, short time domain',
-        title: 'A score becomes a measurement',
+        title: 'Your score becomes useful',
         caption:
-          'It starts the moment you log. A 3:32 Fran isn’t stored as a diary entry — it’s converted into physics: 3.88 watts per kilogram, 99th percentile of the Open field, short time domain. Power is the common language that lets a sprint couplet and a 20-minute grinder sit on the same scale.',
+          'Most workout scores get logged, ranked, and forgotten.\n\nHere, your effort becomes a real data point — power output, watts per kilogram, time domain, movements, and percentile against our competition data.\n\nThat gives you a clearer picture of where your work capacity is strongest and weakest. More importantly, the AI sees the same thing and uses it to shape what comes next.\n\nYour workout history stops being a record of the past. It becomes evidence for your future training.',
       },
       {
         image: '/images/analytics-power-duration.webp',
         alt: 'Power vs Duration chart — every logged metcon as a bar from 3:12 to 17:45, one selected showing its full read and the athlete’s note',
-        title: 'Every workout lands on your curve',
+        title: 'Your workouts become a fitness curve',
         caption:
-          'Each logged metcon becomes a point on your personal power-duration curve, short efforts to long. Tap any bar for the full read — and notice the athlete’s own note riding with the numbers: “it was hard.” The system keeps what you felt next to what you produced, because the coach reads both.',
+          'Each logged metcon becomes another point on your personal power-duration curve — from short, high-power efforts to longer tests of sustained work capacity.\n\nNow the pattern becomes visible.\n\nThis athlete produces more power in shorter workouts, then drops off as duration increases. That tells us where fitness is strongest, where it begins to fade, and what the program should do about it.\n\nShort-duration capacity can be maintained while longer-duration work gets more attention.\n\nAnd because every point includes the workout’s movements, duration, output, and your own feedback, the system can drill deeper than the curve alone.\n\nYou see where your fitness breaks down. The AI uses that information to decide what to build next.',
       },
       {
         image: '/images/engine-analytics-comparison.webp',
         alt: 'Average pace comparison across day types — anaerobic 45.5, max aerobic power 17.3, endurance 11.5 cal/min',
-        title: 'Compared across stimuli',
+        title: 'Your engine isn’t one thing',
         caption:
-          'The same athlete, three energy systems: 45.5 cal/min on anaerobic days, 17.3 at max aerobic power, 11.5 on endurance. A 4× spread on the same machine — proof each day type demands something different, and each one is tracked on its own axis.',
+          'Anaerobic power. Max aerobic power. Endurance. Repeatability. They’re different qualities, and they should be measured separately.\n\nHere, the same athlete produces 45.5 cal/min on anaerobic work, 17.3 at max aerobic power, and 11.5 on endurance work — three very different demands on the same machine.\n\nThe Gains Lab tracks more than 20 conditioning stimuli, so you can see exactly where your engine is strongest, where it falls off, and how each quality is changing over time.\n\nThe AI sees the same map — and can target the parts of your conditioning that need the most work.',
       },
       {
         image: '/images/analytics-energy-ratio.webp',
         alt: 'Energy System Paces — Echo Bike bars at 1.00× time trial, 1.10× aerobic, 2.83× glycolytic, with a 2.56× Energy Systems Ratio',
-        title: 'Two engines, one number',
+        title: 'See how your engine is built',
         caption:
-          'Those day types distill into a single derived metric. Every bar is a multiple of the athlete’s own time-trial pace — the dashed 1.00× baseline. Aerobic sits at 1.10×, glycolytic at 2.83×, and the ratio between them is the headline: a 2.56× glycolytic reserve, the gap between what you can produce in a burst and what you can sustain. The program trains both ends, and this number is how you watch them move.',
+          'Your engine isn’t just “good” or “bad.” It has different parts.\n\nThis view compares what you can sustain near threshold, what you can produce at max aerobic power, and what you can generate at all-out intensity — all relative to your own baseline.\n\nThat shows how your aerobic and anaerobic systems are developed relative to each other, where you rely most heavily on one system, and where there may be room to improve.\n\nYou can also see your average and peak pace across the work you’ve logged.\n\nInstead of one conditioning score, you get a map of how your engine actually works — and the AI can train the parts that need it most.',
       },
       {
         image: '/images/analytics-targets-evolution.webp',
         alt: 'Targets vs Actual — three Max Aerobic Power sessions: targets 15.3, 16.3, 16.8 against actuals 16.3, 18.4, 18.7',
-        title: 'The data writes the program',
+        title: 'Your results change what comes next',
         caption:
-          'This is the part no reward screen does. Three Max Aerobic Power sessions: Sep 17 — target 15.3, actual 16.3. Sep 24 — the target is exactly that 16.3; the athlete posts 18.4. Sep 29 — the bar rises again to 16.8, beaten again at 18.7. Raised every time, and notice it didn’t naively chase the 18.4 breakout — the system sets demands it believes you can repeat. Your analytics aren’t a mirror; they’re the input.',
+          'Logging a result isn’t just adding another score to your history. It tells the system what you’re capable of now.\n\nHere, the athlete beats a Max Aerobic Power target of 15.3 cal/min. The next target rises to 16.3. They beat that too, and the target moves again.\n\nThe system doesn’t simply copy the last score or chase every breakthrough. It uses your performance to keep the next demand challenging, repeatable, and appropriate for your current fitness.\n\nAs you improve, your targets improve with you — so you’re always training the athlete you are today, not the athlete you were two months ago.',
       },
     ],
   },
