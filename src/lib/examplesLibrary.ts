@@ -105,7 +105,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
   programming: {
     title: 'A real training day, block by block',
     intro:
-      'Pulled straight from a generated program — Week 1, Day 1 of a pressing-focused cycle, exactly as the athlete sees it. Warm-up to cool-down, every number computed from their evaluation. Then look closer: the program explains its own reasoning, and every block carries its own coach.',
+      'Pulled straight from a generated program — Week 1, Day 1 of a pressing-focused cycle, exactly as the athlete sees it. Warm-up to cool-down, every number computed from their evaluation. Every session in the program is built this way — skills, strength, accessory, metcon — with the emphasis aimed at what the evaluation found. Then look closer: the program explains its own reasoning, and every block carries its own coach.',
     steps: [
       {
         image: '/images/programming-day-full.webp',
@@ -260,14 +260,9 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
 
 export const EXAMPLE_ENTRIES: ExampleEntry[] = [
   // ── Programming ──────────────────────────────────────────────────
-  {
-    tab: 'programming',
-    image: '/images/Program-week.png',
-    alt: 'A week of generated programming',
-    title: 'A week of programming',
-    caption:
-      'One week from a real generated program. Every session has a purpose — and the emphasis follows the weaknesses the evaluation found.',
-  },
+  // Week-grid entry retired — legible percentages and exercise choices
+  // invited scrutiny without the evaluation context that produced them;
+  // its session-architecture point moved into the programming intro.
   // "Inside a training day" gallery entry retired — the walkthrough's first
   // step IS a full day, captured newer and cleaner.
 ];
