@@ -123,12 +123,21 @@ function StructuredEvalView({ e, onUpgrade, hasEngine = false }: { e: SafeEvalua
           </ol>
         </div>
       )}
-      {/* CTA — the app talking, not the coach: visually distinct from the
-          eval body, rendered only for users without AI Programming. Every
-          claim here is a shipped feature: goal-fused personalized cycles,
-          the day-scoped coach (letter + proposal cards), and the logging
-          loop that sharpens the next cycle. */}
-      {onUpgrade && (
+      <EvalUpgradeCta onUpgrade={onUpgrade} hasEngine={hasEngine} />
+    </div>
+  );
+}
+
+/** The post-eval purchase card — the app talking, not the coach. Every
+ *  claim is a shipped feature: goal-fused personalized cycles, the
+ *  day-scoped coach, and the logging loop that sharpens the next cycle.
+ *  Rendered only when onUpgrade is provided (non-admin, no programming
+ *  entitlement); shared by the structured eval view and the legacy
+ *  markdown render, so pre-structured evaluations end with the same
+ *  ask instead of trailing off. */
+function EvalUpgradeCta({ onUpgrade, hasEngine = false }: { onUpgrade?: (plan: 'programming' | 'all_access' | 'engine') => void; hasEngine?: boolean }) {
+  if (!onUpgrade) return null;
+  return (
         <div style={{ marginTop: 16, padding: '20px 22px', background: 'var(--surface2)', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 10 }}>
           <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
             Turn This Evaluation Into Your Program
@@ -170,7 +179,7 @@ function StructuredEvalView({ e, onUpgrade, hasEngine = false }: { e: SafeEvalua
             <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)', textAlign: 'center' }}>
               <div style={{ fontSize: 13.5, color: 'var(--text-dim)', marginBottom: 10 }}>
                 Want Engine too? Get <strong style={{ color: 'var(--text)' }}>All Access</strong> — best value,
-                save 15%. $50/month for both.
+                save 15%. $49.99/month for both.
               </div>
               <button
                 type="button"
@@ -186,14 +195,12 @@ function StructuredEvalView({ e, onUpgrade, hasEngine = false }: { e: SafeEvalua
                   onClick={() => onUpgrade('engine')}
                   style={{ background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}
                 >
-                  $30/month &rarr;
+                  $29.99/month &rarr;
                 </button>
               </div>
             </div>
           )}
         </div>
-      )}
-    </div>
   );
 }
 
@@ -2459,6 +2466,10 @@ export default function AthletePage({ session }: { session: Session }) {
                                           ) : (
                                             <div className="workout-review-section" style={{ marginTop: 0 }}>
                                               <div className="workout-review-content" dangerouslySetInnerHTML={{ __html: formatMarkdown(ev.analysis!) }} />
+                                              <EvalUpgradeCta
+                                                onUpgrade={!isAdmin && !hasFeature('programming') ? (plan) => navigate(`/checkout?plan=${plan}`) : undefined}
+                                                hasEngine={hasFeature('engine')}
+                                              />
                                             </div>
                                           )}
                                         </div>
