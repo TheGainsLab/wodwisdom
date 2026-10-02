@@ -105,7 +105,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
   programming: {
     title: 'A real training day, block by block',
     intro:
-      'Pulled straight from a generated program — Week 1, Day 1 of a pressing-focused cycle, exactly as the athlete sees it. Warm-up to cool-down, every number computed from their evaluation. Every session in the program is built this way — skills, strength, accessory, metcon — with the emphasis aimed at what the evaluation found. Then look closer: the program explains its own reasoning, and every block carries its own coach.',
+      'Pulled straight from a generated program — Week 1, Day 1 of a pressing-focused cycle, exactly as the athlete sees it. Warm-up to cool-down, every number computed from their evaluation. Then look closer: the program explains its own reasoning, and every block carries its own coach.',
     steps: [
       {
         image: '/images/programming-day-full.webp',
@@ -217,7 +217,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
   analytics: {
     title: 'One athlete’s training, as data',
     intro:
-      'Most apps’ analytics describe your past — a reward screen after the work. Ours are the operating system: the numbers you see here are the same inputs the AI uses to write what comes next. Measured in watts, ranked against 15 million competition scores, honest when the day was ordinary, and fed straight back into the program.',
+      'Most apps’ analytics describe your past — a reward screen after the work. Ours are the operating system: the numbers you see here are the same inputs the AI uses to write what comes next. Measured in watts, ranked against 15 million competition scores, and fed straight back into the program.',
     steps: [
       {
         image: '/images/programming-logged-metcon.webp',
