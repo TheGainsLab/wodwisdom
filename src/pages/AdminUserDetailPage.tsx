@@ -253,7 +253,7 @@ Our AI delivers personalized training and coaching.
 
 It has seen every article, seminar, and training guide behind our methodology. It has reviewed 25 years of programming history, so it knows how those principles get applied in real training. And it holds 15 million competition event scores — a reference set no individual coach could keep in memory.
 
-That's the knowledge base of an experienced coach, with perfect recall and no blind spots. And it puts all of it to work on you — not as information, but as judgment. The same quality of thinking a great coach brings, aimed entirely at your training.
+That's the knowledge base of an experienced coach, with outstanding recall and unlimited availability. And it puts all of it to work on you — not as information, but as judgment. The same quality of thinking a great coach brings, aimed entirely at your training.
 
 Strength work aimed at what you need. Conditioning calibrated to your fitness. Skills and accessories chosen for your priorities.
 
