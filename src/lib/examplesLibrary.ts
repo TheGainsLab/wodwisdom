@@ -54,51 +54,51 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
       {
         image: '/images/eval-intake-profile.png',
         alt: 'Athlete profile intake — basics and athletic data steps',
-        title: 'What we ask',
+        title: 'Start with the basics',
         caption:
-          'We start with the basics — age, height, weight, and gender. Then we ask about your lifts, skills, and conditioning. It’s the same information you’d expect to give a coach. You don’t need exact numbers for everything. If you only know roughly where you stand, that’s enough to get started — and completing Step 1 already unlocks tailored answers from the AI Coach.',
+          'We begin with the same information you’d expect to give a coach: age, height, weight, lifts, skills, and a few conditioning benchmarks.\n\nYou don’t need perfect data. If you only know roughly where you stand, that’s enough to get started.\n\nComplete the basics and the system can already begin tailoring its answers to you.',
       },
       {
         image: '/images/eval-intake-benchmarks.png',
         alt: 'Conditioning benchmarks — running and rowing times entered in the profile',
-        title: 'A few honest numbers',
+        title: 'Give us what you know',
         caption:
-          'Enter what you know — a mile time, a 2k row, bike calories. This athlete’s whole intake took about five minutes.',
+          'We ask for the basics of your athletic profile: your lifts, skills, and a few conditioning benchmarks.\n\nEnter as much as you know. You don’t need every number, and you don’t need perfect precision — a reasonable estimate is enough to get started.\n\nThe inputs are simple. What we do with them is different.',
       },
       {
         image: '/images/eval-summary.png',
         alt: 'Evaluation opening verdict',
         title: 'The coach’s read',
         caption:
-          'This is how the evaluation opens: not with a score, but with a read. The single clearest opportunity in an otherwise well-rounded profile, named in one sentence — before a single detail is unpacked. It’s not scoring inputs. It’s making a coaching call from the evidence.',
+          'The Evaluation opens with the big picture.\n\nBefore it gets into the details, it tells you what matters most: where you’re already strong, where the biggest opportunity is, and what should drive the training next.\n\nHere, the athlete’s engine is strong, but raw strength — especially pressing — is the clearest limiter.\n\nIt doesn’t just score the inputs. It interprets them and makes a coaching judgment.',
       },
       {
         image: '/images/eval-strengths.png',
         alt: 'Evaluation strengths section',
         title: 'What not to waste time on',
         caption:
-          'A good evaluation doesn’t just hunt for weaknesses — it recognizes what’s already working and decides how much attention it still needs. A 19:55 5k and a 6:44 2k row get kept sharp with regular touches, “but it doesn’t need to be pushed while strength is the focus.” Strong skills and a balanced hinge stay in the rotation too — no special emphasis needed. That’s coaching judgment: maintain the strengths, spend your time where the gains are. That’s how training time doesn’t get wasted.',
+          'A good evaluation doesn’t just find weaknesses. It recognizes what’s already working — and decides how much attention it still needs.\n\nHere, strong endurance, advanced skills, and a balanced hinge pattern are all identified as strengths. They stay in the program, but they don’t need to drive it.\n\nThe system keeps them sharp with regular touches while more training time goes toward the athlete’s bigger opportunities.\n\nThat’s coaching judgment: maintain what’s already strong, and spend your time where the gains are.',
       },
       {
         image: '/images/eval-weaknesses.png',
         alt: 'Evaluation weaknesses and priorities, ranked',
         title: 'Ranked, with the why',
         caption:
-          'Not a list — a diagnosis. It notices the jerk (265) barely clears the push press (255), and concludes it’s technique, not strength, capping the clean & jerk — so the fix is cheap. It also separates major priorities from low-cost accessory work, so everything doesn’t get treated as equally important. That’s reasoning, not a template.',
+          'The Evaluation doesn’t just list weaknesses. It ranks them, explains why they matter, and decides which ones deserve the most training attention.\n\nHere, pressing strength is the biggest gap. Squat strength comes next. The jerk looks more like a technique problem than a strength problem, while the remaining gymnastics gaps are lower-cost accessory work.\n\nThat distinction matters because the program won’t treat everything equally.\n\nThese priorities become the work — the things the AI programs to improve first.',
       },
       {
         image: '/images/eval-analysis.png',
         alt: 'Evaluation analysis — the full reasoning across strengths, weaknesses, and conditioning',
-        title: 'The reasoning — hedges included',
+        title: 'The reasoning behind the plan',
         caption:
-          'This is where the evaluation goes deeper. It weighs the athlete as a whole — strengths, weaknesses, age, goals, training frequency, recovery, and its own confidence in the data — then decides what to push, what to maintain, what to touch lightly, and what not to prioritize yet. It’s also honest about its limits. Self-reported lifts start with lower confidence — as you log real training, the calls sharpen. This is the reasoning behind the program: not just what to train, but why, how much, and what comes first.',
+          'This is where the Evaluation goes deeper.\n\nThe AI weighs the athlete as a whole — strengths, weaknesses, age, goals, training frequency, recovery, and how confident it is in the underlying data — then decides what to push, what to maintain, what to touch lightly, and what not to prioritize yet.\n\nIt also explains the tradeoffs. Strong conditioning gets maintained instead of pushed. Pressing strength gets the emphasis. Jerk technique is treated as high-return work. Lower-priority skills stay in the background.\n\nAnd when the evidence is uncertain, it says so. Self-reported lifts start with lower confidence; logged training sharpens the picture over time.\n\nThis is the reasoning behind the program — not just what to train, but why, how much, and what comes first.',
       },
       {
         image: '/images/eval-recommendations.png',
         alt: 'Evaluation recommendations — four prioritized prescriptions',
         title: 'The prescription',
         caption:
-          'The evaluation finishes by turning the reasoning into a short list of clear training priorities. What should lead the cycle. What should support it. What needs technique work. What can stay in the background. If you move forward with AI Programming, these recommendations become inputs to the program generator — alongside your goals, schedule, equipment, and preferences. The evaluation doesn’t just tell you what’s wrong. It tells the system what to do next.',
+          'The Evaluation finishes by turning all of that reasoning into a clear training plan.\n\nWhat should lead the cycle. What should support it. What needs technique work. What can stay in the background.\n\nHere, pressing strength becomes the lead priority, lower-body strength gets a structured progression, jerk technique gets regular attention, and lower-priority skill gaps are handled as accessory work.\n\nIf you move forward with AI Programming, these recommendations become the starting point for the program — alongside your goals, schedule, equipment, and preferences.\n\nThe Evaluation doesn’t just tell you what needs work. It tells the AI what to build next.',
       },
     ],
   },

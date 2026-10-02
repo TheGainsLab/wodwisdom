@@ -129,7 +129,10 @@ export default function ExamplesPage({ signedIn = false }: { signedIn?: boolean 
                     {s.title}
                   </h3>
                   <figcaption style={{ color: 'var(--text-dim)', fontSize: 14.5, lineHeight: 1.55, margin: '0 0 14px' }}>
-                    {s.caption}
+                    {/* Captions carry \n\n paragraph breaks (founder copy). */}
+                    {s.caption.split('\n\n').map((para, j) => (
+                      <p key={j} style={{ margin: j === 0 ? 0 : '10px 0 0' }}>{para}</p>
+                    ))}
                   </figcaption>
                   <img src={s.image} alt={s.alt} loading="lazy" className="feature-img" style={{ maxWidth: 420 }} />
                 </figure>
