@@ -500,7 +500,7 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
                           <div className="ea-ratio-bar-fill" style={{ height: h(summaryRatios.aerobic) }} />
                         </div>
                         <div className="ea-ratio-label">Aerobic</div>
-                        <div className="ea-ratio-sub">max aerobic vs time trial</div>
+                        <div className="ea-ratio-sub">max aerobic vs TT</div>
                       </div>
                     )}
                     {summaryRatios.glycolytic !== null && (
@@ -510,7 +510,7 @@ export default function EngineAnalyticsPage({ session }: { session: Session }) {
                           <div className="ea-ratio-bar-fill" style={{ height: h(summaryRatios.glycolytic) }} />
                         </div>
                         <div className="ea-ratio-label">Glycolytic</div>
-                        <div className="ea-ratio-sub">anaerobic vs time trial</div>
+                        <div className="ea-ratio-sub">anaerobic vs TT</div>
                       </div>
                     )}
                   </div>
