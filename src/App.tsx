@@ -100,6 +100,7 @@ const StayPage = lazy(() => import('./pages/StayPage'));
 const QAEntryPage = lazy(() => import('./pages/QAEntryPage'));
 // Public examples/proof page (both trees — visitors and members)
 const ExamplesPage = lazy(() => import('./pages/ExamplesPage'));
+const PricingPage = lazy(() => import('./pages/PricingPage'));
 
 // Feature landing pages
 const FeaturesHubPage = lazy(() => import('./pages/features/FeaturesHubPage'));
@@ -186,6 +187,7 @@ export default function App() {
             <Route path="/qa" element={<QALibraryPage />} />
             <Route path="/qa/:slug" element={<QAEntryPage />} />
             <Route path="/examples" element={<ExamplesPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
             <Route path="/stay" element={<StayPage />} />
             <Route path="/features" element={<FeaturesHubPage />} />
             <Route path="/features/coaching" element={<AICoachingFeaturePage />} />
@@ -246,6 +248,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/qa" element={<QALibraryPage signedIn />} />
             <Route path="/qa/:slug" element={<QAEntryPage signedIn />} />
             <Route path="/examples" element={<ExamplesPage signedIn />} />
+            <Route path="/pricing" element={<PricingPage signedIn />} />
             <Route path="/stay" element={<StayPage />} />
             <Route path="/chat" element={<ChatPage session={session} />} />
             <Route path="/workout-review" element={<WorkoutReviewPage session={session} />} />

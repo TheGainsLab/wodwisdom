@@ -36,24 +36,44 @@ const CTA_SECONDARY: Record<ExamplesTab, { to: string; label: string }> = {
 
 function TabCta({ tab, signedIn }: { tab: ExamplesTab; signedIn: boolean }) {
   const secondary = CTA_SECONDARY[tab];
+  if (signedIn) {
+    return (
+      <div className="qa-cta-card" style={{ margin: '0 0 56px' }}>
+        <p className="qa-cta-text">
+          Your own evaluation lives in your profile — and every session you log sharpens the picture.
+        </p>
+        <Link to="/profile" className="feature-cta qa-cta-btn">Open your profile</Link>
+        <div style={{ marginTop: 16 }}>
+          <Link to={secondary.to} style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>
+            {secondary.label}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  // Signed out: two intents, two buttons — the eval hook (solid, primary)
+  // and the ready-to-buy door (outlined → /pricing, which works signed in
+  // or out). The grey line serves returning eval-holders, who otherwise
+  // get asked to redo a step they finished (the outreach-email audience).
   return (
     <div className="qa-cta-card" style={{ margin: '0 0 56px' }}>
-      <p className="qa-cta-text">
-        {signedIn
-          ? 'Your own evaluation lives in your profile — and every session you log sharpens the picture.'
-          : CTA_PROMPTS[tab]}
-      </p>
-      <Link
-        to={signedIn ? '/profile' : '/auth?signup=1&next=/profile'}
-        className="feature-cta qa-cta-btn"
-      >
-        {signedIn ? 'Open your profile' : 'Get Your Free Evaluation'}
-      </Link>
-      <div style={{ marginTop: 16 }}>
-        <Link to={secondary.to} style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>
-          {secondary.label}
+      <p className="qa-cta-text">{CTA_PROMPTS[tab]}</p>
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+        <Link to="/auth?signup=1&next=/profile" className="feature-cta qa-cta-btn">
+          Get Your Free Evaluation
+        </Link>
+        <Link
+          to="/pricing"
+          style={{ display: 'inline-block', border: '1px solid var(--accent)', color: 'var(--accent)', borderRadius: 9, padding: '13px 20px', fontWeight: 700, fontSize: 14, textDecoration: 'none', boxSizing: 'border-box', alignSelf: 'center' }}
+        >
+          Choose Your Plan →
         </Link>
       </div>
+      <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '14px 0 0' }}>
+        Already did the evaluation?{' '}
+        <Link to="/auth?next=/profile" style={{ color: 'var(--accent)', fontWeight: 600 }}>Sign in</Link>
+        {' '}— it’s waiting in your profile.
+      </p>
     </div>
   );
 }
