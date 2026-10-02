@@ -80,7 +80,7 @@ interface InboundAttachment {
   content_base64: string;
 }
 
-function renderCustom(subject: string, body: string, name: string, attachments: InboundAttachment[], evalHtml = ""): RenderedTemplate {
+function renderCustom(subject: string, body: string, name: string, attachments: InboundAttachment[], evalHtml = "", evalHeadline: string | null = null): RenderedTemplate {
   // Body comes from the admin composer as plain-text-with-extras. Four
   // kinds of formatting are supported:
   //   1. Blank-line-separated paragraphs -> <p> blocks
@@ -110,8 +110,13 @@ function renderCustom(subject: string, body: string, name: string, attachments: 
   }
 
   const linkPlaceholders: string[] = [];
+  // {eval_headline} -> sentinel before escaping (the sentinel has no HTML-
+  // special characters, so it rides through escape/emphasis untouched).
+  const bodyWithHeadline = evalHeadline !== null
+    ? body.replace(/\{eval_headline\}/g, "\u00a7\u00a7EVHL\u00a7\u00a7")
+    : body;
   const MARKDOWN_LINK = /\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^)\s]+)\)/g;
-  const bodyWithTokens = body.replace(MARKDOWN_LINK, (_, text, url) => {
+  const bodyWithTokens = bodyWithHeadline.replace(MARKDOWN_LINK, (_, text, url) => {
     const i = linkPlaceholders.length;
     // Emphasis inside the link text: escape the text first, then run
     // emphasis on the escaped string so <strong>/<em> tags are emitted
@@ -157,15 +162,50 @@ function renderCustom(subject: string, body: string, name: string, attachments: 
   // of the mail client like human-typed email does — a centered column in a
   // wide Gmail window reads as newsletter chrome. Max-width kept for line
   // length.
+  // The eval-headline sentinel renders as a pull-quote when it stands as
+  // its own paragraph (the draft's layout), or as a plain quoted run when
+  // someone embeds the token mid-sentence.
+  const QUOTE_STYLE = "border-left: 3px solid #ff3a3a; padding-left: 14px; font-style: italic; font-weight: 600; color: #333;";
+  const safeHeadline = evalHeadline !== null ? escapeHtml(evalHeadline) : "";
+  const finalParas = withImages.map((p) => {
+    if (p.trim() === "\u00a7\u00a7EVHL\u00a7\u00a7") {
+      return `<p style="${QUOTE_STYLE}">&ldquo;${safeHeadline}&rdquo;</p>`;
+    }
+    // Function replacement: a `$` in the headline must not trigger
+    // String.replace's substitution patterns.
+    const inline = p.replace(/\u00a7\u00a7EVHL\u00a7\u00a7/g, () => `&ldquo;${safeHeadline}&rdquo;`);
+    return `<p>${inline}</p>`;
+  });
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0; color: #1a1a1a; line-height: 1.6;">
-      ${withImages.map((p) => `<p>${p}</p>`).join("\n      ")}${evalHtml}
+      ${finalParas.join("\n      ")}${evalHtml}
     </div>
   `.trim();
   return {
     subject: subject.trim() || "A note from The Gains Lab",
     html,
   };
+}
+
+/** The one-sentence coach's verdict for the {eval_headline} token.
+ *  Structured rows store it directly; older markdown-only rows fall back
+ *  to the first prose block (skipping headings and bullet groups). */
+function extractEvalHeadline(
+  structured: StructuredEvaluation | null,
+  analysis: string | null,
+): string | null {
+  const h = structured?.headline_takeaway?.trim();
+  if (h) return h;
+  if (!analysis) return null;
+  for (const block of analysis.split(/\n\s*\n/)) {
+    const t = block.trim();
+    if (!t || t.startsWith("#")) continue;
+    if (t.split("\n").every((l) => l.trim().startsWith("- "))) continue;
+    // First prose block; keep it quote-sized.
+    const flat = t.replace(/\s+/g, " ");
+    return flat.length > 220 ? flat.slice(0, 217).trimEnd() + "\u2026" : flat;
+  }
+  return null;
 }
 
 interface StructuredEvaluation {
@@ -230,20 +270,13 @@ function renderEvaluationHtml(
   return "\n      " + parts.join("\n      ");
 }
 
-/** The purchase-ask block — mirrors the in-app post-evaluation card
- *  (founder copy, 2026-09-30): Build My Program primary, the All Access
- *  value band, and the just-conditioning Engine link. Appended after an
- *  included evaluation, or on its own via include_cta. */
+/** The closing escape hatch — one small grey line, always the email's
+ *  last element, no divider (founder revision, 2026-10-02). The buy CTAs
+ *  moved into the body copy as text links, so this block no longer
+ *  carries buttons: an email should end on exactly one exit, after every
+ *  purchase option, in lower visual weight. */
 function renderCtaBlock(): string {
-  const BTN = "display: inline-block; background: #ff3a3a; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;";
-  const parts: string[] = [];
-  parts.push('<hr style="border: none; border-top: 1px solid #e5e5e5; margin: 28px 0;" />');
-  parts.push(`<p style="text-align: center; margin: 0 0 18px;"><a href="${SITE_URL}/checkout?plan=programming" style="${BTN}">Build My Program</a></p>`);
-  parts.push('<p style="text-align: center; font-size: 14px; margin: 0 0 10px;">Want Engine too? Get <strong>All Access</strong> \u2014 best value, save 15%. $50/month for both.</p>');
-  parts.push(`<p style="text-align: center; margin: 0 0 14px;"><a href="${SITE_URL}/checkout?plan=all_access" style="display: inline-block; border: 1px solid #ff3a3a; color: #ff3a3a; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Get All Access \u2192</a></p>`);
-  parts.push(`<p style="text-align: center; font-size: 13px; margin: 0;">Just conditioning? <a href="${SITE_URL}/checkout?plan=engine" style="color: #ff3a3a; font-weight: 600;">$30/month \u2192</a></p>`);
-  parts.push(`<p style="text-align: center; font-size: 12.5px; color: #888; margin: 16px 0 0;">Not ready? <a href="${SITE_URL}/examples" style="color: #ff3a3a;">See real evaluations, programs, and Engine analytics \u2192</a></p>`);
-  return parts.join("\n      ");
+  return `<p style="font-size: 12.5px; color: #888; margin: 28px 0 0;">Not ready? <a href="${SITE_URL}/examples" style="color: #ff3a3a;">See real evaluations, programs, and Engine analytics \u2192</a></p>`;
 }
 
 Deno.serve(async (req) => {
@@ -367,7 +400,9 @@ Deno.serve(async (req) => {
         );
       }
       let evalHtml = "";
-      if (include_evaluation === true) {
+      let evalHeadline: string | null = null;
+      const wantsHeadline = customText.includes("{eval_headline}");
+      if (include_evaluation === true || wantsHeadline) {
         const { data: evalRow } = await supa
           .from("profile_evaluations")
           .select("structured_evaluation, analysis, created_at")
@@ -379,20 +414,36 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (!evalRow) {
           return new Response(
-            JSON.stringify({ error: "This user has no completed evaluation to include" }),
+            JSON.stringify({ error: wantsHeadline && include_evaluation !== true
+              ? "This user has no completed evaluation for the {eval_headline} quote"
+              : "This user has no completed evaluation to include" }),
             { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
           );
         }
-        evalHtml = renderEvaluationHtml(
-          evalRow.structured_evaluation as StructuredEvaluation | null,
-          evalRow.analysis,
-          evalRow.created_at,
-        );
+        if (wantsHeadline) {
+          evalHeadline = extractEvalHeadline(
+            evalRow.structured_evaluation as StructuredEvaluation | null,
+            evalRow.analysis,
+          );
+          if (!evalHeadline) {
+            return new Response(
+              JSON.stringify({ error: "This user's evaluation has no headline to quote" }),
+              { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
+            );
+          }
+        }
+        if (include_evaluation === true) {
+          evalHtml = renderEvaluationHtml(
+            evalRow.structured_evaluation as StructuredEvaluation | null,
+            evalRow.analysis,
+            evalRow.created_at,
+          );
+        }
       }
       if (!evalHtml && include_cta === true) {
         evalHtml = "\n      " + renderCtaBlock();
       }
-      rendered = renderCustom(customSubject, customText, recipientName, attachments, evalHtml);
+      rendered = renderCustom(customSubject, customText, recipientName, attachments, evalHtml, evalHeadline);
     } else {
       return new Response(
         JSON.stringify({ error: `Unknown template_key: ${template_key}` }),
