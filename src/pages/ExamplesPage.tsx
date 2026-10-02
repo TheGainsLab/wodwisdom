@@ -8,6 +8,7 @@ import {
   type ExamplesTab,
 } from '../lib/examplesLibrary';
 import { QAHeader } from '../components/QAShared';
+import { useEntitlements } from '../hooks/useEntitlements';
 import '../features.css';
 import '../qa.css';
 
@@ -36,18 +37,38 @@ const CTA_SECONDARY: Record<ExamplesTab, { to: string; label: string }> = {
 
 function TabCta({ tab, signedIn }: { tab: ExamplesTab; signedIn: boolean }) {
   const secondary = CTA_SECONDARY[tab];
+  // Session-scoped; empty set (never selling) while signed out or loading.
+  const ent = useEntitlements();
   if (signedIn) {
+    const fullyEntitled = ent.loading || ent.isAdmin || (ent.hasFeature('programming') && ent.hasEngineAccess);
+    if (fullyEntitled) {
+      // Nothing to sell — the quiet pointer home.
+      return (
+        <div className="qa-cta-card" style={{ margin: '0 0 56px' }}>
+          <p className="qa-cta-text">
+            Your own evaluation lives in your profile — and every session you log sharpens the picture.
+          </p>
+          <Link to="/profile" className="feature-cta qa-cta-btn">Open your profile</Link>
+          <div style={{ marginTop: 16 }}>
+            <Link to={secondary.to} style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>
+              {secondary.label}
+            </Link>
+          </div>
+        </div>
+      );
+    }
+    // Signed in but not (fully) subscribed: the funnel's next step is a
+    // plan, not a profile tour. /pricing routes their buy through the
+    // account-tied checkout.
     return (
       <div className="qa-cta-card" style={{ margin: '0 0 56px' }}>
         <p className="qa-cta-text">
-          Your own evaluation lives in your profile — and every session you log sharpens the picture.
+          Everything above comes with a plan — built from your evaluation and profile, adjusted every time you log.
         </p>
-        <Link to="/profile" className="feature-cta qa-cta-btn">Open your profile</Link>
-        <div style={{ marginTop: 16 }}>
-          <Link to={secondary.to} style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>
-            {secondary.label}
-          </Link>
-        </div>
+        <Link to="/pricing" className="feature-cta qa-cta-btn">Choose Your Plan →</Link>
+        <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '14px 0 0' }}>
+          or <Link to="/profile" style={{ color: 'var(--accent)', fontWeight: 600 }}>open your profile</Link>
+        </p>
       </div>
     );
   }
