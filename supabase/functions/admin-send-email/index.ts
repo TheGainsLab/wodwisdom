@@ -276,7 +276,7 @@ function renderEvaluationHtml(
  *  carries buttons: an email should end on exactly one exit, after every
  *  purchase option, in lower visual weight. */
 function renderCtaBlock(): string {
-  return `<p style="font-size: 12.5px; color: #888; margin: 28px 0 0;">Not ready? <a href="${SITE_URL}/examples" style="color: #ff3a3a;">See real evaluations, programs, and Engine analytics \u2192</a></p>`;
+  return `<p style="font-size: 12.5px; color: #888; margin: 28px 0 0;">Not ready? <a href="${SITE_URL}/examples" style="color: #ff3a3a;">Look over a real athlete\u2019s shoulder first \u2014 their evaluation, their program, their results \u2192</a></p>`;
 }
 
 Deno.serve(async (req) => {
