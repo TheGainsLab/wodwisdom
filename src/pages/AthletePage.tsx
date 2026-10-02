@@ -179,7 +179,7 @@ function EvalUpgradeCta({ onUpgrade, hasEngine = false }: { onUpgrade?: (plan: '
             <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)', textAlign: 'center' }}>
               <div style={{ fontSize: 13.5, color: 'var(--text-dim)', marginBottom: 10 }}>
                 Want Engine too? Get <strong style={{ color: 'var(--text)' }}>All Access</strong> — best value,
-                save 15%. $50/month for both.
+                save 15%. $49.99/month for both.
               </div>
               <button
                 type="button"
@@ -195,7 +195,7 @@ function EvalUpgradeCta({ onUpgrade, hasEngine = false }: { onUpgrade?: (plan: '
                   onClick={() => onUpgrade('engine')}
                   style={{ background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}
                 >
-                  $30/month &rarr;
+                  $29.99/month &rarr;
                 </button>
               </div>
             </div>

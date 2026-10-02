@@ -271,7 +271,7 @@ Your Evaluation is what makes it personal. AI Programming combines it with your 
 
 [Get AI Programming →](https://www.thegainslab.com/checkout?plan=programming)
 
-Want Engine too? Get **All Access** — best value, save 15%. $50/month for both. [Get All Access →](https://www.thegainslab.com/checkout?plan=all_access)
+Want Engine too? Get **All Access** — best value, save 15%. $49.99/month for both. [Get All Access →](https://www.thegainslab.com/checkout?plan=all_access)
 
 Just conditioning? [Get Engine →](https://www.thegainslab.com/checkout?plan=engine)
 
