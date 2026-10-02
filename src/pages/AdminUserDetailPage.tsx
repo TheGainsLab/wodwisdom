@@ -278,6 +278,33 @@ Just conditioning? [Get Engine →](https://www.thegainslab.com/checkout?plan=en
 — Matt`,
 };
 
+// Founder copy, 2026-10-02 — the checkout-abandoner note. Deliberately
+// anti-sell: eval first (free re-entry that builds conviction), proof
+// second, the buy link last in the strongest slot. "half the intake" is
+// only true for signed-up abandoners — edit or cut it per recipient.
+const CHECKOUT_ABANDONER_DRAFT = {
+  subject: 'Still Thinking It Over?',
+  body: `Hi {first_name},
+
+This is Coach Matt. It's really me, not the AI.
+
+Thanks for stopping by. I'll keep this quick and spare you the hard sell — you've seen the product pages.
+
+The one thing I will gently pressure you on is this: do the free evaluation. You've already done half the intake — finish it and run it. It's free, and it's useful even if you never work with us.
+
+[Evaluation →](https://www.thegainslab.com/auth?signup=1&next=/profile)
+
+As for the pitch — we'd rather show you than tell you. Real screens from live users: their evaluations, programs, and results. See how Year of the Engine personalizes pacing, and how AI Programming builds around you.
+
+[See real evaluations, programs, and results →](https://www.thegainslab.com/examples)
+
+And if you're ready to finish what you started, your checkout is still there.
+
+[Finish checkout →](https://www.thegainslab.com/pricing)
+
+— Matt`,
+};
+
 function EmailSection({ userId, userEmail, userName, hasEvaluation }: { userId: string; userEmail: string; userName: string; hasEvaluation: boolean }) {
   // ?outreach=1 (the /admin/outreach worklist links here with it) pre-checks
   // the outreach tag so working the list marks each user handled on send.
@@ -342,6 +369,19 @@ function EmailSection({ userId, userEmail, userName, hasEvaluation }: { userId: 
     setBody(EVAL_PITCH_DRAFT.body);
     setIncludeEval(false);
     setIncludeCta(true);
+    setConfirmArmed(false);
+    setError('');
+  };
+
+  const loadAbandonerDraft = () => {
+    if ((subject.trim() || body.trim()) && !window.confirm('Replace the current subject and message with the checkout-abandoner draft?')) return;
+    setTemplateKey('custom');
+    setSubject(CHECKOUT_ABANDONER_DRAFT.subject);
+    setBody(CHECKOUT_ABANDONER_DRAFT.body);
+    setIncludeEval(false);
+    // The examples paragraph already plays the escape-hatch role — the
+    // grey closer would duplicate it.
+    setIncludeCta(false);
     setConfirmArmed(false);
     setError('');
   };
@@ -539,6 +579,13 @@ function EmailSection({ userId, userEmail, userName, hasEvaluation }: { userId: 
             style={{ marginTop: 8, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '7px 14px', fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
           >
             Load draft: Eval → Program pitch
+          </button>
+          <button
+            type="button"
+            onClick={loadAbandonerDraft}
+            style={{ marginTop: 8, marginLeft: 8, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '7px 14px', fontFamily: "'Outfit', sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+          >
+            Load draft: Checkout abandoner
           </button>
         </div>
 
