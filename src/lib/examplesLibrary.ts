@@ -222,37 +222,37 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
       {
         image: '/images/programming-logged-metcon.webp',
         alt: 'A logged Fran — 3:32 Rx converted to 3.88 W/kg, 99th percentile, short time domain',
-        title: 'A score becomes a measurement',
+        title: 'Your score becomes useful',
         caption:
-          'It starts the moment you log. A 3:32 Fran isn’t stored as a diary entry — it’s converted into physics: 3.88 watts per kilogram, 99th percentile of the Open field, short time domain. Power is the common language that lets a sprint couplet and a 20-minute grinder sit on the same scale.',
+          'Most workout scores get logged, ranked, and forgotten.\n\nHere, your effort becomes a real data point — power output, watts per kilogram, time domain, movements, and percentile against our competition data.\n\nThat gives you a clearer picture of where your work capacity is strongest and weakest. More importantly, the AI sees the same thing and uses it to shape what comes next.\n\nYour workout history stops being a record of the past. It becomes evidence for your future training.',
       },
       {
         image: '/images/analytics-power-duration.webp',
         alt: 'Power vs Duration chart — every logged metcon as a bar from 3:12 to 17:45, one selected showing its full read and the athlete’s note',
-        title: 'Every workout lands on your curve',
+        title: 'Your workouts become a fitness curve',
         caption:
-          'Each logged metcon becomes a point on your personal power-duration curve, short efforts to long. Tap any bar for the full read — and notice the athlete’s own note riding with the numbers: “it was hard.” The system keeps what you felt next to what you produced, because the coach reads both.',
+          'Each logged metcon becomes another point on your personal power-duration curve — from short, high-power efforts to longer tests of sustained work capacity.\n\nNow the pattern becomes visible.\n\nThis athlete produces more power in shorter workouts, then drops off as duration increases. That tells us where fitness is strongest, where it begins to fade, and what the program should do about it.\n\nShort-duration capacity can be maintained while longer-duration work gets more attention.\n\nAnd because every point includes the workout’s movements, duration, output, and your own feedback, the system can drill deeper than the curve alone.\n\nYou see where your fitness breaks down. The AI uses that information to decide what to build next.',
       },
       {
         image: '/images/engine-analytics-comparison.webp',
         alt: 'Average pace comparison across day types — anaerobic 45.5, max aerobic power 17.3, endurance 11.5 cal/min',
-        title: 'Compared across stimuli',
+        title: 'Your engine isn’t one thing',
         caption:
-          'The same athlete, three energy systems: 45.5 cal/min on anaerobic days, 17.3 at max aerobic power, 11.5 on endurance. A 4× spread on the same machine — proof each day type demands something different, and each one is tracked on its own axis.',
+          'Anaerobic power. Max aerobic power. Endurance. Repeatability. They’re different qualities, and they should be measured separately.\n\nHere, the same athlete produces 45.5 cal/min on anaerobic work, 17.3 at max aerobic power, and 11.5 on endurance work — three very different demands on the same machine.\n\nThe Gains Lab tracks more than 20 conditioning stimuli, so you can see exactly where your engine is strongest, where it falls off, and how each quality is changing over time.\n\nThe AI sees the same map — and can target the parts of your conditioning that need the most work.',
       },
       {
         image: '/images/analytics-energy-ratio.webp',
         alt: 'Energy System Paces — Echo Bike bars at 1.00× time trial, 1.10× aerobic, 2.83× glycolytic, with a 2.56× Energy Systems Ratio',
-        title: 'Two engines, one number',
+        title: 'See how your engine is built',
         caption:
-          'Those day types distill into a single derived metric. Every bar is a multiple of the athlete’s own time-trial pace — the dashed 1.00× baseline. Aerobic sits at 1.10×, glycolytic at 2.83×, and the ratio between them is the headline: a 2.56× glycolytic reserve, the gap between what you can produce in a burst and what you can sustain. The program trains both ends, and this number is how you watch them move.',
+          'Your engine isn’t just “good” or “bad.” It has different parts.\n\nThis view compares what you can sustain near threshold, what you can produce at max aerobic power, and what you can generate at all-out intensity — all relative to your own baseline.\n\nThat shows how your aerobic and anaerobic systems are developed relative to each other, where you rely most heavily on one system, and where there may be room to improve.\n\nYou can also see your average and peak pace across the work you’ve logged.\n\nInstead of one conditioning score, you get a map of how your engine actually works — and the AI can train the parts that need it most.',
       },
       {
         image: '/images/analytics-targets-evolution.webp',
         alt: 'Targets vs Actual — three Max Aerobic Power sessions: targets 15.3, 16.3, 16.8 against actuals 16.3, 18.4, 18.7',
-        title: 'The data writes the program',
+        title: 'Your results change what comes next',
         caption:
-          'This is the part no reward screen does. Three Max Aerobic Power sessions: Sep 17 — target 15.3, actual 16.3. Sep 24 — the target is exactly that 16.3; the athlete posts 18.4. Sep 29 — the bar rises again to 16.8, beaten again at 18.7. Raised every time, and notice it didn’t naively chase the 18.4 breakout — the system sets demands it believes you can repeat. Your analytics aren’t a mirror; they’re the input.',
+          'Logging a result isn’t just adding another score to your history. It tells the system what you’re capable of now.\n\nHere, the athlete beats a Max Aerobic Power target of 15.3 cal/min. The next target rises to 16.3. They beat that too, and the target moves again.\n\nThe system doesn’t simply copy the last score or chase every breakthrough. It uses your performance to keep the next demand challenging, repeatable, and appropriate for your current fitness.\n\nAs you improve, your targets improve with you — so you’re always training the athlete you are today, not the athlete you were two months ago.',
       },
     ],
   },
