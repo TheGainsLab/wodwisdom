@@ -232,7 +232,7 @@ function statusColor(status: string): string {
 // about THIS athlete's evaluation; everything else is ready to send. The
 // purchase buttons come from the Add-purchase-buttons toggle, not the body.
 const EVAL_PITCH_DRAFT = {
-  subject: 'Turn This Evaluation Into Your Program',
+  subject: 'What an AI Coach Does With Your Evaluation',
   body: `Hey {first_name},
 
 This is Coach Matt. It's really me, not the AI. You completed an Evaluation but haven't started a program yet.
@@ -243,7 +243,9 @@ Every group program has the same limitation: coaches can't continuously keep all
 
 But you and I are different athletes. <INSERT: a line or two about THEIR evaluation — what stood out, their clearest opportunity>. It simply doesn't make sense for us to do the same program. Scaling made sense when that was the best tool we had.
 
-[Re-read your evaluation](https://www.thegainslab.com/profile) — everything below is built from it.
+{eval_headline}
+
+That's from your evaluation. [Re-read it](https://www.thegainslab.com/profile) — everything that follows is built from it.
 
 But AI changes what's possible.
 
@@ -265,7 +267,11 @@ And you see everything the AI sees — your full training history, right in your
 
 Your Evaluation is what makes it personal. AI Programming combines it with your profile, goals, preferences, and schedule into one program. When you sign up, you tell us exactly what your goals are — then we build around them.
 
-Not ready yet? [See real programs from actual athletes](https://www.thegainslab.com/examples?tab=programming) — excerpts from programs in use, not mockups.
+[Get AI Programming →](https://www.thegainslab.com/checkout?plan=programming)
+
+Want Engine too? Get **All Access** — best value, save 15%. $50/month for both. [Get All Access →](https://www.thegainslab.com/checkout?plan=all_access)
+
+Just conditioning? [Get Engine →](https://www.thegainslab.com/checkout?plan=engine)
 
 — Matt`,
 };
@@ -559,7 +565,7 @@ function EmailSection({ userId, userEmail, userName, hasEvaluation }: { userId: 
             <span>
               <strong style={{ color: 'var(--text)' }}>Include their evaluation</strong> — appends the latest completed
               evaluation below your note, rendered as email text (verdict, strengths, priorities, recommendations),
-              followed by the purchase buttons.
+              followed by the “Not ready?” closing line.
               {!hasEvaluation && ' This user has no completed evaluation.'}
             </span>
           </label>
@@ -574,8 +580,9 @@ function EmailSection({ userId, userEmail, userName, hasEvaluation }: { userId: 
               style={{ marginTop: 3, accentColor: 'var(--accent)' }}
             />
             <span>
-              <strong style={{ color: 'var(--text)' }}>Add purchase buttons</strong> — ends the email with the
-              Build My Program / All Access / Engine block (same as the in-app post-evaluation card).
+              <strong style={{ color: 'var(--text)' }}>Add “Not ready?” closer</strong> — ends the email with the small
+              grey “See real evaluations, programs, and Engine analytics” line. Purchase links belong in the body text
+              (the draft already carries them).
             </span>
           </label>
         )}
