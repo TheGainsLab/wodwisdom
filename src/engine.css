@@ -154,7 +154,7 @@
 .ea-dual-value{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;width:50px;text-align:right;color:var(--text-dim)}
 
 /* Ratio bars (vertical) */
-.ea-ratio-bars{display:flex;justify-content:center;align-items:flex-end;gap:24px;height:140px;padding:16px 0}
+.ea-ratio-bars{display:flex;justify-content:center;align-items:flex-end;gap:24px;padding:16px 0}
 .ea-ratio-col{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;max-width:100px}
 .ea-ratio-bar-bg{width:40px;height:100px;background:var(--surface2);border-radius:4px;position:relative;overflow:hidden;display:flex;align-items:flex-end}
 .ea-ratio-bar-fill{width:100%;background:var(--accent);border-radius:4px;transition:height .3s ease}
@@ -201,7 +201,7 @@
 .ea-menu-grid{grid-template-columns:1fr}
 .ea-bar-label{width:100px;font-size:10px}
 .ea-bar-value{width:60px;font-size:11px}
-.ea-ratio-bars{gap:16px;height:120px;padding:12px 0}
+.ea-ratio-bars{gap:16px;padding:12px 0}
 .ea-ratio-bar-bg{width:32px;height:80px}
 .ea-ratio-value{font-size:14px}
 .ea-ratio-label{font-size:10px}
