@@ -168,49 +168,49 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'Engine Day 8 — Max Aerobic Power day page with spectrum strip, session structure, and AI tools',
         title: 'Open the day',
         caption:
-          'The day tells you what it trains — the spectrum strip places Max Aerobic Power on the slow-to-fast continuum — and exactly what it asks: 8 rounds, 1:30 on, 1:30 off. Warm-up, pacing, and the AI Coach are one tap away.',
+          'Every Engine session starts by telling you what you’re training and how the day is structured.\n\nThe spectrum shows where the session sits between endurance and power. Here, the work is 8 rounds of 1:30 on / 1:30 off, with 12 total minutes of work.\n\nFrom there, everything you need is one tap away: workout details, your history and past targets, pacing guidance, warm-up, and AI Coach.\n\nYou know the purpose of the session before you start — and you have the tools to execute it well.',
       },
       {
         image: '/images/engine-day-details.webp',
         alt: 'Workout details — every round with a personal calorie target, cal/min rate, and RPM',
-        title: 'Every round has your number',
+        title: 'Every interval is personalized',
         caption:
-          'Open the details and every interval carries a target computed from this athlete’s own time-trial baseline: ~24 cal per 90-second round, with the rate and RPM to hit it. Nothing generic — these are their numbers.',
+          'Open the workout details and every round has a target built from your own performance.\n\nHere, each 90-second interval is set at about 24 calories, with the pace and RPM shown alongside it so you know exactly what to hold.\n\nThat same idea carries across the program — calories, meters, pace, RPM, or split time, depending on the machine.\n\nYou’re not guessing at intensity. Every interval is calibrated to give you the stimulus you need.',
       },
       {
         image: '/images/engine-day-timer.webp',
         alt: 'Built-in work timer — 2:36 elapsed with the calorie goal, block, and round on screen',
-        title: 'Run it on the built-in timer — or don’t',
+        title: 'Your target stays in front of you',
         caption:
-          'Start the session and the timer runs the whole thing: your goal on screen (~50.4 cal here), which block and round you’re in, work and rest called automatically. Prefer the rower’s own monitor? Skip the timer entirely and log your numbers straight off the machine.',
+          'Start the session and your goal stays on screen while the clock runs.\n\nYou can see the target for the interval, the round you’re in, and the work/rest structure in real time — so you always know whether you’re on pace for the intended stimulus.\n\nPrefer the machine’s own monitor? That’s fine too. The timer is optional.\n\nThe point is simple: you know the number before you start, and you can pace against it while you train.',
       },
       {
         image: '/images/engine-day-pacing.webp',
         alt: 'AI Coach pacing answer citing the athlete’s previous session, RPE, and heart rate',
-        title: 'Ask how to attack it',
+        title: 'Ask how to attack the session',
         caption:
-          'Tap “Pace this” and the coach plans the session against the athlete’s actual history — their previous Max Aerobic Power session came in at 106% of target at RPE 8, and the pacing advice starts from that.',
+          'Tap Pace this and AI Coach builds the plan around you.\n\nIt sees your profile, Evaluation, training history, previous sessions, targets, RPE, and the workout in front of you. Then it turns that context into specific pacing guidance for this session — how hard to start, what to hold, where fatigue is likely to show up, and how to approach each interval.\n\nHere, the Coach knows the athlete’s previous Max Aerobic Power session came in at 106% of target at RPE 8, so the advice starts from what this athlete has actually done — not from generic pacing rules.\n\nThe question may be simple. The answer is built from your data.',
       },
       {
         image: '/images/engine-day-history.webp',
         alt: 'Workout history — two Max Aerobic Power sessions a week apart, output rising from 16.3 to 18.4 cal/min',
-        title: 'The history that makes it smart',
+        title: 'Your history stays with you',
         caption:
-          'Every session lands in your history — and the system reads it. Same workout, one week apart: 16.3 cal/min, then 18.4. That improvement is why the next session’s targets are higher. Progress isn’t a feeling here; it’s a number the program acts on.',
+          'Every session is stored, so you can see exactly how your performance is changing over time.\n\nHere, the same Max Aerobic Power work moves from 16.3 cal/min to 18.4 one week later — with RPE recorded alongside it.\n\nThat history gives you a clearer picture of your progress, and it gives the AI better information for what comes next.\n\nYou can see how far you’ve come. The system uses that history to decide where to push next.',
       },
       {
         image: '/images/engine-day-equipment.webp',
         alt: 'Equipment selection — modality picker with a per-machine time-trial baseline',
-        title: 'Pick your engine',
+        title: 'Train on the machine you want',
         caption:
-          'Choose the machine on the way in. Each modality carries its own time-trial baseline — today’s targets come from this athlete’s Echo Bike test. Switch machines and the targets follow.',
+          'Row. Bike. Ski. Run. Treadmill. Mix them up.\n\nThe Gains Lab keeps a separate performance baseline for each modality, so your targets stay personalized to the machine you’re actually using.\n\nHere, today’s Echo Bike target comes from this athlete’s own Echo Bike time trial. Switch to the rower or treadmill and the system uses that modality’s data instead.\n\nYou don’t have to fit your training to the platform. The platform adapts to how you train.',
       },
       {
         image: '/images/engine-analytics-overview-v2.webp',
         alt: 'Analytics overview — 12 sessions at 108% average performance, five day types from anaerobic to threshold, and energy system paces with the 2.56× ratio',
-        title: 'Where it all adds up',
+        title: 'Your whole engine, in one place',
         caption:
-          'Twelve sessions in, this athlete is averaging 108% of their targets at RPE 7.5 — working slightly above prescription without redlining. Five day types on the board, anaerobic through threshold, and the rollup ends in the energy-system read: pace bars against the time-trial baseline, and the glycolytic reserve. A season of Engine work, in one scroll.',
+          'This is the rollup.\n\nSessions completed. Average performance against target. RPE. Equipment used. Training split across day types. Time-trial baselines. Aerobic and anaerobic pace. Glycolytic reserve.\n\nInstead of a list of workouts, you get a living picture of how your conditioning is developing.\n\nYou can see what you’ve trained, how you’re responding, where you’re improving, and what still needs work — and the AI sees the same picture when it decides what comes next.',
       },
     ],
   },
