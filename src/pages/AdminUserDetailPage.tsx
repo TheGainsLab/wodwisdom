@@ -4,6 +4,8 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import { TimelineRow, type TimelineEvent } from '../components/admin/timelineEvents';
+import { PerformanceGrid, SkillCostTable } from '../components/PerformanceGrid';
+import { computeGrid, computeSkillCost, hasBarbellEquipment, skillsInMovementNames, type GridSourceRow } from '../lib/performanceGrid';
 
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB
@@ -857,7 +859,7 @@ function CompetitionSection({ userId }: { userId: string }) {
         if (!row?.competition_athlete_id) { setState('unlinked'); return; }
         setLabel(row.competition_athlete_label ?? null);
         const { data, error: vErr } = await supabase.functions.invoke('verify-competition-athlete', {
-          body: { competition_athlete_id: row.competition_athlete_id, include: ['signature'] },
+          body: { competition_athlete_id: row.competition_athlete_id, include: ['all_results'] },
         });
         if (vErr || !data?.bundle) { setState('error'); return; }
         setBundle(data.bundle);
@@ -874,11 +876,29 @@ function CompetitionSection({ userId }: { userId: string }) {
     open_only: 'Open', qualifier: 'Quarterfinals', regionals: 'Semifinals/Regionals', games_athlete: 'Games',
   };
   const summary = bundle?.competition_summary;
-  const affinities = (bundle?.movement_affinity ?? [])
-    .filter((a: any) => a.avg_percentile != null)
-    .sort((a: any, b: any) => (b.exposures ?? 0) - (a.exposures ?? 0))
-    .slice(0, 8);
-  const gaps = (bundle?.fitness_signature?.closable_gaps ?? []).slice(0, 3);
+  // Raw scored events -> the duration x barbell grid + skill-cost table.
+  // Movement-affinity chips and the closable-gaps line are retired (founder
+  // call, 2026-10-03): dominance taxonomy was unverifiable; the grid keeps
+  // only clock buckets and equipment/skill presence, counts on every cell.
+  const stageLabel: Record<string, string> = {
+    open: 'Open', quarterfinals: 'QF', semifinals: 'Semis', regional: 'Regionals', games: 'Games',
+  };
+  const gridSource: GridSourceRow[] = (bundle?.all_results ?? [])
+    .filter((r: any) => r?.result?.valid && typeof r.result.cohort_percentile === 'number')
+    .map((r: any): GridSourceRow => {
+      const bucket = r.workout?.time_domain?.bucket;
+      const movements: any[] = Array.isArray(r.workout?.movements) ? r.workout.movements : [];
+      return {
+        timeDomain: bucket === 'short' || bucket === 'medium' || bucket === 'long' ? bucket : null,
+        percentile: r.result.cohort_percentile,
+        hasBarbell: hasBarbellEquipment(movements.map((m) => (Array.isArray(m?.equipment) ? m.equipment : []))),
+        skills: skillsInMovementNames(movements.map((m) => String(m?.name ?? ''))),
+        label: `${r.year} ${stageLabel[r.stage] ?? r.stage} · ${r.workout_name}`,
+      };
+    });
+  const gridRows = computeGrid(gridSource);
+  const skillRows = computeSkillCost(gridSource);
+  const scoredCount = gridSource.filter((r) => r.timeDomain !== null).length;
 
   return (
     <>
@@ -908,26 +928,17 @@ function CompetitionSection({ userId }: { userId: string }) {
                 </a>
               )}
             </div>
-            {affinities.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: gaps.length > 0 ? 12 : 0 }}>
-                {affinities.map((a: any) => (
-                  <span key={a.category} title={`${a.exposures} exposures${a.trend?.direction ? ` · ${a.trend.direction}` : ''}`}
-                    style={{ fontSize: 11, background: 'var(--surface2, rgba(255,255,255,0.04))', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', whiteSpace: 'nowrap' }}>
-                    {a.category.replace(/_/g, ' ')} <strong>{Math.round(a.avg_percentile)}</strong>
-                  </span>
-                ))}
-              </div>
-            )}
-            {gaps.length > 0 && (
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                <span style={{ fontWeight: 600, color: 'var(--text)' }}>Closable gaps: </span>
-                {gaps.map((g: any, i: number) => (
-                  <span key={`${g.dimension}-${g.bucket}`}>
-                    {i > 0 && ' · '}
-                    {String(g.bucket).replace(/_/g, ' ')} {Math.round(g.cohort_percentile)}th ({Math.round(g.gap_vs_overall_pp)}pp below overall)
-                  </span>
-                ))}
-              </div>
+            {scoredCount > 0 ? (
+              <>
+                <PerformanceGrid
+                  title="In competition"
+                  subtitle={`Cohort percentile · events — ${summary?.seasons_competed ?? '?'} season${summary?.seasons_competed === 1 ? '' : 's'}, ${scoredCount} scored events`}
+                  rows={gridRows}
+                />
+                <SkillCostTable rows={skillRows} overallLabel="their overall" />
+              </>
+            ) : (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Linked, but no scored events came back.</div>
             )}
           </>
         )}
