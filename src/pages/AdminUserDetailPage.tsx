@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import Nav from '../components/Nav';
 import { TimelineRow, type TimelineEvent } from '../components/admin/timelineEvents';
 import { PerformanceGrid, SkillCostTable } from '../components/PerformanceGrid';
-import { computeGrid, computeSkillCost, hasBarbellEquipment, skillsInMovementNames, type GridSourceRow } from '../lib/performanceGrid';
+import { computeGrid, computeSkillCost, hasBarbellEquipment, hasBarbellMovementNames, skillsInMovementNames, type GridSourceRow } from '../lib/performanceGrid';
 
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB
@@ -849,6 +849,29 @@ function CompetitionSection({ userId }: { userId: string }) {
   const [state, setState] = useState<'loading' | 'unlinked' | 'error' | 'ready'>('loading');
   const [label, setLabel] = useState<string | null>(null);
   const [bundle, setBundle] = useState<any>(null);
+  // Training-side feed: scored logged metcon blocks (admin RPC). Loads in
+  // parallel with the competition bundle; null = still loading.
+  const [trainingSource, setTrainingSource] = useState<GridSourceRow[] | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase.rpc('admin_user_metcon_blocks', { target_user_id: userId });
+      if (error || !Array.isArray(data)) { setTrainingSource([]); return; }
+      setTrainingSource(data
+        .filter((r: any) => typeof r.percentile === 'number' || typeof r.percentile === 'string')
+        .map((r: any): GridSourceRow => {
+          const movements: string[] = Array.isArray(r.movements) ? r.movements : [];
+          const bucket = r.time_domain;
+          return {
+            timeDomain: bucket === 'short' || bucket === 'medium' || bucket === 'long' ? bucket : null,
+            percentile: Number(r.percentile),
+            hasBarbell: hasBarbellMovementNames(movements),
+            skills: skillsInMovementNames(movements),
+            label: `${r.workout_date}${r.block_label ? ` · ${r.block_label}` : ''}`,
+          };
+        }));
+    })();
+  }, [userId]);
 
   useEffect(() => {
     (async () => {
@@ -870,7 +893,11 @@ function CompetitionSection({ userId }: { userId: string }) {
     })();
   }, [userId]);
 
-  if (state === 'unlinked') return null;
+  const trainingRows = trainingSource ?? [];
+  const trainingScored = trainingRows.filter((r) => r.timeDomain !== null).length;
+  const trainingGrid = computeGrid(trainingRows);
+  const trainingSkills = computeSkillCost(trainingRows);
+  if (state === 'unlinked' && trainingScored === 0) return null;
 
   const tierLabel: Record<string, string> = {
     open_only: 'Open', qualifier: 'Quarterfinals', regionals: 'Semifinals/Regionals', games_athlete: 'Games',
@@ -902,7 +929,7 @@ function CompetitionSection({ userId }: { userId: string }) {
 
   return (
     <>
-      <SectionHeader>Competition History</SectionHeader>
+      <SectionHeader>Performance</SectionHeader>
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
         {state === 'loading' && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Loading competition data…</div>}
         {state === 'error' && (
@@ -941,6 +968,19 @@ function CompetitionSection({ userId }: { userId: string }) {
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Linked, but no scored events came back.</div>
             )}
           </>
+        )}
+        {/* Training grid — logged AI-program metcons, stacked below the
+            competition data (always stacked: mobile-first, founder call).
+            Renders for ANY user with scored logged metcons, linked or not. */}
+        {trainingScored > 0 && (
+          <div style={{ marginTop: state === 'unlinked' ? 0 : 14 }}>
+            <PerformanceGrid
+              title="In training"
+              subtitle={`Open-field percentile · logged program metcons — ${trainingScored} scored`}
+              rows={trainingGrid}
+            />
+            <SkillCostTable rows={trainingSkills} overallLabel="their training overall" />
+          </div>
         )}
       </div>
     </>
