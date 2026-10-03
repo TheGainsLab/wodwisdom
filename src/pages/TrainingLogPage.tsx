@@ -1292,14 +1292,17 @@ export default function TrainingLogPage({ session }: { session: Session }) {
       capped: boolean | null; percentile: number | null;
       notes: string | null;
       faults: Array<{ movement: string; faults: string[] }>;
+      movements: string[];
       workout_date: string;
     }> = [];
     for (const log of logs) {
       const logEntries = entriesByLog[log.id] || [];
       for (const b of blocksByLog[log.id] || []) {
         if (b.block_type !== 'metcon') continue;
-        const faults = logEntries
-          .filter(e => (e.block_id ? e.block_id === b.id : e.block_label === b.block_label) && e.faults_observed && e.faults_observed.length > 0)
+        const blockEntries = logEntries
+          .filter(e => (e.block_id ? e.block_id === b.id : e.block_label === b.block_label));
+        const faults = blockEntries
+          .filter(e => e.faults_observed && e.faults_observed.length > 0)
           .map(e => ({ movement: e.movement, faults: e.faults_observed as string[] }));
         out.push({
           id: b.id, log_id: b.log_id, block_label: b.block_label, block_text: b.block_text,
@@ -1310,6 +1313,7 @@ export default function TrainingLogPage({ session }: { session: Session }) {
           capped: b.capped, percentile: b.percentile,
           notes: b.notes,
           faults,
+          movements: [...new Set(blockEntries.map(e => e.movement).filter(Boolean))],
           workout_date: log.workout_date,
         });
       }
