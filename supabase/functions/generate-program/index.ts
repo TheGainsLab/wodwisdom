@@ -22,6 +22,15 @@ import type { DayArchetype } from "../_shared/archetype-specs.ts";
 import { deriveAthleteDiagnostic, type AthleteDiagnostic } from "../_shared/derive-athlete-diagnostic.ts";
 import { fetchTier4Bundle } from "../_shared/fetch-tier4-bundle.ts";
 import {
+  computeGrid,
+  computeSkillCost,
+  formatPerformanceGridSection,
+  hasBarbellEquipment,
+  hasBarbellMovementNames,
+  skillsInMovementNames,
+  type GridSourceRow,
+} from "../_shared/performance-grid.ts";
+import {
   formatActiveFlagRules,
   formatCompetitionProfile,
   formatLiftFindings,
@@ -582,12 +591,79 @@ async function processJob(
     // Failure-soft: any error returns null and the diagnostic flows through
     // with `competition: null` exactly as for unlinked athletes.
     const tier4Bundle = athleteLive?.competition_athlete_id
-      ? await fetchTier4Bundle(athleteLive.competition_athlete_id, { include: ["competency", "signature"] })
+      ? await fetchTier4Bundle(athleteLive.competition_athlete_id, { include: ["competency", "signature", "all_results"] })
       : null;
     const diagnostic = deriveAthleteDiagnostic(profile, {
       tier4: { bundle: tier4Bundle },
     });
-    const profileStr = formatProfile(profile, diagnostic);
+    // Performance grids — the honest per-event aggregation (duration x
+    // barbell presence + skill cost, counts on every cell) that replaced
+    // the service's closable_gaps on the admin card. Both soft-fail to
+    // nothing: a missing grid never blocks generation.
+    const perfSections: string[] = [];
+    try {
+      const allResults: any[] = (tier4Bundle as any)?.all_results ?? [];
+      const compRows: GridSourceRow[] = allResults
+        .filter((r) => r?.result?.valid && typeof r.result.cohort_percentile === "number")
+        .map((r) => {
+          const bucket = r.workout?.time_domain?.bucket;
+          const movements: any[] = Array.isArray(r.workout?.movements) ? r.workout.movements : [];
+          return {
+            timeDomain: bucket === "short" || bucket === "medium" || bucket === "long" ? bucket : null,
+            percentile: r.result.cohort_percentile as number,
+            hasBarbell: hasBarbellEquipment(movements.map((m) => (Array.isArray(m?.equipment) ? m.equipment : []))),
+            skills: skillsInMovementNames(movements.map((m) => String(m?.name ?? ""))),
+            label: String(r.workout_name ?? ""),
+          };
+        });
+      if (compRows.some((r) => r.timeDomain !== null)) {
+        perfSections.push(formatPerformanceGridSection(
+          "IN COMPETITION (cohort percentile, n events per cell)",
+          computeGrid(compRows), computeSkillCost(compRows),
+        ));
+      }
+    } catch (err) {
+      console.warn("[generate-program] competition performance grid failed:", err);
+    }
+    try {
+      const { data: logRows } = await supa
+        .from("workout_logs").select("id").eq("user_id", userId).limit(200);
+      const logIds = (logRows ?? []).map((l: any) => l.id);
+      if (logIds.length > 0) {
+        const [{ data: blocks }, { data: entries }] = await Promise.all([
+          supa.from("workout_log_blocks")
+            .select("id, log_id, block_label, time_domain, percentile")
+            .in("log_id", logIds).eq("block_type", "metcon").not("percentile", "is", null),
+          supa.from("workout_log_entries")
+            .select("log_id, block_id, block_label, movement")
+            .in("log_id", logIds),
+        ]);
+        const trainRows: GridSourceRow[] = (blocks ?? []).map((bRow: any) => {
+          const movements = (entries ?? [])
+            .filter((e: any) => e.log_id === bRow.log_id &&
+              (e.block_id ? e.block_id === bRow.id : e.block_label === bRow.block_label))
+            .map((e: any) => String(e.movement ?? ""))
+            .filter(Boolean);
+          const bucket = bRow.time_domain;
+          return {
+            timeDomain: bucket === "short" || bucket === "medium" || bucket === "long" ? bucket : null,
+            percentile: Number(bRow.percentile),
+            hasBarbell: hasBarbellMovementNames(movements),
+            skills: skillsInMovementNames(movements),
+            label: String(bRow.block_label ?? ""),
+          };
+        }).filter((r: GridSourceRow) => Number.isFinite(r.percentile));
+        if (trainRows.some((r) => r.timeDomain !== null)) {
+          perfSections.push(formatPerformanceGridSection(
+            "IN TRAINING (open-field percentile from logged program metcons, n workouts per cell)",
+            computeGrid(trainRows), computeSkillCost(trainRows),
+          ));
+        }
+      }
+    } catch (err) {
+      console.warn("[generate-program] training performance grid failed:", err);
+    }
+    const profileStr = [formatProfile(profile, diagnostic), ...perfSections].join("\n\n");
     console.log(`[generate-program] Profile: ${profileStr.length} chars, lifts=${Object.keys(profile.lifts || {}).length}, skills=${Object.keys(profile.skills || {}).length}, flags=${diagnostic.lifts.flags.length}+${diagnostic.skills.flags.length}, tier4=${diagnostic.competition ? "linked" : "none"}`);
     const goalText = (athleteLive?.goal ?? "").trim();
     const injuriesText = (athleteLive?.injuries_constraints ?? "").trim();
