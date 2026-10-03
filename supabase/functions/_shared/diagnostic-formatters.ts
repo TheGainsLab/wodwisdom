@@ -377,11 +377,16 @@ export function formatCompetitionProfile(d: AthleteDiagnostic): string {
     if (unclear.length > 0) lines.push(`  Inconclusive (insufficient competition evidence): ${unclear.join(", ")}`);
   }
 
-  // Closable gaps retired from the prompt (2026-10-03): the service's
-  // opaque percentile-of-percentiles aggregation did not survive scrutiny
-  // against raw per-event math. The PERFORMANCE GRID sections (appended by
-  // generate-program from all_results + logged metcons) are the honest
-  // replacement; the diagnostic still carries closable_gaps as data.
+  // Closable gaps — buckets where the athlete lags their OWN overall percentile.
+  if (c.closable_gaps.length > 0) {
+    lines.push("");
+    lines.push("Relative weaknesses — lags their own overall; prioritise these:");
+    for (const g of c.closable_gaps) {
+      lines.push(
+        `  ${humanizeCompetitionBucket(g.bucket)}: ${g.cohort_percentile.toFixed(1)}pct, ${g.gap_vs_overall_pp.toFixed(1)}pp below overall (n=${g.n_workouts})`,
+      );
+    }
+  }
 
   return lines.join("\n").trimEnd();
 }

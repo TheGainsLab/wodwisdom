@@ -44,6 +44,16 @@ import {
 import { computeEquipmentBlockedMovements } from "./equipment-movements.ts";
 import { fetchTier4Bundle, type Tier4Bundle } from "./fetch-tier4-bundle.ts";
 import {
+  computeGrid,
+  computeSkillCost,
+  hasBarbellEquipment,
+  hasBarbellMovementNames,
+  skillsInMovementNames,
+  type GridRowData,
+  type GridSourceRow,
+  type SkillCostRow,
+} from "./performance-grid.ts";
+import {
   type AthleteModel,
   buildAthleteModel,
   type LoggedCompetitionResult,
@@ -180,6 +190,19 @@ export interface PreviousCycleSummary {
   }>;
 }
 
+/** The duration x barbell-presence performance grid + skill-cost list
+ *  (founder spec, 2026-10-03) - the honest per-event aggregation that
+ *  replaced the service's closable_gaps on the admin card and MetCons tab.
+ *  Columns short/medium/long/all; rows all/barbell/no_barbell; every cell
+ *  an event-weighted percentile average with its count. Counts are the
+ *  evidence size: small-n cells are hints, not findings. */
+export interface PerformanceGridPayload {
+  /** Cohort percentile across the athlete's competition events. */
+  competition: { grid: GridRowData[]; skill_cost: SkillCostRow[]; scored: number } | null;
+  /** Open-field percentile across scored logged program metcons. */
+  training: { grid: GridRowData[]; skill_cost: SkillCostRow[]; scored: number } | null;
+}
+
 export interface WriterPayload {
   basics: BasicsPayload;
   /** All 14 canonical lift keys; null when user hasn't entered. */
@@ -201,6 +224,9 @@ export interface WriterPayload {
   athlete_model: AthleteModel;
   /** Tier 4 slice when linked + fetch succeeded; null otherwise. */
   competition: CompetitionPayload | null;
+  /** See PerformanceGridPayload. null only when neither source has a
+   *  scored workout. */
+  performance_grid: PerformanceGridPayload | null;
   /** Step 27 carry-forward: most-recently-active completed cycle's
    *  adherence + skip rate + per-skill volume. NULL for first-time athletes
    *  or anyone without a completed log against any prior program. */
@@ -551,14 +577,39 @@ export async function buildWriterPayload(
   // 2. Tier 4 bundle — only when linked. Soft-fails to null on any
   // upstream error (matches fetchTier4Bundle's existing contract).
   let competition: CompetitionPayload | null = null;
+  let gridCompetition: PerformanceGridPayload["competition"] = null;
+  let gridTraining: PerformanceGridPayload["training"] = null;
   if (profile.competition_athlete_id) {
-    const tier4Include = ["competency", "signature", "power_profile"];
-    if (includeAllResults) tier4Include.unshift("all_results");
+    // all_results is always fetched now: the performance grid computes from
+    // raw events server-side. Whether the RAW events ride into the payload
+    // is still gated on includeAllResults (size), as before.
+    const tier4Include = ["all_results", "competency", "signature", "power_profile"];
     const bundle = await fetchTier4Bundle(profile.competition_athlete_id, {
       include: tier4Include,
     });
     if (bundle) {
       competition = sliceTier4Bundle(bundle, includeAllResults);
+      try {
+        const compRows: GridSourceRow[] = (bundle.all_results ?? [])
+          .filter((r) => r?.result?.valid && typeof r.result.cohort_percentile === "number")
+          .map((r): GridSourceRow => {
+            const bucket = r.workout?.time_domain?.bucket;
+            const movements = Array.isArray(r.workout?.movements) ? r.workout.movements : [];
+            return {
+              timeDomain: bucket === "short" || bucket === "medium" || bucket === "long" ? bucket : null,
+              percentile: r.result.cohort_percentile,
+              hasBarbell: hasBarbellEquipment(movements.map((m) => (Array.isArray((m as { equipment?: string[] }).equipment) ? (m as { equipment: string[] }).equipment : []))),
+              skills: skillsInMovementNames(movements.map((m) => String(m?.name ?? ""))),
+              label: String(r.workout_name ?? ""),
+            };
+          });
+        const scored = compRows.filter((r) => r.timeDomain !== null).length;
+        if (scored > 0) {
+          gridCompetition = { grid: computeGrid(compRows), skill_cost: computeSkillCost(compRows), scored };
+        }
+      } catch (err) {
+        console.warn(`[build-writer-payload] competition performance grid failed for ${userId}:`, err);
+      }
     }
   }
 
@@ -567,6 +618,48 @@ export async function buildWriterPayload(
   // athlete linked official history — so CoachState (→ the eval) and, via
   // CoachState, the generator read them the same way imported results are read.
   const loggedResults = await fetchLoggedCompetitionResults(supa, userId);
+
+  // 2c. Training performance grid — scored logged program metcon blocks,
+  // entry movements matched by block_id with the legacy block_label
+  // fallback (same matching the Training Log page uses). Soft-fails.
+  try {
+    const { data: logRows } = await supa
+      .from("workout_logs").select("id").eq("user_id", userId).limit(200);
+    const logIds = ((logRows ?? []) as Array<{ id: string }>).map((l) => l.id);
+    if (logIds.length > 0) {
+      const [{ data: blocks }, { data: entries }] = await Promise.all([
+        supa.from("workout_log_blocks")
+          .select("id, log_id, block_label, time_domain, percentile")
+          .in("log_id", logIds).eq("block_type", "metcon").not("percentile", "is", null),
+        supa.from("workout_log_entries")
+          .select("log_id, block_id, block_label, movement")
+          .in("log_id", logIds),
+      ]);
+      type BlockRow = { id: string; log_id: string; block_label: string | null; time_domain: string | null; percentile: number | string };
+      type EntryRow = { log_id: string; block_id: string | null; block_label: string | null; movement: string | null };
+      const trainRows: GridSourceRow[] = ((blocks ?? []) as BlockRow[]).map((bRow): GridSourceRow => {
+        const movements = ((entries ?? []) as EntryRow[])
+          .filter((e) => e.log_id === bRow.log_id &&
+            (e.block_id ? e.block_id === bRow.id : e.block_label === bRow.block_label))
+          .map((e) => String(e.movement ?? ""))
+          .filter((m) => m.length > 0);
+        const bucket = bRow.time_domain;
+        return {
+          timeDomain: bucket === "short" || bucket === "medium" || bucket === "long" ? bucket : null,
+          percentile: Number(bRow.percentile),
+          hasBarbell: hasBarbellMovementNames(movements),
+          skills: skillsInMovementNames(movements),
+          label: String(bRow.block_label ?? ""),
+        };
+      }).filter((r) => Number.isFinite(r.percentile));
+      const scored = trainRows.filter((r) => r.timeDomain !== null).length;
+      if (scored > 0) {
+        gridTraining = { grid: computeGrid(trainRows), skill_cost: computeSkillCost(trainRows), scored };
+      }
+    }
+  } catch (err) {
+    console.warn(`[build-writer-payload] training performance grid failed for ${userId}:`, err);
+  }
 
   // 3. Vocabulary — display_name list.
   const vocabulary = await fetchVocabulary(supa);
@@ -747,6 +840,9 @@ export async function buildWriterPayload(
     },
     athlete_model,
     competition,
+    performance_grid: gridCompetition || gridTraining
+      ? { competition: gridCompetition, training: gridTraining }
+      : null,
     previous_cycle,
     vocabulary,
     profile_evaluation,
