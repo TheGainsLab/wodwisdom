@@ -16,6 +16,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import MetconHeatmap from './MetconHeatmap';
 import { bucketByTimeDomain, type WkgBucketStat } from '../lib/competitionHistory';
+import { PerformanceGrid, SkillCostTable } from './PerformanceGrid';
+import { computeGrid, computeSkillCost, hasBarbellEquipment, hasBarbellMovementNames, skillsInMovementNames, type GridSourceRow } from '../lib/performanceGrid';
 
 interface MetconBlockLite {
   id: string;
@@ -33,6 +35,7 @@ interface MetconBlockLite {
   percentile: number | null;
   notes: string | null;
   faults: Array<{ movement: string; faults: string[] }>;
+  movements: string[];
   workout_date: string;
 }
 
@@ -48,6 +51,7 @@ interface Props {
  *  detail card. The bundle carries more; we type only what we render. */
 interface HistoricalMovement {
   name: string;
+  equipment?: string[];
   reps_scheme?: string | null;
   load_lbs?: number | null;
   load_descriptor?: string | null;
@@ -595,8 +599,67 @@ export default function MetconsTab({ userId, bodyweightKg, competitionAthleteId,
       });
   }, [metconBlocks, historySearch]);
 
+  // ── Performance grids: duration × barbell presence, counts on every
+  // cell; one from logged program metcons, one from imported competition
+  // events (linked athletes). Same construction as the admin card.
+  const trainingGridSource = useMemo((): GridSourceRow[] =>
+    metconBlocks
+      .filter(b => b.percentile != null)
+      .map(b => ({
+        timeDomain: b.time_domain === 'short' || b.time_domain === 'medium' || b.time_domain === 'long' ? b.time_domain : null,
+        percentile: b.percentile as number,
+        hasBarbell: hasBarbellMovementNames(b.movements),
+        skills: skillsInMovementNames(b.movements),
+        label: `${b.workout_date}${b.block_label ? ` · ${b.block_label}` : ''}`,
+      })), [metconBlocks]);
+  const trainingGrid = useMemo(() => computeGrid(trainingGridSource), [trainingGridSource]);
+  const trainingSkills = useMemo(() => computeSkillCost(trainingGridSource), [trainingGridSource]);
+  const trainingScored = trainingGridSource.filter(r => r.timeDomain !== null).length;
+
+  const compGridSource = useMemo((): GridSourceRow[] =>
+    historical
+      .filter(r => r.result?.valid && typeof r.result.cohort_percentile === 'number')
+      .map(r => {
+        const bucket = r.workout?.time_domain?.bucket;
+        const movements = r.workout?.movements ?? [];
+        return {
+          timeDomain: bucket === 'short' || bucket === 'medium' || bucket === 'long' ? bucket : null,
+          percentile: r.result.cohort_percentile as number,
+          hasBarbell: hasBarbellEquipment(movements.map(m => m.equipment ?? [])),
+          skills: skillsInMovementNames(movements.map(m => m.name)),
+          label: `${r.year}${r.stage ? ` ${r.stage}` : ''} · ${r.workout_name}`,
+        };
+      }), [historical]);
+  const compGrid = useMemo(() => computeGrid(compGridSource), [compGridSource]);
+  const compSkills = useMemo(() => computeSkillCost(compGridSource), [compGridSource]);
+  const compScored = compGridSource.filter(r => r.timeDomain !== null).length;
+
   return (
     <div>
+      {(trainingScored > 0 || compScored > 0) && (
+        <CollapsibleSection title="Performance Grid" defaultOpen>
+          {trainingScored > 0 && (
+            <>
+              <PerformanceGrid
+                title="In training"
+                subtitle={`Open-field percentile · logged metcons — ${trainingScored} scored`}
+                rows={trainingGrid}
+              />
+              <SkillCostTable rows={trainingSkills} overallLabel="your training overall" />
+            </>
+          )}
+          {compScored > 0 && (
+            <div style={{ marginTop: trainingScored > 0 ? 14 : 0 }}>
+              <PerformanceGrid
+                title="In competition"
+                subtitle={`Cohort percentile · events — ${compScored} scored`}
+                rows={compGrid}
+              />
+              <SkillCostTable rows={compSkills} overallLabel="your competition overall" />
+            </div>
+          )}
+        </CollapsibleSection>
+      )}
       {/* ── Power charts — each chart sits directly under its own stats ── */}
       <CollapsibleSection title="Power Charts" defaultOpen>
         {/* Program group: program stats, then the program chart. */}
