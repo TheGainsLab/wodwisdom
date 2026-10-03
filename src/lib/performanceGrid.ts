@@ -106,3 +106,17 @@ export function skillsInMovementNames(names: string[]): string[] {
 export function hasBarbellEquipment(equipmentLists: string[][]): boolean {
   return equipmentLists.some((eq) => eq.some((e) => e.toLowerCase() === 'barbell'));
 }
+
+/** Barbell presence from movement NAMES — for sources without equipment
+ *  arrays (logged program metcons). A name counts only when it matches a
+ *  barbell lift AND carries no other-implement qualifier, so "dumbbell
+ *  snatch" and "bar muscle-up" can't false-positive. Catalog/typed names,
+ *  not generated prose. */
+const BARBELL_LIFT = /snatch|clean|jerk|thruster|deadlift|front squat|back squat|overhead squat|push press|bench press|good morning|barbell/;
+const OTHER_IMPLEMENT = /dumbbell|\bdb\b|kettlebell|\bkb\b|sandbag|odd.?object|wall.?ball|medicine|muscle.?up/;
+export function hasBarbellMovementNames(names: string[]): boolean {
+  return names.some((raw) => {
+    const n = raw.toLowerCase();
+    return BARBELL_LIFT.test(n) && !OTHER_IMPLEMENT.test(n);
+  });
+}
