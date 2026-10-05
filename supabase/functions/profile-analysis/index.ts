@@ -284,7 +284,7 @@ Deno.serve(async (req) => {
 
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
-      .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, goal, self_perception_level, days_per_week, session_length_minutes, injuries_constraints, competition_athlete_id")
+      .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, goal, self_perception_level, days_per_week, session_length_minutes, injuries_constraints, competition_athlete_id, athletic_reviewed_at")
       .eq("user_id", userId)
       .maybeSingle();
 

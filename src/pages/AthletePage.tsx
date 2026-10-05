@@ -692,6 +692,10 @@ export default function AthletePage({ session }: { session: Session }) {
   const [units, setUnits] = useState<'lbs' | 'kg'>('lbs');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [lifts, setLifts] = useState<Record<string, number>>({});
+  // When the athlete first saved their Athletic Data (null = never saved).
+  // Gates T2 (reviewed semantics, 2026-10-05) and the one-time sparse-save
+  // confirm in saveProfile.
+  const [athleticReviewedAt, setAthleticReviewedAt] = useState<string | null>(null);
   // Starts EMPTY, not seeded with defaults: the record only becomes non-empty
   // once the athlete actually reviews equipment (checkbox touch or Save
   // Equipment). An empty record is the "review required" signal — it keeps T3
@@ -864,7 +868,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, eval_credits_remaining, competition_athlete_id, competition_athlete_label, coaching_intake_raw, injuries_structured, injuries_constraints_hash, injuries_avoidance_confirmed, programming_resume_pending_at')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, eval_credits_remaining, competition_athlete_id, competition_athlete_label, coaching_intake_raw, injuries_structured, injuries_constraints_hash, injuries_avoidance_confirmed, programming_resume_pending_at, athletic_reviewed_at')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -917,6 +921,7 @@ export default function AthletePage({ session }: { session: Session }) {
       if (profileRes.data) {
         const d = profileRes.data;
         setLifts(d.lifts || {});
+        setAthleticReviewedAt(d.athletic_reviewed_at ?? null);
         if (d.equipment && Object.keys(d.equipment).length > 0) {
           // Non-empty record = the athlete (or a pre-review save) already
           // confirmed their equipment — grandfathered straight to green.
@@ -1215,6 +1220,22 @@ export default function AthletePage({ session }: { session: Session }) {
       }
     }
 
+    // One-time sparse-save confirm (first save only): T2 completes on save
+    // regardless of how sparse the data is, so this is the moment the athlete
+    // hears the contract. Cancel aborts the save; confirm takes what's there.
+    const coreLiftsBlank = ['back_squat', 'deadlift', 'bench_press', 'snatch', 'clean_and_jerk']
+      .filter((k) => !(cleanLifts[k] > 0));
+    const hasRun = ['1_mile_run', '5k_run'].some((k) => cleanConditioning[k] != null && cleanConditioning[k] !== '');
+    const sparse = coreLiftsBlank.length > 0 || cleanConditioning['2k_row'] == null || !hasRun;
+    if (!athleticReviewedAt && sparse) {
+      const ok = window.confirm(
+        'We can only work with what you give us — anything left blank stays out of your evaluation and your programming. Whenever you test something new, enter it (estimates count), and every future evaluation and program will include it.\n\nSave with what you have now?'
+      );
+      if (!ok) { setSaving(false); return false; }
+    }
+    // First-save timestamp is preserved on later saves.
+    const reviewedAtIso = athleticReviewedAt ?? new Date().toISOString();
+
     const payload = {
       user_id: session.user.id,
       lifts: cleanLifts,
@@ -1224,6 +1245,7 @@ export default function AthletePage({ session }: { session: Session }) {
       equipment: overrides?.equipment ?? equipment,
       skills: filledSkills,
       conditioning: cleanConditioning,
+      athletic_reviewed_at: reviewedAtIso,
       bodyweight: bw && !isNaN(bw) ? bw : null,
       units,
       age: ageNum && !isNaN(ageNum) ? ageNum : null,
@@ -1278,6 +1300,8 @@ export default function AthletePage({ session }: { session: Session }) {
     // flow by unmounting the component mid-click.
     if (isNewUser) setIsNewUser(false);
     setIsDirty(false);
+    // Saved = reviewed: this is the signal T2 completion reads.
+    setAthleticReviewedAt(reviewedAtIso);
     // Any save that persisted a non-empty equipment record completes the
     // review — this is exactly the signal the T3 gate reads, so header state
     // and gate can never drift.
@@ -1401,6 +1425,7 @@ export default function AthletePage({ session }: { session: Session }) {
     skills: filledSkillsForTierCheck,
     conditioning,
     equipment,
+    athletic_reviewed_at: athleticReviewedAt,
     days_per_week: daysPerWeek ? parseInt(daysPerWeek, 10) : null,
     session_length_minutes: sessionLengthMinutes ? parseInt(sessionLengthMinutes, 10) : null,
     injuries_constraints: injuriesConstraints.trim() || 'None',
@@ -1844,7 +1869,10 @@ export default function AthletePage({ session }: { session: Session }) {
                   precision not required, a general idea is fine.
                 </p>
                 <CollapsibleSection title={`1RM Lifts (${units})`}>
-                  <p className="athlete-card-subtitle">Enter your one-rep max weights in {units}</p>
+                  <p className="athlete-card-subtitle">
+                    Enter your one-rep max weights in {units}. Estimates are fine — a recent heavy
+                    single or an honest guess. Leave blank anything you don’t train or can’t test.
+                  </p>
                   {LIFT_GROUPS.map(group => (
                     <div key={group.title} style={{ marginBottom: 20 }}>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 10 }}>{group.title}</h3>
@@ -2318,7 +2346,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       </button>
                       {!tierStatus.canRunEval && !hasGeneratedProgram && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
-                          Finish your Basics, key lifts, a 2k row, and one run (mile or 5k) to run your free evaluation.
+                          Finish your Basics and save your Athletic Data to run your free evaluation.
                         </span>
                       )}
                     </>
