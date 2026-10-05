@@ -83,3 +83,11 @@ This athlete also trains Engine: a separate, fixed-catalog monostructural condit
   - Rule 6's MONOSTRUCTURAL BUDGET IS ZERO this month: compose NO monostructural-only pieces. A dedicated machine/run session here duplicates what Engine already delivers at the stated weekly minutes. Machines remain welcome INSIDE mixed pieces (rule 8 unchanged).
   - BIAS toward what Engine cannot provide: loading, skills, and mixed-modal movement expressed under fatigue. Where a slot's character allows a choice, lean away from the zones Engine's minutes already saturate and toward the ones it leaves thin.
   - Engine's catalog is FIXED: never assume, instruct, or wait for the athlete's Engine training to change. This month flexes around it.`;
+
+/** Appended to the composer system prompt ONLY when the month has 2
+ *  slots per week (metcon-composer.ts) — larger months stay
+ *  byte-identical. Composable with the ENGINE addendum. */
+export const TWO_DAY_COMPOSER_ADDENDUM = `
+
+TWO-DAY MONTH (2 conditioning slots per week)
+With 8 pieces for the month, weekly targets become monthly: express each development axis at least once every TWO weeks (the audit enforces per-fortnight at this volume), keep format spread month-wide, and make every piece count toward the athlete's priorities — there are no throwaway slots.`;

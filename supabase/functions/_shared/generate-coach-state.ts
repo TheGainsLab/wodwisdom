@@ -23,6 +23,7 @@ import type { WriterPayload } from "./build-writer-payload.ts";
 import {
   COACH_STATE_SYSTEM_PROMPT,
   ENGINE_COACH_STATE_ADDENDUM,
+  TWO_DAY_COACH_STATE_ADDENDUM,
 } from "./coach-state-prompt.ts";
 import {
   athleteModelEvidenceKeys,
@@ -84,12 +85,13 @@ async function callCoachState(
         model: MODEL,
         max_tokens: 8000,
         stream: false,
-        // Engine-awareness (2026-10): the addendum rides ONLY when the
-        // payload carries completed-session Engine evidence — every other
-        // athlete's system prompt is byte-identical to before.
-        system: payload.engine_training
-          ? COACH_STATE_SYSTEM_PROMPT + ENGINE_COACH_STATE_ADDENDUM
-          : COACH_STATE_SYSTEM_PROMPT,
+        // Scoped addenda, composable: ENGINE rides only with completed-
+        // session Engine evidence; TWO-DAY rides only at days_per_week = 2
+        // (a 2-day Engine athlete gets both). Athletes matching neither
+        // get the byte-identical base prompt.
+        system: COACH_STATE_SYSTEM_PROMPT +
+          (payload.engine_training ? ENGINE_COACH_STATE_ADDENDUM : "") +
+          (payload.training_context.days_per_week === 2 ? TWO_DAY_COACH_STATE_ADDENDUM : ""),
         tools: [tool],
         tool_choice: { type: "tool", name: "emit_coach_state" },
         messages: [{ role: "user", content: userMessage }],

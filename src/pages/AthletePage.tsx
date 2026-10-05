@@ -2010,7 +2010,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       <input
                         className="lift-input"
                         type="number"
-                        min="3"
+                        min="2"
                         max="6"
                         placeholder="—"
                         aria-label="Days per week"
@@ -2018,7 +2018,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         onChange={e => { setDaysPerWeek(e.target.value); markDirty(); }}
                         style={{ width: 92, textAlign: 'center', fontSize: 18, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
                       />
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>3–6 days. Your program is built to fit — no filler days.</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>2–6 days. Your program is built to fit — no filler days.</span>
                     </div>
 
                     {/* Session time budget (reinstated 2026-08-31, reversing the

@@ -38,6 +38,7 @@ import { MODELS } from "./model-profiles.ts";
 import {
   METCON_COMPOSER_ENGINE_ADDENDUM,
   METCON_COMPOSER_SYSTEM_PROMPT,
+  TWO_DAY_COMPOSER_ADDENDUM,
 } from "./metcon-composer-prompt.ts";
 import type { EngineTrainingPayload } from "./build-writer-payload.ts";
 
@@ -401,6 +402,11 @@ export async function callMetconComposer(
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
   const model = opts.model ?? MODELS.sonnet;
 
+  // Max conditioning slots in any one week — 2 means a two-day athlete.
+  const weekCounts = new Map<number, number>();
+  for (const sl of inputs.slots) weekCounts.set(sl.week_num, (weekCounts.get(sl.week_num) ?? 0) + 1);
+  const slotsPerWeekMax = Math.max(0, ...weekCounts.values());
+
   const base = buildComposerUserMessage(inputs);
   const userMessage = opts.retryViolations ? `${opts.retryViolations}\n\n---\n\n${base}` : base;
 
@@ -418,11 +424,13 @@ export async function callMetconComposer(
       // 24-slot month with margin. Unused headroom costs nothing.
       max_tokens: 16000,
       stream: false,
-      // Engine-awareness: the addendum rides ONLY with evidence — every
-      // other athlete's composer prompt is byte-identical to before.
-      system: inputs.engine_training
-        ? METCON_COMPOSER_SYSTEM_PROMPT + METCON_COMPOSER_ENGINE_ADDENDUM
-        : METCON_COMPOSER_SYSTEM_PROMPT,
+      // Scoped addenda, composable: ENGINE rides only with completed-
+      // session Engine evidence; TWO-DAY rides only on 2-slot weeks (a
+      // 2-day Engine athlete gets both). Months matching neither get the
+      // byte-identical base prompt.
+      system: METCON_COMPOSER_SYSTEM_PROMPT +
+        (inputs.engine_training ? METCON_COMPOSER_ENGINE_ADDENDUM : "") +
+        (slotsPerWeekMax <= 2 ? TWO_DAY_COMPOSER_ADDENDUM : ""),
       tools: [EMIT_METCON_MONTH_TOOL],
       tool_choice: { type: "tool", name: "emit_metcon_month" },
       messages: [{ role: "user", content: userMessage }],
