@@ -229,9 +229,10 @@ async function stagePayloadBuilding(
     includeAllResults: false,
     includeEvaluations: true,
     monthNumber,
+    includeEngineTraining: true,
   });
   console.log(
-    `[generate-program-v3] payload built (days_per_week=${payload.training_context.days_per_week} competition_linked=${payload.competition != null} vocabulary_size=${payload.vocabulary.length})`,
+    `[generate-program-v3] payload built (days_per_week=${payload.training_context.days_per_week} competition_linked=${payload.competition != null} vocabulary_size=${payload.vocabulary.length} engine_evidence=${payload.engine_training != null})`,
   );
 
   return {

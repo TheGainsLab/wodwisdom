@@ -199,9 +199,10 @@ for (const fixture of ALL_FIXTURES) {
       const supa = makeStubSupa({ profileRow: fixture.profileRow });
       const payload = await buildWriterPayload(supa, "test-user-id");
 
-      // 13 top-level keys per the locked contract (Step 27 added previous_cycle;
+      // 15 top-level keys per the locked contract (Step 27 added previous_cycle;
       // eval-consumption added profile_evaluation + training_evaluation;
-      // coaching-state Step 1 added athlete_model).
+      // coaching-state Step 1 added athlete_model; the honest-analytics pass
+      // added performance_grid; Engine-awareness added engine_training).
       assertEquals(
         Object.keys(payload).sort(),
         [
@@ -209,8 +210,10 @@ for (const fixture of ALL_FIXTURES) {
           "basics",
           "competition",
           "conditioning",
+          "engine_training",
           "equipment",
           "lifts",
+          "performance_grid",
           "previous_cycle",
           "profile_evaluation",
           "rag",

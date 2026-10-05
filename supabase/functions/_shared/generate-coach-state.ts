@@ -20,7 +20,10 @@
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { WriterPayload } from "./build-writer-payload.ts";
-import { COACH_STATE_SYSTEM_PROMPT } from "./coach-state-prompt.ts";
+import {
+  COACH_STATE_SYSTEM_PROMPT,
+  ENGINE_COACH_STATE_ADDENDUM,
+} from "./coach-state-prompt.ts";
 import {
   athleteModelEvidenceKeys,
 } from "./athlete-model.ts";
@@ -81,7 +84,12 @@ async function callCoachState(
         model: MODEL,
         max_tokens: 8000,
         stream: false,
-        system: COACH_STATE_SYSTEM_PROMPT,
+        // Engine-awareness (2026-10): the addendum rides ONLY when the
+        // payload carries completed-session Engine evidence — every other
+        // athlete's system prompt is byte-identical to before.
+        system: payload.engine_training
+          ? COACH_STATE_SYSTEM_PROMPT + ENGINE_COACH_STATE_ADDENDUM
+          : COACH_STATE_SYSTEM_PROMPT,
         tools: [tool],
         tool_choice: { type: "tool", name: "emit_coach_state" },
         messages: [{ role: "user", content: userMessage }],
