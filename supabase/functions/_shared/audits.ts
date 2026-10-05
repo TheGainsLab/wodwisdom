@@ -170,6 +170,37 @@ export function auditMetconOnePiece(output: WriterOutput): AuditResult {
 }
 
 // ============================================================
+// Rule — every training day carries its metcon (platform invariant)
+// ============================================================
+
+/**
+ * Every day in a generated program carries at least one metcon block —
+ * the platform invariant (restated for Engine-awareness, 2026-10: Engine
+ * evidence changes conditioning's CHARACTER, never its existence). The ONE
+ * exception: a day carrying an active-recovery block — dedicated recovery
+ * days replace strength + metcon by design, the same carve-out the
+ * skeleton's cycle_coverage audit makes. The skeleton audit already
+ * guarantees this upstream; this is the final-output guard so nothing
+ * between skeleton and save (fill, block fixes, future stages) can quietly
+ * drop a day's conditioning.
+ */
+export function auditMetconPresence(output: WriterOutput): AuditResult {
+  const violations: string[] = [];
+  for (const week of safeWeeks(output)) {
+    for (const day of safeDays(week)) {
+      const types = new Set(safeBlocks(day).map((b) => b.block_type));
+      if (types.has("active-recovery")) continue;
+      if (!types.has("metcon")) {
+        violations.push(
+          `Week ${week.week_num} Day ${day.day_num}: no metcon block. Every training day carries its metcon — only a dedicated active-recovery day may omit it.`,
+        );
+      }
+    }
+  }
+  return { rule: "metcon_presence", passed: violations.length === 0, violations };
+}
+
+// ============================================================
 // Rule — at most one monostructural cardio modality per metcon block
 // ============================================================
 //
@@ -1111,6 +1142,7 @@ export const ALL_AUDITS = [
   // complexes (snatch + OHS + snatch balance as one block). auditStrengthOneLift()
   // retained as a callable but no longer wired.
   (ctx: AuditContext): AuditResult => auditMetconOnePiece(ctx.output),
+  (ctx: AuditContext): AuditResult => auditMetconPresence(ctx.output),
   (ctx: AuditContext): AuditResult => auditMetconMonostructural(ctx.output),
   (ctx: AuditContext): AuditResult => auditMetconDrills(ctx.output),
   (ctx: AuditContext): AuditResult => auditMetconBarbellLoads(ctx.output),
@@ -1153,8 +1185,11 @@ export const AUDIT_KIND: Record<string, AuditKind> = {
   workup_top_set: "block-local",
   do_not_program: "block-local",
   // Structural — whole-program issues; only writer-retry can fix
+  // (metcon_presence: a MISSING block has nothing for a surgical
+  // block-local call to rewrite).
   block_type_enum: "structural-writer",
   day_count: "structural-writer",
+  metcon_presence: "structural-writer",
   structural_integrity: "structural-writer",
 };
 
