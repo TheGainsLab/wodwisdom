@@ -813,6 +813,24 @@ serve(async (req) => {
         // truth for Engine content access.
         console.log(`[webhook] Subscription payment: customer=${customerId}, subscription=${subscriptionId}, billing_reason=${invoice.billing_reason}`);
 
+        // A NEW paid period is only ever billed by subscription_create (the
+        // first invoice) or subscription_cycle (a renewal). subscription_update
+        // (plan change / upgrade / downgrade) re-bills the SAME month — and the
+        // line-level proration guard below does NOT catch it: an anchor-reset
+        // upgrade bills the new plan as a real non-proration line, and a plan
+        // flip covered by proration credit fires payment_succeeded on a €0
+        // invoice (2026-10-05 incident: one user's same-day plan flips minted
+        // 3 phantom Engine months and would have triggered phantom program
+        // generations). Nothing downstream may advance on anything but a new
+        // period. reconcile-engine-months applies the same filter when it
+        // recounts invoices — the two must agree or the sweep re-mints what
+        // this gate blocks.
+        const BILLS_NEW_PERIOD = ["subscription_create", "subscription_cycle"];
+        if (!BILLS_NEW_PERIOD.includes(invoice.billing_reason)) {
+          console.log(`[webhook] invoice ${invoice.id}: billing_reason=${invoice.billing_reason} bills no new period — skipping drip/generation advancement`);
+          break;
+        }
+
         // Find user — by stripe_customer_id, then by the Stripe customer's
         // email. The customer id is only written by checkout.session.completed,
         // and Stripe does not order invoice.payment_succeeded after it: on a

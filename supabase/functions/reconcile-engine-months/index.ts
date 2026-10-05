@@ -224,7 +224,17 @@ async function reconcileOne(
   );
   if (!invResp.ok) throw new Error(`stripe invoices ${invResp.status}`);
   const invData = await invResp.json();
-  const paidInvoiceCount: number = (invData.data ?? []).length;
+  // Only invoices that billed a NEW period count toward entitlement:
+  // subscription_create (first invoice) + subscription_cycle (renewals).
+  // subscription_update invoices are the SAME month re-billed on a plan
+  // change — they show status=paid too (including €0 ones covered by
+  // proration credit), and counting them re-mints exactly the phantom
+  // months the stripe-webhook billing_reason gate blocks (2026-10-05
+  // incident: same-day plan flips → 2 payments, 4 unlocked months). The
+  // webhook and this sweep apply the SAME filter — keep them in lockstep.
+  const paidInvoiceCount: number = ((invData.data ?? []) as Array<{ billing_reason?: string }>)
+    .filter((inv) => inv.billing_reason === "subscription_create" || inv.billing_reason === "subscription_cycle")
+    .length;
   if (paidInvoiceCount === 0) {
     return { user_id: userId, email: profile.email, before: currentUnlocked, after: currentUnlocked, reason: "no_paid_invoices" };
   }
