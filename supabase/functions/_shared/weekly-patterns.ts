@@ -16,22 +16,27 @@
 import type { DayArchetype } from "./archetype-specs.ts";
 import type { PrimaryGoal } from "./reconciler.ts";
 
-type PatternMap = Record<3 | 4 | 5 | 6, DayArchetype[]>;
+type PatternMap = Record<2 | 3 | 4 | 5 | 6, DayArchetype[]>;
 
 export const WEEKLY_PATTERNS: Record<PrimaryGoal, PatternMap> = {
+  // 2-day rows (2026-10-05, two-day support): both days are complete
+  // full-body sessions; the archetype is the day's lead emphasis only.
   fitness: {
+    2: ["fitness", "fitness"],
     3: ["fitness", "fitness", "fitness"],
     4: ["fitness", "fitness", "fitness", "fitness"],
     5: ["fitness", "metcon", "strength", "fitness", "metcon"],
     6: ["fitness", "metcon", "strength", "recovery", "fitness", "metcon"],
   },
   competitor: {
+    2: ["strength", "metcon"],
     3: ["strength", "metcon", "skill"],
     4: ["strength", "metcon", "skill", "metcon"],
     5: ["strength", "metcon", "skill", "strength", "metcon"],
     6: ["strength", "metcon", "skill", "recovery", "strength", "metcon"],
   },
   strength_and_power: {
+    2: ["strength", "strength"],
     3: ["strength", "fitness", "strength"],
     4: ["strength", "fitness", "strength", "metcon"],
     5: ["strength", "metcon", "strength", "fitness", "strength"],
@@ -49,18 +54,21 @@ export const WEEKLY_PATTERNS: Record<PrimaryGoal, PatternMap> = {
  */
 export const WEEK4_DELOAD_PATTERNS: Record<PrimaryGoal, PatternMap> = {
   fitness: {
+    2: ["fitness", "recovery"],
     3: ["fitness", "recovery", "fitness"],
     4: ["fitness", "fitness", "recovery", "fitness"],
     5: ["fitness", "metcon", "recovery", "fitness", "recovery"],
     6: ["fitness", "metcon", "recovery", "recovery", "fitness", "metcon"],
   },
   competitor: {
+    2: ["fitness", "recovery"],
     3: ["fitness", "metcon", "recovery"],
     4: ["fitness", "metcon", "skill", "recovery"],
     5: ["fitness", "metcon", "recovery", "fitness", "recovery"],
     6: ["fitness", "metcon", "skill", "recovery", "fitness", "recovery"],
   },
   strength_and_power: {
+    2: ["fitness", "recovery"],
     3: ["fitness", "recovery", "fitness"],
     4: ["fitness", "recovery", "strength", "fitness"],
     5: ["fitness", "metcon", "recovery", "fitness", "fitness"],
@@ -68,13 +76,16 @@ export const WEEK4_DELOAD_PATTERNS: Record<PrimaryGoal, PatternMap> = {
   },
 };
 
-const SUPPORTED_DAYS = [3, 4, 5, 6] as const;
+const SUPPORTED_DAYS = [2, 3, 4, 5, 6] as const;
 type SupportedDays = typeof SUPPORTED_DAYS[number];
 
 /** Clamp an arbitrary days_per_week value to the supported range. */
 export function normalizeDaysPerWeek(daysPerWeek: number | null | undefined): SupportedDays {
   if (daysPerWeek == null || !Number.isFinite(daysPerWeek)) return 5;
-  if (daysPerWeek <= 3) return 3;
+  // Floor is 2 (2026-10-05): the athlete's number is honored down to 2 —
+  // a silent 2->3 override contradicted "built around you". 1 still rounds
+  // up: single-day programming is a different product.
+  if (daysPerWeek <= 2) return 2;
   if (daysPerWeek >= 6) return 6;
   return Math.round(daysPerWeek) as SupportedDays;
 }

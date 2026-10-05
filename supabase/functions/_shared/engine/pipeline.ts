@@ -15,6 +15,7 @@
  * surface-side in generate-program-v3.
  */
 
+import { TWO_DAY_FILL_ADDENDUM } from "../v2-system-prompt.ts";
 import type { WriterPayload } from "../build-writer-payload.ts";
 import type { TrainingDesignInput } from "../training-design-input.ts";
 import type { SkeletonOutput } from "../v3-output-schema.ts";
@@ -267,7 +268,11 @@ export async function callWeekFill(
           model: MODEL,
           max_tokens: 16000,
           stream: false,
-          system: pack.writer.weekFillSystemPrompt,
+          // 2-day athletes get the scoped addendum; 3-6 day prompts are
+          // byte-identical to before two-day support.
+          system: daysPerWeek === 2
+            ? pack.writer.weekFillSystemPrompt + TWO_DAY_FILL_ADDENDUM
+            : pack.writer.weekFillSystemPrompt,
           tools: [pack.writer.buildWeekTool(daysPerWeek, units, payload.training_context.session_length_minutes ?? null)],
           tool_choice: { type: "tool", name: "emit_week" },
           messages: [{ role: "user", content: userMessage }],
