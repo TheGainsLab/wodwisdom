@@ -813,21 +813,25 @@ serve(async (req) => {
         // truth for Engine content access.
         console.log(`[webhook] Subscription payment: customer=${customerId}, subscription=${subscriptionId}, billing_reason=${invoice.billing_reason}`);
 
-        // A NEW paid period is only ever billed by subscription_create (the
-        // first invoice) or subscription_cycle (a renewal). subscription_update
-        // (plan change / upgrade / downgrade) re-bills the SAME month — and the
-        // line-level proration guard below does NOT catch it: an anchor-reset
-        // upgrade bills the new plan as a real non-proration line, and a plan
-        // flip covered by proration credit fires payment_succeeded on a €0
-        // invoice (2026-10-05 incident: one user's same-day plan flips minted
-        // 3 phantom Engine months and would have triggered phantom program
-        // generations). Nothing downstream may advance on anything but a new
-        // period. reconcile-engine-months applies the same filter when it
-        // recounts invoices — the two must agree or the sweep re-mints what
-        // this gate blocks.
-        const BILLS_NEW_PERIOD = ["subscription_create", "subscription_cycle"];
-        if (!BILLS_NEW_PERIOD.includes(invoice.billing_reason)) {
-          console.log(`[webhook] invoice ${invoice.id}: billing_reason=${invoice.billing_reason} bills no new period — skipping drip/generation advancement`);
+        // A NEW paid period is billed by subscription_create (the first
+        // invoice), subscription_cycle (a renewal), or a subscription_update
+        // THAT CHARGED REAL MONEY (founder policy, 2026-10-05: an anchor-
+        // reset upgrade that bills a fresh month — proration credit netted
+        // out, card actually charged — buys that period for every feature
+        // on the new plan). A €0 update is NOT a new period: that's a plan
+        // flip paid entirely by proration credit, the exact shape that
+        // minted 3 phantom Engine months in the 2026-10-05 incident — and
+        // repeat flippers stay blocked, because after the first flip the
+        // accumulated credit covers the next invoices, zeroing amount_paid.
+        // reconcile-engine-months applies the SAME predicate when it
+        // recounts invoices — the two must agree or the nightly sweep
+        // re-mints what this gate blocks.
+        const billsNewPeriod =
+          invoice.billing_reason === "subscription_create" ||
+          invoice.billing_reason === "subscription_cycle" ||
+          (invoice.billing_reason === "subscription_update" && (invoice.amount_paid ?? 0) > 0);
+        if (!billsNewPeriod) {
+          console.log(`[webhook] invoice ${invoice.id}: billing_reason=${invoice.billing_reason} amount_paid=${invoice.amount_paid} bills no new period — skipping drip/generation advancement`);
           break;
         }
 
