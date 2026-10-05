@@ -218,6 +218,8 @@ export interface AthleteProfileInput {
   skills?: Record<string, string | null | undefined> | null;
   conditioning?: Record<string, string | number | null | undefined> | null;
   equipment?: Record<string, boolean> | null;
+  /** Set when the athlete saves the Athletic Data section; gates T2. */
+  athletic_reviewed_at?: string | null;
   days_per_week?: number | null;
   session_length_minutes?: number | null;
   injuries_constraints?: string | null;
@@ -283,7 +285,15 @@ export function getTierStatus(profile: AthleteProfileInput | null | undefined): 
   if (liftsMissing.length > 0) t2Missing.push('lifts');
   if (skillsMissing.length > 0) t2Missing.push('skills');
   if (!conditioningComplete) t2Missing.push('conditioning');
-  const tier2: TierSection = { complete: t2Missing.length === 0, missing: t2Missing };
+  // T2 completion is REVIEWED-based (2026-10-05): the athlete saved their
+  // athletic data, however sparse. The data-shape requirements above stopped
+  // gating -- blanks are often permanent and legitimate (equipment, injuries,
+  // sport), and the generator is headed to other sports whose intake collects
+  // different data, so the gate is process (section saved), not data shape.
+  // `missing` stays computed as the informational list: it drives the
+  // sparse-save warning and the evaluation's confidence inputs.
+  const reviewed = p.athletic_reviewed_at != null && String(p.athletic_reviewed_at).trim() !== '';
+  const tier2: TierSection = { complete: reviewed, missing: t2Missing };
 
   // --- T3: Training context ---
   const t3Missing: string[] = [];

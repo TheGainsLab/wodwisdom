@@ -55,7 +55,7 @@ export default function ProfileBanner({ userId }: Props) {
       const [profileRes, evalRes] = await Promise.all([
         supabase
           .from('athlete_profiles')
-          .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender')
+          .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, athletic_reviewed_at')
           .eq('user_id', userId)
           .maybeSingle(),
         supabase

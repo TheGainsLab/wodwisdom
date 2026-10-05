@@ -312,7 +312,7 @@ async function reconcileOne(
   const { data: ap } = await supa
     .from("athlete_profiles")
     .select(
-      "age, height, bodyweight, gender, units, lifts, skills, conditioning, equipment, days_per_week, session_length_minutes, injuries_constraints, goal",
+      "age, height, bodyweight, gender, units, lifts, skills, conditioning, equipment, days_per_week, session_length_minutes, injuries_constraints, goal, athletic_reviewed_at",
     )
     .eq("user_id", userId)
     .maybeSingle();

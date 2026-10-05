@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
     // know nextTier correctly.
     const { data: athleteProfile } = await supa
       .from("athlete_profiles")
-      .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, days_per_week, session_length_minutes, gym_type, years_training, injuries_constraints, training_split")
+      .select("lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, days_per_week, session_length_minutes, gym_type, years_training, injuries_constraints, training_split, athletic_reviewed_at")
       .eq("user_id", user.id)
       .maybeSingle();
 
