@@ -8,6 +8,9 @@
 //   gradient = a "base + surge" day (flux / bursts / full-spectrum): anchored at
 //              lo, reaching toward hi — rendered as a fade so it doesn't read as
 //              a flat band sitting in the middle.
+//
+// MIRROR: supabase/functions/_shared/engine-spectrum.ts carries the same
+// table for the program generator — change the values in both places.
 
 export interface DayTypeSpectrum { lo: number; hi: number; gradient?: boolean }
 

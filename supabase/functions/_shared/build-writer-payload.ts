@@ -64,6 +64,12 @@ import { buildOutsideTrainingFacts, fetchOutsideTraining } from "./athlete-activ
 import type { CoachingIntake } from "./coaching-intake.ts";
 import { persistAthleteModel } from "./persist-athlete-model.ts";
 import { persistTrainingSummary } from "./persist-training-summary.ts";
+import {
+  computeTimeInZone,
+  type ZoneMinutes,
+  zonesTouched,
+} from "./engine-spectrum.ts";
+import { checkEntitlement } from "./entitlements.ts";
 
 // ============================================================
 // Payload types
@@ -203,6 +209,38 @@ export interface PerformanceGridPayload {
   training: { grid: GridRowData[]; skill_cost: SkillCostRow[]; scored: number } | null;
 }
 
+/** The athlete's Engine training, reduced to evidence the generator can
+ *  flex around (2026-10 Engine-awareness contract). Present ONLY when all
+ *  of these hold: the caller opted in (the program generator), the athlete
+ *  holds the engine entitlement, has a chosen track, AND has completed-
+ *  session evidence in the trailing 28 days (≥2 sessions, the latest within
+ *  21 days). A subscription or track choice alone NEVER shades programming,
+ *  and ~3 silent weeks decays the athlete back to self-sufficient — both
+ *  render as null here, indistinguishable from no Engine at all, which is
+ *  exactly the zero-effect the contract demands. Soft-fails to null. */
+export interface EngineTrainingPayload {
+  /** Engine track id (engine_programs registry). */
+  track: string;
+  /** The athlete's own stated Engine goal, verbatim. */
+  goal: string | null;
+  /** Completed sessions, trailing 28 days, reduced to minutes-in-zone
+   *  (pace-fraction-anchored zones; see engine-spectrum.ts). */
+  trailing_28_days: {
+    sessions: number;
+    cadence_per_week: number;
+    minutes_counted: number;
+    time_in_zone_minutes: ZoneMinutes;
+  };
+  /** The next days on the athlete's FIXED catalog track, projected at the
+   *  observed cadence over the coming 4 weeks. Deterministic — Engine never
+   *  adapts to this program; this program flexes around Engine. */
+  upcoming_4_weeks: {
+    projected_sessions: number;
+    days: Array<{ day_type: string; minutes: number | null; zones: string[] }>;
+    time_in_zone_minutes: ZoneMinutes;
+  };
+}
+
 export interface WriterPayload {
   basics: BasicsPayload;
   /** All 14 canonical lift keys; null when user hasn't entered. */
@@ -227,6 +265,10 @@ export interface WriterPayload {
   /** See PerformanceGridPayload. null only when neither source has a
    *  scored workout. */
   performance_grid: PerformanceGridPayload | null;
+  /** See EngineTrainingPayload. GENERATOR ONLY (includeEngineTraining) and
+   *  evidence-gated — the only change every other payload sees is this
+   *  constant null field (no prompt addendum, no behavior shift). */
+  engine_training: EngineTrainingPayload | null;
   /** Step 27 carry-forward: most-recently-active completed cycle's
    *  adherence + skip rate + per-skill volume. NULL for first-time athletes
    *  or anyone without a completed log against any prior program. */
@@ -510,6 +552,9 @@ interface AthleteProfileRow {
   competition_athlete_id: string | null;
   coaching_intake: CoachingIntake | null;
   updated_at: string | null;
+  engine_program_version: string | null;
+  engine_current_day: number | null;
+  engine_goal: string | null;
 }
 
 const PROFILE_COLS =
@@ -518,7 +563,8 @@ const PROFILE_COLS =
   "days_per_week, session_length_minutes, " +
   "goal, injuries_constraints, injuries_structured, " +
   "injuries_constraints_hash, injuries_avoidance_confirmed, self_perception_level, " +
-  "competition_athlete_id, coaching_intake, updated_at";
+  "competition_athlete_id, coaching_intake, updated_at, " +
+  "engine_program_version, engine_current_day, engine_goal";
 
 // ============================================================
 // Main entry point.
@@ -547,6 +593,13 @@ export interface BuildWriterPayloadOptions {
    * Only consulted when includeEvaluations is true. Defaults to 1.
    */
   monthNumber?: number;
+  /**
+   * Populate engine_training (see EngineTrainingPayload) — the Engine-
+   * awareness evidence block. ONLY the program GENERATOR sets this; the
+   * eval keeps it false so eval payloads (and the coach states they cache)
+   * are untouched. Defaults to false.
+   */
+  includeEngineTraining?: boolean;
 }
 
 export async function buildWriterPayload(
@@ -557,6 +610,7 @@ export async function buildWriterPayload(
   const includeAllResults = options.includeAllResults ?? true;
   const includeEvaluations = options.includeEvaluations ?? false;
   const monthNumber = options.monthNumber ?? 1;
+  const includeEngineTraining = options.includeEngineTraining ?? false;
 
   // 1. Athlete profile row — hard requirement.
   const { data: profile, error: profileErr } = await supa
@@ -725,6 +779,18 @@ export async function buildWriterPayload(
     }
   }
 
+  // 3d. Engine training context — GENERATOR ONLY, evidence-gated (see
+  // EngineTrainingPayload). Soft-fails to null: Engine awareness is
+  // informational shading, never a generation dependency.
+  let engine_training: EngineTrainingPayload | null = null;
+  if (includeEngineTraining) {
+    try {
+      engine_training = await fetchEngineTraining(supa, userId, profile);
+    } catch (err) {
+      console.warn(`[build-writer-payload] engine training fetch failed for ${userId}:`, err);
+    }
+  }
+
   // 4. Hydrate JSONB blobs to complete canonical-key maps. We need
   // these before the RAG call (it consumes lifts + skills directly).
   const lifts: Record<string, number | null> = {};
@@ -845,10 +911,155 @@ export async function buildWriterPayload(
     performance_grid: gridCompetition || gridTraining
       ? { competition: gridCompetition, training: gridTraining }
       : null,
+    engine_training,
     previous_cycle,
     vocabulary,
     profile_evaluation,
     training_evaluation,
     rag,
+  };
+}
+
+// ============================================================
+// Engine training context (2026-10 Engine-awareness contract)
+// ============================================================
+
+// Legacy version strings → current program ids (mirrors engineService.ts).
+const ENGINE_VERSION_ALIASES: Record<string, string> = {
+  "5-day": "main_5day",
+  "3-day": "main_3day",
+};
+
+/** Build EngineTrainingPayload, or null per the evidence ladder:
+ *  no entitlement → null; no track → null; fewer than 2 completed sessions
+ *  in the trailing 28 days, or the latest older than 21 days → null (the
+ *  silent-weeks decay). Only completed sessions ever shade programming —
+ *  never the subscription or the track choice alone. */
+async function fetchEngineTraining(
+  supa: SupabaseClient,
+  userId: string,
+  profile: AthleteProfileRow,
+): Promise<EngineTrainingPayload | null> {
+  const rawTrack = asString(profile.engine_program_version);
+  if (!rawTrack) return null;
+  const track = ENGINE_VERSION_ALIASES[rawTrack] ?? rawTrack;
+
+  const entitled = await checkEntitlement(supa, userId, "engine");
+  if (!entitled) return null;
+
+  // Completed sessions, trailing 28 days — ALL tracks. Completed Engine
+  // work is real training load regardless of which track served it.
+  const since = new Date(Date.now() - 28 * 86_400_000).toISOString().slice(0, 10);
+  const { data: sessRows } = await supa
+    .from("engine_workout_sessions")
+    .select("date, day_type, program_day_number")
+    .eq("user_id", userId)
+    .eq("completed", true)
+    .gte("date", since)
+    .order("date", { ascending: false });
+  type SessRow = { date: string; day_type: string | null; program_day_number: number | null };
+  const sessions = (sessRows ?? []) as SessRow[];
+
+  if (sessions.length < 2) return null;
+  const latestMs = new Date(`${sessions[0].date}T00:00:00Z`).getTime();
+  if (!Number.isFinite(latestMs) || Date.now() - latestMs > 21 * 86_400_000) return null;
+
+  // Session minutes come from the catalog (program_day_number is a catalog
+  // content reference into the main_5day-keyed 720-day table), with the
+  // day type's default duration as fallback. AI self-sequencer override
+  // days may miss both — computeTimeInZone skips (and counts) those
+  // rather than guessing.
+  const sessionDayNums = [
+    ...new Set(
+      sessions
+        .map((s) => s.program_day_number)
+        .filter((n): n is number => typeof n === "number"),
+    ),
+  ];
+  type CatalogRow = { day_number: number; day_type: string | null; total_duration_minutes: number | null };
+  const catalogByDay = new Map<number, CatalogRow>();
+  if (sessionDayNums.length > 0) {
+    const { data: cat } = await supa
+      .from("engine_workouts")
+      .select("day_number, day_type, total_duration_minutes")
+      .eq("program_type", "main_5day")
+      .in("day_number", sessionDayNums);
+    for (const w of (cat ?? []) as CatalogRow[]) catalogByDay.set(w.day_number, w);
+  }
+  const { data: dtRows } = await supa
+    .from("engine_day_types")
+    .select("id, max_duration_minutes");
+  const defaultMinutes = new Map<string, number | null>(
+    ((dtRows ?? []) as Array<{ id: string; max_duration_minutes: number | null }>)
+      .map((d) => [d.id, d.max_duration_minutes]),
+  );
+  const minutesFor = (dayType: string | null, cat: CatalogRow | undefined): number | null => {
+    if (typeof cat?.total_duration_minutes === "number") return cat.total_duration_minutes;
+    const fallback = dayType != null ? defaultMinutes.get(dayType) : null;
+    return typeof fallback === "number" ? fallback : null;
+  };
+
+  const observed = sessions.map((s) => {
+    const cat = s.program_day_number != null ? catalogByDay.get(s.program_day_number) : undefined;
+    const dayType = s.day_type ?? cat?.day_type ?? null;
+    return { dayType, minutes: minutesFor(dayType, cat) };
+  });
+  const trailing = computeTimeInZone(observed);
+  const cadencePerWeek = sessions.length / 4;
+
+  // Upcoming: the FIXED catalog from the athlete's current sequence
+  // position, as many days as the observed cadence projects over 4 weeks.
+  // Sequence-identity: engine_current_day is a program sequence position;
+  // the mapping resolves it to catalog content.
+  const projected = Math.min(24, Math.max(1, Math.round(cadencePerWeek * 4)));
+  const startPos =
+    typeof profile.engine_current_day === "number" && profile.engine_current_day >= 1
+      ? profile.engine_current_day
+      : 1;
+  const { data: mapRows } = await supa
+    .from("engine_program_mapping")
+    .select("program_sequence_order, engine_workout_day_number")
+    .eq("engine_program_id", track)
+    .gte("program_sequence_order", startPos)
+    .order("program_sequence_order")
+    .limit(projected);
+  const mapping = (mapRows ?? []) as Array<{ program_sequence_order: number; engine_workout_day_number: number }>;
+
+  const upcomingDayNums = [...new Set(mapping.map((m) => m.engine_workout_day_number))]
+    .filter((n) => !catalogByDay.has(n));
+  if (upcomingDayNums.length > 0) {
+    const { data: cat } = await supa
+      .from("engine_workouts")
+      .select("day_number, day_type, total_duration_minutes")
+      .eq("program_type", "main_5day")
+      .in("day_number", upcomingDayNums);
+    for (const w of (cat ?? []) as CatalogRow[]) catalogByDay.set(w.day_number, w);
+  }
+  const upcomingDays = mapping
+    .map((m) => catalogByDay.get(m.engine_workout_day_number))
+    .filter((w): w is CatalogRow => w != null && w.day_type != null)
+    .map((w) => ({
+      day_type: w.day_type as string,
+      minutes: minutesFor(w.day_type, w),
+      zones: zonesTouched(w.day_type as string) as string[],
+    }));
+  const upcoming = computeTimeInZone(
+    upcomingDays.map((d) => ({ dayType: d.day_type, minutes: d.minutes })),
+  );
+
+  return {
+    track,
+    goal: asString(profile.engine_goal),
+    trailing_28_days: {
+      sessions: sessions.length,
+      cadence_per_week: Math.round(cadencePerWeek * 10) / 10,
+      minutes_counted: trailing.minutesCounted,
+      time_in_zone_minutes: trailing.zones,
+    },
+    upcoming_4_weeks: {
+      projected_sessions: projected,
+      days: upcomingDays,
+      time_in_zone_minutes: upcoming.zones,
+    },
   };
 }

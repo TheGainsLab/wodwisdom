@@ -87,7 +87,15 @@ export type EvidenceKey = AthleteModelKey | (string & {});
 // race, "run 2x/week", a machine-specific target). Absent = the program never
 // emits a cardio block. Dose follows the linked priority's rank; the caps are
 // ceilings, reachable only at rank 1.
-export const COACH_STATE_BUILDER_VERSION = "v1.17";
+// v1.18 (Engine-awareness, 2026-10-05): payload gains engine_training
+// (completed-session Engine evidence → minutes-in-zone + upcoming catalog)
+// and the ENGINE addendum rides the system prompt when it's non-null. The
+// bump regenerates cached states so Engine athletes' judgment sees the
+// block. KNOWN BOUND: engine evidence is NOT in the cache key, so within
+// an unchanged (athlete_model, builder) pair the cached state can lag the
+// athlete's latest Engine month — the composer's per-generation engine
+// context (uncached) carries the fresh picture regardless.
+export const COACH_STATE_BUILDER_VERSION = "v1.18";
 
 // ============================================================
 // Controlled vocabularies — LOCKED v1 (DATA, versioned with the schema;

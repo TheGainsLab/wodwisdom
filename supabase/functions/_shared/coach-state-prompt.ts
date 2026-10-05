@@ -102,11 +102,27 @@ PLAIN LANGUAGE — no system vocabulary. The athlete must never see internal fie
 
 EMIT the emit_coach_state tool. Output beliefs + decisions only — no weekly structure, no sets/reps/movements.`;
 
+/**
+ * Appended to the system prompt ONLY when payload.engine_training is
+ * non-null — i.e. the athlete holds Engine, chose a track, AND has
+ * completed-session evidence in the trailing 28 days (build-writer-payload
+ * gates all three). Every other athlete's prompt is untouched.
+ */
+export const ENGINE_COACH_STATE_ADDENDUM = `
+
+ENGINE TRAINING CONTEXT (engine_training) — present only with completed-session evidence
+This athlete ALSO trains Engine: a separate, fixed-catalog daily conditioning program. payload.engine_training is the EVIDENCE: their completed sessions over the trailing 28 days reduced to minutes-in-zone (base / tempo / aerobic_power / anaerobic — zones anchored to fractions of their time-trial pace), the observed cadence, and the catalog days coming next at that cadence (upcoming_4_weeks). Fold it into your conditioning judgment under these rules:
+  - EVERY TRAINING DAY STILL GETS ITS METCON. Engine changes the CHARACTER of this program's conditioning, never its existence or its daily presence. Less redundancy, not less conditioning.
+  - COMPLEMENT, DON'T DUPLICATE: in metcon_guidance, steer this program's conditioning away from what Engine already covers heavily (the zones carrying the most minutes, trailing and upcoming) and toward what only mixed-modal training provides — loading, skills, and movement variety expressed under fatigue. Dedicated monostructural work is Engine's lane; this program's conditioning should assume that lane is already driven.
+  - ENGINE IS FIXED: its catalog is deterministic and does not adapt to this program — this program flexes around Engine, never the reverse. Do not instruct, predict, or assume changes to the athlete's Engine training, and do not coach Engine itself.
+  - Weigh the Engine minutes as REAL TRAINING LOAD in recovery_stance and total-volume posture, the same way outside_training volume is weighed.
+  - This block exists only when backed by completed sessions. Its absence elsewhere means nothing — never infer Engine training from goals, subscriptions, or track names.`;
 
 /** Appended to the coach-state system prompt ONLY when the payload's
  *  days_per_week = 2 (generate-coach-state.ts) — other schedules stay
- *  byte-identical. */
+ *  byte-identical. Composable with the ENGINE addendum (a 2-day athlete
+ *  with Engine evidence gets both). */
 export const TWO_DAY_COACH_STATE_ADDENDUM = `
 
 TWO-DAY SCHEDULE (this athlete trains 2 days/week)
-Cap real priorities at 1-2 — with 8 sessions a month, three or more dilute to nothing. Both days are complete full-body sessions; never emit specialty single-focus days. Plan variety, time domains, and skill coverage across the MONTH, not the week. The athlete may well train conditioning elsewhere (Engine) — treat the 2 days as their committed full-session budget, not their whole activity.`;
+Cap real priorities at 1-2 — with 8 sessions a month, three or more dilute to nothing. Both days are complete full-body sessions; never emit specialty single-focus days. Plan variety, time domains, and skill coverage across the MONTH, not the week. When the payload carries engine_training, that IS the athlete's conditioning elsewhere — weigh it per ENGINE TRAINING CONTEXT; without it, still treat the 2 days as their committed full-session budget, not necessarily their whole activity.`;

@@ -341,6 +341,8 @@ export function buildGymCohortEnvelope(
     },
     athlete_model,
     competition: null,
+    performance_grid: null,
+    engine_training: null,
     previous_cycle: null,
     vocabulary,
     profile_evaluation: null,
