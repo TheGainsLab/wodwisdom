@@ -13,6 +13,7 @@ import {
   auditStrengthOneLift,
   auditMetconMonostructural,
   auditMetconOnePiece,
+  auditMetconPresence,
   auditRequiredFields,
   auditDoNotProgram,
   auditDayCount,
@@ -703,6 +704,45 @@ Deno.test("runAudits: well-formed baseline output passes structural pre-check, r
   assert(!result.failures.some((f) => f.rule === "structural_integrity"));
 });
 
+
+// ============================================================
+// Rule — every training day carries its metcon (platform invariant)
+// ============================================================
+
+Deno.test("auditMetconPresence: baseline (strength-only days) → fails every day", () => {
+  const out = baselineOutput(); // 4 weeks × 3 days, no metcon anywhere
+  const result = auditMetconPresence(out);
+  assert(!result.passed);
+  assertEquals(result.violations.length, 12);
+  assert(result.violations[0].includes("no metcon block"));
+});
+
+Deno.test("auditMetconPresence: every day with a metcon block → passes", () => {
+  const out = baselineOutput();
+  for (const wk of out.weeks) {
+    for (const d of wk.days) {
+      d.blocks.push(block("metcon", [mv("Burpee", { reps: 10 })], { block_scheme: "AMRAP 10" }));
+    }
+  }
+  const result = auditMetconPresence(out);
+  assert(result.passed);
+  assertEquals(result.violations.length, 0);
+});
+
+Deno.test("auditMetconPresence: active-recovery day without a metcon → exempt", () => {
+  const out = baselineOutput();
+  for (const wk of out.weeks) {
+    for (const d of wk.days) {
+      d.blocks.push(block("metcon", [mv("Burpee", { reps: 10 })], { block_scheme: "AMRAP 10" }));
+    }
+  }
+  // Turn W4D2 into a dedicated recovery day: active-recovery, no metcon.
+  out.weeks[3].days[1].blocks = [
+    block("active-recovery", [mv("Easy Bike", { time_seconds: 1500 })]),
+  ];
+  const result = auditMetconPresence(out);
+  assert(result.passed, result.violations.join(" | "));
+});
 
 // ============================================================
 // Rule — positional/core drills don't belong in metcon blocks

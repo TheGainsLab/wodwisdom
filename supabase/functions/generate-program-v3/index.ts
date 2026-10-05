@@ -532,6 +532,10 @@ async function stageMetcons(
     ].filter(Boolean).join(", "),
     previous_cycle_metcons: [], // per-month metcon detail needs the scoped RPC (parked)
     examples,
+    // Engine-awareness: evidence block or null (build-writer-payload gates
+    // it). Unlike coach-state, this is rebuilt UNCACHED on every generation,
+    // so the composer always sees the athlete's current Engine month.
+    engine_training: payload.engine_training ?? null,
   };
   const bannedSet = new Set(tdi.do_not_program.map((s) => s.toLowerCase()));
   const auditOpts = {
@@ -545,6 +549,7 @@ async function stageMetcons(
     skills: payload.skills as Record<string, string | null>,
     loadingDeemphasis,
     fatigueSkillExclusions,
+    engineActive: payload.engine_training != null,
   };
 
   // Every composer emission is repaired at the boundary BEFORE any code reads

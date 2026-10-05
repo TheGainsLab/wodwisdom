@@ -118,6 +118,24 @@ Deno.test("three monostructural pieces exceed the budget of 2", () => {
   assert(r.violations.some((v) => v.includes("budget is 2")));
 });
 
+Deno.test("engineActive drops the mono budget to 0; mixed pieces with machines stay legal", () => {
+  // goodMonth carries exactly ONE deliberate mono piece — legal normally,
+  // a violation once Engine evidence is active.
+  const m = goodMonth();
+  const normal = auditMetconVariety({ metcons: m });
+  assertEquals(normal.violations.filter((v) => v.includes("mono budget is 0")), []);
+  const engine = auditMetconVariety({ metcons: m }, { engineActive: true });
+  assert(engine.violations.some((v) => v.includes("mono budget is 0")));
+  // A month with machines only INSIDE mixed pieces is untouched by the flag.
+  const mixedOnly = m.map((p) =>
+    p.movements.length > 0 && p.movements.every((mv) => ["Row", "Bike", "Run", "Ski Erg"].includes(mv.movement))
+      ? piece(["Wall Ball", "Row"], { week_num: p.week_num, day_num: p.day_num, format: p.format })
+      : p
+  );
+  const engineMixed = auditMetconVariety({ metcons: mixedOnly }, { engineActive: true });
+  assertEquals(engineMixed.violations.filter((v) => v.includes("mono budget is 0")), []);
+});
+
 Deno.test("dumbbell/kettlebell implements never count as barbell", () => {
   assertEquals(isBarbellMetconMovement("Thruster"), true);
   assertEquals(isBarbellMetconMovement("Dumbbell Thruster"), false);

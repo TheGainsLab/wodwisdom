@@ -35,7 +35,12 @@
  */
 
 import { MODELS } from "./model-profiles.ts";
-import { METCON_COMPOSER_SYSTEM_PROMPT, TWO_DAY_COMPOSER_ADDENDUM } from "./metcon-composer-prompt.ts";
+import {
+  METCON_COMPOSER_ENGINE_ADDENDUM,
+  METCON_COMPOSER_SYSTEM_PROMPT,
+  TWO_DAY_COMPOSER_ADDENDUM,
+} from "./metcon-composer-prompt.ts";
+import type { EngineTrainingPayload } from "./build-writer-payload.ts";
 
 // ============================================================
 // Types
@@ -155,6 +160,12 @@ export interface MetconComposerInputs {
   loading_deemphasis: boolean;
   /** Skill axes the letter keeps OUT of conditioning under fatigue. */
   fatigue_skill_exclusions: string[];
+  /** Engine-awareness (2026-10): payload.engine_training — completed-
+   *  session Engine evidence, or null for everyone without it. Non-null
+   *  adds the ENGINE WEEK CONTEXT section to the user message and the
+   *  ENGINE addendum to the system prompt; null is byte-identical to the
+   *  pre-Engine composer call. */
+  engine_training: EngineTrainingPayload | null;
 }
 
 // ============================================================
@@ -332,6 +343,23 @@ export function buildComposerUserMessage(inputs: MetconComposerInputs): string {
       (inputs.metcon_guidance.trim() || "(none provided — compose from the slots and athlete data)"),
   );
   parts.push(`ATHLETE CONTEXT: ${inputs.athlete_context || "(none)"}`);
+  if (inputs.engine_training) {
+    const et = inputs.engine_training;
+    const z = (m: Record<string, number>) =>
+      `base ${m.base} · tempo ${m.tempo} · aerobic power ${m.aerobic_power} · anaerobic ${m.anaerobic}`;
+    parts.push(
+      [
+        `ENGINE WEEK CONTEXT (completed-session evidence from the athlete's separate daily conditioning program — see ENGINE-AWARE COMPOSITION in the system prompt):`,
+        `  trailing 28 days: ${et.trailing_28_days.sessions} completed sessions (~${et.trailing_28_days.cadence_per_week}/week, ${et.trailing_28_days.minutes_counted} min counted) — minutes in zone: ${z(et.trailing_28_days.time_in_zone_minutes)}`,
+        `  upcoming 4 weeks (fixed catalog at observed cadence, ${et.upcoming_4_weeks.projected_sessions} sessions) — planned minutes in zone: ${z(et.upcoming_4_weeks.time_in_zone_minutes)}`,
+        `  upcoming day types: ${
+          et.upcoming_4_weeks.days.length
+            ? et.upcoming_4_weeks.days.map((d) => `${d.day_type} (${d.zones.join("/") || "?"})`).join(", ")
+            : "(none resolved)"
+        }`,
+      ].join("\n"),
+    );
+  }
   parts.push(`EQUIPMENT (true = available):\n${JSON.stringify(inputs.equipment)}`);
   parts.push(`DO NOT PROGRAM (hard bans):\n${JSON.stringify(inputs.do_not_program)}`);
   parts.push(`SKILL TIERS:\n${JSON.stringify(inputs.skills)}`);
@@ -396,11 +424,13 @@ export async function callMetconComposer(
       // 24-slot month with margin. Unused headroom costs nothing.
       max_tokens: 16000,
       stream: false,
-      // 2-slot weeks get the scoped addendum; larger months stay
-      // byte-identical.
-      system: slotsPerWeekMax <= 2
-        ? METCON_COMPOSER_SYSTEM_PROMPT + TWO_DAY_COMPOSER_ADDENDUM
-        : METCON_COMPOSER_SYSTEM_PROMPT,
+      // Scoped addenda, composable: ENGINE rides only with completed-
+      // session Engine evidence; TWO-DAY rides only on 2-slot weeks (a
+      // 2-day Engine athlete gets both). Months matching neither get the
+      // byte-identical base prompt.
+      system: METCON_COMPOSER_SYSTEM_PROMPT +
+        (inputs.engine_training ? METCON_COMPOSER_ENGINE_ADDENDUM : "") +
+        (slotsPerWeekMax <= 2 ? TWO_DAY_COMPOSER_ADDENDUM : ""),
       tools: [EMIT_METCON_MONTH_TOOL],
       tool_choice: { type: "tool", name: "emit_metcon_month" },
       messages: [{ role: "user", content: userMessage }],

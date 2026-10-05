@@ -310,6 +310,12 @@ export function auditMetconVariety(
     loadingDeemphasis?: boolean;
     /** Skill axes the letter keeps out of conditioning under fatigue. */
     fatigueSkillExclusions?: string[];
+    /** Engine-awareness (2026-10): true when the payload carried completed-
+     *  session Engine evidence. Drops the monostructural-only budget from 2
+     *  to 0 — dedicated mono sessions are exactly what Engine already
+     *  provides, so a mono-only piece here is a duplicate, not variety.
+     *  Machines inside mixed pieces are untouched. */
+    engineActive?: boolean;
   } = {},
 ): MetconVarietyAuditResult {
   const violations: string[] = [];
@@ -432,11 +438,16 @@ export function auditMetconVariety(
     }
   }
 
-  // 6. Monostructural budget — max 2, flag must agree with content.
+  // 6. Monostructural budget — max 2 (0 when Engine evidence is active:
+  // the athlete's dedicated mono work already happens there), flag must
+  // agree with content.
+  const monoBudget = opts.engineActive ? 0 : 2;
   const monoPieces = pieces.filter((m) => m.movements.length > 0 && m.movements.every((mv) => isMonoMovement(mv.movement)));
-  if (monoPieces.length > 2) {
+  if (monoPieces.length > monoBudget) {
     violations.push(
-      `${monoPieces.length} monostructural-only pieces (${monoPieces.map(at).join(", ")}) — the budget is 2, always deliberate.`,
+      opts.engineActive
+        ? `${monoPieces.length} monostructural-only piece(s) (${monoPieces.map(at).join(", ")}) — this athlete trains Engine, so the mono budget is 0: recompose as mixed pieces (machines inside mixed work are fine).`
+        : `${monoPieces.length} monostructural-only pieces (${monoPieces.map(at).join(", ")}) — the budget is 2, always deliberate.`,
     );
   }
   for (const m of monoPieces) {

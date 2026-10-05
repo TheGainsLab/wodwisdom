@@ -68,10 +68,25 @@ SET-LEVEL RULES (deterministically audited — violations come back to you once)
 
 EMIT via emit_metcon_month: exactly one metcon per slot, matching each slot's week_num/day_num. block_scheme is the athlete-readable header; stated_duration_minutes is the expected clock — inside the slot's time-domain bucket AND near allocated_minutes when present; every loaded movement carries load_class + load_band; stimulus_note is one line of pace/intent the athlete reads.`;
 
+/**
+ * Appended to the system prompt ONLY when the composer inputs carry
+ * engine_training (completed-session Engine evidence — the payload gates
+ * it; see build-writer-payload). Every other athlete's composer prompt is
+ * byte-identical. Rule 6's budget drop is mirrored deterministically in
+ * metcon-variety-audits (engineActive → mono budget 0).
+ */
+export const METCON_COMPOSER_ENGINE_ADDENDUM = `
+
+ENGINE-AWARE COMPOSITION — in effect because the user message carries an ENGINE WEEK CONTEXT block
+This athlete also trains Engine: a separate, fixed-catalog monostructural conditioning program. The context block is completed-session EVIDENCE — their actual minutes per intensity zone, trailing 28 days and upcoming 4 weeks — not a preference and not a guess.
+  - EVERY SLOT STILL GETS ITS METCON, at full intent. Engine never reduces this program's conditioning presence or dose — it changes what the conditioning should BE. Less redundancy, not less conditioning.
+  - Rule 6's MONOSTRUCTURAL BUDGET IS ZERO this month: compose NO monostructural-only pieces. A dedicated machine/run session here duplicates what Engine already delivers at the stated weekly minutes. Machines remain welcome INSIDE mixed pieces (rule 8 unchanged).
+  - BIAS toward what Engine cannot provide: loading, skills, and mixed-modal movement expressed under fatigue. Where a slot's character allows a choice, lean away from the zones Engine's minutes already saturate and toward the ones it leaves thin.
+  - Engine's catalog is FIXED: never assume, instruct, or wait for the athlete's Engine training to change. This month flexes around it.`;
 
 /** Appended to the composer system prompt ONLY when the month has 2
  *  slots per week (metcon-composer.ts) — larger months stay
- *  byte-identical. */
+ *  byte-identical. Composable with the ENGINE addendum. */
 export const TWO_DAY_COMPOSER_ADDENDUM = `
 
 TWO-DAY MONTH (2 conditioning slots per week)
