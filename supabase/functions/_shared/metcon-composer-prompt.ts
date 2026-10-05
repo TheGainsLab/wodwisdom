@@ -67,3 +67,12 @@ SET-LEVEL RULES (deterministically audited — violations come back to you once)
   10. FIT TO ATHLETE: at least 60% of the month's pieces include at least one movement from the athlete's development axes or barbell strength work. This is the floor under the objective above — a month that fails it was written for nobody in particular.
 
 EMIT via emit_metcon_month: exactly one metcon per slot, matching each slot's week_num/day_num. block_scheme is the athlete-readable header; stated_duration_minutes is the expected clock — inside the slot's time-domain bucket AND near allocated_minutes when present; every loaded movement carries load_class + load_band; stimulus_note is one line of pace/intent the athlete reads.`;
+
+
+/** Appended to the composer system prompt ONLY when the month has 2
+ *  slots per week (metcon-composer.ts) — larger months stay
+ *  byte-identical. */
+export const TWO_DAY_COMPOSER_ADDENDUM = `
+
+TWO-DAY MONTH (2 conditioning slots per week)
+With 8 pieces for the month, weekly targets become monthly: express each development axis at least once every TWO weeks (the audit enforces per-fortnight at this volume), keep format spread month-wide, and make every piece count toward the athlete's priorities — there are no throwaway slots.`;

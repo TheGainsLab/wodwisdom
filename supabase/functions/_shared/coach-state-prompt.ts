@@ -101,3 +101,12 @@ PLAIN LANGUAGE — no system vocabulary. The athlete must never see internal fie
   Do NOT use the words/phrases: a field key (anything with underscores like bench_to_bodyweight), "normative model", "normative rankings", "position", "below-threshold ratio", "structural gap by position", "athlete_model", or "evidence". Percentiles are fine in plain prose; do NOT write sample-size notation like "n=8" (say "across 8 competition appearances" if it matters). The structured fields (focus/reasons/evidence/confidence) carry the machine-readable provenance — the prose is purely human.
 
 EMIT the emit_coach_state tool. Output beliefs + decisions only — no weekly structure, no sets/reps/movements.`;
+
+
+/** Appended to the coach-state system prompt ONLY when the payload's
+ *  days_per_week = 2 (generate-coach-state.ts) — other schedules stay
+ *  byte-identical. */
+export const TWO_DAY_COACH_STATE_ADDENDUM = `
+
+TWO-DAY SCHEDULE (this athlete trains 2 days/week)
+Cap real priorities at 1-2 — with 8 sessions a month, three or more dilute to nothing. Both days are complete full-body sessions; never emit specialty single-focus days. Plan variety, time domains, and skill coverage across the MONTH, not the week. The athlete may well train conditioning elsewhere (Engine) — treat the 2 days as their committed full-session budget, not their whole activity.`;

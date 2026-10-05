@@ -35,7 +35,7 @@
  */
 
 import { MODELS } from "./model-profiles.ts";
-import { METCON_COMPOSER_SYSTEM_PROMPT } from "./metcon-composer-prompt.ts";
+import { METCON_COMPOSER_SYSTEM_PROMPT, TWO_DAY_COMPOSER_ADDENDUM } from "./metcon-composer-prompt.ts";
 
 // ============================================================
 // Types
@@ -374,6 +374,11 @@ export async function callMetconComposer(
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
   const model = opts.model ?? MODELS.sonnet;
 
+  // Max conditioning slots in any one week — 2 means a two-day athlete.
+  const weekCounts = new Map<number, number>();
+  for (const sl of inputs.slots) weekCounts.set(sl.week_num, (weekCounts.get(sl.week_num) ?? 0) + 1);
+  const slotsPerWeekMax = Math.max(0, ...weekCounts.values());
+
   const base = buildComposerUserMessage(inputs);
   const userMessage = opts.retryViolations ? `${opts.retryViolations}\n\n---\n\n${base}` : base;
 
@@ -391,7 +396,11 @@ export async function callMetconComposer(
       // 24-slot month with margin. Unused headroom costs nothing.
       max_tokens: 16000,
       stream: false,
-      system: METCON_COMPOSER_SYSTEM_PROMPT,
+      // 2-slot weeks get the scoped addendum; larger months stay
+      // byte-identical.
+      system: slotsPerWeekMax <= 2
+        ? METCON_COMPOSER_SYSTEM_PROMPT + TWO_DAY_COMPOSER_ADDENDUM
+        : METCON_COMPOSER_SYSTEM_PROMPT,
       tools: [EMIT_METCON_MONTH_TOOL],
       tool_choice: { type: "tool", name: "emit_metcon_month" },
       messages: [{ role: "user", content: userMessage }],

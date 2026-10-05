@@ -50,8 +50,8 @@ export interface InterpretedProfile {
   /** Flat list of prohibited movement strings from all injuries, for prompt use. */
   prohibited_movements: string[];
   caution_movements: string[];
-  /** Days per week clamped to supported range (3-6). */
-  days_per_week: 3 | 4 | 5 | 6;
+  /** Days per week clamped to supported range (2-6). */
+  days_per_week: 2 | 3 | 4 | 5 | 6;
   /** Archetypes per week for the next month. weeks[0..2] = baseline, weeks[3] = deload. */
   weekly_pattern: { weeks: DayArchetype[][]; baseline: DayArchetype[]; deload: DayArchetype[] };
 }

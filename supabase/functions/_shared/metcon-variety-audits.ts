@@ -568,16 +568,26 @@ export function auditMetconVariety(
       opts.slots.filter((s) => /deload/i.test(s.intensity)).map((s) => s.week_num),
     );
     const weeks = [...new Set(opts.slots.map((s) => s.week_num))].filter((w) => !deloadWeeks.has(w));
+    // Two-day months (<= 2 slots per week) check per FORTNIGHT: with two
+    // pieces a week, per-week expression of every axis is unsatisfiable
+    // once there are 3+ axes — the composer prompt's two-day addendum sets
+    // the same per-two-weeks expectation this floor audits.
+    const slotsWeekCounts = new Map<number, number>();
+    for (const sl of opts.slots) slotsWeekCounts.set(sl.week_num, (slotsWeekCounts.get(sl.week_num) ?? 0) + 1);
+    const slotsPerWeekMax = Math.max(0, ...slotsWeekCounts.values());
+    const windows: number[][] = slotsPerWeekMax <= 2
+      ? Array.from({ length: Math.ceil(weeks.length / 2) }, (_, i) => weeks.slice(i * 2, i * 2 + 2))
+      : weeks.map((w) => [w]);
     for (const axis of opts.developmentAxes) {
       if (excluded.has(axis)) continue;
       if (!(axis in AXIS_MOVEMENT_KEYWORDS)) continue;
-      for (const wk of weeks) {
+      for (const win of windows) {
         const expressed = pieces.some(
-          (m) => m.week_num === wk && (m.movements ?? []).some((mv) => movementExpressesAxis(mv?.movement ?? "", axis)),
+          (m) => win.includes(m.week_num) && (m.movements ?? []).some((mv) => movementExpressesAxis(mv?.movement ?? "", axis)),
         );
         if (!expressed) {
           violations.push(
-            `Week ${wk}: development axis "${axis}" appears in no metcon — what the athlete trains must be expressed under fatigue (add a piece carrying it, at tier-band volume).`,
+            `Week${win.length > 1 ? `s ${win.join("+")}` : ` ${win[0]}`}: development axis "${axis}" appears in no metcon — what the athlete trains must be expressed under fatigue (add a piece carrying it, at tier-band volume).`,
           );
         }
       }

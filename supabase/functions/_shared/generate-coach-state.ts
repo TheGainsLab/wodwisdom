@@ -20,7 +20,7 @@
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { WriterPayload } from "./build-writer-payload.ts";
-import { COACH_STATE_SYSTEM_PROMPT } from "./coach-state-prompt.ts";
+import { COACH_STATE_SYSTEM_PROMPT, TWO_DAY_COACH_STATE_ADDENDUM } from "./coach-state-prompt.ts";
 import {
   athleteModelEvidenceKeys,
 } from "./athlete-model.ts";
@@ -81,7 +81,11 @@ async function callCoachState(
         model: MODEL,
         max_tokens: 8000,
         stream: false,
-        system: COACH_STATE_SYSTEM_PROMPT,
+        // 2-day athletes get the scoped addendum; other schedules
+        // prompts stay byte-identical.
+        system: payload.training_context.days_per_week === 2
+          ? COACH_STATE_SYSTEM_PROMPT + TWO_DAY_COACH_STATE_ADDENDUM
+          : COACH_STATE_SYSTEM_PROMPT,
         tools: [tool],
         tool_choice: { type: "tool", name: "emit_coach_state" },
         messages: [{ role: "user", content: userMessage }],
