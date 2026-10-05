@@ -317,3 +317,12 @@ A separate safety review will read your output alongside the raw injuries and go
 
 WRITE THE PROGRAM.
 `;
+
+
+/** Appended to the fill system prompt ONLY when days_per_week = 2
+ *  (pipeline.ts) — 3-6 day prompts stay byte-identical. At 2 days the
+ *  week-level coaching language above becomes month-level. */
+export const TWO_DAY_FILL_ADDENDUM = `
+
+TWO-DAY WEEKS (this athlete trains 2 days/week)
+Both days are FULL-BODY sessions — no push/pull or upper/lower split survives an 8-session month. Each day still runs the full block structure (strength + accessory + metcon), and every session carries the athlete's top priority: with 8 sessions a month there is no room for a day that ignores it. The weekly coverage language above becomes MONTHLY at this volume — time-domain mix and skill coverage spread across the 4 weeks, not within each 2-day week. Recovery between sessions is abundant by construction: bias toward higher per-session quality volume rather than artificial restraint.`;

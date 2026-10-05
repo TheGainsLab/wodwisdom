@@ -113,7 +113,7 @@ export interface AvoidanceConfirmed {
 
 export interface TrainingContextPayload {
   /** User-specified or default 5; clamped to [3, 6]. */
-  days_per_week: 3 | 4 | 5 | 6;
+  days_per_week: 2 | 3 | 4 | 5 | 6;
   /** The athlete's per-session time budget in minutes (profile slider).
    *  Null when never set — the skeleton then plans without a time budget.
    *  The gym cohort envelope sets it from the cohort config instead. */
@@ -293,12 +293,14 @@ export interface WriterPayload {
 // Helpers — coercion / hydration
 // ============================================================
 
-function clampDaysPerWeek(n: number | null | undefined): 3 | 4 | 5 | 6 {
+function clampDaysPerWeek(n: number | null | undefined): 2 | 3 | 4 | 5 | 6 {
   if (n == null || !Number.isFinite(n)) return 5;
   const r = Math.round(n);
-  if (r <= 3) return 3;
+  // Floor 2 (2026-10-05): honor the athlete's 2 instead of silently
+  // handing them a 3-day program. 1 rounds up; nulls still default to 5.
+  if (r <= 2) return 2;
   if (r >= 6) return 6;
-  return r as 3 | 4 | 5 | 6;
+  return r as 2 | 3 | 4 | 5 | 6;
 }
 
 // Exported so the cohort roster builder resolves member 1RMs by the EXACT same rule

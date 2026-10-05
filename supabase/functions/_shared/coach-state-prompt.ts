@@ -117,3 +117,12 @@ This athlete ALSO trains Engine: a separate, fixed-catalog daily conditioning pr
   - ENGINE IS FIXED: its catalog is deterministic and does not adapt to this program — this program flexes around Engine, never the reverse. Do not instruct, predict, or assume changes to the athlete's Engine training, and do not coach Engine itself.
   - Weigh the Engine minutes as REAL TRAINING LOAD in recovery_stance and total-volume posture, the same way outside_training volume is weighed.
   - This block exists only when backed by completed sessions. Its absence elsewhere means nothing — never infer Engine training from goals, subscriptions, or track names.`;
+
+/** Appended to the coach-state system prompt ONLY when the payload's
+ *  days_per_week = 2 (generate-coach-state.ts) — other schedules stay
+ *  byte-identical. Composable with the ENGINE addendum (a 2-day athlete
+ *  with Engine evidence gets both). */
+export const TWO_DAY_COACH_STATE_ADDENDUM = `
+
+TWO-DAY SCHEDULE (this athlete trains 2 days/week)
+Cap real priorities at 1-2 — with 8 sessions a month, three or more dilute to nothing. Both days are complete full-body sessions; never emit specialty single-focus days. Plan variety, time domains, and skill coverage across the MONTH, not the week. When the payload carries engine_training, that IS the athlete's conditioning elsewhere — weigh it per ENGINE TRAINING CONTEXT; without it, still treat the 2 days as their committed full-session budget, not necessarily their whole activity.`;
