@@ -482,7 +482,7 @@ export default function ChatPage({ session }: { session: Session }) {
               style={{
                 display: 'flex', alignItems: 'center', gap: 7, margin: '10px auto 0',
                 background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 999,
-                padding: '7px 16px', color: 'var(--text-dim)', fontSize: 13, fontWeight: 600,
+                padding: '7px 16px', color: 'var(--text)', fontSize: 13, fontWeight: 600,
                 cursor: 'pointer', fontFamily: 'inherit',
               }}
             >
