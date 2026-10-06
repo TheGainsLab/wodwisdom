@@ -8,7 +8,7 @@ import ProfileBanner from '../components/ProfileBanner';
 import { formatMarkdown } from '../lib/formatMarkdown';
 import { OfflineMessage } from '../components/OfflineBanner';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
-import { Clock, Bookmark, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Clock, Bookmark, ThumbsUp, ThumbsDown, UserRound } from 'lucide-react';
 import { cacheGet, cacheSet, chatHistoryKey } from '../lib/offlineCache';
 import { pickNudgeTemplate, type ProfileSection } from '../lib/chatNudgeTemplates';
 import CoachContactModal from '../components/CoachContactModal';
@@ -474,14 +474,19 @@ export default function ChatPage({ session }: { session: Session }) {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
               </button>
             </div>
-            {/* The human relief valve (2026-10-06): quiet by design — the AI
-                stays the default, but nobody should churn because they
-                couldn't reach a person. */}
+            {/* The human relief valve (2026-10-06): a real button, stated as
+                a capability — never as the AI having failed. Secondary
+                styling so the send button stays the main event. */}
             <button
               onClick={() => setShowCoachModal(true)}
-              style={{ display: 'block', margin: '8px auto 0', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 7, margin: '10px auto 0',
+                background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 999,
+                padding: '7px 16px', color: 'var(--text-dim)', fontSize: 13, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
             >
-              Not getting what you need? <span style={{ textDecoration: 'underline' }}>Message a human coach</span> →
+              <UserRound size={15} /> Message a human coach
             </button>
           </div>
         )}
