@@ -134,11 +134,11 @@ export default function CoachContactModal({ userEmail, onClose }: {
 
         {sent ? (
           <>
-            <h3 style={{ margin: '0 0 10px', fontSize: 17 }}>Sent to your coach</h3>
+            <h3 style={{ margin: '0 0 10px', fontSize: 17 }}>Sent</h3>
             <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text-dim)', margin: 0 }}>
-              Matt will reply <strong>by email to {userEmail}</strong> — usually
-              within 24 hours. The reply lands in your inbox, not in this app,
-              so check there (and the spam folder the first time).
+              The reply goes to <strong>{userEmail}</strong> — usually within
+              24 hours. Check your inbox, not this app (and the spam folder
+              the first time).
             </p>
             <button className="engine-btn engine-btn-primary" onClick={onClose} style={{ marginTop: 16, width: '100%' }}>
               Got it
@@ -148,9 +148,8 @@ export default function CoachContactModal({ userEmail, onClose }: {
           <>
             <h3 style={{ margin: '0 0 10px', fontSize: 17 }}>Your message is with the coach</h3>
             <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text-dim)', margin: 0 }}>
-              You've reached today's limit of 2 messages — Matt has what you
-              sent and will reply by email to <strong>{userEmail}</strong>,
-              usually within 24 hours.
+              You've reached today's limit of 2 messages — your earlier
+              message is with the coach, and the reply comes by email.
             </p>
             <button className="engine-btn engine-btn-primary" onClick={onClose} style={{ marginTop: 16, width: '100%' }}>
               Got it
@@ -160,14 +159,14 @@ export default function CoachContactModal({ userEmail, onClose }: {
           <>
             <h3 style={{ margin: '0 0 6px', fontSize: 17 }}>Message a human coach</h3>
             <p style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-muted)', margin: '0 0 12px' }}>
-              Goes straight to Matt. He replies <strong>by email to {userEmail}</strong> — usually within 24 hours.
+              Replies come by email — usually within 24 hours. The AI Coach is
+              always available in the meantime.
             </p>
 
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value.slice(0, 2000))}
               rows={5}
-              placeholder="What do you need help with? The more specific, the faster the fix."
               style={{
                 width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: 14, lineHeight: 1.5,
                 background: 'var(--bg, #101013)', color: 'var(--text)', border: '1px solid var(--border)',
