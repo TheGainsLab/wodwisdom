@@ -15,7 +15,7 @@ export const TIMELINE_GROUPS: { key: string; label: string; types: string[] }[] 
   { key: 'account', label: 'Account', types: ['signup', 'email_confirmed', 'entitlement'] },
   { key: 'profile', label: 'Profile', types: ['profile_update'] },
   { key: 'evaluations', label: 'Evaluations', types: ['evaluation_profile', 'evaluation_training', 'evaluation_nutrition'] },
-  { key: 'chat', label: 'Chat', types: ['chat_question', 'chat_rating'] },
+  { key: 'chat', label: 'Chat', types: ['chat_question', 'chat_rating', 'coach_message'] },
   { key: 'engine', label: 'Engine', types: ['engine_session', 'time_trial'] },
   { key: 'workouts', label: 'Workouts', types: ['workout_log'] },
   { key: 'nutrition', label: 'Nutrition', types: ['nutrition_day'] },
@@ -57,6 +57,7 @@ export function eventTitle(ev: TimelineEvent): string {
     case 'evaluation_nutrition': return 'Nutrition evaluation generated';
     case 'chat_question': return 'Asked the AI Coach';
     case 'chat_rating': return d.rating === 1 ? 'Rated an answer 👍' : 'Rated an answer 👎';
+    case 'coach_message': return d.status === 'send_failed' ? 'Messaged the coach (delivery failed)' : 'Messaged the coach';
     case 'engine_session': return `Engine session${(d.sequence_position ?? d.program_day_number) != null ? ` — day ${d.sequence_position ?? d.program_day_number}` : ''}`;
     case 'time_trial': return `Time trial — ${d.modality ?? '?'}`;
     case 'workout_log': return 'Logged a workout';
@@ -77,6 +78,10 @@ export function eventDetail(ev: TimelineEvent): string {
   switch (ev.type) {
     case 'chat_question':
       return d.question ?? '';
+    case 'coach_message': {
+      const parts = [d.message, d.image_count > 0 ? `${d.image_count} screenshot${d.image_count > 1 ? 's' : ''}` : null];
+      return parts.filter(Boolean).join(' · ');
+    }
     case 'engine_session': {
       const parts = [d.day_type?.replace(/_/g, ' '), d.modality];
       if (d.performance_ratio != null) parts.push(`ratio ${Number(d.performance_ratio).toFixed(2)}`);
