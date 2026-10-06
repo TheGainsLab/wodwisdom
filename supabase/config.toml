@@ -294,3 +294,9 @@ verify_jwt = false
 
 [functions.save-offer]
 verify_jwt = false
+
+[functions.contact-coach]
+# "Talk to a human coach" button in the AI chat. Auth is verified in-function
+# (bearer token -> auth.getUser), per house convention; rate limit + Resend
+# send to the coach inbox with Reply-To the user.
+verify_jwt = false

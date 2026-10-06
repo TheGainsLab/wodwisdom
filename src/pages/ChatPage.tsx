@@ -11,6 +11,7 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { Clock, Bookmark, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { cacheGet, cacheSet, chatHistoryKey } from '../lib/offlineCache';
 import { pickNudgeTemplate, type ProfileSection } from '../lib/chatNudgeTemplates';
+import CoachContactModal from '../components/CoachContactModal';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -41,6 +42,7 @@ export default function ChatPage({ session }: { session: Session }) {
   const messagesRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const online = useOnlineStatus();
+  const [showCoachModal, setShowCoachModal] = useState(false);
 
   // Load cached messages when offline
   useEffect(() => {
@@ -472,9 +474,24 @@ export default function ChatPage({ session }: { session: Session }) {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
               </button>
             </div>
+            {/* The human relief valve (2026-10-06): quiet by design — the AI
+                stays the default, but nobody should churn because they
+                couldn't reach a person. */}
+            <button
+              onClick={() => setShowCoachModal(true)}
+              style={{ display: 'block', margin: '8px auto 0', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              Not getting what you need? <span style={{ textDecoration: 'underline' }}>Message a human coach</span> →
+            </button>
           </div>
         )}
       </div>
+      {showCoachModal && (
+        <CoachContactModal
+          userEmail={session.user.email ?? ''}
+          onClose={() => setShowCoachModal(false)}
+        />
+      )}
     </div>
   );
 }
