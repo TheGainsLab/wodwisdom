@@ -22,6 +22,13 @@ export default function HomePage({ session }: { session: Session }) {
   const { hasFeature, hasEngineAccess, isAdmin, loading: entLoading } = useEntitlements(session.user.id);
   const [navOpen, setNavOpen] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
+  // DB-truth step flags (2026-10-08): the welcome card's checkmarks and CTA
+  // must match what the profile page itself shows. basicsDone mirrors Step 1
+  // (saved basics data); profileReviewed mirrors Step 2 (athletic_reviewed_at
+  // — stamped only by Save My Numbers). The old any-numbers heuristic showed
+  // step 1 red after Basics saved, and green from a single unsaved lift.
+  const [basicsDone, setBasicsDone] = useState(false);
+  const [profileReviewed, setProfileReviewed] = useState(false);
   const [hasEvaluation, setHasEvaluation] = useState(false);
   const [hasProgram, setHasProgram] = useState(false);
   const [hasCompetitionLink, setHasCompetitionLink] = useState(false);
@@ -42,17 +49,19 @@ export default function HomePage({ session }: { session: Session }) {
       try {
         const [progRes, profileRes, evalRes] = await Promise.all([
           supabase.from('programs').select('id').eq('user_id', session.user.id).neq('committed', false).limit(1),
-          supabase.from('athlete_profiles').select('lifts, skills, conditioning, competition_athlete_id, programming_resume_pending_at').eq('user_id', session.user.id).maybeSingle(),
+          supabase.from('athlete_profiles').select('lifts, skills, conditioning, age, gender, bodyweight, athletic_reviewed_at, competition_athlete_id, programming_resume_pending_at').eq('user_id', session.user.id).maybeSingle(),
           supabase.from('profile_evaluations').select('id').eq('user_id', session.user.id).limit(1),
         ]);
         if (cancelled) return;
         if (profileRes.data) {
-          const d = profileRes.data as { lifts?: Record<string, unknown>; skills?: Record<string, unknown>; conditioning?: Record<string, unknown>; competition_athlete_id?: string | null; programming_resume_pending_at?: string | null };
+          const d = profileRes.data as { lifts?: Record<string, unknown>; skills?: Record<string, unknown>; conditioning?: Record<string, unknown>; age?: number | null; gender?: string | null; bodyweight?: number | null; athletic_reviewed_at?: string | null; competition_athlete_id?: string | null; programming_resume_pending_at?: string | null };
           setResumePending(!!d.programming_resume_pending_at);
           const hasLifts = d.lifts && Object.values(d.lifts).some((v) => typeof v === 'number' && v > 0);
           const hasSkills = d.skills && Object.values(d.skills).some((v) => v && v !== 'none');
           const hasConditioning = d.conditioning && Object.values(d.conditioning).some((v) => !!v);
           setHasProfile(!!(hasLifts || hasSkills || hasConditioning));
+          setBasicsDone(d.age != null && d.bodyweight != null && !!d.gender);
+          setProfileReviewed(!!d.athletic_reviewed_at);
           setHasCompetitionLink(!!d.competition_athlete_id);
         }
         setHasEvaluation(!!(evalRes.data && evalRes.data.length > 0));
@@ -113,7 +122,11 @@ export default function HomePage({ session }: { session: Session }) {
     // dot covers the explorer who scrolled straight to the grid.
     {
       key: 'profile', label: 'Profile',
-      sub: hasEvaluation ? 'Your numbers — they power everything.' : 'Not finished — pick up where you left off.',
+      sub: hasEvaluation
+        ? 'Your numbers — they power everything.'
+        : profileReviewed
+          ? 'Ready — run your evaluation.'
+          : 'Not finished — pick up where you left off.',
       to: '/profile', icon: <User size={20} />, locked: false, plan: '', badge: !hasEvaluation,
     },
     { key: 'settings', label: 'Settings', sub: 'Billing, account & sign out.', to: '/settings', icon: <Settings size={20} />, locked: false, plan: '' },
@@ -161,7 +174,7 @@ export default function HomePage({ session }: { session: Session }) {
                       {hasProgramming ? "Your program is paid for — let's build it" : 'Welcome — here\'s how The Gains Lab works'}
                     </h2>
                     {([
-                      ['Your profile', 'about 5 minutes. Your lifts, skills, and times — estimates are OK, and whatever you skip stays out of the analysis.', hasProfile],
+                      ['Your profile', 'about 5 minutes. Your lifts, skills, and times — estimates are OK, and whatever you skip stays out of the analysis.', profileReviewed],
                       ['Your free AI evaluation', 'a candid read of your fitness: strengths, gaps, and an optimal training strategy. Yours to keep.', hasEvaluation],
                       [hasProgramming ? 'Train' : 'AI Coach',
                         hasProgramming
@@ -184,7 +197,7 @@ export default function HomePage({ session }: { session: Session }) {
                       style={{ width: '100%', marginTop: 10, padding: '11px 0', fontSize: 14 }}
                       onClick={() => navigate('/profile')}
                     >
-                      {hasProfile ? 'Run my evaluation →' : 'Start my profile →'}
+                      {!basicsDone ? 'Start my profile →' : !profileReviewed ? 'Continue — Your Numbers →' : 'Run my evaluation →'}
                     </button>
                     <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', marginTop: 9 }}>
                       Done the CrossFit Open?{' '}

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { classifyAthlete } from '../utils/classify-athlete';
-import { getTierStatus, type AthleteProfileInput, type TierSection } from '../utils/tier-status';
+import { getTierStatus, type AthleteProfileInput, type TierSection, type TierStatus } from '../utils/tier-status';
 import { clampLift, maxLift, filterTimeChars, isValidTimeStr, normalizeTimeStr } from '../utils/profileValidation';
 import { useEntitlements } from '../hooks/useEntitlements';
 import Nav from '../components/Nav';
@@ -142,44 +142,38 @@ function EvalUpgradeCta({ onUpgrade, hasEngine = false }: { onUpgrade?: (plan: '
           <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
             Turn This Evaluation Into Your Program
           </div>
+          {/* One sentence per promise (founder, 2026-10-08: "needs a little
+              polish" — the eval above already did the persuading). */}
           <div style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.65, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <strong style={{ color: 'var(--text)', fontWeight: 700 }}>A program built for you, not a template.</strong>{' '}
-              Combine this evaluation with your goals and preferences, so every training session is
-              aimed at what&rsquo;s holding you back. Not the athlete next to you.
+              Every training session is aimed at what&rsquo;s holding you back.
             </div>
             <div>
               <strong style={{ color: 'var(--text)', fontWeight: 700 }}>A coach beside you, every session.</strong>{' '}
-              Not a chatbot. Our AI Coach is trained on our methodology and 25 years of programming
-              history, with your Evaluation, goals, and history in view. It thinks like an
-              experienced coach, so it answers your questions, coaches your lifts, and adjusts your
-              training in real time.
+              Not a chatbot — trained on our methodology, with your evaluation, goals, and history in view.
             </div>
             <div>
               <strong style={{ color: 'var(--text)', fontWeight: 700 }}>Training that adapts as you improve.</strong>{' '}
-              Log your results and the program updates. It keeps matching the athlete you are now —
-              not the one you were when you started.
+              Log your results and the program updates.
             </div>
-          </div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: '14px 0' }}>
-            Personalized training and coaching, aimed at what&rsquo;s holding you back.{' '}
-            <span style={{ color: 'var(--accent)' }}>Every day.</span>
           </div>
           <button
             type="button"
             className="auth-btn"
-            style={{ padding: '14px 20px', fontSize: 14, width: '100%', fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase' }}
+            style={{ padding: '14px 20px', fontSize: 14, width: '100%', fontWeight: 700, marginTop: 16 }}
             onClick={() => onUpgrade('programming')}
           >
-            Build My Program
+            Get AI Programming &rarr;
           </button>
           {/* Engine / All Access addendum — hidden for existing Engine
-              subscribers, for whom "Want Engine too?" makes no sense. */}
+              subscribers, for whom "Want Engine too?" makes no sense. The
+              sentence doesn't repeat the button's name — the button carries it. */}
           {!hasEngine && (
             <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)', textAlign: 'center' }}>
               <div style={{ fontSize: 13.5, color: 'var(--text-dim)', marginBottom: 10 }}>
-                Want Engine too? Get <strong style={{ color: 'var(--text)' }}>All Access</strong> — best value,
-                save 15%. $49.99/month for both.
+                Want Engine too? <strong style={{ color: 'var(--text)' }}>Best value</strong> — save 15%,
+                $49.99/month for both.
               </div>
               <button
                 type="button"
@@ -195,7 +189,7 @@ function EvalUpgradeCta({ onUpgrade, hasEngine = false }: { onUpgrade?: (plan: '
                   onClick={() => onUpgrade('engine')}
                   style={{ background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}
                 >
-                  $29.99/month &rarr;
+                  Get Engine &rarr;
                 </button>
               </div>
             </div>
@@ -729,6 +723,11 @@ export default function AthletePage({ session }: { session: Session }) {
   // 'required' blocks the run (no 2k row / no run time yet); 'soft' nudges when
   // the required numbers are in but optional athletic fields are still blank.
   const [evalCheckpoint, setEvalCheckpoint] = useState<null | 'required' | 'soft'>(null);
+  // Sparse Step-2 choice (founder, 2026-10-08): replaces the window.confirm
+  // whose OK/Cancel semantics nobody could guess. Two labeled saves instead —
+  // "I'll add more later" persists without completing Step 2; "that's
+  // everything I have" completes it with what's there.
+  const [sparseModalOpen, setSparseModalOpen] = useState(false);
   // Tier 2 card + conditioning section expansion is controlled so the
   // checkpoint's "Add benchmarks" button can open them and scroll there.
   const [t2Expanded, setT2Expanded] = useState(false);
@@ -1251,23 +1250,12 @@ export default function AthletePage({ session }: { session: Session }) {
       }
     }
 
-    // One-time sparse confirm, REVIEW saves only: Step 2 completes when the
-    // athlete claims it does, so this is the moment they hear the contract.
-    // Cancel downgrades to a plain save — the data still persists, Step 2
-    // just stays incomplete (nothing is ever held hostage to the dialog).
-    let review = overrides?.review === true;
-    if (review && !athleticReviewedAt) {
-      const coreLiftsBlank = ['back_squat', 'deadlift', 'bench_press', 'snatch', 'clean_and_jerk']
-        .filter((k) => !(cleanLifts[k] > 0));
-      const hasRun = ['1_mile_run', '5k_run'].some((k) => cleanConditioning[k] != null && cleanConditioning[k] !== '');
-      const sparse = coreLiftsBlank.length > 0 || cleanConditioning['2k_row'] == null || !hasRun;
-      if (sparse) {
-        const ok = window.confirm(
-          'We can only work with what you give us — anything left blank stays out of your evaluation and your programming. Whenever you test something new, enter it (estimates count), and every future evaluation and program will include it.\n\nSave with what you have now?'
-        );
-        if (!ok) review = false;
-      }
-    }
+    // The sparse-save conversation happens BEFORE this function runs — the
+    // Save My Numbers button opens the two-choice modal when core numbers
+    // are blank, and each choice calls saveProfile with the review flag it
+    // means. By the time a review:true save reaches here, the athlete has
+    // already said "that's everything I have."
+    const review = overrides?.review === true;
     // An existing stamp is always preserved; a new one only lands on a
     // review save. Plain saves write back whatever was already there.
     const reviewedAtIso = athleticReviewedAt ?? (review ? new Date().toISOString() : null);
@@ -1470,6 +1458,21 @@ export default function AthletePage({ session }: { session: Session }) {
   };
   const tierStatus = getTierStatus(tierStatusInput);
 
+  // Green-means-saved (founder, 2026-10-08: "it should not turn green until
+  // the save is clicked"). Badges, the contract banner, and every gate read
+  // the LAST-SAVED data, not live keystrokes — otherwise a step shows
+  // Complete ✓ while the unsaved-changes pill is still begging for a save.
+  // The snapshot is captured whenever the form is clean: load-complete
+  // hydration and every save-success flip isDirty false in the same render
+  // as the data they describe, so the closed-over tierStatus is exactly the
+  // persisted state. Live tierStatus still drives the pre-run gap checks.
+  const [savedTier, setSavedTier] = useState<TierStatus | null>(null);
+  useEffect(() => {
+    if (!loading && !loadError && !isDirty) setSavedTier(tierStatus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDirty, loading, loadError]);
+  const savedStatus = savedTier ?? tierStatus;
+
   // Sections always arrive COLLAPSED (founder, 2026-10-08): the user gets
   // the page's shape first, then digs in. The accent `highlight` border on
   // the current step does the pointing; no auto-opens.
@@ -1481,6 +1484,12 @@ export default function AthletePage({ session }: { session: Session }) {
   const condRequiredMissing =
     !isCondFilled(conditioning['2k_row']) ||
     !(isCondFilled(conditioning['1_mile_run']) || isCondFilled(conditioning['5k_run']));
+  // Sparse = any core lift blank, no 2k row, or no run — the same shape the
+  // old save-time confirm checked, computed from live form state so the
+  // Save My Numbers button can route through the two-choice modal first.
+  const step2Sparse =
+    ['back_squat', 'deadlift', 'bench_press', 'snatch', 'clean_and_jerk'].some((k) => !(lifts[k] > 0)) ||
+    condRequiredMissing;
   // Blank optional athletic fields, most-valuable first (conditioning depth,
   // then the non-required lifts), for the soft checkpoint's specifics line.
   const softGapPhrases: string[] = [];
@@ -1530,17 +1539,49 @@ export default function AthletePage({ session }: { session: Session }) {
         {isDirty && interactedRef.current && !saving && !loading && (
           <button
             type="button"
+            className="unsaved-pill"
             onClick={() => { void saveProfile(); }}
-            style={{
-              position: 'fixed', left: '50%', transform: 'translateX(-50%)',
-              bottom: 'calc(74px + env(safe-area-inset-bottom, 0px))', zIndex: 60,
-              background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 999,
-              padding: '9px 18px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-              boxShadow: '0 4px 18px rgba(0,0,0,.45)', cursor: 'pointer',
-            }}
           >
             Unsaved changes — tap to save
           </button>
+        )}
+        {/* Sparse Step-2 save: two honest choices instead of OK/Cancel.
+            Both persist everything entered; only the second completes
+            Step 2 (stamps athletic_reviewed_at → eval unlocks). Tapping
+            the backdrop just closes — nothing saves without a label. */}
+        {sparseModalOpen && (
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+            onClick={() => setSparseModalOpen(false)}
+          >
+            <div className="settings-card" style={{ maxWidth: 440, width: '100%' }} onClick={(e) => e.stopPropagation()}>
+              <h2 className="settings-card-title" style={{ marginBottom: 8 }}>Some numbers are still blank</h2>
+              <p style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.6, margin: '0 0 16px' }}>
+                We can only work with what you give us — whatever stays blank stays out of your
+                evaluation and your programming. Estimates count, and whenever you test something
+                new, enter it and every future evaluation and program will include it.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button
+                  type="button"
+                  className="auth-btn"
+                  disabled={saving}
+                  onClick={async () => { setSparseModalOpen(false); await saveProfile({ review: true }); }}
+                >
+                  Save — that's everything I have
+                </button>
+                <button
+                  type="button"
+                  className="auth-btn"
+                  style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                  disabled={saving}
+                  onClick={async () => { setSparseModalOpen(false); await saveProfile(); }}
+                >
+                  Save — I'll add more later
+                </button>
+              </div>
+            </div>
+          </div>
         )}
         <div className="page-body">
           <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1564,9 +1605,9 @@ export default function AthletePage({ session }: { session: Session }) {
                 eval is step one of every journey. Hides once the eval
                 unlocks and the Run Evaluation card takes over as the hero.
                 "Step", never "Tier", in user-facing copy. */}
-            {!loading && !loadError && !tierStatus.canRunEval && (() => {
+            {!loading && !loadError && !savedStatus.canRunEval && (() => {
               const hasProgramming = isAdmin || hasFeature('programming');
-              const oneLeft = tierStatus.tier1.complete && !tierStatus.tier2.complete;
+              const oneLeft = savedStatus.tier1.complete && !savedStatus.tier2.complete;
               const evalName = (
                 <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
                   {hasProgramming ? 'AI Evaluation' : 'free AI Evaluation'}
@@ -1642,7 +1683,7 @@ export default function AthletePage({ session }: { session: Session }) {
                 {(() => {
                   const hasEvaluation = evaluations.length > 0;
                   const hasEvalCredit = isAdmin || evalCreditsRemaining > 0;
-                  const canRun = tierStatus.canRunEval && hasEvalCredit;
+                  const canRun = savedStatus.canRunEval && hasEvalCredit;
                   const running = analysisLoading === 'profile';
                   const latestEval = evaluations[0];
                   if (running) {
@@ -1716,7 +1757,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   // and never replaced). Tell the user explicitly so they're not
                   // stuck staring at a profile that "looks ready" but has no run
                   // button and no ready-card.
-                  if (tierStatus.canRunEval && !hasEvalCredit) {
+                  if (savedStatus.canRunEval && !hasEvalCredit) {
                     return (
                       <div className="settings-card">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1738,9 +1779,9 @@ export default function AthletePage({ session }: { session: Session }) {
                   // gap instead of the form marking fields required. Any other gap
                   // (basics, key lifts) keeps the card hidden as before.
                   const onlyCondBlocking =
-                    !tierStatus.canRunEval &&
-                    tierStatus.tier1.complete &&
-                    tierStatus.tier2.missing.every((m) => m === 'conditioning');
+                    !savedStatus.canRunEval &&
+                    savedStatus.tier1.complete &&
+                    savedStatus.tier2.missing.every((m) => m === 'conditioning');
                   if (canRun || (hasEvalCredit && onlyCondBlocking)) {
                     const showRequired = evalCheckpoint === 'required' && condRequiredMissing;
                     const showSoft = evalCheckpoint === 'soft' && !condRequiredMissing && softGapPhrases.length > 0;
@@ -1761,6 +1802,13 @@ export default function AthletePage({ session }: { session: Session }) {
                               className="auth-btn"
                               style={{ padding: '10px 20px', fontSize: 14, background: 'var(--accent)', color: 'white' }}
                               onClick={async () => {
+                                // Step 2 signed off = the gap conversation already
+                                // happened at Save My Numbers. One press, one run —
+                                // no second interrogation (founder, 2026-10-08).
+                                if (athleticReviewedAt) {
+                                  await proceedWithEval();
+                                  return;
+                                }
                                 if (condRequiredMissing) {
                                   setEvalCheckpoint('required');
                                   return;
@@ -1834,9 +1882,9 @@ export default function AthletePage({ session }: { session: Session }) {
                   tierNumber={1}
                   title="Basics"
                   unlocks="Age, height, weight, gender & units"
-                  status={tierStatus.tier1}
+                  status={savedStatus.tier1}
                   defaultExpanded={false}
-                  highlight={!tierStatus.tier1.complete}
+                  highlight={!savedStatus.tier1.complete}
                 >
                   <div className="lift-grid" style={{ marginBottom: 16 }}>
                     <div className="lift-item">
@@ -1916,16 +1964,23 @@ export default function AthletePage({ session }: { session: Session }) {
                   </div>
                   {/* Per-section save (2026-10-08): saves everything entered,
                       stamps nothing — Step 1 turns green on its own data and
-                      the banner counts down. Step 2 stays untouched. */}
-                  <button
-                    type="button"
-                    className="auth-btn"
-                    style={{ marginTop: 16 }}
-                    disabled={saving}
-                    onClick={async () => { await saveProfile(); }}
-                  >
-                    {saving ? 'Saving...' : 'Save Basics'}
-                  </button>
+                      the banner counts down. Step 2 stays untouched. The
+                      button confirms its own save: green Saved ✓ while the
+                      form is clean and the saved section is complete. */}
+                  {(() => {
+                    const basicsSaved = !isDirty && savedStatus.tier1.complete;
+                    return (
+                      <button
+                        type="button"
+                        className="auth-btn"
+                        style={{ marginTop: 16, ...(basicsSaved && !saving ? { background: '#2ec486', color: 'white' } : null) }}
+                        disabled={saving}
+                        onClick={async () => { await saveProfile(); }}
+                      >
+                        {saving ? 'Saving...' : basicsSaved ? 'Saved ✓' : 'Save Basics'}
+                      </button>
+                    );
+                  })()}
                 </TierCard>
 
                 {/* Tier 2 — Your Numbers (renamed from "Athletic Data",
@@ -1935,8 +1990,8 @@ export default function AthletePage({ session }: { session: Session }) {
                   tierNumber={2}
                   title="Your Numbers"
                   unlocks="Lifts, skills & conditioning times — estimates are OK"
-                  status={tierStatus.tier2}
-                  highlight={tierStatus.tier1.complete && !tierStatus.tier2.complete}
+                  status={savedStatus.tier2}
+                  highlight={savedStatus.tier1.complete && !savedStatus.tier2.complete}
                   expanded={t2Expanded}
                   onToggle={setT2Expanded}
                   cardRef={tier2Ref}
@@ -2040,18 +2095,30 @@ export default function AthletePage({ session }: { session: Session }) {
                   ))}
                 </CollapsibleSection>
                 {/* THE Step-2 completion act (2026-10-08): this save stamps
-                    athletic_reviewed_at (after the one-time sparse confirm
-                    when blanks remain), turns the section green, and unlocks
-                    the evaluation. Plain saves elsewhere never do. */}
-                <button
-                  type="button"
-                  className="auth-btn"
-                  style={{ marginTop: 16 }}
-                  disabled={saving}
-                  onClick={async () => { await saveProfile({ review: true }); }}
-                >
-                  {saving ? 'Saving...' : 'Save My Numbers'}
-                </button>
+                    athletic_reviewed_at, turns the section green, and unlocks
+                    the evaluation. Plain saves elsewhere never do. First-time
+                    sparse saves route through the two-choice modal instead of
+                    stamping blind. */}
+                {(() => {
+                  const numbersSaved = !isDirty && savedStatus.tier2.complete;
+                  return (
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      style={{ marginTop: 16, ...(numbersSaved && !saving ? { background: '#2ec486', color: 'white' } : null) }}
+                      disabled={saving}
+                      onClick={async () => {
+                        if (!athleticReviewedAt && step2Sparse) {
+                          setSparseModalOpen(true);
+                          return;
+                        }
+                        await saveProfile({ review: true });
+                      }}
+                    >
+                      {saving ? 'Saving...' : numbersSaved ? 'Saved ✓' : 'Save My Numbers'}
+                    </button>
+                  );
+                })()}
                 </TierCard>
 
                 {/* Tier 3 — Goals & Schedule (renamed from "Training
@@ -2060,7 +2127,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   tierNumber={3}
                   title="Goals & Schedule"
                   unlocks="Goal, schedule, equipment & anything the AI should know"
-                  status={tierStatus.tier3}
+                  status={savedStatus.tier3}
                   defaultExpanded={false}
                   locked={!isAdmin && !hasFeature('programming')}
                   lockMessage="Requires AI Programming or All Access subscription"
@@ -2417,30 +2484,9 @@ export default function AthletePage({ session }: { session: Session }) {
                   </div>
                 )}
 
-                {(() => {
-                  // Pure SAVE button. Running the free evaluation lives entirely in
-                  // the Evaluation Status Card above (which saves first if dirty) —
-                  // keeping save and run-eval separate avoids the "wait, does this
-                  // also run/save?" confusion.
-                  const saveBtnLabel = saving ? 'Saving...' : !isDirty ? 'Saved ✓' : 'Save Profile';
-                  return (
-                    <>
-                      <button
-                        className="auth-btn"
-                        onClick={async () => { await saveProfile({ review: true }); }}
-                        disabled={saving || !!analysisLoading}
-                        style={!isDirty && !saving && !analysisLoading ? { background: '#2ec486', color: 'white' } : undefined}
-                      >
-                        {saveBtnLabel}
-                      </button>
-                      {!tierStatus.canRunEval && !hasGeneratedProgram && (
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
-                          Finish Steps 1 and 2, then run your free evaluation.
-                        </span>
-                      )}
-                    </>
-                  );
-                })()}
+                {/* No page-bottom Save Profile: each section owns its save
+                    (2026-10-08 — the stray green "Saved ✓" down here read as
+                    a second, mysterious save). Tier 3 keeps Save & analyze. */}
 
                 {/* Escape hatch (2026-10-08): on desktop the tab bar doesn't
                     render, so without this the page reads as a room with no
@@ -2461,7 +2507,7 @@ export default function AthletePage({ session }: { session: Session }) {
                     and the upgrade route (2026-09-14 ruling — goals are mentioned
                     outside Tier 3 but only ever actionable inside it). */}
                 {!hasGeneratedProgram && (isAdmin || hasFeature('programming')) && (() => {
-                  const tierBlocked = !tierStatus.canRunPrograms;
+                  const tierBlocked = !savedStatus.canRunPrograms;
                   const disabled = generateLoading || tierBlocked;
                   const genTitle = tierBlocked ? 'Complete Step 3 to Generate.' : undefined;
                   // Ready = entitled, tier-complete, not generating. The old
