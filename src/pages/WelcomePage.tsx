@@ -22,12 +22,16 @@ import GainsLogo from '../components/GainsLogo';
 
 const STEPS: Array<{ title: string; body: string }> = [
   {
-    title: 'Your profile',
-    body: 'Your lifts, skills, and times. Estimates are OK. Whatever you skip stays out of the analysis.',
+    title: 'Complete your profile',
+    body: 'Your lifts, skills, and times. Enter what you have — estimates are OK.',
   },
   {
-    title: 'Your free AI evaluation',
+    title: 'Complete your free AI evaluation',
     body: 'A candid read of your fitness: strengths, gaps, and an optimal training strategy. Yours to keep.',
+  },
+  {
+    title: 'Competition history',
+    body: 'Done the Open before? Find your history and link it to your profile. (Optional)',
   },
   {
     title: 'AI Coach',
@@ -37,7 +41,7 @@ const STEPS: Array<{ title: string; body: string }> = [
 
 export default function WelcomePage({ session }: { session: Session }) {
   const navigate = useNavigate();
-  const [gotIt, setGotIt] = useState<boolean[]>([false, false, false]);
+  const [gotIt, setGotIt] = useState<boolean[]>(STEPS.map(() => false));
   const [starting, setStarting] = useState(false);
   const allChecked = gotIt.every(Boolean);
 
@@ -136,7 +140,7 @@ export default function WelcomePage({ session }: { session: Session }) {
             {starting ? 'Opening your profile…' : allChecked ? 'Start my profile →' : 'Start my profile'}
           </button>
           {!allChecked && (
-            <div style={{ textAlign: 'center', fontSize: 11.5, color: 'var(--text-muted)', marginTop: 8 }}>
+            <div style={{ textAlign: 'center', fontSize: 11.5, color: 'var(--text)', marginTop: 8 }}>
               Tap “Got it” on each step to continue
             </div>
           )}
