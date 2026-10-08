@@ -64,17 +64,20 @@ export default function HomePage({ session }: { session: Session }) {
     return () => { cancelled = true; };
   }, [session.user.id]);
 
+  // ── Resident welcome card (2026-10-08): until the user's evaluation
+  // exists, the hero is the same three-step story the /welcome screen told
+  // — where you are, what each step costs, what you get. It suppresses the
+  // other setup-nudge cards (one next-action per screen) and retires the
+  // moment an evaluation exists. Buyers get their purchase acknowledged in
+  // the headline; the CTA tracks their actual next step.
+  const showWelcomeCard = !hasEvaluation && !resumePending;
+
   // ── Context card: the single most relevant next action. ──
   const primary = (() => {
+    if (showWelcomeCard) return null; // the welcome card is the hero
     // Returner pause outranks everything: their paid month is waiting on them.
     if (resumePending && hasProgram) {
       return { title: 'Welcome back — build your next month', body: 'Your next training month is paid for and waiting. Review your numbers on your profile, then tap Build my next month.', cta: 'Review & build', to: '/profile' };
-    }
-    if (hasProgramming && !hasProfile) {
-      return { title: 'Set up your athlete profile', body: 'Add your lifts, skills, and benchmarks — they power your program and make your AI Coach personal.', cta: 'Go to Profile', to: '/profile' };
-    }
-    if (hasProgramming && !hasEvaluation) {
-      return { title: 'Run your evaluation', body: 'Your profile is set up. Run your AI evaluation to unlock program generation.', cta: 'Go to Profile', to: '/profile' };
     }
     if (hasProgramming && !hasProgram) {
       return { title: "Alright, here's the fun part.", body: "What are you training for? A competition? A PR? Just feeling fitter? Tell the coach your goal and schedule, and it'll combine them with everything your evaluation found to build a program that actually fits you.", cta: 'Go to Profile', to: '/profile' };
@@ -93,14 +96,17 @@ export default function HomePage({ session }: { session: Session }) {
   })();
 
   // ── Tiles. locked=true → dimmed + lock badge → routes to checkout for `plan`. ──
+  // Every tile answers "what is this and why would I tap it" — including
+  // the locked ones, which pitch the feature instead of just the padlock
+  // (2026-10-08 onboarding pass: hand-holding at the resting-copy level).
   const tiles: Array<{ key: string; label: string; sub: string; to: string; icon: React.ReactNode; locked: boolean; plan: string }> = [
-    { key: 'coach', label: 'AI Coach', sub: 'Ask anything', to: '/chat', icon: <MessageSquare size={20} />, locked: false, plan: '' },
-    { key: 'training', label: 'AI Program', sub: 'Programs & calendar', to: '/programs', icon: <Dumbbell size={20} />, locked: !hasProgramming, plan: 'programming' },
-    { key: 'engine', label: 'Engine', sub: 'Year of the Engine', to: '/engine', icon: <Flame size={20} />, locked: !hasEngine, plan: 'engine' },
-    { key: 'nutrition', label: 'Nutrition', sub: 'Log & track', to: '/nutrition', icon: <Apple size={20} />, locked: !hasNutrition, plan: 'nutrition' },
-    { key: 'athletedata', label: 'Athlete Data', sub: 'Competition history', to: '/athletedata', icon: <Trophy size={20} />, locked: false, plan: '' },
-    { key: 'profile', label: 'Profile', sub: 'Your athlete data', to: '/profile', icon: <User size={20} />, locked: false, plan: '' },
-    { key: 'settings', label: 'Settings', sub: 'Billing, account & sign out', to: '/settings', icon: <Settings size={20} />, locked: false, plan: '' },
+    { key: 'coach', label: 'AI Coach', sub: 'Ask any training question — 3 free to start.', to: '/chat', icon: <MessageSquare size={20} />, locked: false, plan: '' },
+    { key: 'training', label: 'AI Program', sub: 'A month of training built around your numbers and goals.', to: '/programs', icon: <Dumbbell size={20} />, locked: !hasProgramming, plan: 'programming' },
+    { key: 'engine', label: 'Engine', sub: 'Daily conditioning paced from your own time trial.', to: '/engine', icon: <Flame size={20} />, locked: !hasEngine, plan: 'engine' },
+    { key: 'nutrition', label: 'Nutrition', sub: 'Snap or type your meals; the AI tracks the macros.', to: '/nutrition', icon: <Apple size={20} />, locked: !hasNutrition, plan: 'nutrition' },
+    { key: 'athletedata', label: 'Athlete Data', sub: 'Done the Open? Link it — free percentile breakdown.', to: '/athletedata', icon: <Trophy size={20} />, locked: false, plan: '' },
+    { key: 'profile', label: 'Profile', sub: 'Your numbers — they power everything.', to: '/profile', icon: <User size={20} />, locked: false, plan: '' },
+    { key: 'settings', label: 'Settings', sub: 'Billing, account & sign out.', to: '/settings', icon: <Settings size={20} />, locked: false, plan: '' },
     // Admin-only: the sidebar menu is awkward on mobile, so admins get a tile.
     ...(isAdmin ? [{ key: 'admin', label: 'Admin', sub: 'Users, reports & ops', to: '/admin', icon: <Shield size={20} />, locked: false, plan: '' }] : []),
   ];
@@ -135,31 +141,63 @@ export default function HomePage({ session }: { session: Session }) {
                   </button>
                 )}
 
-                {/* One next-action per screen: this card is the FREE journey's
-                    hero (no primary card above it) or the link-history nudge once
-                    the profile is done. It never stacks under a primary card that
-                    is already saying "set up your profile". */}
-                {((!hasProfile && !primary) || (hasProfile && !hasCompetitionLink)) && (
+                {/* Resident welcome card — the "explain it all" banner,
+                    permanently installed until the evaluation exists. Same
+                    three-beat story as /welcome, so by the second sighting
+                    it's the user's mental model. */}
+                {showWelcomeCard && (
+                  <div className="settings-card" style={{ textAlign: 'left', borderColor: 'var(--accent)' }}>
+                    <h2 className="settings-card-title" style={{ marginBottom: 12, color: 'var(--text)' }}>
+                      {hasProgramming ? "Your program is paid for — let's build it" : 'Welcome — here\'s how The Gains Lab works'}
+                    </h2>
+                    {([
+                      ['Your profile', 'about 5 minutes. Your lifts, skills, and times — estimates are OK, and whatever you skip stays out of the analysis.', hasProfile],
+                      ['Your free AI evaluation', 'a candid read of your fitness: strengths, gaps, and an optimal training strategy. Yours to keep.', hasEvaluation],
+                      [hasProgramming ? 'Train' : 'AI Coach',
+                        hasProgramming
+                          ? 'AI programming built around your numbers, goals, and schedule.'
+                          : 'complete your profile and the answers are personalized to you.',
+                        false],
+                    ] as Array<[string, string, boolean]>).map(([t, b, done], i) => (
+                      <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                        <span aria-hidden style={{ flex: 'none', width: 20, height: 20, borderRadius: '50%', marginTop: 1, background: 'var(--surface2, #1d1d21)', border: '1px solid var(--border)', color: done ? '#2ec486' : 'var(--accent)', fontWeight: 800, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {done ? '✓' : i + 1}
+                        </span>
+                        <span style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--text-dim)' }}>
+                          <strong style={{ color: 'var(--text)' }}>{t}</strong> — {b}
+                        </span>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      style={{ width: '100%', marginTop: 10, padding: '11px 0', fontSize: 14 }}
+                      onClick={() => navigate('/profile')}
+                    >
+                      {hasProfile ? 'Run my evaluation →' : 'Start my profile →'}
+                    </button>
+                    <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', marginTop: 9 }}>
+                      Done the CrossFit Open?{' '}
+                      <button type="button" onClick={(e) => { e.stopPropagation(); navigate('/athletedata'); }} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, padding: 0 }}>
+                        Link your history
+                      </button>{' '}
+                      and step 2 gets sharper.
+                    </div>
+                  </div>
+                )}
+
+                {/* Post-eval link-history nudge (the welcome card covers this
+                    pitch before the eval exists). */}
+                {!showWelcomeCard && hasProfile && !hasCompetitionLink && (
                   <div className="settings-card" style={{ textAlign: 'left' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                       <MessageSquare size={18} style={{ color: 'var(--accent)' }} />
                       <strong style={{ color: 'var(--text)', fontSize: 14 }}>Make your AI Coach personal</strong>
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>
-                      {!hasProfile && !hasCompetitionLink
-                        ? 'Complete your profile and link your competition history, and the Coach grounds its answers in your real numbers, results, and percentiles.'
-                        : !hasProfile
-                          ? 'Complete your profile and the Coach grounds its answers in your lifts, skills, and benchmarks.'
-                          : 'Link your competition history and the Coach grounds its answers in your Open, Quarterfinals, and Games results.'}
+                      Link your competition history and the Coach grounds its answers in your Open, Quarterfinals, and Games results.
                     </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {!hasProfile && (
-                        <button type="button" className="auth-btn" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => navigate('/profile')}>Complete profile</button>
-                      )}
-                      {!hasCompetitionLink && (
-                        <button type="button" className="auth-btn" style={{ padding: '6px 14px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} onClick={() => navigate('/athletedata')}>Link competition history</button>
-                      )}
-                    </div>
+                    <button type="button" className="auth-btn" style={{ padding: '6px 14px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} onClick={() => navigate('/athletedata')}>Link competition history</button>
                   </div>
                 )}
 
@@ -176,7 +214,8 @@ export default function HomePage({ session }: { session: Session }) {
                       {t.locked && <Lock size={14} style={{ position: 'absolute', top: 12, right: 12, color: 'var(--text-muted)' }} />}
                       <div style={{ color: t.locked ? 'var(--text-muted)' : 'var(--accent)', marginBottom: 8 }}>{t.icon}</div>
                       <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{t.label}</div>
-                      <div style={{ fontSize: 12, color: t.locked ? 'var(--accent)' : 'var(--text-dim)' }}>{t.locked ? 'Unlock →' : t.sub}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t.sub}</div>
+                      {t.locked && <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600, marginTop: 4 }}>Unlock →</div>}
                     </button>
                   ))}
                 </div>

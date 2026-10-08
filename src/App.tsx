@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { EntitlementsProvider } from './hooks/useEntitlements';
@@ -17,6 +17,7 @@ import HomePage from './pages/HomePage';
 
 // Lazy-loaded — feature modules loaded on demand
 const HistoryPage = lazy(() => import('./pages/HistoryPage'));
+const WelcomePage = lazy(() => import('./pages/WelcomePage'));
 const BookmarksPage = lazy(() => import('./pages/BookmarksPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
@@ -222,14 +223,51 @@ export default function App() {
   );
 }
 
-const HIDE_TAB_BAR_ROUTES = ['/workout/start', '/checkout', '/checkout/complete'];
+const HIDE_TAB_BAR_ROUTES = ['/workout/start', '/checkout', '/checkout/complete', '/welcome'];
 
 function AuthenticatedApp({ session }: { session: Session }) {
   const location = useLocation();
+  const navigate = useNavigate();
   // Stage D: page_view per route change (pattern only, ids stripped).
   useEffect(() => {
     track('page_view', { path: routePattern(location.pathname) });
   }, [location.pathname]);
+
+  // Welcome gate (2026-10-08): a brand-new account's first authenticated
+  // load routes to /welcome — once per ACCOUNT (profiles.welcome_seen_at,
+  // backfilled for everyone pre-existing), checked once per session
+  // (sessionStorage). An existing evaluation also counts as oriented, so a
+  // failed flag write can never trap a veteran. Checkout routes are left
+  // alone — never yank a user mid-payment; they land on "/" after and the
+  // gate catches them there.
+  const welcomeCheckedFor = useRef<string | null>(null);
+  useEffect(() => {
+    const uid = session.user.id;
+    if (welcomeCheckedFor.current === uid) return;
+    const path = location.pathname;
+    if (path === '/welcome' || path.startsWith('/checkout')) return;
+    try {
+      if (sessionStorage.getItem(`welcome-done:${uid}`) === '1') {
+        welcomeCheckedFor.current = uid;
+        return;
+      }
+    } catch { /* storage unavailable — fall through to the DB check */ }
+    welcomeCheckedFor.current = uid;
+    (async () => {
+      try {
+        const [{ data: prof }, evalRes] = await Promise.all([
+          supabase.from('profiles').select('welcome_seen_at').eq('id', uid).maybeSingle(),
+          supabase.from('profile_evaluations').select('id', { count: 'exact', head: true }).eq('user_id', uid),
+        ]);
+        const oriented = !!prof?.welcome_seen_at || (evalRes.count ?? 0) > 0;
+        if (oriented) {
+          try { sessionStorage.setItem(`welcome-done:${uid}`, '1'); } catch { /* ignore */ }
+          return;
+        }
+        navigate('/welcome', { replace: true });
+      } catch { /* soft-fail: never block the app on the gate */ }
+    })();
+  }, [session.user.id, location.pathname, navigate]);
   const hideTabBar = HIDE_TAB_BAR_ROUTES.some(r => location.pathname === r) ||
     location.pathname.startsWith('/features') ||
     location.pathname.startsWith('/qa') ||
@@ -242,6 +280,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<HomePage session={session} />} />
+            <Route path="/welcome" element={<WelcomePage session={session} />} />
             <Route path="/join/engine/:token" element={<RetiredInviteNotice />} />
             <Route path="/claim/:token" element={<RetiredInviteNotice />} />
             {/* REMOVED (Decision 11): the /gym, /gym/leaderboard, /tv/:token class surfaces are deleted. */}
