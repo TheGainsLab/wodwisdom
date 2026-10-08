@@ -571,6 +571,10 @@ function TierCard({
 }: {
   tierNumber: 1 | 2 | 3;
   title: string;
+  /** Contents preview under the title — WHAT the section asks for, not why
+   *  it matters (the why is told twice upstream: /welcome + the orientation
+   *  card). Previews answer "what will I be asked here?" — the question a
+   *  user actually has at a section header. */
   unlocks: string;
   status: TierSection;
   defaultExpanded?: boolean;
@@ -649,7 +653,7 @@ function TierCard({
           </div>
           <h2 className="settings-card-title" style={{ marginBottom: 2 }}>{title}</h2>
           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-            {locked && lockMessage ? lockMessage : `Unlocks: ${unlocks}`}
+            {locked && lockMessage ? lockMessage : unlocks}
           </div>
         </div>
         <span style={{ fontSize: 14, color: 'var(--text-dim)', flexShrink: 0, marginLeft: 12 }}>{expanded ? '▲' : '▼'}</span>
@@ -1810,7 +1814,7 @@ export default function AthletePage({ session }: { session: Session }) {
                 <TierCard
                   tierNumber={1}
                   title="Basics"
-                  unlocks="Tailored answers from the AI Coach"
+                  unlocks="Age, height, weight, gender & units"
                   status={tierStatus.tier1}
                   defaultExpanded={false}
                 >
@@ -1896,7 +1900,7 @@ export default function AthletePage({ session }: { session: Session }) {
                 <TierCard
                   tierNumber={2}
                   title="Athletic Data"
-                  unlocks="Free AI Evaluation"
+                  unlocks="Lifts, skills & conditioning times — estimates are OK"
                   status={tierStatus.tier2}
                   expanded={t2Expanded}
                   onToggle={setT2Expanded}
@@ -2006,7 +2010,7 @@ export default function AthletePage({ session }: { session: Session }) {
                 <TierCard
                   tierNumber={3}
                   title="Training Context"
-                  unlocks="Personalized AI Programming"
+                  unlocks="Goal, schedule, equipment & anything the AI should know"
                   status={tierStatus.tier3}
                   defaultExpanded={false}
                   locked={!isAdmin && !hasFeature('programming')}
