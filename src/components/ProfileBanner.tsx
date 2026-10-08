@@ -5,22 +5,27 @@ import { useEntitlements } from '../hooks/useEntitlements';
 import { getTierStatus } from '../utils/tier-status';
 import { X } from 'lucide-react';
 
-const DISMISS_KEY = 'profile-banner-dismissed';
+// v2 (2026-10-08): timestamped dismissal that expires after 7 days — the
+// old boolean key silenced onboarding permanently on one idle tap. The
+// legacy key is deliberately ignored (previously-dismissed users see the
+// banner once more; they're the least-oriented group we have).
+const DISMISS_KEY = 'profile-banner-dismissed-v2';
+const DISMISS_TTL_MS = 7 * 24 * 3600_000;
 
 interface Props {
   userId: string;
 }
 
 /**
- * Banner shown at the top of ChatPage prompting incomplete-profile users
- * to fill out their profile. Hides when ANY of:
- *   - User has any active entitlement (paid for any feature)
+ * Banner shown at the top of ChatPage prompting users without an
+ * evaluation to go get one. Hides when ANY of:
  *   - User has T2 complete AND has at least one profile_evaluations row
- *   - User has dismissed the banner (localStorage)
+ *   - User dismissed it within the last 7 days
  *
- * Auth state on the banner: no — even non-paying users benefit from the
- * free Tier 2 evaluation, so the banner is shown to anyone with an
- * incomplete profile regardless of subscription.
+ * 2026-10-08: the old "hide for any paying user" rule is gone — it assumed
+ * paying meant oriented, and the paid-but-never-started churn cohort
+ * disproved that. The eval is step one of EVERY journey; paid users just
+ * get sharper copy.
  */
 export default function ProfileBanner({ userId }: Props) {
   const navigate = useNavigate();
@@ -34,19 +39,15 @@ export default function ProfileBanner({ userId }: Props) {
     let cancelled = false;
 
     const decide = async () => {
-      // 1. Dismissed?
-      if (typeof localStorage !== 'undefined' && localStorage.getItem(DISMISS_KEY) === 'true') {
-        if (!cancelled) { setShouldShow(false); setChecking(false); }
-        return;
-      }
-
-      // 2. Has any active entitlement?
-      const hasAnyPaid = isAdmin
-        || hasFeature('ai_chat')
-        || hasFeature('programming')
-        || hasFeature('engine')
-        || hasFeature('nutrition');
-      if (hasAnyPaid) {
+      // 1. Dismissed within the TTL? (Admins are exempt from the banner.)
+      try {
+        const ts = Number(localStorage.getItem(DISMISS_KEY) ?? 0);
+        if (ts && Date.now() - ts < DISMISS_TTL_MS) {
+          if (!cancelled) { setShouldShow(false); setChecking(false); }
+          return;
+        }
+      } catch { /* storage unavailable — show per the data checks below */ }
+      if (isAdmin) {
         if (!cancelled) { setShouldShow(false); setChecking(false); }
         return;
       }
@@ -79,11 +80,11 @@ export default function ProfileBanner({ userId }: Props) {
   }, [userId, entLoading, hasFeature, isAdmin]);
 
   const dismiss = () => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(DISMISS_KEY, 'true');
-    }
+    try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch { /* ignore */ }
     setShouldShow(false);
   };
+
+  const isPaid = hasFeature('ai_chat') || hasFeature('programming') || hasFeature('engine') || hasFeature('nutrition');
 
   if (checking || !shouldShow) return null;
 
@@ -118,7 +119,9 @@ export default function ProfileBanner({ userId }: Props) {
           padding: 0,
         }}
       >
-        Complete your profile for personalized answers and a free evaluation
+        {isPaid
+          ? 'Your subscription starts with your evaluation — 5 minutes of your numbers and the AI gets to work'
+          : 'Complete your profile for personalized answers and a free evaluation'}
         <span style={{ marginLeft: 8, textDecoration: 'underline', fontWeight: 600 }}>
           Set up profile →
         </span>

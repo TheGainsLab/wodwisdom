@@ -999,7 +999,25 @@ export default function AthletePage({ session }: { session: Session }) {
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
 
-  const markDirty = () => setIsDirty(true);
+  // Unsaved-changes guard (2026-10-08, the Wesley incident: toggled his
+  // equipment, never tapped a save button, edits silently evaporated, then
+  // emailed support believing he'd updated his profile). interactedRef
+  // distinguishes "user actually touched the form this session" from the
+  // always-dirty fresh-profile state, so the reminder never nags someone
+  // who hasn't typed anything.
+  const interactedRef = useRef(false);
+  const markDirty = () => { interactedRef.current = true; setIsDirty(true); };
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty && interactedRef.current && !saving) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [isDirty, saving]);
 
   // "Save & analyze" for Section 2 — persists the structured columns (goals +
   // injuries, via the full profile save) AND, when there are free-text intake
@@ -1483,6 +1501,24 @@ export default function AthletePage({ session }: { session: Session }) {
           </button>
           <h1>Athlete Profile</h1>
         </header>
+        {/* Floating unsaved-changes reminder: visible from the moment the
+            user edits anything until a save lands, wherever they've
+            scrolled. Tapping it saves — no hunting for the right button. */}
+        {isDirty && interactedRef.current && !saving && !loading && (
+          <button
+            type="button"
+            onClick={() => { void saveProfile(); }}
+            style={{
+              position: 'fixed', left: '50%', transform: 'translateX(-50%)',
+              bottom: 'calc(74px + env(safe-area-inset-bottom, 0px))', zIndex: 60,
+              background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 999,
+              padding: '9px 18px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+              boxShadow: '0 4px 18px rgba(0,0,0,.45)', cursor: 'pointer',
+            }}
+          >
+            Unsaved changes — tap to save
+          </button>
+        )}
         <div className="page-body">
           <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {injuryMigrationPrompt && injuryShowback && (
@@ -1502,16 +1538,18 @@ export default function AthletePage({ session }: { session: Session }) {
             {!loading && !loadError && !tierStatus.canRunEval && (() => {
               const hasProgramming = isAdmin || hasFeature('programming');
               const steps: Array<[boolean, string, React.ReactNode]> = [
-                [tierStatus.tier1.complete, 'Basics', <>tailored answers from the <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Coach</span></>],
-                [tierStatus.tier2.complete, 'Athletic Data', <>unlocks your free <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Evaluation</span></>],
-                [tierStatus.tier3.complete, 'Training Context', hasProgramming
+                [tierStatus.tier1.complete, 'Basics', <>1 min · tailored answers from the <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Coach</span></>],
+                [tierStatus.tier2.complete, 'Your Numbers', <>~3 min · unlocks your free <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Evaluation</span>. Estimates are OK — whatever you skip stays out of the analysis.</>],
+                [tierStatus.tier3.complete, 'Goals & Schedule', hasProgramming
                   ? <>powers your <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Programming</span> — built around your goals, fitness level, and schedule</>
                   : <>subscribe to unlock <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Programming</span> built around your goals, fitness level, and schedule</>],
               ];
-              const next = !tierStatus.tier1.complete ? 'Basics' : 'Athletic Data';
+              const next = !tierStatus.tier1.complete ? 'Basics' : 'Your Numbers';
               return (
                 <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
-                  <h2 className="settings-card-title" style={{ marginBottom: 8 }}>Your profile powers everything</h2>
+                  <h2 className="settings-card-title" style={{ marginBottom: 8 }}>
+                    {hasProgramming ? "Your program is paid for — let's build it" : 'Your profile powers everything'}
+                  </h2>
                   <ul style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.6, margin: 0, paddingLeft: 4, listStyle: 'none' }}>
                     {steps.map(([done, name, desc], i) => (
                       <li key={name} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
