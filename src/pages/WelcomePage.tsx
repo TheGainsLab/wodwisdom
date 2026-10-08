@@ -140,7 +140,7 @@ export default function WelcomePage({ session }: { session: Session }) {
             {starting ? 'Opening your profile…' : allChecked ? 'Start my profile →' : 'Start my profile'}
           </button>
           {!allChecked && (
-            <div style={{ textAlign: 'center', fontSize: 11.5, color: 'var(--text-muted)', marginTop: 8 }}>
+            <div style={{ textAlign: 'center', fontSize: 11.5, color: 'var(--text)', marginTop: 8 }}>
               Tap “Got it” on each step to continue
             </div>
           )}
