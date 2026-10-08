@@ -99,11 +99,14 @@ export default function HomePage({ session }: { session: Session }) {
   // Every tile answers "what is this and why would I tap it" — including
   // the locked ones, which pitch the feature instead of just the padlock
   // (2026-10-08 onboarding pass: hand-holding at the resting-copy level).
-  const tiles: Array<{ key: string; label: string; sub: string; to: string; icon: React.ReactNode; locked: boolean; plan: string; badge?: boolean }> = [
+  const tiles: Array<{ key: string; label: string; sub: string; to: string; icon: React.ReactNode; locked: boolean; plan: string; badge?: boolean; lockLabel?: string; lockTo?: string }> = [
     { key: 'coach', label: 'AI Coach', sub: 'Ask any training question — 3 free to start.', to: '/chat', icon: <MessageSquare size={20} />, locked: false, plan: '' },
     { key: 'training', label: 'AI Program', sub: 'A month of training built around your numbers and goals.', to: '/programs', icon: <Dumbbell size={20} />, locked: !hasProgramming, plan: 'programming' },
     { key: 'engine', label: 'Engine', sub: 'Daily conditioning paced from your own time trial.', to: '/engine', icon: <Flame size={20} />, locked: !hasEngine, plan: 'engine' },
-    { key: 'nutrition', label: 'Nutrition', sub: 'Snap or type your meals; the AI tracks the macros.', to: '/nutrition', icon: <Apple size={20} />, locked: !hasNutrition, plan: 'nutrition' },
+    // Nutrition is NOT sold standalone — it rides along with Engine or AI
+    // Programming (founder, 2026-10-08). Locked state says so and sends the
+    // user to the plans page instead of a nutrition checkout.
+    { key: 'nutrition', label: 'Nutrition', sub: 'Snap or type your meals; the AI tracks the macros.', to: '/nutrition', icon: <Apple size={20} />, locked: !hasNutrition, plan: '', lockLabel: 'Included with Engine or AI Programming →', lockTo: '/pricing' },
     { key: 'athletedata', label: 'Athlete Data', sub: 'Done the Open? Link it — free percentile breakdown.', to: '/athletedata', icon: <Trophy size={20} />, locked: false, plan: '' },
     // Pre-eval, the tile tells the truth about itself: a dot + "not
     // finished" (2026-10-08). The welcome card above says it loudly; the
@@ -118,8 +121,8 @@ export default function HomePage({ session }: { session: Session }) {
     ...(isAdmin ? [{ key: 'admin', label: 'Admin', sub: 'Users, reports & ops', to: '/admin', icon: <Shield size={20} />, locked: false, plan: '' }] : []),
   ];
 
-  const onTile = (t: { locked: boolean; plan: string; to: string }) =>
-    t.locked ? navigate(`/checkout?plan=${t.plan}&interval=monthly`) : navigate(t.to);
+  const onTile = (t: { locked: boolean; plan: string; to: string; lockTo?: string }) =>
+    t.locked ? navigate(t.lockTo ?? `/checkout?plan=${t.plan}&interval=monthly`) : navigate(t.to);
 
   return (
     <div className="app-layout">
@@ -223,7 +226,7 @@ export default function HomePage({ session }: { session: Session }) {
                       <div style={{ color: t.locked ? 'var(--text-muted)' : 'var(--accent)', marginBottom: 8 }}>{t.icon}</div>
                       <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{t.label}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t.sub}</div>
-                      {t.locked && <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600, marginTop: 4 }}>Unlock →</div>}
+                      {t.locked && <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600, marginTop: 4 }}>{t.lockLabel ?? 'Unlock →'}</div>}
                     </button>
                   ))}
                 </div>
