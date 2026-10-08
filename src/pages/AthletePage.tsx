@@ -567,6 +567,7 @@ function TierCard({
   lockMessage,
   lockPitch,
   onUpgrade,
+  highlight = false,
   children,
 }: {
   tierNumber: 1 | 2 | 3;
@@ -592,6 +593,9 @@ function TierCard({
   lockPitch?: React.ReactNode;
   /** Click handler for the upgrade CTA shown when locked. */
   onUpgrade?: () => void;
+  /** "You are here" — accent border on the current (incomplete, unlocked)
+   *  step. Sections arrive collapsed; this marks where to dig in. */
+  highlight?: boolean;
   children: React.ReactNode;
 }) {
   const [internalExpanded, setInternalExpanded] = useState(defaultExpanded && !locked);
@@ -612,7 +616,7 @@ function TierCard({
       className="settings-card"
       ref={cardRef}
       style={{
-        borderColor: locked ? 'var(--border)' : status.complete ? '#2ec486' : undefined,
+        borderColor: locked ? 'var(--border)' : status.complete ? '#2ec486' : highlight ? 'var(--accent)' : undefined,
         opacity: locked ? 0.75 : 1,
       }}
     >
@@ -1466,18 +1470,9 @@ export default function AthletePage({ session }: { session: Session }) {
   };
   const tierStatus = getTierStatus(tierStatusInput);
 
-  // Auto-open Step 2 when Basics is done but the numbers aren't saved — the
-  // open section IS the "next up" pointer (2026-10-08; Step 1 handles its
-  // own case via defaultExpanded). Once per mount so a user who closes it
-  // stays in control.
-  const autoOpenedT2 = useRef(false);
-  useEffect(() => {
-    if (loading || loadError || autoOpenedT2.current) return;
-    if (tierStatus.tier1.complete && !tierStatus.tier2.complete) {
-      autoOpenedT2.current = true;
-      setT2Expanded(true);
-    }
-  }, [loading, loadError, tierStatus.tier1.complete, tierStatus.tier2.complete]);
+  // Sections always arrive COLLAPSED (founder, 2026-10-08): the user gets
+  // the page's shape first, then digs in. The accent `highlight` border on
+  // the current step does the pointing; no auto-opens.
 
   // --- Pre-run checkpoint inputs (mirrors the tier-status conditioning gate,
   // computed from live form state so the flag reflects what's on screen). ---
@@ -1830,15 +1825,18 @@ export default function AthletePage({ session }: { session: Session }) {
                   return null;
                 })()}
 
-                {/* Tier 1 — Basics. Auto-opens for a profile that hasn't
-                    completed it: the motivated new user arriving from
-                    /welcome should meet fields, not a shut accordion. */}
+                {/* Tier 1 — Basics. Arrives COLLAPSED like every section
+                    (founder, 2026-10-08): the user gets the whole page's
+                    shape first, then digs in. The welcome screen + contract
+                    banner already did the orienting; an accent border marks
+                    the current step without stealing the screen. */}
                 <TierCard
                   tierNumber={1}
                   title="Basics"
                   unlocks="Age, height, weight, gender & units"
                   status={tierStatus.tier1}
-                  defaultExpanded={!tierStatus.tier1.complete}
+                  defaultExpanded={false}
+                  highlight={!tierStatus.tier1.complete}
                 >
                   <div className="lift-grid" style={{ marginBottom: 16 }}>
                     <div className="lift-item">
@@ -1938,6 +1936,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   title="Your Numbers"
                   unlocks="Lifts, skills & conditioning times — estimates are OK"
                   status={tierStatus.tier2}
+                  highlight={tierStatus.tier1.complete && !tierStatus.tier2.complete}
                   expanded={t2Expanded}
                   onToggle={setT2Expanded}
                   cardRef={tier2Ref}
