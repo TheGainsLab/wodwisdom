@@ -1182,7 +1182,13 @@ export default function AthletePage({ session }: { session: Session }) {
   // materialized full map in the same call that sets state — React state
   // updates are async, so reading `equipment` here right after setEquipment
   // would still see the stale map.
-  const saveProfile = async (overrides?: { equipment?: Record<string, boolean> }): Promise<boolean> => {
+  // `review: true` = this save ALSO claims "Step 2 is done" (stamps
+  // athletic_reviewed_at, firing the one-time sparse confirm when blanks
+  // remain). Only Step 2's own Save and the page-bottom Save Profile pass
+  // it — Step 1's save (and equipment / intake / pre-eval saves) just
+  // persist data, so saving Basics can never complete a section the user
+  // hasn't seen (founder, 2026-10-08).
+  const saveProfile = async (overrides?: { equipment?: Record<string, boolean>; review?: boolean }): Promise<boolean> => {
     setSaving(true);
     setError('');
 
@@ -1241,21 +1247,26 @@ export default function AthletePage({ session }: { session: Session }) {
       }
     }
 
-    // One-time sparse-save confirm (first save only): T2 completes on save
-    // regardless of how sparse the data is, so this is the moment the athlete
-    // hears the contract. Cancel aborts the save; confirm takes what's there.
-    const coreLiftsBlank = ['back_squat', 'deadlift', 'bench_press', 'snatch', 'clean_and_jerk']
-      .filter((k) => !(cleanLifts[k] > 0));
-    const hasRun = ['1_mile_run', '5k_run'].some((k) => cleanConditioning[k] != null && cleanConditioning[k] !== '');
-    const sparse = coreLiftsBlank.length > 0 || cleanConditioning['2k_row'] == null || !hasRun;
-    if (!athleticReviewedAt && sparse) {
-      const ok = window.confirm(
-        'We can only work with what you give us — anything left blank stays out of your evaluation and your programming. Whenever you test something new, enter it (estimates count), and every future evaluation and program will include it.\n\nSave with what you have now?'
-      );
-      if (!ok) { setSaving(false); return false; }
+    // One-time sparse confirm, REVIEW saves only: Step 2 completes when the
+    // athlete claims it does, so this is the moment they hear the contract.
+    // Cancel downgrades to a plain save — the data still persists, Step 2
+    // just stays incomplete (nothing is ever held hostage to the dialog).
+    let review = overrides?.review === true;
+    if (review && !athleticReviewedAt) {
+      const coreLiftsBlank = ['back_squat', 'deadlift', 'bench_press', 'snatch', 'clean_and_jerk']
+        .filter((k) => !(cleanLifts[k] > 0));
+      const hasRun = ['1_mile_run', '5k_run'].some((k) => cleanConditioning[k] != null && cleanConditioning[k] !== '');
+      const sparse = coreLiftsBlank.length > 0 || cleanConditioning['2k_row'] == null || !hasRun;
+      if (sparse) {
+        const ok = window.confirm(
+          'We can only work with what you give us — anything left blank stays out of your evaluation and your programming. Whenever you test something new, enter it (estimates count), and every future evaluation and program will include it.\n\nSave with what you have now?'
+        );
+        if (!ok) review = false;
+      }
     }
-    // First-save timestamp is preserved on later saves.
-    const reviewedAtIso = athleticReviewedAt ?? new Date().toISOString();
+    // An existing stamp is always preserved; a new one only lands on a
+    // review save. Plain saves write back whatever was already there.
+    const reviewedAtIso = athleticReviewedAt ?? (review ? new Date().toISOString() : null);
 
     const payload = {
       user_id: session.user.id,
@@ -1321,8 +1332,9 @@ export default function AthletePage({ session }: { session: Session }) {
     // flow by unmounting the component mid-click.
     if (isNewUser) setIsNewUser(false);
     setIsDirty(false);
-    // Saved = reviewed: this is the signal T2 completion reads.
-    setAthleticReviewedAt(reviewedAtIso);
+    // Step 2 completes only via a review save — a plain save leaves the
+    // stamp (and the tier state) exactly as it was.
+    if (reviewedAtIso) setAthleticReviewedAt(reviewedAtIso);
     // Any save that persisted a non-empty equipment record completes the
     // review — this is exactly the signal the T3 gate reads, so header state
     // and gate can never drift.
@@ -1904,6 +1916,18 @@ export default function AthletePage({ session }: { session: Session }) {
                       </div>
                     </div>
                   </div>
+                  {/* Per-section save (2026-10-08): saves everything entered,
+                      stamps nothing — Step 1 turns green on its own data and
+                      the banner counts down. Step 2 stays untouched. */}
+                  <button
+                    type="button"
+                    className="auth-btn"
+                    style={{ marginTop: 16 }}
+                    disabled={saving}
+                    onClick={async () => { await saveProfile(); }}
+                  >
+                    {saving ? 'Saving...' : 'Save Basics'}
+                  </button>
                 </TierCard>
 
                 {/* Tier 2 — Your Numbers (renamed from "Athletic Data",
@@ -2016,6 +2040,19 @@ export default function AthletePage({ session }: { session: Session }) {
                     </div>
                   ))}
                 </CollapsibleSection>
+                {/* THE Step-2 completion act (2026-10-08): this save stamps
+                    athletic_reviewed_at (after the one-time sparse confirm
+                    when blanks remain), turns the section green, and unlocks
+                    the evaluation. Plain saves elsewhere never do. */}
+                <button
+                  type="button"
+                  className="auth-btn"
+                  style={{ marginTop: 16 }}
+                  disabled={saving}
+                  onClick={async () => { await saveProfile({ review: true }); }}
+                >
+                  {saving ? 'Saving...' : 'Save My Numbers'}
+                </button>
                 </TierCard>
 
                 {/* Tier 3 — Goals & Schedule (renamed from "Training
@@ -2391,7 +2428,7 @@ export default function AthletePage({ session }: { session: Session }) {
                     <>
                       <button
                         className="auth-btn"
-                        onClick={async () => { await saveProfile(); }}
+                        onClick={async () => { await saveProfile({ review: true }); }}
                         disabled={saving || !!analysisLoading}
                         style={!isDirty && !saving && !analysisLoading ? { background: '#2ec486', color: 'white' } : undefined}
                       >
