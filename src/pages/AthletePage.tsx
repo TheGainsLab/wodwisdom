@@ -645,7 +645,6 @@ function TierCard({
             {locked ? (
               <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                Locked
               </span>
             ) : status.complete ? (
               <span style={{ fontSize: 12, color: '#2ec486', fontWeight: 700 }}>Complete ✓</span>
@@ -1455,6 +1454,19 @@ export default function AthletePage({ session }: { session: Session }) {
   };
   const tierStatus = getTierStatus(tierStatusInput);
 
+  // Auto-open Step 2 when Basics is done but the numbers aren't saved — the
+  // open section IS the "next up" pointer (2026-10-08; Step 1 handles its
+  // own case via defaultExpanded). Once per mount so a user who closes it
+  // stays in control.
+  const autoOpenedT2 = useRef(false);
+  useEffect(() => {
+    if (loading || loadError || autoOpenedT2.current) return;
+    if (tierStatus.tier1.complete && !tierStatus.tier2.complete) {
+      autoOpenedT2.current = true;
+      setT2Expanded(true);
+    }
+  }, [loading, loadError, tierStatus.tier1.complete, tierStatus.tier2.complete]);
+
   // --- Pre-run checkpoint inputs (mirrors the tier-status conditioning gate,
   // computed from live form state so the flag reflects what's on screen). ---
   const isCondFilled = (v: string | number | null | undefined): boolean =>
@@ -1535,34 +1547,30 @@ export default function AthletePage({ session }: { session: Session }) {
               </div>
             )}
             {/* ONE orientation card while setting up (replaces the old new-user
-                intro AND the locked-state eval progress line — two meta-cards
-                narrating the same journey). Live checkmarks + a "next up" line;
-                hides once the eval unlocks and the Run Evaluation card takes
-                over as the hero. "Step", never "Tier", in user-facing copy. */}
+                intro AND the locked-state eval progress line). 2026-10-08:
+                slimmed from the three-step orientation card to a one-line
+                CONTRACT banner — /welcome tells the story, the section
+                headers preview their contents, the auto-opened form points
+                at itself; what this spot uniquely owes the user is "what
+                exactly gets me the evaluation." State-aware (counts down),
+                shown to EVERYONE without an eval — paying included, the
+                eval is step one of every journey. Hides once the eval
+                unlocks and the Run Evaluation card takes over as the hero.
+                "Step", never "Tier", in user-facing copy. */}
             {!loading && !loadError && !tierStatus.canRunEval && (() => {
               const hasProgramming = isAdmin || hasFeature('programming');
-              const steps: Array<[boolean, string, React.ReactNode]> = [
-                [tierStatus.tier1.complete, 'Basics', <>1 min · tailored answers from the <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Coach</span></>],
-                [tierStatus.tier2.complete, 'Your Numbers', <>~3 min · unlocks your free <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Evaluation</span>. Estimates are OK — whatever you skip stays out of the analysis.</>],
-                [tierStatus.tier3.complete, 'Goals & Schedule', hasProgramming
-                  ? <>powers your <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Programming</span> — built around your goals, fitness level, and schedule</>
-                  : <>subscribe to unlock <span style={{ color: 'var(--accent)', fontWeight: 600 }}>AI Programming</span> built around your goals, fitness level, and schedule</>],
-              ];
-              const next = !tierStatus.tier1.complete ? 'Basics' : 'Your Numbers';
+              const oneLeft = tierStatus.tier1.complete && !tierStatus.tier2.complete;
+              const evalName = (
+                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                  {hasProgramming ? 'AI Evaluation' : 'free AI Evaluation'}
+                </span>
+              );
+              const tail = hasProgramming ? ' — your program is built from it.' : ' — about 5 minutes.';
               return (
-                <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
-                  <h2 className="settings-card-title" style={{ marginBottom: 8 }}>
-                    {hasProgramming ? "Your program is paid for — let's build it" : 'Your profile powers everything'}
-                  </h2>
-                  <ul style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.6, margin: 0, paddingLeft: 4, listStyle: 'none' }}>
-                    {steps.map(([done, name, desc], i) => (
-                      <li key={name} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-                        <span aria-hidden style={{ color: done ? '#2ec486' : 'var(--text-muted)', fontWeight: 700, flexShrink: 0 }}>{done ? '✓' : '○'}</span>
-                        <span><strong style={{ color: 'var(--text)' }}>Step {i + 1} — {name}</strong> · {desc}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginTop: 10 }}>Next up: {next} ↓</div>
+                <div className="settings-card" style={{ borderColor: 'var(--accent)', background: 'var(--accent-glow)', fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.55 }}>
+                  {oneLeft
+                    ? <>One step left — complete <strong style={{ color: 'var(--text)' }}>Step 2</strong> to generate your {evalName}{tail}</>
+                    : <>Complete <strong style={{ color: 'var(--text)' }}>Steps 1 and 2</strong> to generate your {evalName}{tail}</>}
                 </div>
               );
             })()}
@@ -1810,13 +1818,15 @@ export default function AthletePage({ session }: { session: Session }) {
                   return null;
                 })()}
 
-                {/* Tier 1 — Basics */}
+                {/* Tier 1 — Basics. Auto-opens for a profile that hasn't
+                    completed it: the motivated new user arriving from
+                    /welcome should meet fields, not a shut accordion. */}
                 <TierCard
                   tierNumber={1}
                   title="Basics"
                   unlocks="Age, height, weight, gender & units"
                   status={tierStatus.tier1}
-                  defaultExpanded={false}
+                  defaultExpanded={!tierStatus.tier1.complete}
                 >
                   <div className="lift-grid" style={{ marginBottom: 16 }}>
                     <div className="lift-item">
@@ -1896,10 +1906,12 @@ export default function AthletePage({ session }: { session: Session }) {
                   </div>
                 </TierCard>
 
-                {/* Tier 2 — Athletic Data */}
+                {/* Tier 2 — Your Numbers (renamed from "Athletic Data",
+                    2026-10-08: sections and the journey copy share one
+                    vocabulary) */}
                 <TierCard
                   tierNumber={2}
-                  title="Athletic Data"
+                  title="Your Numbers"
                   unlocks="Lifts, skills & conditioning times — estimates are OK"
                   status={tierStatus.tier2}
                   expanded={t2Expanded}
@@ -2006,10 +2018,11 @@ export default function AthletePage({ session }: { session: Session }) {
                 </CollapsibleSection>
                 </TierCard>
 
-                {/* Tier 3 — Training Context (locked for non-subscribers) */}
+                {/* Tier 3 — Goals & Schedule (renamed from "Training
+                    Context"; locked for non-subscribers) */}
                 <TierCard
                   tierNumber={3}
-                  title="Training Context"
+                  title="Goals & Schedule"
                   unlocks="Goal, schedule, equipment & anything the AI should know"
                   status={tierStatus.tier3}
                   defaultExpanded={false}
@@ -2341,31 +2354,29 @@ export default function AthletePage({ session }: { session: Session }) {
                     read as step two of the eval funnel. The feature itself is the
                     /athletedata route. Public to ALL athletes via ATHLETEDATA_PUBLIC_TIER
                     (currently on); only admin-only if that flag is turned off. */}
+                {/* 2026-10-08: compacted to a quiet row with an OUTLINED
+                    button — Save Profile is the only red button on this
+                    page, and optional enrichment must not out-shout it. */}
                 {(isAdmin || ATHLETEDATA_PUBLIC_TIER) && (
-                  <div className="settings-card" style={{ borderColor: competitionAthleteId ? '#2ec486' : undefined }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', marginBottom: 4 }}>
-                      <span style={{ color: competitionAthleteId ? '#2ec486' : 'var(--accent)' }}>Competition History</span>
-                      {competitionAthleteId
-                        ? <span style={{ color: '#2ec486' }}> · Linked ✓</span>
-                        : <span style={{ color: 'var(--text-muted)' }}> (Free)</span>}
-                    </div>
-                    <h2 className="settings-card-title" style={{ marginBottom: 2 }}>
-                      {competitionAthleteId
-                        ? `Linked: ${competitionAthleteLabel ?? 'your competition profile'}`
-                        : 'Import your competition history'}
-                    </h2>
-                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>
-                      {competitionAthleteId
-                        ? 'Your Open / Quarterfinals / Games history, a completion map, and throwbacks.'
-                        : 'Unlock a detailed analysis of your fitness over the years. No competition history? Start one, with access to every year’s workouts.'}
+                  <div className="settings-card" style={{ borderColor: competitionAthleteId ? '#2ec486' : undefined, display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>
+                        {competitionAthleteId
+                          ? <>Linked: {competitionAthleteLabel ?? 'your competition profile'} <span style={{ color: '#2ec486' }}>✓</span></>
+                          : 'Done the CrossFit Open?'}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                        {competitionAthleteId
+                          ? 'Your Open / Quarterfinals / Games history, a completion map, and throwbacks.'
+                          : 'Import your history for a free year-by-year analysis. No history? Start one — every year’s workouts are open.'}
+                      </div>
                     </div>
                     <button
                       type="button"
-                      className="auth-btn"
-                      style={{ padding: '8px 16px', fontSize: 13 }}
+                      style={{ flex: 'none', background: 'none', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 999, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
                       onClick={() => navigate('/athletedata')}
                     >
-                      {competitionAthleteId ? 'View your competition history →' : 'Get started →'}
+                      {competitionAthleteId ? 'View history →' : 'Import my history →'}
                     </button>
                   </div>
                 )}
@@ -2388,7 +2399,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       </button>
                       {!tierStatus.canRunEval && !hasGeneratedProgram && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
-                          Finish your Basics and save your Athletic Data to run your free evaluation.
+                          Finish Steps 1 and 2, then run your free evaluation.
                         </span>
                       )}
                     </>
@@ -2434,7 +2445,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       )}
                       {ready && !goal.trim() && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
-                          No goal set — add one in Training Context above and the program builds toward it.
+                          No goal set — add one in Goals &amp; Schedule above and the program builds toward it.
                         </span>
                       )}
                       {tierBlocked && (
