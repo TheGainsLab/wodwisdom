@@ -2368,7 +2368,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                         {competitionAthleteId
                           ? 'Your Open / Quarterfinals / Games history, a completion map, and throwbacks.'
-                          : 'Import your history for a free year-by-year analysis. No history? Start one — every year’s workouts are open.'}
+                          : 'Import your history for a free year-by-year analysis. No history? Start one.'}
                       </div>
                     </div>
                     <button
