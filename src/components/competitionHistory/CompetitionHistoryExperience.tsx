@@ -448,7 +448,7 @@ export default function CompetitionHistoryExperience({
       {mode === 'unlinked' && !browseUnlinked && (
         <div>
           <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>
-            <strong style={{ color: 'var(--text)' }}>See your competition history, analyzed</strong> — your Open,
+            <strong style={{ color: 'var(--text)' }}>Add and analyze your competition history</strong> — your Open,
             Quarterfinals, and Games results with percentiles, trends, and a completion map.
           </p>
           <p style={{ marginBottom: 12, fontSize: 13 }}>

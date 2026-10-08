@@ -2368,7 +2368,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                         {competitionAthleteId
                           ? 'Your Open / Quarterfinals / Games history, a completion map, and throwbacks.'
-                          : 'Import your history for a free year-by-year analysis. No history? Start one — every year’s workouts are open.'}
+                          : 'Import your history for a free year-by-year analysis. No history? Start one.'}
                       </div>
                     </div>
                     <button
@@ -2405,6 +2405,19 @@ export default function AthletePage({ session }: { session: Session }) {
                     </>
                   );
                 })()}
+
+                {/* Escape hatch (2026-10-08): on desktop the tab bar doesn't
+                    render, so without this the page reads as a room with no
+                    door. A quiet dark bar under Save — explore freely; the
+                    Home card guides anyone unfinished back here. */}
+                <button
+                  type="button"
+                  className="settings-card"
+                  style={{ textAlign: 'center', cursor: 'pointer', padding: '13px 0', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}
+                  onClick={() => navigate('/')}
+                >
+                  ← Back to Home
+                </button>
 
                 {/* Generate Program — first-time generation only, entitled users
                     only. Hidden once a program exists. Non-entitled users see
