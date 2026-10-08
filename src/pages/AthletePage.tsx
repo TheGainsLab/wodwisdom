@@ -2406,6 +2406,19 @@ export default function AthletePage({ session }: { session: Session }) {
                   );
                 })()}
 
+                {/* Escape hatch (2026-10-08): on desktop the tab bar doesn't
+                    render, so without this the page reads as a room with no
+                    door. A quiet dark bar under Save — explore freely; the
+                    Home card guides anyone unfinished back here. */}
+                <button
+                  type="button"
+                  className="settings-card"
+                  style={{ textAlign: 'center', cursor: 'pointer', padding: '13px 0', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}
+                  onClick={() => navigate('/')}
+                >
+                  ← Back to Home
+                </button>
+
                 {/* Generate Program — first-time generation only, entitled users
                     only. Hidden once a program exists. Non-entitled users see
                     nothing here: the locked Tier 3 card above carries the pitch
