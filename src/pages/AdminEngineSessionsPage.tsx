@@ -38,7 +38,22 @@ interface TimeTrialRow {
   created_at: string;
 }
 
-type Tab = 'sessions' | 'time-trials';
+// One row per modality from admin_engine_energy_ratios — the averaged
+// inputs behind the athlete-facing Energy Systems Ratio. The three ratios
+// are divisions done here, with the same semantics as EngineAnalyticsPage:
+// glycolytic = anaerobic/TT, aerobic = maxAerobic/TT, systems = anaerobic/maxAerobic.
+interface EnergyRatioRow {
+  modality: string;
+  units: string | null;
+  anaerobic_avg_pace: number | null;
+  anaerobic_sessions: number;
+  max_aerobic_avg_pace: number | null;
+  max_aerobic_sessions: number;
+  tt_pace: number | null;
+  tt_date: string | null;
+}
+
+type Tab = 'sessions' | 'time-trials' | 'energy';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -85,6 +100,11 @@ export default function AdminEngineSessionsPage({ session }: { session: Session 
   const [tt, setTt] = useState<TimeTrialRow[] | null>(null);
   const [ttLoading, setTtLoading] = useState(false);
 
+  // Energy systems state
+  const [energy, setEnergy] = useState<EnergyRatioRow[] | null>(null);
+  const [energyLoading, setEnergyLoading] = useState(false);
+  const [energyError, setEnergyError] = useState('');
+
   // Load sessions
   useEffect(() => {
     if (!id || tab !== 'sessions') return;
@@ -130,6 +150,19 @@ export default function AdminEngineSessionsPage({ session }: { session: Session 
     })();
   }, [id, tab, tt]);
 
+  // Load energy ratios on tab switch
+  useEffect(() => {
+    if (!id || tab !== 'energy' || energy !== null) return;
+    (async () => {
+      setEnergyLoading(true);
+      setEnergyError('');
+      const { data, error: err } = await supabase.rpc('admin_engine_energy_ratios', { target_user_id: id });
+      if (err) setEnergyError(err.message);
+      else if (Array.isArray(data)) setEnergy(data as EnergyRatioRow[]);
+      setEnergyLoading(false);
+    })();
+  }, [id, tab, energy]);
+
   // Sparkline data: oldest → newest for visual reading
   const sparkline = useMemo(() => {
     const vals = [...sessions]
@@ -150,7 +183,7 @@ export default function AdminEngineSessionsPage({ session }: { session: Session 
     <AdminSubPageLayout session={session} userId={id!} title="Engine Sessions">
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
-        {(['sessions', 'time-trials'] as Tab[]).map(t => (
+        {(['sessions', 'time-trials', 'energy'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => setParam('tab', t === 'sessions' ? null : t)}
@@ -162,7 +195,7 @@ export default function AdminEngineSessionsPage({ session }: { session: Session 
               marginBottom: -1, fontFamily: "'Outfit', sans-serif",
             }}
           >
-            {t === 'sessions' ? 'Sessions' : 'Time Trials'}
+            {t === 'sessions' ? 'Sessions' : t === 'time-trials' ? 'Time Trials' : 'Energy Systems'}
           </button>
         ))}
       </div>
@@ -340,6 +373,60 @@ export default function AdminEngineSessionsPage({ session }: { session: Session 
           )}
         </>
       )}
+
+      {tab === 'energy' && (
+        <>
+          {energyLoading && <div className="page-loading"><div className="loading-pulse" /></div>}
+
+          {energyError && <div className="auth-error" style={{ display: 'block', marginBottom: 16 }}>{energyError}</div>}
+
+          {energy && energy.length === 0 && (
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
+              No anaerobic or max-aerobic sessions with pace data yet — ratios need those to exist.
+            </div>
+          )}
+
+          {energy && energy.map(row => {
+            // Same math as the athlete's Engine Analytics overview.
+            const glycolytic = row.anaerobic_avg_pace && row.tt_pace ? row.anaerobic_avg_pace / row.tt_pace : null;
+            const aerobic = row.max_aerobic_avg_pace && row.tt_pace ? row.max_aerobic_avg_pace / row.tt_pace : null;
+            const systems = row.anaerobic_avg_pace && row.max_aerobic_avg_pace ? row.anaerobic_avg_pace / row.max_aerobic_avg_pace : null;
+            const fmtX = (v: number | null) => (v != null && isFinite(v) ? `${v.toFixed(2)}×` : '—');
+            return (
+              <div key={row.modality} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{humanize(row.modality)}</div>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <Stat label="Systems (ana ÷ MAP)" value={fmtX(systems)} />
+                  <Stat label="Glycolytic (ana ÷ TT)" value={fmtX(glycolytic)} />
+                  <Stat label="Aerobic (MAP ÷ TT)" value={fmtX(aerobic)} />
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.7 }}>
+                  <div>
+                    Anaerobic avg pace: <Mono>{formatCompactNumber(row.anaerobic_avg_pace)}</Mono> {row.units}/min
+                    {' '}over {row.anaerobic_sessions} session{row.anaerobic_sessions === 1 ? '' : 's'}
+                  </div>
+                  <div>
+                    Max aerobic avg pace: <Mono>{formatCompactNumber(row.max_aerobic_avg_pace)}</Mono> {row.units}/min
+                    {' '}over {row.max_aerobic_sessions} session{row.max_aerobic_sessions === 1 ? '' : 's'}
+                  </div>
+                  <div>
+                    Time trial baseline: <Mono>{formatCompactNumber(row.tt_pace)}</Mono> {row.units}/min
+                    {row.tt_date ? ` (${formatShortDate(row.tt_date)})` : row.tt_pace == null ? ' — none recorded' : ''}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {energy && energy.length > 0 && (
+            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+              Same math as the athlete's Engine Analytics overview: completed sessions with a logged pace,
+              baselined against the modality's latest time trial. Systems is the glycolytic reserve —
+              burst pace over sustainable pace.
+            </div>
+          )}
+        </>
+      )}
     </AdminSubPageLayout>
   );
 }
@@ -351,6 +438,10 @@ const thStyle: React.CSSProperties = {
   textTransform: 'uppercase', letterSpacing: 0.5,
 };
 const tdStyle: React.CSSProperties = { padding: '10px 14px', color: 'var(--text)' };
+
+function Mono({ children }: { children: React.ReactNode }) {
+  return <span style={{ fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}>{children}</span>;
+}
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
