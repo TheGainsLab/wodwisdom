@@ -198,6 +198,23 @@ function EvalUpgradeCta({ onUpgrade, hasEngine = false }: { onUpgrade?: (plan: '
   );
 }
 
+/** Coach-state priority rendering helpers (pre-generation preview +
+ *  program coach's notes). The focus values are snake_case axis names;
+ *  the rationale is already athlete-facing prose — the preview just
+ *  takes its first sentence. */
+export function humanizeFocus(f: string): string {
+  return f.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+export function firstSentence(s: string): string {
+  const i = s.indexOf('. ');
+  return i === -1 ? s : s.slice(0, i + 1);
+}
+export interface CoachPriorityView {
+  rank: number;
+  focus: string;
+  athlete_facing_rationale: string;
+}
+
 const LIFT_GROUPS = [
   {
     title: 'Squats',
@@ -790,6 +807,13 @@ export default function AthletePage({ session }: { session: Session }) {
   // /competition-history.
   const [competitionAthleteId, setCompetitionAthleteId] = useState<string | null>(null);
   const [competitionAthleteLabel, setCompetitionAthleteLabel] = useState<string | null>(null);
+  // Pre-generation priorities preview (founder, 2026-10-09 — the oly-seminar
+  // case: context the athlete never wrote down met them as a cold omission in
+  // the finished program). The coach's ranked priorities render read-only
+  // above Generate so missing context gets added to Goals BEFORE tokens are
+  // spent. The correction surface is the goal/intake the athlete already
+  // owns — deliberately no approval step, no dialogue, no negotiation.
+  const [coachPriorities, setCoachPriorities] = useState<CoachPriorityView[] | null>(null);
 
   const fetchEvaluations = async () => {
     const [profileRes, trainingRes, nutritionRes] = await Promise.all([
@@ -1004,6 +1028,28 @@ export default function AthletePage({ session }: { session: Session }) {
   }, [session.user.id]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
+
+  // Latest coach state (own-row RLS; built at evaluation time, so it exists
+  // before Generate for the normal journey). Failure-soft: the preview is
+  // optional and must never block the page.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('coach_states')
+        .select('coach_state')
+        .eq('user_id', session.user.id)
+        .order('version', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      const pri = (data?.coach_state as { priorities?: CoachPriorityView[] } | null)?.priorities;
+      if (Array.isArray(pri) && pri.length > 0) {
+        setCoachPriorities([...pri].sort((a, b) => a.rank - b.rank));
+      }
+    })().catch(() => { /* optional preview */ });
+    return () => { cancelled = true; };
+  }, [session.user.id]);
 
   // Unsaved-changes guard (2026-10-08, the Wesley incident: toggled his
   // equipment, never tapped a save button, edits silently evaporated, then
@@ -2516,6 +2562,30 @@ export default function AthletePage({ session }: { session: Session }) {
                   const ready = !tierBlocked && !generateLoading;
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {/* Read-only priorities preview: what the coach will
+                          build around, abridged to one sentence each. The
+                          nudge line routes corrections into Goals & Schedule
+                          — the surface the athlete already owns. */}
+                      {ready && coachPriorities && (
+                        <div className="settings-card" style={{ textAlign: 'left' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 8 }}>
+                            Your program will be built around
+                          </div>
+                          <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {coachPriorities.map((p) => (
+                              <li key={p.rank} style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                                <strong style={{ color: 'var(--text)' }}>{humanizeFocus(p.focus)}</strong>
+                                {' — '}
+                                {firstSentence(p.athlete_facing_rationale)}
+                              </li>
+                            ))}
+                          </ol>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>
+                            Anything missing from this picture — an event coming up, a movement that
+                            matters to you? Add it to Goals &amp; Schedule above before you generate.
+                          </div>
+                        </div>
+                      )}
                       <button
                         type="button"
                         className="auth-btn"
