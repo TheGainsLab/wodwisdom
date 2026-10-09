@@ -198,6 +198,23 @@ function EvalUpgradeCta({ onUpgrade, hasEngine = false }: { onUpgrade?: (plan: '
   );
 }
 
+/** Coach-state priority rendering helpers (pre-generation preview +
+ *  program coach's notes). The focus values are snake_case axis names;
+ *  the rationale is already athlete-facing prose — the preview just
+ *  takes its first sentence. */
+export function humanizeFocus(f: string): string {
+  return f.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+export function firstSentence(s: string): string {
+  const i = s.indexOf('. ');
+  return i === -1 ? s : s.slice(0, i + 1);
+}
+export interface CoachPriorityView {
+  rank: number;
+  focus: string;
+  athlete_facing_rationale: string;
+}
+
 const LIFT_GROUPS = [
   {
     title: 'Squats',
@@ -419,7 +436,7 @@ async function sha256Hex(text: string): Promise<string> {
 // Stored answers under the retired keys are KEPT — they load into intakeAnswers
 // and ride along on every save — we just stop asking new users.
 const INTAKE_QUESTIONS: { key: string; label: string; helper: string }[] = [
-  { key: 'anything_else', label: 'Anything else we should know?', helper: 'Training background? Preferences? Let us know here.' },
+  { key: 'anything_else', label: 'Anything else we should know?', helper: "Competitions or events coming up? Movements you love or can't stand? Training background? Tell us here." },
 ];
 
 const LEVEL_LABELS: Record<SkillLevel, string> = {
@@ -731,6 +748,9 @@ export default function AthletePage({ session }: { session: Session }) {
   // Tier 2 card + conditioning section expansion is controlled so the
   // checkpoint's "Add benchmarks" button can open them and scroll there.
   const [t2Expanded, setT2Expanded] = useState(false);
+  // T3 is controlled so the priorities card's "add it to your goals" link can
+  // open the section and land the athlete in the goal box.
+  const [t3Expanded, setT3Expanded] = useState(false);
   const [condSectionOpen, setCondSectionOpen] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
@@ -783,6 +803,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const [evalHistoryOpen, setEvalHistoryOpen] = useState(false);
   const evalHistoryRef = useRef<HTMLDivElement | null>(null);
   const tier2Ref = useRef<HTMLDivElement | null>(null);
+  const goalBoxRef = useRef<HTMLDivElement | null>(null);
   const [evalCreditsRemaining, setEvalCreditsRemaining] = useState<number>(1);
 
   // Tier 4 — competition-history linkage. The /profile card only needs to know
@@ -790,6 +811,13 @@ export default function AthletePage({ session }: { session: Session }) {
   // /competition-history.
   const [competitionAthleteId, setCompetitionAthleteId] = useState<string | null>(null);
   const [competitionAthleteLabel, setCompetitionAthleteLabel] = useState<string | null>(null);
+  // Pre-generation priorities preview (founder, 2026-10-09 — the oly-seminar
+  // case: context the athlete never wrote down met them as a cold omission in
+  // the finished program). The coach's ranked priorities render read-only
+  // above Generate so missing context gets added to Goals BEFORE tokens are
+  // spent. The correction surface is the goal/intake the athlete already
+  // owns — deliberately no approval step, no dialogue, no negotiation.
+  const [coachPriorities, setCoachPriorities] = useState<CoachPriorityView[] | null>(null);
 
   const fetchEvaluations = async () => {
     const [profileRes, trainingRes, nutritionRes] = await Promise.all([
@@ -1004,6 +1032,28 @@ export default function AthletePage({ session }: { session: Session }) {
   }, [session.user.id]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
+
+  // Latest coach state (own-row RLS; built at evaluation time, so it exists
+  // before Generate for the normal journey). Failure-soft: the preview is
+  // optional and must never block the page.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('coach_states')
+        .select('coach_state')
+        .eq('user_id', session.user.id)
+        .order('version', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      const pri = (data?.coach_state as { priorities?: CoachPriorityView[] } | null)?.priorities;
+      if (Array.isArray(pri) && pri.length > 0) {
+        setCoachPriorities([...pri].sort((a, b) => a.rank - b.rank));
+      }
+    })().catch(() => { /* optional preview */ });
+    return () => { cancelled = true; };
+  }, [session.user.id]);
 
   // Unsaved-changes guard (2026-10-08, the Wesley incident: toggled his
   // equipment, never tapped a save button, edits silently evaporated, then
@@ -1513,6 +1563,15 @@ export default function AthletePage({ session }: { session: Session }) {
       if (!ok) return;
     }
     fetchProfileAnalysis();
+  };
+  // The priorities card's correction path: open Step 3 + the coaching box,
+  // then land the athlete on the goal field itself.
+  const jumpToGoals = () => {
+    setT3Expanded(true);
+    setCoachExpanded(true);
+    requestAnimationFrame(() => {
+      goalBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   };
   const jumpToConditioning = () => {
     setEvalCheckpoint(null);
@@ -2128,7 +2187,8 @@ export default function AthletePage({ session }: { session: Session }) {
                   title="Goals & Schedule"
                   unlocks="Goal, schedule, equipment & anything the AI should know"
                   status={savedStatus.tier3}
-                  defaultExpanded={false}
+                  expanded={t3Expanded}
+                  onToggle={setT3Expanded}
                   locked={!isAdmin && !hasFeature('programming')}
                   lockMessage="Requires AI Programming or All Access subscription"
                   lockPitch={
@@ -2304,10 +2364,14 @@ export default function AthletePage({ session }: { session: Session }) {
                     {coachExpanded && (<div style={{ marginTop: 16 }}>
                     <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>Share anything you can. You can tap the microphone and just talk.</p>
 
-                    <div style={{ marginBottom: 18 }}>
+                    <div style={{ marginBottom: 18 }} ref={goalBoxRef}>
                       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>What are you working toward?</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
                         Be specific. <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Required for your program.</span>
+                        {!hasGeneratedProgram && (
+                          <> Competitions or events coming up (with dates), movements you love or
+                          can&apos;t stand, what success looks like in 3 months — it all steers the program.</>
+                        )}
                       </div>
                       <textarea
                         className="lift-input"
@@ -2508,14 +2572,57 @@ export default function AthletePage({ session }: { session: Session }) {
                     outside Tier 3 but only ever actionable inside it). */}
                 {!hasGeneratedProgram && (isAdmin || hasFeature('programming')) && (() => {
                   const tierBlocked = !savedStatus.canRunPrograms;
-                  const disabled = generateLoading || tierBlocked;
-                  const genTitle = tierBlocked ? 'Complete Step 3 to Generate.' : undefined;
-                  // Ready = entitled, tier-complete, not generating. The old
-                  // surface2 styling made an ARMED button look dormant — ready
-                  // now reads as the primary action it is.
-                  const ready = !tierBlocked && !generateLoading;
+                  // First generation requires an evaluation (founder, 2026-10-09:
+                  // "why would we let them?"). The eval is free, is the funnel's
+                  // own hook, and persists the coach state this card previews —
+                  // skipping it buys the athlete nothing and costs them the
+                  // chance to see and correct the coach's read before tokens
+                  // are spent. Client-side only; admins bypass for test flows.
+                  const evalMissing = !isAdmin && evaluations.length === 0;
+                  const disabled = generateLoading || tierBlocked || evalMissing;
+                  const genTitle = tierBlocked
+                    ? 'Complete Step 3 to Generate.'
+                    : evalMissing
+                      ? 'Run your free evaluation first — your program is built from it.'
+                      : undefined;
+                  // Ready = entitled, tier-complete, evaluated, not generating.
+                  // The old surface2 styling made an ARMED button look dormant —
+                  // ready now reads as the primary action it is.
+                  const ready = !tierBlocked && !evalMissing && !generateLoading;
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {/* Read-only priorities preview: what the coach will
+                          build around, abridged to one sentence each. The
+                          nudge line routes corrections into Goals & Schedule
+                          — the surface the athlete already owns. */}
+                      {ready && coachPriorities && (
+                        <div className="settings-card" style={{ textAlign: 'left' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 8 }}>
+                            Your program will be built around
+                          </div>
+                          <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {coachPriorities.map((p) => (
+                              <li key={p.rank} style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                                <strong style={{ color: 'var(--text)' }}>{humanizeFocus(p.focus)}</strong>
+                                {' — '}
+                                {firstSentence(p.athlete_facing_rationale)}
+                              </li>
+                            ))}
+                          </ol>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.6 }}>
+                            Anything missing from this picture — an event coming up, a movement that
+                            matters to you?{' '}
+                            <button
+                              type="button"
+                              onClick={jumpToGoals}
+                              style={{ background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                            >
+                              Add it to your goals →
+                            </button>
+                            {' '}Your program is built from whatever&apos;s saved there when you hit Generate.
+                          </div>
+                        </div>
+                      )}
                       <button
                         type="button"
                         className="auth-btn"
@@ -2524,10 +2631,10 @@ export default function AthletePage({ session }: { session: Session }) {
                           color: ready ? 'var(--accent)' : 'var(--text)',
                           border: ready ? '1px solid var(--accent)' : undefined,
                           fontWeight: ready ? 700 : undefined,
-                          opacity: tierBlocked ? 0.55 : undefined,
-                          cursor: tierBlocked ? 'not-allowed' : undefined,
+                          opacity: (tierBlocked || evalMissing) ? 0.55 : undefined,
+                          cursor: (tierBlocked || evalMissing) ? 'not-allowed' : undefined,
                         }}
-                        onClick={tierBlocked ? undefined : handleGenerateProgram}
+                        onClick={(tierBlocked || evalMissing) ? undefined : handleGenerateProgram}
                         disabled={disabled}
                         title={genTitle}
                       >
@@ -2546,6 +2653,11 @@ export default function AthletePage({ session }: { session: Session }) {
                       {tierBlocked && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
                           Complete Step 3 to Generate.
+                        </span>
+                      )}
+                      {!tierBlocked && evalMissing && (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
+                          Run your free evaluation first — your program is built from it.
                         </span>
                       )}
                     </div>
