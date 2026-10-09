@@ -436,7 +436,7 @@ async function sha256Hex(text: string): Promise<string> {
 // Stored answers under the retired keys are KEPT — they load into intakeAnswers
 // and ride along on every save — we just stop asking new users.
 const INTAKE_QUESTIONS: { key: string; label: string; helper: string }[] = [
-  { key: 'anything_else', label: 'Anything else we should know?', helper: 'Training background? Preferences? Let us know here.' },
+  { key: 'anything_else', label: 'Anything else we should know?', helper: "Competitions or events coming up? Movements you love or can't stand? Training background? Tell us here." },
 ];
 
 const LEVEL_LABELS: Record<SkillLevel, string> = {
@@ -748,6 +748,9 @@ export default function AthletePage({ session }: { session: Session }) {
   // Tier 2 card + conditioning section expansion is controlled so the
   // checkpoint's "Add benchmarks" button can open them and scroll there.
   const [t2Expanded, setT2Expanded] = useState(false);
+  // T3 is controlled so the priorities card's "add it to your goals" link can
+  // open the section and land the athlete in the goal box.
+  const [t3Expanded, setT3Expanded] = useState(false);
   const [condSectionOpen, setCondSectionOpen] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
@@ -800,6 +803,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const [evalHistoryOpen, setEvalHistoryOpen] = useState(false);
   const evalHistoryRef = useRef<HTMLDivElement | null>(null);
   const tier2Ref = useRef<HTMLDivElement | null>(null);
+  const goalBoxRef = useRef<HTMLDivElement | null>(null);
   const [evalCreditsRemaining, setEvalCreditsRemaining] = useState<number>(1);
 
   // Tier 4 — competition-history linkage. The /profile card only needs to know
@@ -1560,6 +1564,15 @@ export default function AthletePage({ session }: { session: Session }) {
     }
     fetchProfileAnalysis();
   };
+  // The priorities card's correction path: open Step 3 + the coaching box,
+  // then land the athlete on the goal field itself.
+  const jumpToGoals = () => {
+    setT3Expanded(true);
+    setCoachExpanded(true);
+    requestAnimationFrame(() => {
+      goalBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  };
   const jumpToConditioning = () => {
     setEvalCheckpoint(null);
     setT2Expanded(true);
@@ -2174,7 +2187,8 @@ export default function AthletePage({ session }: { session: Session }) {
                   title="Goals & Schedule"
                   unlocks="Goal, schedule, equipment & anything the AI should know"
                   status={savedStatus.tier3}
-                  defaultExpanded={false}
+                  expanded={t3Expanded}
+                  onToggle={setT3Expanded}
                   locked={!isAdmin && !hasFeature('programming')}
                   lockMessage="Requires AI Programming or All Access subscription"
                   lockPitch={
@@ -2350,10 +2364,14 @@ export default function AthletePage({ session }: { session: Session }) {
                     {coachExpanded && (<div style={{ marginTop: 16 }}>
                     <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>Share anything you can. You can tap the microphone and just talk.</p>
 
-                    <div style={{ marginBottom: 18 }}>
+                    <div style={{ marginBottom: 18 }} ref={goalBoxRef}>
                       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>What are you working toward?</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
                         Be specific. <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Required for your program.</span>
+                        {!hasGeneratedProgram && (
+                          <> Competitions or events coming up (with dates), movements you love or
+                          can&apos;t stand, what success looks like in 3 months — it all steers the program.</>
+                        )}
                       </div>
                       <textarea
                         className="lift-input"
@@ -2554,12 +2572,23 @@ export default function AthletePage({ session }: { session: Session }) {
                     outside Tier 3 but only ever actionable inside it). */}
                 {!hasGeneratedProgram && (isAdmin || hasFeature('programming')) && (() => {
                   const tierBlocked = !savedStatus.canRunPrograms;
-                  const disabled = generateLoading || tierBlocked;
-                  const genTitle = tierBlocked ? 'Complete Step 3 to Generate.' : undefined;
-                  // Ready = entitled, tier-complete, not generating. The old
-                  // surface2 styling made an ARMED button look dormant — ready
-                  // now reads as the primary action it is.
-                  const ready = !tierBlocked && !generateLoading;
+                  // First generation requires an evaluation (founder, 2026-10-09:
+                  // "why would we let them?"). The eval is free, is the funnel's
+                  // own hook, and persists the coach state this card previews —
+                  // skipping it buys the athlete nothing and costs them the
+                  // chance to see and correct the coach's read before tokens
+                  // are spent. Client-side only; admins bypass for test flows.
+                  const evalMissing = !isAdmin && evaluations.length === 0;
+                  const disabled = generateLoading || tierBlocked || evalMissing;
+                  const genTitle = tierBlocked
+                    ? 'Complete Step 3 to Generate.'
+                    : evalMissing
+                      ? 'Run your free evaluation first — your program is built from it.'
+                      : undefined;
+                  // Ready = entitled, tier-complete, evaluated, not generating.
+                  // The old surface2 styling made an ARMED button look dormant —
+                  // ready now reads as the primary action it is.
+                  const ready = !tierBlocked && !evalMissing && !generateLoading;
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {/* Read-only priorities preview: what the coach will
@@ -2580,9 +2609,17 @@ export default function AthletePage({ session }: { session: Session }) {
                               </li>
                             ))}
                           </ol>
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.6 }}>
                             Anything missing from this picture — an event coming up, a movement that
-                            matters to you? Add it to Goals &amp; Schedule above before you generate.
+                            matters to you?{' '}
+                            <button
+                              type="button"
+                              onClick={jumpToGoals}
+                              style={{ background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                            >
+                              Add it to your goals →
+                            </button>
+                            {' '}Your program is built from whatever&apos;s saved there when you hit Generate.
                           </div>
                         </div>
                       )}
@@ -2594,10 +2631,10 @@ export default function AthletePage({ session }: { session: Session }) {
                           color: ready ? 'var(--accent)' : 'var(--text)',
                           border: ready ? '1px solid var(--accent)' : undefined,
                           fontWeight: ready ? 700 : undefined,
-                          opacity: tierBlocked ? 0.55 : undefined,
-                          cursor: tierBlocked ? 'not-allowed' : undefined,
+                          opacity: (tierBlocked || evalMissing) ? 0.55 : undefined,
+                          cursor: (tierBlocked || evalMissing) ? 'not-allowed' : undefined,
                         }}
-                        onClick={tierBlocked ? undefined : handleGenerateProgram}
+                        onClick={(tierBlocked || evalMissing) ? undefined : handleGenerateProgram}
                         disabled={disabled}
                         title={genTitle}
                       >
@@ -2616,6 +2653,11 @@ export default function AthletePage({ session }: { session: Session }) {
                       {tierBlocked && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
                           Complete Step 3 to Generate.
+                        </span>
+                      )}
+                      {!tierBlocked && evalMissing && (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
+                          Run your free evaluation first — your program is built from it.
                         </span>
                       )}
                     </div>
