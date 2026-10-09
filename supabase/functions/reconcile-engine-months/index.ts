@@ -43,6 +43,7 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
+import { ALERT_EMAIL, emailWrap, escapeHtml, sendViaResend } from "../_shared/checkout-emails.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -120,6 +121,37 @@ Deno.serve(async (_req) => {
       (r) => !/^(monthly|quarterly):/.test(r.reason) && !r.reason.startsWith("already_correct"),
     );
     const healthy = report.filter((r) => r.reason.startsWith("already_correct")).length;
+
+    // Flag-spike alert (2026-10-09 lesson: a deploy regression flagged 44 of
+    // 49 subscribers for four straight mornings and nobody reads the journal
+    // — mars-maker found out at his month wall). Normal mornings run 0–5
+    // flags; double digits means something structural changed, usually a
+    // billing-logic deploy. Best-effort, never fails the sweep, and silent
+    // on dry runs (those are operator-driven).
+    if (!dryRun && flaggedRows.length >= 10) {
+      try {
+        const counts = new Map<string, number>();
+        for (const r of flaggedRows) {
+          const key = String(r.reason).split(":")[0];
+          counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
+        const breakdown = [...counts.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([k, n]) => `${escapeHtml(k)}: ${n}`)
+          .join(", ");
+        await sendViaResend(
+          ALERT_EMAIL,
+          `Engine sweep flagged ${flaggedRows.length} of ${entitlements.length} subscribers`,
+          emailWrap(
+            `<p>The nightly Engine reconciliation flagged <strong>${flaggedRows.length}</strong> of ${entitlements.length} checked subscribers (healthy ${healthy}, healed ${healed.length}).</p>` +
+            `<p>Reasons: ${breakdown}.</p>` +
+            `<p>Per-user list: <code>programming_reconciliations</code> where kind='engine', today's row. A jump like this usually means a deploy changed billing logic — check what shipped yesterday.</p>`,
+          ),
+        );
+      } catch (e) {
+        console.error("[reconcile-engine-months] flag-spike alert failed:", e);
+      }
+    }
 
     // Audit row (kind='engine') — the sweep must never be silent. A failed
     // insert surfaces as a 500 so the cron run history shows it.

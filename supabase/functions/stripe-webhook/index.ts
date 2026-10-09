@@ -50,6 +50,34 @@ async function alertFounder(subject: string, lines: string[]): Promise<void> {
   }
 }
 
+/** Re-fetch an invoice over the plain API before parsing it.
+ *
+ *  Webhook event payloads are rendered in the ENDPOINT's pinned API version
+ *  (2026-03-25.dahlia on this account) — a dialect where invoice.subscription
+ *  and the line shapes this file parses no longer exist at their old paths.
+ *  The plain API answers in the ACCOUNT's default version, the dialect this
+ *  handler was written against. 2026-10-09 incident: the version skew made
+ *  `invoice.subscription` read undefined, so EVERY invoice event was silently
+ *  skipped as "not a subscription invoice" for months — engine drip and
+ *  renewal generation both dead, with the nightly sweeps unknowingly carrying
+ *  delivery. Parse what the API returns, never the event payload's dialect. */
+// deno-lint-ignore no-explicit-any
+async function fetchInvoiceCanonical(invoiceId: string): Promise<any | null> {
+  try {
+    const resp = await fetchWithTimeout(`https://api.stripe.com/v1/invoices/${invoiceId}`, {
+      headers: { "Authorization": "Basic " + btoa(STRIPE_SECRET_KEY + ":") },
+    }, 15_000);
+    if (!resp.ok) {
+      console.error(`[webhook] invoice re-fetch failed (${resp.status}) for ${invoiceId}`);
+      return null;
+    }
+    return await resp.json();
+  } catch (e) {
+    console.error(`[webhook] invoice re-fetch error for ${invoiceId}:`, e);
+    return null;
+  }
+}
+
 // ── Churn-alert dossier ─────────────────────────────────────────────────────
 // A bare "subscription went unpaid for cus_xxx" tells the founder nothing.
 // These helpers assemble who / plan+products / subscribed+tenure / admin link
@@ -744,13 +772,17 @@ serve(async (req) => {
 
       case "invoice.payment_failed": {
         // Involuntary churn starts here — previously invisible until
-        // entitlements were revoked days later.
-        const invoice = event.data.object;
-        if (!invoice.subscription) break;
+        // entitlements were revoked days later. Same dialect hazard as
+        // payment_succeeded: re-fetch, then read both subscription paths.
+        const failedEventInvoice = event.data.object;
+        const invoice = (await fetchInvoiceCanonical(failedEventInvoice.id)) ?? failedEventInvoice;
+        const failedSubId = invoice.subscription ??
+          invoice.parent?.subscription_details?.subscription ?? null;
+        if (!failedSubId) break;
         const who = await resolveByCustomer(supa, invoice.customer);
         await recordBillingEvent(supa, {
           user_id: who.user_id, email: who.email ?? invoice.customer_email ?? null,
-          stripe_customer_id: invoice.customer, stripe_subscription_id: invoice.subscription,
+          stripe_customer_id: invoice.customer, stripe_subscription_id: failedSubId,
           event_type: "payment_failed",
           currency: invoice.currency ?? null,
           amount_cents: invoice.amount_due ?? null,
@@ -801,12 +833,23 @@ serve(async (req) => {
       }
 
       case "invoice.payment_succeeded": {
-        const invoice = event.data.object;
+        // Event payloads arrive in the endpoint's pinned dialect — re-fetch
+        // by id and parse the API's answer (see fetchInvoiceCanonical). The
+        // event object is only the fallback if the fetch fails, read with
+        // both dialects' subscription paths.
+        const eventInvoice = event.data.object;
+        const invoice = (await fetchInvoiceCanonical(eventInvoice.id)) ?? eventInvoice;
         const customerId = invoice.customer;
-        const subscriptionId = invoice.subscription;
+        const subscriptionId = invoice.subscription ??
+          invoice.parent?.subscription_details?.subscription ?? null;
 
-        // Skip if not a subscription invoice (e.g. one-time charges)
-        if (!subscriptionId) break;
+        // Skip if not a subscription invoice (e.g. one-time charges) — and
+        // say so: this exact silent `break` ate every invoice event for
+        // months when the endpoint's pinned version moved the field.
+        if (!subscriptionId) {
+          console.warn(`[webhook] invoice ${invoice.id}: no subscription id in either dialect (billing_reason=${invoice.billing_reason}) — treating as non-subscription invoice`);
+          break;
+        }
 
         // Handle every successful subscription payment — initial and renewals
         // alike. engine_months_unlocked is raised here as the single source of
@@ -970,7 +1013,17 @@ serve(async (req) => {
             .maybeSingle();
 
           const currentUnlocked = athleteProfile?.engine_months_unlocked ?? 0;
-          const newUnlocked = Math.min(currentUnlocked + 1, 36);
+          // subscription_create bills the SAME month the checkout handler
+          // seeds (raise-to-1), not an additional one — the old unconditional
+          // +1 double-granted whenever checkout ran first, leaving 13 of 49
+          // subscribers one month ahead (2026-10-09 audit). Only-raise to 1
+          // makes whichever handler lands first correct and the other a no-op.
+          // (Rare edge, documented: a lapsed Engine subscriber starting a
+          // FRESH subscription keeps their old months and this no-ops; the
+          // nightly sweep flags them over_entitled for the operator to bump.)
+          const newUnlocked = invoice.billing_reason === "subscription_create"
+            ? Math.max(currentUnlocked, 1)
+            : Math.min(currentUnlocked + 1, 36);
           if (newUnlocked > currentUnlocked) {
             console.log(`[webhook] Unlocking engine month ${newUnlocked} for user ${payUserId}`);
             await supa
