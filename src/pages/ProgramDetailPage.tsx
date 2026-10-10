@@ -239,6 +239,36 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   // state's athlete_facing_rationale fields (no extra AI call).
   const [coachNotes, setCoachNotes] = useState<Array<{ rank: number; focus: string; athlete_facing_rationale: string }> | null>(null);
   const [coachNotesOpen, setCoachNotesOpen] = useState(false);
+  // First-program intro (founder, 2026-10-10): one-time how-coaching-works
+  // card on first open of a generated program — the three coach surfaces,
+  // logging, and the human valve. Seeded truthy so it can never flash for
+  // users who already dismissed it; hydrates below. No backfill by design.
+  const [programIntroSeenAt, setProgramIntroSeenAt] = useState<string | null>('pending');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('athlete_profiles')
+        .select('program_intro_seen_at')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+      if (!cancelled) {
+        setProgramIntroSeenAt((data as { program_intro_seen_at?: string | null } | null)?.program_intro_seen_at ?? null);
+      }
+    })().catch(() => { /* card is optional — never block the page */ });
+    return () => { cancelled = true; };
+  }, [session.user.id]);
+
+  // Got-it: optimistic dismiss + targeted stamp. A failed write just means
+  // they see the card once more next visit.
+  const markProgramIntroSeen = async () => {
+    const nowIso = new Date().toISOString();
+    setProgramIntroSeenAt(nowIso);
+    await supabase
+      .from('athlete_profiles')
+      .upsert({ user_id: session.user.id, program_intro_seen_at: nowIso }, { onConflict: 'user_id' });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -800,6 +830,54 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                 {scheduleError && (
                   <div className="schedule-error-banner" onClick={() => setScheduleError(null)}>
                     {scheduleError} <span className="schedule-error-dismiss">✕</span>
+                  </div>
+                )}
+                {/* First-program intro — the one-time how-coaching-works
+                    card. Founder copy ("Built for you. Not by yourself.").
+                    Sits above the coach's notes so the order on first open
+                    is: how this works → why it looks like this → Week 1. */}
+                {program.source === 'generated' && programIntroSeenAt === null && (
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 12, padding: '18px 16px', marginBottom: 14 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
+                      Your program is ready, and it&apos;s not a fixed document.
+                    </div>
+                    <p style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.55, margin: '0 0 14px' }}>
+                      It&apos;s a living program with a coach built in. The coach shows up in three places:
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 }}>
+                      <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                        <strong style={{ color: 'var(--text)' }}>1 — The Coach button, on every block.</strong>{' '}
+                        Tap for guidance on that block: how to pace it, cues to focus on, common flaws to avoid.
+                      </div>
+                      <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                        <strong style={{ color: 'var(--text)' }}>2 — The chat on every training day.</strong>{' '}
+                        This is where you can change the program. Equipment swap, a different stimulus,
+                        less volume — tell the coach what you need, it proposes the change, you approve it.
+                        There&apos;s also an Edit button for quick changes you make yourself.{' '}
+                        <strong style={{ color: 'var(--text)' }}>You always have the last word.</strong>
+                      </div>
+                      <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                        <strong style={{ color: 'var(--text)' }}>3 — The main Coach chat.</strong>{' '}
+                        Available 24/7 and trained on the methodology. This is the place to get personalized
+                        answers about your own training and about all things fitness.
+                      </div>
+                    </div>
+                    <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 14px' }}>
+                      <strong style={{ color: 'var(--text)' }}>Log your training.</strong>{' '}
+                      Next month&apos;s program is built from what you actually did.
+                    </p>
+                    <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 16px' }}>
+                      <strong style={{ color: 'var(--text)' }}>Built for you. Not by yourself.</strong>{' '}
+                      Prefer to speak with a human? Tap <strong style={{ color: 'var(--text)' }}>Message a human coach</strong>{' '}
+                      in the chat — a real coach replies by email within a day.
+                    </p>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      onClick={() => { void markProgramIntroSeen(); }}
+                    >
+                      Got it — show me Week 1
+                    </button>
                   </div>
                 )}
                 {/* Coach's notes — generated programs only. Ends with the
