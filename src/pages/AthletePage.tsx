@@ -198,23 +198,6 @@ function EvalUpgradeCta({ onUpgrade, hasEngine = false }: { onUpgrade?: (plan: '
   );
 }
 
-/** Coach-state priority rendering helpers (pre-generation preview +
- *  program coach's notes). The focus values are snake_case axis names;
- *  the rationale is already athlete-facing prose — the preview just
- *  takes its first sentence. */
-export function humanizeFocus(f: string): string {
-  return f.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-export function firstSentence(s: string): string {
-  const i = s.indexOf('. ');
-  return i === -1 ? s : s.slice(0, i + 1);
-}
-export interface CoachPriorityView {
-  rank: number;
-  focus: string;
-  athlete_facing_rationale: string;
-}
-
 const LIFT_GROUPS = [
   {
     title: 'Squats',
@@ -811,13 +794,15 @@ export default function AthletePage({ session }: { session: Session }) {
   // /competition-history.
   const [competitionAthleteId, setCompetitionAthleteId] = useState<string | null>(null);
   const [competitionAthleteLabel, setCompetitionAthleteLabel] = useState<string | null>(null);
-  // Pre-generation priorities preview (founder, 2026-10-09 — the oly-seminar
-  // case: context the athlete never wrote down met them as a cold omission in
-  // the finished program). The coach's ranked priorities render read-only
-  // above Generate so missing context gets added to Goals BEFORE tokens are
-  // spent. The correction surface is the goal/intake the athlete already
-  // owns — deliberately no approval step, no dialogue, no negotiation.
-  const [coachPriorities, setCoachPriorities] = useState<CoachPriorityView[] | null>(null);
+  // Last call before generation (founder, 2026-10-10: "a boarding call, not
+  // a boarding pass review"). The first Generate press shows a one-time
+  // prompt — anything else to tell us? — with two exits: Add (jumps to the
+  // goal box) or I'm-ready (dismisses). Replaces the coach-state priorities
+  // preview: showing the coach's read invited re-inspection after every
+  // goal edit, a mirror we can't refresh without an AI call per save. The
+  // athlete's input lives in their own words, never in approving ours.
+  const [lastCallOpen, setLastCallOpen] = useState(false);
+  const [lastCallDone, setLastCallDone] = useState(false);
 
   const fetchEvaluations = async () => {
     const [profileRes, trainingRes, nutritionRes] = await Promise.all([
@@ -1033,28 +1018,6 @@ export default function AthletePage({ session }: { session: Session }) {
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
 
-  // Latest coach state (own-row RLS; built at evaluation time, so it exists
-  // before Generate for the normal journey). Failure-soft: the preview is
-  // optional and must never block the page.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from('coach_states')
-        .select('coach_state')
-        .eq('user_id', session.user.id)
-        .order('version', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (cancelled) return;
-      const pri = (data?.coach_state as { priorities?: CoachPriorityView[] } | null)?.priorities;
-      if (Array.isArray(pri) && pri.length > 0) {
-        setCoachPriorities([...pri].sort((a, b) => a.rank - b.rank));
-      }
-    })().catch(() => { /* optional preview */ });
-    return () => { cancelled = true; };
-  }, [session.user.id]);
-
   // Unsaved-changes guard (2026-10-08, the Wesley incident: toggled his
   // equipment, never tapped a save button, edits silently evaporated, then
   // emailed support believing he'd updated his profile). interactedRef
@@ -1195,6 +1158,16 @@ export default function AthletePage({ session }: { session: Session }) {
   const handleGenerateProgram = async () => {
     setGenerateLoading(true);
     setError('');
+    // Unsaved edits ride along: the last-call flow sends athletes to the
+    // goal box right before generating, and a goal typed but not saved
+    // must never be silently missing from the program it was written for.
+    if (isDirty) {
+      const ok = await saveProfile();
+      if (!ok) {
+        setGenerateLoading(false);
+        return;
+      }
+    }
     try {
       // Kick off background generation — returns immediately with job_id
       const { data, error } = await supabase.functions.invoke('generate-program-v3', {
@@ -2591,35 +2564,36 @@ export default function AthletePage({ session }: { session: Session }) {
                   const ready = !tierBlocked && !evalMissing && !generateLoading;
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {/* Read-only priorities preview: what the coach will
-                          build around, abridged to one sentence each. The
-                          nudge line routes corrections into Goals & Schedule
-                          — the surface the athlete already owns. */}
-                      {ready && coachPriorities && (
-                        <div className="settings-card" style={{ textAlign: 'left' }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 8 }}>
-                            Your program will be built around
+                      {/* Last call (boarding call, not boarding pass review):
+                          the first Generate press opens this instead of
+                          generating. No coach state shown — nothing to
+                          inspect or re-request, just the final input door. */}
+                      {lastCallOpen && (
+                        <div className="settings-card" style={{ textAlign: 'left', borderColor: 'var(--accent)', background: 'var(--accent-glow)' }}>
+                          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
+                            Anything else you want to tell us?
                           </div>
-                          <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            {coachPriorities.map((p) => (
-                              <li key={p.rank} style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)' }}>
-                                <strong style={{ color: 'var(--text)' }}>{humanizeFocus(p.focus)}</strong>
-                                {' — '}
-                                {firstSentence(p.athlete_facing_rationale)}
-                              </li>
-                            ))}
-                          </ol>
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.6 }}>
-                            Anything missing from this picture — an event coming up, a movement that
-                            matters to you?{' '}
+                          <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.55, margin: '0 0 14px' }}>
+                            An event coming up, a movement you love or hate, a target — the AI builds
+                            from whatever&apos;s in your goals right now. Last call before it runs.
+                          </p>
+                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                             <button
                               type="button"
-                              onClick={jumpToGoals}
-                              style={{ background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                              className="auth-btn"
+                              style={{ padding: '10px 18px', fontSize: 13, background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                              onClick={() => { setLastCallOpen(false); setLastCallDone(true); jumpToGoals(); }}
                             >
-                              Add it to your goals →
+                              Add to my goals →
                             </button>
-                            {' '}Your program is built from whatever&apos;s saved there when you hit Generate.
+                            <button
+                              type="button"
+                              className="auth-btn"
+                              style={{ padding: '10px 18px', fontSize: 13 }}
+                              onClick={() => { setLastCallOpen(false); setLastCallDone(true); }}
+                            >
+                              No — I&apos;m ready
+                            </button>
                           </div>
                         </div>
                       )}
@@ -2634,7 +2608,13 @@ export default function AthletePage({ session }: { session: Session }) {
                           opacity: (tierBlocked || evalMissing) ? 0.55 : undefined,
                           cursor: (tierBlocked || evalMissing) ? 'not-allowed' : undefined,
                         }}
-                        onClick={(tierBlocked || evalMissing) ? undefined : handleGenerateProgram}
+                        onClick={(tierBlocked || evalMissing) ? undefined : () => {
+                          if (!lastCallDone) {
+                            setLastCallOpen(true);
+                            return;
+                          }
+                          void handleGenerateProgram();
+                        }}
                         disabled={disabled}
                         title={genTitle}
                       >
