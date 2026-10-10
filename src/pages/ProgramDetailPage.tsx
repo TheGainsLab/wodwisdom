@@ -1378,6 +1378,10 @@ interface V3DayViewProps {
   workoutText?: string;
   // When present (the day page), each block renders its type-specific log UI.
   logging?: DayLogController;
+  // Rendered between the intent row and the blocks (the day page passes its
+  // "Ask the coach" bar here — the chat itself lives below the blocks, and
+  // this is the always-visible sign on that door).
+  coachBar?: React.ReactNode;
 }
 
 // Block types the workout review generates coaching for (skills/strength/metcon).
@@ -1549,6 +1553,8 @@ export function V3DayView({ blocks, sourceId, workoutText, logging, onUpdateMove
           )}
         </div>
       )}
+
+      {ai.coachBar}
 
       {blocks.map((b) => (
         <V3BlockCard

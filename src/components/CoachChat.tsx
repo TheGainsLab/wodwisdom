@@ -350,7 +350,9 @@ export default function CoachChat({ session, workoutId, onDayChanged }: {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-          placeholder="Ask about pacing, scaling, substitutions..."
+          placeholder={workoutId
+            ? "Ask about pacing, scaling — or ask me to change a block of today's workout"
+            : "Ask about pacing, scaling, substitutions..."}
           style={{
             flex: 1, padding: '12px 14px', fontSize: 14,
             background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
