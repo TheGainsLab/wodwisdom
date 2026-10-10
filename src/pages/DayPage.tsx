@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -26,6 +26,8 @@ export default function DayPage(_props: { session: Session }) {
   const [meta, setMeta] = useState<{ week_num: number; day_num: number; month_number?: number | null; program_id: string; program_name: string } | null>(null);
   // Bumped when the AI Coach applies a block edit — re-runs the day fetch.
   const [reloadKey, setReloadKey] = useState(0);
+  // The coach bar's target: wraps the chat so a tap can scroll + focus it.
+  const chatRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!workoutId) return;
@@ -267,10 +269,40 @@ export default function DayPage(_props: { session: Session }) {
                   onUpdateBlock={updateBlockField}
                   onAddMovement={addMovementToBlock}
                   onRemoveMovement={removeMovementFromBlock}
+                  coachBar={
+                    /* The always-visible sign on the chat's door (founder,
+                       2026-10-10: "people might not be aware that the AI
+                       coach exists inside the day"). One line under the
+                       intent row; tap scrolls to the chat and focuses it. */
+                    <button
+                      type="button"
+                      onClick={() => {
+                        chatRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        chatRef.current?.querySelector('input')?.focus({ preventScroll: true });
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                        background: 'var(--accent-glow)', border: '1px solid var(--accent)',
+                        borderRadius: 11, padding: '11px 12px', marginBottom: 10,
+                        cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: 'var(--text)',
+                      }}
+                    >
+                      <span aria-hidden style={{ flex: 'none', fontSize: 15 }}>💬</span>
+                      <span style={{ flex: 1 }}>
+                        <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600 }}>Ask the coach</span>
+                        <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-dim)', marginTop: 1 }}>
+                          Questions, scaling — or change today&apos;s workout
+                        </span>
+                      </span>
+                      <span style={{ flex: 'none', color: 'var(--accent)', fontWeight: 700 }}>→</span>
+                    </button>
+                  }
                 />
 
                 {/* Ask the AI Coach about this day — the day is passed as context. */}
-                <CoachChat session={_props.session} workoutId={workoutId ?? null} onDayChanged={() => setReloadKey(k => k + 1)} />
+                <div ref={chatRef}>
+                  <CoachChat session={_props.session} workoutId={workoutId ?? null} onDayChanged={() => setReloadKey(k => k + 1)} />
+                </div>
 
                 {/* Done — the day auto-completes as each block is saved; this
                     just leaves. (Log a block via its own Save on the card.) */}
