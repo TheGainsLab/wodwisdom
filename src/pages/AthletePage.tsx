@@ -751,6 +751,9 @@ export default function AthletePage({ session }: { session: Session }) {
   // T3 is controlled so the priorities card's "add it to your goals" link can
   // open the section and land the athlete in the goal box.
   const [t3Expanded, setT3Expanded] = useState(false);
+  // One-time Tier-3 intro stamp. Seeded truthy so the intro can never flash
+  // for users who already saw it — the real value hydrates with the profile.
+  const [t3IntroSeenAt, setT3IntroSeenAt] = useState<string | null>('pending');
   const [condSectionOpen, setCondSectionOpen] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
@@ -902,7 +905,7 @@ export default function AthletePage({ session }: { session: Session }) {
     Promise.all([
       supabase
         .from('athlete_profiles')
-        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, eval_credits_remaining, competition_athlete_id, competition_athlete_label, coaching_intake_raw, injuries_structured, injuries_constraints_hash, injuries_avoidance_confirmed, programming_resume_pending_at, athletic_reviewed_at')
+        .select('lifts, skills, conditioning, equipment, bodyweight, units, age, height, gender, tdee_override, days_per_week, session_length_minutes, injuries_constraints, goal, eval_credits_remaining, competition_athlete_id, competition_athlete_label, coaching_intake_raw, injuries_structured, injuries_constraints_hash, injuries_avoidance_confirmed, programming_resume_pending_at, athletic_reviewed_at, t3_intro_seen_at')
         .eq('user_id', session.user.id)
         .maybeSingle(),
       supabase
@@ -949,6 +952,7 @@ export default function AthletePage({ session }: { session: Session }) {
       setResumePending(!!profileRes.data?.programming_resume_pending_at);
       if (!profileRes.data) {
         setIsNewUser(true);
+        setT3IntroSeenAt(null);
         // Equipment stays collapsed — its amber "review required" header badge
         // carries the signal; the user opens sections at their own pace.
       }
@@ -956,6 +960,7 @@ export default function AthletePage({ session }: { session: Session }) {
         const d = profileRes.data;
         setLifts(d.lifts || {});
         setAthleticReviewedAt(d.athletic_reviewed_at ?? null);
+        setT3IntroSeenAt((d as { t3_intro_seen_at?: string | null }).t3_intro_seen_at ?? null);
         if (d.equipment && Object.keys(d.equipment).length > 0) {
           // Non-empty record = the athlete (or a pre-review save) already
           // confirmed their equipment — grandfathered straight to green.
@@ -1564,6 +1569,16 @@ export default function AthletePage({ session }: { session: Session }) {
     }
     fetchProfileAnalysis();
   };
+  // Got-it on the Tier-3 intro: optimistic reveal + targeted stamp write.
+  // A failed write just means they see the intro once more next load.
+  const markT3IntroSeen = async () => {
+    const nowIso = new Date().toISOString();
+    setT3IntroSeenAt(nowIso);
+    await supabase
+      .from('athlete_profiles')
+      .upsert({ user_id: session.user.id, t3_intro_seen_at: nowIso }, { onConflict: 'user_id' });
+  };
+
   // The priorities card's correction path: open Step 3 + the coaching box,
   // then land the athlete on the goal field itself.
   const jumpToGoals = () => {
@@ -2206,6 +2221,64 @@ export default function AthletePage({ session }: { session: Session }) {
                   }
                   onUpgrade={() => navigate('/checkout?plan=programming')}
                 >
+                  {/* One-time Tier-3 intro (founder, 2026-10-10): the how-to for
+                      the section, mirroring the account-confirmation welcome.
+                      Gates the contents until Got-it — the stamp lives on
+                      athlete_profiles.t3_intro_seen_at (no backfill: existing
+                      subscribers are exactly the under-filling population this
+                      targets, so they see it once too). */}
+                  {!t3IntroSeenAt ? (
+                    <div style={{ padding: '2px 2px 0' }}>
+                      <p style={{ fontWeight: 700, fontSize: 16, margin: '0 0 8px' }}>
+                        You&apos;ve unlocked AI Programming.
+                      </p>
+                      <p style={{ color: 'var(--text-dim)', fontSize: 13.5, lineHeight: 1.55, margin: '0 0 14px' }}>
+                        This is where you make the program yours. The AI reads your numbers,
+                        not your mind, so everything you enter here goes straight into your training.
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                        <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                          <strong style={{ color: 'var(--text)' }}>1 — Schedule.</strong>{' '}
+                          Days per week, session length. The program is built to fit.
+                        </div>
+                        <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                          <strong style={{ color: 'var(--text)' }}>2 — Equipment.</strong>{' '}
+                          Uncheck what you don&apos;t have. We&apos;ll never program it.
+                        </div>
+                        <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                          <strong style={{ color: 'var(--text)' }}>3 — Goals &amp; preferences.</strong>{' '}
+                          This is the big one. Treat this like talking to your coach — tell us as much as you can.
+                        </div>
+                      </div>
+                      <ul style={{ margin: '0 0 14px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <li style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                          <strong style={{ color: 'var(--text)' }}>Upcoming events?</strong>{' '}
+                          The Open, Masters semis, a Hyrox, a weightlifting competition? Give us a name and date.
+                        </li>
+                        <li style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                          <strong style={{ color: 'var(--text)' }}>Targets?</strong>{' '}
+                          A 2k row PR, a 10k run, a bodyweight target — be specific where you can.
+                        </li>
+                        <li style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                          <strong style={{ color: 'var(--text)' }}>Preferences?</strong>{' '}
+                          Love snatching, hate running? Say so.
+                        </li>
+                      </ul>
+                      <p style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 16px' }}>
+                        &ldquo;Get fitter&rdquo; builds a good program.
+                        &ldquo;Masters semis 2027, oly seminar Oct 22, love snatching, hate
+                        running&rdquo; builds <em style={{ color: 'var(--text)' }}>your</em> program.
+                      </p>
+                      <button
+                        type="button"
+                        className="auth-btn"
+                        onClick={() => { void markT3IntroSeen(); }}
+                      >
+                        Got it — let&apos;s set it up
+                      </button>
+                    </div>
+                  ) : (
+                  <>
                   {/* The fun-part pitch lives here now (its standalone box below is
                       gone): goals are only ever actionable inside Tier 3. */}
                   <div style={{ padding: '2px 2px 0' }}>
@@ -2513,6 +2586,8 @@ export default function AthletePage({ session }: { session: Session }) {
                     {intakeError && <div className="auth-error" style={{ display: 'block', marginTop: 12 }}>{intakeError}</div>}
                     </div>)}
                   </div>
+                  </>
+                  )}
                 </TierCard>
 
                 {/* Competition History — an OPTIONAL add-on, NOT a tier (it doesn't
