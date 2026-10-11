@@ -2297,9 +2297,6 @@ export default function AthletePage({ session }: { session: Session }) {
                         {sessionLengthMinutes ? `${sessionLengthMinutes} min` : '60 min — default'}
                       </span>
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-                      Your next month is sized to this budget. Leave it if ~an hour is right.
-                    </div>
                   </div>
 
                   {/* Card 2 — YOUR EQUIPMENT: a required one-time review. The
