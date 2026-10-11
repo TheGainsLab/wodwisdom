@@ -95,17 +95,29 @@ export default function AthleteDataPage({ session }: { session: Session }) {
           {!ready ? (
             <div className="page-loading"><div className="loading-pulse" /></div>
           ) : !hasAccess ? null : (
-            <CompetitionHistoryExperience
-              userId={session.user.id}
-              userAge={age}
-              userBodyMassKg={bodyMassKg}
-              needsBasics={!gender || bodyMassKg == null || age == null}
-              isAdmin={isAdmin}
-              canLog={canLog}
-              initialLinkedId={linkage.id}
-              initialLinkedLabel={linkage.label}
-              onLinkageChange={setLinkage}
-            />
+            <>
+              <CompetitionHistoryExperience
+                userId={session.user.id}
+                userAge={age}
+                userBodyMassKg={bodyMassKg}
+                needsBasics={!gender || bodyMassKg == null || age == null}
+                isAdmin={isAdmin}
+                canLog={canLog}
+                initialLinkedId={linkage.id}
+                initialLinkedLabel={linkage.label}
+                onLinkageChange={setLinkage}
+              />
+              {/* Same quiet escape hatch as the profile page — on desktop
+                  there's no tab bar, and a page without a door leaks users. */}
+              <button
+                type="button"
+                className="settings-card"
+                style={{ width: '100%', textAlign: 'center', cursor: 'pointer', padding: '13px 0', fontSize: 14, fontWeight: 600, color: 'var(--text)', marginTop: 18 }}
+                onClick={() => navigate('/')}
+              >
+                ← Back to Home
+              </button>
+            </>
           )}
         </div>
       </div>
