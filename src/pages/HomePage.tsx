@@ -215,12 +215,13 @@ export default function HomePage({ session }: { session: Session }) {
                   <div className="settings-card" style={{ textAlign: 'left' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                       <MessageSquare size={18} style={{ color: 'var(--accent)' }} />
-                      <strong style={{ color: 'var(--text)', fontSize: 14 }}>Make your AI Coach personal</strong>
+                      <strong style={{ color: 'var(--text)', fontSize: 14 }}>Done the Open? Link your history</strong>
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>
-                      Link your competition history and the Coach grounds its answers in your Open, Quarterfinals, and Games results.
+                      Your work capacity, your power, every season in one grid — analysis you
+                      won&apos;t find anywhere else. On AI Programming, your coach reads it too.
                     </div>
-                    <button type="button" className="auth-btn" style={{ padding: '6px 14px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} onClick={() => navigate('/athletedata')}>Link competition history</button>
+                    <button type="button" className="auth-btn" style={{ padding: '6px 14px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} onClick={() => navigate('/athletedata')}>Link my history →</button>
                   </div>
                 )}
 
