@@ -2252,19 +2252,10 @@ export default function AthletePage({ session }: { session: Session }) {
                     </div>
                   ) : (
                   <>
-                  {/* The fun-part pitch lives here now (its standalone box below is
-                      gone): goals are only ever actionable inside Tier 3. */}
-                  <div style={{ padding: '2px 2px 0' }}>
-                    <p style={{ fontWeight: 700, fontSize: 15, margin: 0, marginBottom: 6 }}>
-                      Alright, here&apos;s the fun part.
-                    </p>
-                    <p style={{ color: 'var(--text-dim)', fontSize: 13.5, lineHeight: 1.5, margin: 0 }}>
-                      What are you training for? A competition? A PR? Just feeling fitter?
-                      Whatever it is, tell us. Then give us your schedule: how many days, how
-                      much time. We&apos;ll combine it with everything your evaluation found and
-                      build a program that actually fits who you are and what you&apos;re after.
-                    </p>
-                  </div>
+                  {/* The fun-part pitch is gone (2026-10-11): the one-time
+                      Tier-3 intro above now does the orientation once, at the
+                      right moment — repeating it on every visit was noise.
+                      The locked-state lockPitch (non-subscribers) stays. */}
                   {/* Card 1 — YOUR SCHEDULE (session length dropped Aug '26 — no
                       longer required for T3; stored values still feed the writer) */}
                   <div className="settings-card" style={T3_CARD}>
@@ -2305,9 +2296,6 @@ export default function AthletePage({ session }: { session: Session }) {
                       <span style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', minWidth: 110 }}>
                         {sessionLengthMinutes ? `${sessionLengthMinutes} min` : '60 min — default'}
                       </span>
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-                      Your next month is sized to this budget. Leave it if ~an hour is right.
                     </div>
                   </div>
 
@@ -2407,7 +2395,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       <span style={{ fontSize: 14, color: 'var(--text-dim)', flex: 'none' }}>{coachExpanded ? '▲' : '▼'}</span>
                     </button>
                     {coachExpanded && (<div style={{ marginTop: 16 }}>
-                    <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>Share anything you can. You can tap the microphone and just talk.</p>
+                    <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>You can tap the microphone and just talk.</p>
 
                     <div style={{ marginBottom: 18 }} ref={goalBoxRef}>
                       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>
@@ -2419,6 +2407,10 @@ export default function AthletePage({ session }: { session: Session }) {
                           <> Competitions or events coming up (with dates), movements you love or
                           can&apos;t stand, what success looks like in 3 months — it all steers the program.</>
                         )}
+                        <span style={{ display: 'block', marginTop: 4, color: 'var(--text-dim)' }}>
+                          e.g. &ldquo;Qualify for Masters semis — May 2027&rdquo; &middot; &ldquo;First bar
+                          muscle-up by spring&rdquo; &middot; &ldquo;Sub-20 5k without losing my squat&rdquo;
+                        </span>
                       </div>
                       <textarea
                         className="lift-input"
