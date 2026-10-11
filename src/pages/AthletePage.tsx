@@ -2419,6 +2419,10 @@ export default function AthletePage({ session }: { session: Session }) {
                           <> Competitions or events coming up (with dates), movements you love or
                           can&apos;t stand, what success looks like in 3 months — it all steers the program.</>
                         )}
+                        <span style={{ display: 'block', marginTop: 4, color: 'var(--text-dim)' }}>
+                          e.g. &ldquo;Qualify for Masters semis — May 2027&rdquo; &middot; &ldquo;First bar
+                          muscle-up by spring&rdquo; &middot; &ldquo;Sub-20 5k without losing my squat&rdquo;
+                        </span>
                       </div>
                       <textarea
                         className="lift-input"
