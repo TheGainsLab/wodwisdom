@@ -2252,19 +2252,10 @@ export default function AthletePage({ session }: { session: Session }) {
                     </div>
                   ) : (
                   <>
-                  {/* The fun-part pitch lives here now (its standalone box below is
-                      gone): goals are only ever actionable inside Tier 3. */}
-                  <div style={{ padding: '2px 2px 0' }}>
-                    <p style={{ fontWeight: 700, fontSize: 15, margin: 0, marginBottom: 6 }}>
-                      Alright, here&apos;s the fun part.
-                    </p>
-                    <p style={{ color: 'var(--text-dim)', fontSize: 13.5, lineHeight: 1.5, margin: 0 }}>
-                      What are you training for? A competition? A PR? Just feeling fitter?
-                      Whatever it is, tell us. Then give us your schedule: how many days, how
-                      much time. We&apos;ll combine it with everything your evaluation found and
-                      build a program that actually fits who you are and what you&apos;re after.
-                    </p>
-                  </div>
+                  {/* The fun-part pitch is gone (2026-10-11): the one-time
+                      Tier-3 intro above now does the orientation once, at the
+                      right moment — repeating it on every visit was noise.
+                      The locked-state lockPitch (non-subscribers) stays. */}
                   {/* Card 1 — YOUR SCHEDULE (session length dropped Aug '26 — no
                       longer required for T3; stored values still feed the writer) */}
                   <div className="settings-card" style={T3_CARD}>
