@@ -451,25 +451,6 @@ export default function CompetitionHistoryExperience({
             <strong style={{ color: 'var(--text)' }}>Add and analyze your competition history</strong> — your Open,
             Quarterfinals, and Games results with percentiles, trends, and a completion map.
           </p>
-          <p style={{ marginBottom: 12, fontSize: 13 }}>
-            <button
-              type="button"
-              onClick={() => { setScope('all'); setBrowseUnlinked(true); }}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                color: 'var(--accent)',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              Never competed? Browse and try the workouts →
-            </button>
-          </p>
-
           {/* Search */}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <input
@@ -593,6 +574,32 @@ export default function CompetitionHistoryExperience({
           {verifyError && (
             <div style={{ marginTop: 8, fontSize: 13, color: 'var(--danger, #d33)' }}>{verifyError}</div>
           )}
+
+          {/* Never-competed panel (founder, 2026-10-11): its own front door,
+              not a footnote inside the has-a-history card — a no-history
+              visitor used to read "add your competition history", conclude
+              this page wasn't for them, and leave. Every claim is shipped:
+              power via work-calc, placement vs the real field, the
+              completion map. Logging is free for all authenticated users
+              (D5) — no entitlement asterisk. Deliberately NOT "training
+              history": throwbacks land in the competition record on this
+              page, not in the training log. */}
+          <div className="settings-card" style={{ marginTop: 18, textAlign: 'left' }}>
+            <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>
+              <strong style={{ color: 'var(--text)' }}>Never competed? Start your record.</strong>{' '}
+              Browse every workout, try one, and log your score — you&apos;ll see your power
+              output, where you&apos;d have placed against the real field, and a completion
+              map that fills in as you go.
+            </p>
+            <button
+              type="button"
+              className="auth-btn"
+              style={{ maxWidth: 260, padding: '10px 18px', fontSize: 13 }}
+              onClick={() => { setScope('all'); setBrowseUnlinked(true); }}
+            >
+              Browse the workouts →
+            </button>
+          </div>
         </div>
       )}
 

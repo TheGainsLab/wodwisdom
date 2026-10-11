@@ -82,14 +82,18 @@ export default function HomePage({ session }: { session: Session }) {
   const showWelcomeCard = !hasEvaluation && !resumePending;
 
   // ── Context card: the single most relevant next action. ──
-  const primary = (() => {
+  const primary = ((): { kicker?: string; title: string; body: string; cta: string; to: string } | null => {
     if (showWelcomeCard) return null; // the welcome card is the hero
     // Returner pause outranks everything: their paid month is waiting on them.
     if (resumePending && hasProgram) {
       return { title: 'Welcome back — build your next month', body: 'Your next training month is paid for and waiting. Review your numbers on your profile, then tap Build my next month.', cta: 'Review & build', to: '/profile' };
     }
     if (hasProgramming && !hasProgram) {
-      return { title: "Alright, here's the fun part.", body: "What are you training for? A competition? A PR? Just feeling fitter? Tell the coach your goal and schedule, and it'll combine them with everything your evaluation found to build a program that actually fits you.", cta: 'Go to Profile', to: '/profile' };
+      // The most expensive stall in the funnel: paid, evaluated, never
+      // generated. Product named in the kicker, outcome named on the button,
+      // the real section and steps in between (founder, 2026-10-11 — the old
+      // "fun part / tell the coach" copy sold a chat that isn't there).
+      return { kicker: 'AI Programming', title: "Your program is paid for — let's build it.", body: "One step left: open Make it Personal — your schedule, equipment, and goals — then hit Generate. The AI builds your month from your evaluation and everything you tell it there.", cta: 'Build my program', to: '/profile' };
     }
     if (hasProgram) {
       return { title: "Today's training", body: 'Pick up your program — view your calendar, start a session, and log your results.', cta: 'Open My Programs', to: '/programs' };
@@ -156,6 +160,11 @@ export default function HomePage({ session }: { session: Session }) {
               <>
                 {primary && (
                   <button type="button" className="settings-card" style={{ textAlign: 'left', cursor: 'pointer', borderColor: 'var(--accent)' }} onClick={() => navigate(primary.to)}>
+                    {primary.kicker && (
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)', marginBottom: 6 }}>
+                        {primary.kicker}
+                      </div>
+                    )}
                     <h2 className="settings-card-title" style={{ marginBottom: 4, color: 'var(--text)' }}>{primary.title}</h2>
                     <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 14 }}>{primary.body}</div>
                     <span className="auth-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13 }}>
@@ -215,12 +224,13 @@ export default function HomePage({ session }: { session: Session }) {
                   <div className="settings-card" style={{ textAlign: 'left' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                       <MessageSquare size={18} style={{ color: 'var(--accent)' }} />
-                      <strong style={{ color: 'var(--text)', fontSize: 14 }}>Make your AI Coach personal</strong>
+                      <strong style={{ color: 'var(--text)', fontSize: 14 }}>Done the Open? Link your history</strong>
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>
-                      Link your competition history and the Coach grounds its answers in your Open, Quarterfinals, and Games results.
+                      Your work capacity, your power, every season in one grid — analysis you
+                      won&apos;t find anywhere else. On AI Programming, your coach reads it too.
                     </div>
-                    <button type="button" className="auth-btn" style={{ padding: '6px 14px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} onClick={() => navigate('/athletedata')}>Link competition history</button>
+                    <button type="button" className="auth-btn" style={{ padding: '6px 14px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} onClick={() => navigate('/athletedata')}>Link my history →</button>
                   </div>
                 )}
 
