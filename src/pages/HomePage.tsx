@@ -200,7 +200,7 @@ export default function HomePage({ session }: { session: Session }) {
                       {!basicsDone ? 'Start my profile →' : !profileReviewed ? 'Continue — Your Numbers →' : 'Run my evaluation →'}
                     </button>
                     <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', marginTop: 9 }}>
-                      Done the CrossFit Open?{' '}
+                      Done the Open?{' '}
                       <button type="button" onClick={(e) => { e.stopPropagation(); navigate('/athletedata'); }} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, padding: 0 }}>
                         Link your history
                       </button>{' '}

@@ -2172,7 +2172,7 @@ export default function AthletePage({ session }: { session: Session }) {
                     Context"; locked for non-subscribers) */}
                 <TierCard
                   tierNumber={3}
-                  title="Goals & Schedule"
+                  title="Make it Personal"
                   unlocks="Goal, schedule, equipment & anything the AI should know"
                   status={savedStatus.tier3}
                   expanded={t3Expanded}
@@ -2395,13 +2395,12 @@ export default function AthletePage({ session }: { session: Session }) {
                       style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 0, margin: 0, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
                     >
                       <div>
-                        <div style={{ ...CTA_KICKER, marginBottom: 4 }}>Your Coach</div>
+                        <div style={{ ...CTA_KICKER, marginBottom: 4 }}>Your Goals</div>
                         {goal.trim() ? (
                           <div style={{ fontSize: 14, color: '#2ec486', fontWeight: 600 }}>✓ Goal set</div>
                         ) : (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--warning, #f39c12)', fontWeight: 600 }}>
-                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--warning, #f39c12)', flex: 'none' }} />
-                            Goal required
+                          <div style={{ fontSize: 14, color: 'var(--text-dim)', fontWeight: 600 }}>
+                            Share anything you can
                           </div>
                         )}
                       </div>
@@ -2411,9 +2410,11 @@ export default function AthletePage({ session }: { session: Session }) {
                     <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>Share anything you can. You can tap the microphone and just talk.</p>
 
                     <div style={{ marginBottom: 18 }} ref={goalBoxRef}>
-                      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>What are you working toward?</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>
+                        What are you working toward? <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>(required)</span>
+                      </div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-                        Be specific. <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Required for your program.</span>
+                        Be specific.
                         {!hasGeneratedProgram && (
                           <> Competitions or events coming up (with dates), movements you love or
                           can&apos;t stand, what success looks like in 3 months — it all steers the program.</>
@@ -2423,7 +2424,6 @@ export default function AthletePage({ session }: { session: Session }) {
                         className="lift-input"
                         rows={3}
                         maxLength={500}
-                        placeholder='e.g. "Get stronger overall" · "First bar muscle-up by spring" · "Sub-20 5k without losing my squat"'
                         value={goal}
                         onChange={e => { setGoal(e.target.value); markDirty(); setIntakeSaved(false); }}
                         onFocus={() => setT3FocusedBox('goal')}
@@ -2578,7 +2578,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>
                         {competitionAthleteId
                           ? <>Linked: {competitionAthleteLabel ?? 'your competition profile'} <span style={{ color: '#2ec486' }}>✓</span></>
-                          : 'Done the CrossFit Open?'}
+                          : 'Done the Open?'}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                         {competitionAthleteId
@@ -2600,18 +2600,6 @@ export default function AthletePage({ session }: { session: Session }) {
                     (2026-10-08 — the stray green "Saved ✓" down here read as
                     a second, mysterious save). Tier 3 keeps Save & analyze. */}
 
-                {/* Escape hatch (2026-10-08): on desktop the tab bar doesn't
-                    render, so without this the page reads as a room with no
-                    door. A quiet dark bar under Save — explore freely; the
-                    Home card guides anyone unfinished back here. */}
-                <button
-                  type="button"
-                  className="settings-card"
-                  style={{ textAlign: 'center', cursor: 'pointer', padding: '13px 0', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}
-                  onClick={() => navigate('/')}
-                >
-                  ← Back to Home
-                </button>
 
                 {/* Generate Program — first-time generation only, entitled users
                     only. Hidden once a program exists. Non-entitled users see
@@ -2702,7 +2690,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       )}
                       {ready && !goal.trim() && (
                         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>
-                          No goal set — add one in Goals &amp; Schedule above and the program builds toward it.
+                          No goal set — add one in Make it Personal above and the program builds toward it.
                         </span>
                       )}
                       {tierBlocked && (
@@ -2718,6 +2706,19 @@ export default function AthletePage({ session }: { session: Session }) {
                     </div>
                   );
                 })()}
+
+                {/* Escape hatch (2026-10-08): on desktop the tab bar doesn't
+                    render, so without this the page reads as a room with no
+                    door. Below Generate (founder, 2026-10-11): the primary
+                    action outranks the exit. */}
+                <button
+                  type="button"
+                  className="settings-card"
+                  style={{ textAlign: 'center', cursor: 'pointer', padding: '13px 0', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}
+                  onClick={() => navigate('/')}
+                >
+                  ← Back to Home
+                </button>
 
                 {/* AI Evaluation History — grouped by month */}
                 {(evaluations.length > 0 || trainingEvaluations.length > 0 || nutritionEvaluations.length > 0) && (
