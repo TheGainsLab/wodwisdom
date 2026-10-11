@@ -2395,7 +2395,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       <span style={{ fontSize: 14, color: 'var(--text-dim)', flex: 'none' }}>{coachExpanded ? '▲' : '▼'}</span>
                     </button>
                     {coachExpanded && (<div style={{ marginTop: 16 }}>
-                    <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>Share anything you can. You can tap the microphone and just talk.</p>
+                    <p className="athlete-card-subtitle" style={{ marginBottom: 16 }}>You can tap the microphone and just talk.</p>
 
                     <div style={{ marginBottom: 18 }} ref={goalBoxRef}>
                       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 3 }}>
