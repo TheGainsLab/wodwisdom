@@ -2605,15 +2605,26 @@ export default function AthletePage({ session }: { session: Session }) {
                       <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                         {competitionAthleteId
                           ? 'Your Open / Quarterfinals / Games history, a completion map, and throwbacks.'
-                          : 'Import your history for a free year-by-year analysis. No history? Start one.'}
+                          : 'Link your history for a free year-by-year analysis.'}
                       </div>
+                      {/* Second door, same vocabulary as Home's card: the
+                          never-competed path lands in the workout explorer. */}
+                      {!competitionAthleteId && (
+                        <button
+                          type="button"
+                          onClick={() => navigate('/athletedata?browse=1')}
+                          style={{ background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0, marginTop: 4, textAlign: 'left' }}
+                        >
+                          Never competed? Start your record →
+                        </button>
+                      )}
                     </div>
                     <button
                       type="button"
                       style={{ flex: 'none', background: 'none', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 999, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
                       onClick={() => navigate('/athletedata')}
                     >
-                      {competitionAthleteId ? 'View history →' : 'Import my history →'}
+                      {competitionAthleteId ? 'View history →' : 'Link my history →'}
                     </button>
                   </div>
                 )}
