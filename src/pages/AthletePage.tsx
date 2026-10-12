@@ -2227,22 +2227,17 @@ export default function AthletePage({ session }: { session: Session }) {
                       <ul style={{ margin: '0 0 14px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <li style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)' }}>
                           <strong style={{ color: 'var(--text)' }}>Upcoming events?</strong>{' '}
-                          The Open, Masters semis, a Hyrox, a weightlifting competition? Give us a name and date.
+                          The Open, Masters semis, a Hyrox, a weightlifting competition? Tell us what and when.
                         </li>
                         <li style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)' }}>
                           <strong style={{ color: 'var(--text)' }}>Targets?</strong>{' '}
-                          A 2k row PR, a 10k run, a bodyweight target — be specific where you can.
+                          A 2k row PR, a 10k run, a bodyweight target? Be specific where you can.
                         </li>
                         <li style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)' }}>
                           <strong style={{ color: 'var(--text)' }}>Preferences?</strong>{' '}
-                          Love snatching, hate running? Say so.
+                          Love snatching, hate running? Say so — the best program is the one you&apos;re excited to do.
                         </li>
                       </ul>
-                      <p style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 16px' }}>
-                        &ldquo;Get fitter&rdquo; builds a good program.
-                        &ldquo;Masters semis 2027, oly seminar Oct 22, love snatching, hate
-                        running&rdquo; builds <em style={{ color: 'var(--text)' }}>your</em> program.
-                      </p>
                       <button
                         type="button"
                         className="auth-btn"
