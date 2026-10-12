@@ -231,6 +231,20 @@ export default function HomePage({ session }: { session: Session }) {
                       won&apos;t find anywhere else. On AI Programming, your coach reads it too.
                     </div>
                     <button type="button" className="auth-btn" style={{ padding: '6px 14px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} onClick={() => navigate('/athletedata')}>Link my history →</button>
+                    {/* The second door: never-competed users get their own
+                        labeled entrance, landing directly in the workout
+                        explorer (?browse=1), not at a link card that isn't
+                        for them. */}
+                    <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 10 }}>
+                      Never competed?{' '}
+                      <button
+                        type="button"
+                        onClick={() => navigate('/athletedata?browse=1')}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                      >
+                        Browse the workouts and start your record →
+                      </button>
+                    </div>
                   </div>
                 )}
 

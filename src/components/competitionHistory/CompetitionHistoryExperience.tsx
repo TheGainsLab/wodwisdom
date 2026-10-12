@@ -110,6 +110,10 @@ interface Props {
   needsBasics?: boolean;
   initialLinkedId: string | null;
   initialLinkedLabel: string | null;
+  /** Open straight into the workout explorer (the never-competed door —
+   *  Home's "Browse the workouts →" link arrives with ?browse=1). Only
+   *  meaningful for unlinked users; linked users land on their history. */
+  initialBrowse?: boolean;
   /** Called after a successful link/unlink so the host page can refresh. */
   onLinkageChange?: (next: { id: string | null; label: string | null }) => void;
 }
@@ -167,6 +171,7 @@ export default function CompetitionHistoryExperience({
   canLog,
   initialLinkedId,
   initialLinkedLabel,
+  initialBrowse,
   onLinkageChange,
 }: Props) {
   const [mode, setMode] = useState<Mode>(initialLinkedId ? 'linked' : 'unlinked');
@@ -200,12 +205,13 @@ export default function CompetitionHistoryExperience({
   // Linked-state view: tab strip + the Map's scope/filter (lifted here so the
   // Movements / Summary tabs can switch to Map with a movement pre-applied).
   const [tab, setTab] = useState<ExperienceTab>('summary');
-  const [scope, setScope] = useState<Scope>('mine');
+  const [scope, setScope] = useState<Scope>(initialBrowse ? 'all' : 'mine');
   const [filter, setFilter] = useState<Filter>({});
   // Unlinked users (incl. those who never competed, so nothing to link) can
   // still browse the catalog + Try-It workouts. This flips the unlinked view
-  // from the search-to-link flow to the Explorer.
-  const [browseUnlinked, setBrowseUnlinked] = useState(false);
+  // from the search-to-link flow to the Explorer. initialBrowse (Home's
+  // never-competed door, ?browse=1) opens it pre-flipped.
+  const [browseUnlinked, setBrowseUnlinked] = useState(!!initialBrowse);
   const goToMapForMovement = (movement: string) => {
     setScope('mine');
     setFilter({ movement });
