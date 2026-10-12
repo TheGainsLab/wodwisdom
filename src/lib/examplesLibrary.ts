@@ -70,7 +70,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'Evaluation opening verdict',
         title: 'The coach’s read',
         caption:
-          'The Evaluation opens with the big picture.\n\nBefore it gets into the details, it tells you what matters most: where you’re already strong, where the biggest opportunity is, and what should drive the training next.\n\nHere, the verdict is one sentence: pressing is the clearest gap in an otherwise well-rounded profile — a 225 bench and 140 strict press are light next to a 445 deadlift.\n\nIt doesn’t just score the inputs. It interprets them and makes a coaching judgment.',
+          'The Evaluation opens with the big picture.\n\nBefore it gets into the details, it tells you what matters most: where you’re already strong, where the biggest opportunity is, and what should drive the training next.\n\nHere, the verdict is one sentence: pressing is the clearest gap in an otherwise well-rounded profile — light for this athlete’s size next to his pulling and squatting base.\n\nIt doesn’t just score the inputs. It interprets them and makes a coaching judgment.',
       },
       {
         image: '/images/eval-strengths.png',
