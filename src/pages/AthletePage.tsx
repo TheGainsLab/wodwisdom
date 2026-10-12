@@ -2174,7 +2174,7 @@ export default function AthletePage({ session }: { session: Session }) {
                 <TierCard
                   tierNumber={3}
                   title="Make it Personal"
-                  unlocks="Goal, schedule, equipment & anything the AI should know"
+                  unlocks="Goals, schedule, equipment & anything the AI should know"
                   status={savedStatus.tier3}
                   expanded={t3Expanded}
                   onToggle={setT3Expanded}
