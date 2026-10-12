@@ -419,7 +419,7 @@ async function sha256Hex(text: string): Promise<string> {
 // Stored answers under the retired keys are KEPT — they load into intakeAnswers
 // and ride along on every save — we just stop asking new users.
 const INTAKE_QUESTIONS: { key: string; label: string; helper: string }[] = [
-  { key: 'anything_else', label: 'Anything else we should know?', helper: "Competitions or events coming up? Movements you love or can't stand? Training background? Tell us here." },
+  { key: 'anything_else', label: 'Anything else we should know?', helper: "Movements you love or can't stand? Training background? What would you tell your coach at the gym? Tell us here." },
 ];
 
 const LEVEL_LABELS: Record<SkillLevel, string> = {
@@ -2434,12 +2434,17 @@ export default function AthletePage({ session }: { session: Session }) {
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
                         Be specific.
                         {!hasGeneratedProgram && (
-                          <> Competitions or events coming up (with dates), movements you love or
-                          can&apos;t stand, what success looks like in 3 months — it all steers the program.</>
+                          <> A competition or event coming up — name it, with the date. What does
+                          success look like in 3 months?</>
                         )}
+                        {/* Goals only here — preferences (loves/hates, background)
+                            live in the Anything-else box (founder, 2026-10-12:
+                            the required box is for targets; "the AI needs the
+                            goals more than anything else"). */}
                         <span style={{ display: 'block', marginTop: 4, color: 'var(--text-dim)' }}>
                           e.g. &ldquo;Qualify for Masters semis — May 2027&rdquo; &middot; &ldquo;First bar
-                          muscle-up by spring&rdquo; &middot; &ldquo;Sub-20 5k without losing my squat&rdquo;
+                          muscle-up by spring&rdquo; &middot; &ldquo;Sub-20 5k without losing my squat&rdquo; &middot;{' '}
+                          &ldquo;Higher Olympic lifting total&rdquo; — if you&apos;re training for it, tell us!
                         </span>
                       </div>
                       <textarea
