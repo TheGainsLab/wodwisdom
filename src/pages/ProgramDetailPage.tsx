@@ -1646,6 +1646,40 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
   // chevron) for reviewing or amending the log.
   const [logExpanded, setLogExpanded] = useState(false);
 
+  // Warm-up and cool-down are read once per session but take the most
+  // vertical space, so they collapse to a one-line summary. Warm-up opens
+  // expanded (it's the next thing to do when the day opens); cool-down
+  // starts collapsed at the bottom of the page.
+  const collapsible = block.block_type === 'warm-up' || block.block_type === 'cool-down';
+  const [collapsed, setCollapsed] = useState(block.block_type === 'cool-down');
+
+  if (collapsible && collapsed) {
+    const names = block.movements.map((m) => m.movement).filter(Boolean);
+    const summary = names.length
+      ? names.slice(0, 3).join(', ') + (names.length > 3 ? ` +${names.length - 3} more` : '')
+      : (block.block_scheme ?? 'Tap to view');
+    return (
+      <div className="workout-block" data-block={block.block_type}>
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          aria-expanded={false}
+          aria-label={`Show ${displayLabel} block`}
+          style={{ display: 'block', width: '100%', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: 'var(--text)' }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="workout-block-label" data-block={block.block_type} style={{ marginBottom: 0 }}>{displayLabel}</span>
+            {block.block_label && <span style={{ ...labelStyle, opacity: 0.6 }}>{block.block_label}</span>}
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-dim)' }}>▼</span>
+          </span>
+          <span style={{ display: 'block', marginTop: 6, fontSize: 12.5, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {summary}
+          </span>
+        </button>
+      </div>
+    );
+  }
+
   if (isLogged && !logExpanded) {
     return (
       <div className="workout-block" data-block={block.block_type}>
@@ -1716,6 +1750,18 @@ function V3BlockCard({ block, onUpdateMovement, onUpdateBlock, onAddMovement, on
             onClick={() => setLogExpanded(false)}
             aria-label="Collapse logged block"
             style={canEdit ? undefined : { marginLeft: 'auto' }}
+          >
+            ▲
+          </button>
+        )}
+        {collapsible && !isLogged && (
+          <button
+            type="button"
+            className="block-edit-toggle"
+            onClick={() => setCollapsed(true)}
+            aria-expanded={true}
+            aria-label={`Collapse ${displayLabel} block`}
+            style={{ marginLeft: 'auto' }}
           >
             ▲
           </button>
