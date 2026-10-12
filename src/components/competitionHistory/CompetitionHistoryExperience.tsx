@@ -437,6 +437,7 @@ export default function CompetitionHistoryExperience({
   };
 
   return (
+    <>
     <div className="settings-card">
       {/* Up-front heads-up: personalized power + cohort percentiles need Tier-1
           basics, and they're stamped at log time — so prompt BEFORE they log,
@@ -580,32 +581,6 @@ export default function CompetitionHistoryExperience({
           {verifyError && (
             <div style={{ marginTop: 8, fontSize: 13, color: 'var(--danger, #d33)' }}>{verifyError}</div>
           )}
-
-          {/* Never-competed panel (founder, 2026-10-11): its own front door,
-              not a footnote inside the has-a-history card — a no-history
-              visitor used to read "add your competition history", conclude
-              this page wasn't for them, and leave. Every claim is shipped:
-              power via work-calc, placement vs the real field, the
-              completion map. Logging is free for all authenticated users
-              (D5) — no entitlement asterisk. Deliberately NOT "training
-              history": throwbacks land in the competition record on this
-              page, not in the training log. */}
-          <div className="settings-card" style={{ marginTop: 18, textAlign: 'left' }}>
-            <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>
-              <strong style={{ color: 'var(--text)' }}>Never competed? Start your record.</strong>{' '}
-              Browse every workout, try one, and log your score — you&apos;ll see your power
-              output, where you&apos;d have placed against the real field, and a completion
-              map that fills in as you go.
-            </p>
-            <button
-              type="button"
-              className="auth-btn"
-              style={{ maxWidth: 260, padding: '10px 18px', fontSize: 13 }}
-              onClick={() => { setScope('all'); setBrowseUnlinked(true); }}
-            >
-              Browse the workouts →
-            </button>
-          </div>
         </div>
       )}
 
@@ -895,5 +870,32 @@ export default function CompetitionHistoryExperience({
         </div>
       )}
     </div>
+
+    {/* Never-competed panel — a FULLY DISTINCT sibling card, not a subset of
+        the link-your-history panel (founder, 2026-10-12): starting a record
+        is its own journey, not a footnote on someone else's. Every claim is
+        shipped: power via work-calc, placement vs the real field, the
+        completion map. Logging is free for all authenticated users (D5).
+        Deliberately NOT "training history": throwbacks land in the
+        competition record on this page, not the training log. */}
+    {mode === 'unlinked' && !browseUnlinked && (
+      <div className="settings-card" style={{ marginTop: 16, textAlign: 'left' }}>
+        <p className="athlete-card-subtitle" style={{ marginBottom: 12 }}>
+          <strong style={{ color: 'var(--text)' }}>Never competed? Start your record.</strong>{' '}
+          Browse every workout, try one, and log your score — you&apos;ll see your power
+          output, where you&apos;d have placed against the real field, and a completion
+          map that fills in as you go.
+        </p>
+        <button
+          type="button"
+          className="auth-btn"
+          style={{ maxWidth: 260, padding: '10px 18px', fontSize: 13 }}
+          onClick={() => { setScope('all'); setBrowseUnlinked(true); }}
+        >
+          Browse the workouts →
+        </button>
+      </div>
+    )}
+    </>
   );
 }

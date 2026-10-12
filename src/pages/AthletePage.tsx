@@ -419,7 +419,7 @@ async function sha256Hex(text: string): Promise<string> {
 // Stored answers under the retired keys are KEPT — they load into intakeAnswers
 // and ride along on every save — we just stop asking new users.
 const INTAKE_QUESTIONS: { key: string; label: string; helper: string }[] = [
-  { key: 'anything_else', label: 'Anything else we should know?', helper: "Competitions or events coming up? Movements you love or can't stand? Training background? Tell us here." },
+  { key: 'anything_else', label: 'Anything else we should know?', helper: "Movements you love or can't stand? Training background? What would you tell your coach at the gym? Tell us here." },
 ];
 
 const LEVEL_LABELS: Record<SkillLevel, string> = {
@@ -2174,7 +2174,7 @@ export default function AthletePage({ session }: { session: Session }) {
                 <TierCard
                   tierNumber={3}
                   title="Make it Personal"
-                  unlocks="Goal, schedule, equipment & anything the AI should know"
+                  unlocks="Goals, schedule, equipment & anything the AI should know"
                   status={savedStatus.tier3}
                   expanded={t3Expanded}
                   onToggle={setT3Expanded}
@@ -2300,7 +2300,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         onChange={e => { setDaysPerWeek(e.target.value); markDirty(); }}
                         style={{ width: 92, textAlign: 'center', fontSize: 18, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
                       />
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>2–6 days. Your program is built to fit — no filler days.</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>2–6 days. Your program is built to fit.</span>
                     </div>
 
                     {/* Session time budget (reinstated 2026-08-31, reversing the
@@ -2434,12 +2434,17 @@ export default function AthletePage({ session }: { session: Session }) {
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
                         Be specific.
                         {!hasGeneratedProgram && (
-                          <> Competitions or events coming up (with dates), movements you love or
-                          can&apos;t stand, what success looks like in 3 months — it all steers the program.</>
+                          <> A competition or event coming up — name it, with the date. What does
+                          success look like in 3 months?</>
                         )}
+                        {/* Goals only here — preferences (loves/hates, background)
+                            live in the Anything-else box (founder, 2026-10-12:
+                            the required box is for targets; "the AI needs the
+                            goals more than anything else"). */}
                         <span style={{ display: 'block', marginTop: 4, color: 'var(--text-dim)' }}>
                           e.g. &ldquo;Qualify for Masters semis — May 2027&rdquo; &middot; &ldquo;First bar
-                          muscle-up by spring&rdquo; &middot; &ldquo;Sub-20 5k without losing my squat&rdquo;
+                          muscle-up by spring&rdquo; &middot; &ldquo;Sub-20 5k without losing my squat&rdquo; &middot;{' '}
+                          &ldquo;Higher Olympic lifting total&rdquo; — if you&apos;re training for it, tell us!
                         </span>
                       </div>
                       <textarea
@@ -2605,15 +2610,26 @@ export default function AthletePage({ session }: { session: Session }) {
                       <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                         {competitionAthleteId
                           ? 'Your Open / Quarterfinals / Games history, a completion map, and throwbacks.'
-                          : 'Import your history for a free year-by-year analysis. No history? Start one.'}
+                          : 'Link your history for a free year-by-year analysis.'}
                       </div>
+                      {/* Second door, same vocabulary as Home's card: the
+                          never-competed path lands in the workout explorer. */}
+                      {!competitionAthleteId && (
+                        <button
+                          type="button"
+                          onClick={() => navigate('/athletedata?browse=1')}
+                          style={{ background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0, marginTop: 4, textAlign: 'left' }}
+                        >
+                          Never competed? Start your record →
+                        </button>
+                      )}
                     </div>
                     <button
                       type="button"
                       style={{ flex: 'none', background: 'none', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 999, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
                       onClick={() => navigate('/athletedata')}
                     >
-                      {competitionAthleteId ? 'View history →' : 'Import my history →'}
+                      {competitionAthleteId ? 'View history →' : 'Link my history →'}
                     </button>
                   </div>
                 )}

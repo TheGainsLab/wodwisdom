@@ -93,7 +93,7 @@ export default function HomePage({ session }: { session: Session }) {
       // generated. Product named in the kicker, outcome named on the button,
       // the real section and steps in between (founder, 2026-10-11 — the old
       // "fun part / tell the coach" copy sold a chat that isn't there).
-      return { title: "Let's build it", body: "Click below and tell us about your schedule, goals, and equipment — then hit Generate.", cta: 'Build my program', to: '/profile' };
+      return { kicker: 'AI Programming', title: "Let's build it", body: "Click below and tell us about your schedule, goals, and equipment — then hit Generate.", cta: 'Build my program', to: '/profile' };
     }
     if (hasProgram) {
       return { title: "Today's training", body: 'Pick up your program — view your calendar, start a session, and log your results.', cta: 'Open My Programs', to: '/programs' };
