@@ -93,7 +93,7 @@ export default function HomePage({ session }: { session: Session }) {
       // generated. Product named in the kicker, outcome named on the button,
       // the real section and steps in between (founder, 2026-10-11 — the old
       // "fun part / tell the coach" copy sold a chat that isn't there).
-      return { kicker: 'AI Programming', title: "Your program is paid for — let's build it.", body: "Click below and tell us about your schedule, goals, and equipment — then hit Generate.", cta: 'Build my program', to: '/profile' };
+      return { title: "Let's build it", body: "Click below and tell us about your schedule, goals, and equipment — then hit Generate.", cta: 'Build my program', to: '/profile' };
     }
     if (hasProgram) {
       return { title: "Today's training", body: 'Pick up your program — view your calendar, start a session, and log your results.', cta: 'Open My Programs', to: '/programs' };
@@ -231,6 +231,20 @@ export default function HomePage({ session }: { session: Session }) {
                       won&apos;t find anywhere else. On AI Programming, your coach reads it too.
                     </div>
                     <button type="button" className="auth-btn" style={{ padding: '6px 14px', fontSize: 12, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} onClick={() => navigate('/athletedata')}>Link my history →</button>
+                    {/* The second door: never-competed users get their own
+                        labeled entrance, landing directly in the workout
+                        explorer (?browse=1), not at a link card that isn't
+                        for them. */}
+                    <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 10 }}>
+                      Never competed?{' '}
+                      <button
+                        type="button"
+                        onClick={() => navigate('/athletedata?browse=1')}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent)', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                      >
+                        Browse the workouts and start your record →
+                      </button>
+                    </div>
                   </div>
                 )}
 

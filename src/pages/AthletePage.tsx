@@ -2271,7 +2271,10 @@ export default function AthletePage({ session }: { session: Session }) {
                     >
                       <div>
                         <div style={{ ...CTA_KICKER, marginBottom: 4 }}>Your Schedule</div>
-                        {daysPerWeek ? (
+                        {/* Status line is the CLOSED state's summary — an open
+                            card shows its content, not a duplicate headline
+                            (founder, 2026-10-12: "says it twice"). */}
+                        {!schedExpanded && (daysPerWeek ? (
                           <div style={{ fontSize: 14, color: '#2ec486', fontWeight: 600 }}>
                             ✓ {daysPerWeek} days · {sessionLengthMinutes || '60'} min
                           </div>
@@ -2279,7 +2282,7 @@ export default function AthletePage({ session }: { session: Session }) {
                           <div style={{ fontSize: 14, color: 'var(--text-dim)', fontWeight: 600 }}>
                             Days per week and session length
                           </div>
-                        )}
+                        ))}
                       </div>
                       <span style={{ fontSize: 14, color: 'var(--text-dim)', flex: 'none' }}>{schedExpanded ? '▲' : '▼'}</span>
                     </button>
@@ -2340,13 +2343,13 @@ export default function AthletePage({ session }: { session: Session }) {
                     >
                       <div>
                         <div style={{ ...CTA_KICKER, marginBottom: 4 }}>Your Equipment</div>
-                        {equipmentReviewed ? (
+                        {!equipExpanded && (equipmentReviewed ? (
                           <div style={{ fontSize: 14, color: '#2ec486', fontWeight: 600 }}>✓ Equipment reviewed</div>
                         ) : (
                           <div style={{ fontSize: 14, color: 'var(--text-dim)', fontWeight: 600 }}>
                             Uncheck anything you don&apos;t have
                           </div>
-                        )}
+                        ))}
                       </div>
                       <span style={{ fontSize: 14, color: 'var(--text-dim)', flex: 'none' }}>{equipExpanded ? '▲' : '▼'}</span>
                     </button>
@@ -2411,13 +2414,13 @@ export default function AthletePage({ session }: { session: Session }) {
                     >
                       <div>
                         <div style={{ ...CTA_KICKER, marginBottom: 4 }}>Your Goals</div>
-                        {goal.trim() ? (
+                        {!coachExpanded && (goal.trim() ? (
                           <div style={{ fontSize: 14, color: '#2ec486', fontWeight: 600 }}>✓ Goal set</div>
                         ) : (
                           <div style={{ fontSize: 14, color: 'var(--text-dim)', fontWeight: 600 }}>
                             Tell us what you&apos;re working toward
                           </div>
-                        )}
+                        ))}
                       </div>
                       <span style={{ fontSize: 14, color: 'var(--text-dim)', flex: 'none' }}>{coachExpanded ? '▲' : '▼'}</span>
                     </button>

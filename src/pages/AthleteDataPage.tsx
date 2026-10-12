@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useEntitlements } from '../hooks/useEntitlements';
@@ -29,6 +29,10 @@ interface Linkage {
 
 export default function AthleteDataPage({ session }: { session: Session }) {
   const navigate = useNavigate();
+  // ?browse=1 — Home's never-competed door: open straight into the workout
+  // explorer instead of the link-your-history card.
+  const [searchParams] = useSearchParams();
+  const initialBrowse = searchParams.get('browse') === '1';
   const { isAdmin, loading: entLoading } = useEntitlements(session.user.id);
   const [navOpen, setNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -105,6 +109,7 @@ export default function AthleteDataPage({ session }: { session: Session }) {
                 canLog={canLog}
                 initialLinkedId={linkage.id}
                 initialLinkedLabel={linkage.label}
+                initialBrowse={initialBrowse}
                 onLinkageChange={setLinkage}
               />
               {/* Same quiet escape hatch as the profile page — on desktop
