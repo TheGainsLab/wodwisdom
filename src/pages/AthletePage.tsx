@@ -755,6 +755,7 @@ export default function AthletePage({ session }: { session: Session }) {
   const [goal, setGoal] = useState<string>('');
   // Tier 3 card chrome: equipment collapse + which text box has focus (drives
   // the show-on-focus char counters).
+  const [schedExpanded, setSchedExpanded] = useState(false);
   const [equipExpanded, setEquipExpanded] = useState(false);
   const [coachExpanded, setCoachExpanded] = useState(false);
   const [t3FocusedBox, setT3FocusedBox] = useState<string | null>(null);
@@ -2256,10 +2257,33 @@ export default function AthletePage({ session }: { session: Session }) {
                       Tier-3 intro above now does the orientation once, at the
                       right moment — repeating it on every visit was noise.
                       The locked-state lockPitch (non-subscribers) stays. */}
-                  {/* Card 1 — YOUR SCHEDULE (session length dropped Aug '26 — no
-                      longer required for T3; stored values still feed the writer) */}
+                  {/* Card 1 — YOUR SCHEDULE. Collapsible like its siblings
+                      (founder, 2026-10-12: all three cards arrive collapsed —
+                      a checklist of three quiet rows, grey prompt → green ✓).
+                      The done line echoes the saved answer so a returning
+                      athlete reads it without opening. */}
                   <div className="settings-card" style={T3_CARD}>
-                    <div style={CTA_KICKER}>Your Schedule</div>
+                    <button
+                      type="button"
+                      onClick={() => setSchedExpanded(v => !v)}
+                      aria-expanded={schedExpanded}
+                      style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 0, margin: 0, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+                    >
+                      <div>
+                        <div style={{ ...CTA_KICKER, marginBottom: 4 }}>Your Schedule</div>
+                        {daysPerWeek ? (
+                          <div style={{ fontSize: 14, color: '#2ec486', fontWeight: 600 }}>
+                            ✓ {daysPerWeek} days · {sessionLengthMinutes || '60'} min
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 14, color: 'var(--text-dim)', fontWeight: 600 }}>
+                            Days per week and session length
+                          </div>
+                        )}
+                      </div>
+                      <span style={{ fontSize: 14, color: 'var(--text-dim)', flex: 'none' }}>{schedExpanded ? '▲' : '▼'}</span>
+                    </button>
+                    {schedExpanded && (<div style={{ marginTop: 16 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>How many days a week can you train?</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                       <input
@@ -2297,12 +2321,16 @@ export default function AthletePage({ session }: { session: Session }) {
                         {sessionLengthMinutes ? `${sessionLengthMinutes} min` : '60 min — default'}
                       </span>
                     </div>
+                    </div>)}
                   </div>
 
                   {/* Card 2 — YOUR EQUIPMENT: a required one-time review. The
                       record persists empty until the athlete saves it, which
                       keeps T3 incomplete — no programs against equipment
-                      nobody confirmed. Header: amber demand → green done. */}
+                      nobody confirmed. Header: grey prompt → green done (the
+                      amber demand went 2026-10-12 — required-ness is already
+                      enforced by the step badge and the Generate gate, and
+                      three matching rows read as the checklist they are). */}
                   <div className="settings-card" style={{ ...T3_CARD, marginTop: 16 }}>
                     <button
                       type="button"
@@ -2315,9 +2343,8 @@ export default function AthletePage({ session }: { session: Session }) {
                         {equipmentReviewed ? (
                           <div style={{ fontSize: 14, color: '#2ec486', fontWeight: 600 }}>✓ Equipment reviewed</div>
                         ) : (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: 'var(--warning, #f39c12)', fontWeight: 600 }}>
-                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--warning, #f39c12)', flex: 'none' }} />
-                            Equipment review required
+                          <div style={{ fontSize: 14, color: 'var(--text-dim)', fontWeight: 600 }}>
+                            Uncheck anything you don&apos;t have
                           </div>
                         )}
                       </div>
@@ -2388,7 +2415,7 @@ export default function AthletePage({ session }: { session: Session }) {
                           <div style={{ fontSize: 14, color: '#2ec486', fontWeight: 600 }}>✓ Goal set</div>
                         ) : (
                           <div style={{ fontSize: 14, color: 'var(--text-dim)', fontWeight: 600 }}>
-                            Share anything you can
+                            Tell us what you&apos;re working toward
                           </div>
                         )}
                       </div>
