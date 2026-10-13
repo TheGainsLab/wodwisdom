@@ -706,7 +706,6 @@ export default function AthletePage({ session }: { session: Session }) {
   // DB, or saved this session). Drives the amber "review required" → green
   // "reviewed" header on the equipment card.
   const [equipmentReviewed, setEquipmentReviewed] = useState(false);
-  const [equipSaved, setEquipSaved] = useState(false);
   const [skills, setSkills] = useState<Record<string, SkillLevel>>({});
   const [conditioning, setConditioning] = useState<Record<string, string | number>>({});
   const [loading, setLoading] = useState(true);
@@ -775,8 +774,15 @@ export default function AthletePage({ session }: { session: Session }) {
   const [injuryMigrationPrompt, setInjuryMigrationPrompt] = useState(false);
   // Qualitative coaching intake (free-text / voice) — its own save (LLM extract).
   const [intakeAnswers, setIntakeAnswers] = useState<Record<string, string>>({});
+  // Step 3 saved-state mirrors: the collapsed card summaries flip green only
+  // when the typed values match these — green means SAVED, not touched (the
+  // premature-✓ fix, 2026-10-13).
+  const [savedSched, setSavedSched] = useState<{ days: string; len: string }>({ days: '', len: '' });
+  const [savedGoal, setSavedGoal] = useState('');
+  // Persisted intake snapshot (JSON) — intake saves via saveIntake, not
+  // saveProfile, so the draft logic needs its own clean/dirty reference.
+  const loadedIntakeRef = useRef<string>('{}');
   const [intakeSaving, setIntakeSaving] = useState(false);
-  const [intakeSaved, setIntakeSaved] = useState(false);
   const [intakeError, setIntakeError] = useState('');
 
   const navigate = useNavigate();
@@ -970,6 +976,11 @@ export default function AthletePage({ session }: { session: Session }) {
         // the field reads "leave blank if none" consistently on reload.
         setInjuriesConstraints(d.injuries_constraints && d.injuries_constraints !== 'None' ? d.injuries_constraints : '');
         setGoal(d.goal || '');
+        setSavedSched({
+          days: d.days_per_week != null ? String(d.days_per_week) : '',
+          len: d.session_length_minutes != null ? String(d.session_length_minutes) : '',
+        });
+        setSavedGoal(d.goal || '');
         // Existing-user migration show-back (handoff 1.5 / T6): an athlete with
         // non-empty injuries text but no VALID confirmation (missing, or confirmed
         // against older text) is proactively prompted to sign off — BEFORE the
@@ -1002,7 +1013,37 @@ export default function AthletePage({ session }: { session: Session }) {
         {
           const raw = (d as { coaching_intake_raw?: Record<string, string> | null }).coaching_intake_raw;
           if (raw && typeof raw === 'object') setIntakeAnswers(raw);
+          loadedIntakeRef.current = JSON.stringify(raw && typeof raw === 'object' ? raw : {});
         }
+        // Draft restore: unsaved Step 3 edits survive in-app navigation (the
+        // vanished-goal incident, 2026-10-13). Apply only fields that differ
+        // from the server copy; marking dirty re-raises the floating pill so
+        // the save that clears the draft gets prompted.
+        try {
+          const rawDraft = localStorage.getItem(`t3draft:${session.user.id}`);
+          if (rawDraft) {
+            const dr = JSON.parse(rawDraft) as Partial<{
+              days: string; len: string; goal: string; injuries: string;
+              intake: Record<string, string>; equipment: Record<string, boolean>;
+            }>;
+            const loadedDays = d.days_per_week != null ? String(d.days_per_week) : '';
+            const loadedLen = d.session_length_minutes != null ? String(d.session_length_minutes) : '';
+            const loadedGoal = d.goal || '';
+            const loadedInj = d.injuries_constraints && d.injuries_constraints !== 'None' ? d.injuries_constraints : '';
+            let dirtied = false;
+            if (typeof dr.days === 'string' && dr.days !== loadedDays) { setDaysPerWeek(dr.days); dirtied = true; }
+            if (typeof dr.len === 'string' && dr.len !== loadedLen) { setSessionLengthMinutes(dr.len); dirtied = true; }
+            if (typeof dr.goal === 'string' && dr.goal !== loadedGoal) { setGoal(dr.goal); dirtied = true; }
+            if (typeof dr.injuries === 'string' && dr.injuries !== loadedInj) { setInjuriesConstraints(dr.injuries); dirtied = true; }
+            if (dr.equipment && typeof dr.equipment === 'object' && JSON.stringify(dr.equipment) !== JSON.stringify(d.equipment ?? {})) {
+              setEquipment(dr.equipment); dirtied = true;
+            }
+            if (dr.intake && typeof dr.intake === 'object' && JSON.stringify(dr.intake) !== loadedIntakeRef.current) {
+              setIntakeAnswers(dr.intake);
+            }
+            if (dirtied) markDirty();
+          }
+        } catch { /* storage unavailable or corrupt draft — drafts are best-effort */ }
         setEvalCreditsRemaining(typeof d.eval_credits_remaining === 'number' ? d.eval_credits_remaining : 1);
         setCompetitionAthleteId((d as any).competition_athlete_id ?? null);
         setCompetitionAthleteLabel((d as any).competition_athlete_label ?? null);
@@ -1036,6 +1077,29 @@ export default function AthletePage({ session }: { session: Session }) {
   const interactedRef = useRef(false);
   const markDirty = () => { interactedRef.current = true; setIsDirty(true); };
 
+  // A pending avoidance sign-off must never hide inside a collapsed goals
+  // card — the parse lands after the save that collapsed it, so reopen.
+  useEffect(() => {
+    if (injuryShowback) setCoachExpanded(true);
+  }, [injuryShowback]);
+
+  // Step 3 drafts: mirror unsaved edits to localStorage so in-app navigation
+  // can't eat typed work. A draft lives only between an edit and the save
+  // that clears it. Intake answers persist via saveIntake (not saveProfile),
+  // so they carry their own dirty check against the loaded snapshot.
+  useEffect(() => {
+    if (loading) return;
+    const key = `t3draft:${session.user.id}`;
+    const intakeDirty = JSON.stringify(intakeAnswers) !== loadedIntakeRef.current;
+    try {
+      if (!isDirty && !intakeDirty) { localStorage.removeItem(key); return; }
+      localStorage.setItem(key, JSON.stringify({
+        days: daysPerWeek, len: sessionLengthMinutes, goal,
+        injuries: injuriesConstraints, intake: intakeAnswers, equipment,
+      }));
+    } catch { /* storage unavailable — drafts are best-effort */ }
+  }, [loading, isDirty, daysPerWeek, sessionLengthMinutes, goal, injuriesConstraints, intakeAnswers, equipment, session.user.id]);
+
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isDirty && interactedRef.current && !saving) {
@@ -1052,7 +1116,7 @@ export default function AthletePage({ session }: { session: Session }) {
   // answers, LLM-extracts the structured coaching_intake (a short LLM call).
   // Goals/injuries alone save without touching the extractor (no NO_ANSWERS).
   const saveIntake = async () => {
-    setIntakeSaving(true); setIntakeError(''); setIntakeSaved(false);
+    setIntakeSaving(true); setIntakeError('');
     try {
       const savedOk = await saveProfile();
       if (!savedOk) throw new Error('Failed to save your profile');
@@ -1064,7 +1128,10 @@ export default function AthletePage({ session }: { session: Session }) {
         const errMsg = (data as { error?: string } | null)?.error;
         if (error || errMsg) throw new Error(errMsg || error?.message || 'Failed to analyze your answers');
       }
-      setIntakeSaved(true);
+      loadedIntakeRef.current = JSON.stringify(intakeAnswers);
+      // Save collapses the card to its green summary; if the injury parse
+      // comes back needing a sign-off, the show-back effect reopens it.
+      setCoachExpanded(false);
     } catch (e) {
       setIntakeError(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
@@ -1356,6 +1423,10 @@ export default function AthletePage({ session }: { session: Session }) {
     // flow by unmounting the component mid-click.
     if (isNewUser) setIsNewUser(false);
     setIsDirty(false);
+    // Saved-state mirrors: what was just persisted is what the collapsed
+    // Step 3 summaries may now show green.
+    setSavedSched({ days: daysPerWeek, len: sessionLengthMinutes });
+    setSavedGoal(goal);
     // Step 2 completes only via a review save — a plain save leaves the
     // stamp (and the tier state) exactly as it was.
     if (reviewedAtIso) setAthleticReviewedAt(reviewedAtIso);
@@ -2276,15 +2347,20 @@ export default function AthletePage({ session }: { session: Session }) {
                         {/* Status line is the CLOSED state's summary — an open
                             card shows its content, not a duplicate headline
                             (founder, 2026-10-12: "says it twice"). */}
-                        {!schedExpanded && (daysPerWeek ? (
-                          <div style={{ fontSize: 14, color: '#2ec486', fontWeight: 600 }}>
-                            ✓ {daysPerWeek} days · {sessionLengthMinutes || '60'} min
-                          </div>
-                        ) : (
-                          <div style={{ fontSize: 14, color: 'var(--text-dim)', fontWeight: 600 }}>
-                            Days per week and session length
-                          </div>
-                        ))}
+                        {/* Green only when the typed values are the SAVED values —
+                            a touched-but-unsaved card says so (2026-10-13). */}
+                        {!schedExpanded && (() => {
+                          const inSync = savedSched.days !== '' && savedSched.days === daysPerWeek && savedSched.len === sessionLengthMinutes;
+                          return daysPerWeek ? (
+                            <div style={{ fontSize: 14, color: inSync ? '#2ec486' : 'var(--text-dim)', fontWeight: 600 }}>
+                              {inSync ? '✓ ' : ''}{daysPerWeek} days · {sessionLengthMinutes || '60'} min{inSync ? '' : ' — unsaved'}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 14, color: 'var(--text-dim)', fontWeight: 600 }}>
+                              Days per week and session length
+                            </div>
+                          );
+                        })()}
                       </div>
                       <span style={{ fontSize: 14, color: 'var(--text-dim)', flex: 'none' }}>{schedExpanded ? '▲' : '▼'}</span>
                     </button>
@@ -2326,6 +2402,15 @@ export default function AthletePage({ session }: { session: Session }) {
                         {sessionLengthMinutes ? `${sessionLengthMinutes} min` : '60 min — default'}
                       </span>
                     </div>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      disabled={saving}
+                      onClick={async () => { const ok = await saveProfile(); if (ok) setSchedExpanded(false); }}
+                      style={{ marginTop: 16, padding: '8px 16px', fontSize: 13 }}
+                    >
+                      {saving ? 'Saving…' : 'Save'}
+                    </button>
                     </div>)}
                   </div>
 
@@ -2377,7 +2462,6 @@ export default function AthletePage({ session }: { session: Session }) {
                                       // save never persists a partial (= lying) record.
                                       setEquipment(prev => ({ ...materializeEquipment(prev), [item.key]: e.target.checked }));
                                       markDirty();
-                                      setEquipSaved(false);
                                     }}
                                     style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer' }}
                                   />
@@ -2394,11 +2478,11 @@ export default function AthletePage({ session }: { session: Session }) {
                             const full = materializeEquipment(equipment);
                             setEquipment(full);
                             const ok = await saveProfile({ equipment: full });
-                            if (ok) setEquipSaved(true);
+                            if (ok) setEquipExpanded(false);
                           }}
-                          style={{ padding: '8px 16px', fontSize: 13, ...(equipSaved && !saving ? { background: '#2ec486', color: 'white' } : {}) }}
+                          style={{ padding: '8px 16px', fontSize: 13 }}
                         >
-                          {saving ? 'Saving…' : equipSaved ? 'Saved ✓' : 'Save Equipment'}
+                          {saving ? 'Saving…' : 'Save'}
                         </button>
                       </div>
                     )}
@@ -2416,13 +2500,18 @@ export default function AthletePage({ session }: { session: Session }) {
                     >
                       <div>
                         <div style={{ ...CTA_KICKER, marginBottom: 4 }}>Your Goals</div>
-                        {!coachExpanded && (goal.trim() ? (
-                          <div style={{ fontSize: 14, color: '#2ec486', fontWeight: 600 }}>✓ Goal set</div>
-                        ) : (
-                          <div style={{ fontSize: 14, color: 'var(--text-dim)', fontWeight: 600 }}>
-                            Tell us what you&apos;re working toward
-                          </div>
-                        ))}
+                        {!coachExpanded && (() => {
+                          const inSync = savedGoal.trim() !== '' && savedGoal === goal;
+                          return goal.trim() ? (
+                            <div style={{ fontSize: 14, color: inSync ? '#2ec486' : 'var(--text-dim)', fontWeight: 600 }}>
+                              {inSync ? '✓ Goal set' : 'Goal entered — unsaved'}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 14, color: 'var(--text-dim)', fontWeight: 600 }}>
+                              Tell us what you&apos;re working toward
+                            </div>
+                          );
+                        })()}
                       </div>
                       <span style={{ fontSize: 14, color: 'var(--text-dim)', flex: 'none' }}>{coachExpanded ? '▲' : '▼'}</span>
                     </button>
@@ -2454,7 +2543,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         rows={3}
                         maxLength={500}
                         value={goal}
-                        onChange={e => { setGoal(e.target.value); markDirty(); setIntakeSaved(false); }}
+                        onChange={e => { setGoal(e.target.value); markDirty(); }}
                         onFocus={() => setT3FocusedBox('goal')}
                         onBlur={() => setT3FocusedBox(f => (f === 'goal' ? null : f))}
                         style={{
@@ -2486,7 +2575,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         rows={2}
                         maxLength={500}
                         value={injuriesConstraints}
-                        onChange={e => { setInjuriesConstraints(e.target.value); markDirty(); setIntakeSaved(false); }}
+                        onChange={e => { setInjuriesConstraints(e.target.value); markDirty(); }}
                         onFocus={() => setT3FocusedBox('injuries')}
                         onBlur={() => setT3FocusedBox(f => (f === 'injuries' ? null : f))}
                         style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
@@ -2557,7 +2646,7 @@ export default function AthletePage({ session }: { session: Session }) {
                           disabled={injuryConfirmSaving}
                           style={{ padding: '8px 16px', fontSize: 13, background: '#2ec486', color: 'white' }}
                         >
-                          {injuryConfirmSaving ? 'Confirming…' : 'Confirm these avoidances'}
+                          {injuryConfirmSaving ? 'Confirming…' : 'Confirm'}
                         </button>
                       </div>
                     )}
@@ -2573,7 +2662,7 @@ export default function AthletePage({ session }: { session: Session }) {
                           rows={2}
                           maxLength={500}
                           value={intakeAnswers[q.key] ?? ''}
-                          onChange={e => { setIntakeAnswers(prev => ({ ...prev, [q.key]: e.target.value })); setIntakeSaved(false); }}
+                          onChange={e => { setIntakeAnswers(prev => ({ ...prev, [q.key]: e.target.value })); }}
                           onFocus={() => setT3FocusedBox(q.key)}
                           onBlur={() => setT3FocusedBox(f => (f === q.key ? null : f))}
                           style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
@@ -2583,6 +2672,9 @@ export default function AthletePage({ session }: { session: Session }) {
                         </div>
                       </div>
                     ))}
+                    {/* The card's save (founder, 2026-10-13: one save per
+                        stage, labeled plainly). Full profile save + intake
+                        extraction; success collapses the card. */}
                     <button
                       type="button"
                       className="auth-btn"
@@ -2590,7 +2682,7 @@ export default function AthletePage({ session }: { session: Session }) {
                       disabled={intakeSaving}
                       style={{ padding: '8px 16px', fontSize: 13 }}
                     >
-                      {intakeSaving ? 'Saving…' : intakeSaved ? 'Saved ✓' : 'Save & analyze'}
+                      {intakeSaving ? 'Saving…' : 'Save'}
                     </button>
                     {intakeError && <div className="auth-error" style={{ display: 'block', marginTop: 12 }}>{intakeError}</div>}
                     </div>)}
