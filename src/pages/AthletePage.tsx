@@ -706,11 +706,6 @@ export default function AthletePage({ session }: { session: Session }) {
   // DB, or saved this session). Drives the amber "review required" → green
   // "reviewed" header on the equipment card.
   const [equipmentReviewed, setEquipmentReviewed] = useState(false);
-  // True once the athlete has opened the equipment card (or touched a box)
-  // this session — the "I looked at the list" signal. A save then persists
-  // the FULL materialized map, completing the one-time equipment review the
-  // old per-card Save Equipment button used to perform.
-  const equipTouchedRef = useRef(false);
   const [skills, setSkills] = useState<Record<string, SkillLevel>>({});
   const [conditioning, setConditioning] = useState<Record<string, string | number>>({});
   const [loading, setLoading] = useState(true);
@@ -788,7 +783,6 @@ export default function AthletePage({ session }: { session: Session }) {
   // saveProfile, so the draft logic needs its own clean/dirty reference.
   const loadedIntakeRef = useRef<string>('{}');
   const [intakeSaving, setIntakeSaving] = useState(false);
-  const [intakeSaved, setIntakeSaved] = useState(false);
   const [intakeError, setIntakeError] = useState('');
 
   const navigate = useNavigate();
@@ -1083,6 +1077,12 @@ export default function AthletePage({ session }: { session: Session }) {
   const interactedRef = useRef(false);
   const markDirty = () => { interactedRef.current = true; setIsDirty(true); };
 
+  // A pending avoidance sign-off must never hide inside a collapsed goals
+  // card — the parse lands after the save that collapsed it, so reopen.
+  useEffect(() => {
+    if (injuryShowback) setCoachExpanded(true);
+  }, [injuryShowback]);
+
   // Step 3 drafts: mirror unsaved edits to localStorage so in-app navigation
   // can't eat typed work. A draft lives only between an edit and the save
   // that clears it. Intake answers persist via saveIntake (not saveProfile),
@@ -1116,7 +1116,7 @@ export default function AthletePage({ session }: { session: Session }) {
   // answers, LLM-extracts the structured coaching_intake (a short LLM call).
   // Goals/injuries alone save without touching the extractor (no NO_ANSWERS).
   const saveIntake = async () => {
-    setIntakeSaving(true); setIntakeError(''); setIntakeSaved(false);
+    setIntakeSaving(true); setIntakeError('');
     try {
       const savedOk = await saveProfile();
       if (!savedOk) throw new Error('Failed to save your profile');
@@ -1129,7 +1129,9 @@ export default function AthletePage({ session }: { session: Session }) {
         if (error || errMsg) throw new Error(errMsg || error?.message || 'Failed to analyze your answers');
       }
       loadedIntakeRef.current = JSON.stringify(intakeAnswers);
-      setIntakeSaved(true);
+      // Save collapses the card to its green summary; if the injury parse
+      // comes back needing a sign-off, the show-back effect reopens it.
+      setCoachExpanded(false);
     } catch (e) {
       setIntakeError(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
@@ -1363,7 +1365,7 @@ export default function AthletePage({ session }: { session: Session }) {
       // Untouched equipment saves as {} — the review stays pending. The record
       // only becomes non-empty via checkbox interaction or Save Equipment
       // (both materialize the FULL key map first, never a partial one).
-      equipment: overrides?.equipment ?? (equipTouchedRef.current ? materializeEquipment(equipment) : equipment),
+      equipment: overrides?.equipment ?? equipment,
       skills: filledSkills,
       conditioning: cleanConditioning,
       athletic_reviewed_at: reviewedAtIso,
@@ -2400,6 +2402,15 @@ export default function AthletePage({ session }: { session: Session }) {
                         {sessionLengthMinutes ? `${sessionLengthMinutes} min` : '60 min — default'}
                       </span>
                     </div>
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      disabled={saving}
+                      onClick={async () => { const ok = await saveProfile(); if (ok) setSchedExpanded(false); }}
+                      style={{ marginTop: 16, padding: '8px 16px', fontSize: 13 }}
+                    >
+                      {saving ? 'Saving…' : 'Save'}
+                    </button>
                     </div>)}
                   </div>
 
@@ -2413,7 +2424,7 @@ export default function AthletePage({ session }: { session: Session }) {
                   <div className="settings-card" style={{ ...T3_CARD, marginTop: 16 }}>
                     <button
                       type="button"
-                      onClick={() => { equipTouchedRef.current = true; setEquipExpanded(v => !v); }}
+                      onClick={() => setEquipExpanded(v => !v)}
                       aria-expanded={equipExpanded}
                       style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 0, margin: 0, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
                     >
@@ -2459,6 +2470,20 @@ export default function AthletePage({ session }: { session: Session }) {
                             </div>
                           </div>
                         ))}
+                        <button
+                          type="button"
+                          className="auth-btn"
+                          disabled={saving}
+                          onClick={async () => {
+                            const full = materializeEquipment(equipment);
+                            setEquipment(full);
+                            const ok = await saveProfile({ equipment: full });
+                            if (ok) setEquipExpanded(false);
+                          }}
+                          style={{ padding: '8px 16px', fontSize: 13 }}
+                        >
+                          {saving ? 'Saving…' : 'Save'}
+                        </button>
                       </div>
                     )}
                   </div>
@@ -2518,7 +2543,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         rows={3}
                         maxLength={500}
                         value={goal}
-                        onChange={e => { setGoal(e.target.value); markDirty(); setIntakeSaved(false); }}
+                        onChange={e => { setGoal(e.target.value); markDirty(); }}
                         onFocus={() => setT3FocusedBox('goal')}
                         onBlur={() => setT3FocusedBox(f => (f === 'goal' ? null : f))}
                         style={{
@@ -2550,7 +2575,7 @@ export default function AthletePage({ session }: { session: Session }) {
                         rows={2}
                         maxLength={500}
                         value={injuriesConstraints}
-                        onChange={e => { setInjuriesConstraints(e.target.value); markDirty(); setIntakeSaved(false); }}
+                        onChange={e => { setInjuriesConstraints(e.target.value); markDirty(); }}
                         onFocus={() => setT3FocusedBox('injuries')}
                         onBlur={() => setT3FocusedBox(f => (f === 'injuries' ? null : f))}
                         style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
@@ -2621,7 +2646,7 @@ export default function AthletePage({ session }: { session: Session }) {
                           disabled={injuryConfirmSaving}
                           style={{ padding: '8px 16px', fontSize: 13, background: '#2ec486', color: 'white' }}
                         >
-                          {injuryConfirmSaving ? 'Confirming…' : 'Confirm these avoidances'}
+                          {injuryConfirmSaving ? 'Confirming…' : 'Confirm'}
                         </button>
                       </div>
                     )}
@@ -2637,7 +2662,7 @@ export default function AthletePage({ session }: { session: Session }) {
                           rows={2}
                           maxLength={500}
                           value={intakeAnswers[q.key] ?? ''}
-                          onChange={e => { setIntakeAnswers(prev => ({ ...prev, [q.key]: e.target.value })); setIntakeSaved(false); }}
+                          onChange={e => { setIntakeAnswers(prev => ({ ...prev, [q.key]: e.target.value })); }}
                           onFocus={() => setT3FocusedBox(q.key)}
                           onBlur={() => setT3FocusedBox(f => (f === q.key ? null : f))}
                           style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', textAlign: 'left' }}
@@ -2647,23 +2672,21 @@ export default function AthletePage({ session }: { session: Session }) {
                         </div>
                       </div>
                     ))}
+                    {/* The card's save (founder, 2026-10-13: one save per
+                        stage, labeled plainly). Full profile save + intake
+                        extraction; success collapses the card. */}
+                    <button
+                      type="button"
+                      className="auth-btn"
+                      onClick={saveIntake}
+                      disabled={intakeSaving}
+                      style={{ padding: '8px 16px', fontSize: 13 }}
+                    >
+                      {intakeSaving ? 'Saving…' : 'Save'}
+                    </button>
+                    {intakeError && <div className="auth-error" style={{ display: 'block', marginTop: 12 }}>{intakeError}</div>}
                     </div>)}
                   </div>
-
-                  {/* The step's ONE save (founder, 2026-10-13: "one step, one
-                      save"). Persists all three cards via the full profile
-                      save and runs the intake extraction when the catch-all
-                      has text. Per-card buttons are gone on purpose. */}
-                  <button
-                    type="button"
-                    className="auth-btn"
-                    onClick={saveIntake}
-                    disabled={intakeSaving}
-                    style={{ width: '100%', marginTop: 16, padding: '12px 16px', fontSize: 14 }}
-                  >
-                    {intakeSaving ? 'Saving…' : (intakeSaved && !isDirty) ? 'Saved ✓' : 'Save & analyze'}
-                  </button>
-                  {intakeError && <div className="auth-error" style={{ display: 'block', marginTop: 12 }}>{intakeError}</div>}
                   </>
                   )}
                 </TierCard>
