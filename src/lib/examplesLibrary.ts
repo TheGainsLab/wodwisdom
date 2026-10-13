@@ -105,56 +105,63 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
   programming: {
     title: 'A real training day, block by block',
     intro:
-      'Pulled straight from a generated program — Week 1, Day 1 of a pressing-focused cycle, exactly as the athlete sees it. Warm-up to cool-down, every number computed from their evaluation. Then look closer: the program explains its own reasoning, and every block carries its own coach.',
+      'One athlete runs this entire page \u2014 the same athlete whose evaluation you just read. These are his real inputs and the real training day the AI built from them: Week 1, Day 2, an Olympic-lifting session in service of the goals he typed. Every number on this page is his.',
     steps: [
       {
-        image: '/images/programming-day-full.webp',
-        alt: 'A complete training day — warm-up, skills, strength, accessory, metcon, and cool-down blocks',
+        image: '/images/programming-tell-us.png',
+        alt: 'Make it Personal \u2014 schedule, equipment, and goals cards',
+        title: 'First, you tell us',
+        caption:
+          'Before anything is generated, the program asks for three things: your schedule, your equipment, and your goals.\n\nThe schedule shapes the week. The equipment list is a hard rule \u2014 we never program what you don\u2019t own. And the goals are where you talk to your coach.\n\nEverything that follows on this page was built from what went into these three cards.',
+      },
+      {
+        image: '/images/programming-goals-words.png',
+        alt: 'The goals card filled in \u2014 goal text, injury note, and preferences',
+        title: 'His words, not a template',
+        caption:
+          'Here\u2019s what this athlete actually wrote. Goals: raise the Olympic lifts, get stronger overhead, pace long workouts better, string ring muscle-ups together. An injury note: no deadlifts at or above 90%. A preference: he likes Olympic lifts and muscle-ups.\n\nPlain sentences, typed or spoken \u2014 the green check means the AI has it, and your program builds around it.\n\nNo dropdowns. No template. The program is built from your own words.',
+      },
+      {
+        image: '/images/programming-day-full-v2.png',
+        alt: 'A complete training day \u2014 intent, coach bar, warm-up, skills, strength, accessory, metcon, cool-down',
         title: 'The whole day is built around you',
         caption:
-          'This is a complete training day generated from the athlete’s Evaluation, profile, goals, and priorities.\n\nWarm-up. Skills. Strength. Accessories. Metcon. Cool-down.\n\nEach block is individualized — the movements, loads, reps, percentages, and conditioning are chosen for this athlete, not pulled from a shared template.\n\nAnd the day is built as a whole: skills before fatigue, the main strength priority in the right place, supporting accessory work, conditioning that fits the day, and recovery work to finish.\n\nThis isn’t one workout with personalized numbers. It’s an entire training day built for one athlete.',
+          'This is Week 1, Day 2 \u2014 exactly as he sees it.\n\nEvery block serves the goals he typed: a midline circuit before the barbell, pause snatches at 72% for timing, overhead squats and snatch pulls to support the catch, and a short 21-15-9 with light power snatches to practice cycling the bar under fatigue. Warm-up and cool-down are built too \u2014 collapsed here so the main work leads.\n\nAnd the day comes with hands: Edit and Coach on every block, a chat that can change today\u2019s workout, and the training intent up top.\n\nNot one workout with personalized numbers. A whole day with one purpose.',
       },
       {
-        image: '/images/programming-intent.webp',
-        alt: 'Today’s Training Intent — the program explaining why the day is built this way',
+        image: '/images/programming-intent-v2.png',
+        alt: 'Today\u2019s Training Intent expanded \u2014 the program explaining the day\u2019s reasoning',
         title: 'Know what the day is trying to do',
         caption:
-          'Every training day comes with its own intent.\n\nBefore you start, AI Coach explains what the session is trying to accomplish, why the blocks are ordered the way they are, which priorities they support, and how the conditioning fits with the rest of the day.\n\nIt’s the same kind of conversation you’d want from a coach when you walk into the gym: here’s what we’re working on today, here’s why, and here’s how to approach it.\n\nYou don’t just get the workout. You understand the plan behind it.',
+          'Open Today\u2019s Training Intent and the program explains its own reasoning.\n\nWhy the midline work comes first \u2014 while quality is high. What the pause snatches are for \u2014 knee position and bar-path timing, not load. Why the accessories support the catch without taxing the session\u2019s recovery budget. And why the metcon stays capped at 8 minutes \u2014 a sharp finisher that serves the cycle\u2019s conditioning intent instead of digging a hole.\n\nIt\u2019s the conversation you\u2019d want from a coach when you walk into the gym: here\u2019s what we\u2019re doing today, and here\u2019s why.',
       },
       {
-        image: '/images/programming-strength.webp',
-        alt: 'Strength block — Bench Press 5×5 at 195 lbs, 75% of tested max, RPE 7',
-        title: 'Your numbers, proven methods',
-        caption:
-          'The program uses your actual numbers to prescribe the work. Here, 5×5 bench at 195 is 75% of this athlete’s tested max, with a target RPE of 7.\n\nChange the athlete, and the prescription changes.\n\nBut personalization doesn’t mean reinventing strength training. The program still uses proven lifts, loading principles, and progression — it simply applies them to your abilities and priorities.\n\nIndividualized numbers. Familiar methods. Training built for you.',
-      },
-      {
-        image: '/images/programming-skills-coach.webp',
-        alt: 'Skills block with AI Coach game plan and per-movement cues for butterfly pull-ups and legless rope climbs',
+        image: '/images/programming-strength-coach.png',
+        alt: 'Snatch strength block with Coach open \u2014 game plan and per-movement cues',
         title: 'Every block carries a coach',
         caption:
-          'Tap Coach on any block and you get guidance for the work in front of you.\n\nFirst, the game plan: what this block is for, what should feel hard, what should stay controlled, and where your attention belongs.\n\nThen, movement-by-movement coaching: cues, common faults, reminders, and what to watch for — all informed by your skill level and training history.\n\nHere, the system knows butterfly pull-ups are a strength and legless rope climbs are the limiter, so the advice changes accordingly: one clean ascent beats any grind.\n\nYou don’t just get the work. You get coached through how to do it well.',
+          'Tap Coach on the snatch block and you get a game plan plus movement-by-movement cues \u2014 written for this athlete, not for everyone.\n\nThe game plan tells him what the right effort feels like (RPE 5\u20136 while the pause does the work) and gives him a judgment call: if the bar drifts forward on consecutive reps, that set is your last \u2014 bank quality over completeness.\n\nThe cues know his numbers: \u201Cyour OHS at 185 far exceeds this load, so there\u2019s no excuse for a soft catch.\u201D The faults to watch for are listed right below.\n\nYou don\u2019t just get the work. You get coached through it.',
       },
       {
-        image: '/images/programming-metcon.webp',
-        alt: 'Metcon block — AMRAP 13 with an AI game plan predicting rounds and naming the limiter',
+        image: '/images/programming-metcon-plan.png',
+        alt: 'Metcon block with its game plan \u2014 target time, limiter, and pacing',
         title: 'The metcon, with a game plan',
         caption:
-          'Every metcon comes with a strategy built around the athlete.\n\nThe Coach looks at the workout, your profile, your Evaluation, and what you’ve already done that day, then tells you how to approach it — expected rounds, likely limiter, pacing, where to stay controlled, and where to push.\n\nHere, the target is 4–5 rounds, with grip and lat fatigue identified as the main limiter. So the advice is specific: row around 70%, keep the toes-to-bar relaxed, and protect grip for the power cleans.\n\nYou’re not just given a metcon. You’re told how to get the most out of it.',
+          'The Coach reads the workout, your numbers, and what you\u2019ve already done today.\n\nTarget: 5:30\u20137:00 for this athlete. It knows 65 lbs is only ~39% of his snatch \u2014 the bar isn\u2019t the limiter. It knows the 12 heavy snatch reps and pulls from earlier in this same session will make the 21s feel heavier than the load suggests. So the advice is specific: go unbroken while the shoulders feel clean, and let the burpees set the pace.\n\nNot generic pacing rules. A plan for this workout, on this day, in this body.',
       },
       {
-        image: '/images/programming-accessory.webp',
-        alt: 'Accessory block — dumbbell rows and banded tricep extensions with rest guidance',
+        image: '/images/programming-accessory-day.png',
+        alt: 'Accessory block \u2014 overhead squats and snatch pulls with percentages and rest',
         title: 'The small work is personalized too',
         caption:
-          'Accessory work is easy to overlook, but it’s where a lot of gaps get addressed.\n\nThe program uses your Evaluation, history, and goals to choose the supporting work that adds the most value — here, rows to balance the day’s pressing and triceps work to support pressing strength.\n\nThe load, reps, and rest are prescribed for quality, not just to fill time.\n\nThe main work drives the day. The accessory work fills the gaps. Both are built around you.',
+          'Accessory work is where the day\u2019s purpose gets reinforced.\n\nOverhead squats at 70% of his overhead squat max to strengthen the catch position. Snatch pulls at 88% of his snatch to build pull strength above the weights he\u2019s cycling. Rest prescribed for quality, not to fill time.\n\nEven the supporting work knows whose program it\u2019s in.',
       },
       {
-        image: '/images/programming-coach-change.webp',
-        alt: 'AI Coach conversation — athlete’s rower broke, coach proposes swapping to Echo Bike with Apply and Keep buttons',
+        image: '/images/programming-coach-change-v2.png',
+        alt: 'AI Coach conversation \u2014 hotel-gym dumbbell swap proposed with Apply and Keep original buttons',
         title: 'Change the plan without losing the purpose',
         caption:
-          'Life changes. Your training can too.\n\nBroken equipment. Travel. Limited time. A movement that needs to be adjusted. Tell AI Coach what changed, and it can modify the session while preserving what the workout was designed to accomplish.\n\nHere, a broken rower becomes an Echo Bike swap. The rest of the metcon stays intact, the stimulus is preserved, and the Coach even explains how the substitution may change the feel of the workout.\n\nReview the change. Tap Apply. Keep training.\n\nThis isn’t a static program you have to work around. It’s a program that can work around you.',
+          'Life changes. This athlete hit a hotel gym with no barbell.\n\nFirst the coach asks what a real coach would ask: what do you actually have? Then it does the math out loud \u2014 65 lbs is about 42% of your power snatch, light and fast, so a single 50 lb dumbbell keeps the same stimulus \u2014 and writes the change up as a proposal: before and after, same ladder, same cap.\n\nApply, or keep the original. Your call, one tap \u2014 and the coach follows up with how to execute the new version.\n\nNot a static program you work around. A program that works around you.',
       },
     ],
   },
