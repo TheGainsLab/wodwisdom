@@ -764,7 +764,7 @@ export default function AthletePage({ session }: { session: Session }) {
   // own words for sign-off BEFORE it becomes the active safety filter. `hash` binds
   // the confirmation to the exact text this parse ran against.
   const [injuryShowback, setInjuryShowback] = useState<
-    { verbatim: string; list: string[]; hash: string } | null
+    { verbatim: string; list: string[]; hash: string; summary?: string | null } | null
   >(null);
   const [injuryAddInput, setInjuryAddInput] = useState('');
   const [injuryConfirmSaving, setInjuryConfirmSaving] = useState(false);
@@ -992,6 +992,9 @@ export default function AthletePage({ session }: { session: Session }) {
               verbatim: injText,
               list: dm.injuries_structured?.do_not_program ?? [],
               hash: dm.injuries_constraints_hash ?? '',
+              summary: (dm.injuries_structured?.do_not_program?.length ?? 0) > 0
+                ? (dm.injuries_structured as { summary?: string } | null | undefined)?.summary ?? null
+                : null,
             });
             setInjuryMigrationPrompt(true);
           }
@@ -1382,16 +1385,17 @@ export default function AthletePage({ session }: { session: Session }) {
             if (attempt < maxAttempts) { await new Promise(r => setTimeout(r, attempt * 800)); continue; }
             break;
           }
-          const structured = (data as { structured?: { do_not_program?: string[] }; hash?: string } | null);
+          const structured = (data as { structured?: { do_not_program?: string[]; summary?: string }; hash?: string } | null);
           const list = structured?.structured?.do_not_program ?? [];
           const hash = structured?.hash ?? '';
+          const summary = structured?.structured?.summary ?? null;
           // Only confirm when there's something to protect. Empty list (no injuries /
           // cleared) needs no sign-off — the generation guard only gates non-empty text.
           if (list.length > 0 && hash) {
             setInjuryConfirmError('');
             setInjuryConfirmedNote(false);
             setInjuryMigrationPrompt(false); // a fresh post-save parse supersedes the migration prompt
-            setInjuryShowback({ verbatim: injuriesVal, list, hash });
+            setInjuryShowback({ verbatim: injuriesVal, list, hash, summary });
           }
           return; // success (including the legitimately-empty case)
         } catch (err) {
@@ -2502,18 +2506,22 @@ export default function AthletePage({ session }: { session: Session }) {
                     {injuryShowback && (
                       <div style={{ marginBottom: 16, padding: 14, borderRadius: 8, border: '1px solid var(--accent)', background: 'var(--accent-glow)' }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>
-                          Confirm the movements we'll avoid
+                          {injuryShowback.summary ? "Here's what we understood" : "Confirm the movements we'll avoid"}
                         </div>
                         {injuryConfirmError && (
                           <div style={{ fontSize: 12, color: '#e5484d', marginBottom: 8 }}>{injuryConfirmError}</div>
                         )}
-                        {injuryShowback.verbatim && injuryShowback.verbatim !== 'None' && (
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, fontStyle: 'italic' }}>
-                            You wrote: “{injuryShowback.verbatim}”
+                        {injuryShowback.summary && (
+                          <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8, lineHeight: 1.5 }}>
+                            {injuryShowback.summary}
                           </div>
                         )}
                         <div style={{ fontSize: 12, color: 'var(--text)', marginBottom: 6 }}>
-                          Based on that, we'll avoid programming{injuryShowback.list.length === 0 ? ' — nothing yet, add anything we should skip:' : ':'}
+                          {injuryShowback.list.length === 0
+                            ? 'Nothing on the avoid list yet — add anything we should skip:'
+                            : injuryShowback.summary
+                              ? 'So these are off the menu — remove any that go too far, add anything we missed:'
+                              : "Based on that, we'll avoid programming:"}
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
                           {injuryShowback.list.map(m => (
@@ -2538,6 +2546,9 @@ export default function AthletePage({ session }: { session: Session }) {
                             style={{ flex: 1, fontFamily: 'inherit' }}
                           />
                           <button type="button" className="auth-btn" onClick={addInjuryMovement} style={{ padding: '8px 14px', fontSize: 13 }}>Add</button>
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>
+                          Every workout we generate is checked against this list. Change your note anytime and we'll re-read it.
                         </div>
                         <button
                           type="button"
