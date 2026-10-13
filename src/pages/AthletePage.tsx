@@ -739,6 +739,11 @@ export default function AthletePage({ session }: { session: Session }) {
   const [condSectionOpen, setCondSectionOpen] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [hasGeneratedProgram, setHasGeneratedProgram] = useState(false);
+  // "This cycle's plan" — the coach-state priorities, rendered next to the
+  // evaluation (founder, 2026-10-13: the program page is for examining the
+  // program; the reflective reading lives here with the eval).
+  const [cyclePlan, setCyclePlan] = useState<Array<{ rank: number; focus: string; athlete_facing_rationale: string }> | null>(null);
+  const [cyclePlanOpen, setCyclePlanOpen] = useState(false);
   // Returner pause: set by the stripe webhook on a re-subscribe; the athlete
   // reviews their numbers and taps Build (which clears it server-side).
   const [resumePending, setResumePending] = useState(false);
@@ -1082,6 +1087,29 @@ export default function AthletePage({ session }: { session: Session }) {
   useEffect(() => {
     if (injuryShowback) setCoachExpanded(true);
   }, [injuryShowback]);
+
+  // Latest coach-state priorities for the "This cycle's plan" section.
+  // Only meaningful once a generated program exists (the priorities ARE
+  // that program's build rationale).
+  useEffect(() => {
+    if (!hasGeneratedProgram) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('coach_states')
+        .select('coach_state')
+        .eq('user_id', session.user.id)
+        .order('version', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      const pri = (data?.coach_state as { priorities?: Array<{ rank: number; focus: string; athlete_facing_rationale: string }> } | null)?.priorities;
+      if (Array.isArray(pri) && pri.length > 0) {
+        setCyclePlan([...pri].sort((a, b) => a.rank - b.rank));
+      }
+    })().catch(() => { /* the plan section is optional */ });
+    return () => { cancelled = true; };
+  }, [hasGeneratedProgram, session.user.id]);
 
   // Step 3 drafts: mirror unsaved edits to localStorage so in-app navigation
   // can't eat typed work. A draft lives only between an edit and the save
@@ -2960,6 +2988,54 @@ export default function AthletePage({ session }: { session: Session }) {
                                     </div>
                                   );
                                 })}
+                                {/* This cycle's plan — the coach-state priorities behind the
+                                    CURRENT program, so it renders only on the newest month.
+                                    Ends with the adjustment map: a statement of how changes
+                                    work, not an invitation to renegotiate the cycle. */}
+                                {m === months[0] && cyclePlan && (
+                                  <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => setCyclePlanOpen(o => !o)}
+                                      style={{
+                                        width: '100%',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '12px 16px',
+                                        background: 'var(--bg)',
+                                        border: 'none',
+                                        color: 'var(--text)',
+                                        cursor: 'pointer',
+                                        fontFamily: 'inherit',
+                                        fontSize: 14,
+                                      }}
+                                    >
+                                      <span style={{ fontWeight: 600 }}>This cycle&apos;s plan — what your program is built around</span>
+                                      <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{cyclePlanOpen ? '▲' : '▼'}</span>
+                                    </button>
+                                    {cyclePlanOpen && (
+                                      <div style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                                        <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                          {cyclePlan.map((p) => (
+                                            <li key={p.rank} style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-dim)' }}>
+                                              <strong style={{ color: 'var(--text)' }}>
+                                                {p.focus.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                                              </strong>
+                                              {' — '}
+                                              {p.athlete_facing_rationale}
+                                            </li>
+                                          ))}
+                                        </ol>
+                                        <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 12, lineHeight: 1.6 }}>
+                                          Lower-ranked areas get targeted touches rather than volume this cycle — parked,
+                                          not forgotten. Want to adjust a day? Open it and ask the AI Coach there — it can
+                                          rewrite a block with you. Bigger changes go through your human coach.
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );

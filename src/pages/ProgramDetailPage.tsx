@@ -237,8 +237,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
   // up front, not a cold absence the athlete has to interrogate the chat
   // coach about. Collapsed by default; text comes straight from the coach
   // state's athlete_facing_rationale fields (no extra AI call).
-  const [coachNotes, setCoachNotes] = useState<Array<{ rank: number; focus: string; athlete_facing_rationale: string }> | null>(null);
-  const [coachNotesOpen, setCoachNotesOpen] = useState(false);
   // First-program intro (founder, 2026-10-10): one-time how-coaching-works
   // card on first open of a generated program — the three coach surfaces,
   // logging, and the human valve. Seeded truthy so it can never flash for
@@ -270,24 +268,6 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
       .upsert({ user_id: session.user.id, program_intro_seen_at: nowIso }, { onConflict: 'user_id' });
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from('coach_states')
-        .select('coach_state')
-        .eq('user_id', session.user.id)
-        .order('version', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (cancelled) return;
-      const pri = (data?.coach_state as { priorities?: Array<{ rank: number; focus: string; athlete_facing_rationale: string }> } | null)?.priorities;
-      if (Array.isArray(pri) && pri.length > 0) {
-        setCoachNotes([...pri].sort((a, b) => a.rank - b.rank));
-      }
-    })().catch(() => { /* notes are optional */ });
-    return () => { cancelled = true; };
-  }, [session.user.id]);
 
 
   // v3 movement edit. Optimistic local update + UPDATE; revert on error.
@@ -838,37 +818,46 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     is: how this works → why it looks like this → Week 1. */}
                 {program.source === 'generated' && programIntroSeenAt === null && (
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 12, padding: '18px 16px', marginBottom: 14 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
-                      Your program is ready, and it&apos;s not a fixed document.
-                    </div>
-                    <p style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.55, margin: '0 0 14px' }}>
-                      It&apos;s a living program with a coach built in. The coach shows up in three places:
-                    </p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 }}>
-                      <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
-                        <strong style={{ color: 'var(--text)' }}>1 — The Coach button, on every block.</strong>{' '}
-                        Tap for guidance on that block: how to pace it, cues to focus on, common flaws to avoid.
-                      </div>
-                      <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
-                        <strong style={{ color: 'var(--text)' }}>2 — The chat on every training day.</strong>{' '}
-                        This is where you can change the program. Equipment swap, a different stimulus,
-                        less volume — tell the coach what you need, it proposes the change, you approve it.
-                        There&apos;s also an Edit button for quick changes you make yourself.{' '}
-                        <strong style={{ color: 'var(--text)' }}>You always have the last word.</strong>
-                      </div>
-                      <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
-                        <strong style={{ color: 'var(--text)' }}>3 — The main Coach chat.</strong>{' '}
-                        Available 24/7 and trained on the methodology. This is the place to get personalized
-                        answers about your own training and about all things fitness.
-                      </div>
+                    <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+                      Before you jump in — a few things worth knowing.
                     </div>
                     <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 14px' }}>
-                      <strong style={{ color: 'var(--text)' }}>Log your training.</strong>{' '}
-                      Next month&apos;s program is built from what you actually did.
+                      <strong style={{ color: 'var(--text)' }}>You&apos;re working with a coach. Talk to it like one.</strong>{' '}
+                      Detailed questions, follow-ups and refinements are no problem. It&apos;s built for that,
+                      and trained on our methodology. You get coaching, not generic answers.
+                    </p>
+                    <p style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.55, margin: '0 0 10px' }}>
+                      There are three ways to use it:
+                    </p>
+                    <ul style={{ margin: '0 0 14px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <li style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                        <strong style={{ color: 'var(--text)' }}>On every block:</strong>{' '}
+                        tap for pacing, cues, and common flaws.
+                      </li>
+                      <li style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                        <strong style={{ color: 'var(--text)' }}>Each training day:</strong>{' '}
+                        ask for changes — the coach proposes, you approve.
+                      </li>
+                      <li style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                        <strong style={{ color: 'var(--text)' }}>In the main chat:</strong>{' '}
+                        ask anything about fitness, 24/7.
+                      </li>
+                    </ul>
+                    <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 14px' }}>
+                      <strong style={{ color: 'var(--text)' }}>Personalization never stops.</strong>{' '}
+                      The program adapts as you train. Need to adjust? The coach can do that. Equipment swap,
+                      less volume, focus on a specific skill? Just say the word. There&apos;s also an Edit button
+                      for small changes you make yourself.{' '}
+                      <strong style={{ color: 'var(--text)' }}>You always have the last word.</strong>
+                    </p>
+                    <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 14px' }}>
+                      <strong style={{ color: 'var(--text)' }}>Log what you do.</strong>{' '}
+                      More data sharpens the picture, and future programs are built from it. A few taps save
+                      your results. Add notes when there&apos;s more the coach should know.
                     </p>
                     <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 16px' }}>
                       <strong style={{ color: 'var(--text)' }}>Built for you. Not by yourself.</strong>{' '}
-                      Prefer to speak with a human? Tap <strong style={{ color: 'var(--text)' }}>Message a human coach</strong>{' '}
+                      Prefer a human? Tap <strong style={{ color: 'var(--text)' }}>Message a human coach</strong>{' '}
                       in the chat — a real coach replies by email within a day.
                     </p>
                     <button
@@ -880,43 +869,10 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     </button>
                   </div>
                 )}
-                {/* Coach's notes — generated programs only. Ends with the
-                    adjustment map: a statement of how changes work, not an
-                    invitation to renegotiate the cycle. */}
-                {program.source === 'generated' && coachNotes && (
-                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', marginBottom: 14 }}>
-                    <button
-                      type="button"
-                      onClick={() => setCoachNotesOpen((o) => !o)}
-                      style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
-                    >
-                      <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)' }}>
-                        Coach's notes — what this cycle is built around
-                      </span>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{coachNotesOpen ? '▾' : '▸'}</span>
-                    </button>
-                    {coachNotesOpen && (
-                      <div style={{ marginTop: 12 }}>
-                        <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                          {coachNotes.map((p) => (
-                            <li key={p.rank} style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-dim)' }}>
-                              <strong style={{ color: 'var(--text)' }}>
-                                {p.focus.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-                              </strong>
-                              {' — '}
-                              {p.athlete_facing_rationale}
-                            </li>
-                          ))}
-                        </ol>
-                        <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 12, lineHeight: 1.6 }}>
-                          Lower-ranked areas get targeted touches rather than volume this cycle — parked,
-                          not forgotten. Want to adjust a day? Open it and ask the AI Coach there — it can
-                          rewrite a block with you. Bigger changes go through your human coach.
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Coach's notes moved to the evaluation surface (AthletePage
+                    month list) — founder, 2026-10-13: the program page is for
+                    examining the program; the reflective reading lives with
+                    the evaluation. */}
                 <div className="program-days-accordion">
                   {(() => {
                     // Group workouts by month, then into weeks of 5 within each month
