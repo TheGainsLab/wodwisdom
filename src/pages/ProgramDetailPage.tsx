@@ -838,37 +838,46 @@ export default function ProgramDetailPage({ session }: { session: Session }) {
                     is: how this works → why it looks like this → Week 1. */}
                 {program.source === 'generated' && programIntroSeenAt === null && (
                   <div style={{ background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 12, padding: '18px 16px', marginBottom: 14 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
-                      Your program is ready, and it&apos;s not a fixed document.
-                    </div>
-                    <p style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.55, margin: '0 0 14px' }}>
-                      It&apos;s a living program with a coach built in. The coach shows up in three places:
-                    </p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 }}>
-                      <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
-                        <strong style={{ color: 'var(--text)' }}>1 — The Coach button, on every block.</strong>{' '}
-                        Tap for guidance on that block: how to pace it, cues to focus on, common flaws to avoid.
-                      </div>
-                      <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
-                        <strong style={{ color: 'var(--text)' }}>2 — The chat on every training day.</strong>{' '}
-                        This is where you can change the program. Equipment swap, a different stimulus,
-                        less volume — tell the coach what you need, it proposes the change, you approve it.
-                        There&apos;s also an Edit button for quick changes you make yourself.{' '}
-                        <strong style={{ color: 'var(--text)' }}>You always have the last word.</strong>
-                      </div>
-                      <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
-                        <strong style={{ color: 'var(--text)' }}>3 — The main Coach chat.</strong>{' '}
-                        Available 24/7 and trained on the methodology. This is the place to get personalized
-                        answers about your own training and about all things fitness.
-                      </div>
+                    <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+                      Before you jump in — a few things worth knowing.
                     </div>
                     <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 14px' }}>
-                      <strong style={{ color: 'var(--text)' }}>Log your training.</strong>{' '}
-                      Next month&apos;s program is built from what you actually did.
+                      <strong style={{ color: 'var(--text)' }}>You&apos;re working with a coach. Talk to it like one.</strong>{' '}
+                      Detailed questions, follow-ups and refinements are no problem. It&apos;s built for that,
+                      and trained on our methodology. You get coaching, not generic answers.
+                    </p>
+                    <p style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.55, margin: '0 0 10px' }}>
+                      There are three ways to use it:
+                    </p>
+                    <ul style={{ margin: '0 0 14px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <li style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                        <strong style={{ color: 'var(--text)' }}>On every block:</strong>{' '}
+                        tap for pacing, cues, and common flaws.
+                      </li>
+                      <li style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                        <strong style={{ color: 'var(--text)' }}>Each training day:</strong>{' '}
+                        ask for changes — the coach proposes, you approve.
+                      </li>
+                      <li style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
+                        <strong style={{ color: 'var(--text)' }}>In the main chat:</strong>{' '}
+                        ask anything about fitness, 24/7.
+                      </li>
+                    </ul>
+                    <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 14px' }}>
+                      <strong style={{ color: 'var(--text)' }}>Personalization never stops.</strong>{' '}
+                      The program adapts as you train. Need to adjust? The coach can do that. Equipment swap,
+                      less volume, focus on a specific skill? Just say the word. There&apos;s also an Edit button
+                      for small changes you make yourself.{' '}
+                      <strong style={{ color: 'var(--text)' }}>You always have the last word.</strong>
+                    </p>
+                    <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 14px' }}>
+                      <strong style={{ color: 'var(--text)' }}>Log what you do.</strong>{' '}
+                      More data sharpens the picture, and future programs are built from it. A few taps save
+                      your results. Add notes when there&apos;s more the coach should know.
                     </p>
                     <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 16px' }}>
                       <strong style={{ color: 'var(--text)' }}>Built for you. Not by yourself.</strong>{' '}
-                      Prefer to speak with a human? Tap <strong style={{ color: 'var(--text)' }}>Message a human coach</strong>{' '}
+                      Prefer a human? Tap <strong style={{ color: 'var(--text)' }}>Message a human coach</strong>{' '}
                       in the chat — a real coach replies by email within a day.
                     </p>
                     <button
