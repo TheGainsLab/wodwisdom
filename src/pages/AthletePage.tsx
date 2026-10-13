@@ -2516,11 +2516,6 @@ export default function AthletePage({ session }: { session: Session }) {
                             {injuryShowback.summary}
                           </div>
                         )}
-                        {injuryShowback.verbatim && injuryShowback.verbatim !== 'None' && (
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, fontStyle: 'italic' }}>
-                            You wrote: “{injuryShowback.verbatim}”
-                          </div>
-                        )}
                         <div style={{ fontSize: 12, color: 'var(--text)', marginBottom: 6 }}>
                           {injuryShowback.list.length === 0
                             ? 'Nothing on the avoid list yet — add anything we should skip:'
