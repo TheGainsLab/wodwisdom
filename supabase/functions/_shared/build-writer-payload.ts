@@ -186,7 +186,8 @@ export interface PreviousCycleSummary {
     days: number;
   }>;
   /** The athlete's own logged block notes from the prior cycle, newest first
-   *  (bounded: latest 30, each ≤500 chars). Free text typed at log time —
+   *  (bounded: latest 80, each ≤300 chars — sized to cover a full month of
+   *  dense logging). Free text typed at log time —
    *  qualitative evidence for month_in_review and load decisions. Absent on
    *  pre-migration RPC results; empty array when nothing was noted. */
   block_notes?: Array<{
