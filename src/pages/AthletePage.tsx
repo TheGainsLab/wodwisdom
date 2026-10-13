@@ -2207,8 +2207,8 @@ export default function AthletePage({ session }: { session: Session }) {
                         You&apos;ve unlocked AI Programming.
                       </p>
                       <p style={{ color: 'var(--text-dim)', fontSize: 13.5, lineHeight: 1.55, margin: '0 0 14px' }}>
-                        This is where you make the program yours. The AI reads your numbers,
-                        not your mind, so everything you enter here goes straight into your training.
+                        Make the program yours. The AI reads your numbers, not your mind —
+                        so everything you enter here goes straight into your training.
                       </p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
                         <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)' }}>
@@ -2231,13 +2231,16 @@ export default function AthletePage({ session }: { session: Session }) {
                         </li>
                         <li style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)' }}>
                           <strong style={{ color: 'var(--text)' }}>Targets?</strong>{' '}
-                          A 2k row PR, a 10k run, a bodyweight target? Be specific where you can.
+                          Higher Oly total? Fewer breaks on long metcons? Muscle-ups under fatigue? A 2k row PR?
                         </li>
                         <li style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)' }}>
                           <strong style={{ color: 'var(--text)' }}>Preferences?</strong>{' '}
                           Love snatching, hate running? Say so — the best program is the one you&apos;re excited to do.
                         </li>
                       </ul>
+                      <p style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 16px' }}>
+                        More specific goals = more personalized training.
+                      </p>
                       <button
                         type="button"
                         className="auth-btn"
