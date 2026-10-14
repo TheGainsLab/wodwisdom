@@ -112,56 +112,56 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'Make it Personal \u2014 schedule, equipment, and goals cards',
         title: 'First, you tell us',
         caption:
-          'Before anything is generated, the program asks for three things: your schedule, your equipment, and your goals.\n\nThe schedule shapes the week. The equipment list is a hard rule \u2014 we never program what you don\u2019t own. And the goals are where you talk to your coach.\n\nEverything that follows on this page was built from what went into these three cards.',
+          'Before anything is generated, the program asks for three things: your schedule, your equipment, and your goals.\n\nThe program fits your life, so you won\u2019t have to scramble to squeeze in training. It\u2019s built around your equipment, so you don\u2019t have to scale or substitute. Your goals connect where you are today with what you\u2019re training to achieve.\n\nEverything that follows on this page was built from what went into these three cards.',
       },
       {
         image: '/images/programming-goals-words.png',
         alt: 'The goals card filled in \u2014 goal text, injury note, and preferences',
         title: 'His words, not a template',
         caption:
-          'Here\u2019s what this athlete actually wrote. Goals: raise the Olympic lifts, get stronger overhead, pace long workouts better, string ring muscle-ups together. An injury note: no deadlifts at or above 90%. A preference: he likes Olympic lifts and muscle-ups.\n\nPlain sentences, typed or spoken \u2014 the green check means the AI has it, and your program builds around it.\n\nNo dropdowns. No template. The program is built from your own words.',
+          'You don\u2019t choose a program or a track. You have a conversation.\n\nTell us exactly what you\u2019re training for and what you want to accomplish, along with anything we need to work around. Here, that\u2019s raising the Olympic lifts, getting stronger overhead, pacing long workouts, stringing ring muscle-ups together \u2014 and a note to keep deadlifts below 90%.\n\nThe AI combines your words with your profile and evaluation to build the program around your starting point, your goals, and your preferences.\n\nNot a group program you have to fit into. A program built for you.',
       },
       {
         image: '/images/programming-day-full-v2.png',
         alt: 'A complete training day \u2014 intent, coach bar, warm-up, skills, strength, accessory, metcon, cool-down',
         title: 'The whole day is built around you',
         caption:
-          'This is Week 1, Day 2 \u2014 exactly as he sees it.\n\nEvery block serves the goals he typed: a midline circuit before the barbell, pause snatches at 72% for timing, overhead squats and snatch pulls to support the catch, and a short 21-15-9 with light power snatches to practice cycling the bar under fatigue. Warm-up and cool-down are built too \u2014 collapsed here so the main work leads.\n\nAnd the day comes with hands: Edit and Coach on every block, a chat that can change today\u2019s workout, and the training intent up top.\n\nNot one workout with personalized numbers. A whole day with one purpose.',
+          'This is Week 1, Day 2 \u2014 and his goals show up in every block. Midline work for stability. Pause snatches at 72% for positioning and timing. Overhead squats and snatch pulls to support the lifts. A short metcon to practice cycling the bar under fatigue. Warm-up and cool-down are built too \u2014 collapsed here so the main work leads.\n\nThis isn\u2019t a workout generator or a percentage progression. Every block has a purpose, and every block is designed with the others in mind. It\u2019s a complete training day built around the athlete.\n\nAnd it\u2019s not static. Every block has an Edit button and an AI Coach, and the chat can change today\u2019s workout \u2014 ask questions or adjust the training.',
       },
       {
         image: '/images/programming-intent-v2.png',
         alt: 'Today\u2019s Training Intent expanded \u2014 the program explaining the day\u2019s reasoning',
         title: 'Know what the day is trying to do',
         caption:
-          'Open Today\u2019s Training Intent and the program explains its own reasoning.\n\nWhy the midline work comes first \u2014 while quality is high. What the pause snatches are for \u2014 knee position and bar-path timing, not load. Why the accessories support the catch without taxing the session\u2019s recovery budget. And why the metcon stays capped at 8 minutes \u2014 a sharp finisher that serves the cycle\u2019s conditioning intent instead of digging a hole.\n\nIt\u2019s the conversation you\u2019d want from a coach when you walk into the gym: here\u2019s what we\u2019re doing today, and here\u2019s why.',
+          'Before training, the AI Coach walks you through the plan, so you understand how the pieces work together to move you toward your goals \u2014 the purpose of each block, pacing, intensity, and where to prioritize quality over load.\n\nHere it explains why the midline work comes first, what the pause snatches are for \u2014 position and timing, not load \u2014 and why the metcon stays capped at 8 minutes instead of digging a hole.\n\nJust like meeting with your coach when you walk into the gym: you know what you\u2019re doing, why you\u2019re doing it, and how to get the most out of every session.',
       },
       {
         image: '/images/programming-strength-coach.png',
         alt: 'Snatch strength block with Coach open \u2014 game plan and per-movement cues',
         title: 'Every block carries a coach',
         caption:
-          'Tap Coach on the snatch block and you get a game plan plus movement-by-movement cues \u2014 written for this athlete, not for everyone.\n\nThe game plan tells him what the right effort feels like (RPE 5\u20136 while the pause does the work) and gives him a judgment call: if the bar drifts forward on consecutive reps, that set is your last \u2014 bank quality over completeness.\n\nThe cues know his numbers: \u201Cyour OHS at 185 far exceeds this load, so there\u2019s no excuse for a soft catch.\u201D The faults to watch for are listed right below.\n\nYou don\u2019t just get the work. You get coached through it.',
+          'Tap Coach on any block and you get a game plan, specific points of performance, and the common faults to avoid \u2014 how to approach the work, and what to emphasize to get the intended training benefit.\n\nAll of it informed by your abilities, your goals, and the purpose of the day. Here the cues know his numbers: \u201Cyour OHS at 185 far exceeds this load, so there\u2019s no excuse for a soft catch.\u201D\n\nIt\u2019s like having a personal coach by your side every time you train.',
       },
       {
         image: '/images/programming-metcon-plan.png',
         alt: 'Metcon block with its game plan \u2014 target time, limiter, and pacing',
         title: 'The metcon, with a game plan',
         caption:
-          'The Coach reads the workout, your numbers, and what you\u2019ve already done today.\n\nTarget: 5:30\u20137:00 for this athlete. It knows 65 lbs is only ~39% of his snatch \u2014 the bar isn\u2019t the limiter. It knows the 12 heavy snatch reps and pulls from earlier in this same session will make the 21s feel heavier than the load suggests. So the advice is specific: go unbroken while the shoulders feel clean, and let the burpees set the pace.\n\nNot generic pacing rules. A plan for this workout, on this day, in this body.',
+          'Your workout. Your numbers. Your game plan.\n\nEvery metcon comes with a pacing strategy built for you \u2014 not just to finish the workout, but to get the right training stimulus. Here the Coach sets a 5:30\u20137:00 target because it knows 65 lbs is only ~39% of his snatch, and it knows the snatch work from earlier in this same session will make the 21s feel heavier than the load suggests.\n\nWhere to push, where to pace, how to manage fatigue. Coaching makes every session count.',
       },
       {
         image: '/images/programming-accessory-day.png',
         alt: 'Accessory block \u2014 overhead squats and snatch pulls with percentages and rest',
         title: 'The small work is personalized too',
         caption:
-          'Accessory work is where the day\u2019s purpose gets reinforced.\n\nOverhead squats at 70% of his overhead squat max to strengthen the catch position. Snatch pulls at 88% of his snatch to build pull strength above the weights he\u2019s cycling. Rest prescribed for quality, not to fill time.\n\nEven the supporting work knows whose program it\u2019s in.',
+          'Every detail matters. Even the accessory work.\n\nYour coach looks at the entire training day \u2014 what the strength work develops, what the skills reinforce, what the metcon delivers \u2014 and uses the accessory block to support it: overhead squats at 70% to strengthen the catch, snatch pulls at 88% to build pull strength above the weights he\u2019s cycling.\n\nNothing is overlooked. Every part of your training works toward making you better \u2014 and like every other block, it comes with coaching guidance to get the intended benefit.',
       },
       {
         image: '/images/programming-coach-change-v2.png',
         alt: 'AI Coach conversation \u2014 hotel-gym dumbbell swap proposed with Apply and Keep original buttons',
         title: 'Change the plan without losing the purpose',
         caption:
-          'Life changes. This athlete hit a hotel gym with no barbell.\n\nFirst the coach asks what a real coach would ask: what do you actually have? Then it does the math out loud \u2014 65 lbs is about 42% of your power snatch, light and fast, so a single 50 lb dumbbell keeps the same stimulus \u2014 and writes the change up as a proposal: before and after, same ladder, same cap.\n\nApply, or keep the original. Your call, one tap \u2014 and the coach follows up with how to execute the new version.\n\nNot a static program you work around. A program that works around you.',
+          'Life changes. Your program changes with you.\n\nDifferent equipment, an injury to work around, short on time, extra skill practice \u2014 just tell us. Here, a hotel gym with no barbell: the coach asks what he actually has, does the math \u2014 a single 50 lb dumbbell keeps the same stimulus as the 65 lb bar \u2014 and writes the change up as a proposal. Apply, or keep the original. Your call, one tap.\n\nThe only way to get more personalized might be to have your coach move in with you.',
       },
     ],
   },
@@ -239,6 +239,13 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         title: 'Your workouts become a fitness curve',
         caption:
           'Each logged metcon becomes another point on your personal power-duration curve — from short, high-power efforts to longer tests of sustained work capacity.\n\nNow the pattern becomes visible.\n\nThis athlete produces more power in shorter workouts, then drops off as duration increases. That tells us where fitness is strongest, where it begins to fade, and what the program should do about it.\n\nShort-duration capacity can be maintained while longer-duration work gets more attention.\n\nAnd because every point includes the workout’s movements, duration, output, and your own feedback, the system can drill deeper than the curve alone.\n\nYou see where your fitness breaks down. The AI uses that information to decide what to build next.',
+      },
+      {
+        image: '/images/analytics-performance-grid.png',
+        alt: 'Performance Grid \u2014 training percentiles by duration and barbell with evidence counts, plus Skill Cost rows',
+        title: 'Strengths and weaknesses, located',
+        caption:
+          'Every scored metcon lands in this grid \u2014 your percentile by time domain and by barbell, with the evidence count on every cell.\n\nThis athlete holds the 60s and 70s in short and medium work, then drops to the mid-40s in everything long \u2014 the red column is a weakness you can point at. And small samples stay honest: a cell built on one workout reads as a hint, not a verdict.\n\nSkill Cost goes a level deeper: your percentile when a movement shows up versus your training overall. Double-unders cost this athlete 15 points when they appear. HSPU add 20. Tap a row to see the workouts behind it.\n\nYou see exactly where the work is. So does the AI that writes next month.',
       },
       {
         image: '/images/engine-analytics-comparison.webp',
