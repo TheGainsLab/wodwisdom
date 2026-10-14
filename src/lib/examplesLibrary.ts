@@ -154,7 +154,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'Accessory block \u2014 overhead squats and snatch pulls with percentages and rest',
         title: 'The small work is personalized too',
         caption:
-          'Accessory work is where the day\u2019s purpose gets reinforced.\n\nOverhead squats at 70% of his overhead squat max to strengthen the catch position. Snatch pulls at 88% of his snatch to build pull strength above the weights he\u2019s cycling. Rest prescribed for quality, not to fill time.\n\nEven the supporting work knows whose program it\u2019s in.',
+          'Every detail matters. Even the accessory work.\n\nYour coach looks at the entire training day \u2014 what the strength work develops, what the skills reinforce, what the metcon delivers \u2014 and uses the accessory block to support it: overhead squats at 70% to strengthen the catch, snatch pulls at 88% to build pull strength above the weights he\u2019s cycling.\n\nNothing is overlooked. Every part of your training works toward making you better \u2014 and like every other block, it comes with coaching guidance to get the intended benefit.',
       },
       {
         image: '/images/programming-coach-change-v2.png',
