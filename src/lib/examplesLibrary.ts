@@ -105,7 +105,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
   programming: {
     title: 'A real training day, block by block',
     intro:
-      'One athlete runs this entire page \u2014 the same athlete whose evaluation you just read. These are his real inputs and the real training day the AI built from them: Week 1, Day 2, an Olympic-lifting session in service of the goals he typed. Every number on this page is his.',
+      'This is the same athlete whose evaluation you just read. Now see how the AI turns that evaluation, his goals, and his preferences into a personalized training program.\n\nFollow along from his initial instructions through Week 1, Day 2 \u2014 every number on this page is his. See how every block serves a purpose, how the pieces work together, and how the AI Coach guides him through the session \u2014 even adjusting the workout when his circumstances change.\n\nNot a collection of generated workouts. A complete training plan, built around one athlete, with a coach built in.',
     steps: [
       {
         image: '/images/programming-tell-us.png',
