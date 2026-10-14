@@ -133,7 +133,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'Today\u2019s Training Intent expanded \u2014 the program explaining the day\u2019s reasoning',
         title: 'Know what the day is trying to do',
         caption:
-          'Open Today\u2019s Training Intent and the program explains its own reasoning.\n\nWhy the midline work comes first \u2014 while quality is high. What the pause snatches are for \u2014 knee position and bar-path timing, not load. Why the accessories support the catch without taxing the session\u2019s recovery budget. And why the metcon stays capped at 8 minutes \u2014 a sharp finisher that serves the cycle\u2019s conditioning intent instead of digging a hole.\n\nIt\u2019s the conversation you\u2019d want from a coach when you walk into the gym: here\u2019s what we\u2019re doing today, and here\u2019s why.',
+          'Before training, the AI Coach walks you through the plan, so you understand how the pieces work together to move you toward your goals \u2014 the purpose of each block, pacing, intensity, and where to prioritize quality over load.\n\nHere it explains why the midline work comes first, what the pause snatches are for \u2014 position and timing, not load \u2014 and why the metcon stays capped at 8 minutes instead of digging a hole.\n\nJust like meeting with your coach when you walk into the gym: you know what you\u2019re doing, why you\u2019re doing it, and how to get the most out of every session.',
       },
       {
         image: '/images/programming-strength-coach.png',
