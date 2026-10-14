@@ -147,7 +147,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'Metcon block with its game plan \u2014 target time, limiter, and pacing',
         title: 'The metcon, with a game plan',
         caption:
-          'The Coach reads the workout, your numbers, and what you\u2019ve already done today.\n\nTarget: 5:30\u20137:00 for this athlete. It knows 65 lbs is only ~39% of his snatch \u2014 the bar isn\u2019t the limiter. It knows the 12 heavy snatch reps and pulls from earlier in this same session will make the 21s feel heavier than the load suggests. So the advice is specific: go unbroken while the shoulders feel clean, and let the burpees set the pace.\n\nNot generic pacing rules. A plan for this workout, on this day, in this body.',
+          'Your workout. Your numbers. Your game plan.\n\nEvery metcon comes with a pacing strategy built for you \u2014 not just to finish the workout, but to get the right training stimulus. Here the Coach sets a 5:30\u20137:00 target because it knows 65 lbs is only ~39% of his snatch, and it knows the snatch work from earlier in this same session will make the 21s feel heavier than the load suggests.\n\nWhere to push, where to pace, how to manage fatigue. Coaching makes every session count.',
       },
       {
         image: '/images/programming-accessory-day.png',
