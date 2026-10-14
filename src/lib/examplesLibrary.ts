@@ -224,7 +224,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
   analytics: {
     title: 'One athlete’s training, as data',
     intro:
-      'Most apps’ analytics describe your past — a reward screen after the work. Ours are the operating system: the numbers you see here are the same inputs the AI uses to write what comes next. Measured in watts, ranked against 15 million competition scores, and fed straight back into the program.',
+      'Most fitness apps use analytics to show you what you\u2019ve done. The Gains Lab uses them to decide what you should do next.\n\nThese are real results from one athlete\u2019s training \u2014 measured in power output, compared against 15 million competition event scores, and analyzed to reveal strengths, weaknesses, and opportunities for improvement.\n\nFollow along as those results become a detailed picture of the athlete\u2019s fitness, revealing things that individual workout scores can\u2019t.\n\nAnd here\u2019s the difference: everything you see is available to the AI Coach and helps shape what gets programmed next.',
     steps: [
       {
         image: '/images/programming-logged-metcon.webp',
