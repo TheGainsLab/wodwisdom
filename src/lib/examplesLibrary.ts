@@ -126,7 +126,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'A complete training day \u2014 intent, coach bar, warm-up, skills, strength, accessory, metcon, cool-down',
         title: 'The whole day is built around you',
         caption:
-          'This is Week 1, Day 2 \u2014 exactly as he sees it.\n\nEvery block serves the goals he typed: a midline circuit before the barbell, pause snatches at 72% for timing, overhead squats and snatch pulls to support the catch, and a short 21-15-9 with light power snatches to practice cycling the bar under fatigue. Warm-up and cool-down are built too \u2014 collapsed here so the main work leads.\n\nAnd the day comes with hands: Edit and Coach on every block, a chat that can change today\u2019s workout, and the training intent up top.\n\nNot one workout with personalized numbers. A whole day with one purpose.',
+          'This is Week 1, Day 2 \u2014 and his goals show up in every block. Midline work for stability. Pause snatches at 72% for positioning and timing. Overhead squats and snatch pulls to support the lifts. A short metcon to practice cycling the bar under fatigue. Warm-up and cool-down are built too \u2014 collapsed here so the main work leads.\n\nThis isn\u2019t a workout generator or a percentage progression. Every block has a purpose, and every block is designed with the others in mind. It\u2019s a complete training day built around the athlete.\n\nAnd it\u2019s not static. Every block has an Edit button and an AI Coach, and the chat can change today\u2019s workout \u2014 ask questions or adjust the training.',
       },
       {
         image: '/images/programming-intent-v2.png',
