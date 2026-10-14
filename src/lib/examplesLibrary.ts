@@ -168,7 +168,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
   engine: {
     title: 'A training day, start to finish',
     intro:
-      'Captured from a live athlete’s account — Day 8 of their program, a Max Aerobic Power session. This is what opening a day and doing the work actually looks like.',
+      'This is Day 8 of a real athlete\u2019s Year of the Engine program \u2014 a Max Aerobic Power session, captured directly from their account.\n\nFollow along as the athlete opens the workout, sees their personalized targets, gets pacing guidance from AI Coach, and tracks their performance.\n\nSee how every interval is calibrated to the athlete\u2019s abilities, how the coaching helps them get the intended stimulus, and how their results inform future training.\n\nNot just conditioning workouts. Personalized training that evolves as you improve.',
     steps: [
       {
         image: '/images/engine-day-overview.webp',
