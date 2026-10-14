@@ -140,7 +140,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'Snatch strength block with Coach open \u2014 game plan and per-movement cues',
         title: 'Every block carries a coach',
         caption:
-          'Tap Coach on the snatch block and you get a game plan plus movement-by-movement cues \u2014 written for this athlete, not for everyone.\n\nThe game plan tells him what the right effort feels like (RPE 5\u20136 while the pause does the work) and gives him a judgment call: if the bar drifts forward on consecutive reps, that set is your last \u2014 bank quality over completeness.\n\nThe cues know his numbers: \u201Cyour OHS at 185 far exceeds this load, so there\u2019s no excuse for a soft catch.\u201D The faults to watch for are listed right below.\n\nYou don\u2019t just get the work. You get coached through it.',
+          'Tap Coach on any block and you get a game plan, specific points of performance, and the common faults to avoid \u2014 how to approach the work, and what to emphasize to get the intended training benefit.\n\nAll of it informed by your abilities, your goals, and the purpose of the day. Here the cues know his numbers: \u201Cyour OHS at 185 far exceeds this load, so there\u2019s no excuse for a soft catch.\u201D\n\nIt\u2019s like having a personal coach by your side every time you train.',
       },
       {
         image: '/images/programming-metcon-plan.png',
