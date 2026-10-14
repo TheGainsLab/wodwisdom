@@ -110,56 +110,56 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
       {
         image: '/images/programming-tell-us.png',
         alt: 'Make it Personal \u2014 schedule, equipment, and goals cards',
-        title: 'First, you tell us',
+        title: 'Training that fits your life',
         caption:
           'Before anything is generated, the program asks for three things: your schedule, your equipment, and your goals.\n\nThe program fits your life, so you won\u2019t have to scramble to squeeze in training. It\u2019s built around your equipment, so you don\u2019t have to scale or substitute. Your goals connect where you are today with what you\u2019re training to achieve.\n\nEverything that follows on this page was built from what went into these three cards.',
       },
       {
         image: '/images/programming-goals-words.png',
         alt: 'The goals card filled in \u2014 goal text, injury note, and preferences',
-        title: 'His words, not a template',
+        title: 'Conversation with a coach',
         caption:
           'You don\u2019t choose a program or a track. You have a conversation.\n\nTell us exactly what you\u2019re training for and what you want to accomplish, along with anything we need to work around. Here, that\u2019s raising the Olympic lifts, getting stronger overhead, pacing long workouts, stringing ring muscle-ups together \u2014 and a note to keep deadlifts below 90%.\n\nThe AI combines your words with your profile and evaluation to build the program around your starting point, your goals, and your preferences.\n\nNot a group program you have to fit into. A program built for you.',
       },
       {
         image: '/images/programming-day-full-v2.png',
         alt: 'A complete training day \u2014 intent, coach bar, warm-up, skills, strength, accessory, metcon, cool-down',
-        title: 'The whole day is built around you',
+        title: 'A complete training day, built for you',
         caption:
           'This is Week 1, Day 2 \u2014 and his goals show up in every block. Midline work for stability. Pause snatches at 72% for positioning and timing. Overhead squats and snatch pulls to support the lifts. A short metcon to practice cycling the bar under fatigue. Warm-up and cool-down are built too \u2014 collapsed here so the main work leads.\n\nThis isn\u2019t a workout generator or a percentage progression. Every block has a purpose, and every block is designed with the others in mind. It\u2019s a complete training day built around the athlete.\n\nAnd it\u2019s not static. Every block has an Edit button and an AI Coach, and the chat can change today\u2019s workout \u2014 ask questions or adjust the training.',
       },
       {
         image: '/images/programming-intent-v2.png',
         alt: 'Today\u2019s Training Intent expanded \u2014 the program explaining the day\u2019s reasoning',
-        title: 'Know what the day is trying to do',
+        title: 'Your pre-workout briefing',
         caption:
           'Before training, the AI Coach walks you through the plan, so you understand how the pieces work together to move you toward your goals \u2014 the purpose of each block, pacing, intensity, and where to prioritize quality over load.\n\nHere it explains why the midline work comes first, what the pause snatches are for \u2014 position and timing, not load \u2014 and why the metcon stays capped at 8 minutes instead of digging a hole.\n\nJust like meeting with your coach when you walk into the gym: you know what you\u2019re doing, why you\u2019re doing it, and how to get the most out of every session.',
       },
       {
         image: '/images/programming-strength-coach.png',
         alt: 'Snatch strength block with Coach open \u2014 game plan and per-movement cues',
-        title: 'Every block carries a coach',
+        title: 'Coaching on every block',
         caption:
           'Tap Coach on any block and you get a game plan, specific points of performance, and the common faults to avoid \u2014 how to approach the work, and what to emphasize to get the intended training benefit.\n\nAll of it informed by your abilities, your goals, and the purpose of the day. Here the cues know his numbers: \u201Cyour OHS at 185 far exceeds this load, so there\u2019s no excuse for a soft catch.\u201D\n\nIt\u2019s like having a personal coach by your side every time you train.',
       },
       {
         image: '/images/programming-metcon-plan.png',
         alt: 'Metcon block with its game plan \u2014 target time, limiter, and pacing',
-        title: 'The metcon, with a game plan',
+        title: 'Personalized pacing strategy',
         caption:
           'Your workout. Your numbers. Your game plan.\n\nEvery metcon comes with a pacing strategy built for you \u2014 not just to finish the workout, but to get the right training stimulus. Here the Coach sets a 5:30\u20137:00 target because it knows 65 lbs is only ~39% of his snatch, and it knows the snatch work from earlier in this same session will make the 21s feel heavier than the load suggests.\n\nWhere to push, where to pace, how to manage fatigue. Coaching makes every session count.',
       },
       {
         image: '/images/programming-accessory-day.png',
         alt: 'Accessory block \u2014 overhead squats and snatch pulls with percentages and rest',
-        title: 'The small work is personalized too',
+        title: 'Every detail has a purpose',
         caption:
           'Every detail matters. Even the accessory work.\n\nYour coach looks at the entire training day \u2014 what the strength work develops, what the skills reinforce, what the metcon delivers \u2014 and uses the accessory block to support it: overhead squats at 70% to strengthen the catch, snatch pulls at 88% to build pull strength above the weights he\u2019s cycling.\n\nNothing is overlooked. Every part of your training works toward making you better \u2014 and like every other block, it comes with coaching guidance to get the intended benefit.',
       },
       {
         image: '/images/programming-coach-change-v2.png',
         alt: 'AI Coach conversation \u2014 hotel-gym dumbbell swap proposed with Apply and Keep original buttons',
-        title: 'Change the plan without losing the purpose',
+        title: 'Your program changes when life does',
         caption:
           'Life changes. Your program changes with you.\n\nDifferent equipment, an injury to work around, short on time, extra skill practice \u2014 just tell us. Here, a hotel gym with no barbell: the coach asks what he actually has, does the math \u2014 a single 50 lb dumbbell keeps the same stimulus as the 65 lb bar \u2014 and writes the change up as a proposal. Apply, or keep the original. Your call, one tap.\n\nThe only way to get more personalized might be to have your coach move in with you.',
       },
