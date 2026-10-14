@@ -49,7 +49,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
   evaluations: {
     title: 'A real evaluation, start to finish',
     intro:
-      'Generated from about five minutes of self-reported input — the same intake you’d do. Read it top to bottom and notice what it’s doing: establishing the facts, weighing them, reasoning its way to a prescription. This is the foundation a program is built from.',
+      'This entire evaluation was generated from about five minutes of self-reported information \u2014 the same information we\u2019ll ask you for.\n\nFollow along as the AI analyzes the athlete\u2019s strengths and weaknesses, identifies what\u2019s holding this athlete back, and determines where training will make the biggest difference.\n\nIt doesn\u2019t just report the numbers. It interprets them, makes coaching decisions, and builds a roadmap for improvement.\n\nAnd if you choose AI Programming, this evaluation becomes the foundation for your personalized training.',
     steps: [
       {
         image: '/images/eval-intake-profile.png',
