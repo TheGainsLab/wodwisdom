@@ -112,7 +112,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'Make it Personal \u2014 schedule, equipment, and goals cards',
         title: 'First, you tell us',
         caption:
-          'Before anything is generated, the program asks for three things: your schedule, your equipment, and your goals.\n\nThe schedule shapes the week. The equipment list is a hard rule \u2014 we never program what you don\u2019t own. And the goals are where you talk to your coach.\n\nEverything that follows on this page was built from what went into these three cards.',
+          'Before anything is generated, the program asks for three things: your schedule, your equipment, and your goals.\n\nThe program fits your life, so you won\u2019t have to scramble to squeeze in training. It\u2019s built around your equipment, so you don\u2019t have to scale or substitute. Your goals connect where you are today with what you\u2019re training to achieve.\n\nEverything that follows on this page was built from what went into these three cards.',
       },
       {
         image: '/images/programming-goals-words.png',
