@@ -229,42 +229,42 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
       {
         image: '/images/programming-logged-metcon.webp',
         alt: 'A logged Fran — 3:32 Rx converted to 3.88 W/kg, 99th percentile, short time domain',
-        title: 'Your score becomes useful',
+        title: 'Every workout tells us something',
         caption:
           'Most workout scores get logged, ranked, and forgotten.\n\nHere, your effort becomes a real data point — power output, watts per kilogram, time domain, movements, and percentile against our competition data.\n\nThat gives you a clearer picture of where your work capacity is strongest and weakest. More importantly, the AI sees the same thing and uses it to shape what comes next.\n\nYour workout history stops being a record of the past. It becomes evidence for your future training.',
       },
       {
         image: '/images/analytics-power-duration.webp',
         alt: 'Power vs Duration chart — every logged metcon as a bar from 3:12 to 17:45, one selected showing its full read and the athlete’s note',
-        title: 'Your workouts become a fitness curve',
+        title: 'See your fitness across every time domain',
         caption:
           'Each logged metcon becomes another point on your personal power-duration curve — from short, high-power efforts to longer tests of sustained work capacity.\n\nNow the pattern becomes visible.\n\nThis athlete produces more power in shorter workouts, then drops off as duration increases. That tells us where fitness is strongest, where it begins to fade, and what the program should do about it.\n\nShort-duration capacity can be maintained while longer-duration work gets more attention.\n\nAnd because every point includes the workout’s movements, duration, output, and your own feedback, the system can drill deeper than the curve alone.\n\nYou see where your fitness breaks down. The AI uses that information to decide what to build next.',
       },
       {
         image: '/images/analytics-performance-grid.png',
         alt: 'Performance Grid \u2014 training percentiles by duration and barbell with evidence counts, plus Skill Cost rows',
-        title: 'Strengths and weaknesses, located',
+        title: 'Find exactly what’s holding you back',
         caption:
           'Every scored metcon lands in this grid \u2014 your percentile by time domain and by barbell, with the evidence count on every cell.\n\nThis athlete holds the 60s and 70s in short and medium work, then drops to the mid-40s in everything long \u2014 the red column is a weakness you can point at. And small samples stay honest: a cell built on one workout reads as a hint, not a verdict.\n\nSkill Cost goes a level deeper: your percentile when a movement shows up versus your training overall. Double-unders cost this athlete 15 points when they appear. HSPU add 20. Tap a row to see the workouts behind it.\n\nYou see exactly where the work is. So does the AI that writes next month.',
       },
       {
         image: '/images/engine-analytics-comparison.webp',
         alt: 'Average pace comparison across day types — anaerobic 45.5, max aerobic power 17.3, endurance 11.5 cal/min',
-        title: 'Your engine isn’t one thing',
+        title: 'Measure every part of your engine',
         caption:
           'Anaerobic power. Max aerobic power. Endurance. Repeatability. They’re different qualities, and they should be measured separately.\n\nHere, the same athlete produces 45.5 cal/min on anaerobic work, 17.3 at max aerobic power, and 11.5 on endurance work — three very different demands on the same machine.\n\nThe Gains Lab tracks more than 20 conditioning stimuli, so you can see exactly where your engine is strongest, where it falls off, and how each quality is changing over time.\n\nThe AI sees the same map — and can target the parts of your conditioning that need the most work.',
       },
       {
         image: '/images/analytics-energy-ratio.webp',
         alt: 'Energy System Paces — Echo Bike bars at 1.00× time trial, 1.10× aerobic, 2.83× glycolytic, with a 2.56× Energy Systems Ratio',
-        title: 'See how your engine is built',
+        title: 'See how your aerobic and anaerobic systems compare',
         caption:
           'Your engine isn’t just “good” or “bad.” It has different parts.\n\nThis view compares what you can sustain near threshold, what you can produce at max aerobic power, and what you can generate at all-out intensity — all relative to your own baseline.\n\nThat shows how your aerobic and anaerobic systems are developed relative to each other, where you rely most heavily on one system, and where there may be room to improve.\n\nYou can also see your average and peak pace across the work you’ve logged.\n\nInstead of one conditioning score, you get a map of how your engine actually works — and the AI can train the parts that need it most.',
       },
       {
         image: '/images/analytics-targets-evolution.webp',
         alt: 'Targets vs Actual — three Max Aerobic Power sessions: targets 15.3, 16.3, 16.8 against actuals 16.3, 18.4, 18.7',
-        title: 'Your results change what comes next',
+        title: 'Your targets improve as you do',
         caption:
           'Logging a result isn’t just adding another score to your history. It tells the system what you’re capable of now.\n\nHere, the athlete beats a Max Aerobic Power target of 15.3 cal/min. The next target rises to 16.3. They beat that too, and the target moves again.\n\nThe system doesn’t simply copy the last score or chase every breakthrough. It uses your performance to keep the next demand challenging, repeatable, and appropriate for your current fitness.\n\nAs you improve, your targets improve with you — so you’re always training the athlete you are today, not the athlete you were two months ago.',
       },
