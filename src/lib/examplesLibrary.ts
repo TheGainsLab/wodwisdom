@@ -161,7 +161,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'AI Coach conversation \u2014 hotel-gym dumbbell swap proposed with Apply and Keep original buttons',
         title: 'Change the plan without losing the purpose',
         caption:
-          'Life changes. This athlete hit a hotel gym with no barbell.\n\nFirst the coach asks what a real coach would ask: what do you actually have? Then it does the math out loud \u2014 65 lbs is about 42% of your power snatch, light and fast, so a single 50 lb dumbbell keeps the same stimulus \u2014 and writes the change up as a proposal: before and after, same ladder, same cap.\n\nApply, or keep the original. Your call, one tap \u2014 and the coach follows up with how to execute the new version.\n\nNot a static program you work around. A program that works around you.',
+          'Life changes. Your program changes with you.\n\nDifferent equipment, an injury to work around, short on time, extra skill practice \u2014 just tell us. Here, a hotel gym with no barbell: the coach asks what he actually has, does the math \u2014 a single 50 lb dumbbell keeps the same stimulus as the 65 lb bar \u2014 and writes the change up as a proposal. Apply, or keep the original. Your call, one tap.\n\nThe only way to get more personalized might be to have your coach move in with you.',
       },
     ],
   },
