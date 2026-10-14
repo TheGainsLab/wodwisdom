@@ -241,6 +241,13 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
           'Each logged metcon becomes another point on your personal power-duration curve — from short, high-power efforts to longer tests of sustained work capacity.\n\nNow the pattern becomes visible.\n\nThis athlete produces more power in shorter workouts, then drops off as duration increases. That tells us where fitness is strongest, where it begins to fade, and what the program should do about it.\n\nShort-duration capacity can be maintained while longer-duration work gets more attention.\n\nAnd because every point includes the workout’s movements, duration, output, and your own feedback, the system can drill deeper than the curve alone.\n\nYou see where your fitness breaks down. The AI uses that information to decide what to build next.',
       },
       {
+        image: '/images/analytics-performance-grid.png',
+        alt: 'Performance Grid \u2014 training percentiles by duration and barbell with evidence counts, plus Skill Cost rows',
+        title: 'Strengths and weaknesses, located',
+        caption:
+          'Every scored metcon lands in this grid \u2014 your percentile by time domain and by barbell, with the evidence count on every cell.\n\nThis athlete holds the 60s and 70s in short and medium work, then drops to the mid-40s in everything long \u2014 the red column is a weakness you can point at. And small samples stay honest: a cell built on one workout reads as a hint, not a verdict.\n\nSkill Cost goes a level deeper: your percentile when a movement shows up versus your training overall. Double-unders cost this athlete 15 points when they appear. HSPU add 20. Tap a row to see the workouts behind it.\n\nYou see exactly where the work is. So does the AI that writes next month.',
+      },
+      {
         image: '/images/engine-analytics-comparison.webp',
         alt: 'Average pace comparison across day types — anaerobic 45.5, max aerobic power 17.3, endurance 11.5 cal/min',
         title: 'Your engine isn’t one thing',
