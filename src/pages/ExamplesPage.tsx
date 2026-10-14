@@ -158,7 +158,7 @@ export default function ExamplesPage({ signedIn = false }: { signedIn?: boolean 
               <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 8px', color: 'var(--text)' }}>
                 {walkthrough.title}
               </h2>
-              <p style={{ color: 'var(--text-dim)', fontSize: 15, lineHeight: 1.55, margin: '0 0 28px' }}>
+              <p style={{ color: 'var(--text-dim)', fontSize: 15, lineHeight: 1.55, margin: '0 0 28px', whiteSpace: 'pre-line' }}>
                 {walkthrough.intro}
               </p>
               {walkthrough.steps.map((s, i) => (
