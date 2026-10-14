@@ -119,7 +119,7 @@ export const EXAMPLE_WALKTHROUGHS: Partial<Record<ExamplesTab, ExampleWalkthroug
         alt: 'The goals card filled in \u2014 goal text, injury note, and preferences',
         title: 'His words, not a template',
         caption:
-          'Here\u2019s what this athlete actually wrote. Goals: raise the Olympic lifts, get stronger overhead, pace long workouts better, string ring muscle-ups together. An injury note: no deadlifts at or above 90%. A preference: he likes Olympic lifts and muscle-ups.\n\nPlain sentences, typed or spoken \u2014 the green check means the AI has it, and your program builds around it.\n\nNo dropdowns. No template. The program is built from your own words.',
+          'You don\u2019t choose a program or a track. You have a conversation.\n\nTell us exactly what you\u2019re training for and what you want to accomplish, along with anything we need to work around. Here, that\u2019s raising the Olympic lifts, getting stronger overhead, pacing long workouts, stringing ring muscle-ups together \u2014 and a note to keep deadlifts below 90%.\n\nThe AI combines your words with your profile and evaluation to build the program around your starting point, your goals, and your preferences.\n\nNot a group program you have to fit into. A program built for you.',
       },
       {
         image: '/images/programming-day-full-v2.png',
