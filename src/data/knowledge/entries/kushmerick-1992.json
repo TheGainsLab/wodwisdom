@@ -8,6 +8,7 @@
   "header": {
     "title_plain": "Slow-twitch muscle refuels twice as fast and has twice the aerobic capacity of fast-twitch — and the two are controlled differently",
     "citation": {
+      "title": "",
       "authors": "Kushmerick MJ, Meyer RA, Brown TR",
       "year": "1992",
       "journal": "Am J Physiol",
@@ -177,7 +178,7 @@
     }
   },
   "layer2": {
-    "what_it_means": "Slow-twitch muscle isn't just \"more enduring\" in a vague sense: in this preparation it had about twice the oxygen-using capacity, recovered its phosphocreatine roughly 2.5 times faster, and barely acidified at workloads that made fast-twitch muscle acidic. That's the physiological basis for the common observation that slow-twitch-dominant athletes recover between efforts quickly and tolerate high-frequency work, and that fast-twitch-dominant athletes need longer rests. It also warns that whole-muscle measurements in humans blend both fibre types, so an individual's recovery curve depends on their fibre mix.",
+    "what_it_means": "Slow-twitch muscle isn't just \"more enduring\" in a vague sense: in this preparation it had about twice the oxygen-using capacity, recovered its phosphocreatine in less than half the time (half-time ~4 min vs ~10 min), and barely acidified at workloads that made fast-twitch muscle acidic. That's the physiological basis for the common observation that slow-twitch-dominant athletes recover between efforts quickly and tolerate high-frequency work, and that fast-twitch-dominant athletes need longer rests. It also warns that whole-muscle measurements in humans blend both fibre types, so an individual's recovery curve depends on their fibre mix.",
     "what_it_doesnt_mean": "It's cat muscle, removed from the body and perfused in a magnet at 30 °C, with three or four muscles per group. Twitch stimulation at up to 2 Hz is nothing like a lift or a sprint. The paper is about how respiration is regulated, not about training; the numbers above should not be quoted as human values. The authors themselves end by warning against \"simplistic mechanistic interpretations.\"",
     "questions_raised": []
   },

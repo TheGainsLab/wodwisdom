@@ -63,6 +63,8 @@ export interface KnowledgeEntry {
   header: {
     title_plain: string;
     citation: {
+      /** The paper's own title, verbatim from the source ("" until entered). */
+      title: string;
       authors: string;
       year: string;
       journal: string;

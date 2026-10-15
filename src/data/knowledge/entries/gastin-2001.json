@@ -8,6 +8,7 @@
   "header": {
     "title_plain": "Aerobic energy matters much sooner than coaches think: a 75-second all-out effort is already half aerobic",
     "citation": {
+      "title": "",
       "authors": "Gastin PB",
       "year": "2001",
       "journal": "Sports Med",
@@ -57,7 +58,7 @@
     }
   },
   "layer2": {
-    "what_it_means": "Anything longer than about a minute at max effort is mostly aerobic, and anything longer than 20–30 seconds is already mostly aerobic by its second half. A 400 m, a 500 m row, a 2-minute AMRAP: these are aerobic events with an anaerobic start, not the reverse. The practical corollary is that aerobic fitness determines performance in \"anaerobic\" work far more than old charts suggest, and that repeated sprints become progressively more aerobic as the anaerobic systems run down — by the tenth 6-second sprint, glycolysis has nearly stopped and the oxidative system is doing the work.",
+    "what_it_means": "Anything longer than about a minute at max effort is mostly aerobic, and anything longer than 20–30 seconds is already mostly aerobic by its second half. An 800 m run, a 90-second all-out bike, a 2-minute AMRAP: these are aerobic events with an anaerobic start, not the reverse. The practical corollary is that aerobic fitness determines performance in \"anaerobic\" work far more than old charts suggest, and that repeated sprints become progressively more aerobic as the anaerobic systems run down — by the tenth 6-second sprint, glycolysis has nearly stopped and the oxidative system is doing the work.",
     "what_it_doesnt_mean": "This doesn't say the anaerobic systems are unimportant — in the first 10 seconds they supply 94% of energy, and in a 30-second sprint still 73%. It doesn't give the time course of each system within a bout (the summary curve is cumulative). The ±10% band is wide, and every anaerobic estimate is indirect. \"Aerobic\" here means oxygen use by the working muscle, not \"easy\": the aerobic system at 90% of max is hard work.",
     "questions_raised": []
   },
