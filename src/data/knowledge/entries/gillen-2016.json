@@ -1,0 +1,228 @@
+{
+  "id": "gillen-2016",
+  "slug": "gillen-2016",
+  "source_pdf": "12_weeks_sprint_interval_.pdf",
+  "shape": "intervention",
+  "document_type": "journal article",
+  "meta_analysis": false,
+  "header": {
+    "title_plain": "Three 20-second all-out sprints in a 10-minute session, three times a week, raised fitness 19% and improved insulin sensitivity in sedentary men, much as 45 minutes of steady cycling did.",
+    "citation": {
+      "authors": "Gillen JB, Martin BJ, MacInnis MJ, Skelly LE, Tarnopolsky MA, Gibala MJ",
+      "year": "2016",
+      "journal": "PLoS ONE",
+      "volume_issue_pages": "11(4): e0154075",
+      "doi": "10.1371/journal.pone.0154075"
+    },
+    "topics": [
+      "sprint-interval",
+      "sit",
+      "hiit",
+      "interval-training",
+      "moderate-continuous-training",
+      "steady-state-cardio",
+      "time-efficient-training",
+      "vo2peak",
+      "insulin-sensitivity",
+      "mitochondria",
+      "cardiometabolic-health",
+      "sedentary-beginners"
+    ],
+    "evidence_type": "Three-arm controlled training study over 12 weeks: sprint interval training (n = 9), moderate continuous training (n = 10) and non-training control (n = 6), 27 sedentary men enrolled, matched for age, BMI and VO2peak and assigned to groups; not stated as randomised; blinding not stated.",
+    "confidence": {
+      "level": "moderate",
+      "why": "Has a non-training control group and robust measures (IVGTT, muscle biopsies, lab VO2peak test), but groups are small, assignment is not stated as randomised, and some outcomes were analysed on reduced n."
+    },
+    "practical_relevance": {
+      "level": "high",
+      "why": "Gives a specific, short protocol (10 min including warm-up, 3 x 20 s all-out) that produced the same size of VO2peak gain as 45 min of moderate cycling in sedentary men, which bears directly on what a coach can program for time-poor beginners."
+    },
+    "author_stance": "none apparent; the senior author's group has previously published on the same brief SIT protocol (Gillen et al. 2014, ref 17), which this study builds on.",
+    "funding_and_conflicts": "Funded by an NSERC operating grant (RGPIN/227858-2010) and an internally sponsored McMaster University research grant to MJG; JBG, MJM and LES held NSERC scholarships/fellowships. Authors declare no competing interests."
+  },
+  "layer1": {
+    "intervention": {
+      "groups": [
+        {
+          "name": "Sprint interval training (SIT)",
+          "protocol": "Stationary bike (electronically braked ergometer). 2 min warm-up at 50 W; 3 x 20 s 'all-out' sprints against 0.05 kg/kg body mass (~500 W), with 2 min easy cycling at 50 W between sprints; 3 min cool-down at 50 W. 10 min total, 1 min of hard work per session. Loads adjusted to keep relative intensity as fitness rose.",
+          "per_week": "3 sessions (lead-in: 1 session in week 1, 2 in week 2; week 7 two sessions replaced by mid-training testing); 31 ± 1 sessions completed",
+          "n_enrolled": "10 (one dropout for reasons unrelated to the study)",
+          "n_analysed": "9 (8 for blood analyses)",
+          "age": "27 ± 7 y",
+          "sex": "male",
+          "training_status": "sedentary (IPAQ score < 600 MET-minutes per week)",
+          "other": "Weight 84 ± 23 kg; BMI 27 ± 5 kg/m2; VO2peak 32 ± 7 ml/kg/min. Mean HR over sessions 79 ± 4% HRmax; mean RPE 16 ± 1 (Borg 6-20); ~60 kJ work per session."
+        },
+        {
+          "name": "Moderate-intensity continuous training (MICT)",
+          "protocol": "Stationary bike. 2 min warm-up at 50 W; 45 min continuous cycling at ~70% of maximal heart rate (~110 W; target band 64-76% HRmax); 3 min cool-down at 50 W. 50 min total. Loads adjusted to keep relative intensity as fitness rose.",
+          "per_week": "3 sessions (same lead-in and week-7 arrangement as SIT); 32 ± 2 sessions completed",
+          "n_enrolled": "11 (one dropout for reasons unrelated to the study)",
+          "n_analysed": "10 (9 for body composition)",
+          "age": "28 ± 9 y",
+          "sex": "male",
+          "training_status": "sedentary (IPAQ score < 600 MET-minutes per week)",
+          "other": "Weight 84 ± 20 kg; BMI 26 ± 6 kg/m2; VO2peak 33 ± 6 ml/kg/min (Table 1; abstract gives 34 ± 6). Mean HR over sessions 71 ± 5% HRmax; mean RPE 13 ± 1; ~310 kJ work per session."
+        },
+        {
+          "name": "Non-training control (CTL)",
+          "protocol": "No training. Did not attend the lab during the 12 weeks except for mid-point testing in week 7.",
+          "per_week": "0",
+          "n_enrolled": "6",
+          "n_analysed": "6 (5 for body composition)",
+          "age": "26 ± 8 y",
+          "sex": "male",
+          "training_status": "sedentary (IPAQ score < 600 MET-minutes per week)",
+          "other": "Weight 78 ± 25 kg; BMI 25 ± 7 kg/m2; VO2peak 32 ± 7 ml/kg/min."
+        }
+      ],
+      "design_notes": "Duration 12 weeks of training. 27 sedentary men, matched for age, BMI and VO2peak and assigned to SIT, MICT or CTL; the paper does not state that assignment was randomised and does not mention blinding. No baseline differences between groups for any variable in Table 1. One dropout in each training group (reasons unrelated to the study). Reduced n for specific outcomes: body composition analysed on n = 9 (MICT) and n = 5 (CTL); blood analyses on n = 8 (SIT), 'due to difficulties during data collection'. All training was on a cycle ergometer in the lab with HR monitored; RPE recorded at sessions 1, 15 and 30. VO2peak measured on a ramp cycle test at baseline, 6 weeks and ~1 week after training. Insulin sensitivity measured by 50-min intravenous glucose tolerance test (IVGTT, CSI index of Tura et al.) after a 10-h fast and a standardised evening meal, 72 h after the last session. Body fat by air-displacement plethysmography (BodPod). Muscle biopsy (vastus lateralis) 96 h after training; citrate synthase and beta-HAD activity, and electron transport chain subunits and GLUT4 by western blot. Diet across the 12 weeks is not described as controlled. Statistics: two-way ANOVA (group x time) with Tukey post hoc; p < 0.05. No equivalence or non-inferiority test between SIT and MICT. Authors' limitations/caveats: mechanisms for the VO2peak gain unknown; time course of muscle remodelling not examined; SIT 'requires a very high level of motivation and is clearly not suited for everyone'; real-world effectiveness and adherence remain contentious; large-scale randomised trials needed.",
+      "measured": [
+        { "outcome": "VO2peak (relative)", "unit": "ml/kg/min", "group": "SIT", "before": "32 ± 7", "after": "38 ± 8", "change": "+19%; ~+12% at 6 weeks", "significant": "yes", "note": "p < 0.001 vs pre; further rise from 6 to 12 weeks p = 0.007." },
+        { "outcome": "VO2peak (relative)", "unit": "ml/kg/min", "group": "MICT", "before": "34 ± 6", "after": "40 ± 8", "change": "+19%; ~+12% at 6 weeks", "significant": "yes", "note": "p < 0.001 vs pre; further rise from 6 to 12 weeks p = 0.005. Table 1 gives baseline 33 ± 6. Absolute change ~6 ml/kg/min in both training groups, ~1.7 METs." },
+        { "outcome": "VO2peak (relative)", "unit": "ml/kg/min", "group": "CTL", "before": "32 ± 7", "after": "~32 (approx., from Fig 1)", "change": "only small changes", "significant": "no", "note": "p = 0.43 at 6 weeks, p = 0.99 at 12 weeks." },
+        { "outcome": "VO2peak (absolute)", "unit": "L/min", "group": "SIT", "before": "2.6 ± 0.8", "after": "3.0 ± 0.7", "change": "+0.4 L/min (calculated from Table 2)", "significant": "yes", "note": "Time x group p < 0.0001." },
+        { "outcome": "VO2peak (absolute)", "unit": "L/min", "group": "MICT", "before": "2.7 ± 0.5", "after": "3.2 ± 0.5", "change": "+0.5 L/min (calculated from Table 2)", "significant": "yes", "note": "" },
+        { "outcome": "VO2peak (absolute)", "unit": "L/min", "group": "CTL", "before": "2.5 ± 0.7", "after": "2.5 ± 0.7", "change": "none", "significant": "no", "note": "" },
+        { "outcome": "Max workload on VO2peak test", "unit": "W", "group": "SIT", "before": "243 ± 68", "after": "275 ± 50", "change": "+32 W (calculated)", "significant": "yes", "note": "Time x group p < 0.0001." },
+        { "outcome": "Max workload on VO2peak test", "unit": "W", "group": "MICT", "before": "248 ± 30", "after": "271 ± 33", "change": "+23 W (calculated)", "significant": "yes", "note": "" },
+        { "outcome": "Max workload on VO2peak test", "unit": "W", "group": "CTL", "before": "219 ± 60", "after": "213 ± 52", "change": "-6 W (calculated)", "significant": "no", "note": "" },
+        { "outcome": "Insulin sensitivity index (CSI, from IVGTT)", "unit": "x 10^-4 min^-1 [µU/mL]^-1", "group": "SIT", "before": "4.9 ± 2.5", "after": "7.5 ± 4.7", "change": "+53%", "significant": "yes", "note": "p = 0.002. Blood analyses n = 8." },
+        { "outcome": "Insulin sensitivity index (CSI, from IVGTT)", "unit": "x 10^-4 min^-1 [µU/mL]^-1", "group": "MICT", "before": "5.0 ± 3.3", "after": "6.7 ± 5.0", "change": "+34%", "significant": "yes", "note": "p = 0.013. Time x group p = 0.039." },
+        { "outcome": "Insulin sensitivity index (CSI, from IVGTT)", "unit": "x 10^-4 min^-1 [µU/mL]^-1", "group": "CTL", "before": "7.4 ± 5.8", "after": "7.0 ± 4.9", "change": "small", "significant": "no", "note": "p = 0.64 (Results p.5); abstract gives p = 0.63." },
+        { "outcome": "Glucose area under the curve, 0-50 min of IVGTT", "unit": "mmol/L", "group": "SIT", "before": "303 ± 92", "after": "225 ± 75", "change": "-78 (calculated)", "significant": "yes", "note": "p < 0.001. Time x group p = 0.004." },
+        { "outcome": "Glucose area under the curve, 0-50 min of IVGTT", "unit": "mmol/L", "group": "MICT", "before": "321 ± 144", "after": "257 ± 103", "change": "-64 (calculated)", "significant": "yes", "note": "p = 0.001." },
+        { "outcome": "Glucose area under the curve, 0-50 min of IVGTT", "unit": "mmol/L", "group": "CTL", "before": "201 ± 52", "after": "222 ± 54", "change": "+21 (calculated)", "significant": "no", "note": "p = 0.32." },
+        { "outcome": "Body fat", "unit": "%", "group": "SIT", "before": "30 ± 7", "after": "28 ± 8", "change": "-2 percentage points (calculated)", "significant": "yes", "note": "p = 0.011. Time x group p = 0.012." },
+        { "outcome": "Body fat", "unit": "%", "group": "MICT", "before": "27 ± 10", "after": "25 ± 10", "change": "-2 percentage points (calculated)", "significant": "yes", "note": "p = 0.011. Body composition n = 9." },
+        { "outcome": "Body fat", "unit": "%", "group": "CTL", "before": "24 ± 6", "after": "25 ± 6", "change": "+1 percentage point (calculated)", "significant": "no", "note": "p = 0.12. Body composition n = 5." },
+        { "outcome": "Citrate synthase maximal activity (mitochondrial content marker)", "unit": "mmol/kg protein/h", "group": "SIT", "before": "~3.0 (approx., from Fig 3A)", "after": "~4.5 (approx., from Fig 3A)", "change": "+48%", "significant": "yes", "note": "p < 0.0001; higher than CTL post-training (p = 0.03)." },
+        { "outcome": "Citrate synthase maximal activity (mitochondrial content marker)", "unit": "mmol/kg protein/h", "group": "MICT", "before": "~3.5 (approx., from Fig 3A)", "after": "~4.4 (approx., from Fig 3A)", "change": "+27%", "significant": "yes", "note": "p = 0.004; higher than CTL post-training (p = 0.03)." },
+        { "outcome": "Citrate synthase maximal activity (mitochondrial content marker)", "unit": "mmol/kg protein/h", "group": "CTL", "before": "~3.6 (approx., from Fig 3A)", "after": "~3.6 (approx., from Fig 3A)", "change": "small", "significant": "no", "note": "p = 0.97 (abstract)." },
+        { "outcome": "Electron transport chain proteins (Complex II-70kDa, Complex III-Core 2, COX IV, ATP synthase alpha)", "unit": "fold change vs pre", "group": "SIT", "before": "1.0", "after": "~1.3-1.8 (approx., from Fig 3C)", "change": "increased", "significant": "yes", "note": "Complex II p < 0.001; Complex III p < 0.001; COX IV p < 0.001; ATP synthase p = 0.001; all higher than CTL post-training (p < 0.05)." },
+        { "outcome": "Electron transport chain proteins (Complex II-70kDa, Complex III-Core 2, COX IV, ATP synthase alpha)", "unit": "fold change vs pre", "group": "MICT", "before": "1.0", "after": "~1.2-1.5 (approx., from Fig 3C)", "change": "increased", "significant": "yes", "note": "Complex II p = 0.02; Complex III p = 0.003; COX IV p = 0.001; ATP synthase p = 0.004; all higher than CTL post-training (p < 0.05)." },
+        { "outcome": "GLUT4 protein content", "unit": "arbitrary units (relative to pre)", "group": "SIT", "before": "1.0 ± 0.6", "after": "1.6 ± 0.6", "change": "~+50%", "significant": "yes", "note": "p = 0.001. Time x group p = 0.021." },
+        { "outcome": "GLUT4 protein content", "unit": "arbitrary units (relative to pre)", "group": "MICT", "before": "1.0 ± 0.6", "after": "1.5 ± 0.6", "change": "~+50%", "significant": "yes", "note": "p = 0.002." },
+        { "outcome": "GLUT4 protein content", "unit": "arbitrary units (relative to pre)", "group": "CTL", "before": "1.0 ± 0.4", "after": "0.9 ± 0.4", "change": "little change", "significant": "no", "note": "p = 0.50." },
+        { "outcome": "Body weight", "unit": "kg", "group": "SIT / MICT / CTL", "before": "84 ± 23 / 84 ± 20 / 78 ± 25", "after": "83 ± 22 / 82 ± 20 / 78 ± 23", "change": "remained similar in all groups", "significant": "no", "note": "Time x group p = 0.364." },
+        { "outcome": "BMI", "unit": "kg/m2", "group": "SIT / MICT / CTL", "before": "27 ± 5 / 26 ± 6 / 25 ± 7", "after": "26 ± 5 / 26 ± 6 / 25 ± 7", "change": "unchanged", "significant": "no", "note": "Time x group p = 0.334." },
+        { "outcome": "Fasting plasma glucose", "unit": "mmol/L", "group": "SIT / MICT / CTL", "before": "5.0 ± 1.2 / 5.3 ± 0.8 / 5.5 ± 1.6", "after": "5.4 ± 0.8 / 5.7 ± 0.9 / 5.4 ± 0.8", "change": "no significant change", "significant": "no", "note": "Time x group p = 0.284. SIT blood n = 8." },
+        { "outcome": "Fasting plasma insulin", "unit": "µIU/mL", "group": "SIT / MICT / CTL", "before": "9.5 ± 5.3 / 10.1 ± 6.0 / 7.5 ± 6.4", "after": "7.8 ± 4.1 / 8.4 ± 6.9 / 10.8 ± 13.2", "change": "no significant change", "significant": "no", "note": "Time x group p = 0.135." },
+        { "outcome": "HOMA-IR", "unit": "index", "group": "SIT / MICT / CTL", "before": "2.1 ± 1.3 / 2.4 ± 1.6 / 2.0 ± 2.3", "after": "1.9 ± 1.0 / 2.3 ± 2.1 / 2.7 ± 3.7", "change": "no significant change", "significant": "no", "note": "Time x group p = 0.348." },
+        { "outcome": "Glucose disappearance rate (KG, 10-50 min of IVGTT)", "unit": "%/min", "group": "SIT / MICT / CTL", "before": "2.1 ± 0.9 / 2.0 ± 0.9 / 2.1 ± 0.6", "after": "2.4 ± 0.8 / 2.1 ± 0.7 / 2.1 ± 0.7", "change": "no significant change", "significant": "no", "note": "Time x group p = 0.576." },
+        { "outcome": "Insulin area under the curve, 10-50 min of IVGTT", "unit": "µIU/ml", "group": "SIT / MICT / CTL", "before": "1231 ± 705 / 1171 ± 591 / 1095 ± 843", "after": "1149 ± 844 / 1007 ± 545 / 1158 ± 908", "change": "no significant change", "significant": "no", "note": "Time x group p = 0.353." },
+        { "outcome": "Insulin area under the curve, 0-50 min of IVGTT", "unit": "µIU/ml", "group": "SIT / MICT / CTL", "before": "1515 ± 917 / 1423 ± 712 / 1317 ± 946", "after": "1454 ± 1065 / 1223 ± 647 / 1425 ± 1035", "change": "no significant change", "significant": "no", "note": "Time x group p = 0.209." },
+        { "outcome": "Beta-HAD maximal activity (fat-oxidation enzyme)", "unit": "mmol/kg protein/h", "group": "SIT / MICT / CTL", "before": "not printed", "after": "not printed", "change": "+28% / +17% / -2%", "significant": "no", "note": "No time x group interaction (p = 0.16)." },
+        { "outcome": "Complex I NDUFA9 protein", "unit": "fold change vs pre", "group": "SIT / MICT / CTL", "before": "1.0", "after": "~1.6 / ~1.5 / ~0.7 (approx., from Fig 3C)", "change": "not reported in text", "significant": "no", "note": "No significance markers on this protein in Fig 3C; not listed among the subunits that increased." }
+      ]
+    }
+  },
+  "layer2": {
+    "what_it_means": "Ten minutes on a bike with three 20-second all-out sprints, done three times a week for 12 weeks, raised aerobic fitness in sedentary men by the same proportion as 45 minutes of steady cycling at about 70% of maximal heart rate. VO2peak rose 19% in both training groups (sprint group 32 to 38 ml/kg/min; continuous group 34 to 40 ml/kg/min) while the controls did not change. Insulin sensitivity, measured with an intravenous glucose tolerance test, rose 53% after sprint training and 34% after continuous training. Citrate synthase, a marker of how much mitochondria the muscle holds, rose 48% and 27%, and GLUT4, the protein that lets muscle take in glucose, rose about 50% in both. Body fat fell by about two percentage points in both training groups. The sprint group did around 60 kJ of work per session against about 310 kJ, and 1 minute of hard effort inside 10 minutes against 50 minutes. For a time-poor beginner who can tolerate maximal efforts, 3 x 20 s all-out with 2 minutes easy between, three times a week, is a supported way to build aerobic fitness and improve how muscle handles glucose.",
+    "what_it_doesnt_mean": "It does not show that the two programmes are equivalent. Both improved compared with control and their results were similar, but the authors ran no equivalence test, and groups of 9 and 10 men are small. The paper does not say assignment was randomised; men were matched and assigned. There were only 6 controls, and blood and body-composition results come from even smaller groups (8 in the sprint group for blood, 9 and 5 for body composition). Everyone was a sedentary man aged about 27; nothing here applies directly to women, older adults, trained athletes or people with diabetes. Body weight, fasting glucose, fasting insulin and HOMA-IR did not change in any group, so the insulin benefit appeared only in the dynamic glucose test. Diet over the 12 weeks is not described as controlled. Every session was supervised in a lab on a bike, sprints were rated about 16 out of 20 for effort, and the authors say this kind of training needs very high motivation and is not suited to everyone. Adherence outside the lab was not tested.",
+    "questions_raised": []
+  },
+  "translation": [
+    "Protocol: on a bike, 2 min easy warm-up, then 3 x 20 s flat-out sprints with 2 min easy pedalling between, then 3 min easy cool-down: 10 min total, 3 times a week for 12 weeks.",
+    "Comparison group: 45 min steady cycling at about 70% of max heart rate (50 min with warm-up and cool-down), 3 times a week.",
+    "Result: VO2peak went up 19% in both groups (about 6 ml/kg/min), even though the sprint group did 1 minute of hard work per session.",
+    "Insulin sensitivity rose 53% with sprints and 34% with steady cycling; body weight did not change in either group."
+  ],
+  "glossary_candidates": [
+    { "term": "VO2peak", "definition": "The highest rate of oxygen use reached in an all-out exercise test, a standard measure of aerobic fitness, usually given in millilitres per kilogram of body weight per minute.", "confidence_term_is_new": "unsure" },
+    { "term": "Sprint interval training (SIT)", "definition": "Short bursts of all-out effort (here 20 seconds) separated by easy recovery; a subset of high-intensity interval training.", "confidence_term_is_new": "unsure" },
+    { "term": "Moderate-intensity continuous training (MICT)", "definition": "Steady exercise held at a moderate effort for a long block, such as 45 minutes of cycling at about 70% of max heart rate.", "confidence_term_is_new": "likely" },
+    { "term": "Insulin sensitivity", "definition": "How strongly the body responds to insulin by clearing sugar from the blood; higher sensitivity means less insulin is needed for the same effect.", "confidence_term_is_new": "unsure" },
+    { "term": "Intravenous glucose tolerance test (IVGTT)", "definition": "A test in which sugar is given directly into a vein and blood is sampled repeatedly to see how quickly the body clears it and how much insulin it releases.", "confidence_term_is_new": "likely" },
+    { "term": "CSI (insulin sensitivity index)", "definition": "A number calculated from a 50-minute IVGTT that summarises insulin sensitivity; higher is better.", "confidence_term_is_new": "likely" },
+    { "term": "HOMA-IR", "definition": "An estimate of insulin resistance worked out from a single fasting blood glucose and insulin value; higher means more resistant.", "confidence_term_is_new": "likely" },
+    { "term": "Area under the curve (AUC)", "definition": "The total amount of something (here blood glucose or insulin) over the length of a test, rather than its value at one moment.", "confidence_term_is_new": "likely" },
+    { "term": "Citrate synthase", "definition": "An enzyme found inside mitochondria; how active it is in a muscle sample is used as a marker of how much mitochondria the muscle has.", "confidence_term_is_new": "likely" },
+    { "term": "Mitochondria", "definition": "The parts of a cell that use oxygen to produce energy; more of them means muscle can do more aerobic work.", "confidence_term_is_new": "unsure" },
+    { "term": "Beta-HAD", "definition": "An enzyme in the pathway muscle uses to burn fat; its activity is used as a marker of fat-burning capacity.", "confidence_term_is_new": "likely" },
+    { "term": "GLUT4", "definition": "A protein that moves sugar from the blood into muscle cells; more of it helps muscle take up glucose.", "confidence_term_is_new": "likely" },
+    { "term": "Electron transport chain", "definition": "The set of protein complexes inside mitochondria that use oxygen to make usable energy; their amount is another marker of mitochondrial content.", "confidence_term_is_new": "likely" },
+    { "term": "Muscle biopsy", "definition": "A small piece of muscle (here about 100 mg from the outer thigh) removed with a needle under local anaesthetic for lab analysis.", "confidence_term_is_new": "unsure" },
+    { "term": "Sedentary", "definition": "Doing little physical activity; here defined as scoring under 600 MET-minutes per week on a standard activity questionnaire.", "confidence_term_is_new": "unsure" },
+    { "term": "MET (metabolic equivalent)", "definition": "A unit of exercise intensity where 1 MET is the energy used sitting at rest; 'MET-minutes' multiplies intensity by time.", "confidence_term_is_new": "unsure" },
+    { "term": "Control group", "definition": "Participants who do not get the training, so that changes from simply being in the study or the passage of time can be separated from the effect of training.", "confidence_term_is_new": "unsure" },
+    { "term": "Randomised", "definition": "Assigned to groups by chance, which protects against the groups differing in ways the researchers did not measure; this paper says participants were matched and assigned, not randomised.", "confidence_term_is_new": "unsure" },
+    { "term": "Statistically significant", "definition": "A result unlikely to be due to chance alone by the study's chosen threshold (here p < 0.05); it says nothing on its own about how large or important the effect is.", "confidence_term_is_new": "unsure" },
+    { "term": "RPE (rating of perceived exertion)", "definition": "A person's own rating of how hard exercise feels; here on the Borg 6-20 scale, where 13 is 'somewhat hard' and 16 is between 'hard' and 'very hard'.", "confidence_term_is_new": "unsure" }  ],
+  "charts": [
+    {
+      "template": "before_after_bars",
+      "title": "VO2peak before and after 12 weeks",
+      "series": [
+        { "label": "SIT (3 x 20 s, 10 min)", "before": 32, "after": 38 },
+        { "label": "MICT (45 min steady)", "before": 34, "after": 40 },
+        { "label": "Control", "before": 32, "after": 32 }
+      ],
+      "units": "ml/kg/min",
+      "approximate": true,
+      "note": "SIT and MICT values from the abstract (p.1). Control baseline from Table 1; control post value read from Fig 1 (approx.). Table 1 gives MICT baseline as 33 ± 6. Both training groups +19% (p < 0.001); control p = 0.99."
+    },
+    {
+      "template": "grouped_change_bars",
+      "title": "Percent change after 12 weeks, main outcomes",
+      "series": [
+        { "group": "SIT", "values": [ { "label": "VO2peak", "value": 19 }, { "label": "Insulin sensitivity (CSI)", "value": 53 }, { "label": "Citrate synthase", "value": 48 }, { "label": "GLUT4", "value": 50 }, { "label": "Beta-HAD", "value": 28 } ] },
+        { "group": "MICT", "values": [ { "label": "VO2peak", "value": 19 }, { "label": "Insulin sensitivity (CSI)", "value": 34 }, { "label": "Citrate synthase", "value": 27 }, { "label": "GLUT4", "value": 50 }, { "label": "Beta-HAD", "value": 17 } ] },
+        { "group": "Control", "values": [ { "label": "VO2peak", "value": 0 }, { "label": "Insulin sensitivity (CSI)", "value": -5 }, { "label": "Citrate synthase", "value": 0 }, { "label": "GLUT4", "value": -10 }, { "label": "Beta-HAD", "value": -2 } ] }
+      ],
+      "units": "% change from pre-training",
+      "approximate": true,
+      "note": "SIT/MICT percentages as printed (pp.5-8); GLUT4 printed as '~50%' for both. Control percentages are not printed except beta-HAD (-2%): VO2peak, CSI and GLUT4 control values calculated from Table 2 means (2.5 -> 2.5 L/min; 7.4 -> 7.0; 1.0 -> 0.9); control citrate synthase read from Fig 3A (approx.). Beta-HAD change was not significant (interaction p = 0.16)."
+    },
+    {
+      "template": "timeline",
+      "title": "Study timeline",
+      "series": [
+        { "label": "Baseline testing", "start": 0, "end": 0, "note": "VO2peak test; ~5 days later body composition and IVGTT; ~2 days later muscle biopsy; at least 5 days later exercise familiarisation." },
+        { "label": "Lead-in", "start": 1, "end": 2, "note": "1 session in week 1, 2 sessions in week 2." },
+        { "label": "Training, 3 sessions per week", "start": 3, "end": 12, "note": "SIT 10 min / MICT 50 min per session; loads adjusted to keep relative intensity." },
+        { "label": "Mid-training VO2peak test", "start": 7, "end": 7, "note": "Two week-7 sessions replaced by testing; controls attended only this visit during the 12 weeks. VO2peak ~+12% at 6 weeks in both training groups." },
+        { "label": "Post-testing", "start": 12, "end": 13, "note": "Body composition and IVGTT 72 h after last session; biopsy 96 h after; VO2peak test ~1 week after training." }
+      ],
+      "units": "weeks",
+      "approximate": false,
+      "note": "Baseline test day intervals are given in days in the paper and are not placed on a week number; shown at week 0."
+    },
+    {
+      "template": "population_card",
+      "title": "Who was studied",
+      "series": [
+        { "n": "25 analysed (SIT 9, MICT 10, CTL 6) of 27 enrolled", "sex_split": "100% male", "age": "27 ± 8 y (abstract); group means 26-28 y", "status": "sedentary (IPAQ < 600 MET-min/week)", "other": "BMI 26 ± 6 kg/m2; baseline VO2peak 32-33 ml/kg/min; matched for age, BMI and VO2peak; not stated as randomised; reduced n for blood (SIT 8) and body composition (MICT 9, CTL 5)." }
+      ],
+      "units": "",
+      "approximate": false,
+      "note": ""
+    }
+  ],
+  "verification_notes": [
+    "Citation, received/accepted/published dates, DOI 10.1371/journal.pone.0154075, PLoS ONE 11(4): e0154075: p.1 (left column)",
+    "Funding (NSERC RGPIN/227858-2010, McMaster internal grant, scholarships): p.1 left column; competing interests none: p.2 left column",
+    "Abstract: age 27 ± 8 y, BMI 26 ± 6 kg/m2, n = 9/10/6, SIT ~500 W, 2 min at 50 W, MICT ~110 W at ~70% HRmax, 2 min warm-up and 3 min cool-down: p.1",
+    "Abstract: VO2peak +19% both groups, SIT 32 ± 7 to 38 ± 8, MICT 34 ± 6 to 40 ± 8 ml/kg/min, p < 0.001; CSI SIT 4.9 ± 2.5 to 7.5 ± 4.7 (p = 0.002), MICT 5.0 ± 3.3 to 6.7 ± 5.0 (p = 0.013); control p = 0.99 (VO2peak), 0.63 (CSI), 0.97 (CS): p.1",
+    "27 sedentary men, IPAQ < 600 MET-minutes/week, matched for age, BMI and VO2peak and 'assigned'; no mention of randomisation; one dropout per training group: p.3 'Subjects and Ethics Approval'",
+    "Baseline characteristics by group (age, height, weight, BMI, VO2peak 33/32/32 ml/kg/min, L/min, max workload), no baseline differences: Table 1, p.3",
+    "Testing methods: VO2peak ramp test 1 W per 2 s; IVGTT after 10-h fast, standardised meal 561 ± 99 kcal; BodPod; biopsy ~100 mg vastus lateralis: pp.3-4",
+    "Familiarisation, MICT target 64-76% HRmax; lead-in 1 session week 1, 2 sessions week 2; week 7 mid-assessment; SIT 3 x 20 s against 0.05 kg/kg body mass with 2 min at 50 W; MICT 45 min at ~70% HRmax; 2-min warm-up, 3-min cool-down; 10- and 50-min sessions; RPE at sessions 1, 15, 30; controls only attended week 7: p.4 '12-week training intervention'",
+    "Post-testing timing: body composition and IVGTT 72 h, biopsy 96 h, VO2peak ~1 week after training: p.4 'Post-testing'",
+    "CSI formula (Tura et al.), HOMA-IR: p.4",
+    "Statistics (two-way ANOVA, Tukey, p < 0.05); reduced n: body composition MICT 9, CTL 5; blood SIT 8: p.5 'Statistics'",
+    "Sessions completed 31 ± 1 (SIT) and 32 ± 2 (MICT); mean HR 79 ± 4% and 71 ± 5% HRmax; RPE 16 ± 1 and 13 ± 1; work ~60 and ~310 kJ per session; body mass similar; body fat decreased SIT p = 0.011, MICT p = 0.011, CON p = 0.12: p.5 'Descriptive characteristics of training'",
+    "VO2peak ~12% at 6 weeks (p < 0.001), further rise 6 to 12 weeks (p = 0.007 SIT, p = 0.005 MICT), 19% overall; CTL p = 0.43 at 6 wk and p = 0.99 at 12 wk: p.5 'Cardiorespiratory fitness'; Fig 1, p.6",
+    "Control VO2peak post value ~32 ml/kg/min: approx., from Fig 1, p.6",
+    "CSI +53% SIT (p = 0.002), +34% MICT (p = 0.013), CON p = 0.64; glucose AUC reduced SIT p < 0.001, MICT p = 0.001, CON p = 0.32: p.5 'Indices of glycemic control'; Fig 2, p.7",
+    "All pre/post values for weight, BMI, % fat, VO2peak (L/min), max workload, CSI, KG, insulin AUCs, glucose AUC, FPG, FPI, HOMA-IR, GLUT4 and Time/Group/T x G p values: Table 2, p.6",
+    "Citrate synthase +48% SIT (p < 0.0001), +27% MICT (p = 0.004), higher than CTL post (p = 0.03); ETC subunit p values: p.6 'Skeletal muscle adaptations'; Fig 3A-C, p.7",
+    "Citrate synthase pre/post bar heights and ETC fold changes (incl. NDUFA9): approx., from Fig 3A and Fig 3C, p.7",
+    "Beta-HAD +28% SIT, +17% MICT, -2% CTL, interaction p = 0.16; GLUT4 ~50% increase SIT p = 0.001, MICT p = 0.002, CTL p = 0.50: p.8 top",
+    "Absolute VO2peak change ~6 ml/kg/min, ~1.7 METs: p.8 'Cardiorespiratory fitness'",
+    "Authors' limitations: mechanisms for VO2peak gain unknown (p.9); time course of muscle remodelling not examined (p.10); SIT needs very high motivation and is not suited for everyone, large-scale randomised trials needed (pp.10-11 'Conclusion'); effectiveness/adherence contentious (p.10 'Efficacy versus Effectiveness')",
+    "Authors' wording 'to the same extent' / 'as effective as' (p.2 Conclusions, p.8, p.10); no equivalence or non-inferiority test described in Statistics (p.5)",
+    "Calculated values (absolute changes, control % changes for VO2peak, CSI, GLUT4) are arithmetic on Table 2 means, labelled 'calculated' in the entry"
+  ]
+}

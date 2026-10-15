@@ -1,0 +1,290 @@
+{
+  "accumulated-oxygen-deficit": [
+    "gastin-1995"
+  ],
+  "aerobic": [
+    "gastin-2001"
+  ],
+  "all-out-test": [
+    "gastin-1995"
+  ],
+  "anaerobic": [
+    "gastin-2001"
+  ],
+  "anaerobic-capacity": [
+    "gastin-1995"
+  ],
+  "aod": [
+    "gastin-1995"
+  ],
+  "body-composition": [
+    "escalante-barakat-2020"
+  ],
+  "bone": [
+    "storey-smith-2012"
+  ],
+  "breathing": [
+    "biro-oxygen-cascade"
+  ],
+  "carbohydrate-metabolism": [
+    "brooks-mercier-1994"
+  ],
+  "cardiac-output": [
+    "biro-oxygen-cascade"
+  ],
+  "cardiometabolic-health": [
+    "gillen-2016"
+  ],
+  "catecholamines": [
+    "brooks-mercier-1994"
+  ],
+  "circulation": [
+    "biro-oxygen-cascade"
+  ],
+  "clean-and-jerk": [
+    "storey-smith-2012"
+  ],
+  "conditioning": [
+    "gastin-2001"
+  ],
+  "crossover-concept": [
+    "brooks-mercier-1994"
+  ],
+  "cycling": [
+    "gastin-1995"
+  ],
+  "endurance-training": [
+    "brooks-mercier-1994"
+  ],
+  "energy-systems": [
+    "gastin-2001",
+    "gastin-1995"
+  ],
+  "exercise-intensity": [
+    "brooks-mercier-1994"
+  ],
+  "fasted-cardio": [
+    "escalante-barakat-2020"
+  ],
+  "fat-burning-zone": [
+    "brooks-mercier-1994"
+  ],
+  "fat-loss": [
+    "escalante-barakat-2020"
+  ],
+  "fat-oxidation": [
+    "brooks-mercier-1994",
+    "escalante-barakat-2020"
+  ],
+  "fatigue": [
+    "shulman-2005"
+  ],
+  "fibre-type": [
+    "malisoux-2006",
+    "travis-2020",
+    "kushmerick-1992"
+  ],
+  "fitness-testing": [
+    "gastin-1995"
+  ],
+  "fuel-use": [
+    "brooks-mercier-1994"
+  ],
+  "glycogen": [
+    "brooks-mercier-1994",
+    "shulman-2005"
+  ],
+  "glycolysis": [
+    "conley-2001"
+  ],
+  "haemoglobin": [
+    "biro-oxygen-cascade"
+  ],
+  "heart": [
+    "biro-oxygen-cascade"
+  ],
+  "hiit": [
+    "gillen-2016"
+  ],
+  "hormones": [
+    "storey-smith-2012"
+  ],
+  "hypertrophy": [
+    "malisoux-2006",
+    "travis-2020"
+  ],
+  "insulin-sensitivity": [
+    "gillen-2016"
+  ],
+  "interval-training": [
+    "gillen-2016"
+  ],
+  "jump-training": [
+    "malisoux-2006"
+  ],
+  "lactate": [
+    "shulman-2005",
+    "conley-2001"
+  ],
+  "lactate-threshold": [
+    "brooks-mercier-1994"
+  ],
+  "load": [
+    "travis-2020"
+  ],
+  "masters": [
+    "storey-smith-2012"
+  ],
+  "middle-distance": [
+    "gastin-2001"
+  ],
+  "mitochondria": [
+    "gillen-2016",
+    "kushmerick-1992",
+    "conley-2001"
+  ],
+  "moderate-continuous-training": [
+    "gillen-2016"
+  ],
+  "muscle-energetics": [
+    "shulman-2005",
+    "kushmerick-1992",
+    "conley-2001"
+  ],
+  "nmr": [
+    "shulman-2005",
+    "kushmerick-1992"
+  ],
+  "nutrition": [
+    "escalante-barakat-2020",
+    "storey-smith-2012"
+  ],
+  "oxygen-consumption": [
+    "kushmerick-1992"
+  ],
+  "oxygen-transport": [
+    "biro-oxygen-cascade"
+  ],
+  "oxygen-uptake": [
+    "gastin-1995"
+  ],
+  "periodization": [
+    "travis-2020",
+    "storey-smith-2012"
+  ],
+  "ph": [
+    "conley-2001"
+  ],
+  "phosphocreatine": [
+    "shulman-2005",
+    "kushmerick-1992"
+  ],
+  "physiology-basics": [
+    "biro-oxygen-cascade"
+  ],
+  "physique": [
+    "escalante-barakat-2020"
+  ],
+  "plyometrics": [
+    "malisoux-2006"
+  ],
+  "power": [
+    "malisoux-2006",
+    "travis-2020",
+    "storey-smith-2012"
+  ],
+  "powerlifting": [
+    "travis-2020"
+  ],
+  "protein": [
+    "escalante-barakat-2020"
+  ],
+  "recovery": [
+    "kushmerick-1992"
+  ],
+  "repeated-sprints": [
+    "gastin-2001"
+  ],
+  "sedentary-beginners": [
+    "gillen-2016"
+  ],
+  "single-fibre": [
+    "malisoux-2006"
+  ],
+  "sit": [
+    "gillen-2016"
+  ],
+  "snatch": [
+    "storey-smith-2012"
+  ],
+  "sprint": [
+    "gastin-2001"
+  ],
+  "sprint-interval": [
+    "gillen-2016"
+  ],
+  "sprint-testing": [
+    "gastin-1995"
+  ],
+  "squat-depth": [
+    "travis-2020"
+  ],
+  "steady-state": [
+    "conley-2001"
+  ],
+  "steady-state-cardio": [
+    "gillen-2016"
+  ],
+  "strength": [
+    "travis-2020"
+  ],
+  "stretch-shortening": [
+    "malisoux-2006"
+  ],
+  "substrate-utilization": [
+    "brooks-mercier-1994"
+  ],
+  "supramaximal-exercise": [
+    "gastin-1995"
+  ],
+  "sustainable-power": [
+    "conley-2001"
+  ],
+  "testing-protocols": [
+    "gastin-1995"
+  ],
+  "threshold": [
+    "conley-2001"
+  ],
+  "time-efficient-training": [
+    "gillen-2016"
+  ],
+  "training-frequency": [
+    "storey-smith-2012"
+  ],
+  "training-to-failure": [
+    "travis-2020"
+  ],
+  "vo2": [
+    "biro-oxygen-cascade"
+  ],
+  "vo2peak": [
+    "gillen-2016"
+  ],
+  "weight-cutting": [
+    "storey-smith-2012"
+  ],
+  "weightlifting": [
+    "travis-2020",
+    "storey-smith-2012"
+  ],
+  "wingate": [
+    "gastin-2001"
+  ],
+  "women": [
+    "storey-smith-2012"
+  ],
+  "zone-2": [
+    "brooks-mercier-1994"
+  ]
+}

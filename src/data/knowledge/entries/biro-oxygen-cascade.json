@@ -1,0 +1,109 @@
+{
+  "id": "biro-oxygen-cascade",
+  "slug": "biro-oxygen-cascade",
+  "source_pdf": "Oxygen_cascade_atmosphere_to_mitochindria.pdf",
+  "shape": "reference",
+  "document_type": "book chapter",
+  "meta_analysis": false,
+  "header": {
+    "title_plain": "How oxygen gets from the air to your mitochondria, and why a tenfold range in demand needs a five-fold range in cardiac output",
+    "citation": {
+      "authors": "Biro GP",
+      "year": "not printed in source",
+      "journal": "not printed in source",
+      "volume_issue_pages": "not printed in source",
+      "doi": "not printed in source"
+    },
+    "topics": ["oxygen-transport", "haemoglobin", "cardiac-output", "vo2", "breathing", "circulation", "heart", "physiology-basics"],
+    "evidence_type": "Educational chapter, \"From the atmosphere to the mitochondrion: the oxygen cascade\" (book chapter, University of Ottawa (emeritus)) — a textbook summary of established physiology, not a study. Publication details not printed in the file — year, book title and editors to be added.",
+    "confidence": {
+      "level": "reference",
+      "why": "Settled science; no claims to test."
+    },
+    "practical_relevance": {
+      "level": "medium",
+      "why": "Not actionable by itself, but the foundation that makes VO2max, cardiac output, lactate and \"aerobic capacity\" entries make sense. Good glossary source."
+    },
+    "author_stance": "none apparent",
+    "funding_and_conflicts": "not stated"
+  },
+  "layer1": {
+    "reference": {
+      "what_it_explains": "Oxygen reaches muscle in four steps: breathing moves air into the lungs; oxygen diffuses into blood and binds haemoglobin; the heart pumps blood to the tissues; oxygen diffuses from capillaries into cells and mitochondria. Haemoglobin is the hinge — it carries ~60× more oxygen than blood could dissolve — and its binding curve is shaped so that it loads easily in the lungs and unloads easily in hot, acidic, CO2-rich working muscle. Total oxygen demand varies about tenfold from rest to maximal exercise; the system meets it by raising cardiac output ~5× and oxygen extraction ~2×. Oxygen delivery = cardiac output × arterial oxygen content. Oxygen content is roughly fixed by haemoglobin; cardiac output is the variable the body adjusts minute to minute.",
+      "key_numbers": [
+        { "quantity": "Oxygen in air / arriving at the lung / in alveoli", "value": "~159 / ~150 / ~100 mmHg", "note": "" },
+        { "quantity": "Oxygen carried per gram of haemoglobin", "value": "1.34–1.36 mL", "note": "" },
+        { "quantity": "Arterial oxygen content at 15 g/dL haemoglobin", "value": "~20 mL per 100 mL blood", "note": "dissolved alone would be ~0.3" },
+        { "quantity": "Venous blood at rest", "value": "~70–75% saturated, ~40 mmHg", "note": "" },
+        { "quantity": "p50 (oxygen pressure at half-saturation)", "value": "~27 mmHg", "note": "shifts right (easier unloading) with heat, acid, CO2 and 2,3-DPG; 2,3-DPG can move it between 15 and 34 mmHg" },
+        { "quantity": "Capillary transit time in the lung", "value": "~0.7 s", "note": "" },
+        { "quantity": "Cardiac output, rest → max", "value": "~4.5 → ~22.5 L/min (5×)", "note": "heart rate ~3×, stroke volume ~2×" },
+        { "quantity": "Whole-body oxygen use, rest → max", "value": "~10×", "note": "" },
+        { "quantity": "Heart's own blood supply", "value": "~5% of cardiac output, ~10% of body energy use", "note": "extracts ~60% of oxygen at rest (venous saturation ~40%), so it can only meet extra demand by raising its own blood flow" },
+        { "quantity": "Coronary perfusion", "value": "mostly during diastole", "note": "higher heart rates shorten the window" },
+        { "quantity": "Work of breathing at maximal exercise", "value": "becomes limiting", "note": "the extra oxygen taken in is consumed by the breathing muscles" }
+      ],
+      "scope_limits": "Nothing about training adaptations, nutrition, or performance; it's a clinical physiology chapter with examples drawn from anaemia, transfusion and heart failure. Mitochondrial oxygen levels in living tissue are, as it notes, still uncertain."
+    }
+  },
+  "layer2": {
+    "what_it_means": "Three things fall out. First, VO2max is bounded by delivery — mostly cardiac output and haemoglobin — which is why endurance adaptations are about stroke volume, blood volume and capillaries rather than lungs. Second, the right-shift of the haemoglobin curve in hot, acidic muscle is the body helping hard-working tissue; \"acidic\" is not simply bad. Third, the heart runs near its extraction ceiling at rest, so it depends on blood flow; that is why cardiac disease limits exercise first and why uncontrolled hypertension (higher afterload) matters for anyone training hard.",
+    "what_it_doesnt_mean": "Nothing about training adaptations, nutrition, or performance; it's a clinical physiology chapter with examples drawn from anaemia, transfusion and heart failure. Mitochondrial oxygen levels in living tissue are, as it notes, still uncertain.",
+    "questions_raised": []
+  },
+  "translation": [],
+  "glossary_candidates": [
+    { "term": "Haemoglobin", "definition": "The protein in red blood cells that carries almost all the oxygen in blood.", "confidence_term_is_new": "likely" },
+    { "term": "Oxygen dissociation curve", "definition": "The S-shaped relationship between oxygen pressure and how much haemoglobin is carrying; its shape lets blood load in the lungs and unload in muscle.", "confidence_term_is_new": "likely" },
+    { "term": "Cardiac output", "definition": "Litres of blood the heart pumps per minute = heart rate × stroke volume.", "confidence_term_is_new": "likely" },
+    { "term": "Stroke volume", "definition": "Blood ejected per heartbeat; the main thing endurance training enlarges.", "confidence_term_is_new": "likely" },
+    { "term": "Oxygen extraction", "definition": "The fraction of delivered oxygen that tissues actually take; ~25% at rest for the body, ~60% for the heart.", "confidence_term_is_new": "likely" },
+    { "term": "Diffusion", "definition": "Passive movement of a gas from high to low pressure — how oxygen crosses from air to blood and blood to cell.", "confidence_term_is_new": "likely" },
+    { "term": "Hypoxia", "definition": "Oxygen supply inadequate for demand, at the tissue or cell level.", "confidence_term_is_new": "likely" },
+    { "term": "2,3-DPG", "definition": "A compound in red cells that makes haemoglobin release oxygen more readily; rises in anaemia and at altitude.", "confidence_term_is_new": "likely" }
+  ],
+  "charts": [
+    {
+      "template": "values_by_condition",
+      "title": "The oxygen cascade: oxygen pressure at each step",
+      "series": [
+        {
+          "label": "Oxygen pressure",
+          "values": [
+            { "condition": "Air", "value": 159 },
+            { "condition": "Arriving at the lung", "value": 150 },
+            { "condition": "Alveoli", "value": 100 },
+            { "condition": "Arterial", "value": 95 },
+            { "condition": "Venous", "value": 40 }
+          ]
+        }
+      ],
+      "units": "mmHg",
+      "approximate": true,
+      "note": "Arterial value is ~95. Mitochondria ~30–40? mmHg is omitted from the bars because the chapter says mitochondrial oxygen levels in living tissue are still uncertain."
+    },
+    {
+      "template": "before_after_bars",
+      "title": "Cardiac output, rest vs maximal exercise",
+      "series": [
+        { "label": "Cardiac output", "before": 4.5, "after": 22.5 }
+      ],
+      "units": "L/min",
+      "approximate": true,
+      "note": "rest → maximal exercise, not a training change. before = rest, after = max. Heart rate ×3; stroke volume ×2; O2 use ×10."
+    }
+  ],
+  "verification_notes": [
+    "Four steps: Introduction and \"Components\" section",
+    "0.03 mL/dL/mmHg, 1.34/1.36 mL/g, 20 mL/dL, 0.44 mL/dL dissolved: \"Physiological importance of the ODC\"",
+    "p50 27, right-shift factors, 2,3-DPG 15–34: same section",
+    "Tenfold VO2 range: Introduction and \"Pulmonary ventilation\"",
+    "159/150/100 mmHg: \"First step\"",
+    "0.7 s transit: \"Second step\"",
+    "4,500 → 22,500 mL/min, HR 3×, SV 2×: \"Third step\"",
+    "Heart 5% CO, 10% energy, ~40% venous sat, 11–12 mL/dL a-v difference, diastolic perfusion: \"Cardiac energetics\"",
+    "Work of breathing limiting: \"Pulmonary ventilation\"",
+    "Mitochondrial pO2 uncertainty: \"Fourth step\".",
+    "Citation incomplete in source file."
+  ]
+}

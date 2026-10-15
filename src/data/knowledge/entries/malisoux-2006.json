@@ -1,0 +1,160 @@
+{
+  "id": "malisoux-2006",
+  "slug": "malisoux-2006",
+  "source_pdf": "SSC_training_to_enahnce_power_output_of_single_fibers.pdf",
+  "shape": "intervention",
+  "document_type": "journal article",
+  "meta_analysis": false,
+  "header": {
+    "title_plain": "Eight weeks of maximal jumping made every muscle fibre type bigger, stronger and faster — including slow-twitch",
+    "citation": {
+      "authors": "Malisoux L, Francaux M, Nielens H, Theisen D",
+      "year": "2006",
+      "journal": "J Appl Physiol",
+      "volume_issue_pages": "100: 771–779",
+      "doi": "10.1152/japplphysiol.01027.2005"
+    },
+    "topics": ["plyometrics", "stretch-shortening", "jump-training", "power", "hypertrophy", "single-fibre", "fibre-type"],
+    "evidence_type": "Pre/post intervention, single group, no control, 8 men. Lab single-fibre measurements plus functional tests.",
+    "confidence": {
+      "level": "preliminary",
+      "why": "Clean mechanistic data, but tiny, uncontrolled and all young men."
+    },
+    "practical_relevance": {
+      "level": "high",
+      "why": "Gives a specific bodyweight plyometric protocol (3×/week for 8 weeks) with jump, leg-press and shuttle gains, and shows a fibre-velocity effect conventional lifting has not shown."
+    },
+    "author_stance": "none apparent",
+    "funding_and_conflicts": "Funded by a university research fund."
+  },
+  "layer1": {
+    "intervention": {
+      "groups": [
+        {
+          "name": "Plyometric (SSC)",
+          "protocol": "Bodyweight jumps, max effort, progressive: static & countermovement jumps, 40-cm drop jumps, double/single-leg triple jumps, hurdle jumps. Sessions 20 → ~45 min",
+          "per_week": "3 sessions, 24 total, 5,228 jumps",
+          "n_enrolled": "8",
+          "n_analysed": "8",
+          "age": "23 ±1",
+          "sex": "M",
+          "training_status": "recreationally active ~3 h/wk; no prior jump training",
+          "other": ""
+        }
+      ],
+      "design_notes": "No control group. Duration: 8 weeks. Compliance 100%. Biopsies from vastus lateralis 3 days after each test session; 1,115 fibres pre, 1,002 post typed; 60–80 per fibre type tested mechanically. Single-fibre measurements on skinned (dissected, chemically treated) fibres at 15 °C. Comparison the authors draw: 12 weeks of conventional resistance training (Widrick 2002) raised type I and IIa fibre power 30% and 42% through size and force alone, with no change in shortening velocity.",
+      "measured": [
+        { "outcome": "Static jump", "unit": "m", "group": "Plyometric (SSC)", "before": "0.40", "after": "0.43", "change": "+9%", "significant": "yes", "note": "" },
+        { "outcome": "Countermovement jump", "unit": "m", "group": "Plyometric (SSC)", "before": "0.41", "after": "0.47", "change": "+13%", "significant": "yes", "note": "" },
+        { "outcome": "6×5 m shuttle", "unit": "s", "group": "Plyometric (SSC)", "before": "9.98", "after": "9.62", "change": "−4%", "significant": "yes", "note": "" },
+        { "outcome": "Leg press 1RM", "unit": "kg", "group": "Plyometric (SSC)", "before": "223", "after": "248", "change": "+12%", "significant": "yes", "note": "" },
+        { "outcome": "Fibre cross-sectional area — type I", "unit": "µm²", "group": "Plyometric (SSC)", "before": "4,782", "after": "5,862", "change": "+23%", "significant": "yes", "note": "" },
+        { "outcome": "Fibre cross-sectional area — type IIa", "unit": "µm²", "group": "Plyometric (SSC)", "before": "6,511", "after": "7,918", "change": "+22%", "significant": "yes", "note": "" },
+        { "outcome": "Fibre cross-sectional area — type IIa/IIx", "unit": "µm²", "group": "Plyometric (SSC)", "before": "5,518", "after": "7,167", "change": "+30%", "significant": "yes", "note": "" },
+        { "outcome": "Peak force — type I", "unit": "mN", "group": "Plyometric (SSC)", "before": "0.83", "after": "0.99", "change": "+19%", "significant": "yes", "note": "" },
+        { "outcome": "Peak force — type IIa", "unit": "mN", "group": "Plyometric (SSC)", "before": "1.19", "after": "1.37", "change": "+15%", "significant": "yes", "note": "" },
+        { "outcome": "Peak force — type IIa/IIx", "unit": "mN", "group": "Plyometric (SSC)", "before": "1.11", "after": "1.29", "change": "+16%", "significant": "yes", "note": "" },
+        { "outcome": "Force per area (specific tension) — all fibre types", "unit": "", "group": "Plyometric (SSC)", "before": "unchanged", "after": "unchanged", "change": "—", "significant": "no", "note": "" },
+        { "outcome": "Max shortening velocity — type I", "unit": "FL/s", "group": "Plyometric (SSC)", "before": "0.94", "after": "1.11", "change": "+18%", "significant": "yes", "note": "" },
+        { "outcome": "Max shortening velocity — type IIa", "unit": "FL/s", "group": "Plyometric (SSC)", "before": "2.94", "after": "3.78", "change": "+29%", "significant": "yes", "note": "" },
+        { "outcome": "Max shortening velocity — type IIa/IIx", "unit": "FL/s", "group": "Plyometric (SSC)", "before": "3.58", "after": "4.37", "change": "+22%", "significant": "yes", "note": "" },
+        { "outcome": "Peak power — type I", "unit": "µN·FL/s", "group": "Plyometric (SSC)", "before": "12.9", "after": "16.1", "change": "+25%", "significant": "yes", "note": "" },
+        { "outcome": "Peak power — type IIa", "unit": "µN·FL/s", "group": "Plyometric (SSC)", "before": "51.2", "after": "68.7", "change": "+34%", "significant": "yes", "note": "" },
+        { "outcome": "Peak power — type IIa/IIx", "unit": "µN·FL/s", "group": "Plyometric (SSC)", "before": "49.7", "after": "74.2", "change": "+49%", "significant": "yes", "note": "" },
+        { "outcome": "Power per volume — type IIa", "unit": "W/l", "group": "Plyometric (SSC)", "before": "8.11", "after": "8.87", "change": "+9%", "significant": "yes", "note": "" },
+        { "outcome": "Power per volume — types I, IIa/IIx", "unit": "W/l", "group": "Plyometric (SSC)", "before": "unchanged", "after": "unchanged", "change": "—", "significant": "no", "note": "" },
+        { "outcome": "Fibre-type share — IIa", "unit": "%", "group": "Plyometric (SSC)", "before": "33", "after": "41", "change": "+8 pts", "significant": "no", "note": "p = 0.08" },
+        { "outcome": "Fibre-type share — IIx", "unit": "%", "group": "Plyometric (SSC)", "before": "7", "after": "3", "change": "−4 pts", "significant": "no", "note": "p = 0.06" },
+        { "outcome": "Fibre-type share — I/IIa hybrids", "unit": "%", "group": "Plyometric (SSC)", "before": "2", "after": "5", "change": "+3 pts", "significant": "yes", "note": "" },
+        { "outcome": "Fibre-type share — I", "unit": "%", "group": "Plyometric (SSC)", "before": "30", "after": "29", "change": "—", "significant": "no", "note": "" },
+        { "outcome": "Passive stiffness — type IIa/IIx", "unit": "kN/m²", "group": "Plyometric (SSC)", "before": "54.3", "after": "66.1", "change": "+22%", "significant": "yes", "note": "" },
+        { "outcome": "Passive stiffness — types I, IIa", "unit": "kN/m²", "group": "Plyometric (SSC)", "before": "unchanged", "after": "unchanged", "change": "—", "significant": "no", "note": "" }
+      ]
+    }
+  },
+  "layer2": {
+    "what_it_means": "Jump training did more than make these men jump higher. At the level of individual muscle fibres it increased size, force, contraction speed and power across the board — and, unusually, it sped up slow-twitch fibres as well as fast ones. Conventional lifting in comparable studies grows fibres and makes them stronger but doesn't make them faster. So plyometrics appear to train a quality (shortening velocity) that heavy lifting doesn't, and the whole-body results followed: +13% countermovement jump, +12% leg press, faster shuttle run. Three bodyweight sessions a week were enough.",
+    "what_it_doesnt_mean": "Eight young, already-active men and no control group: any change over eight weeks of being in a study is attributed to the jumps. The single-fibre measurements are made on dissected, chemically treated fibres at 15 °C — a window into mechanism, not a performance test. The fibre-type shifts didn't reach significance. The authors are explicit that they can't prove the fast contractions caused the faster fibres. Nothing here about women, older adults, or combining plyometrics with lifting, and 5,228 maximal jumps in 8 weeks is a substantial load that was progressed carefully and supervised.",
+    "questions_raised": []
+  },
+  "translation": [
+    "Protocol: bodyweight jumps at max effort, 3×/week for 8 weeks, ~20 rising to ~45 min, drop jumps from 40 cm, hurdle and single-leg variants added as tolerated, ~220 jumps per session on average.",
+    "Result: vertical jump +9–13%, leg press +12%, 5-m shuttle −4%.",
+    "Distinctive effect: fibres got faster, not just bigger — something lifting alone hasn't shown."
+  ],
+  "glossary_candidates": [
+    { "term": "Stretch-shortening cycle (SSC)", "definition": "A fast lengthening of a muscle immediately followed by a powerful shortening — the mechanism of jumping, bounding, and plyometrics.", "confidence_term_is_new": "likely" },
+    { "term": "Plyometrics", "definition": "Jump-based training that exploits the stretch-shortening cycle.", "confidence_term_is_new": "likely" },
+    { "term": "Countermovement jump", "definition": "A vertical jump with a quick dip first; the standard test of lower-body power.", "confidence_term_is_new": "likely" },
+    { "term": "Cross-sectional area (CSA)", "definition": "The thickness of a muscle or fibre; the main driver of how much force it can produce.", "confidence_term_is_new": "likely" },
+    { "term": "Specific tension", "definition": "Force divided by fibre size; unchanged here, meaning fibres got stronger by getting bigger, not by improving quality.", "confidence_term_is_new": "likely" },
+    { "term": "Shortening velocity (V0)", "definition": "How fast a fibre contracts with no load; faster fibres make more power.", "confidence_term_is_new": "likely" },
+    { "term": "Hybrid fibres", "definition": "Fibres containing more than one myosin type (e.g. IIa/IIx); common and intermediate in properties.", "confidence_term_is_new": "likely" },
+    { "term": "Skinned fibre", "definition": "A single muscle fibre with its membrane removed so it can be activated and measured in a dish.", "confidence_term_is_new": "likely" }
+  ],
+  "charts": [
+    {
+      "template": "grouped_change_bars",
+      "title": "% change by fibre type after 8 weeks of plyometrics",
+      "series": [
+        { "group": "Type I", "values": [ { "label": "Size", "value": 23 }, { "label": "Force", "value": 19 }, { "label": "Velocity", "value": 18 }, { "label": "Power", "value": 25 } ] },
+        { "group": "Type IIa", "values": [ { "label": "Size", "value": 22 }, { "label": "Force", "value": 15 }, { "label": "Velocity", "value": 29 }, { "label": "Power", "value": 34 } ] },
+        { "group": "Type IIa/IIx", "values": [ { "label": "Size", "value": 30 }, { "label": "Force", "value": 16 }, { "label": "Velocity", "value": 22 }, { "label": "Power", "value": 49 } ] }
+      ],
+      "units": "% change",
+      "approximate": false,
+      "note": "Size = cross-sectional area; force = peak force; velocity = max shortening velocity; power = peak power."
+    },
+    {
+      "template": "before_after_bars",
+      "title": "Functional tests before and after",
+      "series": [
+        { "label": "Static jump (m)", "before": 0.40, "after": 0.43 },
+        { "label": "Countermovement jump (m)", "before": 0.41, "after": 0.47 },
+        { "label": "6×5 m shuttle (s)", "before": 9.98, "after": 9.62 },
+        { "label": "Leg press 1RM (kg)", "before": 223, "after": 248 }
+      ],
+      "units": "mixed: m, s, kg (see labels)",
+      "approximate": false,
+      "note": "% change: SJ +9, CMJ +13, shuttle −4, leg press +12."
+    },
+    {
+      "template": "timeline",
+      "title": "Study timeline",
+      "series": [
+        { "label": "Pre-tests", "start": 0, "end": 0, "note": "" },
+        { "label": "Biopsy", "start": 0, "end": 0, "note": "+3 d after pre-tests" },
+        { "label": "Training: 3×/wk", "start": 0, "end": 8, "note": "Ramp over first 4 weeks" },
+        { "label": "Post-tests", "start": 8, "end": 8, "note": "4 d after last session" },
+        { "label": "Biopsy", "start": 8, "end": 8, "note": "+3 d after post-tests" }
+      ],
+      "units": "weeks",
+      "approximate": false,
+      "note": "Day offsets (+3 d, 4 d) are in each row's note; week positions are schematic."
+    },
+    {
+      "template": "population_card",
+      "title": "Who was studied",
+      "series": [
+        { "n": "8", "sex_split": "100% male", "age": "23", "status": "recreationally active, no plyometric history", "other": "68 kg" }
+      ],
+      "units": "",
+      "approximate": false,
+      "note": ""
+    }
+  ],
+  "verification_notes": [
+    "Subjects: p.772",
+    "Programme, 24 sessions, 5,228 jumps, 20→45 min, 40 cm: p.772",
+    "Functional results, Table 1: p.775",
+    "Fibre counts 1,115/1,002, type shares, Table 2: p.775",
+    "CSA, P0, P0/CSA, Table 3: p.776",
+    "V0, Table 4: p.776",
+    "Power, Table 5: p.777",
+    "Stiffness 54.3→66.1: p.776",
+    "Widrick comparison: p.778",
+    "No causal evidence, mechanisms unknown: p.777",
+    "Grant: p.779",
+    "15 °C: p.772"
+  ]
+}

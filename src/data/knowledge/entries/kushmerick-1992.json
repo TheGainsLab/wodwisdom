@@ -1,0 +1,346 @@
+{
+  "id": "kushmerick-1992",
+  "slug": "kushmerick-1992",
+  "source_pdf": "Regulation_of_oxygen_consumption_in_fast-_and_slow-twitch_muscle.pdf",
+  "shape": "comparison",
+  "document_type": "journal article",
+  "meta_analysis": false,
+  "header": {
+    "title_plain": "Slow-twitch muscle refuels twice as fast and has twice the aerobic capacity of fast-twitch — and the two are controlled differently",
+    "citation": {
+      "authors": "Kushmerick MJ, Meyer RA, Brown TR",
+      "year": "1992",
+      "journal": "Am J Physiol",
+      "volume_issue_pages": "263 (Cell Physiol 32): C598–C606",
+      "doi": "10.1152/ajpcell.1992.263.3.C598"
+    },
+    "topics": [
+      "fibre-type",
+      "phosphocreatine",
+      "recovery",
+      "mitochondria",
+      "oxygen-consumption",
+      "muscle-energetics",
+      "nmr"
+    ],
+    "evidence_type": "Ex-vivo animal study (cat muscles, isolated and artificially perfused), 31P-NMR plus oxygen measurements. n = 4 + 3 muscles (NMR), 7 + 7 (oxygen).",
+    "confidence": {
+      "level": "moderate",
+      "why": "Capped at moderate because this is an ex-vivo animal study (isolated, perfused cat muscle); moderate for the mechanism, not transferable as a prescription."
+    },
+    "practical_relevance": {
+      "level": "low",
+      "why": "A mechanism paper that explains why fibre types behave differently; nothing here changes what a coach programs."
+    },
+    "author_stance": "none apparent",
+    "funding_and_conflicts": "NIH-funded."
+  },
+  "layer1": {
+    "comparison": {
+      "who": [
+        {
+          "name": "Cat biceps brachii",
+          "n": "4 NMR / 7 O2",
+          "age": "n/a — cat muscle",
+          "sex": "n/a — cat muscle",
+          "training_status": "n/a",
+          "other": "Fibre type: fast-twitch (FG + FOG). Preparation: isolated, perfused with red cells, 30 °C."
+        },
+        {
+          "name": "Cat soleus",
+          "n": "3 NMR / 7 O2",
+          "age": "n/a — cat muscle",
+          "sex": "n/a — cat muscle",
+          "training_status": "n/a",
+          "other": "Fibre type: slow-twitch (SO, ~100%). Preparation: same (isolated, perfused with red cells, 30 °C)."
+        }
+      ],
+      "conditions": [
+        {
+          "name": "Twitch stimulation",
+          "description": "Electrical twitch stimulation; each muscle tested at 2–4 rates.",
+          "intensity": "0.05–2 Hz",
+          "duration": "15–20 min",
+          "other": "Measured: oxygen uptake at steady state, PCr, Pi, ATP and pH by NMR; ADP calculated from the creatine-kinase equilibrium."
+        },
+        {
+          "name": "Recovery",
+          "description": "Recovery after each stimulation bout.",
+          "intensity": "rest",
+          "duration": "≥1 h",
+          "other": ""
+        }
+      ],
+      "design_notes": "Ex-vivo preparation: cat biceps brachii and soleus isolated and perfused with red cells at 30 °C; 31P-NMR plus oxygen measurements. Electrical twitch stimulation at 0.05–2 Hz for 15–20 min, then ≥1 h recovery; each muscle tested at 2–4 rates. Measured: oxygen uptake at steady state, PCr, Pi, ATP and pH by NMR; ADP calculated from the creatine-kinase equilibrium. Conclusion drawn: simple ADP feedback explains the fast-twitch muscle; it is \"not sufficient\" for the slow-twitch muscle, which shows an unexplained overshoot during recovery.",
+      "measured": [
+        {
+          "outcome": "Resting O2 uptake",
+          "unit": "µmol/g/min",
+          "values_by_condition": {
+            "Biceps (fast)": "0.07",
+            "Soleus (slow)": "0.08"
+          },
+          "differed": "no",
+          "note": ""
+        },
+        {
+          "outcome": "Maximal O2 uptake, estimated",
+          "unit": "µmol/g/min",
+          "values_by_condition": {
+            "Biceps (fast)": "0.62 (0.53 reached)",
+            "Soleus (slow)": "1.37 (0.84 reached at 2 Hz, ~61% of max)"
+          },
+          "differed": "yes — soleus ~2×",
+          "note": ""
+        },
+        {
+          "outcome": "Stimulation rate for half-max O2",
+          "unit": "Hz",
+          "values_by_condition": {
+            "Biceps (fast)": "0.2 Hz",
+            "Soleus (slow)": "1.2 Hz"
+          },
+          "differed": "yes",
+          "note": ""
+        },
+        {
+          "outcome": "Mitochondrial density (cited)",
+          "unit": "% by volume",
+          "values_by_condition": {
+            "Biceps (fast)": "~3% by volume",
+            "Soleus (slow)": "~6%"
+          },
+          "differed": "yes",
+          "note": "Cited value, not measured in this study."
+        },
+        {
+          "outcome": "PCr recovery half-time after stimulation",
+          "unit": "min",
+          "values_by_condition": {
+            "Biceps (fast)": "~10 min, simple exponential",
+            "Soleus (slow)": "~4 min, not exponential; PCr overshoots to ~50.5% vs 45% resting, Pi undershoots"
+          },
+          "differed": "yes",
+          "note": "Pi undershoot 11.8 vs 15.8 (verification notes)."
+        },
+        {
+          "outcome": "ADP rise rest → hardest stimulation",
+          "unit": "fold",
+          "values_by_condition": {
+            "Biceps (fast)": "~50-fold",
+            "Soleus (slow)": "~13-fold"
+          },
+          "differed": "yes",
+          "note": ""
+        },
+        {
+          "outcome": "ADP at half-max O2 (K0.5)",
+          "unit": "µM",
+          "values_by_condition": {
+            "Biceps (fast)": "23 µM (CI 6–39)",
+            "Soleus (slow)": "50 µM (34–66)"
+          },
+          "differed": "no (not significant)",
+          "note": ""
+        },
+        {
+          "outcome": "Does Pi control respiration?",
+          "unit": "",
+          "values_by_condition": {
+            "Biceps (fast)": "no",
+            "Soleus (slow)": "no"
+          },
+          "differed": "—",
+          "note": ""
+        },
+        {
+          "outcome": "pH during 0.5 Hz",
+          "unit": "pH",
+          "values_by_condition": {
+            "Biceps (fast)": "6.96 → 6.81",
+            "Soleus (slow)": "transient rise at onset, then minor change"
+          },
+          "differed": "yes",
+          "note": ""
+        },
+        {
+          "outcome": "ATP",
+          "unit": "",
+          "values_by_condition": {
+            "Biceps (fast)": "unchanged",
+            "Soleus (slow)": "unchanged"
+          },
+          "differed": "—",
+          "note": ""
+        }
+      ]
+    }
+  },
+  "layer2": {
+    "what_it_means": "Slow-twitch muscle isn't just \"more enduring\" in a vague sense: in this preparation it had about twice the oxygen-using capacity, recovered its phosphocreatine roughly 2.5 times faster, and barely acidified at workloads that made fast-twitch muscle acidic. That's the physiological basis for the common observation that slow-twitch-dominant athletes recover between efforts quickly and tolerate high-frequency work, and that fast-twitch-dominant athletes need longer rests. It also warns that whole-muscle measurements in humans blend both fibre types, so an individual's recovery curve depends on their fibre mix.",
+    "what_it_doesnt_mean": "It's cat muscle, removed from the body and perfused in a magnet at 30 °C, with three or four muscles per group. Twitch stimulation at up to 2 Hz is nothing like a lift or a sprint. The paper is about how respiration is regulated, not about training; the numbers above should not be quoted as human values. The authors themselves end by warning against \"simplistic mechanistic interpretations.\"",
+    "questions_raised": []
+  },
+  "translation": [
+    "Slow-twitch muscle: ~2× the aerobic capacity, PCr refilled in ~4 min half-time vs ~10 min for fast-twitch (in this animal preparation).",
+    "Fast-twitch muscle acidifies under repeated work; slow-twitch barely does."
+  ],
+  "glossary_candidates": [
+    {
+      "term": "Inorganic phosphate (Pi)",
+      "definition": "What's released when PCr or ATP is spent; rises during work and is linked to fatigue.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "PCr recovery half-time",
+      "definition": "How long it takes to refill half the spent phosphocreatine after effort — a marker of mitochondrial capacity and a guide to rest intervals.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Ex vivo / perfused preparation",
+      "definition": "A tissue removed from the animal and kept alive artificially so it can be measured precisely; precise, but not the same as a living body.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "First-order kinetics",
+      "definition": "A simple exponential recovery — the same fraction restored each minute.",
+      "confidence_term_is_new": "likely"
+    }
+  ],
+  "charts": [
+    {
+      "template": "values_by_condition",
+      "title": "Maximal O2 uptake: fast vs slow muscle",
+      "series": [
+        {
+          "label": "Maximal O2 uptake, estimated",
+          "values": [
+            {
+              "condition": "Biceps (fast)",
+              "value": 0.62
+            },
+            {
+              "condition": "Soleus (slow)",
+              "value": 1.37
+            }
+          ]
+        },
+        {
+          "label": "Maximal O2 uptake, reached",
+          "values": [
+            {
+              "condition": "Biceps (fast)",
+              "value": 0.53
+            },
+            {
+              "condition": "Soleus (slow)",
+              "value": 0.84
+            }
+          ]
+        }
+      ],
+      "units": "µmol/g/min",
+      "approximate": false,
+      "note": "Values from the text/table. O2 uptake vs stimulation rate: biceps plateau ~0.6; soleus still rising at 2 Hz toward ~1.4 (µmol/g/min). Soleus 0.84 reached at 2 Hz, ~61% of max."
+    },
+    {
+      "template": "values_by_condition",
+      "title": "PCr recovery half-time after stimulation",
+      "series": [
+        {
+          "label": "PCr recovery half-time",
+          "values": [
+            {
+              "condition": "Biceps (fast)",
+              "value": 10
+            },
+            {
+              "condition": "Soleus (slow)",
+              "value": 4
+            }
+          ]
+        }
+      ],
+      "units": "min",
+      "approximate": true,
+      "note": "~10 min (simple exponential) vs ~4 min (not exponential)."
+    },
+    {
+      "template": "concept_curve",
+      "title": "PCr recovery curves, fast vs slow muscle",
+      "series": [
+        {
+          "label": "Biceps (fast) — half-time 10 min",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 10,
+              "y": 50
+            },
+            {
+              "x": 20,
+              "y": 75
+            },
+            {
+              "x": 30,
+              "y": 87.5
+            }
+          ]
+        },
+        {
+          "label": "Soleus (slow) — half-time ~4 min",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 4,
+              "y": 50
+            },
+            {
+              "x": 8,
+              "y": 75
+            },
+            {
+              "x": 12,
+              "y": 87.5
+            }
+          ]
+        }
+      ],
+      "units": "x = minutes after stimulation; y = % of spent PCr restored",
+      "approximate": true,
+      "note": "schematic — not measured data. Both curves are simple exponentials computed from the reported half-times (10 min biceps, ~4 min soleus), not traced from the figure. The paper reports the soleus recovery is NOT exponential and overshoots (PCr ~50.5% vs 45% resting at 15–20 min); that overshoot is not drawn."
+    },
+    {
+      "template": "population_card",
+      "title": "Who was studied",
+      "series": [
+        {
+          "n": "4+3 NMR / 7+7 O2",
+          "sex_split": "n/a (animal)",
+          "age": "n/a",
+          "status": "cat biceps and soleus, ex vivo",
+          "other": "isolated, perfused with red cells, 30 °C"
+        }
+      ],
+      "units": "",
+      "approximate": false,
+      "note": ""
+    }
+  ],
+  "verification_notes": [
+    "Muscles, n, prep: C598–C599",
+    "Table 1 values: C599",
+    "Max O2 0.62/0.53, 1.37/0.84, 61%, half-max 0.2/1.2 Hz, 6%/3%: C600",
+    "Half-times 10 / ~4 min, overshoot 50.5 vs 45.0, undershoot 11.8 vs 15.8: C601–C602",
+    "ADP 50-/13-fold, K0.5 23 / 50 µM, Pi not controlling: C603",
+    "pH 6.96→6.81, soleus alkaline transient: C601–C602",
+    "Conclusions and \"simplistic\" warning: C604–C605",
+    "Funding: C605."
+  ]
+}

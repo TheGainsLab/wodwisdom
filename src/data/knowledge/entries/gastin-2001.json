@@ -1,0 +1,150 @@
+{
+  "id": "gastin-2001",
+  "slug": "gastin-2001",
+  "source_pdf": "Energy_System_Interaction_and_Relative_Contribution_.pdf",
+  "shape": "review",
+  "document_type": "journal article",
+  "meta_analysis": false,
+  "header": {
+    "title_plain": "Aerobic energy matters much sooner than coaches think: a 75-second all-out effort is already half aerobic",
+    "citation": {
+      "authors": "Gastin PB",
+      "year": "2001",
+      "journal": "Sports Med",
+      "volume_issue_pages": "31(10): 725–741",
+      "doi": "10.2165/00007256-200131100-00003"
+    },
+    "topics": ["energy-systems", "aerobic", "anaerobic", "sprint", "middle-distance", "wingate", "repeated-sprints", "conditioning"],
+    "evidence_type": "Review that pools 30+ studies into a summary curve (Table I/II, Fig 2). Prediction interval ~±10%. Pooled summary, not a formal meta-analysis. No funding stated.",
+    "confidence": {
+      "level": "moderate",
+      "why": "Moderate for the summary table (many studies, consistent methods); conceptual elsewhere."
+    },
+    "practical_relevance": {
+      "level": "high",
+      "why": "The duration table changes how coaches classify and condition for efforts of 30 s to 4 min, and repeated sprints become progressively more aerobic."
+    },
+    "author_stance": "none apparent",
+    "funding_and_conflicts": "not stated"
+  },
+  "layer1": {
+    "review": {
+      "claim": "Textbook diagrams showing energy systems switching on one after another, with aerobic metabolism arriving late, are wrong. All three systems contribute from the first seconds. The aerobic share of a maximal effort reaches 50% at roughly 75 seconds, not the 2–4 minutes long taught. The old figures came from an \"oxygen debt\" method that over-counted anaerobic energy.",
+      "definitions_used": [],
+      "evidence_cited": [
+        { "finding": "Summary table: share of total energy for a maximal effort of 0–10 s", "source": "Table II, pooled", "numbers": "Anaerobic 94%, aerobic 6%", "note": "±~10%" },
+        { "finding": "Summary table: share of total energy for a maximal effort of 0–15 s", "source": "Table II, pooled", "numbers": "Anaerobic 88%, aerobic 12%", "note": "±~10%" },
+        { "finding": "Summary table: share of total energy for a maximal effort of 0–20 s", "source": "Table II, pooled", "numbers": "Anaerobic 82%, aerobic 18%", "note": "±~10%" },
+        { "finding": "Summary table: share of total energy for a maximal effort of 0–30 s", "source": "Table II, pooled", "numbers": "Anaerobic 73%, aerobic 27%", "note": "±~10%" },
+        { "finding": "Summary table: share of total energy for a maximal effort of 0–45 s", "source": "Table II, pooled", "numbers": "Anaerobic 63%, aerobic 37%", "note": "±~10%" },
+        { "finding": "Summary table: share of total energy for a maximal effort of 0–60 s", "source": "Table II, pooled", "numbers": "Anaerobic 55%, aerobic 45%", "note": "±~10%" },
+        { "finding": "Summary table: share of total energy for a maximal effort of 0–75 s", "source": "Table II, pooled", "numbers": "Anaerobic 49%, aerobic 51%", "note": "±~10%" },
+        { "finding": "Summary table: share of total energy for a maximal effort of 0–90 s", "source": "Table II, pooled", "numbers": "Anaerobic 44%, aerobic 56%", "note": "±~10%" },
+        { "finding": "Summary table: share of total energy for a maximal effort of 0–120 s", "source": "Table II, pooled", "numbers": "Anaerobic 37%, aerobic 63%", "note": "±~10%" },
+        { "finding": "Summary table: share of total energy for a maximal effort of 0–180 s", "source": "Table II, pooled", "numbers": "Anaerobic 27%, aerobic 73%", "note": "±~10%" },
+        { "finding": "Summary table: share of total energy for a maximal effort of 0–240 s", "source": "Table II, pooled", "numbers": "Anaerobic 21%, aerobic 79%", "note": "±~10%" },
+        { "finding": "Within a single bout, aerobic becomes the main source by 20–30 s", "source": "as reviewed", "numbers": "90-s all-out cycle: aerobic share 30% in first 30 s, 73% in 30–60 s, 91% in 60–90 s. 800 m run: 41 / 73 / 76 / 76% per 30-s phase. 1500 m: 57 / 84 / 87 / 88 / 89 / 89%", "note": "" },
+        { "finding": "Oxygen uptake rises fast", "source": "as reviewed", "numbers": "After 30–60 s of hard exercise VO2 can be ~90% of max", "note": "" },
+        { "finding": "Wingate (30 s) is not purely anaerobic", "source": "as reviewed", "numbers": "Aerobic share 16–18% by older assumed-efficiency methods, 23–33% by oxygen-deficit method, 29% by direct muscle measures", "note": "" },
+        { "finding": "Repeated sprints lean harder on aerobic", "source": "as reviewed", "numbers": "Second 30-s sprint after 4 min rest: aerobic share 44%, power −18%, anaerobic ATP −41%, VO2 +19%. Ten 6-s sprints: anaerobic ATP use fell 64%, glycolysis almost shut down by sprint 10", "note": "" },
+        { "finding": "Anaerobic power vs aerobic power", "source": "as reviewed", "numbers": "Weightlifters produce 10–20× the power that elicits VO2max; sprinters 3–5×; maximal anaerobic : sustainable aerobic ratio ~2.0–2.6", "note": "" },
+        { "finding": "Phosphocreatine (PCr) and glycolysis timing", "source": "as reviewed", "numbers": "Each can make ATP at 6–9 mmol/kg dry muscle/s; together ~15 over the first 6 s, half from PCr. PCr rate is maximal immediately and falls after 1.3 s; glycolysis peaks after ~5 s. Resting ATP ~25, PCr 70–80 mmol/kg dm; ATP never drops >30–40%; PCr can be nearly emptied. ATP-PCr provides 20–30% of anaerobic energy in a 2–3 min effort", "note": "" },
+        { "finding": "Coaches disagree with the data", "source": "as reviewed", "numbers": "Eight coaches/scientists put the aerobic share of an 800 m at 35–65%; studies say 55–65%", "note": "" },
+        { "finding": "Old textbook estimates", "source": "as reviewed", "numbers": "Equal contribution at 2 min (Åstrand), 3–4 min (Fox/Mathews) — based on oxygen-debt, now discredited", "note": "" }
+      ],
+      "recommendations_made": [],
+      "untested_or_contested": "Anaerobic energy can't be measured directly in whole-body exercise; all estimates are indirect (oxygen deficit, biopsies, models) and may under-count. Efficiency may change at supramaximal intensities. Training status made only small differences in the pooled data."
+    }
+  },
+  "layer2": {
+    "what_it_means": "Anything longer than about a minute at max effort is mostly aerobic, and anything longer than 20–30 seconds is already mostly aerobic by its second half. A 400 m, a 500 m row, a 2-minute AMRAP: these are aerobic events with an anaerobic start, not the reverse. The practical corollary is that aerobic fitness determines performance in \"anaerobic\" work far more than old charts suggest, and that repeated sprints become progressively more aerobic as the anaerobic systems run down — by the tenth 6-second sprint, glycolysis has nearly stopped and the oxidative system is doing the work.",
+    "what_it_doesnt_mean": "This doesn't say the anaerobic systems are unimportant — in the first 10 seconds they supply 94% of energy, and in a 30-second sprint still 73%. It doesn't give the time course of each system within a bout (the summary curve is cumulative). The ±10% band is wide, and every anaerobic estimate is indirect. \"Aerobic\" here means oxygen use by the working muscle, not \"easy\": the aerobic system at 90% of max is hard work.",
+    "questions_raised": []
+  },
+  "translation": [
+    "10 s max effort: ~94% anaerobic. 30 s: ~73%. 60 s: ~55%. 75 s: 50/50. 2 min: ~63% aerobic. 4 min: ~79% aerobic.",
+    "Within any effort over ~30 s, the second half runs mainly on oxygen.",
+    "Repeated sprints: each one is more aerobic than the last."
+  ],
+  "glossary_candidates": [
+    { "term": "ATP", "definition": "The molecule muscles spend for every contraction; it's stored in tiny amounts and must be remade constantly.", "confidence_term_is_new": "likely" },
+    { "term": "Phosphocreatine (PCr)", "definition": "A fast backup store that remakes ATP in the first seconds of hard effort; nearly empty after ~10–20 s of all-out work.", "confidence_term_is_new": "likely" },
+    { "term": "Glycolysis", "definition": "Breaking down carbohydrate without oxygen to make ATP quickly; produces lactate.", "confidence_term_is_new": "likely" },
+    { "term": "Aerobic (oxidative) system", "definition": "Making ATP with oxygen from carbohydrate and fat; slower to start but almost unlimited capacity.", "confidence_term_is_new": "likely" },
+    { "term": "Oxygen debt", "definition": "The old idea that extra oxygen breathed after exercise \"repays\" anaerobic energy; discredited as a measure.", "confidence_term_is_new": "likely" },
+    { "term": "Muscle biopsy", "definition": "A small sample of muscle taken with a needle to measure its contents.", "confidence_term_is_new": "likely" }
+  ],
+  "charts": [
+    {
+      "template": "stacked_share",
+      "title": "Anaerobic vs aerobic share by duration of maximal effort",
+      "series": [
+        { "label": "0–10 s", "parts": [ { "name": "anaerobic", "value": 94 }, { "name": "aerobic", "value": 6 } ] },
+        { "label": "0–15 s", "parts": [ { "name": "anaerobic", "value": 88 }, { "name": "aerobic", "value": 12 } ] },
+        { "label": "0–20 s", "parts": [ { "name": "anaerobic", "value": 82 }, { "name": "aerobic", "value": 18 } ] },
+        { "label": "0–30 s", "parts": [ { "name": "anaerobic", "value": 73 }, { "name": "aerobic", "value": 27 } ] },
+        { "label": "0–45 s", "parts": [ { "name": "anaerobic", "value": 63 }, { "name": "aerobic", "value": 37 } ] },
+        { "label": "0–60 s", "parts": [ { "name": "anaerobic", "value": 55 }, { "name": "aerobic", "value": 45 } ] },
+        { "label": "0–75 s", "parts": [ { "name": "anaerobic", "value": 49 }, { "name": "aerobic", "value": 51 } ] },
+        { "label": "0–90 s", "parts": [ { "name": "anaerobic", "value": 44 }, { "name": "aerobic", "value": 56 } ] },
+        { "label": "0–120 s", "parts": [ { "name": "anaerobic", "value": 37 }, { "name": "aerobic", "value": 63 } ] },
+        { "label": "0–180 s", "parts": [ { "name": "anaerobic", "value": 27 }, { "name": "aerobic", "value": 73 } ] },
+        { "label": "0–240 s", "parts": [ { "name": "anaerobic", "value": 21 }, { "name": "aerobic", "value": 79 } ] }
+      ],
+      "units": "% of total energy",
+      "approximate": false,
+      "note": "Summary table (Table II, pooled); prediction interval ±~10%."
+    },
+    {
+      "template": "values_by_condition",
+      "title": "Aerobic share per 30-s phase within a single bout",
+      "series": [
+        {
+          "label": "90-s all-out",
+          "values": [
+            { "condition": "0–30 s", "value": 30 },
+            { "condition": "30–60 s", "value": 73 },
+            { "condition": "60–90 s", "value": 91 }
+          ]
+        },
+        {
+          "label": "800 m",
+          "values": [
+            { "condition": "0–30 s", "value": 41 },
+            { "condition": "30–60 s", "value": 73 },
+            { "condition": "60–90 s", "value": 76 },
+            { "condition": "90–120 s", "value": 76 }
+          ]
+        },
+        {
+          "label": "1500 m",
+          "values": [
+            { "condition": "0–30 s", "value": 57 },
+            { "condition": "30–60 s", "value": 84 },
+            { "condition": "60–90 s", "value": 87 },
+            { "condition": "90–120 s", "value": 88 },
+            { "condition": "120–150 s", "value": 89 },
+            { "condition": "150–180 s", "value": 89 }
+          ]
+        }
+      ],
+      "units": "% aerobic",
+      "approximate": false,
+      "note": "Phase labels for 800 m and 1500 m are successive 30-s phases as printed (\"per 30-s phase\")."
+    }
+  ],
+  "verification_notes": [
+    "All numbers are the review authors' reporting of cited studies; not verified against originals.",
+    "Table II and ±10%: p.735",
+    "Table I studies: pp.731–733",
+    "Table III phases: p.736",
+    "20–30 s crossover within bout: p.736",
+    "Wingate 16–18 / 23–33 / 29%, second sprint 44%, 6-s sprints 64%: p.730",
+    "VO2 90% at 30–60 s: p.730",
+    "Power ratios, 10–20×, 3–5×, 2.0–2.6: p.729",
+    "ATP/PCr rates and stores: p.730",
+    "Coaches 35–65% vs 55–65%: p.734",
+    "Old estimates 2 / 3–4 min: pp.727, 735",
+    "Funding: not stated."
+  ]
+}

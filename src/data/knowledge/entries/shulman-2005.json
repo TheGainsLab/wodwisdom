@@ -1,0 +1,104 @@
+{
+  "id": "shulman-2005",
+  "slug": "shulman-2005",
+  "source_pdf": "Glycogen_Turnover_Forms_Lactate_during_Exercise.pdf",
+  "shape": "review",
+  "document_type": "journal article",
+  "meta_analysis": false,
+  "header": {
+    "title_plain": "A different story about lactate: it's made by glycogen turnover feeding fast contractions, not by running out of oxygen",
+    "citation": {
+      "authors": "Shulman RG",
+      "year": "2005",
+      "journal": "Exerc Sport Sci Rev",
+      "volume_issue_pages": "33(4): 157–162",
+      "doi": "not printed in source"
+    },
+    "topics": ["lactate", "glycogen", "phosphocreatine", "fatigue", "muscle-energetics", "nmr"],
+    "evidence_type": "Review proposing the author's own \"glycogen shunt\" hypothesis, drawing mainly on NMR studies from his lab and a few others. No funding stated.",
+    "confidence": {
+      "level": "conceptual",
+      "why": "Contested hypothesis — a mechanistic hypothesis, not a settled model."
+    },
+    "practical_relevance": {
+      "level": "low",
+      "why": "Mechanism paper; the two coach-usable points (lactate is made in oxygenated muscle; carbohydrate feeding extends time to exhaustion) are background rather than programming changes."
+    },
+    "author_stance": "Proposes his own lab's hypothesis (the \"glycogen shunt\"), drawing mainly on NMR studies from his lab.",
+    "funding_and_conflicts": "not stated"
+  },
+  "layer1": {
+    "review": {
+      "claim": "Muscle contractions happen in milliseconds and need ATP on that timescale. PCr refills ATP within a single twitch, but something must refill PCr, and only glycogen breakdown (glycogenolysis) is fast enough. So glycogen is continuously broken down in milliseconds and rebuilt between contractions using oxygen. Lactate is the inevitable by-product of this fast, inefficient route — it is made in fully oxygenated muscle and is not a sign of oxygen shortage. Fatigue at low glycogen may reflect a failing rate of glucose flow through glycogen, not the glycogen level itself.",
+      "definitions_used": [],
+      "evidence_cited": [
+        { "finding": "PCr swings within a single twitch", "source": "Chung et al., rat muscle, 1-ms NMR", "numbers": "PCr falls ~3 µmol/g per twitch (half-time 8 ms) and recovers (half-time 14 ms); whole cycle ~30 ms; ~40× more PCr use per twitch than the old slow method implied; ATP unchanged", "note": "" },
+        { "finding": "Glucose can't supply it; glycogen can", "source": "—", "numbers": "Free glucose + G6P in muscle <0.3 mmol — too little; ~1 µmol/g glycogen per contraction against ~70 µmol/g stores", "note": "" },
+        { "finding": "Muscle without glycogen breakdown fails fast", "source": "McArdle's disease patients (31P NMR)", "numbers": "Resting pH ~7.2 vs 7.02 in controls; during exercise PCr falls much faster, pH stays high, patients can't sustain even mild exercise", "note": "" },
+        { "finding": "PCr is not the whole story", "source": "Creatine-kinase knockout mice", "numbers": "With <1% CK activity: shortening velocity −20%, max power −16%, work −30%, time to sustain −40%; force only ~20% down", "note": "" },
+        { "finding": "Glycogen turns over even when its level is flat", "source": "13C NMR, human calf, 15/20/25% MVC for hours", "numbers": "Glycogen settles at a lower plateau the harder the exercise; labelled glucose is incorporated into glycogen during exercise; 60% depletion after intense toe-lifts, then plateau not baseline", "note": "" },
+        { "finding": "Carbohydrate feeding delays fatigue without sparing glycogen", "source": "Coyle", "numbers": "Fed subjects lasted 1 h longer; glycogen fell at the same rate in both groups; exhaustion at a similar, non-zero glycogen level", "note": "" },
+        { "finding": "Oxygen is plentiful in working muscle", "source": "Myoglobin NMR", "numbers": "Oxygen in working muscle falls with load but stays above mitochondrial needs even at VO2max", "note": "" }
+      ],
+      "recommendations_made": [],
+      "untested_or_contested": "The twitch-level pH change was not statistically significant. The model rests on measurements that can't yet be made in whole-body human exercise. The author acknowledges the \"normal physiological mechanism\" for lactate production \"has not been found\" — this paper proposes one."
+    }
+  },
+  "layer2": {
+    "what_it_means": "Two ideas a coach can use. First, lactate is not \"the burn from running out of oxygen\"; it's produced whenever muscle needs ATP faster than the oxidative route delivers, which happens in every hard contraction regardless of oxygen supply, and most of it gets re-burned as fuel. Second, hitting the wall at the end of long work may be about the flow rate of carbohydrate through muscle rather than the tank being empty — which is why feeding carbohydrate during long efforts extends time to exhaustion even though glycogen falls at the same rate.",
+    "what_it_doesnt_mean": "This is one lab's hypothesis built on rat twitches, a rare genetic disease, knockout mice and NMR of calf muscle at low intensity. It isn't a training study and it doesn't tell you how to train. The \"glycogen shunt\" is not consensus physiology; other models (e.g. Conley et al. in this batch) explain the same lactate without it. For a coach, the safe takeaways are the two above; the mechanism itself is for the curious.",
+    "questions_raised": []
+  },
+  "translation": [
+    "Lactate is produced in well-oxygenated muscle; it's fuel, not waste, and not a sign of oxygen debt.",
+    "Feeding carbohydrate during long hard sessions extends time to exhaustion (by ~1 h in the cited study)."
+  ],
+  "glossary_candidates": [
+    { "term": "Glycogenolysis", "definition": "Breaking glycogen down into glucose units to make ATP fast.", "confidence_term_is_new": "likely" },
+    { "term": "NMR / MRS", "definition": "Magnetic-resonance measurement of chemicals (PCr, ATP, glycogen) inside living muscle without a biopsy.", "confidence_term_is_new": "likely" },
+    { "term": "McArdle's disease", "definition": "A genetic condition in which muscle can't break down glycogen; sufferers tire and cramp quickly.", "confidence_term_is_new": "likely" },
+    { "term": "Lactate shuttle", "definition": "The idea (Brooks) that lactate made in one place is carried to another and burned as fuel.", "confidence_term_is_new": "likely" },
+    { "term": "Creatine kinase", "definition": "The enzyme that moves phosphate between PCr and ATP.", "confidence_term_is_new": "likely" },
+    { "term": "MVC", "definition": "Maximal voluntary contraction; low-intensity exercise is often set as a % of it.", "confidence_term_is_new": "likely" }
+  ],
+  "charts": [
+    {
+      "template": "concept_curve",
+      "title": "PCr and force within a single twitch",
+      "series": [
+        {
+          "label": "PCr (% of resting)",
+          "points": [ { "x": 0, "y": 100 }, { "x": 16, "y": 90 }, { "x": 30, "y": 100 } ]
+        }
+      ],
+      "units": "ms (x); % of resting PCr (y)",
+      "approximate": true,
+      "note": "schematic — not measured data. PCr dips ~10% at 16 ms, force peaks at 25 ms, PCr recovered by ~30 ms. Force has no magnitude in the source; mark its peak at x = 25 ms as an annotation only."
+    },
+    {
+      "template": "before_after_bars",
+      "title": "Glycogen plateau by exercise intensity (human calf)",
+      "series": [
+        { "label": "15% MVC", "before": 85, "after": 57 },
+        { "label": "20% MVC", "before": 72, "after": 50 },
+        { "label": "25% MVC", "before": 58, "after": 43 }
+      ],
+      "units": "mM",
+      "approximate": true,
+      "note": "Approximate, from Fig 3; start → plateau over ~5–9 h."
+    }
+  ],
+  "verification_notes": [
+    "All numbers are the review authors' reporting of cited studies; not verified against originals.",
+    "Chung twitch data, 3 µmol/g, 8/14 ms, 40×: p.158 and Fig 1",
+    "<0.3 mmol glucose, ~1 and ~70 µmol/g: p.158",
+    "McArdle's pH 7.2 vs 7.02: p.159",
+    "CK knockout %: p.159",
+    "13C NMR, 60% depletion, labelled glucose: p.160, Figs 3–5",
+    "Coyle 1 h longer, same glycogen rate: p.161",
+    "Myoglobin: p.157",
+    "\"has not been found\": p.157",
+    "pH not significant: Fig 1 legend p.158",
+    "Funding: not stated."
+  ]
+}

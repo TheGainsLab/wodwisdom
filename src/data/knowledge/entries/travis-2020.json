@@ -1,0 +1,254 @@
+{
+  "id": "travis-2020",
+  "slug": "travis-2020",
+  "source_pdf": "Emphasizing_Task-Specific_Hypertrophy_to_Enhance_Sequential_Strength_and_Power_Performance.pdf",
+  "shape": "review",
+  "document_type": "position stand",
+  "meta_analysis": false,
+  "header": {
+    "title_plain": "Not all muscle growth is equal: for strength and power, grow the fast fibres with heavy loads, not everything with high reps",
+    "citation": {
+      "authors": "Travis SK, Ishida A, Taber CB, Fry AC, Stone MH",
+      "year": "2020",
+      "journal": "J Funct Morphol Kinesiol",
+      "volume_issue_pages": "5: 76",
+      "doi": "10.3390/jfmk5040076"
+    },
+    "topics": [
+      "hypertrophy",
+      "strength",
+      "power",
+      "fibre-type",
+      "load",
+      "periodization",
+      "powerlifting",
+      "weightlifting",
+      "training-to-failure",
+      "squat-depth"
+    ],
+    "evidence_type": "Narrative review / position paper from a strength-and-conditioning research group. Much of the mechanistic content is theoretical.",
+    "confidence": {
+      "level": "conceptual",
+      "why": "A coherent argument with real supporting data, but one school of thought; the authors acknowledge disagreement in the field."
+    },
+    "practical_relevance": {
+      "level": "high",
+      "why": "Bears on how to program hypertrophy phases for athletes."
+    },
+    "author_stance": "one strength-and-conditioning research group with a stated position; explicitly disagrees with Loenneke's group on size vs strength",
+    "funding_and_conflicts": "No funding; no conflicts."
+  },
+  "layer1": {
+    "review": {
+      "claim": "\"Hypertrophy\" is not one thing. Bodybuilders and strength athletes can have similar muscle size but very different strength, because which fibres grew and what grew inside them differ. For strength and power, the goal should be optimal rather than maximal hypertrophy: grow type II fibres preferentially (raise the type II : type I size ratio), grow contractile protein rather than non-contractile cell volume, grow the regions of muscles that the competition lift uses, and sequence hypertrophy → strength → power so each phase sets up the next.",
+      "definitions_used": [],
+      "evidence_cited": [
+        {
+          "finding": "Growth signalling tracks strength gains",
+          "source": "Terzis 2008, 14 weeks",
+          "numbers": "p70S6K activation correlated with gains in fat-free mass (r = 0.81–0.89), squat 1RM (r = 0.84), type II fibre size (r = 0.82)",
+          "note": ""
+        },
+        {
+          "finding": "Load determines which fibres grow",
+          "source": "Grgic & Schoenfeld 2018 meta-analysis",
+          "numbers": "high load → type II growth; low load → relatively more type I",
+          "note": ""
+        },
+        {
+          "finding": "Strength athletes have bigger fast fibres than bodybuilders",
+          "source": "several",
+          "numbers": "~20% greater type II fibre area in powerlifters/weightlifters; type II fibres up to twice the size of type I vs bodybuilders' more even profile",
+          "note": ""
+        },
+        {
+          "finding": "Light-load training grows slow fibres",
+          "source": "Bjørnsen 2019, Norwegian powerlifters, blood-flow restriction at ~30% 1RM",
+          "numbers": "type I +12%, type II +4%; front squat improved (authors attribute partly to novelty)",
+          "note": ""
+        },
+        {
+          "finding": "Muscle size predicts lifting",
+          "source": "Brechue & Abe 2002",
+          "numbers": "r = 0.63–0.91 between muscle size and squat/bench/deadlift in national powerlifters",
+          "note": ""
+        },
+        {
+          "finding": "Architecture has limits",
+          "source": "Abe 2018 case",
+          "numbers": "theoretical pennation-angle limit ~30°; a world-champion raw powerlifter measured 33° (477.5 kg squat)",
+          "note": "Single case."
+        },
+        {
+          "finding": "High-volume growth may be non-contractile",
+          "source": "Haun 2019",
+          "numbers": "6 weeks of high-volume training: growth mostly sarcoplasmic, with lower actin/myosin concentration",
+          "note": ""
+        },
+        {
+          "finding": "Training to failure isn't better",
+          "source": "Carroll 2018/2019",
+          "numbers": "non-failure group showed greater type II hypertrophy and performance than failure group",
+          "note": ""
+        },
+        {
+          "finding": "Range of motion matters",
+          "source": "Kubo 2019; Bloomquist 2013",
+          "numbers": "full squats produced greater growth across more muscles than half squats over 10 weeks",
+          "note": ""
+        },
+        {
+          "finding": "Thresholds (theoretical)",
+          "source": "—",
+          "numbers": "~60% 1RM for whole-muscle growth; ≥80% to target high-threshold motor units; ≥10 reps/set for ~6 weeks may raise AMPK signalling that interferes with type II growth",
+          "note": "Labelled theoretical by the authors."
+        }
+      ],
+      "recommendations_made": [
+        "Hypertrophy phase for strength/power athletes: 80–95% 1RM, ~5 reps/set, not to failure.",
+        "Use full range of motion and competition-specific exercises.",
+        "Precede with 2–4 weeks of general hypertrophy/strength-endurance to prime the process.",
+        "Sequence phases (phase potentiation)."
+      ],
+      "untested_or_contested": "Whether size and strength are \"completely separate\" (they argue no; Loenneke's group argues yes). Fibre-type shift findings are often misclassified. Sarcoplasmic hypertrophy remains controversial. The load thresholds are \"theoretical.\" They call for studies combining ultrasound, biopsy and 1RM testing."
+    }
+  },
+  "layer2": {
+    "what_it_means": "This is the case for lifting heavy even when the goal is size, if the size is meant to serve strength or power. The supporting facts are solid: heavy loads preferentially grow fast-twitch fibres, strength athletes carry bigger fast fibres than bodybuilders of similar overall size, going to failure doesn't improve fast-fibre growth, and full-depth squats grow more muscle than half squats. For a coach, the practical shape is a hypertrophy block built on 5-ish reps at 80–95% rather than 10–15 reps at 65%, with full range of motion and reps in reserve, followed by strength and power blocks that cash in the new tissue.",
+    "what_it_doesnt_mean": "It doesn't say high-rep training is useless — it's the better route to type I growth and general muscle mass, and the authors themselves recommend 2–4 weeks of it first. The molecular story (mTOR, AMPK, myostatin, miRNA) is largely reasoning from mechanism, not from training outcomes; the paper is explicit that the load thresholds are theoretical. It's written by one research group with a known position, and some of its evidence is elite-athlete observation and single-case data. For general-population members chasing size and health, most of this is beside the point.",
+    "questions_raised": []
+  },
+  "translation": [
+    "Strength/power hypertrophy block: 80–95% 1RM, ~5 reps per set, stop short of failure, full depth, lifts that look like the sport.",
+    "Light, high-rep work grows slow-twitch fibres; heavy work grows fast-twitch.",
+    "Full squats beat half squats for muscle growth (10 weeks)."
+  ],
+  "glossary_candidates": [
+    {
+      "term": "Myofibrillar vs sarcoplasmic hypertrophy",
+      "definition": "Growth of the force-producing filaments vs growth of the fluid and non-contractile contents of the fibre; both make muscle bigger, only the first makes it proportionally stronger.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Type II : type I size ratio",
+      "definition": "How much bigger fast fibres are than slow ones; higher in strength and power athletes.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Pennation angle",
+      "definition": "The angle fibres sit at relative to the line of pull; increases with hypertrophy and raises force at some cost to speed.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Sarcomeres in series / in parallel",
+      "definition": "More in parallel = more force; more in series = more speed and range.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "mTOR / AMPK",
+      "definition": "Two opposing cell signals: mTOR drives growth; AMPK responds to endurance-type stress and can dampen it.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Phase potentiation",
+      "definition": "Ordering training blocks so each one sets up the next (e.g. hypertrophy → strength → power).",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Training to failure",
+      "definition": "Continuing a set until no more reps are possible.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Regional hypertrophy",
+      "definition": "Growth concentrated in one part of a muscle, depending on the exercise and range of motion.",
+      "confidence_term_is_new": "likely"
+    }
+  ],
+  "charts": [
+    {
+      "template": "concept_curve",
+      "title": "Load → which fibres grow",
+      "series": [
+        {
+          "label": "Type I emphasis",
+          "points": [
+            {
+              "x": 30,
+              "y": 1
+            },
+            {
+              "x": 60,
+              "y": 0.5
+            },
+            {
+              "x": 80,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "label": "Type II emphasis",
+          "points": [
+            {
+              "x": 30,
+              "y": 0
+            },
+            {
+              "x": 60,
+              "y": 0.5
+            },
+            {
+              "x": 80,
+              "y": 1
+            }
+          ]
+        }
+      ],
+      "units": "x = load, % 1RM (thresholds as printed); y = 1 if the authors say this fibre type is emphasised at that load, 0 if not — a category, not a measurement",
+      "approximate": true,
+      "note": "schematic — not measured data. <60% 1RM → type I; 60–80% → mixed; ≥80% → type II. Thresholds are labelled theoretical by the authors; y values are illustrative only."
+    },
+    {
+      "template": "grouped_change_bars",
+      "title": "Bjørnsen 2019: fibre growth with light-load BFR training",
+      "series": [
+        {
+          "group": "Blood-flow restriction at ~30% 1RM",
+          "values": [
+            {
+              "label": "Type I",
+              "value": 12
+            },
+            {
+              "label": "Type II",
+              "value": 4
+            }
+          ]
+        }
+      ],
+      "units": "% change in fibre size",
+      "approximate": false,
+      "note": "Norwegian powerlifters. Review authors' reporting of Bjørnsen 2019. Other chart data in the hand entry not charted separately: Terzis correlations 0.81–0.89 / 0.84 / 0.82 (in evidence_cited)."
+    }
+  ],
+  "verification_notes": [
+    "All numbers are the review authors' reporting of cited studies; not verified against originals.",
+    "Three stimuli, mechanisms: pp.2–5",
+    "Terzis r values: p.4",
+    "≥10 reps/6 weeks AMPK: p.4",
+    "Grgic & Schoenfeld: p.4",
+    "Pennation 30°/33°, 477.5 kg: p.5",
+    "Brechue & Abe r: p.6",
+    "20% type II, twice the size: p.7",
+    "60% / 80% thresholds, \"theoretical\": p.7",
+    "Bjørnsen 12%/4%: p.8",
+    "Haun sarcoplasmic: p.9",
+    "Carroll failure vs non-failure: p.10",
+    "Kubo full vs half: p.11",
+    "2–4 weeks priming: p.12",
+    "80–95%, 5 reps: p.13",
+    "Disagreement with Loenneke: pp.2, 14",
+    "Funding/conflicts: p.14."
+  ]
+}

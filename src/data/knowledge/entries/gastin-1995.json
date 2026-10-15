@@ -1,0 +1,417 @@
+{
+  "id": "gastin-1995",
+  "slug": "gastin-1995",
+  "source_pdf": "accumulated_oxygen_deficit_during_supramaximal_16-2.pdf",
+  "shape": "comparison",
+  "document_type": "journal article",
+  "meta_analysis": false,
+  "header": {
+    "title_plain": "A 60–90 s all-out cycling test gave the same anaerobic-capacity estimate (accumulated oxygen deficit) as riding to exhaustion at a fixed supramaximal workload.",
+    "citation": {
+      "authors": "Gastin PB, Costill DL, Lawson DL, Krzeminski K, McConell GK",
+      "year": "1995",
+      "journal": "Medicine and Science in Sports and Exercise",
+      "volume_issue_pages": "27(2): 255–263",
+      "doi": "not printed in source"
+    },
+    "topics": [
+      "anaerobic-capacity",
+      "accumulated-oxygen-deficit",
+      "aod",
+      "supramaximal-exercise",
+      "all-out-test",
+      "sprint-testing",
+      "cycling",
+      "testing-protocols",
+      "oxygen-uptake",
+      "energy-systems",
+      "fitness-testing"
+    ],
+    "evidence_type": "Two separate method-comparison studies with no training period. Study 1: 9 active men, three supramaximal cycle tests (constant ~110% and ~125% VO2max to exhaustion, and an isokinetic all-out test) in random order. Study 2: 12 subjects (6 untrained, 6 endurance trained; sex not stated), a constant ~110% VO2max test to exhaustion and a 90 s all-out test; order not stated as randomised. No blinding stated. Each test performed once per subject.",
+    "confidence": {
+      "level": "preliminary",
+      "why": "The hand entry rated this preliminary–moderate; preliminary is chosen because each study is small (n = 9 and n = 12), each test was done once with no test–retest reliability data, AOD is an indirect estimate built on an extrapolated oxygen cost, and 'not significantly different' was not backed by an equivalence test, although the result did replicate across two labs and two ergometers."
+    },
+    "practical_relevance": {
+      "level": "low",
+      "why": "A method-validation paper for lab testing; the single practical point is that a 60–90 s all-out effort captures anaerobic capacity about as well as a constant-pace ride to exhaustion, which matters to whoever designs tests rather than to day-to-day programming."
+    },
+    "author_stance": "The study 2 all-out protocol is a modification of a variable-resistance test previously published by the first author's group (Gastin et al., ref 14), so the authors are validating a protocol from their own lab; no other interest is apparent.",
+    "funding_and_conflicts": "not stated"
+  },
+  "layer1": {
+    "comparison": {
+      "who": [
+        {
+          "name": "Study 1 (Ball State University, USA)",
+          "n": "9",
+          "age": "27 ± 1 yr (range 23–35), mean ± SEM",
+          "sex": "male",
+          "training_status": "\"active\"; \"a fairly heterogeneous group of training backgrounds and sporting pursuits\"; graduate students in the Human Performance Laboratory",
+          "other": "Height 181 ± 2 cm (174–191); weight 76 ± 2 kg (69–87); VO2max 57 ± 3 ml·kg−1·min−1 (45–67); fast-twitch fibres in vastus lateralis 48 ± 6% (30–78); efficiency regression slope 11.8 ± 0.2 ml·min−1·W−1, intercept 2.5 ± 0.5 ml·kg−1·min−1, r = 0.996 ± 0.001"
+        },
+        {
+          "name": "Study 2 (Victoria University of Technology, Australia)",
+          "n": "12 (6 untrained, 6 endurance trained), pooled a priori",
+          "age": "23 ± 1 yr (range 18–30), mean ± SEM",
+          "sex": "not stated",
+          "training_status": "6 untrained (VO2max 48 ± 1 ml·kg−1·min−1) and 6 endurance trained (VO2max 63 ± 1 ml·kg−1·min−1)",
+          "other": "Height 180 ± 2 cm (172–190); weight 72 ± 2 kg (63–81); VO2max 55 ± 3 ml·kg−1·min−1 (44–67); efficiency regression slope 10.9 ± 0.2 ml·min−1·W−1, intercept 7.9 ± 0.3 ml·kg−1·min−1, r = 0.998 ± 0.003; fibre type not measured"
+        }
+      ],
+      "conditions": [
+        {
+          "name": "S1 110% constant",
+          "description": "Study 1. Seated ride to exhaustion at a preset power output on a Cybex MET 100 ergometer in constant-workrate mode, pedalling ~90 rpm; stopped when the rider could not hold above 80 rpm.",
+          "intensity": "Target ~110% VO2max; achieved 107 ± 1% VO2max; mean power 5.0 ± 0.3 W·kg−1",
+          "duration": "186 ± 13 s (to exhaustion)",
+          "other": "7 min warm-up at 50% VO2max, 5 min rest, rolling start; expired gas in Douglas bags; fingertip blood lactate at 1, 3 and 5 min post"
+        },
+        {
+          "name": "S1 125% constant",
+          "description": "Study 1. As above at a higher preset power output.",
+          "intensity": "Target ~125% VO2max; achieved 125 ± 2% VO2max; mean power 5.9 ± 0.3 W·kg−1",
+          "duration": "94 ± 7 s (to exhaustion)",
+          "other": "Same warm-up, gas collection and lactate sampling as above"
+        },
+        {
+          "name": "S1 isokinetic all-out",
+          "description": "Study 1. Maximal effort on the Cybex ergometer in isokinetic mode, cadence fixed at 90 rpm; stopped when power (sampled at 0.5 Hz) fell below that equivalent to 95% VO2max.",
+          "intensity": "Mean 149 ± 5% VO2max (7.0 ± 0.2 W·kg−1); peak 9.6 ± 0.2 W·kg−1 (206% VO2max); minimum 4.2 ± 0.3 W·kg−1 (92% VO2max)",
+          "duration": "62 ± 2 s",
+          "other": "Fatigue index 55.5 ± 2.7%; three study-1 tests given in random order, 2–7 d apart"
+        },
+        {
+          "name": "S2 110% constant",
+          "description": "Study 2. Seated ride to exhaustion at a constant intensity on a modified Monark 814 friction-loaded ergometer at ~90 rpm; ended voluntarily or by the investigator when power fell below that equivalent to 95% VO2max.",
+          "intensity": "Target ~110% VO2max; achieved 109 ± 1% VO2max; mean power 4.8 ± 0.2 W·kg−1",
+          "duration": "208 ± 18 s (to exhaustion)",
+          "other": "Breath-by-breath gas analysis and power averaged over 5 s intervals"
+        },
+        {
+          "name": "S2 variable all-out",
+          "description": "Study 2. 90 s maximal effort on the Monark with variable resistance (modified from Gastin et al., ref 14): 0.095 kg·kg−1 body weight, reduced to 0.075 at 30 s and 0.055 at 60 s; cadence free to vary.",
+          "intensity": "Mean 143 ± 5% VO2max (6.4 ± 0.1 W·kg−1); peak 11.9 ± 0.2 W·kg−1 (254% VO2max); minimum 3.9 ± 0.2 W·kg−1 (92% VO2max)",
+          "duration": "90 s (fixed)",
+          "other": "Fatigue index 66.7 ± 1.9%; order of the two study-2 tests not stated as randomised"
+        }
+      ],
+      "design_notes": "Two independent studies run by the first author in separate labs. Before the supramaximal tests, each subject did a VO2max test and a series of submaximal rides (study 1: six to eight 7 min rides from 80 W rising 40 W per ride, 29 ± 2 to 84 ± 2% VO2max, 80–360 W; study 2: five to six 5 min rides at 46 ± 1 to 81 ± 2% VO2max, steady state accepted when VO2 changed by less than 0.6 ml·kg−1 (<50 ml) from the 4th to 5th min). The linear oxygen-cost-versus-power relationship was extrapolated to estimate the oxygen cost of each supramaximal test (Medbø method); AOD = estimated oxygen cost minus measured oxygen uptake. Tests 2–7 d apart at the same time of day, after 24 h of standardised diet and limited activity and at least 4 h fasting. Study 1 used Douglas bags; study 2 breath-by-breath. Study 1 fibre type from a vastus lateralis biopsy (ATPase stain, ~400 fibres). Statistics: study 1 one-way repeated-measures ANOVA with Newman-Keuls post hoc; study 2 two-tailed paired t-test; P < 0.05; data mean ± SEM. Peak blood lactate was not reported for study 2. The authors note AOD variance may be higher than other measures because it is derived from several measures each with its own variance, and that AOD may not be a valid measure of anaerobic capacity at all (with references). No invasive validation of AOD was done. No test–retest reliability data, no equivalence test.",
+      "measured": [
+        {
+          "outcome": "Accumulated oxygen deficit (AOD)",
+          "unit": "ml·kg−1",
+          "values_by_condition": {
+            "S1 110% constant": "43.9 ± 3.0",
+            "S1 125% constant": "44.1 ± 1.8",
+            "S1 isokinetic all-out": "42.0 ± 2.0",
+            "S2 110% constant": "52.1 ± 3.1",
+            "S2 variable all-out": "51.2 ± 2.5"
+          },
+          "differed": "no (P > 0.05 within each study)",
+          "note": "Primary outcome. Not an equivalence test: 'not significantly different' only."
+        },
+        {
+          "outcome": "Individual between-test difference in AOD",
+          "unit": "ml·kg−1",
+          "values_by_condition": {
+            "Study 1 (any two tests)": "4.0 ± 0.5 (range 1.3–10.3)",
+            "Study 2 (110% vs all-out)": "4.7 ± 1.1 (range 0–13.2)"
+          },
+          "differed": "not tested",
+          "note": "Averaged absolute differences between a subject's own tests, reported as mean ± SEM. The paper does not call these coefficients of variation. Greater interindividual variability in the constant-intensity tests (study 1)."
+        },
+        {
+          "outcome": "AOD by training status (study 2)",
+          "unit": "ml·kg−1",
+          "values_by_condition": {
+            "S2 variable all-out, untrained": "49.9",
+            "S2 variable all-out, endurance trained": "52.6",
+            "S2 110% constant, untrained": "47.1",
+            "S2 110% constant, endurance trained": "57.1"
+          },
+          "differed": "Between groups: no (all-out P = 0.60; constant P = 0.11). Test-by-group pattern: yes (P = 0.04)",
+          "note": "Untrained higher AOD in the all-out test (mean difference 2.7 ± 1.1); endurance trained higher in the constant test (4.5 ± 2.8). All 6 untrained had their highest AOD in the all-out test; 4 of 6 trained had theirs in the constant test. Subgroups of 6."
+        },
+        {
+          "outcome": "Exercise intensity achieved",
+          "unit": "% VO2max",
+          "values_by_condition": {
+            "S1 110% constant": "107 ± 1",
+            "S1 125% constant": "125 ± 2",
+            "S1 isokinetic all-out": "149 ± 5",
+            "S2 110% constant": "109 ± 1",
+            "S2 variable all-out": "143 ± 5"
+          },
+          "differed": "yes — study 1: all pairs; study 2: 110% vs all-out",
+          "note": "All-out values are means over the test."
+        },
+        {
+          "outcome": "Duration (time to exhaustion for constant tests)",
+          "unit": "s",
+          "values_by_condition": {
+            "S1 110% constant": "186 ± 13",
+            "S1 125% constant": "94 ± 7",
+            "S1 isokinetic all-out": "62 ± 2",
+            "S2 110% constant": "208 ± 18",
+            "S2 variable all-out": "90"
+          },
+          "differed": "yes — study 1: all pairs; study 2: 110% vs all-out",
+          "note": "Study 2 all-out duration was fixed by protocol."
+        },
+        {
+          "outcome": "Total work",
+          "unit": "J·kg−1",
+          "values_by_condition": {
+            "S1 110% constant": "921 ± 73",
+            "S1 125% constant": "536 ± 21",
+            "S1 isokinetic all-out": "429 ± 17",
+            "S2 110% constant": "979 ± 74",
+            "S2 variable all-out": "576 ± 12"
+          },
+          "differed": "yes — study 1: 110% vs 125% and 110% vs all-out (125% vs all-out not marked significant); study 2: 110% vs all-out",
+          "note": "Extra work in the longer tests attributed to aerobic metabolism."
+        },
+        {
+          "outcome": "Mean power",
+          "unit": "W·kg−1",
+          "values_by_condition": {
+            "S1 110% constant": "5.0 ± 0.3",
+            "S1 125% constant": "5.9 ± 0.3",
+            "S1 isokinetic all-out": "7.0 ± 0.2",
+            "S2 110% constant": "4.8 ± 0.2",
+            "S2 variable all-out": "6.4 ± 0.1"
+          },
+          "differed": "yes — study 1: all pairs; study 2: 110% vs all-out",
+          "note": ""
+        },
+        {
+          "outcome": "Peak power (all-out tests only)",
+          "unit": "W·kg−1",
+          "values_by_condition": {
+            "S1 isokinetic all-out": "9.6 ± 0.2 (206% VO2max)",
+            "S2 variable all-out": "11.9 ± 0.2 (254% VO2max)"
+          },
+          "differed": "not tested",
+          "note": "Discussion gives study 1 peak as 205% VO2max, results text 206%. Minimum power: 4.2 ± 0.3 (92% VO2max) and 3.9 ± 0.2 (92% VO2max)."
+        },
+        {
+          "outcome": "Fatigue index (all-out tests only)",
+          "unit": "%",
+          "values_by_condition": {
+            "S1 isokinetic all-out": "55.5 ± 2.7",
+            "S2 variable all-out": "66.7 ± 1.9"
+          },
+          "differed": "not tested",
+          "note": "Authors attribute the higher study 2 value to higher peak and slightly lower minimum power."
+        },
+        {
+          "outcome": "Aerobic share of total energy (aerobic metabolism)",
+          "unit": "%",
+          "values_by_condition": {
+            "S1 110% constant": "76 ± 1",
+            "S1 125% constant": "59 ± 2",
+            "S1 isokinetic all-out": "51 ± 1",
+            "S2 110% constant": "74 ± 1",
+            "S2 variable all-out": "57 ± 2"
+          },
+          "differed": "yes — study 1: all pairs; study 2: 110% vs all-out",
+          "note": ""
+        },
+        {
+          "outcome": "Aerobic work",
+          "unit": "J·kg−1",
+          "values_by_condition": {
+            "S1 110% constant": "707 ± 63",
+            "S1 125% constant": "321 ± 22",
+            "S1 isokinetic all-out": "221 ± 11",
+            "S2 110% constant": "730 ± 64",
+            "S2 variable all-out": "327 ± 10"
+          },
+          "differed": "yes — study 1: 110% vs 125% and 110% vs all-out (125% vs all-out not marked); study 2: 110% vs all-out",
+          "note": "Calculated assuming the same work costs 1 mol ATP whether made aerobically or anaerobically (Fig 2 legend)."
+        },
+        {
+          "outcome": "Anaerobic work",
+          "unit": "J·kg−1",
+          "values_by_condition": {
+            "S1 110% constant": "214 ± 15",
+            "S1 125% constant": "215 ± 8",
+            "S1 isokinetic all-out": "208 ± 10",
+            "S2 110% constant": "249 ± 15",
+            "S2 variable all-out": "249 ± 12"
+          },
+          "differed": "no",
+          "note": "Calculated, as above."
+        },
+        {
+          "outcome": "Anaerobic energy release, first 30 s (oxygen deficit rate)",
+          "unit": "ml·kg−1·s−1",
+          "values_by_condition": {
+            "S1 110% constant": "0.60 ± 0.04",
+            "S1 125% constant": "0.73 ± 0.05",
+            "S1 isokinetic all-out": "1.12 ± 0.06",
+            "S2 110% constant": "0.67 ± 0.03",
+            "S2 variable all-out": "1.35 ± 0.04"
+          },
+          "differed": "yes — study 1: all pairs; study 2: 110% vs all-out",
+          "note": "Fig 3 shows the same data as oxygen deficit in the first 30 s, in ml·kg−1."
+        },
+        {
+          "outcome": "Aerobic energy release, first 30 s (oxygen uptake rate)",
+          "unit": "ml·kg−1·s−1",
+          "values_by_condition": {
+            "S1 110% constant": "0.42 ± 0.02",
+            "S1 125% constant": "0.45 ± 0.02",
+            "S1 isokinetic all-out": "0.58 ± 0.03",
+            "S2 110% constant": "0.36 ± 0.02",
+            "S2 variable all-out": "0.53 ± 0.02"
+          },
+          "differed": "yes — study 1: 110% vs all-out and 125% vs all-out (110% vs 125% not marked); study 2: 110% vs all-out",
+          "note": "Oxygen uptake rose faster in the all-out tests."
+        },
+        {
+          "outcome": "Peak blood lactate",
+          "unit": "mmol·l−1",
+          "values_by_condition": {
+            "S1 110% constant": "16.7 ± 0.6",
+            "S1 125% constant": "14.5 ± 0.5",
+            "S1 isokinetic all-out": "18.2 ± 1.0",
+            "S2 110% constant": "not reported",
+            "S2 variable all-out": "not reported"
+          },
+          "differed": "yes — study 1: 110% vs 125% and 125% vs all-out; 110% vs all-out not marked significant",
+          "note": ""
+        },
+        {
+          "outcome": "Correlations, study 1 (n = 9)",
+          "unit": "r",
+          "values_by_condition": {
+            "AOD vs % fast-twitch fibres": "−0.05 (no relationship)",
+            "Peak power vs AOD, isokinetic all-out": "0.85",
+            "Peak blood lactate vs AOD": "0.64 in 110% test only; not related in the other two",
+            "% fast-twitch vs peak lactate": "0.71 (125%), 0.59 (isokinetic all-out)",
+            "% fast-twitch vs VO2max": "−0.68",
+            "% fast-twitch vs aerobic energy rate, first 30 s": "−0.77 (110%), −0.75 (125%)",
+            "% fast-twitch vs anaerobic energy rate, first 30 s": "no relationship in any test"
+          },
+          "differed": "not applicable",
+          "note": "Authors say it is hard to tell whether few relationships exist or whether subject number and training status hid them."
+        },
+        {
+          "outcome": "Single-subject example (study 2, Fig 1; VO2max 49.3 ml·kg−1·min−1)",
+          "unit": "ml·kg−1",
+          "values_by_condition": {
+            "S2 variable all-out": "48.9",
+            "S2 110% constant": "47.7"
+          },
+          "differed": "not tested",
+          "note": "Difference 1.2 ml·kg−1 for this subject."
+        }
+      ]
+    }
+  },
+  "layer2": {
+    "what_it_means": "Across two separate studies, the estimated anaerobic capacity (accumulated oxygen deficit, AOD) came out the same whether riders went all-out or held a fixed supramaximal workload until exhaustion: 43.9, 44.1 and 42.0 ml·kg−1 for the three study-1 tests and 52.1 versus 51.2 ml·kg−1 in study 2. The calculated anaerobic work was also unchanged across tests (208–215 J·kg−1 in study 1, 249 J·kg−1 for both study-2 tests), while total and aerobic work grew with test length: the 110% rides lasted 186–208 s and drew 74–76% of their energy aerobically, against 51–57% for the 62–90 s all-out tests. The practical reading is that a 60–90 s all-out effort exhausts the anaerobic reserve about as fully as a constant-pace ride to failure, while also yielding peak power, mean power and a fatigue index from the same test. It also shows why total work in a long sprint test partly reflects aerobic fitness rather than anaerobic capacity alone. Individual results were less consistent than the averages: a rider's AOD differed between tests by 4.0 ml·kg−1 on average in study 1 and 4.7 ml·kg−1 in study 2, with differences up to 13.2 ml·kg−1.",
+    "what_it_doesnt_mean": "This does not show the two test types are interchangeable for an individual. The comparison found no significant difference; no equivalence test was run, and individual differences reached 10.3 and 13.2 ml·kg−1. In study 2, untrained subjects tended to score higher on the all-out test and endurance-trained subjects on the constant test, though each subgroup had only six people. Samples were small (9 and 12), study 1 was young active men, study 2's sex is not stated, and nobody was older, female by report, or a trained sprinter. Each test was performed once, so day-to-day reliability is unknown. AOD is an indirect estimate: it depends on extrapolating oxygen cost from submaximal rides, assumes efficiency holds above VO2max, and the authors themselves cite work questioning whether AOD validly measures anaerobic capacity. Results apply to seated cycling on two specific lab ergometers, not to running, rowing or field tests, and the paper says nothing about training anaerobic capacity.",
+    "questions_raised": []
+  },
+  "translation": [
+    "A 60–90 s all-out bike test gave an anaerobic-capacity estimate not significantly different from riding to failure at about 110–125% of VO2max (42.0 vs 43.9–44.1 ml/kg in one study, 51.2 vs 52.1 ml/kg in the other).",
+    "Riding to failure at about 110% lasted 186–208 s and did more total work (921–979 vs 429–576 J/kg), but anaerobic work did not differ; the extra was aerobic."
+  ],
+  "glossary_candidates": [
+    { "term": "Accumulated oxygen deficit (AOD)", "definition": "The gap between the oxygen a hard effort would need and the oxygen actually used, added up over the effort. Used as an estimate of how much energy came from anaerobic sources.", "confidence_term_is_new": "likely" },
+    { "term": "Supramaximal exercise", "definition": "Work at an intensity above the power that produces VO2max, so it cannot be supplied by aerobic metabolism alone and can only be held briefly.", "confidence_term_is_new": "likely" },
+    { "term": "Anaerobic capacity", "definition": "The total amount of energy a person can produce without oxygen (from phosphocreatine and glycolysis) before that supply is used up.", "confidence_term_is_new": "unsure" },
+    { "term": "Constant-intensity test (to exhaustion)", "definition": "A test in which the workload is fixed in advance and the rider holds it until they can no longer keep the required cadence.", "confidence_term_is_new": "likely" },
+    { "term": "All-out test", "definition": "A test in which the athlete goes as hard as possible from the start for a set time or until power drops below a cut-off, so power is high early and fades.", "confidence_term_is_new": "unsure" },
+    { "term": "Isokinetic ergometer", "definition": "An exercise machine that holds cadence at a fixed speed (here 90 rpm) however hard the rider pushes, so only the force and power change.", "confidence_term_is_new": "likely" },
+    { "term": "Wingate test", "definition": "A standard 30 s all-out cycling test against a fixed resistance set from body weight, used to measure peak and mean anaerobic power.", "confidence_term_is_new": "unsure" },
+    { "term": "Fatigue index", "definition": "How much power falls during an all-out test, from the peak to the minimum, expressed as a percentage of the peak.", "confidence_term_is_new": "likely" },
+    { "term": "Blood lactate (peak)", "definition": "The highest lactate concentration measured in blood after a hard effort; a rough marker of how much glycolysis was used.", "confidence_term_is_new": "unsure" },
+    { "term": "VO2max", "definition": "The highest rate at which a person can take up and use oxygen during exercise, usually in ml per kg body weight per minute.", "confidence_term_is_new": "unsure" },
+    { "term": "Efficiency relationship (oxygen cost extrapolation)", "definition": "A straight line linking power output to oxygen use, built from several easier rides and extended upward to estimate the oxygen a supramaximal effort would need.", "confidence_term_is_new": "likely" },
+    { "term": "SEM (standard error of the mean)", "definition": "A measure of how precisely a group average is known; it is smaller than the spread between individuals, so ± SEM values look tighter than the real person-to-person variation.", "confidence_term_is_new": "likely" },
+    { "term": "Correlation coefficient (r)", "definition": "A number from −1 to 1 describing how closely two measures rise or fall together; 0 means no straight-line relationship.", "confidence_term_is_new": "unsure" },
+    { "term": "Fast-twitch fibre percentage (muscle biopsy)", "definition": "The share of fast-twitch fibres in a small muscle sample removed with a needle, here from the outer thigh (vastus lateralis).", "confidence_term_is_new": "unsure" },
+    { "term": "Douglas bag / breath-by-breath gas analysis", "definition": "Two ways to measure oxygen uptake: collecting expired air in large bags for analysis, or analysing each breath continuously with a metabolic cart.", "confidence_term_is_new": "likely" }
+  ],
+  "charts": [
+    {
+      "template": "values_by_condition",
+      "title": "Accumulated oxygen deficit was similar in every test",
+      "series": [
+        {
+          "label": "AOD (mean)",
+          "values": [
+            { "condition": "S1 110% constant", "value": 43.9 },
+            { "condition": "S1 125% constant", "value": 44.1 },
+            { "condition": "S1 isokinetic all-out", "value": 42.0 },
+            { "condition": "S2 110% constant", "value": 52.1 },
+            { "condition": "S2 variable all-out", "value": 51.2 }
+          ]
+        }
+      ],
+      "units": "ml·kg−1",
+      "approximate": false,
+      "note": "Means from Table 2 (± SEM 1.8–3.1). No significant difference within either study. Compare within a study only; studies used different subjects and ergometers."
+    },
+    {
+      "template": "stacked_share",
+      "title": "Longer tests drew more of their energy aerobically",
+      "series": [
+        { "label": "S1 110% constant", "parts": [ { "name": "Aerobic", "value": 76 }, { "name": "Anaerobic", "value": 24 } ] },
+        { "label": "S1 125% constant", "parts": [ { "name": "Aerobic", "value": 59 }, { "name": "Anaerobic", "value": 41 } ] },
+        { "label": "S1 isokinetic all-out", "parts": [ { "name": "Aerobic", "value": 51 }, { "name": "Anaerobic", "value": 49 } ] },
+        { "label": "S2 110% constant", "parts": [ { "name": "Aerobic", "value": 74 }, { "name": "Anaerobic", "value": 26 } ] },
+        { "label": "S2 variable all-out", "parts": [ { "name": "Aerobic", "value": 57 }, { "name": "Anaerobic", "value": 43 } ] }
+      ],
+      "units": "% of total energy",
+      "approximate": false,
+      "note": "Aerobic % from Table 2; anaerobic share is 100 minus the printed aerobic %, not a separately printed value."
+    },
+    {
+      "template": "population_card",
+      "title": "Who was tested",
+      "series": [
+        {
+          "n": "21 across two studies (study 1: 9; study 2: 12)",
+          "sex_split": "Study 1: 9 men; study 2: not stated",
+          "age": "Study 1: 27 ± 1 yr (23–35); study 2: 23 ± 1 yr (18–30)",
+          "status": "Study 1: active, mixed training backgrounds (VO2max 57 ± 3 ml·kg−1·min−1); study 2: 6 untrained + 6 endurance trained (VO2max 48 ± 1 and 63 ± 1)",
+          "other": "Seated cycling on lab ergometers; each test done once"
+        }
+      ],
+      "units": "",
+      "approximate": false,
+      "note": "Values mean ± SEM (range)."
+    }
+  ],
+  "verification_notes": [
+    "Citation (authors, Med Sci Sports Exerc 27(2): 255–263, 1995), received Dec 1993, accepted Aug 1994; no DOI printed: p.255 (abstract citation line and footer)",
+    "Two independent studies, labs (Ball State, Victoria University of Technology), ethics, tests 2–7 d apart, standardised diet/activity, 4 h fasted: p.256 Methods",
+    "Study 1: nine active male subjects, heterogeneous training backgrounds; graduate students: p.256 Study 1",
+    "Subject characteristics for both studies (age, height, weight, VO2max, % FT fibres, slope, intercept, r, ranges): p.256 Table 1",
+    "Study 2: twelve subjects, 6 untrained and 6 endurance trained, VO2max 48 ± 1 and 63 ± 1; pooled a priori; sex not stated anywhere in the paper: p.257 Study 2",
+    "Study 1 equipment and protocol (Cybex MET 100, 90 rpm, 7 min submax rides from 80 W +40 W, 29 ± 2 to 84 ± 2% VO2max, 80–360 W, Douglas bags, random order, 7 min warm-up at 50% VO2max, 5 min break, termination rules <80 rpm and <95% VO2max at 0.5 Hz, lactate at 1, 3, 5 min): p.256",
+    "Fibre typing (vastus lateralis biopsy, ATPase, ~400 fibres): p.256–257",
+    "Study 2 equipment and protocol (Monark 814, 10 Hz sampling, 5 min rides at 46 ± 1 to 81 ± 2% VO2max, steady-state criterion <0.6 ml·kg−1 (<50 ml), resistance 0.095 → 0.075 at 30 s → 0.055 kg·kg−1 BW at 60 s, 90 s duration, termination at <95% VO2max, 5 s averaging): p.257",
+    "Statistics (StatView II/SuperANOVA, P < 0.05, mean ± SEM, repeated-measures ANOVA + Newman-Keuls for study 1, two-tailed t-test for study 2): p.257 Statistics",
+    "All condition values for intensity, duration, work, power, AOD, aerobic %, aerobic and anaerobic work, first-30-s anaerobic and aerobic energy release, peak blood lactate, and significance markers: p.258 Table 2",
+    "AOD headline values 43.9, 44.1, 42.0 and 52.1, 51.2 ml·kg−1, P > 0.05: p.255 Abstract; p.258 Table 2",
+    "Study 1 individual AOD difference 4.0 ± 0.5 ml·kg−1 (range 1.3–10.3), greater variability in constant tests: p.258 Results",
+    "Study 1 all-out peak 9.6 ± 0.2 W·kg−1 (206% VO2max), minimum 4.2 ± 0.3 (92%), fatigue index 55.5 ± 2.7%, mean 7.0 ± 0.2 (149%): p.258 Results",
+    "Study 1 correlations (AOD vs FT r = −0.05; FT vs peak lactate 0.71 and 0.59; lactate vs AOD 0.64 in 110% only; FT vs VO2max −0.68; FT vs first-30-s aerobic rate −0.77 and −0.75; no FT vs anaerobic rate; peak power vs AOD 0.85): p.258–259 Results",
+    "Study 2 AOD 51.2 vs 52.1, individual difference 4.7 ± 1.1 ml·kg−1 (range 0–13.2): p.259 Results",
+    "Single subject example (VO2max 49.3; AOD 48.9 all-out, 47.7 at 110%; difference 1.2): p.258 Fig 1 legend; p.259 Results",
+    "Study 2 subgroup AOD (all-out 49.9 vs 52.6, P = 0.60; constant 47.1 vs 57.1, P = 0.11; P = 0.04 for test comparison; 2.7 ± 1.1 and 4.5 ± 2.8; all 6 untrained highest in all-out, 4 of 6 trained highest in constant): p.259 Results",
+    "Study 2 all-out mean 6.4 ± 0.1 W·kg−1 (143%), peak 11.9 ± 0.2 (254%), minimum 3.9 ± 0.2 (92%): p.259 Results; fatigue index 66.7 ± 1.9%: p.260",
+    "Aerobic/anaerobic work split and 1 mol ATP assumption: p.259 Fig 2; first-30-s oxygen deficit and uptake: p.259 Fig 3 (values used here are from Table 2, not read from figures)",
+    "Discussion figures 205% and 254% peak, 107%/125%/109% constant intensities; discrepancy 205% (p.260) vs 206% (p.258) noted: p.260",
+    "Authors' limitations: AOD variance compounded from multiple measures; AOD may not be a valid measure of anaerobic capacity; few correlations possibly due to subject number and training status; possible efficiency error from variable pedal rate in study 2; individual test specificity: p.260–261",
+    "Conclusion that an all-out protocol gives a valid estimate of maximal AOD; 60–90 s suggestion; endurance trained may suit a longer constant test: p.262",
+    "Funding: no funding or conflict statement printed; acknowledgments only; correspondence address Victorian Institute of Sport: p.262",
+    "Own-lab protocol (ref 14, Gastin et al. 1991, variable resistance loadings): p.257 and p.262 references"
+  ]
+}
