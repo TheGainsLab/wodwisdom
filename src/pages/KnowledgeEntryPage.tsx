@@ -161,11 +161,9 @@ function ComparisonFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['compa
 }
 
 function ReviewFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['review']> }) {
+  // The claim renders at the top of the page, not here.
   return (
     <>
-      <div style={{ padding: '12px 14px', borderLeft: '3px solid var(--accent)', background: 'var(--surface)', borderRadius: 8, fontSize: 13.5, lineHeight: 1.6, marginBottom: 14 }}>
-        {l.claim}
-      </div>
       {l.definitions_used.length > 0 && (
         <FactsTable
           columns={[{ key: 'term', label: 'Term' }, { key: 'definition', label: 'As the authors define it' }]}
@@ -195,9 +193,9 @@ function ReviewFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['review']>
 }
 
 function ReferenceFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['reference']> }) {
+  // what_it_explains renders at the top of the page, not here.
   return (
     <>
-      <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, margin: '0 0 14px' }}>{l.what_it_explains}</p>
       <FactsTable
         columns={[{ key: 'quantity', label: 'Quantity' }, { key: 'value', label: 'Value' }, { key: 'note', label: 'Note' }]}
         rows={l.key_numbers.map((k) => ({ ...k, value: val(k.value) }))}
@@ -422,20 +420,40 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
           Research Library
         </Link>
 
-        <h1 style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.3, margin: '12px 0 10px' }}>{h.title_plain}</h1>
-
-        <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 10px', lineHeight: 1.5 }}>
-          {cite.authors !== NOT_PRINTED && <>{cite.authors} </>}
-          {cite.year !== NOT_PRINTED && <>({cite.year}). </>}
-          {!!cite.title && cite.title !== NOT_PRINTED && <>&ldquo;{cite.title}.&rdquo; </>}
-          {cite.journal !== NOT_PRINTED && <>{cite.journal} </>}
-          {cite.volume_issue_pages !== NOT_PRINTED && <>{cite.volume_issue_pages}. </>}
+        {/* Receipt first, eyes on the finding: paper title (modest) → byline →
+            headline (the visual lead) → the argument, then the trust section. */}
+        {!!cite.title && cite.title !== NOT_PRINTED && (
+          <div style={{ fontSize: 16, fontWeight: 650, lineHeight: 1.4, margin: '14px 0 3px', color: 'var(--text)' }}>
+            {cite.title}
+          </div>
+        )}
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 14px', lineHeight: 1.5 }}>
+          {cite.authors !== NOT_PRINTED && <>{cite.authors}</>}
+          {cite.year !== NOT_PRINTED && <> · {cite.year}</>}
+          {cite.journal !== NOT_PRINTED && <> · {cite.journal}</>}
+          {cite.volume_issue_pages !== NOT_PRINTED && <> {cite.volume_issue_pages}</>}
           {cite.doi !== NOT_PRINTED && (
-            <a href={`https://doi.org/${cite.doi}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
-              doi:{cite.doi}
-            </a>
+            <>
+              {' · '}
+              <a href={`https://doi.org/${cite.doi}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
+                doi:{cite.doi}
+              </a>
+            </>
           )}
         </p>
+
+        <h1 style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.3, margin: '0 0 12px' }}>{h.title_plain}</h1>
+
+        {entry.layer1.review?.claim && (
+          <div style={{ padding: '12px 14px', borderLeft: '3px solid var(--accent)', background: 'var(--surface)', borderRadius: 8, fontSize: 13.5, lineHeight: 1.6, marginBottom: 14 }}>
+            {entry.layer1.review.claim}
+          </div>
+        )}
+        {entry.layer1.reference?.what_it_explains && (
+          <p style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.6, margin: '0 0 14px' }}>
+            {entry.layer1.reference.what_it_explains}
+          </p>
+        )}
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
           <KnowledgeBadge kind="shape" value={entry.shape} />
