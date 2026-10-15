@@ -64,6 +64,8 @@ export interface KnowledgeEntry {
   meta_analysis: boolean;
   header: {
     title_plain: string;
+    /** Study shapes only: 2–4 plain sentences overviewing what was done. The page's lede. */
+    setup_plain?: string;
     citation: {
       /** The paper's own title, verbatim from the source ("" until entered). */
       title: string;
