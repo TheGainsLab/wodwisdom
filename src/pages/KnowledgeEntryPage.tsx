@@ -232,14 +232,89 @@ function chartRows(c: KnowledgeChart): { columns: Array<{ key: string; label: st
   }
 }
 
+// Categorical slots validated (dataviz six checks) against the site surface
+// #111114: CVD ΔE 26.8, normal 31.8, all ≥3:1 contrast. Assignment is by
+// first appearance in the chart's own data, never cycled.
+const SHARE_SLOTS = ['#3987e5', '#d95926', '#199e70'];
+
+/** stacked_share as horizontal 100%-stacked bars; null → caller falls back to the table. */
+function renderStackedShare(c: KnowledgeChart): React.ReactNode | null {
+  const series = c.series as Array<{ label: string; parts: Array<{ name: string; value: number }> }>;
+  if (!series.length || series.some((r) => !Array.isArray(r.parts))) return null;
+  const names: string[] = [];
+  for (const row of series) {
+    for (const p of row.parts) {
+      if (!names.some((n) => n.toLowerCase() === p.name.toLowerCase())) names.push(p.name);
+    }
+  }
+  if (names.length < 2 || names.length > SHARE_SLOTS.length) return null;
+  const color = (name: string) => SHARE_SLOTS[names.findIndex((n) => n.toLowerCase() === name.toLowerCase())];
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const suffix = c.units.trim().startsWith('%') ? '%' : '';
+  return (
+    <div style={{ margin: '2px 0 10px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 10 }}>
+        {names.map((n) => (
+          <span key={n} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-dim)' }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: color(n), flexShrink: 0 }} />
+            {cap(n)}
+          </span>
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {series.map((row) => {
+          const total = row.parts.reduce((a, p) => a + p.value, 0) || 1;
+          return (
+            <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 56, flexShrink: 0, fontSize: 11.5, color: 'var(--text-dim)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                {row.label}
+              </div>
+              <div style={{ flex: 1, display: 'flex', gap: 2, height: 20 }}>
+                {row.parts.map((p, i) => {
+                  const pct = (p.value / total) * 100;
+                  return (
+                    <div
+                      key={p.name}
+                      title={`${cap(p.name)}: ${p.value}${suffix} (${row.label})`}
+                      style={{
+                        width: `${pct}%`, background: color(p.name), minWidth: 2,
+                        borderRadius: i === 0 ? '4px 0 0 4px' : i === row.parts.length - 1 ? '0 4px 4px 0' : 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      {pct >= 12 && (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#111114', whiteSpace: 'nowrap' }}>
+                          {p.value}{suffix}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ChartBlock({ c }: { c: KnowledgeChart }) {
   const { columns, rows } = chartRows(c);
+  const drawn = c.template === 'stacked_share' ? renderStackedShare(c) : null;
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 12, background: 'var(--surface)' }}>
       <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 8 }}>
         {c.title}{c.units ? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> · {c.units}</span> : null}
       </div>
-      {columns.length > 0 && <FactsTable columns={columns} rows={rows} />}
+      {drawn}
+      {drawn && columns.length > 0 && (
+        <details style={{ margin: '0 0 6px' }}>
+          <summary style={{ fontSize: 11.5, color: 'var(--text-muted)', cursor: 'pointer' }}>View as table</summary>
+          <FactsTable columns={columns} rows={rows} />
+        </details>
+      )}
+      {!drawn && columns.length > 0 && <FactsTable columns={columns} rows={rows} />}
       {c.approximate && (
         <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 4 }}>
           approximate — values read from a figure
