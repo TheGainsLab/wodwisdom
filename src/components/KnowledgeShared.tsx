@@ -39,10 +39,10 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function GlossarySpan({ text, definition }: { text: string; definition: string }) {
+function GlossarySpan({ text, definition, inline = false }: { text: string; definition: string; inline?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
-    <span style={{ position: 'relative' }}>
+    <span style={inline ? undefined : { position: 'relative' }}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -58,7 +58,14 @@ function GlossarySpan({ text, definition }: { text: string; definition: string }
       {open && (
         <span
           role="note"
-          style={{
+          style={inline ? {
+            // Inline mode for table cells: the definition expands in the flow
+            // (a floating box would be clipped by the table's scroll container).
+            display: 'block', margin: '6px 0 4px', padding: '8px 10px', borderRadius: 6,
+            background: 'var(--surface2, #222)', border: '1px solid var(--border)',
+            color: 'var(--text)', fontSize: 12, lineHeight: 1.5, fontWeight: 400,
+            textAlign: 'left',
+          } : {
             position: 'absolute', left: 0, top: 'calc(100% + 6px)', zIndex: 30,
             minWidth: 220, maxWidth: 300, padding: '10px 12px', borderRadius: 8,
             background: 'var(--surface2, #222)', border: '1px solid var(--border)',
@@ -73,12 +80,23 @@ function GlossarySpan({ text, definition }: { text: string; definition: string }
   );
 }
 
-/** Linkify one section of prose: first occurrence of each glossary term. */
-export function linkifyGlossary(text: string): React.ReactNode[] {
+/**
+ * Linkify one section of prose: first occurrence of each glossary term.
+ * `seen` widens "section" beyond one string — pass a shared Set to link each
+ * term only once across many strings (e.g. every cell of one table).
+ * `inline` renders definitions in the flow instead of a floating box
+ * (required inside scroll containers like the facts tables).
+ */
+export function linkifyGlossary(
+  text: string,
+  opts?: { inline?: boolean; seen?: Set<string> },
+): React.ReactNode[] {
   // Collect first-occurrence matches, longest terms first so "VO2peak"
   // beats "VO2"; overlapping later matches are discarded.
   const matches: Array<{ start: number; end: number; term: string; definition: string }> = [];
   for (const t of TERMS) {
+    const key = t.term.toLowerCase();
+    if (opts?.seen?.has(key)) continue;
     const re = new RegExp(`(?<![\\w-])${escapeRegExp(t.term)}(?![\\w-])`, 'i');
     const m = re.exec(text);
     if (!m) continue;
@@ -86,6 +104,7 @@ export function linkifyGlossary(text: string): React.ReactNode[] {
     const end = start + m[0].length;
     if (matches.some((x) => start < x.end && end > x.start)) continue;
     matches.push({ start, end, term: m[0], definition: t.definition });
+    opts?.seen?.add(key);
   }
   matches.sort((a, b) => a.start - b.start);
 
@@ -93,7 +112,7 @@ export function linkifyGlossary(text: string): React.ReactNode[] {
   let cursor = 0;
   matches.forEach((m, i) => {
     if (m.start > cursor) out.push(text.slice(cursor, m.start));
-    out.push(<GlossarySpan key={i} text={m.term} definition={m.definition} />);
+    out.push(<GlossarySpan key={i} text={m.term} definition={m.definition} inline={opts?.inline} />);
     cursor = m.end;
   });
   if (cursor < text.length) out.push(text.slice(cursor));

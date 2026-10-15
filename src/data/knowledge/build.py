@@ -140,6 +140,7 @@ def main():
         h = e["header"]
         index.append(OrderedDict(
             id=e["id"], slug=e["slug"], title=h["title_plain"],
+            paper_title=h["citation"]["title"],
             authors=h["citation"]["authors"], year=h["citation"]["year"], journal=h["citation"]["journal"],
             shape=e["shape"], confidence=h["confidence"]["level"],
             practical_relevance=h["practical_relevance"]["level"],

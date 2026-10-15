@@ -41,6 +41,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
       if (!q) return true;
       return (
         r.title.toLowerCase().includes(q) ||
+        r.paper_title.toLowerCase().includes(q) ||
         r.authors.toLowerCase().includes(q) ||
         r.topics.some((t) => topicLabel(t).includes(q))
       );
@@ -101,6 +102,14 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
                 color: 'var(--text)', textDecoration: 'none',
               }}
             >
+              {/* Red eyebrow: the paper's own title marks each card as a real
+                  paper and delineates it in the list; the headline below stays
+                  the attention line. */}
+              {!!r.paper_title && r.paper_title !== 'not printed in source' && (
+                <div style={{ fontSize: 11.5, fontWeight: 600, lineHeight: 1.4, color: 'var(--accent)', marginBottom: 4, letterSpacing: 0.2 }}>
+                  {r.paper_title}
+                </div>
+              )}
               <div style={{ fontSize: 15.5, fontWeight: 700, lineHeight: 1.4, marginBottom: 6 }}>
                 {r.title}
               </div>

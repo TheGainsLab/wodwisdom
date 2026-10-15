@@ -18,6 +18,8 @@ export interface KnowledgeIndexRow {
   id: string;
   slug: string;
   title: string;
+  /** The paper's own title — the card's red eyebrow line. */
+  paper_title: string;
   authors: string;
   year: string;
   journal: string;
