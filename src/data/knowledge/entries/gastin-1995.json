@@ -362,11 +362,11 @@
       "template": "stacked_share",
       "title": "Longer tests drew more of their energy aerobically",
       "series": [
-        { "label": "S1 110% constant", "parts": [ { "name": "Aerobic", "value": 76 }, { "name": "Anaerobic", "value": 24 } ] },
-        { "label": "S1 125% constant", "parts": [ { "name": "Aerobic", "value": 59 }, { "name": "Anaerobic", "value": 41 } ] },
-        { "label": "S1 isokinetic all-out", "parts": [ { "name": "Aerobic", "value": 51 }, { "name": "Anaerobic", "value": 49 } ] },
-        { "label": "S2 110% constant", "parts": [ { "name": "Aerobic", "value": 74 }, { "name": "Anaerobic", "value": 26 } ] },
-        { "label": "S2 variable all-out", "parts": [ { "name": "Aerobic", "value": 57 }, { "name": "Anaerobic", "value": 43 } ] }
+        { "label": "S1 110% constant", "parts": [ { "name": "Anaerobic", "value": 24 }, { "name": "Aerobic", "value": 76 } ] },
+        { "label": "S1 125% constant", "parts": [ { "name": "Anaerobic", "value": 41 }, { "name": "Aerobic", "value": 59 } ] },
+        { "label": "S1 isokinetic all-out", "parts": [ { "name": "Anaerobic", "value": 49 }, { "name": "Aerobic", "value": 51 } ] },
+        { "label": "S2 110% constant", "parts": [ { "name": "Anaerobic", "value": 26 }, { "name": "Aerobic", "value": 74 } ] },
+        { "label": "S2 variable all-out", "parts": [ { "name": "Anaerobic", "value": 43 }, { "name": "Aerobic", "value": 57 } ] }
       ],
       "units": "% of total energy",
       "approximate": false,
