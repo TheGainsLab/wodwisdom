@@ -5,6 +5,13 @@
   "shape": "intervention",
   "document_type": "journal article",
   "meta_analysis": false,
+  "key_findings": [
+    "Every fibre type got bigger (+22–30% size) and more powerful (+25–49% peak power) in eight weeks.",
+    "Slow-twitch fibres improved too: +23% size, +19% force, +18% velocity, +25% power.",
+    "Hybrid IIa/IIx fibres gained the most power: +49%.",
+    "Performance followed: countermovement jump 0.41 → 0.47 m, leg press 1RM 223 → 248 kg, shuttle run 9.98 → 9.62 s.",
+    "Unlike 12 weeks of conventional lifting (power up through size and force only), jump training also made fibres faster."
+  ],
   "header": {
     "title_plain": "Eight weeks of maximal jumping made every muscle fibre type bigger, stronger and faster — including slow-twitch",
     "setup_plain": "Eight recreationally active men did eight weeks of maximal bodyweight jumping — static, countermovement, drop, triple and hurdle jumps, 24 sessions, 5,228 jumps in all. Individual muscle fibres from the thigh were tested for size, force, speed and power before and after. No control group.",

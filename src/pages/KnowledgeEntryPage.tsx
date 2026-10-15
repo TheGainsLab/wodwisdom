@@ -612,12 +612,45 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
         {/* One results section for every shape: charts lead, receipts
             follow. population_card no longer renders — the setup lede
             carries who was studied; the data stays in the entry. */}
+        {/* Fixed format, every entry: key-finding bullets → one chart →
+            everything else behind All the data. Entries without
+            key_findings fall back to the full layout until populated. */}
         <SectionTitle>What they found</SectionTitle>
-        {entry.charts.filter((c) => c.template !== 'population_card').map((c, i) => <ChartBlock key={i} c={c} />)}
-        {entry.layer1.intervention && <InterventionFacts l={entry.layer1.intervention} />}
-        {entry.layer1.comparison && <ComparisonFacts l={entry.layer1.comparison} />}
-        {entry.layer1.review && <ReviewFacts l={entry.layer1.review} />}
-        {entry.layer1.reference && <ReferenceFacts l={entry.layer1.reference} />}
+        {(() => {
+          const charts = entry.charts.filter((c) => c.template !== 'population_card');
+          const facts = (
+            <>
+              {entry.layer1.intervention && <InterventionFacts l={entry.layer1.intervention} />}
+              {entry.layer1.comparison && <ComparisonFacts l={entry.layer1.comparison} />}
+              {entry.layer1.review && <ReviewFacts l={entry.layer1.review} />}
+              {entry.layer1.reference && <ReferenceFacts l={entry.layer1.reference} />}
+            </>
+          );
+          if (!entry.key_findings?.length) {
+            return <>{charts.map((c, i) => <ChartBlock key={i} c={c} />)}{facts}</>;
+          }
+          return (
+            <>
+              <ul style={{ margin: '0 0 16px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 9 }}>
+                {entry.key_findings.map((f, i) => (
+                  <li key={i} style={{ fontSize: 14.5, lineHeight: 1.55, color: 'var(--text)' }}>
+                    {linkifyGlossary(f)}
+                  </li>
+                ))}
+              </ul>
+              {charts.length > 0 && <ChartBlock c={charts[0]} />}
+              <details style={{ marginTop: 4 }}>
+                <summary style={{ fontSize: 12.5, color: 'var(--text-muted)', cursor: 'pointer' }}>
+                  All the data — every number from the paper
+                </summary>
+                <div style={{ marginTop: 12 }}>
+                  {charts.slice(1).map((c, i) => <ChartBlock key={i} c={c} />)}
+                  {facts}
+                </div>
+              </details>
+            </>
+          );
+        })()}
 
         <SectionTitle>What it means</SectionTitle>
         <p style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text)', margin: 0 }}>
