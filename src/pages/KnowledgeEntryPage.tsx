@@ -187,11 +187,7 @@ function ReviewFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['review']>
           {l.recommendations_made.map((r, i) => <li key={i}>{r}</li>)}
         </ul>
       )}
-      {l.untested_or_contested && (
-        <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, margin: 0 }}>
-          <strong style={{ color: 'var(--text)' }}>Untested or contested: </strong>{l.untested_or_contested}
-        </p>
-      )}
+      {/* untested_or_contested renders in About this paper, not here. */}
     </>
   );
 }
@@ -515,6 +511,11 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
           <strong style={{ color: 'var(--text)' }}>Relevance: {h.practical_relevance.level}</strong>
           {h.practical_relevance.why && <> — {h.practical_relevance.why}</>}
         </p>
+        {entry.layer1.review?.untested_or_contested && (
+          <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '6px 0 0' }}>
+            <strong style={{ color: 'var(--text)' }}>Untested or contested</strong> — {entry.layer1.review.untested_or_contested}
+          </p>
+        )}
         {showStance && (
           <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '6px 0 0' }}>
             <strong style={{ color: 'var(--text)' }}>Author stance</strong> — {h.author_stance}
