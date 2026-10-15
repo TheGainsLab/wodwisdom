@@ -335,15 +335,26 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
           <KnowledgeBadge kind="relevance" value={h.practical_relevance.level} why={h.practical_relevance.why} />
         </div>
 
-        <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.55, margin: '0 0 6px' }}>{h.evidence_type}</p>
+        <SectionTitle>What kind of evidence this is</SectionTitle>
+        <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)', margin: '0 0 10px' }}>
+          {linkifyGlossary(h.evidence_type)}
+        </p>
+        <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 6px' }}>
+          <strong style={{ color: 'var(--text)' }}>Confidence: {h.confidence.level}</strong>
+          {h.confidence.why && <> — {h.confidence.why}</>}
+        </p>
+        <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: 0 }}>
+          <strong style={{ color: 'var(--text)' }}>Relevance: {h.practical_relevance.level}</strong>
+          {h.practical_relevance.why && <> — {h.practical_relevance.why}</>}
+        </p>
         {showStance && (
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 4px' }}>
-            <strong>Author stance:</strong> {h.author_stance}
+          <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '6px 0 0' }}>
+            <strong style={{ color: 'var(--text)' }}>Author stance</strong> — {h.author_stance}
           </p>
         )}
         {h.funding_and_conflicts && (
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
-            <strong>Funding &amp; conflicts:</strong> {h.funding_and_conflicts}
+          <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '6px 0 0' }}>
+            <strong style={{ color: 'var(--text)' }}>Funding &amp; conflicts</strong> — {h.funding_and_conflicts}
           </p>
         )}
 
