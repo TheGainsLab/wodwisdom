@@ -7,6 +7,7 @@
   "meta_analysis": false,
   "header": {
     "title_plain": "Slow-twitch muscle refuels twice as fast and has twice the aerobic capacity of fast-twitch — and the two are controlled differently",
+    "setup_plain": "Isolated cat muscles — fast-twitch biceps and slow-twitch soleus — were perfused with red cells at 30 °C and stimulated electrically for 15–20 minutes at rates from 0.05 to 2 Hz, then given at least an hour of recovery. Oxygen uptake, phosphocreatine, phosphate, ATP and pH were tracked by NMR through work and recovery.",
     "citation": {
       "title": "Regulation of oxygen consumption in fast- and slow-twitch muscle",
       "authors": "Kushmerick MJ, Meyer RA, Brown TR",
