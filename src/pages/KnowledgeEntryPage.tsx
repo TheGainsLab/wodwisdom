@@ -62,24 +62,53 @@ function val(v: string | undefined): React.ReactNode {
 
 // ── Layer-1 shape renderers ─────────────────────────────────────────────
 
+// ── Setup narrative (the "what this is" lede for study shapes) ─────────
+//
+// Who was studied and what they did reads as prose, not a table — the
+// fields are descriptions, and a one-row table of sentences is noise.
+// Assembled verbatim from the entry's own fields; nothing is written.
+
+function usable(v?: string): boolean {
+  return !!v && !/^n\/a/i.test(v.trim()) && !/^not stated/i.test(v.trim());
+}
+
+export function setupNarrative(entry: KnowledgeEntry): string[] {
+  const out: string[] = [];
+  const iv = entry.layer1.intervention;
+  const cp = entry.layer1.comparison;
+  if (iv) {
+    for (const g of iv.groups) {
+      const n = g.n_enrolled === g.n_analysed ? `n ${g.n_enrolled}` : `${g.n_enrolled} enrolled / ${g.n_analysed} analysed`;
+      const demo = [usable(g.age) && `age ${g.age}`, usable(g.sex) && g.sex, usable(g.training_status) && g.training_status]
+        .filter(Boolean).join(', ');
+      const bits = [[n, demo].filter(Boolean).join(', '), g.protocol, g.per_week, g.other]
+        .filter((s) => usable(s as string));
+      out.push(`${g.name} — ${bits.join('. ').replace(/\.\./g, '.')}.`);
+    }
+    if (iv.design_notes) out.push(iv.design_notes);
+  }
+  if (cp) {
+    for (const w of cp.who) {
+      const demo = [usable(w.n) && `n ${w.n}`, usable(w.age) && `age ${w.age}`, usable(w.sex) && w.sex, usable(w.training_status) && w.training_status]
+        .filter(Boolean).join(', ');
+      const bits = [demo, w.other].filter((s) => usable(s as string));
+      out.push(`${w.name} — ${bits.join('. ').replace(/\.\./g, '.')}.`);
+    }
+    for (const c of cp.conditions) {
+      const bits = [c.description, [usable(c.intensity) && c.intensity, usable(c.duration) && c.duration].filter(Boolean).join(', '), c.other]
+        .filter((s) => usable(s as string));
+      out.push(`${c.name} — ${bits.join('. ').replace(/\.\./g, '.')}.`);
+    }
+    if (cp.design_notes) out.push(cp.design_notes);
+  }
+  return out;
+}
+
 function InterventionFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['intervention']> }) {
+  // Groups and design notes render as the page's setup narrative, not here.
   return (
     <>
-      <FactsTable
-        columns={[
-          { key: 'name', label: 'Group' }, { key: 'protocol', label: 'Protocol' },
-          { key: 'per_week', label: 'Per week' }, { key: 'n', label: 'n' },
-          { key: 'age', label: 'Age' }, { key: 'sex', label: 'Sex' },
-          { key: 'training_status', label: 'Status' }, { key: 'other', label: 'Other' },
-        ]}
-        rows={l.groups.map((g) => ({
-          name: g.name, protocol: g.protocol, per_week: g.per_week,
-          n: g.n_enrolled === g.n_analysed ? g.n_enrolled : `${g.n_enrolled} enrolled / ${g.n_analysed} analysed`,
-          age: g.age, sex: g.sex, training_status: g.training_status, other: g.other,
-        }))}
-      />
-      {l.design_notes && <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, margin: '0 0 14px' }}>{l.design_notes}</p>}
-      <FactsTable
+      <SplitFactsTable
         columns={[
           { key: 'outcome', label: 'Outcome' }, { key: 'unit', label: 'Unit' },
           { key: 'group', label: 'Group' }, { key: 'before', label: 'Before' },
@@ -92,6 +121,7 @@ function InterventionFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['int
           significant: m.significant, note: m.note,
           __muted: m.significant === 'no',
         }))}
+        charted={l.measured.map((m) => !!m.charted)}
       />
     </>
   );
@@ -130,23 +160,9 @@ function SplitFactsTable({ columns, rows, charted }: {
 
 function ComparisonFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['comparison']> }) {
   const conditionKeys = Array.from(new Set(l.measured.flatMap((m) => Object.keys(m.values_by_condition))));
+  // Who, conditions and design notes render as the page's setup narrative.
   return (
     <>
-      <FactsTable
-        columns={[
-          { key: 'name', label: 'Who' }, { key: 'n', label: 'n' }, { key: 'age', label: 'Age' },
-          { key: 'sex', label: 'Sex' }, { key: 'training_status', label: 'Status' }, { key: 'other', label: 'Other' },
-        ]}
-        rows={l.who.map((w) => ({ ...w }))}
-      />
-      <FactsTable
-        columns={[
-          { key: 'name', label: 'Condition' }, { key: 'description', label: 'Description' },
-          { key: 'intensity', label: 'Intensity' }, { key: 'duration', label: 'Duration' }, { key: 'other', label: 'Other' },
-        ]}
-        rows={l.conditions.map((c) => ({ ...c }))}
-      />
-      {l.design_notes && <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, margin: '0 0 14px' }}>{l.design_notes}</p>}
       <SplitFactsTable
         columns={[
           { key: 'outcome', label: 'Outcome' }, { key: 'unit', label: 'Unit' },
@@ -569,16 +585,22 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
 
         <h1 style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.3, margin: '0 0 12px' }}>{h.title_plain}</h1>
 
-        {entry.layer1.review?.claim && (
-          <div style={{ padding: '12px 14px', borderLeft: '3px solid var(--accent)', background: 'var(--surface)', borderRadius: 8, fontSize: 13.5, lineHeight: 1.6, marginBottom: 14 }}>
-            {entry.layer1.review.claim}
-          </div>
-        )}
-        {entry.layer1.reference?.what_it_explains && (
-          <p style={{ fontSize: 13.5, color: 'var(--text-dim)', lineHeight: 1.6, margin: '0 0 14px' }}>
-            {entry.layer1.reference.what_it_explains}
-          </p>
-        )}
+        {/* The lede — every shape gets one, same slot, same style:
+            reviews state the authors' claim, references what the source
+            explains, studies who was studied and what they did. */}
+        {(() => {
+          const paras = entry.layer1.review?.claim ? [entry.layer1.review.claim]
+            : entry.layer1.reference?.what_it_explains ? [entry.layer1.reference.what_it_explains]
+            : setupNarrative(entry);
+          if (!paras.length) return null;
+          return (
+            <div style={{ padding: '12px 14px', borderLeft: '3px solid var(--accent)', background: 'var(--surface)', borderRadius: 8, marginBottom: 14 }}>
+              {paras.map((p, i) => (
+                <p key={i} style={{ fontSize: 13.5, lineHeight: 1.6, margin: i === paras.length - 1 ? 0 : '0 0 8px' }}>{p}</p>
+              ))}
+            </div>
+          );
+        })()}
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
           <KnowledgeBadge kind="shape" value={entry.shape} />
@@ -586,18 +608,15 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
           <KnowledgeBadge kind="relevance" value={h.practical_relevance.level} why={h.practical_relevance.why} />
         </div>
 
-        <SectionTitle>The facts</SectionTitle>
+        {/* One results section for every shape: charts lead, receipts
+            follow. population_card no longer renders — the setup lede
+            carries who was studied; the data stays in the entry. */}
+        <SectionTitle>What they found</SectionTitle>
+        {entry.charts.filter((c) => c.template !== 'population_card').map((c, i) => <ChartBlock key={i} c={c} />)}
         {entry.layer1.intervention && <InterventionFacts l={entry.layer1.intervention} />}
         {entry.layer1.comparison && <ComparisonFacts l={entry.layer1.comparison} />}
         {entry.layer1.review && <ReviewFacts l={entry.layer1.review} />}
         {entry.layer1.reference && <ReferenceFacts l={entry.layer1.reference} />}
-
-        {entry.charts.length > 0 && (
-          <>
-            <SectionTitle>At a glance</SectionTitle>
-            {entry.charts.map((c, i) => <ChartBlock key={i} c={c} />)}
-          </>
-        )}
 
         <SectionTitle>What it means</SectionTitle>
         <p style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text)', margin: 0 }}>
