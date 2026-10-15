@@ -87,7 +87,7 @@ export interface KnowledgeEntry {
       design_notes: string;
       measured: Array<{
         outcome: string; unit: string; group: string; before: string; after: string;
-        change: string; significant: string; note: string;
+        change: string; significant: string; note: string; charted?: boolean;
       }>;
     };
     comparison?: {
@@ -96,13 +96,15 @@ export interface KnowledgeEntry {
       design_notes: string;
       measured: Array<{
         outcome: string; unit: string; values_by_condition: Record<string, string>;
-        differed: string; note: string;
+        differed: string; note: string; charted?: boolean;
       }>;
     };
     review?: {
       claim: string;
       definitions_used: Array<{ term: string; definition: string }>;
-      evidence_cited: Array<{ finding: string; source: string; numbers: string; note: string }>;
+      // charted rows are drawn by one of the entry's charts; the page
+      // collapses them behind a disclosure instead of printing them twice.
+      evidence_cited: Array<{ finding: string; source: string; numbers: string; note: string; charted?: boolean }>;
       recommendations_made: string[];
       untested_or_contested: string;
     };
