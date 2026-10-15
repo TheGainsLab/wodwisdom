@@ -1,0 +1,389 @@
+{
+  "id": "storey-smith-2012",
+  "slug": "storey-smith-2012",
+  "source_pdf": "Unique_Aspects_of_Competitive_Weightlifitng.pdf",
+  "shape": "review",
+  "document_type": "journal article",
+  "meta_analysis": false,
+  "header": {
+    "title_plain": "Olympic weightlifters train harder and more often than any guideline allows — and the evidence says it works for them, within limits",
+    "citation": {
+      "authors": "Storey A, Smith HK",
+      "year": "2012",
+      "journal": "Sports Med",
+      "volume_issue_pages": "42(9): 769–790",
+      "doi": "10.1007/BF03262294"
+    },
+    "topics": [
+      "weightlifting",
+      "snatch",
+      "clean-and-jerk",
+      "power",
+      "training-frequency",
+      "periodization",
+      "nutrition",
+      "weight-cutting",
+      "masters",
+      "women",
+      "bone",
+      "hormones"
+    ],
+    "evidence_type": "Narrative review of English-language research 1970s–Feb 2012 (PubMed, SPORTDiscus, Google Scholar). No new data; no funding; no conflicts.",
+    "confidence": {
+      "level": "conceptual",
+      "why": "Conceptual, but numerically dense — most figures come from small studies of elite men."
+    },
+    "practical_relevance": {
+      "level": "medium",
+      "why": "Ceiling data from elite men; peak-power load (70–80% 1RM) and the junior volume finding are the actionable points."
+    },
+    "author_stance": "none apparent",
+    "funding_and_conflicts": "No funding; no conflicts."
+  },
+  "layer1": {
+    "review": {
+      "claim": "Competitive weightlifting produces the highest power outputs and fastest force development recorded in sport, through training that is more frequent and more intense than conventional recommendations. The adaptations (muscle, bone, heart, hormones) look physiological rather than harmful. Nearly all evidence is from young elite men; women, under-17s and over-35s are under-researched.",
+      "definitions_used": [],
+      "evidence_cited": [
+        {
+          "finding": "The lifts: Snatch: 6 phases, 3–5 s effort; C&J: 12 phases, 8–12 s. C&J load ~18–20% greater than snatch",
+          "source": "as reviewed",
+          "numbers": "Bar speed at max: snatch 1.65–2.28 m/s, clean 0.88–1.73 m/s; submax lifts >3.0 / >2.5 m/s. Jerk drive power 2,140 W (56 kg class) to 4,786 W (105+ kg). Transition into jerk can load ~17× body mass",
+          "note": ""
+        },
+        {
+          "finding": "Power vs other athletes: Second pull produces the highest power in the literature",
+          "source": "as reviewed",
+          "numbers": "Absolute 5,442 W (snatch), 6,981 W (C&J); relative 53–56 W/kg men, 38–40 W/kg women. Compare bench press 415 W, deadlift 1,274 W, ~4–12 W/kg",
+          "note": ""
+        },
+        {
+          "finding": "Strength and rate of force: Lifters beat other strength/power athletes on both",
+          "source": "as reviewed",
+          "numbers": "Isometric peak force ~15–20% higher; rate of force development ~13–16% higher. Lifts reach peak force in <260 ms vs 300–400 ms isometrically. Lower-body power 13–36% higher than other power athletes; upper-body power no different from handball players",
+          "note": ""
+        },
+        {
+          "finding": "Soviet model: Classic periodization, wide variety",
+          "source": "as reviewed",
+          "numbers": "20,000–25,000 multi-joint reps/yr; 15–35% of them competition lifts at 80–90% 1RM; 4–7% at ≥90%",
+          "note": ""
+        },
+        {
+          "finding": "Bulgarian model: Near-max loading, little intensity variation, volume waves",
+          "source": "as reviewed",
+          "numbers": "1,400–4,000 max attempts/yr plus ~450–460 failed supramax; time split 10% warm-up / 45% competition lifts / 40% complementary strength / 3% supplementary / 2% other; 2–3 weeks loading then 1 week reduced",
+          "note": ""
+        },
+        {
+          "finding": "Frequency: Far above ACSM's 4–6 sessions/week for advanced trainees",
+          "source": "as reviewed",
+          "numbers": "≥2 sessions/day at ≥80% 1RM, 6–7 days/week, same muscle groups. Greek 1996 Olympic prep: 13 snatch, 11 C&J, 11 back-squat, 9 front-squat sessions in one 6-day week. Splitting a day's volume into two sessions gave greater strength and hypertrophy in seniors",
+          "note": ""
+        },
+        {
+          "finding": "Volume by age: Proposed inverted-U: juniors and masters tolerate less",
+          "source": "as reviewed",
+          "numbers": "Juniors (17–20 y), 10 weeks, >90–100% 1RM: moderate volume +10.5% C&J, +9.5% back squat; low volume +3.0% / +5.3%; high volume +6.9% squat only. Extra same-day sessions didn't help juniors. Masters (≥35) show declining tolerance",
+          "note": ""
+        },
+        {
+          "finding": "Load for power: Peak power load depends on the exercise",
+          "source": "as reviewed",
+          "numbers": "Ballistic (jump squat, bench throw): 30–50% 1RM, possibly as low as body weight. Snatch/C&J: 70–80% 1RM, so lifters train the competition lifts at ≥70%",
+          "note": ""
+        },
+        {
+          "finding": "Energy and diet: High expenditure; protein and fat over-consumed, carbohydrate under",
+          "source": "as reviewed",
+          "numbers": "Training ~39.5 kJ/min; ~16,456 kJ/week from training alone. Intake 13,212–19,307 kJ/day (recommended 14,700–23,100). Protein 1.6–3.2 g/kg/day vs recommended 1.2–1.7; fat 40–44% of energy vs 20–35% acceptable; carbohydrate 2.9–6.1 g/kg/day vs 7–8 recommended",
+          "note": ""
+        },
+        {
+          "finding": "Weight cutting: Mild dehydration is recoverable; severe isn't",
+          "source": "as reviewed",
+          "numbers": "Lifters train 5–10% above class. ≤2% body-mass loss from dehydration: performance restored with ~2 h rehydration. 3–4%: impairment not recoverable in time. Recommendation: diet to ≤2% above class, then mild dehydration only in the last 24 h",
+          "note": ""
+        },
+        {
+          "finding": "Body composition: Light/middle classes lean; heavy classes not",
+          "source": "as reviewed",
+          "numbers": "5–10% fat (≤56–85 kg men), ≥17% (≥94 kg). Women possibly ~double men's fat %. Elite lifters leaner than lower-level lifters of the same weight. Shorter limbs and height = less torque, shorter bar path, larger muscle cross-section",
+          "note": ""
+        },
+        {
+          "finding": "Muscle fibres: Same fast-twitch % as untrained, but bigger type II fibres",
+          "source": "as reviewed",
+          "numbers": "53–65% fast-twitch in vastus lateralis. Performance correlates with type IIA % (r = 0.94) and IIA area (r = 0.83). IIX→IIA shift with training",
+          "note": ""
+        },
+        {
+          "finding": "Sex differences: Weightlifting training shrinks the gap",
+          "source": "as reviewed",
+          "numbers": "Untrained: men 31–48% stronger, 17–46% more powerful. Under-69 kg world records: women lift 79–84% of men's totals (youth 83.7%, junior 80.0%, senior 79.2%)",
+          "note": ""
+        },
+        {
+          "finding": "Ageing: Masters lifters stay far ahead of untrained peers; decline ~1–1.5%/yr",
+          "source": "as reviewed",
+          "numbers": "Masters (40–87 y): 32% more knee-extensor force and power than untrained age-matched adults, with similar leg muscle volume (neural); motor-unit firing ~20% higher. Women decline faster (R² = 0.90 vs age) — not seen in powerlifting",
+          "note": ""
+        },
+        {
+          "finding": "Bone: Densest skeletons in sport; benefit fades after ~65",
+          "source": "as reviewed",
+          "numbers": "Bone-formation markers up to 35% higher. Density: vertebrae +13–42%, femoral neck +12–24%, tibia +9–12%, radius +10% vs untrained/recreational. Retired lifters 50–64 y still higher than controls; 65–79 y no difference",
+          "note": ""
+        },
+        {
+          "finding": "Heart: Bigger left ventricle, but proportional to body size = physiological",
+          "source": "as reviewed",
+          "numbers": "LV mass ~13–30% larger in some studies, not in others; scales with body mass. VO2max 42.0–50.7 ml/kg/min. 8 weeks of WL-style training in active adults: VO2max +6–7%; 3 years in competitive lifters: −4% absolute, −11% relative. Resting HR 60–81, BP 115–153/71–93 (\"normal\" to stage-1 hypertensive)",
+          "note": ""
+        },
+        {
+          "finding": "Hormones: Responses like conventional heavy training; T:C tracks volume",
+          "source": "as reviewed",
+          "numbers": "Basal testosterone 14.4–27.7 nmol/L (normal 12.1–34.7). Acute rise 17–30% after a hard session; bigger with >2 years' experience; no rise in competition. Elite women: 37% volume cut → basal T:C +72.5% over 5 weeks; male lifter: 54% volume increase over 2 weeks → T:C −60%. Growth hormone 4.5–13-fold acute rises",
+          "note": ""
+        }
+      ],
+      "recommendations_made": [
+        "Weight cutting: diet to ≤2% above class, then mild dehydration only in the last 24 h."
+      ],
+      "untested_or_contested": "Which programme design is best (Soviet vs Bulgarian vs Western) — no direct comparisons. Everything about women, under-17s and over-35s. Whether a taper restores IIX fibres in lifters. Optimal macronutrient balance. Whether high-load vs low-load weightlifting-derivative training is better for power athletes."
+    }
+  },
+  "layer2": {
+    "what_it_means": "The headline for a coach is that weightlifters are the most powerful athletes measured, and they got there by training the competitive lifts and their derivatives heavy and often. Peak power in the snatch and clean comes at 70–80% of max, not the 30–50% that works for jumps and throws — so if you program cleans for power, the bar needs to be heavy. The review's volume-by-age idea is useful: juniors responded best to moderate amounts of near-max lifting, not more, and masters tolerate less again. The bone data are striking (vertebrae up to 42% denser) and the heart data reassuring. The diet finding is the one most coaches will recognise: lifters eat plenty of protein and fat and not enough carbohydrate.",
+    "what_it_doesnt_mean": "This is a review, and much of it describes what elite lifters do rather than what has been tested. Training 6–7 days a week with two heavy sessions a day is reported in internationals who were selected for tolerating it; the review itself notes that the same frequency causes overtraining markers in other studies. The junior volume study is one trial of 10 weeks. Almost nothing here is about women, teenagers, masters, or beginners — the people most likely to walk into a gym. Heavy, frequent training by elite lifters tells you the ceiling, not the dose for a member.",
+    "questions_raised": []
+  },
+  "translation": [
+    "Peak-power load for the snatch and clean and jerk: 70–80% of 1RM. For jumps and throws: 30–50% or lighter.",
+    "Elite practice: 2 sessions/day, 6–7 days/week, mostly at ≥80% 1RM — a ceiling, not a prescription.",
+    "Junior lifters: moderate amounts of heavy (>90%) lifting beat both less and more, over 10 weeks.",
+    "Making weight: lose no more than 2% body mass by dehydration, and only in the last 24 h; recover with 2 h of rehydration."
+  ],
+  "glossary_candidates": [
+    {
+      "term": "1RM",
+      "definition": "The heaviest load you can lift once with good form; training loads are set as a percentage of it.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Rate of force development",
+      "definition": "How fast force rises after a contraction starts; the key quality in explosive lifts, where peak force arrives in a quarter of a second.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Periodization",
+      "definition": "Planning training in phases (preparation, competition, transition) that vary volume and intensity.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Hypertrophy",
+      "definition": "Growth in muscle fibre size.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Type IIA / IIX fibres",
+      "definition": "Two kinds of fast-twitch fibre; IIX are fastest but fatigue quickest, and training tends to convert IIX to IIA.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Left ventricular hypertrophy",
+      "definition": "Thickening of the heart's main pumping chamber; a problem in disease, but proportional growth with body size in athletes is normal.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Testosterone:cortisol ratio",
+      "definition": "A blood marker that tends to fall when training volume rises; used to monitor training stress.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Sinclair score",
+      "definition": "A formula that adjusts a weightlifting total for body weight so lifters in different classes can be compared.",
+      "confidence_term_is_new": "likely"
+    },
+    {
+      "term": "Hypohydration",
+      "definition": "Being short of body water, usually deliberately before a weigh-in.",
+      "confidence_term_is_new": "likely"
+    }
+  ],
+  "charts": [
+    {
+      "template": "values_by_condition",
+      "title": "Peak power: weightlifting vs other lifts",
+      "series": [
+        {
+          "label": "Peak power (male)",
+          "values": [
+            {
+              "condition": "C&J second pull",
+              "value": 6981
+            },
+            {
+              "condition": "Snatch",
+              "value": 5442
+            },
+            {
+              "condition": "Deadlift",
+              "value": 1274
+            },
+            {
+              "condition": "Bench press",
+              "value": 415
+            }
+          ]
+        }
+      ],
+      "units": "W",
+      "approximate": true,
+      "note": "All male; approximate, from cited studies."
+    },
+    {
+      "template": "values_by_condition",
+      "title": "Bone density advantage vs untrained",
+      "series": [
+        {
+          "label": "Bone density advantage",
+          "values": [
+            {
+              "condition": "Vertebrae",
+              "value": "13–42"
+            },
+            {
+              "condition": "Femoral neck",
+              "value": "12–24"
+            },
+            {
+              "condition": "Tibia",
+              "value": "9–12"
+            },
+            {
+              "condition": "Radius",
+              "value": "10"
+            }
+          ]
+        }
+      ],
+      "units": "% higher than untrained/recreational",
+      "approximate": false,
+      "note": "Show as ranges (values are range strings as printed)."
+    },
+    {
+      "template": "grouped_change_bars",
+      "title": "Junior lifters: 10 weeks at low, moderate and high volume",
+      "series": [
+        {
+          "group": "C&J",
+          "values": [
+            {
+              "label": "Low volume",
+              "value": 3.0
+            },
+            {
+              "label": "Moderate volume",
+              "value": 10.5
+            },
+            {
+              "label": "High volume",
+              "value": null
+            }
+          ]
+        },
+        {
+          "group": "Back squat",
+          "values": [
+            {
+              "label": "Low volume",
+              "value": 5.3
+            },
+            {
+              "label": "Moderate volume",
+              "value": 9.5
+            },
+            {
+              "label": "High volume",
+              "value": 6.9
+            }
+          ]
+        }
+      ],
+      "units": "% change",
+      "approximate": false,
+      "note": "High-volume C&J change not reported (null)."
+    },
+    {
+      "template": "values_by_condition",
+      "title": "Lifters' diet vs recommendation",
+      "series": [
+        {
+          "label": "Protein (g/kg)",
+          "values": [
+            {
+              "condition": "Lifters' intake",
+              "value": "1.6–3.2"
+            },
+            {
+              "condition": "Recommended",
+              "value": "1.2–1.7"
+            }
+          ]
+        },
+        {
+          "label": "Fat (% of energy)",
+          "values": [
+            {
+              "condition": "Lifters' intake",
+              "value": "40–44"
+            },
+            {
+              "condition": "Recommended",
+              "value": "20–35"
+            }
+          ]
+        },
+        {
+          "label": "Carbohydrate (g/kg)",
+          "values": [
+            {
+              "condition": "Lifters' intake",
+              "value": "2.9–6.1"
+            },
+            {
+              "condition": "Recommended",
+              "value": "7–8"
+            }
+          ]
+        }
+      ],
+      "units": "mixed: g/kg/day (protein, carbohydrate); % of energy (fat)",
+      "approximate": false,
+      "note": "Values are range strings as printed."
+    }
+  ],
+  "verification_notes": [
+    "All numbers are the review authors' reporting of cited studies; not verified against originals.",
+    "Lift phases, speeds, durations: pp.771–772",
+    "Jerk power 2,140–4,786 W, 17× body mass: p.772",
+    "Soviet/Bulgarian figures: p.774",
+    "Frequency, Greek team, ACSM: p.775",
+    "Junior volume study, inverted-U: p.775, Fig 3 p.776",
+    "Power loads 30–50% / 70–80%: pp.775–776",
+    "Energy and diet: p.776",
+    "Weight cutting: p.777",
+    "Body composition, anthropometry: p.777",
+    "Fibre %, r values: p.778",
+    "PF/RFD %, power W and W/kg: pp.778–779",
+    "Sex difference %, Table I: p.779",
+    "Masters 32%, 20%, decline, Fig 4: pp.779–780",
+    "Bone: p.780",
+    "Heart, VO2max, BP: pp.780–781",
+    "Hormones: pp.781–782",
+    "Funding/conflicts: p.783",
+    "Review scope: p.771"
+  ]
+}

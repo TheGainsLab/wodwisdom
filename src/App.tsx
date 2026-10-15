@@ -97,6 +97,8 @@ const AILogProgramPage = lazy(() => import('./pages/AILogProgramPage'));
 
 // Public Q&A library (both trees — visitors and members)
 const QALibraryPage = lazy(() => import('./pages/QALibraryPage'));
+const KnowledgeListPage = lazy(() => import('./pages/KnowledgeListPage'));
+const KnowledgeEntryPage = lazy(() => import('./pages/KnowledgeEntryPage'));
 const StayPage = lazy(() => import('./pages/StayPage'));
 const QAEntryPage = lazy(() => import('./pages/QAEntryPage'));
 // Public examples/proof page (both trees — visitors and members)
@@ -186,6 +188,8 @@ export default function App() {
           <Routes>
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/qa" element={<QALibraryPage />} />
+            <Route path="/knowledge" element={<KnowledgeListPage />} />
+            <Route path="/knowledge/:slug" element={<KnowledgeEntryPage />} />
             <Route path="/qa/:slug" element={<QAEntryPage />} />
             <Route path="/examples" element={<ExamplesPage />} />
             <Route path="/pricing" element={<PricingPage />} />
@@ -285,6 +289,8 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/claim/:token" element={<RetiredInviteNotice />} />
             {/* REMOVED (Decision 11): the /gym, /gym/leaderboard, /tv/:token class surfaces are deleted. */}
             <Route path="/qa" element={<QALibraryPage signedIn />} />
+            <Route path="/knowledge" element={<KnowledgeListPage signedIn />} />
+            <Route path="/knowledge/:slug" element={<KnowledgeEntryPage signedIn />} />
             <Route path="/qa/:slug" element={<QAEntryPage signedIn />} />
             <Route path="/examples" element={<ExamplesPage signedIn />} />
             <Route path="/pricing" element={<PricingPage signedIn />} />

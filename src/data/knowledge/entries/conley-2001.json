@@ -1,0 +1,128 @@
+{
+  "id": "conley-2001",
+  "slug": "conley-2001",
+  "source_pdf": "Limits_to_sustainable_muscle_performance_-_interaction_between_.pdf",
+  "shape": "review",
+  "document_type": "journal article",
+  "meta_analysis": false,
+  "header": {
+    "title_plain": "Why you can't hold your top aerobic pace: acid from glycolysis blunts the signal that drives the mitochondria",
+    "citation": {
+      "authors": "Conley KE, Kemper WF, Crowther GJ",
+      "year": "2001",
+      "journal": "J Exp Biol",
+      "volume_issue_pages": "204: 3189–3194",
+      "doi": "not printed in source"
+    },
+    "topics": ["sustainable-power", "steady-state", "glycolysis", "mitochondria", "ph", "lactate", "threshold", "muscle-energetics"],
+    "evidence_type": "Review/hypothesis built on the authors' 31P-MRS studies of human muscle and rattlesnake tail-shaker muscle, plus cited literature. NIH and NSF funded.",
+    "confidence": {
+      "level": "conceptual",
+      "why": "A coherent mechanistic argument, partly validated in an animal model."
+    },
+    "practical_relevance": {
+      "level": "low",
+      "why": "Mechanism paper with one actionable framing (sustainable pace is set by acid build-up, which endurance adaptations reduce); hand entry said low–medium, low chosen."
+    },
+    "author_stance": "none apparent",
+    "funding_and_conflicts": "NIH and NSF funded."
+  },
+  "layer1": {
+    "review": {
+      "claim": "The power you can sustain for more than a few minutes is set inside the muscle, by whether ATP supply can match demand. Even in fully aerobic steady-state exercise, glycolysis supplies a sizeable share of ATP and so produces acid (H+). That acid lowers the concentration of ADP, which is the signal that tells mitochondria how hard to work. So mitochondria in sustained exercise run well below their capacity — not because oxygen is short, but because the activating signal is suppressed. Three phases follow: fatiguing high power (seconds), a transitional zone (seconds to minutes, PCr and pH drifting down), and the sustainable zone.",
+      "definitions_used": [],
+      "evidence_cited": [
+        { "finding": "Sustainable power is a fraction of max", "source": "Wilkie; cycling data", "numbers": "~⅓ of maximal power sustainable for prolonged periods; cyclists hold ~80% of their VO2max-test power for 30 min", "note": "" },
+        { "finding": "Glycolysis contributes to steady-state ATP in humans", "source": "Authors' MRS, 3 human muscles", "numbers": "10–12% of ATP from glycolysis producing lactate; up to ~20% including the glycolytic step on the way to oxidation; vs 8% expected if all pyruvate were oxidised", "note": "" },
+        { "finding": "Extreme case validates the method", "source": "Rattlesnake tail-shaker, 50 Hz for hours", "numbers": "Glycolysis >⅓ (~40%) of sustained ATP; MRS estimate matched direct lactate measurement", "note": "Animal data." },
+        { "finding": "Mitochondria are not fully switched on in steady state", "source": "Literature + isolated mitochondria curve", "numbers": "Highest steady-state ADP in muscle 0.06–0.11 mmol/L; ~0.3 mmol/L needed to elicit full oxidative capacity. Steady-state PCr falls only to ~half resting", "note": "" },
+        { "finding": "Full activation is possible, briefly", "source": "Quadriceps at VO2max (Richardson 1995)", "numbers": "PCr down to 3 mmol/L, pH 6.5, ADP 0.25 mmol/L — near maximal mitochondrial drive, sustainable <5 min", "note": "" },
+        { "finding": "Keeping pH high is the other route", "source": "Tail-shaker muscle", "numbers": "pH 7.2 (vs 6.5 in human quads at VO2max), PCr 10 mmol/L, ADP 0.15 → >80% of oxidative capacity, sustained. Achieved by fibres half the diameter (33 vs 67 µm) and blood flow 468 vs 350 ml/100 g/min in human athletes", "note": "Animal data." },
+        { "finding": "Oxygen isn't the limiter at steady state", "source": "cited", "numbers": "O2 delivery may limit near VO2max in athletes, but not at the lower rates of steady-state work; glycolysis is independent of oxygenation in stimulated human muscle", "note": "" },
+        { "finding": "PCr recovery slows at low pH", "source": "rodent/human", "numbers": "cited, no numbers", "note": "" }
+      ],
+      "recommendations_made": [],
+      "untested_or_contested": "Whether pH acts on the ADP signal or directly on mitochondria. The argument is a \"contention\" supported by MRS; direct whole-body confirmation isn't available."
+    }
+  },
+  "layer2": {
+    "what_it_means": "This is the physiology behind the lactate/anaerobic threshold, told from inside the cell. Your sustainable pace isn't capped by the lungs or the heart at that intensity; it's capped by acid accumulation turning down the mitochondria's throttle. Two things raise the ceiling: fewer H+ produced per unit of work, and faster H+ removal — the snake does it with tiny fibres and enormous blood flow. In human terms that's the rationale for the adaptations endurance training produces (more capillaries, more mitochondria, better buffering and lactate clearance), and it explains why the threshold, not VO2max, tracks what you can actually hold.",
+    "what_it_doesnt_mean": "It's a mechanism paper with no training intervention and one validated animal model; the human numbers are from small MRS studies of single muscles. It doesn't tell you how to raise the threshold, only what sets it. Don't read \"glycolysis supplies 10–20% of steady-state ATP\" as \"steady-state exercise is 20% anaerobic\" in the sense coaches use — the lactate produced is largely re-oxidised. And the ⅓-of-max and 80%-for-30-min figures are illustrative, not prescriptive.",
+    "questions_raised": []
+  },
+  "translation": [
+    "Sustainable power ≈ ⅓ of your best few-second power; ~80% of VO2max-test power holds for ~30 min in cyclists.",
+    "What limits it: acid build-up dampening the signal to the mitochondria, not oxygen supply.",
+    "What raises it: producing less acid per watt and clearing it faster — the adaptations endurance training targets."
+  ],
+  "glossary_candidates": [
+    { "term": "ADP", "definition": "What's left when ATP is spent; its rise is the signal that tells mitochondria to make more ATP.", "confidence_term_is_new": "likely" },
+    { "term": "Oxidative phosphorylation", "definition": "The mitochondrial process that makes ATP using oxygen.", "confidence_term_is_new": "likely" },
+    { "term": "Steady state", "definition": "Exercise at an intensity where PCr, pH and oxygen uptake stop drifting — sustainable for long periods.", "confidence_term_is_new": "likely" },
+    { "term": "Intracellular pH / H+", "definition": "Acidity inside the muscle fibre; falls (acid rises) with hard work and interferes with energy signalling.", "confidence_term_is_new": "likely" },
+    { "term": "Buffering", "definition": "The muscle's capacity to absorb acid; improves with training.", "confidence_term_is_new": "likely" },
+    { "term": "Capillary density", "definition": "How many small blood vessels surround each fibre; more means faster delivery of oxygen and removal of acid.", "confidence_term_is_new": "likely" }
+  ],
+  "charts": [
+    {
+      "template": "concept_curve",
+      "title": "Power–duration curve",
+      "series": [
+        {
+          "label": "Power",
+          "points": [ { "x": 1, "y": 650 }, { "x": 5, "y": 280 } ]
+        }
+      ],
+      "units": "min (x); W (y)",
+      "approximate": true,
+      "note": "schematic — not measured data. From Fig 1: ~650 W at <1 min falling to ~280 W by 5 min and flat thereafter (x = 1 stands for \"<1 min\")."
+    },
+    {
+      "template": "values_by_condition",
+      "title": "ADP: steady state vs full mitochondrial drive",
+      "series": [
+        {
+          "label": "ADP",
+          "values": [
+            { "condition": "Human steady state (highest)", "value": "0.06–0.11" },
+            { "condition": "Needed for full capacity", "value": "~0.3" },
+            { "condition": "Human quads at VO2max", "value": "0.25" },
+            { "condition": "Snake sustained (animal)", "value": "0.15" }
+          ]
+        }
+      ],
+      "units": "mmol/L",
+      "approximate": false,
+      "note": "Snake value is from rattlesnake tail-shaker muscle (animal)."
+    },
+    {
+      "template": "values_by_condition",
+      "title": "Glycolytic share of steady-state ATP",
+      "series": [
+        {
+          "label": "Glycolytic share",
+          "values": [
+            { "condition": "Human", "value": "10–12 (up to 20)" },
+            { "condition": "Snake (animal)", "value": "~40" }
+          ]
+        }
+      ],
+      "units": "% of ATP",
+      "approximate": false,
+      "note": "Snake value is from rattlesnake tail-shaker muscle (animal)."
+    }
+  ],
+  "verification_notes": [
+    "All numbers are the review authors' reporting of cited studies; not verified against originals.",
+    "⅓ sustainable, 80% for 30 min: pp.3189–3190",
+    "10–12%, 8%, 20%: p.3191",
+    "Snake >⅓, MRS vs lactate: p.3191",
+    "ADP 0.06–0.11, 0.3, PCr ~half: p.3192",
+    "Richardson PCr 3, pH 6.5, ADP 0.25: p.3193",
+    "Snake pH 7.2, PCr 10, ADP 0.15, >80%, 33 vs 67 µm, 468 vs 350: p.3193",
+    "O2 not limiting: p.3191",
+    "Three phases: p.3194",
+    "Funding: p.3194",
+    "\"contention\": pp.3189, 3191"
+  ]
+}

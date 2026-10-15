@@ -1,0 +1,110 @@
+{
+  "id": "escalante-barakat-2020",
+  "slug": "escalante-barakat-2020",
+  "source_pdf": "Fasted_Versus_Nonfasted_Aerobic_Exercise_on_Body_Composition.pdf",
+  "shape": "review",
+  "document_type": "journal article",
+  "meta_analysis": false,
+  "header": {
+    "title_plain": "Fasted cardio burns more fat during the session — and doesn't change how much fat you lose",
+    "citation": {
+      "authors": "Escalante G, Barakat C",
+      "year": "2020",
+      "journal": "Strength Cond J",
+      "volume_issue_pages": "not printed in source",
+      "doi": "10.1519/SSC.0000000000000565"
+    },
+    "topics": ["fasted-cardio", "fat-loss", "body-composition", "physique", "nutrition", "protein", "fat-oxidation"],
+    "evidence_type": "Narrative review aimed at physique athletes, drawing on two meta-analyses of acute effects, one meta-analysis of body-composition outcomes (5 studies, 96 people), and a handful of trials.",
+    "confidence": {
+      "level": "moderate",
+      "why": "The \"no difference\" finding rests on meta-analyses; the physique-athlete caveats are the authors' speculation."
+    },
+    "practical_relevance": {
+      "level": "high",
+      "why": "Directly answers one of the most common \"I saw it online\" questions."
+    },
+    "author_stance": "one author is a physique coach (stated); no conflicts declared",
+    "funding_and_conflicts": "No funding; no conflicts (one author is a physique coach)."
+  },
+  "layer1": {
+    "review": {
+      "claim": "Fasted aerobic exercise does raise fat oxidation during the session and has some favourable acute effects. But controlled studies find trivial-to-no difference in fat loss between fasted and fed cardio when calories are matched. Physique athletes at very low body fat haven't been studied, so small advantages can't be ruled out. Protein before cardio may be the best of both.",
+      "definitions_used": [],
+      "evidence_cited": [
+        { "finding": "Fasted exercise burns more fat during the session", "source": "Vieira 2016 meta-analysis", "numbers": "27 studies, 273 participants; low-intensity (~40–70% HRmax); blood glucose not different (p = 0.91)", "note": "" },
+        { "finding": "Fasted training raises stored muscle glycogen", "source": "Van Proeyen 2011", "numbers": "+22% basal muscle glycogen in fasted group; no change fed", "note": "" },
+        { "finding": "Fasted exercise uses fat stored inside muscle", "source": "De Bock / van Loon", "numbers": "intramuscular triglyceride ↓ ~60% fasted; no change fed", "note": "" },
+        { "finding": "More fatty acids circulate when fasted", "source": "Aird 2018 meta-analysis", "numbers": "46 studies; FFA higher fasted; other markers mixed and population-dependent", "note": "" },
+        { "finding": "30-day trial, fasted vs fed", "source": "Trabelsi 2012 (Ramadan)", "numbers": "19 active men, 3×/wk, 40–60 min at 60–80% HRmax. Weight: fasted 79.2→77.7 kg, fed 80.5→78.4 kg (both sig). Body fat: fasted 19.4→18.6% (sig), fed 19.3→18.8% (not sig).", "note": "But fed group ate 3,056 vs 2,466 kcal/day (calorie confound); skinfold measurement." },
+        { "finding": "Pooled body-composition outcomes", "source": "Hackett & Hagstrom 2017 meta-analysis", "numbers": "5 studies, 96 participants (60 M, 36 F), age 21–27: trivial-to-small effects on weight, % fat, lean mass", "note": "" },
+        { "finding": "Best-controlled trial", "source": "Schoenfeld 2014", "numbers": "20 women, 4 weeks, hypocaloric diet, 1.8 g/kg protein, 60 min walking 3×/wk supervised. Fasted: 26.3→25.0% fat, 16.5→15.4 kg fat. Fed: 24.8→24.1%, 15.7→15.0 kg.", "note": "No significant difference." },
+        { "finding": "Fasted cardio costs some protein", "source": "Lemon & Mullin 1980", "numbers": "nitrogen loss ≈ 14 g amino acids/h during 60 min fasted exercise", "note": "" },
+        { "finding": "Eating first raises post-exercise burn", "source": "several", "numbers": "greater post-exercise energy expenditure fed vs fasted", "note": "" },
+        { "finding": "Protein before cardio", "source": "Gieske 2018 pilot", "numbers": "11 men, crossover: 25 g whey / casein / maltodextrin / nothing, then 30 min at 55–60% HR reserve. Protein → higher post-exercise energy expenditure and fat oxidation; casein > whey during exercise; fasting did not raise fat oxidation", "note": "" }
+      ],
+      "recommendations_made": [
+        "Protein before cardio is the authors' own practical pick: it may protect muscle, slightly raises post-exercise burn, and doesn't blunt fat use the way carbohydrate does.",
+        "Avoid fasted sessions longer than 60 minutes because of protein loss."
+      ],
+      "untested_or_contested": "No studies in physique competitors (lean, high-protein, resistance-trained, 8–16+ week preps). Small effects below statistical significance might matter at the margin of competition. Thermogenic supplements commonly taken before fasted cardio may change the picture."
+    }
+  },
+  "layer2": {
+    "what_it_means": "Burning more fat during a workout and losing more fat overall are different things, and the evidence separates them cleanly. Fasted cardio shifts fuel use for an hour; over weeks, the body balances it out, and fat loss tracks the calorie deficit. So the honest answer to \"should I do fasted cardio?\" is: if you like it and it helps you be consistent, fine; if you hate it, you're giving up nothing by eating first. The authors' own practical pick is protein before cardio — it may protect muscle, slightly raises post-exercise burn, and doesn't blunt fat use the way carbohydrate does. They also advise against fasted sessions longer than 60 minutes because of protein loss.",
+    "what_it_doesnt_mean": "It doesn't prove fasted cardio is useless — it proves it's not better in the populations studied, who were mostly untrained, overweight, or young women on short trials. The authors hold open a door for very lean competitors, but that's a hypothesis they're explicit about. And none of this is about fasted lifting, high-intensity work, or intermittent fasting as a diet.",
+    "questions_raised": []
+  },
+  "translation": [
+    "Fasted vs fed cardio, matched calories, 4 weeks: ~1.1 kg vs ~0.7 kg fat lost, not a significant difference.",
+    "Fasted: more fat burned in the session; fed: more burned afterwards. Net: about the same.",
+    "If fasted: keep it under 60 min and low-to-moderate intensity. Or have 25 g protein first."
+  ],
+  "glossary_candidates": [
+    { "term": "Fasted cardio", "definition": "Aerobic exercise done after an overnight fast, before eating.", "confidence_term_is_new": "likely" },
+    { "term": "Fat oxidation vs fat loss", "definition": "Fat oxidation is fat burned right now; fat loss is the change in body fat over time, which depends on total energy balance.", "confidence_term_is_new": "likely" },
+    { "term": "Intramuscular triglyceride", "definition": "Fat stored inside muscle fibres; a fuel for moderate exercise, especially when fasted.", "confidence_term_is_new": "likely" },
+    { "term": "Meta-analysis", "definition": "A study that pools the results of many studies to get a more reliable overall answer.", "confidence_term_is_new": "likely" },
+    { "term": "Effect size", "definition": "How big a difference is, independent of whether it's statistically significant; \"trivial\" means too small to matter.", "confidence_term_is_new": "likely" },
+    { "term": "Energy balance / calorie deficit", "definition": "Calories in minus calories out; fat loss over time requires a sustained deficit.", "confidence_term_is_new": "likely" },
+    { "term": "Protein-enhanced cardio", "definition": "Cardio done after a protein-only feed (e.g. 25 g whey or casein).", "confidence_term_is_new": "likely" }
+  ],
+  "charts": [
+    {
+      "template": "before_after_bars",
+      "title": "Schoenfeld 2014: fat mass, fasted vs fed cardio",
+      "series": [
+        { "label": "Fasted", "before": 16.5, "after": 15.4 },
+        { "label": "Fed", "before": 15.7, "after": 15.0 }
+      ],
+      "units": "kg fat mass",
+      "approximate": false,
+      "note": "20 women, 4 weeks, hypocaloric diet; no significant difference between groups. Review authors' reporting of Schoenfeld 2014."
+    },
+    {
+      "template": "before_after_bars",
+      "title": "Schoenfeld 2014: % body fat, fasted vs fed cardio",
+      "series": [
+        { "label": "Fasted", "before": 26.3, "after": 25.0 },
+        { "label": "Fed", "before": 24.8, "after": 24.1 }
+      ],
+      "units": "% body fat",
+      "approximate": false,
+      "note": "No significant difference between groups. Review authors' reporting of Schoenfeld 2014. Population: review; pooled n ≈ 96 for body-composition outcomes (Hackett & Hagstrom)."
+    }
+  ],
+  "verification_notes": [
+    "All numbers are the review authors' reporting of cited studies; not verified against originals.",
+    "Vieira 27/273, p = 0.91: pp.1–2",
+    "Van Proeyen +22%: p.2",
+    "IMCT ~60%: p.2",
+    "Aird 46 studies: p.2",
+    "Trabelsi all values: p.3",
+    "Hackett & Hagstrom 5/96/60M/36F: p.3",
+    "Schoenfeld values, 1.8 g/kg, 60 min 3×/wk: pp.3–4",
+    "14 g/h nitrogen: p.4",
+    "Gieske design and results: pp.4–5",
+    "Practical applications, 60-min limit: pp.5–6",
+    "Conflicts/funding: p.6."
+  ]
+}

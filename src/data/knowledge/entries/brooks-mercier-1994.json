@@ -1,0 +1,165 @@
+{
+  "id": "brooks-mercier-1994",
+  "slug": "brooks-mercier-1994",
+  "source_pdf": "Crossover_concept.pdf",
+  "shape": "review",
+  "document_type": "journal article",
+  "meta_analysis": false,
+  "header": {
+    "title_plain": "As exercise gets harder, carbohydrate takes over from fat as the main fuel, and endurance training moves that switch to higher workloads without stopping it.",
+    "citation": {
+      "authors": "Brooks GA, Mercier J",
+      "year": "1994",
+      "journal": "Journal of Applied Physiology",
+      "volume_issue_pages": "76(6): 2253-2261",
+      "doi": "10.1152/jappl.1994.76.6.2253"
+    },
+    "topics": [
+      "crossover-concept",
+      "substrate-utilization",
+      "fat-oxidation",
+      "carbohydrate-metabolism",
+      "fat-burning-zone",
+      "exercise-intensity",
+      "endurance-training",
+      "glycogen",
+      "catecholamines",
+      "lactate-threshold",
+      "zone-2",
+      "fuel-use"
+    ],
+    "evidence_type": "Brief narrative review proposing a conceptual model; no new data collected; no systematic search (the authors say they cite 'the significant work that we believe supports our concept'); the model's central figure (Fig 1) is a schematic, not plotted data.",
+    "confidence": {
+      "level": "conceptual",
+      "why": "The authors call the crossover concept 'a theoretical construct' and say the experiments needed to substantiate it have not been done; its strength rests on the cited studies, several of which are small, in animals, or tested at only one intensity."
+    },
+    "practical_relevance": {
+      "level": "high",
+      "why": "It is the standard framework behind 'fat-burning zone' and zone-based fuel advice, and it changes how a coach explains intensity, fuel use and why race-pace work runs on carbohydrate."
+    },
+    "author_stance": "The paper does not name the lactate shuttle, but it reveals a lactate-centred view from Brooks's own lab: 16 of the 62 references include Brooks as an author (refs 3-8, 14, 15, 18, 23, 27, 39, 43, 46, 52, 57), it cites unpublished data from his lab, it stresses lactate oxidation and lactate as a gluconeogenic fuel, and the authors state that they cite only the work they believe supports their concept.",
+    "funding_and_conflicts": "Supported by National Institutes of Health Grants DK-19577 and AR/DK-42906. Conflicts of interest not stated."
+  },
+  "layer1": {
+    "review": {
+      "claim": "The balance of carbohydrate and fat used during sustained exercise depends on two opposing influences. Rising exercise intensity increases carbohydrate use, through faster muscle glycogen breakdown, recruitment of fast glycolytic fibres and greater sympathetic nervous system (adrenaline) activity. Endurance training pushes the other way, through more mitochondria and a smaller sympathetic response to a given workload, which favours fat oxidation at mild-to-moderate intensities. The crossover point is the power output above which carbohydrate supplies more energy than fat, with carbohydrate's share rising and fat's falling as intensity increases further. Training moves the crossover to a higher absolute power output, but at hard intensities carbohydrate dominates regardless of training state, so studies showing more fat use after training and studies showing carbohydrate dependence in athletes are, the authors argue, consistent.",
+      "definitions_used": [
+        { "term": "Crossover point", "definition": "The power output at which energy derived from oxidation of carbohydrate-based fuels predominates over that derived from lipids, with further increases in power producing a relative increase in carbohydrate energy and a relative decrease in fat energy. No numeric %VO2max is given for the crossover point in the text." },
+        { "term": "Mild intensity", "definition": "A lesser metabolic response than moderate exercise, e.g. ≤45% VO2max." },
+        { "term": "Moderate intensity", "definition": "A leg power output that elicits 50-55% of whole-body VO2max." },
+        { "term": "Hard intensity", "definition": "A greater metabolic response than moderate exercise, e.g. ≥65% VO2max in the main text; the abstract gives '~75% maximal O2 uptake' as its example of hard-intensity exercise." },
+        { "term": "Training", "definition": "Regularly performed endurance exercise at an intensity sufficient to induce both central circulatory and peripheral muscle mitochondrial adaptations." },
+        { "term": "Carbohydrates (CHO)", "definition": "Endogenous sources: muscle and liver glycogen; blood glucose; and blood, muscle and liver lactate." },
+        { "term": "Lipids", "definition": "Adipose and intramuscular triglycerides, plus blood-borne free fatty acids (FFAs) and triglycerides." },
+        { "term": "Utilization", "definition": "Disposal (disappearance) from blood or another storage compartment; for CHO this can be anaerobic glycolysis, gluconeogenesis or oxidation; for lipids, oxidation or re-esterification. The authors use 'lipid oxidation' but 'CHO utilization' because carbohydrate can also yield energy anaerobically." },
+        { "term": "Anaerobic glycolysis", "definition": "Glycogenolysis or glycolysis leading to net lactate accumulation in blood, muscle or another compartment." },
+        { "term": "Absolute vs relative intensity", "definition": "Not defined as a term, but central to the argument: testing at the same absolute power output before and after training means testing at a lower relative intensity after training, which the authors say 'missed the crossover to CHO dependency'." }
+      ],
+      "evidence_cited": [
+        { "finding": "Four sets of findings support more fat oxidation after training during submaximal exercise: more mitochondria, lower respiratory exchange ratio (R), muscle glycogen sparing, and lower blood catecholamines and lactate at a given power output.", "source": "Refs 1, 3, 11, 12, 15, 17, 21, 22, 28, 29, 36, 39, 40, 59 (as grouped by the authors)", "numbers": "No values given", "note": "Supporting evidence for the training arm of the model." },
+        { "finding": "A lower R at a given submaximal power output after training is 'a highly reproducible observation' and, under steady-state conditions, 'probably represent[s] the strongest data available' for enhanced fat oxidation after training.", "source": "Gollnick 1985 (ref 21)", "numbers": "No values given", "note": "Authors flag the assumption that R equals the tissue respiratory quotient." },
+        { "finding": "Net muscle glycogen breakdown is less after training; the blunting is most prominent at the rest-to-exercise transition.", "source": "Rat (ref 1) and human (refs 21, 36) biopsy studies", "numbers": "No values given", "note": "Authors say studies on the mechanism of glycogen sparing are lacking." },
+        { "finding": "Against the usual explanation: increased blood glucose uptake, not increased fat use, explained most of the muscle glycogen sparing in trained rats during moderate-to-hard exercise.", "source": "Donovan & Sumida 1990 (ref 19)", "numbers": "No values given", "note": "Animal data. Cuts against the idea that glycogen sparing means more fat burning." },
+        { "finding": "In fit subjects cycling hard, palmitate (blood fatty acid) turnover fell compared with rest.", "source": "Jones et al. 1980 (ref 35)", "numbers": "Cycling at 70% VO2max", "note": "Consistent with dog data (ref 32) showing reduced lipolysis and FFA turnover when lactic acidosis occurs." },
+        { "finding": "In marathon running, palmitate turnover rose only slightly while glucose appearance rose; across these two reports, oxygen uptake, CO2 output and total CHO oxidation rose far more, so the relative contribution of blood FFAs fell.", "source": "Hall et al. 1983 (ref 25); Jones et al. 1980 (ref 35)", "numbers": "Glucose appearance rate increased twofold over resting values (Hall); VO2, CO2 output and total CHO oxidation increased ~15-fold compared with rest (both reports)", "note": "Authors: 'a small absolute increase but relative decline in lipid oxidation at relatively high power outputs, even in highly trained individuals, is predicted by the crossover concept.' Authors also note these two reports are 'generally ignored', and that the literature on FFA turnover in trained vs untrained humans is thin, early data came from dogs, and no rat reports show increased FFA turnover with training." },
+        { "finding": "Glucose turnover declines after training during mild-to-moderate exercise, but this and similar studies tested the same absolute power output before and after training.", "source": "Coggan et al. 1990 (ref 11); see also refs 11-13", "numbers": "Exercise at 50% of pretraining VO2max = 40-45% of posttraining VO2max; blood glucose concentration and turnover decreased vs pretraining", "note": "Authors argue these protocols 'missed the crossover to CHO dependency by not testing subjects at higher exercise intensities'." },
+        { "finding": "Training also raises the capacity to use glucose: muscle GLUT-4 and hexokinase increase, and liver gluconeogenic capacity improves.", "source": "Refs 2, 31, 53 (ref 53 is rat liver in situ)", "numbers": "No values given", "note": "Authors: these adaptations 'favor increased blood glucose utilization and glycogen sparing, not increased lipid oxidation'. Cuts against a fat-only reading of training adaptations." },
+        { "finding": "In trained vs untrained men exercising hard, arterial glucose concentration and appearance rate are higher in the trained.", "source": "Kjaer et al. 1986 (ref 40)", "numbers": "Exercise eliciting ≥60% VO2max", "note": "Same reference: catecholamine rise at moderate-to-hard intensity is greater in highly trained than less fit individuals." },
+        { "finding": "After training, at a given submaximal workload insulin falls less and glucagon and catecholamines rise less; during mild-to-moderate exercise circulating adrenaline rises little if at all above rest.", "source": "Refs 12, 17, 24, 42", "numbers": "Authors predict adrenaline may not rise above rest at an intensity eliciting 40-50% of posttraining VO2max", "note": "The 40-50% figure is the authors' prediction, not a cited measurement." },
+        { "finding": "A few training sessions changed substrate use (lower lactate and R) before mitochondrial or circulatory adaptations occurred.", "source": "Green et al. 1992 (ref 22)", "numbers": "No values given", "note": "Catecholamines were not reported; authors read this as consistent with reduced sympathetic drive shifting the crossover." },
+        { "finding": "Conflicting training effects on fat mobilisation: adipocytes from trained people show enhanced lipolysis to adrenaline, but in trained rats insulin's suppression of plasma FFA is increased; circulating FFA is lower after training at a given mild-to-moderate workload.", "source": "Refs 16, 41, 47, 48, 11", "numbers": "No values given", "note": "Authors: resolution of these conflicting effects 'remains to be achieved'." },
+        { "finding": "Subjects with low lactate thresholds had higher blood glucose turnover than those with high thresholds.", "source": "Coggan et al. 1992 (ref 12)", "numbers": "No values given", "note": "Sympathetic responses not reported; offered as a possible link between lactate threshold and crossover point." },
+        { "finding": "In trained subjects, muscle citrate was elevated but glucose 6-phosphate unchanged versus pretraining.", "source": "Coggan et al. 1993 (ref 13)", "numbers": "Power output eliciting 50% of pretraining VO2max", "note": "Authors state the results 'are also inconsistent with the suggested training effect of raising glucose-fatty acid cycle activity in humans'. Cuts against one proposed mechanism for more fat use after training." },
+        { "finding": "Most lactate entering the blood is oxidised, so VO2 represents most of the energy used below the lactate threshold.", "source": "Refs 18, 43", "numbers": "70-80% of lactate appearing in blood disposed of through oxidation", "note": "Both references are from Brooks's lab." },
+        { "finding": "Training increases leucine oxidation during exercise, but amino acids contribute little to total fuel.", "source": "Henderson et al. 1985 (ref 27)", "numbers": "~1% of overall substrate oxidation", "note": "Rat study per its reference title; relative contribution falls as intensity rises." },
+        { "finding": "High-fat diets with adequate calories can increase fat oxidation at rest and during exercise and maintain blood glucose during prolonged submaximal exercise.", "source": "Phinney et al. 1983 (ref 49)", "numbers": "Adaptation requires 'several weeks, if not months'", "note": "Authors: unclear that this would permit sustained high-power exercise as used in competition." },
+        { "finding": "Trained women compared with men showed lower R, lower circulating adrenaline and less muscle glycogen depletion.", "source": "Tarnopolsky et al. 1990 (ref 55)", "numbers": "Running 90-101 min at 65% VO2max", "note": "Authors: no published attempts to measure substrate flux rates in men and women; 'such data need to be supplied'." },
+        { "finding": "Raising blood fatty acids several-fold with Intralipid and heparin did not significantly improve endurance.", "source": "Van Baak et al. 1993 (ref 57a)", "numbers": "Male subjects at 70% VO2max; non-esterified fatty acids and glycerol 'several times over' saline control; endurance not significantly improved", "note": "Authors: muscles were carbohydrate-dependent at that intensity, so extra fat supply did not help." },
+        { "finding": "In highly trained men, plasma FFA appearance fell and glucose appearance rose in direct proportion to exercise intensity; total fat oxidation was no different at 85% than at 25% VO2max despite a threefold increase in energy expenditure.", "source": "Romijn et al. 1993 (ref 51a)", "numbers": "5 highly trained men; 25, 65 and 85% VO2max; threefold increase in energy expenditure; total fat oxidation (indirect calorimetry) no different at 85% vs 25% VO2max", "note": "No fuel-split percentages or oxidation rates at each intensity are printed in this review. Key point for the fat-burning-zone belief: the higher fat share at 25% did not mean more total fat burned than at 85%." },
+        { "finding": "After training, at the same absolute workload, R fell (interpreted as more total fat oxidation) but plasma FFA turnover and oxidation also fell; investigators attributed the extra fat use to intramuscular lipid.", "source": "Martin et al. 1993 (ref 42a)", "numbers": "10 men and 3 women; same power output elicited 58% VO2max before and 46% VO2max after training (from that paper's Tables 1 and 2)", "note": "Partly cuts against a simple 'training burns more blood fat' reading. No sympathetic or lipolysis data available. Authors: shifting exercise to a relatively lesser level 'increases total lipid oxidation if not FFA oxidation'." }
+      ],
+      "recommendations_made": [],
+      "untested_or_contested": "The authors call the concept 'a theoretical construct' and say they 'have likely oversimplified the presentation of a complex problem'. Experiments measuring glucose, glycerol and FFA kinetics, glycogen depletion and glucoregulatory hormones across graded intensities after short- and long-term training 'are required to substantiate the crossover concept'. Experiments establishing the role of sympathetic stimulation in shifting fuel from fat to carbohydrate 'have not yet been done'. It remains to be determined which, if any, blood lactate concentration correlates with the crossover point, and anaerobic energy in maximal exercise cannot currently be quantified. Mechanisms of training-induced glycogen sparing are little studied, and conflicting training effects on fat mobilisation are unresolved. No published study had compared substrate flux in men and women. Data on fat turnover in trained versus untrained humans are scarce, and early work used dogs, which are hard to extrapolate to humans. Effects of nutrition, environment, fibre type, sex and hormone sensitivity are not surveyed. Whether high-fat-diet adaptation would support sustained high-power exercise is unclear. The Fig 1 legend states that on a relative basis training 'probably' has minimal effects on the curves."
+    }
+  },
+  "layer2": {
+    "what_it_means": "Fuel use is a sliding balance, not a switch. At rest and easy intensities fat supplies most of the energy; as intensity climbs, carbohydrate takes a growing share, and above the crossover point it supplies most of the energy. Endurance training moves that point to a higher absolute workload, so a trained person uses a bigger fat share at the same pace, partly because that pace is now a smaller fraction of their maximum. In the Martin study the same workload went from 58% to 46% VO2max after training. Training does not abolish the switch: during hard work, which the authors put at ≥65% VO2max and which covers most athletic training and racing above 70-75% of maximum, carbohydrate dominates in trained people too. Raising blood fat several-fold at 70% VO2max did not improve endurance. For a coach, the practical message is that fuelling and glycogen matter for hard sessions and races, that easy aerobic work is where fat supplies the bigger share, and that 'trained people burn more fat' applies at the same absolute pace, not at the same relative effort.",
+    "what_it_doesnt_mean": "It does not support the 'fat-burning zone' belief that low intensity burns more fat. The crossover describes fat's share of energy, not the total amount of fat burned. In the one study here that measured total fat oxidation across intensities, five highly trained men burned no more fat at 25% than at 85% VO2max, while energy use at 85% was three times higher. Nothing here measures fat loss over weeks, energy balance or after-exercise fuel use, so it says nothing about which intensity loses more body fat. This is one group's model, built partly on Brooks's own lab work and on studies chosen because they support it. Its figure is a drawing, not data, and it gives no specific %VO2max for the crossover point. Much of the evidence compares people or tests one intensity, some comes from rats and dogs, and the authors say the confirming experiments had not been done. Women, untrained or overweight people, and older adults were barely studied.",
+    "questions_raised": []
+  },
+  "translation": [
+    "Easy work, around 45% of max or below, runs mainly on fat in trained people; hard work, 65% of max and up, runs mainly on carbs, trained or not.",
+    "Getting fitter makes a given pace easier: in one study the same workload went from 58% to 46% of max after training, so more of it came from fat.",
+    "A bigger fat share isn't more fat burned: 5 trained men burned no more fat at 25% of max than at 85%, while burning three times the energy at 85%.",
+    "Most hard training and racing sits above 70-75% of max, where carbs are the main fuel."
+  ],
+  "glossary_candidates": [
+    { "term": "Crossover point", "definition": "The exercise intensity above which carbohydrate supplies more of the body's energy than fat does.", "confidence_term_is_new": "likely" },
+    { "term": "Substrate", "definition": "A fuel the body breaks down for energy, mainly carbohydrate, fat and, to a small extent, protein.", "confidence_term_is_new": "likely" },
+    { "term": "Glycogen", "definition": "The stored form of carbohydrate, kept in muscles and the liver.", "confidence_term_is_new": "unsure" },
+    { "term": "Glycogen sparing", "definition": "Using less stored muscle carbohydrate for the same exercise, usually because another fuel such as fat or blood sugar covers more of the demand.", "confidence_term_is_new": "likely" },
+    { "term": "Free fatty acids (FFA)", "definition": "Fat molecules released from fat stores into the blood, where muscles can take them up and burn them.", "confidence_term_is_new": "likely" },
+    { "term": "Fat oxidation", "definition": "Burning fat for energy at a given moment; not the same as losing body fat over time.", "confidence_term_is_new": "unsure" },
+    { "term": "Respiratory exchange ratio (R or RER)", "definition": "The ratio of carbon dioxide breathed out to oxygen taken in; lower values mean more fat is being burned, higher values mean more carbohydrate.", "confidence_term_is_new": "likely" },
+    { "term": "Sympathetic nervous system (SNS)", "definition": "The 'fight or flight' system that ramps up during hard exercise and releases adrenaline and noradrenaline.", "confidence_term_is_new": "likely" },
+    { "term": "Adrenaline (epinephrine) / catecholamines", "definition": "Stress hormones that rise with hard exercise; adrenaline speeds the breakdown of muscle glycogen. Catecholamines is the group name for adrenaline and noradrenaline.", "confidence_term_is_new": "likely" },
+    { "term": "Lactate threshold", "definition": "The exercise intensity at which lactate starts building up in the blood faster than the body can clear it.", "confidence_term_is_new": "unsure" },
+    { "term": "Isotope tracer", "definition": "A labelled version of a molecule, such as a fatty acid or glucose, infused into the blood so researchers can track how fast that fuel is released and used.", "confidence_term_is_new": "likely" },
+    { "term": "Absolute vs relative intensity", "definition": "Absolute intensity is the actual workload (watts or pace); relative intensity is that workload as a percentage of a person's own maximum. After training, the same absolute workload is a lower relative intensity.", "confidence_term_is_new": "likely" },
+    { "term": "VO2max", "definition": "The most oxygen a person can use per minute during all-out exercise; intensities are often given as a percentage of it.", "confidence_term_is_new": "unsure" },
+    { "term": "Turnover / rate of appearance", "definition": "How fast a fuel such as glucose or fatty acids enters (and leaves) the blood, as opposed to its concentration at one moment.", "confidence_term_is_new": "likely" },
+    { "term": "Gluconeogenesis", "definition": "The liver making new glucose from other molecules, including lactate.", "confidence_term_is_new": "likely" }
+  ],
+  "charts": [
+    {
+      "template": "concept_curve",
+      "title": "The crossover: fat's and carbohydrate's share of energy as intensity rises",
+      "series": [
+        { "label": "Fat (% of energy)", "points": [ { "x": 0, "y": 60 }, { "x": 20, "y": 54 }, { "x": 40, "y": 45 }, { "x": 60, "y": 35 }, { "x": 80, "y": 22 }, { "x": 100, "y": 0 } ] },
+        { "label": "Carbohydrate (% of energy)", "points": [ { "x": 0, "y": 40 }, { "x": 20, "y": 46 }, { "x": 40, "y": 53 }, { "x": 60, "y": 62 }, { "x": 80, "y": 80 }, { "x": 100, "y": 100 } ] }
+      ],
+      "units": "x = aerobic power, % of maximum (x = 0 stands for 'Rest'); y = % of energy from each fuel",
+      "approximate": true,
+      "note": "schematic — not measured data. Values approx., read from Fig 1, which is a drawing. In the original, fat is plotted on a 0-60% left axis and carbohydrate on a 40-100% right axis, so the point where the two lines cross on the page (about 70% aerobic power) is not where carbohydrate passes 50%; on the printed scales that happens at roughly 30-40% aerobic power. The figure has arrows showing training shifts curves rightward and sympathetic (SNS) stimulation shifts them leftward. The legend says that on a relative basis training 'probably has minimal effects' on the curves."
+    },
+    {
+      "template": "values_by_condition",
+      "title": "Same workload, lower relative intensity after training (Martin et al.)",
+      "series": [
+        { "label": "Relative intensity of the same absolute power output", "values": [ { "condition": "Before training", "value": 58 }, { "condition": "After training", "value": 46 } ] }
+      ],
+      "units": "% VO2max",
+      "approximate": false,
+      "note": "Second-hand: the review authors' reporting of Martin et al. 1993 (10 men, 3 women), taken from that paper's Tables 1 and 2. Shows why studies at a fixed absolute workload find more fat use after training. No Romijn fuel-split chart: the review prints no fat/carbohydrate percentages or oxidation rates at 25, 65 or 85% VO2max, only that total fat oxidation did not differ between 85% and 25%."
+    }
+  ],
+  "verification_notes": [
+    "All numbers are the review authors' reporting of cited studies; not verified against originals.",
+    "Page numbers below are journal pages; PDF p.1 is a ResearchGate cover sheet, so journal p.2253 = PDF p.2 through p.2261 = PDF p.10.",
+    "Citation, authors, journal, 76(6): 2253-2261, 1994: p.2253 (abstract header). DOI 10.1152/jappl.1994.76.6.2253: printed only on the ResearchGate cover sheet (PDF p.1), not on the article pages.",
+    "Document type: labelled 'brief review' in the banner, p.2253; 'theoretical means' in abstract, p.2253.",
+    "Crossover point definition: p.2253 (abstract and main text) and Fig 1 legend, p.2254.",
+    "Abstract figures, '≤45% maximal O2 uptake' lipid main substrate after training, '~75% maximal O2 uptake' hard exercise, athletes '>70-75% of maximum aerobic power': p.2253.",
+    "Intensity bands, moderate 50-55% VO2max, mild ≤45%, hard ≥65%; definitions of training, CHO, lipids, utilization, anaerobic glycolysis: p.2254.",
+    "No numeric %VO2max for the crossover point appears anywhere in the text; the caller's '50-65% VO2max' range is not printed in this document.",
+    "Fig 1 schematic: p.2254; axes Fat 0-60% (left), CHO 40-100% (right), aerobic power Rest-100%; concept_curve values approx., from Fig 1.",
+    "Leucine oxidation ~1% of substrate oxidation: p.2254.",
+    "Lactate 70-80% disposed through oxidation; anaerobic energy minimal below lactate threshold: p.2255.",
+    "Four sets of findings for training-increased lipid oxidation; mitochondrial reticulum; R reproducible: p.2255.",
+    "R 'strongest data'; glycogen sparing biopsies; Donovan & Sumida challenge; unpublished Azevedo/Lehman/Brooks data (printed as 'Brouns'): p.2256.",
+    "Jones et al. 70% VO2max palmitate turnover decrease; Hall et al. twofold glucose appearance; ~15-fold increase; dogs and rats paucity of data: p.2256.",
+    "Absolute vs relative paradigm, Coggan refs 11-13, 'missed the crossover'; GLUT-4, hexokinase, gluconeogenesis: p.2256.",
+    "Hormonal responses after training; catecholamines greater in highly trained (ref 40); Green et al. few bouts; adipocyte vs insulin FFA conflict; prediction that adrenaline may not rise at 40-50% posttraining VO2max: p.2257.",
+    "Kjaer ≥60% VO2max glucose; Coggan 50% pretraining = 40-45% posttraining VO2max; SNS experiments 'not yet been done'; Coggan low vs high lactate threshold; citrate/G6P 'inconsistent with... glucose-fatty acid cycle'; lactate-crossover correlation undetermined; glycogen depletion shifts curves: p.2258.",
+    "High-fat diet adaptation 'several weeks, if not months': pp.2258-2259.",
+    "Tarnopolsky 90-101 min at 65% VO2max; no flux data in men vs women: p.2259.",
+    "Van Baak 70% VO2max, Intralipid + heparin, FFA several times control, endurance not significantly improved: p.2259.",
+    "Romijn 5 highly trained men, 25/65/85% VO2max, FFA appearance down and glucose appearance up in proportion to intensity, threefold energy expenditure, total fat oxidation no different 85% vs 25%: p.2259. No fuel-split numbers printed.",
+    "Martin 10 men and 3 women, 58% VO2max before / 46% after training, R down, plasma FFA turnover and oxidation down, intramuscular lipid conclusion: p.2259.",
+    "Summary; 'theoretical construct'; experiments 'required to substantiate the crossover concept': pp.2259-2260.",
+    "Authors' limitations, 'likely oversimplified', no extensive survey, cite work 'we believe supports our concept': p.2254.",
+    "Funding NIH DK-19577 and AR/DK-42906: p.2260. No conflict statement printed.",
+    "Author stance count, 16 of 62 references with Brooks as author (refs 3-8, 14, 15, 18, 23, 27, 39, 43, 46, 52, 57): reference list pp.2260-2261. Lactate shuttle is not named in the paper.",
+    "recommendations_made left empty: the paper makes no explicit practical recommendations; the statement that athletes train and compete above 70-75% and depend on CHO (p.2253) is descriptive."
+  ]
+}
