@@ -5,6 +5,13 @@
   "shape": "review",
   "document_type": "journal article",
   "meta_analysis": false,
+  "key_findings": [
+    "Harder means more carbohydrate: in trained men, total fat oxidation was no higher at 85% VO2max than at 25%, despite a threefold rise in energy burned.",
+    "Training pushes the other way at easy-to-moderate intensities — lower R, spared glycogen, lower adrenaline at a given workload.",
+    "The crossover point is the power output where carbohydrate overtakes fat; training moves it to a higher absolute power.",
+    "At hard intensities, carbohydrate dominates regardless of training state.",
+    "Most lactate entering the blood (70–80%) is burned as fuel, not wasted."
+  ],
   "header": {
     "title_plain": "As exercise gets harder, carbohydrate takes over from fat as the main fuel, and endurance training moves that switch to higher workloads without stopping it.",
     "citation": {

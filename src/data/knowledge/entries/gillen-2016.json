@@ -5,6 +5,13 @@
   "shape": "intervention",
   "document_type": "journal article",
   "meta_analysis": false,
+  "key_findings": [
+    "Ten minutes of exercise — one minute of it hard — matched 45 minutes of steady cardio: VO2peak +19% in both groups.",
+    "Insulin sensitivity rose 53% with sprints and 34% with steady cardio; the no-training group didn't change.",
+    "Muscle adaptations matched too: mitochondrial-content marker +48% vs +27%; GLUT4 ~+50% in both.",
+    "The control group changed on nothing — the training caused the gains.",
+    "Time commitment differed five-fold for the same fitness result."
+  ],
   "header": {
     "title_plain": "Three 20-second all-out sprints in a 10-minute session, three times a week, raised fitness 19% and improved insulin sensitivity in sedentary men, much as 45 minutes of steady cycling did.",
     "setup_plain": "Twenty-five sedentary men were randomized to twelve weeks of sprint-interval training (three 20-second all-out sprints in a 10-minute session), 45 minutes of steady cycling, or no training, three sessions a week. Fitness, insulin sensitivity and muscle measures were taken before and after.",

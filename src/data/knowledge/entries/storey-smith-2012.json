@@ -5,6 +5,13 @@
   "shape": "review",
   "document_type": "journal article",
   "meta_analysis": false,
+  "key_findings": [
+    "The second pull of a clean produces ~7,000 W of peak power — roughly 17× a bench press (415 W).",
+    "In junior lifters, moderate volume beat low and high: clean & jerk +10.5% vs +3.0%, squat +9.5% vs 5.3–6.9%, over 10 weeks.",
+    "Women lift 79–84% of men's world-record totals across age groups.",
+    "Masters lifters (40–87) keep ~32% more knee-extensor force and power than untrained peers, declining ~1–1.5% per year.",
+    "Lifters build some of the densest skeletons in sport: vertebrae +13–42% vs untrained — an advantage that persists into the 50s and 60s."
+  ],
   "header": {
     "title_plain": "Olympic weightlifters train harder and more often than any guideline allows — and the evidence says it works for them, within limits",
     "citation": {

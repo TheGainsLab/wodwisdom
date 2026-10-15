@@ -61,6 +61,9 @@ def check(e, path):
         errs.append(f"practical_relevance.level invalid")
     if e.get("shape") in ("intervention", "comparison") and not h.get("setup_plain"):
         errs.append("intervention/comparison entries need header.setup_plain (plain-prose overview lede)")
+    kfn = len(e.get("key_findings", []))
+    if not (3 <= kfn <= 6):
+        errs.append(f"key_findings has {kfn} bullets (need 3–6: one claim with its number each)")
     if not (5 <= len(h.get("topics", [])) <= 12):
         warns.append(f"topics count {len(h.get('topics', []))} outside 5–12")
     l2 = e.get("layer2", {})

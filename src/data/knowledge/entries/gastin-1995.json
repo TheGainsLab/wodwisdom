@@ -5,6 +5,13 @@
   "shape": "comparison",
   "document_type": "journal article",
   "meta_analysis": false,
+  "key_findings": [
+    "Anaerobic capacity (accumulated oxygen deficit) came out the same whether riders went all-out or rode to exhaustion at a fixed supramaximal load: 42.0–44.1 ml/kg across study 1's three tests.",
+    "The all-out tests hit far higher peaks (9.6 and 11.9 W/kg — up to 254% of VO2max power) yet drew the same anaerobic total.",
+    "Agreement between any two tests averaged ~4–5 ml/kg per rider (ranges 0–13.2) — a usable estimate, not a precise one.",
+    "Anaerobic capacity showed no relationship to fast-twitch fibre percentage (r = −0.05).",
+    "The longer the test, the more aerobic it was: 51% aerobic in the 62-second all-out vs 76% in the ~3-minute constant ride."
+  ],
   "header": {
     "title_plain": "A 60–90 s all-out cycling test gave the same anaerobic-capacity estimate (accumulated oxygen deficit) as riding to exhaustion at a fixed supramaximal workload.",
     "setup_plain": "Two studies in two labs. In the first, nine active men rode to exhaustion at 110% and 125% of VO2max and did a 62-second all-out isokinetic test. In the second, twelve men — six untrained, six endurance trained — rode to exhaustion at 110% and did a 90-second all-out test with falling resistance. Accumulated oxygen deficit was measured in every test and compared across them.",

@@ -5,6 +5,12 @@
   "shape": "comparison",
   "document_type": "journal article",
   "meta_analysis": false,
+  "key_findings": [
+    "Slow-twitch muscle had about twice the oxygen-using capacity of fast-twitch (estimated max 1.37 vs 0.62 µmol/g/min).",
+    "Slow-twitch refilled its phosphocreatine in less than half the time (half-time ~4 vs ~10 min).",
+    "Fast-twitch acidified at workloads the slow muscle handled with no pH drop (half-max oxygen at 0.2 vs 1.2 Hz stimulation).",
+    "The two fibre types are controlled differently: simple ADP feedback explained the fast muscle but was \"not sufficient\" for the slow one."
+  ],
   "header": {
     "title_plain": "Slow-twitch muscle refuels twice as fast and has twice the aerobic capacity of fast-twitch — and the two are controlled differently",
     "setup_plain": "Isolated cat muscles — fast-twitch biceps and slow-twitch soleus — were perfused with red cells at 30 °C and stimulated electrically for 15–20 minutes at rates from 0.05 to 2 Hz, then given at least an hour of recovery. Oxygen uptake, phosphocreatine, phosphate, ATP and pH were tracked by NMR through work and recovery.",
