@@ -330,9 +330,134 @@ function renderStackedShare(c: KnowledgeChart): React.ReactNode | null {
   );
 }
 
+// Two shades of one hue for before→after (palette ramp steps on the dark surface).
+const BEFORE_HUE = '#86b6ef';
+const AFTER_HUE = '#3987e5';
+
+/** before_after_bars: paired horizontal bars per item; null → table fallback. */
+function renderBeforeAfterBars(c: KnowledgeChart): React.ReactNode | null {
+  const series = c.series as Array<{ label: string; before: number; after: number }>;
+  if (!series.length || series.some((r) => typeof r.before !== 'number' || typeof r.after !== 'number')) return null;
+  // "mixed" units (e.g. m, s, kg in one chart) can't share a scale: each row
+  // scales to itself and only the within-pair change is comparable.
+  const mixed = c.units.trim().toLowerCase().startsWith('mixed');
+  const sharedMax = Math.max(...series.flatMap((r) => [r.before, r.after]));
+  const fmt = (v: number) => String(v);
+  const bar = (v: number, max: number, color: string, cap: string) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ width: 40, flexShrink: 0, fontSize: 10.5, color: 'var(--text-muted)', textAlign: 'right' }}>{cap}</span>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ width: `${Math.max((v / max) * 86, 0.5)}%`, minWidth: 2, height: 14, background: color, borderRadius: '0 4px 4px 0' }} />
+        <span style={{ fontSize: 11.5, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{fmt(v)}</span>
+      </div>
+    </div>
+  );
+  return (
+    <div style={{ margin: '2px 0 10px' }}>
+      <div style={{ display: 'flex', gap: 14, marginBottom: 10 }}>
+        {[['Before', BEFORE_HUE], ['After', AFTER_HUE]].map(([n, col]) => (
+          <span key={n} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-dim)' }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: col, flexShrink: 0 }} />{n}
+          </span>
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {series.map((r) => {
+          const max = mixed ? Math.max(r.before, r.after) : sharedMax;
+          return (
+            <div key={r.label}>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>{r.label}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {bar(r.before, max, BEFORE_HUE, 'before')}
+                {bar(r.after, max, AFTER_HUE, 'after')}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** grouped_change_bars: signed change bars per outcome, one color per group. */
+function renderGroupedChangeBars(c: KnowledgeChart): React.ReactNode | null {
+  const series = c.series as Array<{ group: string; values: Array<{ label: string; value: number | null }> }>;
+  if (!series.length || series.length > SHARE_SLOTS.length) return null;
+  if (series.some((s) => !Array.isArray(s.values))) return null;
+  const outcomes: string[] = [];
+  for (const s of series) for (const v of s.values) if (!outcomes.includes(v.label)) outcomes.push(v.label);
+  const all = series.flatMap((s) => s.values.map((v) => v.value)).filter((v): v is number => typeof v === 'number');
+  if (!all.length) return null;
+  const minV = Math.min(0, ...all);
+  const maxV = Math.max(0, ...all);
+  const span = maxV - minV || 1;
+  const pct = (v: number) => ((v - minV) / span) * 86; // leave room for tip labels
+  const zero = pct(0);
+  const suffix = c.units.includes('%') ? '%' : '';
+  const color = (g: string) => SHARE_SLOTS[series.findIndex((s) => s.group === g)];
+  return (
+    <div style={{ margin: '2px 0 10px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 10 }}>
+        {series.map((s) => (
+          <span key={s.group} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-dim)' }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: color(s.group), flexShrink: 0 }} />{s.group}
+          </span>
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {outcomes.map((o) => (
+          <div key={o}>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>{o}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {series.map((s) => {
+                const v = s.values.find((x) => x.label === o)?.value;
+                if (v === undefined) return null;
+                if (v === null) {
+                  return (
+                    <div key={s.group} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 14 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 3, background: color(s.group), flexShrink: 0, opacity: 0.5 }} />
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>not reported</span>
+                    </div>
+                  );
+                }
+                const left = Math.min(zero, pct(v));
+                const width = Math.abs(pct(v) - zero);
+                return (
+                  <div key={s.group} style={{ position: 'relative', height: 14 }}>
+                    {minV < 0 && (
+                      <div style={{ position: 'absolute', left: `${zero}%`, top: -1, bottom: -1, width: 1, background: 'var(--border)' }} />
+                    )}
+                    <div style={{
+                      position: 'absolute', left: `${left}%`, width: `${Math.max(width, 0.4)}%`, minWidth: 2, top: 1, height: 12,
+                      background: color(s.group),
+                      borderRadius: v >= 0 ? '0 4px 4px 0' : '4px 0 0 4px',
+                    }} />
+                    <span style={{
+                      position: 'absolute', top: 0, fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap',
+                      ...(v >= 0
+                        ? { left: `${zero + width}%`, paddingLeft: 6 }
+                        : { right: `${100 - left}%`, paddingRight: 6 }),
+                    }}>
+                      {v > 0 ? '+' : ''}{v}{suffix}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ChartBlock({ c }: { c: KnowledgeChart }) {
   const { columns, rows } = chartRows(c);
-  const drawn = c.template === 'stacked_share' ? renderStackedShare(c) : null;
+  const drawn =
+    c.template === 'stacked_share' ? renderStackedShare(c)
+    : c.template === 'before_after_bars' ? renderBeforeAfterBars(c)
+    : c.template === 'grouped_change_bars' ? renderGroupedChangeBars(c)
+    : null;
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 12, background: 'var(--surface)' }}>
       <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 8 }}>
