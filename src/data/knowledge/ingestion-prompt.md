@@ -100,6 +100,8 @@ Voice for Layer 2: neutral, specific, plain. Write the honest version; the edito
 
 `charts[]`: 1–4 chart specifications for fixed templates. Each: `template` (one of `before_after_bars`, `grouped_change_bars`, `values_by_condition`, `stacked_share`, `timeline`, `population_card`, `concept_curve`), `title`, `series` (data as arrays of `{label, value}` or `{label, before, after}`), `units`, `approximate` (true if any value was read from a figure), `note`. Use `concept_curve` only for schematic relationships in reviews/references, and mark it `"schematic — not measured data"`. Always include a `population_card` for intervention and comparison shapes (`n`, `sex_split`, `age`, `status`, `other`).
 
+When a chart draws its values from Layer 1 rows (`measured` or `evidence_cited`), set `"charted": true` on each of those rows. The page then shows the chart and collapses the flagged rows behind a disclosure instead of printing the same numbers twice; the rows stay in the entry as the canonical record. A chart never contains a number that is absent from Layer 1.
+
 ### 8. Verification notes
 
 `verification_notes[]`: one string per fact or cluster of facts: `"<fact>: p.<n> / Table <n> / Fig <n>"`. Cover every number in Layer 1, the design facts, the funding statement, and the authors' limitations. For reviews, the first line reads: `"All numbers are the review authors' reporting of cited studies; not verified against originals."` For references, locate by section heading if pages are absent.

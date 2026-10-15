@@ -209,6 +209,7 @@
         {
           "outcome": "Aerobic share of total energy (aerobic metabolism)",
           "unit": "%",
+          "charted": true,
           "values_by_condition": {
             "S1 110% constant": "76 ± 1",
             "S1 125% constant": "59 ± 2",

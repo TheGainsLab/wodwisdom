@@ -93,6 +93,37 @@ function InterventionFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['int
   );
 }
 
+/**
+ * FactsTable split on the `charted` flag: rows a chart already draws
+ * collapse behind a disclosure instead of printing twice. The disclosure
+ * sits where the charted rows sat (before the table when they led).
+ */
+function SplitFactsTable({ columns, rows, charted }: {
+  columns: Array<{ key: string; label: string }>;
+  rows: Array<Record<string, React.ReactNode>>;
+  charted: boolean[];
+}) {
+  const shown = rows.filter((_, i) => !charted[i]);
+  const hidden = rows.filter((_, i) => charted[i]);
+  if (hidden.length === 0) return <FactsTable columns={columns} rows={rows} />;
+  const disclosure = (
+    <details style={{ margin: '0 0 14px' }}>
+      <summary style={{ fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
+        {hidden.length === 1 ? '1 row' : `${hidden.length} rows`} drawn in the chart below — view as table
+      </summary>
+      <FactsTable columns={columns} rows={hidden} />
+    </details>
+  );
+  const chartedFirst = charted[0] === true;
+  return (
+    <>
+      {chartedFirst && disclosure}
+      {shown.length > 0 && <FactsTable columns={columns} rows={shown} />}
+      {!chartedFirst && disclosure}
+    </>
+  );
+}
+
 function ComparisonFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['comparison']> }) {
   const conditionKeys = Array.from(new Set(l.measured.flatMap((m) => Object.keys(m.values_by_condition))));
   return (
@@ -112,7 +143,7 @@ function ComparisonFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['compa
         rows={l.conditions.map((c) => ({ ...c }))}
       />
       {l.design_notes && <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, margin: '0 0 14px' }}>{l.design_notes}</p>}
-      <FactsTable
+      <SplitFactsTable
         columns={[
           { key: 'outcome', label: 'Outcome' }, { key: 'unit', label: 'Unit' },
           ...conditionKeys.map((k) => ({ key: `c_${k}`, label: k })),
@@ -123,6 +154,7 @@ function ComparisonFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['compa
           ...Object.fromEntries(conditionKeys.map((k) => [`c_${k}`, val(m.values_by_condition[k])])),
           differed: m.differed, note: m.note,
         }))}
+        charted={l.measured.map((m) => !!m.charted)}
       />
     </>
   );
@@ -140,12 +172,13 @@ function ReviewFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['review']>
           rows={l.definitions_used.map((d) => ({ ...d }))}
         />
       )}
-      <FactsTable
+      <SplitFactsTable
         columns={[
           { key: 'finding', label: 'Finding' }, { key: 'source', label: 'Source' },
           { key: 'numbers', label: 'Numbers' }, { key: 'note', label: 'Note' },
         ]}
         rows={l.evidence_cited.map((e) => ({ ...e, numbers: val(e.numbers) }))}
+        charted={l.evidence_cited.map((e) => !!e.charted)}
       />
       {l.recommendations_made.length > 0 && (
         <ul style={{ margin: '0 0 14px', paddingLeft: 18, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6 }}>
