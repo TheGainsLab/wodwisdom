@@ -461,29 +461,6 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
           <KnowledgeBadge kind="relevance" value={h.practical_relevance.level} why={h.practical_relevance.why} />
         </div>
 
-        <SectionTitle>What kind of evidence this is</SectionTitle>
-        <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)', margin: '0 0 10px' }}>
-          {linkifyGlossary(h.evidence_type)}
-        </p>
-        <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 6px' }}>
-          <strong style={{ color: 'var(--text)' }}>Confidence: {h.confidence.level}</strong>
-          {h.confidence.why && <> — {h.confidence.why}</>}
-        </p>
-        <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: 0 }}>
-          <strong style={{ color: 'var(--text)' }}>Relevance: {h.practical_relevance.level}</strong>
-          {h.practical_relevance.why && <> — {h.practical_relevance.why}</>}
-        </p>
-        {showStance && (
-          <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '6px 0 0' }}>
-            <strong style={{ color: 'var(--text)' }}>Author stance</strong> — {h.author_stance}
-          </p>
-        )}
-        {h.funding_and_conflicts && (
-          <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '6px 0 0' }}>
-            <strong style={{ color: 'var(--text)' }}>Funding &amp; conflicts</strong> — {h.funding_and_conflicts}
-          </p>
-        )}
-
         <SectionTitle>The facts</SectionTitle>
         {entry.layer1.intervention && <InterventionFacts l={entry.layer1.intervention} />}
         {entry.layer1.comparison && <ComparisonFacts l={entry.layer1.comparison} />}
@@ -518,6 +495,31 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
               ))}
             </ul>
           </>
+        )}
+
+        {/* The trust block in full: badges in the header give the glance,
+            this section gives the depth, out of the reading flow. */}
+        <SectionTitle>About this paper</SectionTitle>
+        <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text)', margin: '0 0 10px' }}>
+          {linkifyGlossary(h.evidence_type)}
+        </p>
+        <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 6px' }}>
+          <strong style={{ color: 'var(--text)' }}>Confidence: {h.confidence.level}</strong>
+          {h.confidence.why && <> — {h.confidence.why}</>}
+        </p>
+        <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: 0 }}>
+          <strong style={{ color: 'var(--text)' }}>Relevance: {h.practical_relevance.level}</strong>
+          {h.practical_relevance.why && <> — {h.practical_relevance.why}</>}
+        </p>
+        {showStance && (
+          <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '6px 0 0' }}>
+            <strong style={{ color: 'var(--text)' }}>Author stance</strong> — {h.author_stance}
+          </p>
+        )}
+        {h.funding_and_conflicts && (
+          <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '6px 0 0' }}>
+            <strong style={{ color: 'var(--text)' }}>Funding &amp; conflicts</strong> — {h.funding_and_conflicts}
+          </p>
         )}
 
         {idx && idx.topics.length > 0 && (
