@@ -29,6 +29,10 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 function FactsTable({ columns, rows }: { columns: Array<{ key: string; label: string }>; rows: Array<Record<string, React.ReactNode>> }) {
+  // Glossary terms link once per table (the table is the "section");
+  // definitions expand inline so the scroll container can't clip them.
+  const seen = new Set<string>();
+  const cell = (v: React.ReactNode) => (typeof v === 'string' ? linkifyGlossary(v, { inline: true, seen }) : v ?? '');
   return (
     <div style={{ overflowX: 'auto', marginBottom: 14 }}>
       <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 480 }}>
@@ -38,7 +42,7 @@ function FactsTable({ columns, rows }: { columns: Array<{ key: string; label: st
         <tbody>
           {rows.map((r, i) => (
             <tr key={i} style={r.__muted ? { opacity: 0.55 } : undefined}>
-              {columns.map((c) => <td key={c.key} style={td}>{r[c.key] ?? ''}</td>)}
+              {columns.map((c) => <td key={c.key} style={td}>{cell(r[c.key])}</td>)}
             </tr>
           ))}
         </tbody>
