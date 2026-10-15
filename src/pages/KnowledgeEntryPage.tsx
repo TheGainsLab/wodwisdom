@@ -319,6 +319,7 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
         <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 10px', lineHeight: 1.5 }}>
           {cite.authors !== NOT_PRINTED && <>{cite.authors} </>}
           {cite.year !== NOT_PRINTED && <>({cite.year}). </>}
+          {!!cite.title && cite.title !== NOT_PRINTED && <>&ldquo;{cite.title}.&rdquo; </>}
           {cite.journal !== NOT_PRINTED && <>{cite.journal} </>}
           {cite.volume_issue_pages !== NOT_PRINTED && <>{cite.volume_issue_pages}. </>}
           {cite.doi !== NOT_PRINTED && (
