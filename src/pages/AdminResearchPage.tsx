@@ -252,7 +252,8 @@ export default function AdminResearchPage({ session }: { session: Session }) {
           <h1>Research Library</h1>
         </header>
 
-        <div style={{ padding: '0 20px 60px', maxWidth: 920 }}>
+        {/* page-body is the app's scroll container — body is overflow:hidden app-wide. */}
+        <div className="page-body" style={{ padding: '0 20px 60px', maxWidth: 920 }}>
           {error && <div style={{ color: 'var(--accent)', fontSize: 13, margin: '10px 0' }}>{error}</div>}
 
           {!selected && (
