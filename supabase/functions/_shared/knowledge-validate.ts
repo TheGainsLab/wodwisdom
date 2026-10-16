@@ -125,6 +125,50 @@ export function validateKnowledgeEntry(e: any): ValidatorReport {
         }
       }
     }
+    // Series must match the template's exact shape (ingestion-prompt.md §7):
+    // the renderers read these keys and no others, so a wrong shape draws as
+    // an empty chart. Errors here route the draft through the repair round.
+    const t = c?.template;
+    const name = c?.title || t;
+    const items: any[] = Array.isArray(c?.series) ? c.series : [];
+    if (t !== "concept_curve" && TEMPLATES.has(t)) {
+      if (items.length === 0) {
+        errors.push(`chart '${name}': series is empty`);
+      } else if (t === "before_after_bars") {
+        if (items.some((s) => typeof s?.label !== "string" || !("before" in (s ?? {})) || !("after" in (s ?? {})))) {
+          errors.push(`chart '${name}': before_after_bars series items must be {label, before, after}`);
+        }
+      } else if (t === "grouped_change_bars") {
+        if (items.some((s) =>
+          typeof s?.group !== "string" || !Array.isArray(s?.values) ||
+          s.values.some((v: any) => typeof v?.label !== "string" || !("value" in (v ?? {})))
+        )) {
+          errors.push(`chart '${name}': grouped_change_bars series items must be {group, values: [{label, value}]} — one item per group, even for single-group studies`);
+        }
+      } else if (t === "values_by_condition") {
+        if (items.some((s) =>
+          typeof s?.label !== "string" || !Array.isArray(s?.values) ||
+          s.values.some((v: any) => typeof v?.condition !== "string" || !("value" in (v ?? {})))
+        )) {
+          errors.push(`chart '${name}': values_by_condition series items must be {label, values: [{condition, value}]}`);
+        }
+      } else if (t === "stacked_share") {
+        if (items.some((s) =>
+          typeof s?.label !== "string" || !Array.isArray(s?.parts) ||
+          s.parts.some((p: any) => typeof p?.name !== "string" || typeof p?.value !== "number")
+        )) {
+          errors.push(`chart '${name}': stacked_share series items must be {label, parts: [{name, value}]}`);
+        }
+      } else if (t === "timeline") {
+        if (items.some((s) => typeof s?.label !== "string" || !("start" in (s ?? {})) || !("end" in (s ?? {})))) {
+          errors.push(`chart '${name}': timeline series items must be {label, start, end, note}`);
+        }
+      } else if (t === "population_card") {
+        if (items.some((s) => !s || typeof s !== "object" || !("n" in s))) {
+          errors.push(`chart '${name}': population_card series items must be {n, sex_split, age, status, other}`);
+        }
+      }
+    }
   }
   if (
     (e?.shape === "intervention" || e?.shape === "comparison") &&

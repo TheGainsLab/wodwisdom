@@ -147,7 +147,7 @@ function SplitFactsTable({ columns, rows, charted }: {
   const disclosure = (
     <details style={{ margin: '0 0 14px' }}>
       <summary style={{ fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
-        {hidden.length === 1 ? '1 row' : `${hidden.length} rows`} drawn in the chart below — view as table
+        {hidden.length === 1 ? '1 row' : `${hidden.length} rows`} already drawn in the charts above — view as table
       </summary>
       <FactsTable columns={columns} rows={hidden} />
     </details>
@@ -229,21 +229,40 @@ function ReferenceFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['refere
 
 // ── Charts (v0: honest data tables; SVG templates arrive in the next PR) ──
 
+/**
+ * grouped_change_bars series in canonical form. Drafts made before the
+ * per-template shape contract emitted flat `{label, value}` items for
+ * single-group studies; that shape is unambiguous, so it's adapted into
+ * one unnamed group instead of rendering an empty chart.
+ */
+function groupedChangeSeries(c: KnowledgeChart): Array<{ group: string; values: Array<{ label: string; value: number | null }> }> {
+  const raw = (c.series ?? []) as Array<Record<string, any>>;
+  const flat = raw.length > 0 && raw.every((s) => s && typeof s === 'object' && typeof s.label === 'string' && !('values' in s) && 'value' in s);
+  const nested = flat ? [{ group: '', values: raw }] : raw;
+  return (nested as Array<{ group: string; values: Array<{ label: string; value: number | null }> }>)
+    .filter((s) => !!s && typeof s.group === 'string' && Array.isArray(s.values))
+    .map((s) => ({ ...s, values: s.values.filter((v) => !!v && typeof v.label === 'string') }));
+}
+
 function chartRows(c: KnowledgeChart): { columns: Array<{ key: string; label: string }>; rows: Array<Record<string, React.ReactNode>> } {
   const s = (c.series ?? []) as Array<Record<string, any>>;
   switch (c.template) {
     case 'before_after_bars':
       return {
         columns: [{ key: 'label', label: '' }, { key: 'before', label: 'Before' }, { key: 'after', label: 'After' }],
-        rows: s.map((x) => ({ label: x.label, before: String(x.before), after: String(x.after) })),
+        rows: s.map((x) => ({
+          label: x.label,
+          before: x.before === undefined || x.before === null || x.before === '' ? 'not reported' : String(x.before),
+          after: x.after === undefined || x.after === null || x.after === '' ? 'not reported' : String(x.after),
+        })),
       };
     case 'grouped_change_bars':
       return {
         columns: [{ key: 'group', label: 'Group' }, { key: 'values', label: 'Change' }],
-        rows: s.map((x) => ({
-          group: x.group,
-          values: ((x.values ?? []) as Array<{ label: string; value: number }>).filter(Boolean)
-            .map((v) => `${v.label}: ${v.value > 0 ? '+' : ''}${v.value}%`).join(' · '),
+        rows: groupedChangeSeries(c).map((x) => ({
+          group: x.group || '—',
+          values: x.values
+            .map((v) => `${v.label}: ${v.value === null ? 'not reported' : `${typeof v.value === 'number' && v.value > 0 ? '+' : ''}${v.value}%`}`).join(' · '),
         })),
       };
     case 'values_by_condition':
@@ -405,9 +424,7 @@ function renderBeforeAfterBars(c: KnowledgeChart): React.ReactNode | null {
 
 /** grouped_change_bars: signed change bars per outcome, one color per group. */
 function renderGroupedChangeBars(c: KnowledgeChart): React.ReactNode | null {
-  const series = ((c.series ?? []) as Array<{ group: string; values: Array<{ label: string; value: number | null }> }>)
-    .filter((s) => !!s && typeof s.group === 'string' && Array.isArray(s.values))
-    .map((s) => ({ ...s, values: s.values.filter((v) => !!v && typeof v.label === 'string') }));
+  const series = groupedChangeSeries(c);
   if (!series.length || series.length > SHARE_SLOTS.length) return null;
   const outcomes: string[] = [];
   for (const s of series) for (const v of s.values) if (!outcomes.includes(v.label)) outcomes.push(v.label);
@@ -422,13 +439,15 @@ function renderGroupedChangeBars(c: KnowledgeChart): React.ReactNode | null {
   const color = (g: string) => SHARE_SLOTS[series.findIndex((s) => s.group === g)];
   return (
     <div style={{ margin: '2px 0 10px' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 10 }}>
-        {series.map((s) => (
-          <span key={s.group} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-dim)' }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: color(s.group), flexShrink: 0 }} />{s.group}
-          </span>
-        ))}
-      </div>
+      {series.some((s) => s.group) && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 10 }}>
+          {series.map((s) => (
+            <span key={s.group} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-dim)' }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: color(s.group), flexShrink: 0 }} />{s.group}
+            </span>
+          ))}
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {outcomes.map((o) => (
           <div key={o}>
@@ -478,6 +497,14 @@ function renderGroupedChangeBars(c: KnowledgeChart): React.ReactNode | null {
 
 function ChartBlock({ c }: { c: KnowledgeChart }) {
   const { columns, rows } = chartRows(c);
+  // A row where every cell is blank carries no information — a mis-shaped
+  // series must not render as a skeleton of empty lines.
+  const liveRows = rows.filter((r) =>
+    columns.some(({ key }) => {
+      const v = r[key];
+      return typeof v === 'string' ? v.trim() !== '' && v !== 'undefined' : v !== undefined && v !== null;
+    }),
+  );
   const drawn =
     c.template === 'stacked_share' ? renderStackedShare(c)
     : c.template === 'before_after_bars' ? renderBeforeAfterBars(c)
@@ -489,13 +516,18 @@ function ChartBlock({ c }: { c: KnowledgeChart }) {
         {c.title}{c.units ? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> · {c.units}</span> : null}
       </div>
       {drawn}
-      {drawn && columns.length > 0 && (
+      {drawn && columns.length > 0 && liveRows.length > 0 && (
         <details style={{ margin: '0 0 6px' }} onToggle={(e) => (e.target as HTMLDetailsElement).open && logKnowledgeEvent('chart_table_view', undefined, { chart: c.title })}>
           <summary style={{ fontSize: 11.5, color: 'var(--text-muted)', cursor: 'pointer' }}>View as table</summary>
-          <FactsTable columns={columns} rows={rows} />
+          <FactsTable columns={columns} rows={liveRows} />
         </details>
       )}
-      {!drawn && columns.length > 0 && <FactsTable columns={columns} rows={rows} />}
+      {!drawn && columns.length > 0 && liveRows.length > 0 && <FactsTable columns={columns} rows={liveRows} />}
+      {!drawn && c.template !== 'concept_curve' && liveRows.length === 0 && (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: 4 }}>
+          This chart's data doesn't match its template, so it can't be drawn. The numbers remain in the sections above.
+        </div>
+      )}
       {c.approximate && (
         <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 4 }}>
           approximate — values read from a figure

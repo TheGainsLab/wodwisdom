@@ -107,6 +107,42 @@ def check(e, path):
                 tot = sum(p.get("value", 0) for p in s.get("parts", []))
                 if abs(tot - 100) > 1.5:
                     errs.append(f"stacked_share '{s.get('label')}' parts sum to {tot}, not 100")
+        # Series must match the template's exact shape (ingestion-prompt.md §7);
+        # keep in lockstep with _shared/knowledge-validate.ts.
+        t = c.get("template")
+        name = c.get("title") or t
+        items = c.get("series") if isinstance(c.get("series"), list) else []
+        if t != "concept_curve" and t in TEMPLATES:
+            def bad(pred):
+                return any(not isinstance(s, dict) or pred(s) for s in items)
+            if not items:
+                errs.append(f"chart '{name}': series is empty")
+            elif t == "before_after_bars":
+                if bad(lambda s: not isinstance(s.get("label"), str) or "before" not in s or "after" not in s):
+                    errs.append(f"chart '{name}': before_after_bars series items must be {{label, before, after}}")
+            elif t == "grouped_change_bars":
+                if bad(lambda s: not isinstance(s.get("group"), str) or not isinstance(s.get("values"), list)
+                       or any(not isinstance(v, dict) or not isinstance(v.get("label"), str) or "value" not in v
+                              for v in s.get("values", []))):
+                    errs.append(f"chart '{name}': grouped_change_bars series items must be "
+                                f"{{group, values: [{{label, value}}]}} — one item per group, even for single-group studies")
+            elif t == "values_by_condition":
+                if bad(lambda s: not isinstance(s.get("label"), str) or not isinstance(s.get("values"), list)
+                       or any(not isinstance(v, dict) or not isinstance(v.get("condition"), str) or "value" not in v
+                              for v in s.get("values", []))):
+                    errs.append(f"chart '{name}': values_by_condition series items must be {{label, values: [{{condition, value}}]}}")
+            elif t == "stacked_share":
+                if bad(lambda s: not isinstance(s.get("label"), str) or not isinstance(s.get("parts"), list)
+                       or any(not isinstance(p, dict) or not isinstance(p.get("name"), str)
+                              or not isinstance(p.get("value"), (int, float))
+                              for p in s.get("parts", []))):
+                    errs.append(f"chart '{name}': stacked_share series items must be {{label, parts: [{{name, value}}]}}")
+            elif t == "timeline":
+                if bad(lambda s: not isinstance(s.get("label"), str) or "start" not in s or "end" not in s):
+                    errs.append(f"chart '{name}': timeline series items must be {{label, start, end, note}}")
+            elif t == "population_card":
+                if bad(lambda s: "n" not in s):
+                    errs.append(f"chart '{name}': population_card series items must be {{n, sex_split, age, status, other}}")
     if e["shape"] in ("intervention", "comparison") and not any(
             c.get("template") == "population_card" for c in e.get("charts", [])):
         errs.append("intervention/comparison entries need a population_card chart")
