@@ -163,6 +163,11 @@ export default function AdminResearchPage({ session }: { session: Session }) {
                     textAlign: 'left', background: 'var(--surface)', border: '1px solid var(--border)',
                     borderRadius: 10, padding: '12px 14px', cursor: 'pointer', color: 'var(--text)', fontFamily: 'inherit',
                   }}>
+                    {!!r.entry.header.citation?.title && r.entry.header.citation.title !== 'not printed in source' && (
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', lineHeight: 1.4, marginBottom: 3 }}>
+                        {r.entry.header.citation.title}
+                      </div>
+                    )}
                     <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.4 }}>{r.entry.header.title_plain}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                       <span style={{
