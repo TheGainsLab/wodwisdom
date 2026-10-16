@@ -91,24 +91,36 @@ export default function AdminResearchPage({ session }: { session: Session }) {
     return () => clearInterval(t);
   }, [anyDrafting]);
 
-  const onUpload = async (file: File) => {
+  // A drop of several PDFs starts several drafts: each file uploads and
+  // kicks off its own ingest in turn, and one bad file names itself without
+  // stopping the rest.
+  const onUpload = async (files: File[]) => {
     setError('');
-    setUploading(`Uploading "${file.name}"…`);
-    try {
-      // Straight to storage (no base64-through-the-function), so file size
-      // is never capped by the function's request body.
-      const storagePath = `${Date.now()}-${file.name.replace(/[^A-Za-z0-9._-]/g, '_')}`;
-      const { error: upErr } = await supabase.storage
-        .from('knowledge-pdfs')
-        .upload(storagePath, file, { contentType: 'application/pdf' });
-      if (upErr) throw new Error(`upload failed: ${upErr.message}`);
-      await invokeIngest({ storage_path: storagePath });
-      await refresh();
-      setUploading(null); // the queue now shows a 'drafting' row that polls itself in
-    } catch (e) {
-      setUploading(null);
-      setError(e instanceof Error ? e.message : 'Ingestion failed');
+    const errors: string[] = [];
+    const pdfs = files.filter((f) => {
+      if (f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')) return true;
+      errors.push(`"${f.name}" skipped — PDFs only (${f.type || 'unknown type'})`);
+      return false;
+    });
+    for (let i = 0; i < pdfs.length; i++) {
+      const file = pdfs[i];
+      setUploading(pdfs.length > 1 ? `Uploading "${file.name}" (${i + 1} of ${pdfs.length})…` : `Uploading "${file.name}"…`);
+      try {
+        // Straight to storage (no base64-through-the-function), so file size
+        // is never capped by the function's request body.
+        const storagePath = `${Date.now()}-${file.name.replace(/[^A-Za-z0-9._-]/g, '_')}`;
+        const { error: upErr } = await supabase.storage
+          .from('knowledge-pdfs')
+          .upload(storagePath, file, { contentType: 'application/pdf' });
+        if (upErr) throw new Error(`upload failed: ${upErr.message}`);
+        await invokeIngest({ storage_path: storagePath });
+      } catch (e) {
+        errors.push(`"${file.name}": ${e instanceof Error ? e.message : 'ingestion failed'}`);
+      }
     }
+    await refresh();
+    setUploading(null); // the queue now shows 'drafting' rows that poll themselves in
+    if (errors.length) setError(errors.join(' · '));
   };
 
   // ── System check: one click verifies every link in the pipeline ───────
@@ -284,13 +296,8 @@ export default function AdminResearchPage({ session }: { session: Session }) {
                 onDrop={(e) => {
                   e.preventDefault();
                   if (uploading) return;
-                  const f = e.dataTransfer.files?.[0];
-                  if (!f) return;
-                  if (f.type !== 'application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) {
-                    setError('PDFs only — that file is ' + (f.type || 'not a PDF'));
-                    return;
-                  }
-                  onUpload(f);
+                  const fs = Array.from(e.dataTransfer.files ?? []);
+                  if (fs.length) onUpload(fs);
                 }}
                 style={{
                   display: 'block', border: '2px dashed var(--border)', borderRadius: 12,
@@ -298,10 +305,10 @@ export default function AdminResearchPage({ session }: { session: Session }) {
                   color: 'var(--text-dim)', fontSize: 14, margin: '16px 0 24px',
                 }}
               >
-                {uploading ?? 'Drop a paper here or click to choose a PDF — the entry drafts itself.'}
+                {uploading ?? 'Drop papers here or click to choose PDFs — each entry drafts itself.'}
                 <input
-                  type="file" accept="application/pdf" style={{ display: 'none' }} disabled={!!uploading}
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ''; }}
+                  type="file" accept="application/pdf" multiple style={{ display: 'none' }} disabled={!!uploading}
+                  onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) onUpload(fs); e.target.value = ''; }}
                 />
               </label>
 
