@@ -18,7 +18,7 @@ import '../qa.css';
 
 interface Row {
   slug: string;
-  status: 'draft' | 'published' | 'rejected';
+  status: 'drafting' | 'draft' | 'published' | 'rejected' | 'failed';
   entry: KnowledgeEntry;
   validator_report: { errors: string[]; warnings: string[]; model?: string; repaired?: boolean } | null;
   created_at: string;
@@ -57,6 +57,14 @@ export default function AdminResearchPage({ session }: { session: Session }) {
   };
   useEffect(() => { if (role === 'admin') refresh(); }, [role]);
 
+  // While anything is drafting in the background, poll for it to land.
+  const anyDrafting = rows.some((r) => r.status === 'drafting');
+  useEffect(() => {
+    if (!anyDrafting) return;
+    const t = setInterval(refresh, 8000);
+    return () => clearInterval(t);
+  }, [anyDrafting]);
+
   const onUpload = async (file: File) => {
     setError('');
     setUploading(`Drafting "${file.name}" — this takes a few minutes…`);
@@ -73,7 +81,7 @@ export default function AdminResearchPage({ session }: { session: Session }) {
       if (err) throw new Error(err.message ?? 'ingestion failed');
       if (data?.error) throw new Error(data.error);
       await refresh();
-      setUploading(null);
+      setUploading(null); // the queue now shows a 'drafting' row that polls itself in
     } catch (e) {
       setUploading(null);
       setError(e instanceof Error ? e.message : 'Ingestion failed');
@@ -81,6 +89,7 @@ export default function AdminResearchPage({ session }: { session: Session }) {
   };
 
   const open = (r: Row) => {
+    if (r.status === 'drafting') return; // nothing to review yet
     setSelected(r);
     setDraft(JSON.parse(JSON.stringify(r.entry)) as KnowledgeEntry);
   };
@@ -130,11 +139,25 @@ export default function AdminResearchPage({ session }: { session: Session }) {
           {!selected && (
             <>
               {/* Upload */}
-              <label style={{
-                display: 'block', border: '2px dashed var(--border)', borderRadius: 12,
-                padding: '26px 20px', textAlign: 'center', cursor: uploading ? 'default' : 'pointer',
-                color: 'var(--text-dim)', fontSize: 14, margin: '16px 0 24px',
-              }}>
+              <label
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (uploading) return;
+                  const f = e.dataTransfer.files?.[0];
+                  if (!f) return;
+                  if (f.type !== 'application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) {
+                    setError('PDFs only — that file is ' + (f.type || 'not a PDF'));
+                    return;
+                  }
+                  onUpload(f);
+                }}
+                style={{
+                  display: 'block', border: '2px dashed var(--border)', borderRadius: 12,
+                  padding: '26px 20px', textAlign: 'center', cursor: uploading ? 'default' : 'pointer',
+                  color: 'var(--text-dim)', fontSize: 14, margin: '16px 0 24px',
+                }}
+              >
                 {uploading ?? 'Drop a paper here or click to choose a PDF — the entry drafts itself.'}
                 <input
                   type="file" accept="application/pdf" style={{ display: 'none' }} disabled={!!uploading}
@@ -149,12 +172,21 @@ export default function AdminResearchPage({ session }: { session: Session }) {
                     textAlign: 'left', background: 'var(--surface)', border: '1px solid var(--border)',
                     borderRadius: 10, padding: '12px 14px', cursor: 'pointer', color: 'var(--text)', fontFamily: 'inherit',
                   }}>
+                    {!!r.entry.header.citation?.title && r.entry.header.citation.title !== 'not printed in source' && (
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', lineHeight: 1.4, marginBottom: 3 }}>
+                        {r.entry.header.citation.title}
+                      </div>
+                    )}
                     <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.4 }}>{r.entry.header.title_plain}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                       <span style={{
                         fontWeight: 700,
-                        color: r.status === 'published' ? '#4ade80' : r.status === 'rejected' ? 'var(--text-muted)' : '#fdba74',
-                      }}>{r.status}</span>
+                        color: r.status === 'published' ? '#4ade80'
+                          : r.status === 'failed' ? 'var(--accent)'
+                          : r.status === 'rejected' ? 'var(--text-muted)'
+                          : r.status === 'drafting' ? '#a5b4fc'
+                          : '#fdba74',
+                      }}>{r.status === 'drafting' ? 'drafting…' : r.status}</span>
                       <span>{r.slug}</span>
                       {r.validator_report && (
                         <span>
@@ -178,12 +210,12 @@ export default function AdminResearchPage({ session }: { session: Session }) {
                 <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{selected.slug} · {selected.status}</span>
                 <div style={{ flex: 1 }} />
                 <button disabled={saving} onClick={() => saveEntry()} style={{ ...field, width: 'auto', cursor: 'pointer' }}>Save edits</button>
-                {selected.status !== 'published' && (
+                {selected.status !== 'published' && selected.status !== 'failed' && (
                   <button disabled={saving} onClick={() => saveEntry('published')} style={{ ...field, width: 'auto', cursor: 'pointer', borderColor: '#4ade80', color: '#4ade80', fontWeight: 700 }}>
                     Approve &amp; publish
                   </button>
                 )}
-                {selected.status === 'draft' && (
+                {(selected.status === 'draft' || selected.status === 'failed') && (
                   <button disabled={saving} onClick={() => saveEntry('rejected')} style={{ ...field, width: 'auto', cursor: 'pointer', color: 'var(--text-muted)' }}>Reject</button>
                 )}
               </div>
@@ -196,6 +228,9 @@ export default function AdminResearchPage({ session }: { session: Session }) {
                 </div>
               )}
 
+              {/* A failed row has only a stub entry — report and Reject, no preview. */}
+              {!!draft.layer1 && (
+              <>
               {/* Editorial fields — the judgment seats. Layer-1 extraction
                   problems are a reject-and-reingest, not a hand edit. */}
               <details style={{ marginBottom: 20 }}>
@@ -238,6 +273,8 @@ export default function AdminResearchPage({ session }: { session: Session }) {
                   <KnowledgeEntryView entry={draft} signedIn />
                 </div>
               </div>
+              </>
+              )}
             </>
           )}
         </div>

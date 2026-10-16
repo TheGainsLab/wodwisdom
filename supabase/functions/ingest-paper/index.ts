@@ -26,7 +26,9 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 // primary, Sonnet fallback). One attempt each — a PDF pass is slow, and the
 // edge wall clock is ~400s.
 const PROFILE = resolveModelProfile("quality");
-const ATTEMPT_TIMEOUT_MS = 210_000;
+// Background wall clock is ~400s: primary + fallback must leave room for a
+// repair round, which is skipped when the first pass ran long.
+const ATTEMPT_TIMEOUT_MS = 150_000;
 const MAX_TOKENS = 24_000;
 
 const SYSTEM = KNOWLEDGE_INGESTION_PROMPT +
@@ -170,47 +172,80 @@ Deno.serve(async (req) => {
       return json({ error: "Provide storage_path or pdf_base64" }, 400);
     }
 
-    // Draft, validate, one repair round on errors.
-    let { text, model } = await draftFromPdf(pdfBase64, null);
-    let entry = extractJson(text);
-    let report = validateKnowledgeEntry(entry);
-    let repaired = false;
-    if (report.errors.length > 0) {
-      try {
-        const retry = await draftFromPdf(pdfBase64, report.errors.join("\n"));
-        const retryEntry = extractJson(retry.text);
-        const retryReport = validateKnowledgeEntry(retryEntry);
-        if (retryReport.errors.length < report.errors.length) {
-          entry = retryEntry;
-          report = retryReport;
-          model = retry.model;
-          repaired = true;
-        }
-      } catch (e) {
-        console.warn("ingest-paper: repair round failed, keeping first draft:", e);
-      }
-    }
-
-    // Slug: derive from citation, honor the model's own if it's free.
-    const { data: existing } = await supa.from("knowledge_entries").select("slug");
-    const taken = new Set((existing ?? []).map((r: { slug: string }) => r.slug));
-    let slug = typeof entry.slug === "string" && /^[a-z0-9][a-z0-9-]*$/.test(entry.slug as string) && !taken.has(entry.slug as string)
-      ? entry.slug as string
-      : deriveSlug(entry, taken);
-    entry.slug = slug;
-    entry.id = slug;
-    report = validateKnowledgeEntry(entry);
-
-    const { error: insErr } = await supa.from("knowledge_entries").insert({
-      slug,
-      status: "draft",
-      entry,
-      validator_report: { ...report, model, repaired },
+    // The drafting pass outlives the gateway's request window, so it runs as
+    // a background task: insert a 'drafting' placeholder row, respond 202
+    // immediately, and let the queue poll the row's status.
+    const stubSlug = `ingest-${Date.now()}`;
+    const filenameLabel = storagePath.replace(/^\d+-/, "");
+    const { error: stubErr } = await supa.from("knowledge_entries").insert({
+      slug: stubSlug,
+      status: "drafting",
+      entry: { header: { title_plain: `Drafting from ${filenameLabel}…`, citation: {}, topics: [] } },
       source_pdf_path: storagePath,
     });
-    if (insErr) return json({ error: `Draft save failed: ${insErr.message}` }, 500);
+    if (stubErr) return json({ error: `Could not start draft: ${stubErr.message}` }, 500);
 
-    return json({ slug, status: "draft", model, repaired, validator_report: report });
+    const work = (async () => {
+      const t0 = Date.now();
+      try {
+        let { text, model } = await draftFromPdf(pdfBase64, null);
+        let entry = extractJson(text);
+        let report = validateKnowledgeEntry(entry);
+        let repaired = false;
+        if (report.errors.length > 0 && Date.now() - t0 < 180_000) {
+          try {
+            const retry = await draftFromPdf(pdfBase64, report.errors.join("\n"));
+            const retryEntry = extractJson(retry.text);
+            const retryReport = validateKnowledgeEntry(retryEntry);
+            if (retryReport.errors.length < report.errors.length) {
+              entry = retryEntry;
+              report = retryReport;
+              model = retry.model;
+              repaired = true;
+            }
+          } catch (e) {
+            console.warn("ingest-paper: repair round failed, keeping first draft:", e);
+          }
+        }
+
+        // Slug: derive from citation, honor the model's own if it's free.
+        const { data: existing } = await supa.from("knowledge_entries").select("slug");
+        const taken = new Set(
+          (existing ?? []).map((r: { slug: string }) => r.slug).filter((s: string) => s !== stubSlug),
+        );
+        const slug = typeof entry.slug === "string" && /^[a-z0-9][a-z0-9-]*$/.test(entry.slug as string) && !taken.has(entry.slug as string)
+          ? entry.slug as string
+          : deriveSlug(entry, taken);
+        entry.slug = slug;
+        entry.id = slug;
+        report = validateKnowledgeEntry(entry);
+
+        const { error: upErr2 } = await supa.from("knowledge_entries").update({
+          slug,
+          status: "draft",
+          entry,
+          validator_report: { ...report, model, repaired },
+          updated_at: new Date().toISOString(),
+        }).eq("slug", stubSlug);
+        if (upErr2) throw new Error(`draft save failed: ${upErr2.message}`);
+        console.log(`ingest-paper: drafted ${slug} (${model}${repaired ? ", repaired" : ""}, ${report.errors.length} errors)`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("ingest-paper background failure:", msg);
+        await supa.from("knowledge_entries").update({
+          status: "failed",
+          validator_report: { errors: [msg], warnings: [] },
+          updated_at: new Date().toISOString(),
+        }).eq("slug", stubSlug);
+      }
+    })();
+
+    // deno-lint-ignore no-explicit-any
+    const runtime = (globalThis as any).EdgeRuntime;
+    if (runtime?.waitUntil) runtime.waitUntil(work);
+    else work.catch(() => {});
+
+    return json({ slug: stubSlug, status: "drafting" }, 202);
   } catch (e) {
     console.error("ingest-paper error:", e);
     return json({ error: e instanceof Error ? e.message : "Ingestion failed" }, 500);
