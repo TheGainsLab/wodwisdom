@@ -30,6 +30,9 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 function FactsTable({ columns, rows }: { columns: Array<{ key: string; label: string }>; rows: Array<Record<string, React.ReactNode>> }) {
+  // A header row over zero rows is furniture, not information — a draft
+  // with an empty (or foreign) section renders nothing here.
+  if (rows.length === 0) return null;
   // Glossary terms link once per table (the table is the "section");
   // definitions expand inline so the scroll container can't clip them.
   const seen = new Set<string>();
@@ -238,9 +241,11 @@ function ReferenceFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['refere
         columns={[{ key: 'quantity', label: 'Quantity' }, { key: 'value', label: 'Value' }, { key: 'note', label: 'Note' }]}
         rows={(l.key_numbers ?? []).map((k) => ({ ...k, value: val(k.value) }))}
       />
-      <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, margin: 0 }}>
-        <strong style={{ color: 'var(--text)' }}>Scope limits: </strong>{l.scope_limits}
-      </p>
+      {!!l.scope_limits && (
+        <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, margin: 0 }}>
+          <strong style={{ color: 'var(--text)' }}>Scope limits: </strong>{l.scope_limits}
+        </p>
+      )}
     </>
   );
 }

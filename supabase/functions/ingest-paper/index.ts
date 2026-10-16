@@ -16,6 +16,36 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { fetchWithTimeout } from "../_shared/fetch-with-timeout.ts";
 import { resolveModelProfile } from "../_shared/model-profiles.ts";
 import { validateKnowledgeEntry } from "../_shared/knowledge-validate.ts";
+
+/**
+ * The drafting model sometimes copies the prompt's full JSON skeleton and
+ * leaves the three unused layer1 blocks in place. The decision (shape) is
+ * the model's; the cleanup is mechanical: drop every layer1 block that
+ * isn't the declared shape. The guard: only strip when the declared
+ * shape's own block has content, so a misclassified draft is never
+ * silently emptied — the validator flags it for human review instead.
+ * Returns the names of the blocks removed (surfaced as a report warning).
+ */
+// deno-lint-ignore no-explicit-any
+function stripForeignLayer1(entry: any): string[] {
+  const shape = entry?.shape;
+  const l1 = entry?.layer1;
+  if (!shape || !l1 || typeof l1 !== "object" || Array.isArray(l1)) return [];
+  const own = l1[shape];
+  const hasContent = !!own && typeof own === "object" &&
+    Object.values(own).some((v) =>
+      Array.isArray(v) ? v.length > 0 : typeof v === "string" ? v.trim() !== "" : !!v
+    );
+  if (!hasContent) return [];
+  const stripped: string[] = [];
+  for (const k of Object.keys(l1)) {
+    if (k !== shape) {
+      delete l1[k];
+      stripped.push(k);
+    }
+  }
+  return stripped;
+}
 import { KNOWLEDGE_INGESTION_PROMPT } from "../_shared/knowledge-ingestion-prompt.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -25,7 +55,7 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 // Bumped with every change to this function. The admin System Check compares
 // it against the version the app expects, so "did the deploy happen?" is a
 // question the system answers about itself.
-export const FUNCTION_VERSION = "2026-10-16.4";
+export const FUNCTION_VERSION = "2026-10-16.5";
 
 // The hardest extraction + judgment in the app: quality profile (Opus
 // primary, Sonnet fallback). One attempt each — a PDF pass is slow, and the
@@ -254,6 +284,7 @@ Deno.serve(async (req) => {
       try {
         let { text, model } = await draftFromPdf(pdfBase64, null);
         let entry = extractJson(text);
+        let stripped = stripForeignLayer1(entry);
         let report = validateKnowledgeEntry(entry);
         let repaired = false;
         if (report.errors.length > 0 && Date.now() - t0 < 180_000) {
@@ -261,11 +292,13 @@ Deno.serve(async (req) => {
             // Capped so worst-case total stays inside the background wall clock.
             const retry = await draftFromPdf(pdfBase64, report.errors.join("\n"), { timeoutMs: 120_000, primaryOnly: true });
             const retryEntry = extractJson(retry.text);
+            const retryStripped = stripForeignLayer1(retryEntry);
             const retryReport = validateKnowledgeEntry(retryEntry);
             if (retryReport.errors.length < report.errors.length) {
               entry = retryEntry;
               report = retryReport;
               model = retry.model;
+              stripped = retryStripped;
               repaired = true;
             }
           } catch (e) {
@@ -284,6 +317,9 @@ Deno.serve(async (req) => {
         entry.slug = slug;
         entry.id = slug;
         report = validateKnowledgeEntry(entry);
+        if (stripped.length) {
+          report.warnings.push(`layer1 sections stripped mechanically: ${stripped.join(", ")} (model emitted extra blocks beside '${entry.shape}')`);
+        }
 
         // A concurrent ingest (or the dedup read missing rows) can collide on
         // the slug primary key: retry with a numeric suffix rather than
