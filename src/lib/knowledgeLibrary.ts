@@ -7,8 +7,8 @@
  * twelve as the versioned archive plus the ingestion contract
  * (ingestion-prompt.md, build.py); the app no longer imports entries from it.
  *
- * The glossary stays static for now — it merges on publish once the
- * ingestion pipeline lands (step 4).
+ * The glossary lives in knowledge_glossary and merges on publish via the
+ * admin review screen.
  */
 
 import { supabase } from './supabase';
@@ -154,6 +154,102 @@ export function ensureGlossary(): Promise<void> {
 
 const REL_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
+// ── The runtime boundary ────────────────────────────────────────────────
+//
+// TypeScript types vanish at runtime; entries are model-produced JSON that
+// can deviate from them. Every entry entering the app passes through this
+// normalizer, which guarantees the full shape with safe defaults — so the
+// renderers' assumptions are true by construction, and a schema change
+// means updating ONE function, never guarding call sites.
+
+function nstr(v: unknown, d = ''): string {
+  return typeof v === 'string' ? v : d;
+}
+function narr<T>(v: unknown): T[] {
+  return Array.isArray(v) ? (v as T[]) : [];
+}
+function nobj(v: unknown): Record<string, unknown> {
+  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+}
+
+export function normalizeKnowledgeEntry(raw: unknown): KnowledgeEntry {
+  const o = nobj(raw);
+  const h = nobj(o.header);
+  const c = nobj(h.citation);
+  const conf = nobj(h.confidence);
+  const rel = nobj(h.practical_relevance);
+  const l1raw = nobj(o.layer1);
+  const l2 = nobj(o.layer2);
+
+  const layer1: KnowledgeEntry['layer1'] = {};
+  if (l1raw.intervention) {
+    const iv = nobj(l1raw.intervention);
+    layer1.intervention = {
+      groups: narr(iv.groups), design_notes: nstr(iv.design_notes), measured: narr(iv.measured),
+    } as NonNullable<KnowledgeEntry['layer1']['intervention']>;
+  }
+  if (l1raw.comparison) {
+    const cp = nobj(l1raw.comparison);
+    layer1.comparison = {
+      who: narr(cp.who), conditions: narr(cp.conditions), design_notes: nstr(cp.design_notes),
+      measured: narr<Record<string, unknown>>(cp.measured).map((m) => ({ ...m, values_by_condition: nobj(m.values_by_condition) })),
+    } as NonNullable<KnowledgeEntry['layer1']['comparison']>;
+  }
+  if (l1raw.review) {
+    const rv = nobj(l1raw.review);
+    layer1.review = {
+      claim: nstr(rv.claim), definitions_used: narr(rv.definitions_used),
+      evidence_cited: narr(rv.evidence_cited), recommendations_made: narr(rv.recommendations_made),
+      untested_or_contested: nstr(rv.untested_or_contested),
+    } as NonNullable<KnowledgeEntry['layer1']['review']>;
+  }
+  if (l1raw.reference) {
+    const rf = nobj(l1raw.reference);
+    layer1.reference = {
+      what_it_explains: nstr(rf.what_it_explains), key_numbers: narr(rf.key_numbers), scope_limits: nstr(rf.scope_limits),
+    } as NonNullable<KnowledgeEntry['layer1']['reference']>;
+  }
+
+  return {
+    // Spread first: unknown keys an entry carries (e.g. source_pdf on the
+    // founding twelve) survive normalization — editing must never shed data.
+    ...(o as Partial<KnowledgeEntry>),
+    id: nstr(o.id), slug: nstr(o.slug),
+    shape: (['intervention', 'comparison', 'review', 'reference'].includes(o.shape as string) ? o.shape : 'review') as KnowledgeEntry['shape'],
+    document_type: nstr(o.document_type),
+    meta_analysis: !!o.meta_analysis,
+    key_findings: narr(o.key_findings),
+    glossary_candidates: narr(o.glossary_candidates),
+    verification_notes: narr(o.verification_notes),
+    header: {
+      title_plain: nstr(h.title_plain),
+      setup_plain: h.setup_plain === undefined ? undefined : nstr(h.setup_plain),
+      citation: {
+        title: nstr(c.title), authors: nstr(c.authors), year: nstr(c.year),
+        journal: nstr(c.journal), volume_issue_pages: nstr(c.volume_issue_pages), doi: nstr(c.doi),
+      },
+      topics: narr(h.topics),
+      evidence_type: nstr(h.evidence_type),
+      confidence: { level: nstr(conf.level), why: nstr(conf.why) },
+      practical_relevance: { level: nstr(rel.level), why: nstr(rel.why) },
+      author_stance: nstr(h.author_stance),
+      funding_and_conflicts: nstr(h.funding_and_conflicts),
+    },
+    layer1,
+    layer2: {
+      what_it_means: nstr(l2.what_it_means),
+      what_it_doesnt_mean: nstr(l2.what_it_doesnt_mean),
+      questions_raised: narr(l2.questions_raised),
+    },
+    translation: narr(o.translation),
+    charts: narr<Record<string, unknown>>(o.charts).map((ch) => ({
+      template: nstr(ch.template) as KnowledgeChart['template'],
+      title: nstr(ch.title), series: narr(ch.series), units: nstr(ch.units),
+      approximate: !!ch.approximate, note: nstr(ch.note),
+    })),
+  };
+}
+
 function toIndexRow(slug: string, e: KnowledgeEntry): KnowledgeIndexRow {
   return {
     id: e.id, slug,
@@ -178,7 +274,7 @@ export async function fetchKnowledgeIndex(): Promise<KnowledgeIndexRow[]> {
     .eq('status', 'published');
   if (error || !data) return [];
   return data
-    .map((r) => toIndexRow(r.slug as string, r.entry as KnowledgeEntry))
+    .map((r) => toIndexRow(r.slug as string, normalizeKnowledgeEntry(r.entry)))
     .sort((a, b) =>
       (REL_RANK[a.practical_relevance] ?? 3) - (REL_RANK[b.practical_relevance] ?? 3) ||
       a.title.localeCompare(b.title));
@@ -192,7 +288,7 @@ export async function loadKnowledgeEntry(slug: string): Promise<KnowledgeEntry |
     .eq('status', 'published')
     .maybeSingle();
   if (error || !data) return null;
-  return data.entry as KnowledgeEntry;
+  return normalizeKnowledgeEntry(data.entry);
 }
 
 /** "sprint-intervals" → "sprint intervals" for chip display. */

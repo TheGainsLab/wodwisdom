@@ -53,8 +53,9 @@ function FactsTable({ columns, rows }: { columns: Array<{ key: string; label: st
 }
 
 /** "approx." / "from Fig" values get a read-from-figure marker (honesty rule 3). */
-function val(v: string | undefined): React.ReactNode {
-  if (!v) return '';
+function val(v: string | number | undefined): React.ReactNode {
+  if (v === undefined || v === null || v === '') return '';
+  v = String(v);
   if (/approx\.|from fig/i.test(v)) {
     return <span>≈ {v.replace(/^approx\.\s*/i, '')}</span>;
   }
@@ -78,8 +79,10 @@ export function setupNarrative(entry: KnowledgeEntry): string[] {
   const iv = entry.layer1.intervention;
   const cp = entry.layer1.comparison;
   if (iv) {
-    for (const g of iv.groups) {
-      const n = g.n_enrolled === g.n_analysed ? `n ${g.n_enrolled}` : `${g.n_enrolled} enrolled / ${g.n_analysed} analysed`;
+    for (const g of iv.groups ?? []) {
+      const n = !usable(g.n_enrolled) ? ''
+        : g.n_enrolled === g.n_analysed ? `n ${g.n_enrolled}`
+        : `${g.n_enrolled} enrolled / ${g.n_analysed} analysed`;
       const demo = [usable(g.age) && `age ${g.age}`, usable(g.sex) && g.sex, usable(g.training_status) && g.training_status]
         .filter(Boolean).join(', ');
       const bits = [[n, demo].filter(Boolean).join(', '), g.protocol, g.per_week, g.other]
@@ -89,13 +92,13 @@ export function setupNarrative(entry: KnowledgeEntry): string[] {
     if (iv.design_notes) out.push(iv.design_notes);
   }
   if (cp) {
-    for (const w of cp.who) {
+    for (const w of cp.who ?? []) {
       const demo = [usable(w.n) && `n ${w.n}`, usable(w.age) && `age ${w.age}`, usable(w.sex) && w.sex, usable(w.training_status) && w.training_status]
         .filter(Boolean).join(', ');
       const bits = [demo, w.other].filter((s) => usable(s as string));
       out.push(`${w.name} — ${bits.join('. ').replace(/\.\./g, '.')}.`);
     }
-    for (const c of cp.conditions) {
+    for (const c of cp.conditions ?? []) {
       const bits = [c.description, [usable(c.intensity) && c.intensity, usable(c.duration) && c.duration].filter(Boolean).join(', '), c.other]
         .filter((s) => usable(s as string));
       out.push(`${c.name} — ${bits.join('. ').replace(/\.\./g, '.')}.`);
@@ -116,13 +119,13 @@ function InterventionFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['int
           { key: 'after', label: 'After' }, { key: 'change', label: 'Change' },
           { key: 'significant', label: 'Significant' }, { key: 'note', label: 'Note' },
         ]}
-        rows={l.measured.map((m) => ({
+        rows={(l.measured ?? []).map((m) => ({
           outcome: m.outcome, unit: m.unit, group: m.group,
           before: val(m.before), after: val(m.after), change: val(m.change),
           significant: m.significant, note: m.note,
           __muted: m.significant === 'no',
         }))}
-        charted={l.measured.map((m) => !!m.charted)}
+        charted={(l.measured ?? []).map((m) => !!m.charted)}
       />
     </>
   );
@@ -160,7 +163,7 @@ function SplitFactsTable({ columns, rows, charted }: {
 }
 
 function ComparisonFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['comparison']> }) {
-  const conditionKeys = Array.from(new Set(l.measured.flatMap((m) => Object.keys(m.values_by_condition))));
+  const conditionKeys = Array.from(new Set((l.measured ?? []).flatMap((m) => Object.keys(m.values_by_condition ?? {}))));
   // Who, conditions and design notes render as the page's setup narrative.
   return (
     <>
@@ -170,12 +173,12 @@ function ComparisonFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['compa
           ...conditionKeys.map((k) => ({ key: `c_${k}`, label: k })),
           { key: 'differed', label: 'Differed' }, { key: 'note', label: 'Note' },
         ]}
-        rows={l.measured.map((m) => ({
+        rows={(l.measured ?? []).map((m) => ({
           outcome: m.outcome, unit: m.unit,
           ...Object.fromEntries(conditionKeys.map((k) => [`c_${k}`, val(m.values_by_condition[k])])),
           differed: m.differed, note: m.note,
         }))}
-        charted={l.measured.map((m) => !!m.charted)}
+        charted={(l.measured ?? []).map((m) => !!m.charted)}
       />
     </>
   );
@@ -185,10 +188,10 @@ function ReviewFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['review']>
   // The claim renders at the top of the page, not here.
   return (
     <>
-      {l.definitions_used.length > 0 && (
+      {(l.definitions_used ?? []).length > 0 && (
         <FactsTable
           columns={[{ key: 'term', label: 'Term' }, { key: 'definition', label: 'As the authors define it' }]}
-          rows={l.definitions_used.map((d) => ({ ...d }))}
+          rows={(l.definitions_used ?? []).map((d) => ({ ...d }))}
         />
       )}
       <SplitFactsTable
@@ -196,12 +199,12 @@ function ReviewFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['review']>
           { key: 'finding', label: 'Finding' }, { key: 'source', label: 'Source' },
           { key: 'numbers', label: 'Numbers' }, { key: 'note', label: 'Note' },
         ]}
-        rows={l.evidence_cited.map((e) => ({ ...e, numbers: val(e.numbers) }))}
-        charted={l.evidence_cited.map((e) => !!e.charted)}
+        rows={(l.evidence_cited ?? []).map((e) => ({ ...e, numbers: val(e.numbers) }))}
+        charted={(l.evidence_cited ?? []).map((e) => !!e.charted)}
       />
-      {l.recommendations_made.length > 0 && (
+      {(l.recommendations_made ?? []).length > 0 && (
         <ul style={{ margin: '0 0 14px', paddingLeft: 18, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-          {l.recommendations_made.map((r, i) => <li key={i}>{r}</li>)}
+          {(l.recommendations_made ?? []).map((r, i) => <li key={i}>{r}</li>)}
         </ul>
       )}
       {/* untested_or_contested renders in About this paper, not here. */}
@@ -215,7 +218,7 @@ function ReferenceFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['refere
     <>
       <FactsTable
         columns={[{ key: 'quantity', label: 'Quantity' }, { key: 'value', label: 'Value' }, { key: 'note', label: 'Note' }]}
-        rows={l.key_numbers.map((k) => ({ ...k, value: val(k.value) }))}
+        rows={(l.key_numbers ?? []).map((k) => ({ ...k, value: val(k.value) }))}
       />
       <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, margin: 0 }}>
         <strong style={{ color: 'var(--text)' }}>Scope limits: </strong>{l.scope_limits}
@@ -239,7 +242,7 @@ function chartRows(c: KnowledgeChart): { columns: Array<{ key: string; label: st
         columns: [{ key: 'group', label: 'Group' }, { key: 'values', label: 'Change' }],
         rows: s.map((x) => ({
           group: x.group,
-          values: (x.values as Array<{ label: string; value: number }>)
+          values: ((x.values ?? []) as Array<{ label: string; value: number }>).filter(Boolean)
             .map((v) => `${v.label}: ${v.value > 0 ? '+' : ''}${v.value}%`).join(' · '),
         })),
       };
@@ -248,7 +251,7 @@ function chartRows(c: KnowledgeChart): { columns: Array<{ key: string; label: st
         columns: [{ key: 'label', label: '' }, { key: 'values', label: 'By condition' }],
         rows: s.map((x) => ({
           label: x.label,
-          values: (x.values as Array<{ condition: string; value: number }>)
+          values: ((x.values ?? []) as Array<{ condition: string; value: number }>).filter(Boolean)
             .map((v) => `${v.condition}: ${v.value}`).join(' · '),
         })),
       };
@@ -257,7 +260,7 @@ function chartRows(c: KnowledgeChart): { columns: Array<{ key: string; label: st
         columns: [{ key: 'label', label: '' }, { key: 'parts', label: 'Share' }],
         rows: s.map((x) => ({
           label: x.label,
-          parts: (x.parts as Array<{ name: string; value: number }>)
+          parts: ((x.parts ?? []) as Array<{ name: string; value: number }>).filter(Boolean)
             .map((p) => `${p.name} ${p.value}%`).join(' · '),
         })),
       };
@@ -276,6 +279,10 @@ function chartRows(c: KnowledgeChart): { columns: Array<{ key: string; label: st
       };
     case 'concept_curve':
       // A schematic has no honest table form; the note carries the meaning.
+      return { columns: [], rows: [] };
+    default:
+      // Unknown template (deviant draft): render nothing rather than crash;
+      // the validator report names the problem.
       return { columns: [], rows: [] };
   }
 }
@@ -398,9 +405,10 @@ function renderBeforeAfterBars(c: KnowledgeChart): React.ReactNode | null {
 
 /** grouped_change_bars: signed change bars per outcome, one color per group. */
 function renderGroupedChangeBars(c: KnowledgeChart): React.ReactNode | null {
-  const series = (c.series ?? []) as Array<{ group: string; values: Array<{ label: string; value: number | null }> }>;
+  const series = ((c.series ?? []) as Array<{ group: string; values: Array<{ label: string; value: number | null }> }>)
+    .filter((s) => !!s && typeof s.group === 'string' && Array.isArray(s.values))
+    .map((s) => ({ ...s, values: s.values.filter((v) => !!v && typeof v.label === 'string') }));
   if (!series.length || series.length > SHARE_SLOTS.length) return null;
-  if (series.some((s) => !Array.isArray(s.values))) return null;
   const outcomes: string[] = [];
   for (const s of series) for (const v of s.values) if (!outcomes.includes(v.label)) outcomes.push(v.label);
   const all = series.flatMap((s) => s.values.map((v) => v.value)).filter((v): v is number => typeof v === 'number');
@@ -567,7 +575,7 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
 /** The full article body — shared by the public page and the admin review screen. */
 export function KnowledgeEntryView({ entry, signedIn = false }: { entry: KnowledgeEntry; signedIn?: boolean }) {
   const h = entry.header;
-  const cite = h.citation;
+  const cite = h.citation ?? ({} as KnowledgeEntry['header']['citation']);
   const showStance = h.author_stance && !/^none apparent/i.test(h.author_stance);
 
   return (
@@ -580,11 +588,11 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
           </div>
         )}
         <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 14px', lineHeight: 1.5 }}>
-          {cite.authors !== NOT_PRINTED && <>{cite.authors}</>}
-          {cite.year !== NOT_PRINTED && <> · {cite.year}</>}
-          {cite.journal !== NOT_PRINTED && <> · {cite.journal}</>}
-          {cite.volume_issue_pages !== NOT_PRINTED && <> {cite.volume_issue_pages}</>}
-          {cite.doi !== NOT_PRINTED && (
+          {!!cite.authors && cite.authors !== NOT_PRINTED && <>{cite.authors}</>}
+          {!!cite.year && cite.year !== NOT_PRINTED && <> · {cite.year}</>}
+          {!!cite.journal && cite.journal !== NOT_PRINTED && <> · {cite.journal}</>}
+          {!!cite.volume_issue_pages && cite.volume_issue_pages !== NOT_PRINTED && <> {cite.volume_issue_pages}</>}
+          {!!cite.doi && cite.doi !== NOT_PRINTED && (
             <>
               {' · '}
               <a href={`https://doi.org/${cite.doi}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
@@ -616,8 +624,8 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
           <KnowledgeBadge kind="shape" value={entry.shape} />
-          <KnowledgeBadge kind="confidence" value={h.confidence.level} why={h.confidence.why} />
-          <KnowledgeBadge kind="relevance" value={h.practical_relevance.level} why={h.practical_relevance.why} />
+          <KnowledgeBadge kind="confidence" value={h.confidence?.level ?? ''} why={h.confidence?.why} />
+          <KnowledgeBadge kind="relevance" value={h.practical_relevance?.level ?? ''} why={h.practical_relevance?.why} />
         </div>
 
         {/* One results section for every shape: charts lead, receipts
@@ -676,9 +684,9 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
         {/* Always rendered — the spine is identical on every page. A paper
             with no gym-floor line says so instead of hiding the section. */}
         <SectionTitle>Say it to a member</SectionTitle>
-        {entry.translation.length > 0 ? (
+        {(entry.translation ?? []).length > 0 ? (
           <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {entry.translation.map((t, i) => (
+            {(entry.translation ?? []).map((t, i) => (
               <li key={i} style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-dim)' }}>
                 {linkifyGlossary(t)}
               </li>
@@ -700,12 +708,12 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
           <p key={i} style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, margin: '0 0 8px' }}>{p}</p>
         ))}
         <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '0 0 6px' }}>
-          <strong style={{ color: 'var(--text)' }}>Confidence: {h.confidence.level}</strong>
-          {h.confidence.why && <> — {h.confidence.why}</>}
+          <strong style={{ color: 'var(--text)' }}>Confidence: {h.confidence?.level}</strong>
+          {h.confidence?.why && <> — {h.confidence.why}</>}
         </p>
         <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: 0 }}>
-          <strong style={{ color: 'var(--text)' }}>Relevance: {h.practical_relevance.level}</strong>
-          {h.practical_relevance.why && <> — {h.practical_relevance.why}</>}
+          <strong style={{ color: 'var(--text)' }}>Relevance: {h.practical_relevance?.level}</strong>
+          {h.practical_relevance?.why && <> — {h.practical_relevance.why}</>}
         </p>
         {entry.layer1.review?.untested_or_contested && (
           <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-dim)', margin: '6px 0 0' }}>
@@ -723,9 +731,9 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
           </p>
         )}
 
-        {h.topics.length > 0 && (
+        {(h.topics ?? []).length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 24 }}>
-            {h.topics.map((t) => (
+            {(h.topics ?? []).map((t) => (
               <span key={t} style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11.5, border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
                 {topicLabel(t)}
               </span>
