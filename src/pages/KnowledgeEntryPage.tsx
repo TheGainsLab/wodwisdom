@@ -699,9 +699,16 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
                 ))}
               </ul>
               {charts.length > 0 && <ChartBlock c={charts[0]} />}
-              <details style={{ marginTop: 4 }}>
-                <summary style={{ fontSize: 12.5, color: 'var(--text-muted)', cursor: 'pointer' }}>
-                  All the data — every number from the paper
+              {/* A spine section, not a footnote: the full-record promise is
+                  the page's trust anchor, so it wears the section header
+                  style — but stays collapsed so the dense tables never
+                  interrupt the reading path. */}
+              <details style={{ marginTop: 4 }} onToggle={(e) => (e.target as HTMLDetailsElement).open && logKnowledgeEvent('all_data_view', entry.slug)}>
+                <summary style={{ cursor: 'pointer', margin: '24px 0 10px' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.8px', color: 'var(--accent)' }}>
+                    All the data
+                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>— every number from the paper</span>
                 </summary>
                 <div style={{ marginTop: 12 }}>
                   {charts.slice(1).map((c, i) => <ChartBlock key={i} c={c} />)}
