@@ -63,7 +63,7 @@ Populate only the block for the chosen shape. Rules that apply to every shape:
 
 - `who[]`: participants or samples, same fields as `groups` minus protocol.
 - `conditions[]`: one row per test/condition: `name`, `description`, `intensity`, `duration`, `other`.
-- `measured[]`: `outcome`, `unit`, `values_by_condition` (an object keyed by condition name), `differed` (`yes` / `no` / which pairs), `note`.
+- `measured[]`: `outcome`, `unit`, `values_by_condition` (an object keyed by condition name), `differed` (`yes` / `no` / which pairs), `note`. The keys of `values_by_condition` name the conditions a reader compares, and rows that share a comparison share the same key set: the experimental conditions for measured outcomes, subgroup names for subgroup results. Never give a row its own one-off keys — a statistic that fits no condition set (a correlation, a single-subject example) goes in the `note` of the relevant row, not in invented columns.
 - `design_notes` as above.
 
 **`review` block**
