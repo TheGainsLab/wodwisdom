@@ -303,3 +303,6 @@ verify_jwt = false
 
 [functions.ingest-paper]
 verify_jwt = false
+
+[functions.discuss-paper]
+verify_jwt = false

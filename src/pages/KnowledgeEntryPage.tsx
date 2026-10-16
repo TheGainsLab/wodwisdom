@@ -6,6 +6,7 @@ import {
 } from '../lib/knowledgeLibrary';
 import { QAHeader } from '../components/QAShared';
 import { KnowledgeBadge, linkifyGlossary } from '../components/KnowledgeShared';
+import KnowledgeDiscuss from '../components/KnowledgeDiscuss';
 import '../features.css';
 import '../qa.css';
 import { logKnowledgeEvent } from '../lib/knowledgeEvents';
@@ -888,24 +889,54 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
           </div>
         )}
 
-        {/* Discuss this paper — the one gated action. Chat ships later; the
-            button exists from day one as the demand signal (design handoff),
-            and the sub-line keeps the promise honest. */}
-        <div style={{ marginTop: 28, padding: '16px', borderRadius: 12, border: '1px solid var(--accent)', background: 'var(--surface)' }}>
+        <DiscussBlock slug={entry.slug} signedIn={signedIn} />
+    </>
+  );
+}
+
+/**
+ * Discuss this paper — the one gated action. Signed-in members chat with
+ * the paper right here (grounded in its verified record, 3 free questions
+ * across the library); signed-out readers go to signup and land back on
+ * this page.
+ */
+function DiscussBlock({ slug, signedIn }: { slug: string; signedIn: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: 28, padding: '16px', borderRadius: 12, border: '1px solid var(--accent)', background: 'var(--surface)' }}>
+      {signedIn ? (
+        <>
+          {!open && (
+            <button
+              className="feature-cta"
+              style={{ display: 'inline-block' }}
+              onClick={() => { setOpen(true); logKnowledgeEvent('discuss_click', slug, { signedIn }); }}
+            >
+              Discuss this paper with the AI Coach
+            </button>
+          )}
+          {!open && (
+            <p style={{ fontSize: 12.5, color: 'var(--text-dim)', margin: '10px 0 0', lineHeight: 1.5 }}>
+              Ask this paper questions — answers come from its verified record, with anything beyond it clearly labeled.
+            </p>
+          )}
+          {open && <KnowledgeDiscuss slug={slug} />}
+        </>
+      ) : (
+        <>
           <Link
-            to={signedIn ? '/knowledge' : `/auth?signup=1&next=/knowledge/${entry.slug}`}
+            to={`/auth?signup=1&next=/knowledge/${slug}`}
             className="feature-cta"
             style={{ display: 'inline-block' }}
-            onClick={() => logKnowledgeEvent('discuss_click', entry.slug, { signedIn })}
+            onClick={() => logKnowledgeEvent('discuss_click', slug, { signedIn })}
           >
             Discuss this paper with the AI Coach
           </Link>
           <p style={{ fontSize: 12.5, color: 'var(--text-dim)', margin: '10px 0 0', lineHeight: 1.5 }}>
-            {signedIn
-              ? 'Research chat is coming soon — you’ll be able to ask this paper questions right here.'
-              : 'Research chat is coming. Create a free account and you’re on the list — we’ll email you when your papers can talk back.'}
+            Create a free account to ask this paper questions — 3 free research questions, answers grounded in the study you're reading.
           </p>
-        </div>
-    </>
+        </>
+      )}
+    </div>
   );
 }
