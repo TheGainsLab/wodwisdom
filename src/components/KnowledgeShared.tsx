@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { KNOWLEDGE_GLOSSARY } from '../lib/knowledgeLibrary';
+import { getGlossaryTerms } from '../lib/knowledgeLibrary';
+import { logKnowledgeEvent } from '../lib/knowledgeEvents';
 
 /** Shape / confidence / relevance badges for the research library. */
 export function KnowledgeBadge({ kind, value, why }: { kind: 'shape' | 'confidence' | 'relevance'; value: string; why?: string }) {
@@ -33,7 +34,10 @@ export function KnowledgeBadge({ kind, value, why }: { kind: 'shape' | 'confiden
 // (works on mobile where hover doesn't exist). First occurrence per
 // section only — a linkify() call is one section.
 
-const TERMS = [...KNOWLEDGE_GLOSSARY].sort((a, b) => b.term.length - a.term.length);
+// Resolved at call time: pages await ensureGlossary() before rendering prose.
+function TERMS() {
+  return [...getGlossaryTerms()].sort((a, b) => b.term.length - a.term.length);
+}
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -45,7 +49,7 @@ function GlossarySpan({ text, definition, inline = false }: { text: string; defi
     <span style={inline ? undefined : { position: 'relative' }}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => { setOpen((o) => !o); if (!open) logKnowledgeEvent('glossary_tap', undefined, { term: text }); }}
         aria-expanded={open}
         style={{
           background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer',
@@ -94,7 +98,7 @@ export function linkifyGlossary(
   // Collect first-occurrence matches, longest terms first so "VO2peak"
   // beats "VO2"; overlapping later matches are discarded.
   const matches: Array<{ start: number; end: number; term: string; definition: string }> = [];
-  for (const t of TERMS) {
+  for (const t of TERMS()) {
     const key = t.term.toLowerCase();
     if (opts?.seen?.has(key)) continue;
     const re = new RegExp(`(?<![\\w-])${escapeRegExp(t.term)}(?![\\w-])`, 'i');

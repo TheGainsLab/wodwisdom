@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import type { KnowledgeEntry } from '../lib/knowledgeLibrary';
+import { ensureGlossary, type KnowledgeEntry } from '../lib/knowledgeLibrary';
 import { KnowledgeEntryView } from './KnowledgeEntryPage';
 import Nav from '../components/Nav';
 import '../features.css';
@@ -55,7 +55,7 @@ export default function AdminResearchPage({ session }: { session: Session }) {
     if (err) setError(err.message);
     else setRows((data ?? []) as Row[]);
   };
-  useEffect(() => { if (role === 'admin') refresh(); }, [role]);
+  useEffect(() => { if (role === 'admin') { refresh(); ensureGlossary(); } }, [role]);
 
   // While anything is drafting in the background, poll for it to land.
   const anyDrafting = rows.some((r) => r.status === 'drafting');
@@ -67,16 +67,17 @@ export default function AdminResearchPage({ session }: { session: Session }) {
 
   const onUpload = async (file: File) => {
     setError('');
-    setUploading(`Drafting "${file.name}" — this takes a few minutes…`);
+    setUploading(`Uploading "${file.name}"…`);
     try {
-      const b64 = await new Promise<string>((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(String(r.result).split(',')[1] ?? '');
-        r.onerror = () => reject(new Error('could not read file'));
-        r.readAsDataURL(file);
-      });
+      // Straight to storage (no base64-through-the-function), so file size
+      // is never capped by the function's request body.
+      const storagePath = `${Date.now()}-${file.name.replace(/[^A-Za-z0-9._-]/g, '_')}`;
+      const { error: upErr } = await supabase.storage
+        .from('knowledge-pdfs')
+        .upload(storagePath, file, { contentType: 'application/pdf' });
+      if (upErr) throw new Error(`upload failed: ${upErr.message}`);
       const { data, error: err } = await supabase.functions.invoke('ingest-paper', {
-        body: { pdf_base64: b64, filename: file.name },
+        body: { storage_path: storagePath },
       });
       if (err) throw new Error(err.message ?? 'ingestion failed');
       if (data?.error) throw new Error(data.error);
@@ -125,6 +126,12 @@ export default function AdminResearchPage({ session }: { session: Session }) {
 
   const saveEntry = async (status?: 'published' | 'rejected') => {
     if (!selected || !draft) return;
+    if (status === 'published' && (selected.validator_report?.errors?.length ?? 0) > 0) {
+      const ok = window.confirm(
+        `This draft still has ${selected.validator_report!.errors.length} validator error(s) — publish anyway?`,
+      );
+      if (!ok) return;
+    }
     setSaving(true);
     setError('');
     const patch: Record<string, unknown> = { entry: draft, updated_at: new Date().toISOString() };
@@ -133,10 +140,44 @@ export default function AdminResearchPage({ session }: { session: Session }) {
       if (status === 'published') patch.published_at = new Date().toISOString();
     }
     const { error: err } = await supabase.from('knowledge_entries').update(patch).eq('slug', selected.slug);
+    if (!err && status === 'published') await mergeGlossary(draft);
     setSaving(false);
     if (err) { setError(err.message); return; }
     await refresh();
     if (status) { setSelected(null); setDraft(null); }
+  };
+
+  // Publish-time glossary merge: first definition wins, alternates recorded
+  // for reconciliation — the same rule build.py used for the founding twelve.
+  const mergeGlossary = async (entry: KnowledgeEntry) => {
+    const candidates = entry.glossary_candidates ?? [];
+    for (const g of candidates) {
+      if (!g?.term || !g?.definition) continue;
+      const key = g.term.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      if (!key) continue;
+      const { data: existing } = await supabase
+        .from('knowledge_glossary')
+        .select('term_key, definition, sources, alt_definitions')
+        .eq('term_key', key)
+        .maybeSingle();
+      if (!existing) {
+        await supabase.from('knowledge_glossary').insert({
+          term_key: key, term: g.term, definition: g.definition,
+          status: 'candidate', sources: [entry.slug], alt_definitions: [],
+        });
+      } else {
+        const sources: string[] = Array.isArray(existing.sources) ? existing.sources : [];
+        const alts: Array<{ entry: string; definition: string }> =
+          Array.isArray(existing.alt_definitions) ? existing.alt_definitions : [];
+        if (!sources.includes(entry.slug)) sources.push(entry.slug);
+        if (existing.definition !== g.definition && !alts.some((a) => a.entry === entry.slug)) {
+          alts.push({ entry: entry.slug, definition: g.definition });
+        }
+        await supabase.from('knowledge_glossary').update({
+          sources, alt_definitions: alts, updated_at: new Date().toISOString(),
+        }).eq('term_key', key);
+      }
+    }
   };
 
   const setHeader = (k: string, v: unknown) => draft && setDraft({ ...draft, header: { ...draft.header, [k]: v } });
@@ -216,6 +257,9 @@ export default function AdminResearchPage({ session }: { session: Session }) {
                           : r.status === 'drafting' ? '#a5b4fc'
                           : '#fdba74',
                       }}>{r.status === 'drafting' ? 'drafting…' : r.status}</span>
+                      {r.status === 'drafting' && Date.now() - new Date(r.created_at).getTime() > 12 * 60_000 && (
+                        <span style={{ color: 'var(--accent)' }}>stalled? open it and delete, then re-upload</span>
+                      )}
                       <span>{r.slug}</span>
                       {r.validator_report && (
                         <span>

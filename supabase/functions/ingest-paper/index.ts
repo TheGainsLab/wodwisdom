@@ -37,6 +37,7 @@ const SYSTEM = KNOWLEDGE_INGESTION_PROMPT +
 async function draftFromPdf(
   pdfBase64: string,
   feedback: string | null,
+  opts?: { timeoutMs?: number; primaryOnly?: boolean },
 ): Promise<{ text: string; model: string }> {
   const content: unknown[] = [
     { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
@@ -47,7 +48,10 @@ async function draftFromPdf(
         : "Produce the knowledge entry JSON for this document.",
     },
   ];
-  const models = [PROFILE.primary, ...(PROFILE.fallback ? [PROFILE.fallback] : [])];
+  const models = opts?.primaryOnly
+    ? [PROFILE.primary]
+    : [PROFILE.primary, ...(PROFILE.fallback ? [PROFILE.fallback] : [])];
+  const timeoutMs = opts?.timeoutMs ?? ATTEMPT_TIMEOUT_MS;
   let lastErr = "";
   for (const model of models) {
     try {
@@ -64,9 +68,13 @@ async function draftFromPdf(
           system: SYSTEM,
           messages: [{ role: "user", content }],
         }),
-      }, ATTEMPT_TIMEOUT_MS);
+      }, timeoutMs);
       if (resp.ok) {
         const data = await resp.json();
+        if (data.stop_reason === "max_tokens") {
+          // A truncated entry can't be parsed; name the real cause.
+          throw new Error("output truncated at the token limit — paper too dense for one pass");
+        }
         const text = (data.content ?? []).filter((b: { type: string }) => b.type === "text")
           .map((b: { text: string }) => b.text).join("").trim();
         if (text) return { text, model };
@@ -194,7 +202,8 @@ Deno.serve(async (req) => {
         let repaired = false;
         if (report.errors.length > 0 && Date.now() - t0 < 180_000) {
           try {
-            const retry = await draftFromPdf(pdfBase64, report.errors.join("\n"));
+            // Capped so worst-case total stays inside the background wall clock.
+            const retry = await draftFromPdf(pdfBase64, report.errors.join("\n"), { timeoutMs: 120_000, primaryOnly: true });
             const retryEntry = extractJson(retry.text);
             const retryReport = validateKnowledgeEntry(retryEntry);
             if (retryReport.errors.length < report.errors.length) {

@@ -12,7 +12,6 @@
  */
 
 import { supabase } from './supabase';
-import glossaryJson from '../data/knowledge/glossary.json';
 
 export interface KnowledgeIndexRow {
   id: string;
@@ -61,6 +60,9 @@ export interface KnowledgeEntry {
   slug: string;
   /** 3–6 one-line findings, each a claim with its number; the fixed-format core of What they found. */
   key_findings?: string[];
+  /** New terms this paper proposes for the glossary; merged on publish. */
+  glossary_candidates?: Array<{ term: string; definition: string; confidence_term_is_new: string }>;
+  verification_notes?: string[];
   shape: KnowledgeIndexRow['shape'];
   document_type: string;
   meta_analysis: boolean;
@@ -129,7 +131,26 @@ export interface KnowledgeEntry {
   charts: KnowledgeChart[];
 }
 
-export const KNOWLEDGE_GLOSSARY = glossaryJson as GlossaryTerm[];
+// Glossary lives in knowledge_glossary (publishing a paper merges its new
+// terms). Loaded once per session; linkifyGlossary reads the current list.
+let glossaryTerms: GlossaryTerm[] = [];
+let glossaryLoad: Promise<void> | null = null;
+
+export function getGlossaryTerms(): GlossaryTerm[] {
+  return glossaryTerms;
+}
+
+export function ensureGlossary(): Promise<void> {
+  if (!glossaryLoad) {
+    glossaryLoad = (async () => {
+      const { data } = await supabase
+        .from('knowledge_glossary')
+        .select('term, definition, status, sources, alt_definitions');
+      if (data) glossaryTerms = data as GlossaryTerm[];
+    })();
+  }
+  return glossaryLoad;
+}
 
 const REL_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
 

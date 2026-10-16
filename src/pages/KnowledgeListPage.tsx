@@ -5,6 +5,7 @@ import { QAHeader } from '../components/QAShared';
 import { KnowledgeBadge } from '../components/KnowledgeShared';
 import '../features.css';
 import '../qa.css';
+import { logKnowledgeEvent } from '../lib/knowledgeEvents';
 
 /**
  * /knowledge — the research library list. Free to browse, no account.
@@ -19,6 +20,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
   useEffect(() => {
     let cancelled = false;
     fetchKnowledgeIndex().then((rows) => { if (!cancelled) setIndex(rows); });
+    logKnowledgeEvent('list_view');
     return () => { cancelled = true; };
   }, []);
 
@@ -82,7 +84,7 @@ export default function KnowledgeListPage({ signedIn = false }: { signedIn?: boo
             <button
               key={t}
               type="button"
-              onClick={() => setTopic(topic === t ? null : t)}
+              onClick={() => { setTopic(topic === t ? null : t); if (topic !== t) logKnowledgeEvent('topic_filter', undefined, { topic: t }); }}
               style={{
                 padding: '4px 10px', borderRadius: 999, fontSize: 12, cursor: 'pointer',
                 fontFamily: 'inherit',

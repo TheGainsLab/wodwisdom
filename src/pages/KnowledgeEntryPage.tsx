@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  loadKnowledgeEntry, topicLabel,
+  loadKnowledgeEntry, ensureGlossary, topicLabel,
   type KnowledgeEntry, type KnowledgeChart,
 } from '../lib/knowledgeLibrary';
 import { QAHeader } from '../components/QAShared';
 import { KnowledgeBadge, linkifyGlossary } from '../components/KnowledgeShared';
 import '../features.css';
 import '../qa.css';
+import { logKnowledgeEvent } from '../lib/knowledgeEvents';
 
 const NOT_PRINTED = 'not printed in source';
 
@@ -481,7 +482,7 @@ function ChartBlock({ c }: { c: KnowledgeChart }) {
       </div>
       {drawn}
       {drawn && columns.length > 0 && (
-        <details style={{ margin: '0 0 6px' }}>
+        <details style={{ margin: '0 0 6px' }} onToggle={(e) => (e.target as HTMLDetailsElement).open && logKnowledgeEvent('chart_table_view', undefined, { chart: c.title })}>
           <summary style={{ fontSize: 11.5, color: 'var(--text-muted)', cursor: 'pointer' }}>View as table</summary>
           <FactsTable columns={columns} rows={rows} />
         </details>
@@ -508,9 +509,11 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
     let cancelled = false;
     setEntry(null); setMissing(false);
     if (!slug) { setMissing(true); return; }
-    loadKnowledgeEntry(slug).then((e) => {
+    // Glossary loads alongside the entry so tap-to-define terms are linkable
+    // on first paint.
+    Promise.all([loadKnowledgeEntry(slug), ensureGlossary()]).then(([e]) => {
       if (cancelled) return;
-      if (e) setEntry(e); else setMissing(true);
+      if (e) { setEntry(e); logKnowledgeEvent('entry_view', slug); } else setMissing(true);
     });
     return () => { cancelled = true; };
   }, [slug]);
@@ -738,6 +741,7 @@ export function KnowledgeEntryView({ entry, signedIn = false }: { entry: Knowled
             to={signedIn ? '/knowledge' : `/auth?signup=1&next=/knowledge/${entry.slug}`}
             className="feature-cta"
             style={{ display: 'inline-block' }}
+            onClick={() => logKnowledgeEvent('discuss_click', entry.slug, { signedIn })}
           >
             Discuss this paper with the AI Coach
           </Link>
