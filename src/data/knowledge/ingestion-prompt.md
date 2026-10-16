@@ -47,6 +47,7 @@ Also record `document_type` (journal article / book chapter / position stand / t
 Populate only the block for the chosen shape. Rules that apply to every shape:
 
 - **Numbers live here.** Every quantitative result in the document that bears on the claim appears in Layer 1 with its value, units and direction. If the document gives a percentage and absolute values, give both.
+- **Tables and results text are extracted whole.** Every row of every numbered table becomes a Layer 1 row — secondary outcomes, subgroup rows and non-significant results included. The same goes for numbers printed in the results text: correlations, subgroup values, individual ranges and spreads each land in a Layer 1 row or the `note` of the relevant row. Never triage: if the paper printed it, the entry carries it. Per-outcome figure panels extract one row per reported outcome, marked approximate when read from the figure.
 - **Every number gets a locator** in `verification_notes` (page, table or figure). Values you read from a chart rather than from text or a table are suffixed `" (approx., from Fig N)"`.
 - **Include what did not change.** Any outcome the authors measured and found unchanged or non-significant is listed, marked `"no"` in the significance column. Omitting null results is the most common way a summary misleads.
 - **Significance is reported as the authors report it.** Use `yes` / `no` / `not tested` / `not reported`. Do not infer significance from the size of a change.
@@ -103,6 +104,14 @@ Voice for Layer 2: neutral, specific, plain. Write the honest version; the edito
 `charts[]`: 1–4 chart specifications for fixed templates. Each: `template` (one of `before_after_bars`, `grouped_change_bars`, `values_by_condition`, `stacked_share`, `population_card`, `concept_curve`), `title`, `series`, `units`, `approximate` (true if any value was read from a figure), `note`.
 
 A chart carries a **finding** — something the paper measured and a reader needs to compare. Logistics, methods and schedules are never charts: scheduling facts belong in `setup_plain` and the design notes, with their consequences (e.g. a test taken one day after training) stated in Layer 2 where they affect interpretation.
+
+Chart selection follows the data, not taste:
+
+- Rows whose parts sum to 100 chart as `stacked_share` — always.
+- A paper whose central model is a schematic figure charts it as `concept_curve`. Measured data never takes the schematic label; a scatter or relationship the templates cannot draw honestly stays a Layer 1 row, uncharted.
+- When the paper's central claim is a contrast of inputs (volume, time, dose) producing similar outcomes, chart the input contrast as `values_by_condition` — not only the outcomes.
+- `grouped_change_bars` carries signed changes only; absolute values compare via `values_by_condition` or `before_after_bars`.
+- Never chart a series whose values are all null, and never chart a value the paper does not print (no computing an "after" from a baseline and a change).
 
 `series` must match its template's exact shape — the renderer reads these keys and no others, and any other shape fails validation:
 

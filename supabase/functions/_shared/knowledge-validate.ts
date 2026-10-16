@@ -126,6 +126,12 @@ export function validateKnowledgeEntry(e: any): ValidatorReport {
   const stray = [...numbersIn(l2)].filter((n) => !l1nums.has(n) && !/^\d{1,2}$/.test(n));
   if (stray.length) warnings.push(`numbers in layer2 not found in layer1: ${stray.slice(0, 12).join(", ")}`);
 
+  // Key findings make the same promise: every number they cite is in the
+  // full record. A bullet whose number is nowhere in ALL THE DATA breaks
+  // the page's own guarantee.
+  const kfStray = [...numbersIn(e?.key_findings)].filter((n) => !l1nums.has(n) && !/^\d{1,2}$/.test(n));
+  if (kfStray.length) warnings.push(`numbers in key_findings not found in layer1: ${kfStray.slice(0, 12).join(", ")}`);
+
   for (const row of l1.intervention?.measured ?? []) {
     if (!SIG.has(row?.significant)) {
       errors.push(`measured.significant ${JSON.stringify(row?.significant)} invalid (${row?.outcome})`);
