@@ -163,23 +163,37 @@ function SplitFactsTable({ columns, rows, charted }: {
 }
 
 function ComparisonFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['comparison']> }) {
-  const conditionKeys = Array.from(new Set((l.measured ?? []).flatMap((m) => Object.keys(m.values_by_condition ?? {}))));
   // Who, conditions and design notes render as the page's setup narrative.
+  // Rows group by the condition set they actually use — one compact table
+  // per set, in order of first appearance. A union of every condition
+  // across all rows renders as a sparse grid of mostly empty cells the
+  // moment a paper mixes test conditions with subgroups or correlations.
+  const measured = l.measured ?? [];
+  const sig = (m: (typeof measured)[number]) => Object.keys(m.values_by_condition ?? {}).sort().join('\u0000');
+  const groups: Array<{ keys: string[]; rows: typeof measured }> = [];
+  for (const m of measured) {
+    const g = groups.find((x) => [...x.keys].sort().join('\u0000') === sig(m));
+    if (g) g.rows.push(m);
+    else groups.push({ keys: Object.keys(m.values_by_condition ?? {}), rows: [m] });
+  }
   return (
     <>
-      <SplitFactsTable
-        columns={[
-          { key: 'outcome', label: 'Outcome' }, { key: 'unit', label: 'Unit' },
-          ...conditionKeys.map((k) => ({ key: `c_${k}`, label: k })),
-          { key: 'differed', label: 'Differed' }, { key: 'note', label: 'Note' },
-        ]}
-        rows={(l.measured ?? []).map((m) => ({
-          outcome: m.outcome, unit: m.unit,
-          ...Object.fromEntries(conditionKeys.map((k) => [`c_${k}`, val(m.values_by_condition[k])])),
-          differed: m.differed, note: m.note,
-        }))}
-        charted={(l.measured ?? []).map((m) => !!m.charted)}
-      />
+      {groups.map((g, gi) => (
+        <SplitFactsTable
+          key={gi}
+          columns={[
+            { key: 'outcome', label: 'Outcome' }, { key: 'unit', label: 'Unit' },
+            ...g.keys.map((k) => ({ key: `c_${k}`, label: k })),
+            { key: 'differed', label: 'Differed' }, { key: 'note', label: 'Note' },
+          ]}
+          rows={g.rows.map((m) => ({
+            outcome: m.outcome, unit: m.unit,
+            ...Object.fromEntries(g.keys.map((k) => [`c_${k}`, val(m.values_by_condition[k])])),
+            differed: m.differed, note: m.note,
+          }))}
+          charted={g.rows.map((m) => !!m.charted)}
+        />
+      ))}
     </>
   );
 }
