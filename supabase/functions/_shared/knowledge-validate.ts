@@ -10,14 +10,34 @@
 
 // deno-lint-ignore-file no-explicit-any
 
+import { CHART_TEMPLATES } from "./knowledge-chart-templates.ts";
+
 const SHAPES = new Set(["intervention", "comparison", "review", "reference"]);
 const CONF = new Set(["strong", "moderate", "preliminary", "conceptual", "reference"]);
 const REL = new Set(["high", "medium", "low"]);
 const SIG = new Set(["yes", "no", "not tested", "not reported"]);
-const TEMPLATES = new Set([
-  "before_after_bars", "grouped_change_bars", "values_by_condition",
-  "stacked_share", "timeline", "population_card", "concept_curve",
-]);
+
+/**
+ * Does a series item match a template's declared shape?
+ * Tokens: 'string' | 'number' | 'any' (key present); a nested array means
+ * every element matches the inner shape. The shapes themselves live in
+ * src/data/knowledge/chart-templates.json — nothing template-specific here.
+ */
+function matchesShape(v: any, shape: Record<string, unknown>): boolean {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return false;
+  for (const [k, tok] of Object.entries(shape)) {
+    if (Array.isArray(tok)) {
+      if (!Array.isArray(v[k]) || !v[k].every((x: any) => matchesShape(x, tok[0] as Record<string, unknown>))) return false;
+    } else if (tok === "string") {
+      if (typeof v[k] !== "string") return false;
+    } else if (tok === "number") {
+      if (typeof v[k] !== "number") return false;
+    } else if (!(k in v)) {
+      return false;
+    }
+  }
+  return true;
+}
 const HEADER_KEYS = [
   "title_plain", "citation", "topics", "evidence_type", "confidence",
   "practical_relevance", "author_stance", "funding_and_conflicts",
@@ -113,11 +133,13 @@ export function validateKnowledgeEntry(e: any): ValidatorReport {
   }
 
   for (const c of e?.charts ?? []) {
-    if (!TEMPLATES.has(c?.template)) errors.push(`chart template ${JSON.stringify(c?.template)} invalid`);
-    if (c?.template === "concept_curve" && !String(c?.note ?? "").toLowerCase().includes("schematic")) {
+    const t = c?.template;
+    const spec = CHART_TEMPLATES[t];
+    if (!spec) errors.push(`chart template ${JSON.stringify(t)} invalid`);
+    if (t === "concept_curve" && !String(c?.note ?? "").toLowerCase().includes("schematic")) {
       errors.push("concept_curve note must say 'schematic — not measured data'");
     }
-    if (c?.template === "stacked_share") {
+    if (t === "stacked_share") {
       for (const s of c?.series ?? []) {
         const tot = (s?.parts ?? []).reduce((a: number, p: any) => a + (p?.value ?? 0), 0);
         if (Math.abs(tot - 100) > 1.5) {
@@ -125,48 +147,16 @@ export function validateKnowledgeEntry(e: any): ValidatorReport {
         }
       }
     }
-    // Series must match the template's exact shape (ingestion-prompt.md §7):
-    // the renderers read these keys and no others, so a wrong shape draws as
-    // an empty chart. Errors here route the draft through the repair round.
-    const t = c?.template;
-    const name = c?.title || t;
-    const items: any[] = Array.isArray(c?.series) ? c.series : [];
-    if (t !== "concept_curve" && TEMPLATES.has(t)) {
+    // Series must match the template's declared shape (chart-templates.json):
+    // a wrong shape here routes the draft through the repair round, so the
+    // archive stays canonical even though the renderer also adapts.
+    if (spec?.shape) {
+      const name = c?.title || t;
+      const items: any[] = Array.isArray(c?.series) ? c.series : [];
       if (items.length === 0) {
         errors.push(`chart '${name}': series is empty`);
-      } else if (t === "before_after_bars") {
-        if (items.some((s) => typeof s?.label !== "string" || !("before" in (s ?? {})) || !("after" in (s ?? {})))) {
-          errors.push(`chart '${name}': before_after_bars series items must be {label, before, after}`);
-        }
-      } else if (t === "grouped_change_bars") {
-        if (items.some((s) =>
-          typeof s?.group !== "string" || !Array.isArray(s?.values) ||
-          s.values.some((v: any) => typeof v?.label !== "string" || !("value" in (v ?? {})))
-        )) {
-          errors.push(`chart '${name}': grouped_change_bars series items must be {group, values: [{label, value}]} — one item per group, even for single-group studies`);
-        }
-      } else if (t === "values_by_condition") {
-        if (items.some((s) =>
-          typeof s?.label !== "string" || !Array.isArray(s?.values) ||
-          s.values.some((v: any) => typeof v?.condition !== "string" || !("value" in (v ?? {})))
-        )) {
-          errors.push(`chart '${name}': values_by_condition series items must be {label, values: [{condition, value}]}`);
-        }
-      } else if (t === "stacked_share") {
-        if (items.some((s) =>
-          typeof s?.label !== "string" || !Array.isArray(s?.parts) ||
-          s.parts.some((p: any) => typeof p?.name !== "string" || typeof p?.value !== "number")
-        )) {
-          errors.push(`chart '${name}': stacked_share series items must be {label, parts: [{name, value}]}`);
-        }
-      } else if (t === "timeline") {
-        if (items.some((s) => typeof s?.label !== "string" || !("start" in (s ?? {})) || !("end" in (s ?? {})))) {
-          errors.push(`chart '${name}': timeline series items must be {label, start, end, note}`);
-        }
-      } else if (t === "population_card") {
-        if (items.some((s) => !s || typeof s !== "object" || !("n" in s))) {
-          errors.push(`chart '${name}': population_card series items must be {n, sex_split, age, status, other}`);
-        }
+      } else if (items.some((s) => !matchesShape(s, spec.shape as Record<string, unknown>))) {
+        errors.push(`chart '${name}': ${t} series items must be ${spec.shape_text}`);
       }
     }
   }

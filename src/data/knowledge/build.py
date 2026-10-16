@@ -14,8 +14,32 @@ SHAPES = {"intervention", "comparison", "review", "reference"}
 CONF = {"strong", "moderate", "preliminary", "conceptual", "reference"}
 REL = {"high", "medium", "low"}
 SIG = {"yes", "no", "not tested", "not reported"}
-TEMPLATES = {"before_after_bars", "grouped_change_bars", "values_by_condition",
-             "stacked_share", "timeline", "population_card", "concept_curve"}
+# Chart templates and their series shapes come from the single source of
+# truth; nothing template-specific is hard-coded here.
+with open(os.path.join(ROOT, "chart-templates.json")) as f:
+    CHART_TEMPLATES = {k: v for k, v in json.load(f).items() if not k.startswith("_")}
+TEMPLATES = set(CHART_TEMPLATES)
+
+
+def matches_shape(v, shape):
+    """Series item vs declared shape. Tokens: 'string' | 'number' | 'any'
+    (key present); a nested list means every element matches the inner shape.
+    Mirror of matchesShape in _shared/knowledge-validate.ts."""
+    if not isinstance(v, dict):
+        return False
+    for k, tok in shape.items():
+        if isinstance(tok, list):
+            if not isinstance(v.get(k), list) or not all(matches_shape(x, tok[0]) for x in v[k]):
+                return False
+        elif tok == "string":
+            if not isinstance(v.get(k), str):
+                return False
+        elif tok == "number":
+            if not isinstance(v.get(k), (int, float)) or isinstance(v.get(k), bool):
+                return False
+        elif k not in v:
+            return False
+    return True
 HEADER_KEYS = {"title_plain", "citation", "topics", "evidence_type", "confidence",
                "practical_relevance", "author_stance", "funding_and_conflicts"}
 CITE_KEYS = {"title", "authors", "year", "journal", "volume_issue_pages", "doi"}
@@ -107,42 +131,17 @@ def check(e, path):
                 tot = sum(p.get("value", 0) for p in s.get("parts", []))
                 if abs(tot - 100) > 1.5:
                     errs.append(f"stacked_share '{s.get('label')}' parts sum to {tot}, not 100")
-        # Series must match the template's exact shape (ingestion-prompt.md §7);
-        # keep in lockstep with _shared/knowledge-validate.ts.
+        # Series must match the template's declared shape (chart-templates.json);
+        # mirror of _shared/knowledge-validate.ts.
         t = c.get("template")
-        name = c.get("title") or t
-        items = c.get("series") if isinstance(c.get("series"), list) else []
-        if t != "concept_curve" and t in TEMPLATES:
-            def bad(pred):
-                return any(not isinstance(s, dict) or pred(s) for s in items)
+        spec = CHART_TEMPLATES.get(t) or {}
+        if spec.get("shape"):
+            name = c.get("title") or t
+            items = c.get("series") if isinstance(c.get("series"), list) else []
             if not items:
                 errs.append(f"chart '{name}': series is empty")
-            elif t == "before_after_bars":
-                if bad(lambda s: not isinstance(s.get("label"), str) or "before" not in s or "after" not in s):
-                    errs.append(f"chart '{name}': before_after_bars series items must be {{label, before, after}}")
-            elif t == "grouped_change_bars":
-                if bad(lambda s: not isinstance(s.get("group"), str) or not isinstance(s.get("values"), list)
-                       or any(not isinstance(v, dict) or not isinstance(v.get("label"), str) or "value" not in v
-                              for v in s.get("values", []))):
-                    errs.append(f"chart '{name}': grouped_change_bars series items must be "
-                                f"{{group, values: [{{label, value}}]}} — one item per group, even for single-group studies")
-            elif t == "values_by_condition":
-                if bad(lambda s: not isinstance(s.get("label"), str) or not isinstance(s.get("values"), list)
-                       or any(not isinstance(v, dict) or not isinstance(v.get("condition"), str) or "value" not in v
-                              for v in s.get("values", []))):
-                    errs.append(f"chart '{name}': values_by_condition series items must be {{label, values: [{{condition, value}}]}}")
-            elif t == "stacked_share":
-                if bad(lambda s: not isinstance(s.get("label"), str) or not isinstance(s.get("parts"), list)
-                       or any(not isinstance(p, dict) or not isinstance(p.get("name"), str)
-                              or not isinstance(p.get("value"), (int, float))
-                              for p in s.get("parts", []))):
-                    errs.append(f"chart '{name}': stacked_share series items must be {{label, parts: [{{name, value}}]}}")
-            elif t == "timeline":
-                if bad(lambda s: not isinstance(s.get("label"), str) or "start" not in s or "end" not in s):
-                    errs.append(f"chart '{name}': timeline series items must be {{label, start, end, note}}")
-            elif t == "population_card":
-                if bad(lambda s: "n" not in s):
-                    errs.append(f"chart '{name}': population_card series items must be {{n, sex_split, age, status, other}}")
+            elif any(not matches_shape(s, spec["shape"]) for s in items):
+                errs.append(f"chart '{name}': {t} series items must be {spec['shape_text']}")
     if e["shape"] in ("intervention", "comparison") and not any(
             c.get("template") == "population_card" for c in e.get("charts", [])):
         errs.append("intervention/comparison entries need a population_card chart")

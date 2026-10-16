@@ -505,11 +505,25 @@ function ChartBlock({ c }: { c: KnowledgeChart }) {
       return typeof v === 'string' ? v.trim() !== '' && v !== 'undefined' : v !== undefined && v !== null;
     }),
   );
-  const drawn =
+  // The chart generates from the data: the declared template gets first try,
+  // but when it can't draw this series (or names no drawable form), whichever
+  // drawable form the series' own keys satisfy draws it instead. Each
+  // renderer validates the data it needs and returns null otherwise, so a
+  // wrong guess is impossible — only key-complete data draws.
+  const byTemplate =
     c.template === 'stacked_share' ? renderStackedShare(c)
     : c.template === 'before_after_bars' ? renderBeforeAfterBars(c)
     : c.template === 'grouped_change_bars' ? renderGroupedChangeBars(c)
     : null;
+  const drawn = byTemplate
+    ?? (c.template !== 'population_card' && c.template !== 'concept_curve'
+      ? renderBeforeAfterBars(c) ?? renderStackedShare(c) ?? renderGroupedChangeBars(c)
+      : null);
+  // An empty or broken chart helps no reader: nothing drawable and no table
+  // rows means the block doesn't render at all. (concept_curve is note-only
+  // by design.) The validator stops such charts at ingest; this covers
+  // drafts made before it existed.
+  if (!drawn && liveRows.length === 0 && c.template !== 'concept_curve') return null;
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 12, background: 'var(--surface)' }}>
       <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 8 }}>
@@ -523,11 +537,6 @@ function ChartBlock({ c }: { c: KnowledgeChart }) {
         </details>
       )}
       {!drawn && columns.length > 0 && liveRows.length > 0 && <FactsTable columns={columns} rows={liveRows} />}
-      {!drawn && c.template !== 'concept_curve' && liveRows.length === 0 && (
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: 4 }}>
-          This chart's data doesn't match its template, so it can't be drawn. The numbers remain in the sections above.
-        </div>
-      )}
       {c.approximate && (
         <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 4 }}>
           approximate — values read from a figure
