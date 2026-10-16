@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { DISCUSS_PAPER_ENDPOINT, getAuthHeaders, supabase } from '../lib/supabase';
+import { formatMarkdown } from '../lib/formatMarkdown';
 
 /**
  * Discuss this paper — the research chat panel on a knowledge entry page.
@@ -16,19 +17,14 @@ type Msg = { role: 'user' | 'assistant'; content: string; streaming?: boolean };
 
 const FREE_LIMIT_DEFAULT = 3;
 
-/** Assistant answers point to siblings as /knowledge/<slug> — make them tappable. */
-function renderWithLinks(text: string): React.ReactNode[] {
-  const out: React.ReactNode[] = [];
-  const re = /\/knowledge\/[a-z0-9][a-z0-9-]*/g;
-  let cursor = 0;
-  for (const m of text.matchAll(re)) {
-    const start = m.index ?? 0;
-    if (start > cursor) out.push(text.slice(cursor, start));
-    out.push(<Link key={start} to={m[0]} style={{ color: 'var(--slot1, #3987e5)' }}>{m[0]}</Link>);
-    cursor = start + m[0].length;
-  }
-  if (cursor < text.length) out.push(text.slice(cursor));
-  return out;
+/**
+ * Answers render through the house markdown formatter (same as the main
+ * chat). Bare /knowledge/<slug> paths the model emits become markdown
+ * links first, so sibling-paper pointers are always tappable.
+ */
+function renderAssistantHtml(text: string): string {
+  const linked = text.replace(/(^|[\s(])(\/knowledge\/[a-z0-9][a-z0-9-]*)/g, '$1[$2]($2)');
+  return formatMarkdown(linked);
 }
 
 export default function KnowledgeDiscuss({ slug }: { slug: string }) {
@@ -126,7 +122,10 @@ export default function KnowledgeDiscuss({ slug }: { slug: string }) {
       }
       setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, streaming: false } : m)));
     } catch (e) {
-      setMessages((prev) => prev.slice(0, -1));
+      // Remove BOTH pending bubbles and restore the question to the input —
+      // leaving the user bubble behind doubled the question on retry.
+      setMessages((prev) => prev.slice(0, -2));
+      setInput(question);
       setError(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
       setSending(false);
@@ -140,12 +139,16 @@ export default function KnowledgeDiscuss({ slug }: { slug: string }) {
           {messages.map((m, i) => (
             <div
               key={i}
+              className={m.role === 'assistant' ? 'msg-body assistant' : undefined}
               style={m.role === 'user'
                 ? { alignSelf: 'flex-end', maxWidth: '85%', padding: '8px 12px', borderRadius: 10, background: 'var(--surface2, #222)', border: '1px solid var(--border)', fontSize: 13.5, lineHeight: 1.55 }
-                : { alignSelf: 'stretch', fontSize: 13.5, lineHeight: 1.6, color: 'var(--text)', whiteSpace: 'pre-wrap' }}
+                : { alignSelf: 'stretch', fontSize: 13.5, lineHeight: 1.6, color: 'var(--text)' }}
             >
-              {m.role === 'assistant' ? renderWithLinks(m.content) : m.content}
-              {m.streaming && !m.content && <span style={{ color: 'var(--text-muted)' }}>thinking…</span>}
+              {m.role === 'assistant' ? (
+                m.streaming && !m.content
+                  ? <span style={{ color: 'var(--text-muted)' }}>thinking…</span>
+                  : <div dangerouslySetInnerHTML={{ __html: renderAssistantHtml(m.content) }} />
+              ) : m.content}
             </div>
           ))}
           <div ref={endRef} />
