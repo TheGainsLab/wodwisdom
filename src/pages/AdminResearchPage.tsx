@@ -9,7 +9,7 @@
  */
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { DISCUSS_PAPER_ENDPOINT, getAuthHeaders, supabase } from '../lib/supabase';
 import { ensureGlossary, normalizeKnowledgeEntry, type KnowledgeEntry } from '../lib/knowledgeLibrary';
 import { KnowledgeEntryView } from './KnowledgeEntryPage';
 import Nav from '../components/Nav';
@@ -156,6 +156,22 @@ export default function AdminResearchPage({ session }: { session: Session }) {
       for (const c of (data.checks as Check[] | undefined) ?? []) results.push(c);
     } catch (e) {
       results.push({ name: 'function: reachable', ok: false, detail: e instanceof Error ? e.message : String(e) });
+    }
+    // Discuss-paper function: same selftest contract as ingest.
+    try {
+      const resp = await fetch(DISCUSS_PAPER_ENDPOINT, {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ action: 'selftest' }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(String(data.error ?? `HTTP ${resp.status}`));
+      results.push({ name: 'discuss: function reachable', ok: true, detail: String(data.version ?? '') });
+      for (const c of (data.checks as Check[] | undefined) ?? []) {
+        results.push({ ...c, name: `discuss: ${c.name}` });
+      }
+    } catch (e) {
+      results.push({ name: 'discuss: function reachable', ok: false, detail: `${e instanceof Error ? e.message : String(e)} — function deployed?` });
     }
     setSysCheck(results);
     setChecking(false);
