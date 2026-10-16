@@ -1,0 +1,45 @@
+{
+  "_comment": "Single source of truth for chart series shapes. Consumed by build.py (directly), by scripts/sync-ingestion-prompt.mjs (generates the shape list inside ingestion-prompt.md and _shared/knowledge-chart-templates.ts for the ingest validator), and documented nowhere else — edit here only. shape tokens: 'string' = must be a string, 'number' = must be a number, 'any' = key must be present; a nested array means every element matches the inner shape. shape null = series not validated (schematic).",
+  "before_after_bars": {
+    "shape": { "label": "string", "before": "any", "after": "any" },
+    "shape_text": "{label, before, after}",
+    "example": [{ "label": "VO2max (ml·min⁻¹·kg⁻¹)", "before": 57.3, "after": 63.8 }],
+    "doc": "numbers, or `null` for a value the paper does not report"
+  },
+  "grouped_change_bars": {
+    "shape": { "group": "string", "values": [{ "label": "string", "value": "any" }] },
+    "shape_text": "{group, values: [{label, value}]} — one item per group, even for single-group studies",
+    "example": [{ "group": "Sprint training", "values": [{ "label": "PFK", "value": 106 }] }],
+    "doc": "one item per group, **even when the study has a single group**; each `label` is an outcome and `value` its signed change in the chart's `units`"
+  },
+  "values_by_condition": {
+    "shape": { "label": "string", "values": [{ "condition": "string", "value": "any" }] },
+    "shape_text": "{label, values: [{condition, value}]}",
+    "example": [{ "label": "Peak power (W)", "values": [{ "condition": "45-s rest", "value": 723 }] }],
+    "doc": ""
+  },
+  "stacked_share": {
+    "shape": { "label": "string", "parts": [{ "name": "string", "value": "number" }] },
+    "shape_text": "{label, parts: [{name, value}]}",
+    "example": [{ "label": "0–30 s", "parts": [{ "name": "aerobic", "value": 45 }, { "name": "anaerobic", "value": 55 }] }],
+    "doc": "each row's parts sum to 100"
+  },
+  "timeline": {
+    "shape": { "label": "string", "start": "any", "end": "any" },
+    "shape_text": "{label, start, end, note}",
+    "example": [{ "label": "Training block", "start": 0, "end": 14, "note": "" }],
+    "doc": "`start`/`end` are numbers in the chart's `units`"
+  },
+  "population_card": {
+    "shape": { "n": "any" },
+    "shape_text": "{n, sex_split, age, status, other}",
+    "example": [{ "n": "5", "sex_split": "5 M", "age": "20.8 (2.9)", "status": "active, not in regular training", "other": "" }],
+    "doc": "one item per group"
+  },
+  "concept_curve": {
+    "shape": null,
+    "shape_text": "",
+    "example": [],
+    "doc": "`series` may be `[]`; the `note` carries the meaning"
+  }
+}

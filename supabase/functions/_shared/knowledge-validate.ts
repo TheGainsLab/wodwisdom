@@ -10,14 +10,34 @@
 
 // deno-lint-ignore-file no-explicit-any
 
+import { CHART_TEMPLATES } from "./knowledge-chart-templates.ts";
+
 const SHAPES = new Set(["intervention", "comparison", "review", "reference"]);
 const CONF = new Set(["strong", "moderate", "preliminary", "conceptual", "reference"]);
 const REL = new Set(["high", "medium", "low"]);
 const SIG = new Set(["yes", "no", "not tested", "not reported"]);
-const TEMPLATES = new Set([
-  "before_after_bars", "grouped_change_bars", "values_by_condition",
-  "stacked_share", "timeline", "population_card", "concept_curve",
-]);
+
+/**
+ * Does a series item match a template's declared shape?
+ * Tokens: 'string' | 'number' | 'any' (key present); a nested array means
+ * every element matches the inner shape. The shapes themselves live in
+ * src/data/knowledge/chart-templates.json — nothing template-specific here.
+ */
+function matchesShape(v: any, shape: Record<string, unknown>): boolean {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return false;
+  for (const [k, tok] of Object.entries(shape)) {
+    if (Array.isArray(tok)) {
+      if (!Array.isArray(v[k]) || !v[k].every((x: any) => matchesShape(x, tok[0] as Record<string, unknown>))) return false;
+    } else if (tok === "string") {
+      if (typeof v[k] !== "string") return false;
+    } else if (tok === "number") {
+      if (typeof v[k] !== "number") return false;
+    } else if (!(k in v)) {
+      return false;
+    }
+  }
+  return true;
+}
 const HEADER_KEYS = [
   "title_plain", "citation", "topics", "evidence_type", "confidence",
   "practical_relevance", "author_stance", "funding_and_conflicts",
@@ -113,16 +133,30 @@ export function validateKnowledgeEntry(e: any): ValidatorReport {
   }
 
   for (const c of e?.charts ?? []) {
-    if (!TEMPLATES.has(c?.template)) errors.push(`chart template ${JSON.stringify(c?.template)} invalid`);
-    if (c?.template === "concept_curve" && !String(c?.note ?? "").toLowerCase().includes("schematic")) {
+    const t = c?.template;
+    const spec = CHART_TEMPLATES[t];
+    if (!spec) errors.push(`chart template ${JSON.stringify(t)} invalid`);
+    if (t === "concept_curve" && !String(c?.note ?? "").toLowerCase().includes("schematic")) {
       errors.push("concept_curve note must say 'schematic — not measured data'");
     }
-    if (c?.template === "stacked_share") {
+    if (t === "stacked_share") {
       for (const s of c?.series ?? []) {
         const tot = (s?.parts ?? []).reduce((a: number, p: any) => a + (p?.value ?? 0), 0);
         if (Math.abs(tot - 100) > 1.5) {
           errors.push(`stacked_share '${s?.label}' parts sum to ${tot}, not 100`);
         }
+      }
+    }
+    // Series must match the template's declared shape (chart-templates.json):
+    // a wrong shape here routes the draft through the repair round, so the
+    // archive stays canonical even though the renderer also adapts.
+    if (spec?.shape) {
+      const name = c?.title || t;
+      const items: any[] = Array.isArray(c?.series) ? c.series : [];
+      if (items.length === 0) {
+        errors.push(`chart '${name}': series is empty`);
+      } else if (items.some((s) => !matchesShape(s, spec.shape as Record<string, unknown>))) {
+        errors.push(`chart '${name}': ${t} series items must be ${spec.shape_text}`);
       }
     }
   }

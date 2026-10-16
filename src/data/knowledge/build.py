@@ -14,8 +14,32 @@ SHAPES = {"intervention", "comparison", "review", "reference"}
 CONF = {"strong", "moderate", "preliminary", "conceptual", "reference"}
 REL = {"high", "medium", "low"}
 SIG = {"yes", "no", "not tested", "not reported"}
-TEMPLATES = {"before_after_bars", "grouped_change_bars", "values_by_condition",
-             "stacked_share", "timeline", "population_card", "concept_curve"}
+# Chart templates and their series shapes come from the single source of
+# truth; nothing template-specific is hard-coded here.
+with open(os.path.join(ROOT, "chart-templates.json")) as f:
+    CHART_TEMPLATES = {k: v for k, v in json.load(f).items() if not k.startswith("_")}
+TEMPLATES = set(CHART_TEMPLATES)
+
+
+def matches_shape(v, shape):
+    """Series item vs declared shape. Tokens: 'string' | 'number' | 'any'
+    (key present); a nested list means every element matches the inner shape.
+    Mirror of matchesShape in _shared/knowledge-validate.ts."""
+    if not isinstance(v, dict):
+        return False
+    for k, tok in shape.items():
+        if isinstance(tok, list):
+            if not isinstance(v.get(k), list) or not all(matches_shape(x, tok[0]) for x in v[k]):
+                return False
+        elif tok == "string":
+            if not isinstance(v.get(k), str):
+                return False
+        elif tok == "number":
+            if not isinstance(v.get(k), (int, float)) or isinstance(v.get(k), bool):
+                return False
+        elif k not in v:
+            return False
+    return True
 HEADER_KEYS = {"title_plain", "citation", "topics", "evidence_type", "confidence",
                "practical_relevance", "author_stance", "funding_and_conflicts"}
 CITE_KEYS = {"title", "authors", "year", "journal", "volume_issue_pages", "doi"}
@@ -107,6 +131,17 @@ def check(e, path):
                 tot = sum(p.get("value", 0) for p in s.get("parts", []))
                 if abs(tot - 100) > 1.5:
                     errs.append(f"stacked_share '{s.get('label')}' parts sum to {tot}, not 100")
+        # Series must match the template's declared shape (chart-templates.json);
+        # mirror of _shared/knowledge-validate.ts.
+        t = c.get("template")
+        spec = CHART_TEMPLATES.get(t) or {}
+        if spec.get("shape"):
+            name = c.get("title") or t
+            items = c.get("series") if isinstance(c.get("series"), list) else []
+            if not items:
+                errs.append(f"chart '{name}': series is empty")
+            elif any(not matches_shape(s, spec["shape"]) for s in items):
+                errs.append(f"chart '{name}': {t} series items must be {spec['shape_text']}")
     if e["shape"] in ("intervention", "comparison") and not any(
             c.get("template") == "population_card" for c in e.get("charts", [])):
         errs.append("intervention/comparison entries need a population_card chart")

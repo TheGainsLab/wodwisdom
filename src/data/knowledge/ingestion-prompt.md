@@ -57,7 +57,7 @@ Populate only the block for the chosen shape. Rules that apply to every shape:
 
 - `groups[]`: one row per arm, including control. Fields: `name`, `protocol` (in plain gym terms, with the precise prescription — sets, duration, intensity, frequency), `per_week`, `n_enrolled`, `n_analysed`, `age`, `sex`, `training_status`, `other`. If sex is not stated, write `"not stated"`; never infer.
 - `design_notes`: duration, randomisation, matching, blinding, dropouts, reduced n for specific outcomes, measurement methods that matter (e.g. skinfolds vs DXA).
-- `measured[]`: one row per outcome per group: `outcome`, `unit`, `group`, `before`, `after`, `change` (absolute and/or %), `significant`, `note`. Add a final set of rows for unchanged outcomes.
+- `measured[]`: one row per outcome per group: `outcome`, `unit`, `group`, `before`, `after`, `change` (absolute and/or %), `significant`, `note`. Add a final set of rows for unchanged outcomes. Each outcome appears exactly once — never repeat a measurement under a second name, and never add a row "for clarity". `before`/`after` carry the printed values only (mean and spread, e.g. `57.3 (2.6)`); a time-course or range goes in `note` or in its own rows per time point, never as prose inside the value cells.
 
 **`comparison` block**
 
@@ -100,7 +100,21 @@ Voice for Layer 2: neutral, specific, plain. Write the honest version; the edito
 
 ### 7. Chart data
 
-`charts[]`: 1–4 chart specifications for fixed templates. Each: `template` (one of `before_after_bars`, `grouped_change_bars`, `values_by_condition`, `stacked_share`, `timeline`, `population_card`, `concept_curve`), `title`, `series` (data as arrays of `{label, value}` or `{label, before, after}`), `units`, `approximate` (true if any value was read from a figure), `note`. Use `concept_curve` only for schematic relationships in reviews/references, and mark it `"schematic — not measured data"`. Always include a `population_card` for intervention and comparison shapes (`n`, `sex_split`, `age`, `status`, `other`).
+`charts[]`: 1–4 chart specifications for fixed templates. Each: `template` (one of `before_after_bars`, `grouped_change_bars`, `values_by_condition`, `stacked_share`, `timeline`, `population_card`, `concept_curve`), `title`, `series`, `units`, `approximate` (true if any value was read from a figure), `note`.
+
+`series` must match its template's exact shape — the renderer reads these keys and no others, and any other shape fails validation:
+
+<!-- chart-shapes:start — generated from chart-templates.json by scripts/sync-ingestion-prompt.mjs; edit the JSON, not this block -->
+- `before_after_bars`: `[{"label":"VO2max (ml·min⁻¹·kg⁻¹)","before":57.3,"after":63.8}]` — numbers, or `null` for a value the paper does not report
+- `grouped_change_bars`: `[{"group":"Sprint training","values":[{"label":"PFK","value":106}]}]` — one item per group, **even when the study has a single group**; each `label` is an outcome and `value` its signed change in the chart's `units`
+- `values_by_condition`: `[{"label":"Peak power (W)","values":[{"condition":"45-s rest","value":723}]}]`
+- `stacked_share`: `[{"label":"0–30 s","parts":[{"name":"aerobic","value":45},{"name":"anaerobic","value":55}]}]` — each row's parts sum to 100
+- `timeline`: `[{"label":"Training block","start":0,"end":14,"note":""}]` — `start`/`end` are numbers in the chart's `units`
+- `population_card`: `[{"n":"5","sex_split":"5 M","age":"20.8 (2.9)","status":"active, not in regular training","other":""}]` — one item per group
+- `concept_curve`: `series` may be `[]`; the `note` carries the meaning
+<!-- chart-shapes:end -->
+
+Use `concept_curve` only for schematic relationships in reviews/references, and mark it `"schematic — not measured data"`. Always include a `population_card` for intervention and comparison shapes.
 
 When a chart draws its values from Layer 1 rows (`measured` or `evidence_cited`), set `"charted": true` on each of those rows. The page then shows the chart and collapses the flagged rows behind a disclosure instead of printing the same numbers twice; the rows stay in the entry as the canonical record. A chart never contains a number that is absent from Layer 1.
 
