@@ -544,10 +544,6 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
     );
   }
 
-  const h = entry.header;
-  const cite = h.citation;
-  const showStance = h.author_stance && !/^none apparent/i.test(h.author_stance);
-
   return (
     <div className="feature-page">
       <QAHeader signedIn={signedIn} />
@@ -559,7 +555,20 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
           </svg>
           Research Library
         </Link>
+        <KnowledgeEntryView entry={entry} signedIn={signedIn} />
+      </div>
+    </div>
+  );
+}
 
+/** The full article body — shared by the public page and the admin review screen. */
+export function KnowledgeEntryView({ entry, signedIn = false }: { entry: KnowledgeEntry; signedIn?: boolean }) {
+  const h = entry.header;
+  const cite = h.citation;
+  const showStance = h.author_stance && !/^none apparent/i.test(h.author_stance);
+
+  return (
+    <>
         {/* Receipt first, eyes on the finding: paper title (modest) → byline →
             headline (the visual lead) → the argument, then the trust section. */}
         {!!cite.title && cite.title !== NOT_PRINTED && (
@@ -738,7 +747,6 @@ export default function KnowledgeEntryPage({ signedIn = false }: { signedIn?: bo
               : 'Research chat is coming. Create a free account and you’re on the list — we’ll email you when your papers can talk back.'}
           </p>
         </div>
-      </div>
-    </div>
+    </>
   );
 }

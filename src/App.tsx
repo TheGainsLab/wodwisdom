@@ -32,6 +32,7 @@ const AdminChatPage = lazy(() => import('./pages/AdminChatPage'));
 const AdminUserTimelinePage = lazy(() => import('./pages/AdminUserTimelinePage'));
 const AdminActivityFeedPage = lazy(() => import('./pages/AdminActivityFeedPage'));
 const AdminOpsPage = lazy(() => import('./pages/AdminOpsPage'));
+const AdminResearchPage = lazy(() => import('./pages/AdminResearchPage'));
 const AdminOutreachPage = lazy(() => import('./pages/AdminOutreachPage'));
 const AdminRatingsPage = lazy(() => import('./pages/AdminRatingsPage'));
 const AdminReportsPage = lazy(() => import('./pages/AdminReportsPage'));
@@ -320,6 +321,7 @@ function AuthenticatedApp({ session }: { session: Session }) {
             <Route path="/admin/reports" element={<AdminReportsPage session={session} />} />
             <Route path="/admin/activity" element={<AdminActivityFeedPage session={session} />} />
             <Route path="/admin/ops" element={<AdminOpsPage session={session} />} />
+            <Route path="/admin/research" element={<AdminResearchPage session={session} />} />
             <Route path="/admin/outreach" element={<AdminOutreachPage session={session} />} />
             <Route path="/admin/users/:id" element={<AdminUserDetailPage session={session} />} />
             <Route path="/admin/users/:id/timeline" element={<AdminUserTimelinePage session={session} />} />
