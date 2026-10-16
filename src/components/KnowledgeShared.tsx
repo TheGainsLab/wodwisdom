@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getGlossaryTerms } from '../lib/knowledgeLibrary';
+import { logKnowledgeEvent } from '../lib/knowledgeEvents';
 
 /** Shape / confidence / relevance badges for the research library. */
 export function KnowledgeBadge({ kind, value, why }: { kind: 'shape' | 'confidence' | 'relevance'; value: string; why?: string }) {
@@ -48,7 +49,7 @@ function GlossarySpan({ text, definition, inline = false }: { text: string; defi
     <span style={inline ? undefined : { position: 'relative' }}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => { setOpen((o) => !o); if (!open) logKnowledgeEvent('glossary_tap', undefined, { term: text }); }}
         aria-expanded={open}
         style={{
           background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer',
