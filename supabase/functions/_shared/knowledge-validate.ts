@@ -79,6 +79,19 @@ export function validateKnowledgeEntry(e: any): ValidatorReport {
   const topicsN = Array.isArray(h.topics) ? h.topics.length : 0;
   if (topicsN < 5 || topicsN > 12) warnings.push(`topics count ${topicsN} outside 5–12`);
 
+  // Structural requirements the page renderer depends on. A draft missing
+  // these must never reach review as "0 errors".
+  if (!Array.isArray(h.topics)) errors.push("header.topics must be an array");
+  if (!Array.isArray(e?.translation)) errors.push("translation must be an array (empty only for pure background papers)");
+  if (!Array.isArray(e?.charts) || e.charts.length < 1) errors.push("charts must be an array with at least one chart");
+  if (!Array.isArray(e?.verification_notes) || e.verification_notes.length < 1) {
+    errors.push("verification_notes must be a non-empty array");
+  }
+  if (!e?.layer2 || typeof e.layer2.what_it_means !== "string" || !e.layer2.what_it_means ||
+      typeof e.layer2.what_it_doesnt_mean !== "string" || !e.layer2.what_it_doesnt_mean) {
+    errors.push("layer2 needs non-empty what_it_means and what_it_doesnt_mean");
+  }
+
   const l2 = e?.layer2 ?? {};
   for (const [k, lo, hi] of [["what_it_means", 120, 220], ["what_it_doesnt_mean", 100, 200]] as const) {
     const w = String(l2[k] ?? "").split(/\s+/).filter(Boolean).length;

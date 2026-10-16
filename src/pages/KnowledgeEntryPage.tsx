@@ -226,7 +226,7 @@ function ReferenceFacts({ l }: { l: NonNullable<KnowledgeEntry['layer1']['refere
 // ── Charts (v0: honest data tables; SVG templates arrive in the next PR) ──
 
 function chartRows(c: KnowledgeChart): { columns: Array<{ key: string; label: string }>; rows: Array<Record<string, React.ReactNode>> } {
-  const s = c.series as Array<Record<string, any>>;
+  const s = (c.series ?? []) as Array<Record<string, any>>;
   switch (c.template) {
     case 'before_after_bars':
       return {
@@ -286,7 +286,7 @@ const SHARE_SLOTS = ['#3987e5', '#d95926', '#199e70'];
 
 /** stacked_share as horizontal 100%-stacked bars; null → caller falls back to the table. */
 function renderStackedShare(c: KnowledgeChart): React.ReactNode | null {
-  const series = c.series as Array<{ label: string; parts: Array<{ name: string; value: number }> }>;
+  const series = (c.series ?? []) as Array<{ label: string; parts: Array<{ name: string; value: number }> }>;
   if (!series.length || series.some((r) => !Array.isArray(r.parts))) return null;
   const names: string[] = [];
   for (const row of series) {
@@ -352,7 +352,7 @@ const AFTER_HUE = '#3987e5';
 
 /** before_after_bars: paired horizontal bars per item; null → table fallback. */
 function renderBeforeAfterBars(c: KnowledgeChart): React.ReactNode | null {
-  const series = c.series as Array<{ label: string; before: number; after: number }>;
+  const series = (c.series ?? []) as Array<{ label: string; before: number; after: number }>;
   if (!series.length || series.some((r) => typeof r.before !== 'number' || typeof r.after !== 'number')) return null;
   // "mixed" units (e.g. m, s, kg in one chart) can't share a scale: each row
   // scales to itself and only the within-pair change is comparable.
@@ -397,7 +397,7 @@ function renderBeforeAfterBars(c: KnowledgeChart): React.ReactNode | null {
 
 /** grouped_change_bars: signed change bars per outcome, one color per group. */
 function renderGroupedChangeBars(c: KnowledgeChart): React.ReactNode | null {
-  const series = c.series as Array<{ group: string; values: Array<{ label: string; value: number | null }> }>;
+  const series = (c.series ?? []) as Array<{ group: string; values: Array<{ label: string; value: number | null }> }>;
   if (!series.length || series.length > SHARE_SLOTS.length) return null;
   if (series.some((s) => !Array.isArray(s.values))) return null;
   const outcomes: string[] = [];

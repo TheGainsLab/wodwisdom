@@ -66,6 +66,18 @@ def check(e, path):
         errs.append(f"key_findings has {kfn} bullets (need 3–6: one claim with its number each)")
     if not (5 <= len(h.get("topics", [])) <= 12):
         warns.append(f"topics count {len(h.get('topics', []))} outside 5–12")
+    # Structural requirements the page renderer depends on (lockstep with
+    # supabase/functions/_shared/knowledge-validate.ts).
+    if not isinstance(h.get("topics"), list):
+        errs.append("header.topics must be an array")
+    if not isinstance(e.get("translation"), list):
+        errs.append("translation must be an array (empty only for pure background papers)")
+    if not isinstance(e.get("charts"), list) or len(e.get("charts", [])) < 1:
+        errs.append("charts must be an array with at least one chart")
+    if not isinstance(e.get("verification_notes"), list) or len(e.get("verification_notes", [])) < 1:
+        errs.append("verification_notes must be a non-empty array")
+    if not e.get("layer2", {}).get("what_it_means") or not e.get("layer2", {}).get("what_it_doesnt_mean"):
+        errs.append("layer2 needs non-empty what_it_means and what_it_doesnt_mean")
     l2 = e.get("layer2", {})
     for k in ("what_it_means", "what_it_doesnt_mean"):
         w = len(l2.get(k, "").split())
