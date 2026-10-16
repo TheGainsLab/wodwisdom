@@ -130,11 +130,25 @@ export default function AdminResearchPage({ session }: { session: Session }) {
           {!selected && (
             <>
               {/* Upload */}
-              <label style={{
-                display: 'block', border: '2px dashed var(--border)', borderRadius: 12,
-                padding: '26px 20px', textAlign: 'center', cursor: uploading ? 'default' : 'pointer',
-                color: 'var(--text-dim)', fontSize: 14, margin: '16px 0 24px',
-              }}>
+              <label
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (uploading) return;
+                  const f = e.dataTransfer.files?.[0];
+                  if (!f) return;
+                  if (f.type !== 'application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) {
+                    setError('PDFs only — that file is ' + (f.type || 'not a PDF'));
+                    return;
+                  }
+                  onUpload(f);
+                }}
+                style={{
+                  display: 'block', border: '2px dashed var(--border)', borderRadius: 12,
+                  padding: '26px 20px', textAlign: 'center', cursor: uploading ? 'default' : 'pointer',
+                  color: 'var(--text-dim)', fontSize: 14, margin: '16px 0 24px',
+                }}
+              >
                 {uploading ?? 'Drop a paper here or click to choose a PDF — the entry drafts itself.'}
                 <input
                   type="file" accept="application/pdf" style={{ display: 'none' }} disabled={!!uploading}
